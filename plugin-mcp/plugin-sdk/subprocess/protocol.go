@@ -56,6 +56,10 @@ const (
 	MethodCRUDUpdate     = "crud/update"
 	MethodCRUDDelete     = "crud/delete"
 	MethodCRUDList       = "crud/list"
+
+	// MCP methods (host -> plugin).
+	MethodListTools = "mcp/list_tools"
+	MethodCallTool  = "mcp/call_tool"
 )
 
 // --- Standard JSON-RPC error codes ---
