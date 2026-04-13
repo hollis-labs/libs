@@ -68,6 +68,10 @@ func TestMethodConstants(t *testing.T) {
 		MethodCRUDUpdate:     "crud/update",
 		MethodCRUDDelete:     "crud/delete",
 		MethodCRUDList:       "crud/list",
+		MethodListTools:      "mcp/list_tools",
+		MethodMCPCallTool:    "mcp/call_tool",
+		MethodHTTPHandle:     "http/handle",
+		MethodMigrate:        "plugin/migrate",
 	}
 	for got, want := range cases {
 		if got != want {
@@ -78,17 +82,10 @@ func TestMethodConstants(t *testing.T) {
 
 func TestLoadResultRoundtrip(t *testing.T) {
 	in := LoadResult{
-		Dependencies:       []string{"other-plugin"},
-		EventSubscriptions: []string{"message.sent"},
-		CRUDResources:      []string{"bookmark"},
-		Commands: []CommandRegistration{{
-			Name:        "bk",
-			Description: "bookmark a URL",
-			Category:    "tools",
-			Args: []CommandArg{
-				{Name: "url", Required: true, Type: "string"},
-			},
-		}},
+		SkippedRegistrations: []SkippedRegistration{
+			{Kind: "command", ID: "bk", Reason: "api_key not set"},
+			{Kind: "mcp_server", ID: "tools", Reason: "feature flag off"},
+		},
 	}
 	data, err := json.Marshal(in)
 	if err != nil {
@@ -98,10 +95,25 @@ func TestLoadResultRoundtrip(t *testing.T) {
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if len(out.Commands) != 1 || out.Commands[0].Name != "bk" {
-		t.Errorf("command roundtrip lost data: %+v", out.Commands)
+	if len(out.SkippedRegistrations) != 2 {
+		t.Fatalf("SkippedRegistrations = %d, want 2", len(out.SkippedRegistrations))
 	}
-	if len(out.Commands[0].Args) != 1 || out.Commands[0].Args[0].Name != "url" {
-		t.Errorf("command args roundtrip lost data: %+v", out.Commands[0].Args)
+	if out.SkippedRegistrations[0].Kind != "command" || out.SkippedRegistrations[0].ID != "bk" {
+		t.Errorf("skipped[0] = %+v", out.SkippedRegistrations[0])
+	}
+	if out.SkippedRegistrations[1].Reason != "feature flag off" {
+		t.Errorf("skipped[1].Reason = %q", out.SkippedRegistrations[1].Reason)
+	}
+}
+
+func TestLoadResultEmptyRoundtrip(t *testing.T) {
+	// Empty LoadResult — the common case — must round-trip cleanly
+	// and omit the skipped_registrations field.
+	data, err := json.Marshal(LoadResult{})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(data) != "{}" {
+		t.Errorf("empty LoadResult marshaled to %q, want %q", string(data), "{}")
 	}
 }

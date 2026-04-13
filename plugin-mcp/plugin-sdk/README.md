@@ -34,7 +34,7 @@ github.com/hollis-labs/plugin-sdk
 
 Independent release cycle. Nanite host and plugins consume via `go.mod` dependency on a tagged version.
 
-Current status: v0.1.0 — initial extraction from `github.com/hollis-labs/go-plugin` and nanite's `internal/plugin/subprocess`.
+Current status: v0.2.0 — yaml-authoritative load protocol (`LoadResult` ack-only), new method surface (`mcp/call_tool`, `http/handle`, `plugin/migrate`), and envelope propagation on command/event responses. **Breaking release** — see CHANGELOG.
 
 ## Development
 

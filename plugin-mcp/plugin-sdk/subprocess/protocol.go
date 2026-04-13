@@ -59,7 +59,23 @@ const (
 
 	// MCP methods (host -> plugin).
 	MethodListTools = "mcp/list_tools"
-	MethodCallTool  = "mcp/call_tool"
+
+	// MethodMCPCallTool is sent when an MCP tool provided by the plugin
+	// is invoked. The plugin responds with an MCPCallResult carrying
+	// tool output and any emitted envelopes.
+	MethodMCPCallTool = "mcp/call_tool"
+
+	// MethodHTTPHandle is sent when an HTTP route registered by the
+	// plugin is hit. The plugin responds with an HTTPResponse.
+	// Streaming is not supported on this path — use SSE envelopes via
+	// EventHandleResult instead.
+	MethodHTTPHandle = "http/handle"
+
+	// MethodMigrate is sent at plugin load time when the plugin's
+	// installed manifest version differs from the declared version.
+	// Plugins that don't implement migration should return an empty
+	// MigrateResult.
+	MethodMigrate = "plugin/migrate"
 )
 
 // --- Standard JSON-RPC error codes ---

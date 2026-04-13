@@ -249,7 +249,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		s.writeResult(req.ID, CommandExecResult{Action: res.Action, Content: res.Content})
+		s.writeResult(req.ID, CommandExecResult{Action: res.Action, Content: res.Content, Envelopes: res.Envelopes})
 
 	case MethodEventHandle:
 		if s.asEvent == nil {
@@ -282,7 +282,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		s.writeResult(req.ID, EventHandleResult{Cancel: res.Cancel, Reason: res.Reason})
+		s.writeResult(req.ID, EventHandleResult{Cancel: res.Cancel, Reason: res.Reason, Envelopes: res.Envelopes})
 
 	case MethodCRUDCreate, MethodCRUDRead, MethodCRUDUpdate, MethodCRUDDelete, MethodCRUDList:
 		if s.asCRUD == nil {

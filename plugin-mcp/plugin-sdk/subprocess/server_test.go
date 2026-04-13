@@ -190,6 +190,60 @@ func TestServe_CommandHandler(t *testing.T) {
 	}
 }
 
+func TestServe_CommandEnvelopesPropagate(t *testing.T) {
+	p := &envelopeCommandPlugin{basePlugin: basePlugin{id: "env"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute,
+			Params: CommandExecParams{Name: "emit"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res CommandExecResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.card" {
+		t.Errorf("envelopes did not propagate: %+v", res.Envelopes)
+	}
+}
+
+type envelopeCommandPlugin struct{ basePlugin }
+
+func (p *envelopeCommandPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	return CommandResult{
+		Action:    "message",
+		Content:   "ok",
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.card", Data: map[string]interface{}{"k": "v"}}},
+	}, nil
+}
+
+func TestServe_EventEnvelopesPropagate(t *testing.T) {
+	p := &envelopeEventPlugin{basePlugin: basePlugin{id: "env-evt"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodEventHandle,
+			Params: EventHandleParams{Type: "message.sent"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res EventHandleResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.trace" {
+		t.Errorf("event envelopes did not propagate: %+v", res.Envelopes)
+	}
+}
+
+type envelopeEventPlugin struct{ basePlugin }
+
+func (p *envelopeEventPlugin) EventHandle(ctx context.Context, req EventRequest) (EventResult, error) {
+	return EventResult{
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.trace", Data: map[string]interface{}{"seen": true}}},
+	}, nil
+}
+
 func TestServe_EventHandlerCancel(t *testing.T) {
 	p := &eventPlugin{basePlugin: basePlugin{id: "evt"}}
 	resps := drive(t, p, []RPCRequest{

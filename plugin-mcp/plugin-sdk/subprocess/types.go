@@ -69,87 +69,34 @@ type InitResult struct {
 // LoadParams is sent by the host during plugin/load (currently empty, reserved).
 type LoadParams struct{}
 
-// LoadResult is the registration manifest returned by the plugin during
-// plugin/load. The host translates each section into the corresponding
-// Register* calls.
+// LoadResult is the plugin's acknowledgement of plugin/load. As of
+// v0.2.0, declarative registrations (commands, slots, components,
+// keybindings, config schema, event subscriptions, CRUD resources) are
+// yaml-authoritative — the host reads them from plugin.yaml and applies
+// them directly. Plugins no longer return these fields at runtime.
 //
-// Some fields (Commands, Slots, Components, Keybindings) carry wire
-// structs that mirror host-specific Go types. The host's public plugin
-// package is responsible for translating these into its canonical types.
-// Keeping them in the SDK keeps LoadResult a single decodable unit; the
-// only cost is a few extra field definitions no non-Nanite host would
-// populate.
+// The only payload a plugin may return is SkippedRegistrations — a list
+// of yaml-declared registrations the plugin declines at load time (e.g.
+// a command that depends on optional config the plugin couldn't
+// resolve). The host logs these and proceeds without the skipped
+// registrations; there is no yaml fallback path.
 type LoadResult struct {
-	Dependencies       []string                `json:"dependencies,omitempty"`
-	Commands           []CommandRegistration   `json:"commands,omitempty"`
-	Slots              []UISlotEntry           `json:"slots,omitempty"`
-	Components         []ComponentRegistration `json:"components,omitempty"`
-	Keybindings        []KeybindingDef         `json:"keybindings,omitempty"`
-	ConfigSchema       []plugin.ConfigFieldDef `json:"config_schema,omitempty"`
-	EventSubscriptions []string                `json:"event_subscriptions,omitempty"`
-	CRUDResources      []string                `json:"crud_resources,omitempty"` // resource type names for CRUD
+	// SkippedRegistrations lists any declared registrations the plugin
+	// explicitly declined at load time. Informational — the host does
+	// NOT fall back to yaml-only for these; it logs and proceeds.
+	SkippedRegistrations []SkippedRegistration `json:"skipped_registrations,omitempty"`
 }
 
-// CommandRegistration is the wire representation of a slash command.
-// The Handler field on the host-side SlashCommandDef cannot be
-// serialized, so the host creates a proxy handler that calls
-// command/execute over JSON-RPC when the command is invoked.
-type CommandRegistration struct {
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Category    string       `json:"category"`
-	Args        []CommandArg `json:"args,omitempty"`
-	Permission  string       `json:"required_permission,omitempty"`
-}
-
-// ComponentRegistration is the wire representation of a UIComponent.
-// The Handler field is omitted — subprocess plugins serve UI via the
-// frontend ESM loader, not via server-side handlers.
-type ComponentRegistration struct {
-	ID          string                 `json:"id"`
-	Type        plugin.UIComponentType `json:"type"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Props       map[string]interface{} `json:"props,omitempty"`
-}
-
-// UISlotEntry is the wire representation of a UI slot registration.
-// Slot names are host-defined strings (Nanite uses values like
-// "nav-rail", "settings-tab"; see nanite/pkg/plugin for the typed
-// constants).
-type UISlotEntry struct {
-	ID        string                 `json:"id"`
-	PluginID  string                 `json:"plugin_id"`
-	Slot      string                 `json:"slot"`
-	Label     string                 `json:"label"`
-	Icon      string                 `json:"icon,omitempty"`
-	Priority  int                    `json:"priority,omitempty"`
-	Component string                 `json:"component,omitempty"`
-	Action    string                 `json:"action,omitempty"`
-	Props     map[string]interface{} `json:"props,omitempty"`
-}
-
-// KeybindingDef is the wire representation of a keyboard shortcut
-// registration. The Key field uses the binding format "mod+shift+k"
-// where "mod" maps to Cmd on macOS and Ctrl elsewhere.
-type KeybindingDef struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Action      string `json:"action"`
-	ActionValue string `json:"action_value"`
-	Label       string `json:"label"`
-	Description string `json:"description,omitempty"`
-}
-
-// CommandArg is the wire representation of a slash command argument,
-// used by the host frontend to render autocomplete hints and validate
-// input.
-type CommandArg struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Required    bool     `json:"required,omitempty"`
-	Type        string   `json:"type,omitempty"`
-	Options     []string `json:"options,omitempty"`
+// SkippedRegistration is a runtime opt-out for a yaml-declared
+// registration.
+type SkippedRegistration struct {
+	// Kind identifies the registration category, e.g. "command",
+	// "slot", "component", "keybinding", "event", "crud", "mcp_server".
+	Kind string `json:"kind"`
+	// ID is the registration identifier from plugin.yaml.
+	ID string `json:"id"`
+	// Reason is a human-readable cause, surfaced in host logs.
+	Reason string `json:"reason"`
 }
 
 // --- Runtime request/response types ---
@@ -163,8 +110,9 @@ type CommandExecParams struct {
 
 // CommandExecResult is returned by the plugin for command/execute.
 type CommandExecResult struct {
-	Action  string `json:"action"` // "message", "noop", "error"
-	Content string `json:"content,omitempty"`
+	Action    string               `json:"action"` // "message", "noop", "error"
+	Content   string               `json:"content,omitempty"`
+	Envelopes []plugin.EnvelopeOut `json:"envelopes,omitempty"`
 }
 
 // EventHandleParams is sent to the plugin for event/handle.
@@ -178,8 +126,9 @@ type EventHandleParams struct {
 
 // EventHandleResult is returned by the plugin for event/handle.
 type EventHandleResult struct {
-	Cancel bool   `json:"cancel,omitempty"` // true to cancel a pre-hook action
-	Reason string `json:"reason,omitempty"`
+	Cancel    bool                 `json:"cancel,omitempty"` // true to cancel a pre-hook action
+	Reason    string               `json:"reason,omitempty"`
+	Envelopes []plugin.EnvelopeOut `json:"envelopes,omitempty"`
 }
 
 // CRUDParams is sent for all crud/* methods.
@@ -204,4 +153,63 @@ type CRUDListResult struct {
 type HealthResult struct {
 	OK      bool   `json:"ok"`
 	Message string `json:"message,omitempty"`
+}
+
+// --- MCP tool call (host -> plugin) ---
+
+// MCPCallRequest is sent to the plugin for mcp/call_tool when a tool
+// provided by the plugin is invoked.
+type MCPCallRequest struct {
+	ToolName  string                 `json:"tool_name"`
+	Arguments map[string]interface{} `json:"arguments"`
+	SessionID string                 `json:"session_id,omitempty"`
+}
+
+// MCPCallResult is returned by the plugin for mcp/call_tool.
+type MCPCallResult struct {
+	// Content is the tool's structured or textual output, JSON-encoded.
+	Content json.RawMessage `json:"content"`
+	// IsError signals the tool returned a user-visible error (not an
+	// RPC-level error — use the standard RPC error for transport issues).
+	IsError bool `json:"is_error,omitempty"`
+	// Envelopes emitted alongside the tool result.
+	Envelopes []plugin.EnvelopeOut `json:"envelopes,omitempty"`
+}
+
+// --- HTTP route handling (host -> plugin) ---
+
+// HTTPRequest is sent to the plugin for http/handle when a registered
+// plugin route is hit. Streaming is not supported on this path; use SSE
+// envelopes via EventHandleResult instead.
+type HTTPRequest struct {
+	Method    string            `json:"method"`
+	Path      string            `json:"path"`
+	Query     map[string]string `json:"query,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Body      []byte            `json:"body,omitempty"`
+	SessionID string            `json:"session_id,omitempty"`
+}
+
+// HTTPResponse is returned by the plugin for http/handle.
+type HTTPResponse struct {
+	Status  int               `json:"status"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Body    []byte            `json:"body,omitempty"`
+}
+
+// --- Plugin migration (host -> plugin) ---
+
+// MigrateParams is sent to the plugin for plugin/migrate when the
+// installed manifest version differs from the declared version.
+type MigrateParams struct {
+	FromVersion string `json:"from_version"` // installed manifest version
+	ToVersion   string `json:"to_version"`   // target manifest version
+	DataDir     string `json:"data_dir"`     // convenience — same value passed via InitParams
+}
+
+// MigrateResult is returned by the plugin for plugin/migrate. An empty
+// result is equivalent to "no-op migration succeeded". Plugins that
+// don't implement migration should return an empty MigrateResult.
+type MigrateResult struct {
+	Notes []string `json:"notes,omitempty"` // optional migration log for the host to surface
 }
