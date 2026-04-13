@@ -2,16 +2,50 @@ package subprocess
 
 import (
 	"encoding/json"
+	"errors"
+	"os"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
 )
+
+// ErrNoDataDir is returned by InitParams.ResolvedDataDir when the host
+// did not provide a DataDir. Plugins receiving this from a v0.1.1 host
+// (which doesn't populate DataDir) must decide how to proceed — there
+// is no safe default for persistent data.
+var ErrNoDataDir = errors.New("subprocess: InitParams.DataDir not set by host")
+
+// ResolvedDataDir returns the host-provided DataDir, or ErrNoDataDir
+// if the host did not populate it (e.g. an older v0.1.1 host). Plugins
+// should treat an error here as fatal for any persistence path; there
+// is no safe fallback for data.
+func (p *InitParams) ResolvedDataDir() (string, error) {
+	if p.DataDir == "" {
+		return "", ErrNoDataDir
+	}
+	return p.DataDir, nil
+}
+
+// ResolvedCacheDir returns the host-provided CacheDir. If the host did
+// not populate it (e.g. an older v0.1.1 host), it falls back to
+// os.TempDir(). The returned error is currently always nil; the
+// signature returns error to allow future validation without breaking
+// callers.
+func (p *InitParams) ResolvedCacheDir() (string, error) {
+	if p.CacheDir == "" {
+		return os.TempDir(), nil
+	}
+	return p.CacheDir, nil
+}
 
 // --- Init handshake ---
 
 // InitParams is sent by the host during plugin/init.
 type InitParams struct {
 	PluginDir string            `json:"plugin_dir"`
+	DataDir   string            `json:"data_dir"`  // persistent per-plugin data root (absolute path)
+	CacheDir  string            `json:"cache_dir"` // ephemeral per-plugin cache root (absolute path)
 	Config    map[string]string `json:"config"`    // resolved config values
+	LogLevel  string            `json:"log_level"` // host-requested level: "debug" | "info" | "warn" | "error"
 	HostInfo  HostInfo          `json:"host_info"` // host capabilities
 }
 
