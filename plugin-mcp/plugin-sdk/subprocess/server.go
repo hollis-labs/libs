@@ -165,6 +165,8 @@ type server struct {
 	asCRUD    CRUDHandler
 	asHealth  HealthChecker
 	asMigrate Migrator
+	asMCP     MCPHandler
+	asHTTP    HTTPHandler
 }
 
 func (s *server) detectCapabilities() {
@@ -182,6 +184,12 @@ func (s *server) detectCapabilities() {
 	}
 	if m, ok := s.plugin.(Migrator); ok {
 		s.asMigrate = m
+	}
+	if m, ok := s.plugin.(MCPHandler); ok {
+		s.asMCP = m
+	}
+	if h, ok := s.plugin.(HTTPHandler); ok {
+		s.asHTTP = h
 	}
 }
 
@@ -290,6 +298,56 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			return
 		}
 		s.dispatchCRUD(ctx, req)
+
+	case MethodMCPCallTool:
+		if s.asMCP == nil {
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement MCPHandler")
+			return
+		}
+		var params MCPCallRequest
+		if err := decodeParams(req.Params, &params); err != nil {
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			return
+		}
+		res, err := s.asMCP.MCPCallTool(ctx, params)
+		if err != nil {
+			s.writeErrorFromPluginErr(req.ID, err)
+			return
+		}
+		s.writeResult(req.ID, res)
+
+	case MethodHTTPHandle:
+		if s.asHTTP == nil {
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement HTTPHandler")
+			return
+		}
+		var params HTTPRequest
+		if err := decodeParams(req.Params, &params); err != nil {
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			return
+		}
+		res, err := s.asHTTP.HTTPHandle(ctx, params)
+		if err != nil {
+			s.writeErrorFromPluginErr(req.ID, err)
+			return
+		}
+		s.writeResult(req.ID, res)
+
+	case MethodMigrate:
+		if s.asMigrate == nil {
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement Migrator")
+			return
+		}
+		var params MigrateParams
+		if err := decodeParams(req.Params, &params); err != nil {
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			return
+		}
+		if err := s.asMigrate.Migrate(ctx, params.FromVersion, params.ToVersion); err != nil {
+			s.writeErrorFromPluginErr(req.ID, err)
+			return
+		}
+		s.writeResult(req.ID, MigrateResult{})
 
 	default:
 		s.writeError(req.ID, ErrCodeMethodNotFound, fmt.Sprintf("unknown method %q", req.Method))

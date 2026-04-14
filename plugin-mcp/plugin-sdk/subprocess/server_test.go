@@ -300,6 +300,154 @@ func (p *panicPlugin) Command(ctx context.Context, req CommandRequest) (CommandR
 	panic(fmt.Errorf("boom"))
 }
 
+// --- MCP / HTTP / Migrate dispatch tests (v0.3.0) ---
+
+type mcpPlugin struct {
+	basePlugin
+	gotReq MCPCallRequest
+}
+
+func (p *mcpPlugin) MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCallResult, error) {
+	p.gotReq = req
+	if req.ToolName == "boom" {
+		return MCPCallResult{}, fmt.Errorf("tool failed")
+	}
+	return MCPCallResult{
+		Content:   json.RawMessage(`{"ok":true}`),
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.result", Data: map[string]interface{}{"k": "v"}}},
+	}, nil
+}
+
+func TestServe_MCPHandler(t *testing.T) {
+	p := &mcpPlugin{basePlugin: basePlugin{id: "mcp"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodMCPCallTool,
+			Params: MCPCallRequest{ToolName: "search", Arguments: map[string]interface{}{"q": "cats"}, SessionID: "s1"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	var res MCPCallResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(res.Content) != `{"ok":true}` {
+		t.Errorf("content = %s", res.Content)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.result" {
+		t.Errorf("envelopes did not propagate: %+v", res.Envelopes)
+	}
+	if p.gotReq.ToolName != "search" || p.gotReq.SessionID != "s1" {
+		t.Errorf("plugin did not receive request: %+v", p.gotReq)
+	}
+}
+
+func TestServe_MCPMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "x"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps[0].Error)
+	}
+}
+
+type httpPlugin struct{ basePlugin }
+
+func (p *httpPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
+	if req.Method == "GET" && req.Path == "/ping" {
+		return HTTPResponse{Status: 200, Headers: map[string]string{"X-Echo": req.Query["msg"]}, Body: []byte("pong")}, nil
+	}
+	return HTTPResponse{Status: 404}, nil
+}
+
+func TestServe_HTTPHandler(t *testing.T) {
+	p := &httpPlugin{basePlugin: basePlugin{id: "http"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodHTTPHandle,
+			Params: HTTPRequest{Method: "GET", Path: "/ping", Query: map[string]string{"msg": "hi"}}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	var res HTTPResponse
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if res.Status != 200 || string(res.Body) != "pong" || res.Headers["X-Echo"] != "hi" {
+		t.Errorf("response = %+v", res)
+	}
+}
+
+func TestServe_HTTPMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps)
+	}
+}
+
+type migratePlugin struct {
+	basePlugin
+	gotFrom, gotTo string
+}
+
+func (p *migratePlugin) Migrate(ctx context.Context, from, to string) error {
+	p.gotFrom = from
+	p.gotTo = to
+	if to == "bad" {
+		return fmt.Errorf("migration failed")
+	}
+	return nil
+}
+
+func TestServe_Migrator(t *testing.T) {
+	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/tmp"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	if p.gotFrom != "0.1.0" || p.gotTo != "0.2.0" {
+		t.Errorf("plugin did not receive params: from=%q to=%q", p.gotFrom, p.gotTo)
+	}
+}
+
+func TestServe_MigrateError(t *testing.T) {
+	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "bad"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeInternal {
+		t.Errorf("expected internal error, got %+v", resps)
+	}
+}
+
+func TestServe_MigrateMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps)
+	}
+}
+
 func TestServe_NilPlugin(t *testing.T) {
 	err := Serve(nil)
 	if err == nil {

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.0 — 2026-04-13
+
+### Added
+
+- `MCPHandler` plugin-side capability interface — plugins implement `MCPCallTool(ctx, MCPCallRequest) (MCPCallResult, error)` to serve `mcp/call_tool` requests. Tool registration remains declarative via `plugin.yaml`; the handler services runtime invocations only.
+- `HTTPHandler` plugin-side capability interface — plugins implement `HTTPHandle(ctx, HTTPRequest) (HTTPResponse, error)` to service `http/handle` requests for routes registered via `plugin.yaml`. Streaming is not supported on this path.
+- `subprocess.Serve` dispatches `mcp/call_tool`, `http/handle`, and `plugin/migrate` methods. Previously the method constants and wire types existed (v0.2.0) but no dispatch path routed them to a handler — plugins implementing these could not be invoked.
+- `Migrator` is now dispatchable. Plugins that implement `Migrate(ctx, from, to string) error` receive `plugin/migrate` calls before `plugin/load` when the installed manifest version differs from the declared version.
+
+### Compatibility
+
+- Fully backward compatible with v0.2.0. Plugins that do not implement the new interfaces continue to return `ErrCodeMethodNotFound` for the corresponding methods.
+
 ## v0.2.0 — 2026-04-13
 
 ### Breaking

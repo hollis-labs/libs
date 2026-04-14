@@ -96,7 +96,24 @@ type CRUDHandler interface {
 
 // Migrator is implemented by plugins that need to run schema migrations
 // on version upgrades. The host calls Migrate before Load when the
-// on-disk version differs from the installed version.
+// on-disk version differs from the installed version. Returning a nil
+// error is equivalent to a no-op migration.
 type Migrator interface {
 	Migrate(ctx context.Context, from, to string) error
+}
+
+// MCPHandler is implemented by plugins that expose MCP tools. The host
+// dispatches mcp/call_tool requests here when a tool registered via
+// plugin.yaml is invoked. Tool registration itself is declarative; the
+// handler services runtime invocations only.
+type MCPHandler interface {
+	MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCallResult, error)
+}
+
+// HTTPHandler is implemented by plugins that service host-registered
+// HTTP routes. The host dispatches http/handle requests here. Streaming
+// is not supported on this path — emit SSE envelopes via command or
+// event results instead.
+type HTTPHandler interface {
+	HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error)
 }
