@@ -30,8 +30,14 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	if e.Code != "" || e.Message != "" {
+	if e.Code != "" && e.Message != "" {
 		return fmt.Sprintf("agentmux %d (%s): %s", e.StatusCode, e.Code, e.Message)
+	}
+	if e.Code != "" {
+		return fmt.Sprintf("agentmux %d (%s)", e.StatusCode, e.Code)
+	}
+	if e.Message != "" {
+		return fmt.Sprintf("agentmux %d: %s", e.StatusCode, e.Message)
 	}
 	return fmt.Sprintf("agentmux %d: %s", e.StatusCode, e.Body)
 }

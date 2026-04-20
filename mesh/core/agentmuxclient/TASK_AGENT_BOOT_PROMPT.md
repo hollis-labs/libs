@@ -1,13 +1,13 @@
 # Task Agent Boot Prompt: go-agentmux-client
 
-You are working in `/example/user/Projects-apps/framework/libs/go-agentmux-client`.
+You are working in the `go-agentmux-client` module root.
 
 Goal: turn this scaffold into the reusable Go client package for Agent Mux, published as `github.com/hollis-labs/go-agentmux-client` with package name `agentmux`.
 
 Context:
 
-- Source API contract lives in `/example/user/Projects-apps/agent-mux/docs/api/README.md`.
-- Existing non-reusable internal client lives in `/example/user/Projects-apps/agent-mux/internal/client/client.go`.
+- Source API contract lives in the sibling Agent Mux repository at `docs/api/README.md`.
+- Existing non-reusable internal client lives in the Agent Mux repository at `internal/client/client.go`.
 - Do not import `github.com/chrispian/agent-mux/internal/*`; this package must be consumable by Nanite, Clockwork, and other apps.
 - The mux daemon local API is currently v0.0.2 and supports UDS and loopback TCP transports.
 
