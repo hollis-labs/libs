@@ -29,9 +29,10 @@ type LaunchRequest struct {
 }
 
 type LaunchResponse struct {
-	ID        string `json:"id"`
-	Workspace string `json:"workspace"`
-	Log       string `json:"log"`
+	ID         string `json:"id"`
+	Workspace  string `json:"workspace"`
+	Log        string `json:"log"`
+	ProviderID string `json:"provider_id"`
 }
 
 type WaitResponse struct {
