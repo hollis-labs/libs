@@ -43,7 +43,7 @@ func newMsgTestHandler(ms *memstore.Store, disp messaging.Dispatcher) http.Handl
 	h := &msgTestHandler{store: ms, disp: disp}
 	mux := http.NewServeMux()
 
-	// More-specific patterns must be registered first so they take priority.
+	// More-specific patterns registered first to take priority over wildcards.
 	mux.HandleFunc("POST /messages/request", h.handleRequest)
 	mux.HandleFunc("GET /messages/inbox", h.handleInbox)
 	mux.HandleFunc("GET /messages/thread/{threadID}", h.handleThread)

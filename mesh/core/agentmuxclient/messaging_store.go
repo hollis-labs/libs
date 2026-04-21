@@ -148,7 +148,11 @@ func (s *httpStore) Cancel(ctx context.Context, id string) error {
 // Subscribe returns a channel that receives envelopes sent through this httpStore
 // after the subscription is created. Closes when ctx is canceled.
 //
-// Polling-based; replace with SSE when /messages/subscribe ships in agent-mux.
+// Implemented as in-process fan-out: notified by Send calls on this same
+// instance. Does not observe messages sent by other processes. The daemon's
+// GET /messages/subscribe SSE endpoint requires a recipient address that the
+// messaging.Filter does not carry; callers who need cross-process delivery
+// should use httpDispatcher.Request (POST /messages/request) instead.
 func (s *httpStore) Subscribe(ctx context.Context, f messaging.Filter) (<-chan messaging.Envelope, error) {
 	sub := &msgSub{
 		ch:     make(chan messaging.Envelope, 16),
