@@ -1,6 +1,7 @@
 package agentmux
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,26 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	messaging "github.com/hollis-labs/go-messaging"
 )
 
 // httpStore implements messaging.Store over the /messages/* HTTP routes.
-// Subscribe is best-effort in-process fan-out: it observes envelopes sent
-// through THIS instance only. It does not see messages from other processes.
-// Replace with SSE-based Subscribe when /messages/subscribe ships in agent-mux.
+// Subscribe connects to GET /messages/subscribe as an SSE stream.
 type httpStore struct {
-	c    *Client
-	mu   sync.Mutex
-	subs []*msgSub
-}
-
-type msgSub struct {
-	ch     chan messaging.Envelope
-	filter messaging.Filter
-	ctx    context.Context
+	c *Client
 }
 
 // Verify interface at compile time.
@@ -67,7 +57,6 @@ func (s *httpStore) Send(ctx context.Context, env messaging.Envelope) (messaging
 	if err := s.c.doJSON(ctx, http.MethodPost, "/messages", env, http.StatusCreated, &out); err != nil {
 		return messaging.Envelope{}, mapStoreError(err)
 	}
-	s.fanOut(out)
 	return out, nil
 }
 
@@ -145,58 +134,58 @@ func (s *httpStore) Cancel(ctx context.Context, id string) error {
 	return mapStoreError(err)
 }
 
-// Subscribe returns a channel that receives envelopes sent through this httpStore
-// after the subscription is created. Closes when ctx is canceled.
-//
-// Implemented as in-process fan-out: notified by Send calls on this same
-// instance. Does not observe messages sent by other processes. The daemon's
-// GET /messages/subscribe SSE endpoint requires a recipient address that the
-// messaging.Filter does not carry; callers who need cross-process delivery
-// should use httpDispatcher.Request (POST /messages/request) instead.
-func (s *httpStore) Subscribe(ctx context.Context, f messaging.Filter) (<-chan messaging.Envelope, error) {
-	sub := &msgSub{
-		ch:     make(chan messaging.Envelope, 16),
-		filter: f,
-		ctx:    ctx,
+// Subscribe streams envelopes addressed to `to` matching the filter from the
+// daemon's GET /messages/subscribe SSE endpoint. The HTTP connection is
+// established synchronously before returning so that a Send immediately after
+// Subscribe is guaranteed to be observed. The returned channel closes when ctx
+// is canceled or the SSE stream ends.
+func (s *httpStore) Subscribe(ctx context.Context, to messaging.Address, f messaging.Filter) (<-chan messaging.Envelope, error) {
+	q := url.Values{}
+	q.Set("to", to.URN())
+	if len(f.Kind) > 0 {
+		kinds := make([]string, len(f.Kind))
+		for i, k := range f.Kind {
+			kinds[i] = string(k)
+		}
+		q.Set("kind", strings.Join(kinds, ","))
 	}
-	s.mu.Lock()
-	s.subs = append(s.subs, sub)
-	s.mu.Unlock()
+	if f.ThreadID != "" {
+		q.Set("thread_id", f.ThreadID)
+	}
 
+	// Establish the SSE connection synchronously so the server has registered
+	// this subscription before we return — a Send immediately after Subscribe
+	// is guaranteed to arrive on the channel.
+	resp, err := s.c.doStream(ctx, withQuery("/messages/subscribe", q), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan messaging.Envelope, 16)
 	go func() {
-		<-ctx.Done()
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		for i, sv := range s.subs {
-			if sv == sub {
-				s.subs = append(s.subs[:i], s.subs[i+1:]...)
-				break
+		defer close(ch)
+		defer func() { _ = resp.Body.Close() }()
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			data := strings.TrimPrefix(line, "data: ")
+			var env messaging.Envelope
+			if err := json.Unmarshal([]byte(data), &env); err != nil {
+				continue
+			}
+			select {
+			case ch <- env:
+			case <-ctx.Done():
+				return
 			}
 		}
-		close(sub.ch)
 	}()
 
-	return sub.ch, nil
-}
-
-// fanOut broadcasts env to all matching in-process subscribers. Non-blocking:
-// drops for a subscriber whose buffer is full.
-func (s *httpStore) fanOut(env messaging.Envelope) {
-	s.mu.Lock()
-	snapshot := make([]*msgSub, len(s.subs))
-	copy(snapshot, s.subs)
-	s.mu.Unlock()
-
-	for _, sub := range snapshot {
-		if !sub.filter.Matches(env) {
-			continue
-		}
-		select {
-		case sub.ch <- env:
-		case <-sub.ctx.Done():
-		default:
-		}
-	}
+	return ch, nil
 }
 
 // Request sends env as Kind=request and blocks until the daemon returns a

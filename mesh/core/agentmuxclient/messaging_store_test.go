@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,6 +46,7 @@ func newMsgTestHandler(ms *memstore.Store, disp messaging.Dispatcher) http.Handl
 
 	// More-specific patterns registered first to take priority over wildcards.
 	mux.HandleFunc("POST /messages/request", h.handleRequest)
+	mux.HandleFunc("GET /messages/subscribe", h.handleSubscribe)
 	mux.HandleFunc("GET /messages/inbox", h.handleInbox)
 	mux.HandleFunc("GET /messages/thread/{threadID}", h.handleThread)
 	mux.HandleFunc("GET /messages/{id}", h.handleGet)
@@ -155,6 +157,56 @@ func (h *msgTestHandler) handleCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSubscribe streams newly-created envelopes for a recipient as SSE.
+func (h *msgTestHandler) handleSubscribe(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeTestErr(w, http.StatusInternalServerError, "internal", "streaming not supported")
+		return
+	}
+	toURN := r.URL.Query().Get("to")
+	to, err := messaging.ParseURN(toURN)
+	if err != nil {
+		writeTestErr(w, http.StatusBadRequest, "bad_request", "invalid to address")
+		return
+	}
+	f := parseFilter(r)
+
+	ch, err := h.store.Subscribe(r.Context(), to, f)
+	if err != nil {
+		writeTestErr(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ping := time.NewTicker(15 * time.Second)
+	defer ping.Stop()
+
+	for {
+		select {
+		case env, open := <-ch:
+			if !open {
+				return
+			}
+			b, err := json.Marshal(env)
+			if err != nil {
+				continue
+			}
+			_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", b)
+			flusher.Flush()
+		case <-ping.C:
+			_, _ = fmt.Fprint(w, ": ping\n\n")
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 // handleRequest implements the blocking POST /messages/request endpoint.
