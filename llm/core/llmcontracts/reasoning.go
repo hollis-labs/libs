@@ -5,7 +5,6 @@ import "context"
 // ReasoningConfig carries per-turn reasoning/thinking configuration for
 // providers that support it (e.g. Anthropic interleaved thinking).
 // Callers inject this via WithReasoningConfig before calling StreamChat.
-// F3 / CW-20260420-0023.
 type ReasoningConfig struct {
 	// Enabled reports whether reasoning/thinking blocks should be requested.
 	Enabled bool
