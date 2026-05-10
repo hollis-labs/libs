@@ -2,3 +2,13 @@
 *.out
 *.test
 coverage.out
+
+# Agent / IDE scratch — must not enter the public repo
+.agentrc/
+.claude/
+.nanite/
+agentrc.yaml
+agentrc.yml
+CLAUDE.md
+AGENTS.md
+AUDIT_RESULTS.md
