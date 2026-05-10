@@ -5,11 +5,15 @@
 //
 // For wire-format fidelity, enable JSON roundtrip mode — either
 // explicitly with WithJSONRoundtrip(true) or via the environment
-// variable NANITE_PLUGIN_SDK_JSON_ROUNDTRIP=1. In roundtrip mode every
+// variable PLUGIN_SDK_JSON_ROUNDTRIP=1. In roundtrip mode every
 // request and response is run through json.Marshal + json.Unmarshal
 // before and after the plugin sees it, catching missed json tags,
 // unserializable types, and other wire-only bugs that would otherwise
 // only surface in production.
+//
+// The legacy NANITE_PLUGIN_SDK_JSON_ROUNDTRIP env var name is still
+// honored for backward compatibility but is deprecated; prefer the
+// host-neutral PLUGIN_SDK_JSON_ROUNDTRIP.
 //
 // Example:
 //
@@ -37,10 +41,15 @@ import (
 	"github.com/hollis-labs/plugin-sdk/subprocess"
 )
 
-// envJSONRoundtrip is the env var that forces JSON roundtrip on every
-// request/response when set to a truthy value (any non-empty string
-// other than "0" or "false").
-const envJSONRoundtrip = "NANITE_PLUGIN_SDK_JSON_ROUNDTRIP"
+// envJSONRoundtrip is the canonical env var that forces JSON roundtrip
+// on every request/response when set to a truthy value (any non-empty
+// string other than "0" or "false").
+const envJSONRoundtrip = "PLUGIN_SDK_JSON_ROUNDTRIP"
+
+// envJSONRoundtripLegacy is the original (host-coupled) env var name.
+// Honored for backward compatibility; prefer envJSONRoundtrip in new
+// configurations. Will be removed in a future release.
+const envJSONRoundtripLegacy = "NANITE_PLUGIN_SDK_JSON_ROUNDTRIP"
 
 // Harness drives a subprocess plugin in-process with mocked init
 // parameters. Call Init, Load, Unload, and capability-specific helpers
@@ -88,8 +97,9 @@ func WithHostInfo(info subprocess.HostInfo) Option {
 // unserializable fields — that would otherwise only surface when the
 // plugin runs as a real subprocess.
 //
-// If not set, the environment variable NANITE_PLUGIN_SDK_JSON_ROUNDTRIP
-// is consulted; any truthy value enables roundtripping.
+// If not set, the environment variable PLUGIN_SDK_JSON_ROUNDTRIP is
+// consulted (with NANITE_PLUGIN_SDK_JSON_ROUNDTRIP honored as a
+// deprecated legacy alias); any truthy value enables roundtripping.
 func WithJSONRoundtrip(enabled bool) Option {
 	return func(h *Harness) {
 		h.roundtrip = enabled
@@ -105,7 +115,7 @@ func New(t testing.TB, p subprocess.Plugin, opts ...Option) *Harness {
 		plugin:    p,
 		config:    map[string]string{},
 		hostInfo:  subprocess.HostInfo{Version: "test", Protocol: subprocess.ProtocolVersion},
-		roundtrip: envTruthy(os.Getenv(envJSONRoundtrip)),
+		roundtrip: envTruthy(os.Getenv(envJSONRoundtrip)) || envTruthy(os.Getenv(envJSONRoundtripLegacy)),
 	}
 	for _, opt := range opts {
 		opt(h)

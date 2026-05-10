@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// fakeEventHook exercises the EventHook.PluginID contract added in Track C.
+// fakeEventHook exercises the EventHook.PluginID contract.
 type fakeEventHook struct {
 	pluginID string
 	types    []string

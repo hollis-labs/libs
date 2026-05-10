@@ -7,9 +7,9 @@ import (
 
 func TestErrorCodes(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     *Error
-		wantMsg string
+		name     string
+		err      *Error
+		wantMsg  string
 		wantCode int
 	}{
 		{"not found", ErrNotFound("missing widget"), "missing widget", 404},

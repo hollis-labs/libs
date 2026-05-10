@@ -1,11 +1,6 @@
-// Package plugin defines the universal Plugin SDK surface that both the host
-// application and plugins import. It has zero dependencies on any host-specific
-// code path; host-specific extensions live in the host's own public package
-// (for Nanite, that is github.com/hollis-labs/nanite/pkg/plugin).
-//
-// The types here were extracted from github.com/hollis-labs/go-plugin during
-// the Nanite plugin system overhaul (Phase 2 Track C, 2026-04-13).
 package plugin
+
+// Package-level documentation lives in doc.go.
 
 import (
 	"context"
@@ -52,9 +47,9 @@ type PluginStatus struct {
 
 // Host provides the runtime environment and services available to plugins.
 // This is the base Host contract — host applications may extend it with
-// additional registration methods in their own public package (e.g., Nanite
-// adds RegisterCommand / RegisterSlot / RegisterKeybinding in
-// github.com/hollis-labs/nanite/pkg/plugin).
+// additional registration methods in their own public package (for example,
+// adding RegisterCommand / RegisterSlot / RegisterKeybinding in a host's
+// own pkg/plugin package).
 type Host interface {
 	// GetPlugin retrieves another loaded plugin by ID.
 	GetPlugin(id string) (Plugin, bool)
@@ -112,9 +107,9 @@ type CRUDHandler interface {
 // EventHook processes events from the host application.
 //
 // Implementations MUST report the ID of the plugin that owns them via
-// PluginID so the host can cleanly unregister hooks during unload. This is
-// the post-Track-C EventHook contract; pre-audit hooks that did not carry
-// a PluginID were a source of leak bugs.
+// PluginID so the host can cleanly unregister hooks during unload. Hooks
+// without a PluginID cannot be cleanly removed at unload and are a
+// known source of leak bugs.
 type EventHook interface {
 	// Handle processes an event. Returning ErrCancelled from a pre-hook
 	// event (e.g., message.sending) cancels the pending action.

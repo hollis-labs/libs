@@ -1,7 +1,6 @@
-// Hello is the minimum-viable subprocess plugin. It exists to validate
-// the plugin-sdk C.7 gate: a plugin using only plugin-sdk imports,
-// under 50 lines, can be spawned and handle the init/load/unload
-// cycle.
+// Hello is the minimum-viable subprocess plugin: a plugin that uses
+// only plugin-sdk imports, fits in roughly fifty lines, and handles a
+// full init / load / unload lifecycle plus a single command.
 //
 // Build:
 //

@@ -122,6 +122,7 @@ func TestRoundtripCatchesUnserializableResult(t *testing.T) {
 }
 
 func TestEnvTruthyDefault(t *testing.T) {
+	_ = os.Unsetenv("PLUGIN_SDK_JSON_ROUNDTRIP")
 	_ = os.Unsetenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
 	h := subprocesstest.New(t, echoPlugin{})
 	if h.RoundtripEnabled() {
@@ -130,10 +131,22 @@ func TestEnvTruthyDefault(t *testing.T) {
 }
 
 func TestEnvTruthyEnabled(t *testing.T) {
+	// Clear the legacy var so this test exercises only the canonical name.
+	_ = os.Unsetenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
+	t.Setenv("PLUGIN_SDK_JSON_ROUNDTRIP", "1")
+	h := subprocesstest.New(t, echoPlugin{})
+	if !h.RoundtripEnabled() {
+		t.Errorf("roundtrip should be enabled via PLUGIN_SDK_JSON_ROUNDTRIP")
+	}
+}
+
+func TestEnvTruthyEnabledLegacy(t *testing.T) {
+	// Backward compatibility: the legacy env var name continues to work.
+	_ = os.Unsetenv("PLUGIN_SDK_JSON_ROUNDTRIP")
 	t.Setenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP", "1")
 	h := subprocesstest.New(t, echoPlugin{})
 	if !h.RoundtripEnabled() {
-		t.Errorf("roundtrip should be enabled via env var")
+		t.Errorf("roundtrip should still be enabled via legacy NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
 	}
 }
 

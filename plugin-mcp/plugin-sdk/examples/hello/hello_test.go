@@ -9,8 +9,9 @@ import (
 )
 
 // TestHelloLifecycle drives the hello plugin through init/load/unload
-// using the in-process harness. This is the plugin-sdk C.7 gate proof:
-// a plugin using only plugin-sdk imports completes a full lifecycle.
+// using the in-process harness. Demonstrates that a plugin built
+// against only plugin-sdk imports completes a full lifecycle and
+// services a command.
 func TestHelloLifecycle(t *testing.T) {
 	h := subprocesstest.New(t, hello{})
 	defer h.Close()

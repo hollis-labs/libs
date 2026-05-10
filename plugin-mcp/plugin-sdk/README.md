@@ -1,49 +1,138 @@
 # plugin-sdk
 
-Universal plugin SDK for the Nanite plugin architecture.
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/plugin-sdk.svg)](https://pkg.go.dev/github.com/hollis-labs/plugin-sdk)
 
-Provides:
+Universal Go SDK for building plugins that talk to a host application
+over JSON-RPC stdio. The SDK is host-neutral — the base contract has
+zero dependencies on any specific host product, and host applications
+extend it with their own registration surfaces in their own packages.
 
-- The `Plugin` interface and core plugin types (`Host`, `CRUDHandler`, `EventHook`, `UIComponent`, etc.)
-- Typed plugin errors with HTTP-friendly status codes
-- JSON-RPC 2.0 wire protocol for host/plugin communication over stdio
-- A subprocess server library (`subprocess.Serve`) that handles stdin/stdout, RPC dispatch, concurrency, panic recovery, and shutdown
-- A testing harness (`subprocess/subprocesstest`) for driving plugins without spawning a subprocess
-- `EnvelopeOut` and `MessageOut` wire types for envelope emission
+## Status
 
-## Module layout
+Pre-1.0 (`v0.x`). The wire protocol (`subprocess.ProtocolVersion = 1`)
+and exported interfaces are stable in practice but the API may still
+shift between minor versions; treat any minor bump as potentially
+breaking and read the CHANGELOG before upgrading. Patch bumps
+(`v0.x.y`) are documentation, examples, and internal hardening only.
+
+## Install
+
+```bash
+go get github.com/hollis-labs/plugin-sdk
+```
+
+## What's in the box
+
+- The `Plugin` contract and core base types (`Host`, `CRUDHandler`,
+  `EventHook`, `UIComponent`, `Connector`, `ConfigFieldDef`).
+- Typed plugin errors (`Error` / `PluginError`) with HTTP-friendly
+  status codes, and the `ErrCancelled` sentinel for pre-hook
+  cancellation.
+- `EnvelopeOut` / `MessageOut` wire types for envelope emission.
+- `subprocess` — JSON-RPC 2.0 wire protocol, `subprocess.Serve`
+  entry point (handles stdin/stdout, dispatch, concurrency, panic
+  recovery, signal-driven shutdown), capability interfaces
+  (`CommandHandler`, `EventHandler`, `CRUDHandler`, `MCPHandler`,
+  `HTTPHandler`, `Migrator`, `HealthChecker`), config / data /
+  cache helpers, and a stderr JSON-lines logger with secret
+  redaction.
+- `subprocess/subprocesstest` — in-process test harness for driving
+  plugins without spawning a real subprocess, with optional JSON
+  roundtripping to catch wire-format bugs.
+
+## Quickstart
+
+A minimum-viable plugin is roughly fifty lines:
+
+```go
+package main
+
+import (
+    "context"
+    "os"
+
+    "github.com/hollis-labs/plugin-sdk/subprocess"
+)
+
+type hello struct{}
+
+func (hello) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
+    return subprocess.InitResult{
+        ID:       "hello",
+        Name:     "Hello",
+        Version:  "0.1.0",
+        Protocol: subprocess.ProtocolVersion,
+    }, nil
+}
+
+func (hello) Load(ctx context.Context) (subprocess.LoadResult, error) {
+    return subprocess.LoadResult{}, nil
+}
+
+func (hello) Unload(ctx context.Context) error { return nil }
+
+func (hello) Command(ctx context.Context, req subprocess.CommandRequest) (subprocess.CommandResult, error) {
+    return subprocess.CommandResult{Action: "message", Content: "hello, " + req.Args}, nil
+}
+
+func main() {
+    if err := subprocess.Serve(hello{}); err != nil {
+        os.Exit(1)
+    }
+}
+```
+
+A runnable copy lives at [`examples/hello/`](./examples/hello). Build
+it with `go build -o hello ./examples/hello`; the
+`examples/hello/hello_test.go` file demonstrates exercising the same
+plugin in-process via the test harness.
+
+## Layout
 
 ```
 github.com/hollis-labs/plugin-sdk
-├── plugin.go              Plugin, Host, CRUDHandler, EventHook, ...
+├── doc.go                 package-level overview
+├── plugin.go              Plugin, Host, CRUDHandler, EventHook, UIComponent, ...
 ├── errors.go              Error type, sentinels, constructors
 ├── envelope.go            EnvelopeOut, MessageOut
 ├── logger.go              Logger interface
+├── examples/
+│   └── hello/             minimum-viable subprocess plugin
 └── subprocess/
-    ├── protocol.go        JSON-RPC 2.0 wire types (RPCRequest/Response/Error, methods, codes)
-    ├── types.go           Request/response types (InitParams, LoadResult, ...)
-    ├── server.go          Serve(Plugin) entry point
-    ├── config.go          ConfigReader
+    ├── protocol.go        JSON-RPC 2.0 wire types, methods, error codes
+    ├── types.go           Init / Load / Command / Event / CRUD / MCP / HTTP / Migrate wire types
+    ├── types_sdk.go       SDK-level Go types and capability interfaces
+    ├── server.go          subprocess.Serve entry point
+    ├── config.go          ConfigReader (with secret redaction integration)
     ├── data.go            DataHelper, CacheHelper
     ├── log.go             stderr JSON-lines logger
     └── subprocesstest/
-        └── harness.go     test harness
+        └── harness.go     in-process test harness
 ```
 
 ## Versioning
 
-Independent release cycle. Nanite host and plugins consume via `go.mod` dependency on a tagged version.
+Independent release cycle. Consumers pin a tagged version via `go.mod`.
+See [CHANGELOG.md](./CHANGELOG.md) for per-release notes.
 
-Current status: v0.3.0 — `MCPHandler` / `HTTPHandler` plugin-side interfaces and `subprocess.Serve` dispatch for `mcp/call_tool`, `http/handle`, and `plugin/migrate` (the v0.2.0 wire surface is now actually invocable). Backward compatible with v0.2.0. See CHANGELOG.
-
-## Development
-
-Tests run with `NANITE_PLUGIN_SDK_JSON_ROUNDTRIP=1` to exercise wire-format roundtripping:
+## Testing
 
 ```bash
-NANITE_PLUGIN_SDK_JSON_ROUNDTRIP=1 go test ./...
+go test ./...
 ```
+
+For wire-format fidelity, enable JSON roundtripping in the harness so
+every request and response is marshaled + unmarshaled before the
+plugin sees it:
+
+```bash
+PLUGIN_SDK_JSON_ROUNDTRIP=1 go test ./...
+```
+
+The legacy `NANITE_PLUGIN_SDK_JSON_ROUNDTRIP` env var name is still
+honored for backward compatibility but is deprecated; prefer
+`PLUGIN_SDK_JSON_ROUNDTRIP` in new configurations.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [LICENSE](./LICENSE).

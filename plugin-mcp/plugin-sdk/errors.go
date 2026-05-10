@@ -13,10 +13,11 @@ var ErrCancelled = errors.New("plugin: action cancelled by hook")
 // handlers should return these instead of plain errors so the host can
 // translate them into HTTP status codes and JSON-RPC error objects.
 //
-// Backward-compatibility alias: the previous name in go-plugin was
-// PluginError; both names are accepted.
+// PluginError is a backward-compatibility alias retained for callers
+// that imported the type under its older name; new code should use
+// Error directly.
 type Error struct {
-	Code    int    // HTTP status code (404, 409, 422, etc.)
+	Code    int // HTTP status code (404, 409, 422, etc.)
 	Message string
 }
 

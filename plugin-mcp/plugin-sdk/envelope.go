@@ -1,14 +1,13 @@
 package plugin
 
 // EnvelopeOut is an envelope emitted by a plugin as the result of a command,
-// event handler, or MCP tool call. Envelopes are validated against the
-// plugin's declared envelope types and their JSON Schemas before being
-// surfaced to the UI.
+// event handler, or MCP tool call. Envelopes are validated by the host
+// against the plugin's declared envelope types and their JSON Schemas
+// before being surfaced to the UI.
 //
-// This type is part of the Track-B envelope-emission contract: plugins no
-// longer call chat.RegisterEnvelopeType directly — they declare envelope
+// Envelope-type registration is declarative: plugins declare envelope
 // types in plugin.yaml and return EnvelopeOut values from capability
-// handlers.
+// handlers. Plugins do not register envelope types programmatically.
 type EnvelopeOut struct {
 	// Type is the envelope type identifier, e.g. "oembed.card" or
 	// "support-ticket.created". Must match one of the types declared in

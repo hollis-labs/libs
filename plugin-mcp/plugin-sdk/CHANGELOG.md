@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.3.1 — 2026-05-10
+
+### Changed
+
+- **README rewritten** for a public, host-neutral audience: status banner,
+  godoc badge, install snippet, runnable quickstart, layout reference,
+  and pointer to `examples/hello/`. No host-specific framing or
+  internal-product references.
+- **Top-level package documentation** moved to a dedicated `doc.go`
+  giving an overview of the package layout for `pkg.go.dev`.
+- **Inline godoc reframed** in `plugin.go`, `envelope.go`, `errors.go`,
+  `plugin_test.go`, `subprocess/types.go`, `examples/hello/`, and
+  `subprocess/subprocesstest/harness.go` — host-neutral language
+  throughout, removing references to internal phase / track names and
+  product-specific package paths. No exported-symbol changes.
+
+### Added
+
+- **`PLUGIN_SDK_JSON_ROUNDTRIP`** — host-neutral environment variable
+  name for opting into JSON-roundtrip mode in the
+  `subprocess/subprocesstest` harness. Both env names are honored;
+  set either to a truthy value to enable.
+- **`.gitignore`** with Go defaults plus explicit deny entries for
+  agent-tool artifacts (`.agentrc/`, `.claude/`, `CLAUDE.md`,
+  `AGENTS.md`, `.lefthook.yml`, etc.) and `.env*` files.
+- **`doc.go`** at the package root for `pkg.go.dev` rendering.
+
+### Deprecated
+
+- **`NANITE_PLUGIN_SDK_JSON_ROUNDTRIP`** env var — still honored for
+  backward compatibility, will be removed in a future release. Prefer
+  `PLUGIN_SDK_JSON_ROUNDTRIP`.
+
+### Compatibility
+
+Fully backward compatible with v0.3.0. No exported-symbol or wire-
+protocol changes; the `ProtocolVersion = 1` constant is unchanged. The
+deprecated env var continues to work; set the new name to silence the
+deprecation in your CI configuration.
+
 ## v0.3.0 — 2026-04-13
 
 ### Added

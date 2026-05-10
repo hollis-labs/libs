@@ -43,12 +43,16 @@ type dirHelper struct {
 	root string
 }
 
-func (d *dirHelper) DataDir() string                  { return d.root }
-func (d *dirHelper) CacheDir() string                 { return d.root }
-func (d *dirHelper) DataPath(elem ...string) string   { return filepath.Join(append([]string{d.root}, elem...)...) }
-func (d *dirHelper) CachePath(elem ...string) string  { return filepath.Join(append([]string{d.root}, elem...)...) }
-func (d *dirHelper) EnsureDataDir() error             { return ensureDir(d.root) }
-func (d *dirHelper) EnsureCacheDir() error            { return ensureDir(d.root) }
+func (d *dirHelper) DataDir() string  { return d.root }
+func (d *dirHelper) CacheDir() string { return d.root }
+func (d *dirHelper) DataPath(elem ...string) string {
+	return filepath.Join(append([]string{d.root}, elem...)...)
+}
+func (d *dirHelper) CachePath(elem ...string) string {
+	return filepath.Join(append([]string{d.root}, elem...)...)
+}
+func (d *dirHelper) EnsureDataDir() error  { return ensureDir(d.root) }
+func (d *dirHelper) EnsureCacheDir() error { return ensureDir(d.root) }
 
 func ensureDir(path string) error {
 	return os.MkdirAll(path, 0o755)

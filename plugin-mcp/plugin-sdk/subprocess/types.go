@@ -51,7 +51,7 @@ type InitParams struct {
 
 // HostInfo describes the host environment to the plugin.
 type HostInfo struct {
-	Version  string `json:"version"`  // host version (e.g. nanite version)
+	Version  string `json:"version"`  // host application version
 	Protocol int    `json:"protocol"` // protocol version (see ProtocolVersion)
 }
 

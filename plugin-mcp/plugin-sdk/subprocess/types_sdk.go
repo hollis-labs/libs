@@ -21,9 +21,9 @@ type CommandRequest struct {
 
 // CommandResult is returned by a plugin's Command handler.
 type CommandResult struct {
-	Action    string                // "message", "noop", "error"
-	Content   string                // message body (for "message" action)
-	Envelopes []plugin.EnvelopeOut  // optional envelopes to emit alongside the message
+	Action    string               // "message", "noop", "error"
+	Content   string               // message body (for "message" action)
+	Envelopes []plugin.EnvelopeOut // optional envelopes to emit alongside the message
 }
 
 // EventRequest is passed to a plugin's EventHandle handler.
