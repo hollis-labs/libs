@@ -11,6 +11,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
 	llmtypes "github.com/hollis-labs/go-llm-types"
 )
@@ -45,7 +46,10 @@ func main() {
 	fmt.Println(req.EffectiveSystemPrompt())
 	fmt.Println()
 
-	out, _ := json.MarshalIndent(req.Tools, "", "  ")
+	out, err := json.MarshalIndent(req.Tools, "", "  ")
+	if err != nil {
+		log.Fatalf("marshal tools: %v", err)
+	}
 	fmt.Println("Tool definitions:")
 	fmt.Println(string(out))
 }

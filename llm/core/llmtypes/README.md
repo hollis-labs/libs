@@ -8,7 +8,7 @@ types only** — no transport, no provider interfaces, no retry logic.
 ## Status
 
 Pre-1.0 (`v0.x`). The API may evolve; breaking changes will be called out in
-[CHANGELOG.md](./CHANGELOG.md) and a minor-version bump.
+[CHANGELOG.md](./CHANGELOG.md) with a minor-version bump.
 
 ## Install
 

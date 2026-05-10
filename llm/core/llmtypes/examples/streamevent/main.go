@@ -41,10 +41,18 @@ func main() {
 		case llmtypes.EventDelta:
 			text.WriteString(ev.Content)
 		case llmtypes.EventThinking:
-			fmt.Printf("[thinking] %s\n", ev.ThinkingBlock.Thinking)
+			if ev.ThinkingBlock != nil {
+				fmt.Printf("[thinking] %s\n", ev.ThinkingBlock.Thinking)
+			} else {
+				fmt.Printf("[thinking] (no block)\n")
+			}
 		case llmtypes.EventUsage:
-			fmt.Printf("[usage] in=%d out=%d stop=%s\n",
-				ev.Usage.InputTokens, ev.Usage.OutputTokens, ev.Usage.StopReason)
+			if ev.Usage != nil {
+				fmt.Printf("[usage] in=%d out=%d stop=%s\n",
+					ev.Usage.InputTokens, ev.Usage.OutputTokens, ev.Usage.StopReason)
+			} else {
+				fmt.Printf("[usage] (no usage)\n")
+			}
 		case llmtypes.EventError:
 			fmt.Printf("[error] %s\n", ev.Error)
 		}
