@@ -134,6 +134,19 @@ type SlotBlock struct {
 	Changed  bool
 }
 
+// CacheHint tells a provider what content to cache.
+// Position identifies the type of content ("system", "tools", "recent_message").
+// Index provides ordering context — for "recent_message", 0 means the most recent
+// user message, 1 means the second most recent, etc.
+//
+// Cache hints belong on ChatRequest.CacheHints so they travel with the call.
+// The earlier pattern of setting hints on a shared provider singleton is
+// unsafe under concurrent use — see CacheableProvider in go-llm-contracts.
+type CacheHint struct {
+	Position string // "system", "tools", "recent_message"
+	Index    int    // ordering context (e.g. 0 = most recent, 1 = second most recent)
+}
+
 // ChatRequest is the unified input to provider chat methods.
 type ChatRequest struct {
 	Model        string
@@ -142,6 +155,12 @@ type ChatRequest struct {
 	Messages     []ChatMessage
 	Tools        []ToolDefinition
 	MaxTokens    int
+	// CacheHints tells the provider WHAT to cache for this call. Providers
+	// that support prompt caching translate each hint into their own caching
+	// primitive (e.g., Anthropic's cache_control markers). Threading hints
+	// through the request — rather than mutating shared provider state —
+	// keeps concurrent callers isolated.
+	CacheHints []CacheHint
 }
 
 // EffectiveSystemPrompt returns SystemPrompt when no slots are set, otherwise
