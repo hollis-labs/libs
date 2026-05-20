@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-05-20
 
 - `CacheHint` is now a type alias for `llmtypes.CacheHint`. Callers that use
   `llmcontracts.CacheHint` continue to compile unchanged.
@@ -12,8 +12,8 @@
 - `Cacheable.EstimateCacheablePrefix` doc updated: implementations should
   read hints from `req.CacheHints`.
 - `examples/cacheable` rewritten to demonstrate the per-call pattern.
-
-Requires `go-llm-types` ≥ the release that adds `ChatRequest.CacheHints`.
+- Bumped `go-llm-types` requirement to v0.3.0 (the release that adds
+  `ChatRequest.CacheHints`).
 
 ## v0.2.0 — 2026-05-10
 
