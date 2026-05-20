@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-05-20
 
 - Added `CacheHint` (`Position`, `Index`) and `ChatRequest.CacheHints` so
   prompt-cache directives travel with the per-call request instead of being
