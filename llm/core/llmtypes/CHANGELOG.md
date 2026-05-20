@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added `CacheHint` (`Position`, `Index`) and `ChatRequest.CacheHints` so
+  prompt-cache directives travel with the per-call request instead of being
+  set on a shared provider singleton. The singleton pattern raced under
+  concurrent callers and could drop `cache_control` markers, producing
+  degenerate echoed turns with `cache_read=0` (agridd/Nanite FU-13).
+
 ## v0.2.0 — 2026-05-10
 
 Public-release prep. No public-API changes; additions only.

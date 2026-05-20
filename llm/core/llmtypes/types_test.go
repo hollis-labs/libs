@@ -21,6 +21,21 @@ func TestEffectiveSystemPromptNoSlots(t *testing.T) {
 	}
 }
 
+func TestChatRequestCacheHints(t *testing.T) {
+	req := ChatRequest{
+		CacheHints: []CacheHint{
+			{Position: "system", Index: 0},
+			{Position: "recent_message", Index: 1},
+		},
+	}
+	if len(req.CacheHints) != 2 {
+		t.Fatalf("CacheHints len = %d, want 2", len(req.CacheHints))
+	}
+	if req.CacheHints[0].Position != "system" || req.CacheHints[1].Index != 1 {
+		t.Fatalf("CacheHints not preserved: %#v", req.CacheHints)
+	}
+}
+
 func TestEffectiveSystemPromptWithSlots(t *testing.T) {
 	req := ChatRequest{
 		SystemPrompt: "system",
