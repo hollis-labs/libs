@@ -1,24 +1,29 @@
 package llmcontracts
 
-// CacheHint tells a provider what content to cache.
-// Position identifies the type of content ("system", "tools", "recent_message").
-// Index provides ordering context — for "recent_message", 0 means the most recent
-// user message, 1 means the second most recent, etc.
-type CacheHint struct {
-	Position string // "system", "tools", "recent_message"
-	Index    int    // ordering context (e.g. 0 = most recent, 1 = second most recent)
-}
+import "github.com/hollis-labs/go-llm-types"
 
-// CacheableProvider is implemented by providers that support prompt caching.
-// The chat engine calls SetCacheHints before each provider request to tell the
-// provider WHAT to cache. Each provider decides HOW to implement caching based
-// on its own API (e.g., Anthropic uses cache_control: {type: "ephemeral"}).
+// CacheHint aliases llmtypes.CacheHint so callers that already import this
+// package keep working. Authoritative definition lives in go-llm-types
+// alongside llmtypes.ChatRequest.CacheHints.
+type CacheHint = llmtypes.CacheHint
+
+// CacheableProvider was implemented by providers that supported prompt
+// caching. The chat engine called SetCacheHints before each request to tell
+// the provider WHAT to cache.
+//
+// Deprecated: storing hints on the provider mutates shared state and races
+// under concurrent callers — one session's SetCacheHints can wipe another's
+// hints between assignment and read, producing requests without
+// cache_control markers and degenerate echoed turns. Set hints on the
+// per-call request via llmtypes.ChatRequest.CacheHints instead. Providers
+// should read req.CacheHints when building each request.
 type CacheableProvider interface {
+	// Deprecated: see CacheableProvider. Use llmtypes.ChatRequest.CacheHints.
 	SetCacheHints(hints []CacheHint)
 }
 
-// DefaultCacheStrategy returns the standard set of cache hints used before
-// each provider call. It caches:
+// DefaultCacheStrategy returns the standard set of cache hints to attach to
+// each request's llmtypes.ChatRequest.CacheHints. It caches:
 //   - The system prompt
 //   - The last tool definition (marking the end of the tools block)
 //   - The last 2 user messages (most recent conversation context)

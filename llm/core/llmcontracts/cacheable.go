@@ -21,8 +21,8 @@ import (
 // usage response; this is for pre-flight observability only.
 type Cacheable interface {
 	// EstimateCacheablePrefix returns the approximate token count of the
-	// cacheable prefix for the given request, using the provider's current
-	// cache hints. Returns 0 when no cache hints are configured or the
+	// cacheable prefix for the given request, using the hints carried on
+	// req.CacheHints. Returns 0 when no cache hints are configured or the
 	// request would emit no cache_control markers.
 	EstimateCacheablePrefix(ctx context.Context, req llmtypes.ChatRequest) int
 }

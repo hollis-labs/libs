@@ -1,7 +1,11 @@
-// Package main demonstrates the llmcontracts.CacheableProvider interface, used
-// by callers to inform a provider WHAT to cache before each request. Each
-// provider decides HOW to translate the hints into its own caching primitive
-// (e.g., Anthropic's cache_control: {type: "ephemeral"} markers).
+// Package main demonstrates how to inform a provider WHAT to cache for a
+// given chat call by setting ChatRequest.CacheHints. Each provider decides
+// HOW to translate the hints into its own caching primitive (e.g.,
+// Anthropic's cache_control: {type: "ephemeral"} markers).
+//
+// Hints travel with the request, so concurrent callers can't clobber each
+// other's caching directives. The older CacheableProvider.SetCacheHints
+// pattern stored hints on the provider singleton and is deprecated.
 package main
 
 import (
@@ -12,45 +16,44 @@ import (
 	llmtypes "github.com/hollis-labs/go-llm-types"
 )
 
-// cacheableProvider records the latest cache hints. A real adapter would
-// translate them into provider-specific cache markers when serializing the
-// request body.
-type cacheableProvider struct {
-	hints []llmcontracts.CacheHint
-}
+// cachingProvider is a minimal Provider that reads cache hints from each
+// request. A real adapter would translate them into provider-specific
+// cache markers when serializing the body.
+type cachingProvider struct{}
 
-func (p *cacheableProvider) StreamChat(context.Context, llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
+func (cachingProvider) StreamChat(_ context.Context, req llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
+	for _, h := range req.CacheHints {
+		fmt.Printf("apply cache hint: position=%s index=%d\n", h.Position, h.Index)
+	}
 	ch := make(chan llmtypes.StreamEvent)
 	close(ch)
 	return ch, nil
 }
-func (p *cacheableProvider) Complete(context.Context, llmtypes.ChatRequest) (string, error) {
+func (cachingProvider) Complete(context.Context, llmtypes.ChatRequest) (string, error) {
 	return "", nil
 }
-func (p *cacheableProvider) Capabilities() llmtypes.ProviderCapabilities {
+func (cachingProvider) Capabilities() llmtypes.ProviderCapabilities {
 	return llmtypes.ProviderCapabilities{SupportsSystemPromptCaching: true}
 }
 
-// SetCacheHints stores the hint set the caller wants applied to the next
-// request. Implementations should be cheap and idempotent.
-func (p *cacheableProvider) SetCacheHints(hints []llmcontracts.CacheHint) {
-	p.hints = hints
-}
-
-// Compile-time checks.
-var (
-	_ llmcontracts.Provider          = (*cacheableProvider)(nil)
-	_ llmcontracts.CacheableProvider = (*cacheableProvider)(nil)
-)
+// Compile-time check.
+var _ llmcontracts.Provider = cachingProvider{}
 
 func main() {
-	p := &cacheableProvider{}
+	p := cachingProvider{}
 
-	// Apply the standard four-hint strategy: system prompt, tools sentinel,
-	// and the two most recent user messages.
-	p.SetCacheHints(llmcontracts.DefaultCacheStrategy())
+	req := llmtypes.ChatRequest{
+		Model:        "claude-3-5-sonnet",
+		SystemPrompt: "You are a concise assistant.",
+		Messages: []llmtypes.ChatMessage{
+			{Role: "user", Content: "What is the capital of France?"},
+		},
+		// Apply the standard four-hint strategy: system prompt, tools
+		// sentinel, and the two most recent user messages.
+		CacheHints: llmcontracts.DefaultCacheStrategy(),
+	}
 
-	for _, h := range p.hints {
-		fmt.Printf("cache hint: position=%s index=%d\n", h.Position, h.Index)
+	if _, err := p.StreamChat(context.Background(), req); err != nil {
+		fmt.Println("error:", err)
 	}
 }
