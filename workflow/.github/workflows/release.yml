@@ -3,12 +3,18 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag to verify and publish
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -18,22 +24,24 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
       - name: Verify immutable tag target
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$GITHUB_SHA"
           test "$(git cat-file -t "$RELEASE_TAG")" = tag
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "$RELEASE_TAG^{commit}")"
+          test "$(git rev-parse "$RELEASE_TAG^{tag}")" = "$(git ls-remote origin "refs/tags/$RELEASE_TAG" | awk '{print $1}')"
       - name: Run release gates
         run: make check
       - name: Create draft release and publish verified tag
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           gh release create "$RELEASE_TAG" --draft --verify-tag --generate-notes --title "$RELEASE_TAG"
           gh release edit "$RELEASE_TAG" --draft=false --verify-tag
