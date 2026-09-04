@@ -33,6 +33,7 @@ registries for each plan identity.
 - [Adoption guide](docs/workflow-engine-adoption.md) — minimal embedding path,
   host-owned seams, conformance levels, and production checklist.
 - [Stability policy](STABILITY.md) — pre-v1 compatibility and versioning rules.
+- [Changelog](CHANGELOG.md) — release boundary, compatibility, and migration notes.
 - [Dependency policy](DEPENDENCIES.md) — enforced core/import boundary.
 - [Public API snapshot](public-api.txt) — exported declaration change guard.
 - [Examples](examples/workflow/README.md) — graph-native source examples and their host
