@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 const (
-	graphPackagePath = "github.com/hollis-labs/hadron/workflow/graph"
+	graphPackagePath = "github.com/hollis-labs/go-workflow/graph"
 	schemaID         = "https://schemas.hollis-labs.dev/workflow/graph/v1/workflow.schema.json"
 	planSchemaID     = "https://schemas.hollis-labs.dev/workflow/plan/v1/execution-plan.schema.json"
 )

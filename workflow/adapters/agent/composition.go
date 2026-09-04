@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	calladapter "github.com/hollis-labs/hadron/workflow/adapters/call"
-	waitadapter "github.com/hollis-labs/hadron/workflow/adapters/wait"
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/values"
+	calladapter "github.com/hollis-labs/go-workflow/adapters/call"
+	waitadapter "github.com/hollis-labs/go-workflow/adapters/wait"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 const (

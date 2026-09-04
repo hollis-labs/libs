@@ -58,7 +58,7 @@ Steps accept either:
   `transform`, `sleep`, `wait_for`, `human_gate`, or `message_wait`.
 
 `agent_launch` is a recognized graph-native shorthand but requires the
-explicit extraction-safe expander supplied by `workflow/adapters/agent` (for
+explicit extraction-safe expander supplied by `adapters/agent` (for
 example through `agent.Compile`). Core never imports adapters or performs an
 implicit global registration. Pure expanders run before graph/plan digests are
 computed. Generated child workflows are committed to the serialized plan's
@@ -110,9 +110,9 @@ and validation phases rather than changing this source-lowering contract.
 
 ## Examples and conformance fixtures
 
-The stock daemon's runnable examples live in
-[`examples/workflow/production`](../../examples/workflow/production/). They use
-only the production host's frozen capability set.
+The Hadron host's runnable examples live in
+[`examples/workflow/production`](../examples/workflow/production/). They use
+only that host's frozen capability set.
 
 The three source files in the parent `examples/workflow` directory are compiler
 and adapter conformance fixtures. Acceptance tests compile them with test kind

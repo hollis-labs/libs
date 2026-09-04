@@ -8,8 +8,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 const operationalChunkBytes = 16 << 10

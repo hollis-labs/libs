@@ -15,8 +15,8 @@ import (
 	"github.com/expr-lang/expr"
 	exprtypes "github.com/expr-lang/expr/types"
 	"github.com/expr-lang/expr/vm"
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 // ExpressionEngine evaluates workflow expressions and owns a concurrency-safe

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/hollis-labs/hadron/workflow/values"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 // ServicePhase distinguishes provider start/readiness from durable teardown.

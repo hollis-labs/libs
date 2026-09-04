@@ -3,7 +3,7 @@ package compile
 import (
 	"strings"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph"
 	"gopkg.in/yaml.v3"
 )
 

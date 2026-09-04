@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
-	"github.com/hollis-labs/hadron/workflow/runtime/inmemory"
-	"github.com/hollis-labs/hadron/workflow/values"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/go-workflow/graph"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/go-workflow/runtime/inmemory"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 func TestBindRunRequiredUnknownDefaultsCoercionAndProvenance(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
-	"github.com/hollis-labs/hadron/workflow/runtime/inmemory"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/go-workflow/runtime/inmemory"
 )
 
 func TestReadyQueueDefaultsToFIFOWithStableInvocationTieBreak(t *testing.T) {

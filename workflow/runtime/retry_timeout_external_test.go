@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/graph"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/go-workflow/stepkind"
 )
 
 func TestRetryEvaluatorBackoffClassesAttemptsAndTimeouts(t *testing.T) {

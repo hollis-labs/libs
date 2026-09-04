@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/adapters/emit"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
+	"github.com/hollis-labs/go-workflow/adapters/emit"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 var publishedAt = time.Date(2026, time.August, 24, 20, 0, 0, 0, time.UTC)

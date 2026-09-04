@@ -3,8 +3,8 @@ package compile_test
 import (
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/graph"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 func TestPlanDigestRecomputesCanonicalRelocationStableIdentity(t *testing.T) {

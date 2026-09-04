@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	scriptadapter "github.com/hollis-labs/hadron/workflow/adapters/script"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
+	scriptadapter "github.com/hollis-labs/go-workflow/adapters/script"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 func TestExecutorRegistersWithDeterministicCapabilityFreeContract(t *testing.T) {

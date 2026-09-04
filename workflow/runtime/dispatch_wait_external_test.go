@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/stepkind/stepkindtest"
-	"github.com/hollis-labs/hadron/workflow/values"
-	"github.com/hollis-labs/hadron/workflow/verification"
-	workflowwait "github.com/hollis-labs/hadron/workflow/wait"
+	"github.com/hollis-labs/go-workflow/graph"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/stepkind/stepkindtest"
+	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/go-workflow/verification"
+	workflowwait "github.com/hollis-labs/go-workflow/wait"
 )
 
 func TestStepDispatcherDurableWaitContinuationEndToEnd(t *testing.T) {

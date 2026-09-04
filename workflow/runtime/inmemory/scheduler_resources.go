@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
 )
 
 var _ workflowruntime.SchedulerResourceStore = (*Store)(nil)

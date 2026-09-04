@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	workflowwait "github.com/hollis-labs/hadron/workflow/wait"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	workflowwait "github.com/hollis-labs/go-workflow/wait"
 )
 
 const (

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 // OSProcessRunner is the standard-library direct process runner. It supplies

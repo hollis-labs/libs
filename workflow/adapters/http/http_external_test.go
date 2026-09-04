@@ -5,8 +5,8 @@ import (
 	"net/netip"
 	"testing"
 
-	httpadapter "github.com/hollis-labs/hadron/workflow/adapters/http"
-	"github.com/hollis-labs/hadron/workflow/graph"
+	httpadapter "github.com/hollis-labs/go-workflow/adapters/http"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 type externalResolver struct{}

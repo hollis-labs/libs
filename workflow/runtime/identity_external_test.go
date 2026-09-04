@@ -3,7 +3,7 @@ package runtime_test
 import (
 	"testing"
 
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
 )
 
 func TestEncodeAttemptIdentityIsCollisionFreeForOpaqueDelimiters(t *testing.T) {

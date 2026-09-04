@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/values"
-	"github.com/hollis-labs/hadron/workflow/verification"
+	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/go-workflow/verification"
 )
 
 // PersistVerificationForTest exposes the package's durable replay contract to

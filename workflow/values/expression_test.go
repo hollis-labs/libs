@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 func TestExpressionEngineEvaluatesPredicatesBindingsAndFanOut(t *testing.T) {

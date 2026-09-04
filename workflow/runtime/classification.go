@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/values"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 // ErrRetentionHook marks host retention preparation or recording failure.

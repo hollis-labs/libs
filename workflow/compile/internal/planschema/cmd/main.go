@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/hadron/workflow/compile/internal/planschema"
+	"github.com/hollis-labs/go-workflow/compile/internal/planschema"
 )
 
 func main() {

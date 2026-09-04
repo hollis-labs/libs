@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	waitadapter "github.com/hollis-labs/hadron/workflow/adapters/wait"
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
-	workflowwait "github.com/hollis-labs/hadron/workflow/wait"
+	waitadapter "github.com/hollis-labs/go-workflow/adapters/wait"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
+	workflowwait "github.com/hollis-labs/go-workflow/wait"
 )
 
 var baseTime = time.Date(2026, time.August, 24, 15, 0, 0, 0, time.UTC)

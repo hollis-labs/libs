@@ -1,6 +1,6 @@
 # Workflow Authoring Front Ends
 
-`workflow/authoring` is a value-style view over the canonical `graph.Graph`
+`authoring` is a value-style view over the canonical `graph.Graph`
 contract. It does not execute plans or define a second workflow language.
 
 Go callers build an immutable graph and then use the ordinary compiler,
@@ -22,36 +22,35 @@ result := built.Compile(ctx, authoring.CompileOptions{
 Every builder method returns independently owned graph data. `Compile` never
 creates mutable in-flight execution state.
 
-## Generated TypeScript
+## Generated clients
 
-The committed graph and workflow API schemas generate
-`cmd/hadron-app/frontend/src/api/generated/workflow.ts`. That file is the sole
-frontend authority for workflow DTOs, schema identifiers, authoring-envelope
-preflight, and daemon workflow routes. It provides:
+The committed graph schema is the authority for graph DTOs and schema
+identifiers. A host may use it to generate its transport-specific clients and
+authoring-envelope preflight. Generated clients should provide equivalents of:
 
 - `createGraphAuthoringEnvelope` and `createWorkflowSourceAuthoringEnvelope`;
 - `decodeAuthoringEnvelope`, with strict unknown-field, byte, depth, node, edge,
   and exact schema/version checks;
-- `HadronWorkflowClient`, generated from the shared HTTP operation map.
+- a host-specific client generated from the host's operation map.
 
-Regenerate and verify from the repository root:
+Regenerate and verify the engine schema from the repository root:
 
 ```sh
-go generate ./workflow/graph ./internal/api
-go test ./workflow/graph/... ./internal/api/...
+go generate ./graph
+go test ./graph/...
 ```
 
-The frontend `npm test` command includes the byte-for-byte stale-artifact gate.
+A consuming host is responsible for a byte-for-byte stale-artifact gate for any
+client it generates.
 
 ## Agent ingress
 
-`appworkflow.AgentAuthoringService` accepts a bounded raw `authoring.Envelope`.
-It stages exact material only while the existing definition resolver validates
-it, then uses `ContractRegistrationService` for contract tests and registry
-publication. Namespace authorization, definition authorization, step-kind and
-effects validation, policy hooks, provenance, and exact digests stay on those
-shared paths. A request without a contract suite receives a scaffold and does
-not mutate the catalog.
+A host agent-ingress service should accept a bounded raw `authoring.Envelope`.
+It should stage exact material only while its definition resolver validates it,
+then run contract tests before registry publication. Namespace and definition
+authorization, step-kind and effects validation, policy hooks, provenance, and
+exact digests remain mandatory host checks. A request without a contract suite
+must not mutate the catalog.
 
 Schema identifiers and versions are exact, not negotiated by content sniffing.
 Legacy registry records with all discriminator fields absent default only to

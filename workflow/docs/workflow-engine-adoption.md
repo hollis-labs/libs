@@ -1,19 +1,19 @@
 # Embed the workflow engine in a Go host
 
-Hadron's reusable engine boundary is the complete public
-`github.com/hollis-labs/hadron/workflow/...` tree. It contains graph and source
+The reusable engine boundary is the complete public
+`github.com/hollis-labs/go-workflow/...` module. It contains graph and source
 contracts, compiler phases, typed values, runtime state machines, waits,
 verification, step-kind SDKs and adapters, offline embedding, and conformance
 fixtures. It has no dependency on `github.com/hollis-labs/hadron/internal/...`.
 
-Hadron application services, registry publication, authentication, HTTP, MCP,
-A2A, SQLite, workers, and the stock daemon capability profile are host
+Application services, registry publication, authentication, HTTP, MCP, A2A,
+databases, workers, and daemon capability profiles are host
 composition. They are deliberately not engine dependencies.
 
 ## Minimal path
 
 The executable external-package example is
-[`workflow/offline/adoption_external_test.go`](../workflow/offline/adoption_external_test.go).
+[`offline/adoption_external_test.go`](../offline/adoption_external_test.go).
 It performs the complete portable sequence:
 
 1. load one bounded graph-native source with `compile.LoadBytes`;
@@ -24,8 +24,9 @@ It performs the complete portable sequence:
 5. validate the inferred plan with `compile.ValidatePlan`;
 6. build an immutable offline manifest and execute it through the ordinary
    runtime with `offline.Execute`; and
-7. call the exhaustive `conformance.RunExhaustive` entry point from outside the
-   conformance package; and
+7. compile-call the exhaustive `conformance.RunExhaustive` entry point from an
+   external package (the example uses an expectation-only wiring fake and is
+   not host qualification); and
 8. exercise durable compensation directly. A durable host that implements the
    compensation fixture family should use `conformance.RunExhaustive` for its
    final qualification gate.
@@ -71,8 +72,8 @@ lifecycle hooks. `stepkind.Resolve` never selects a latest version when more
 than one version exists. Register all implementations, verify the advertised
 specs, then treat the registry as frozen for a plan's lifetime.
 
-`workflow/stepkind/stepkindtest` provides public application-neutral fake kinds
-for downstream tests. Concrete packages under `workflow/adapters` are optional
+`stepkind/stepkindtest` provides public application-neutral fake kinds for
+downstream tests. Concrete packages under `adapters` are optional
 embeddable capabilities; importing an adapter does not enable it. The stock
 Hadron daemon's six-kind profile is a product-host choice, not an engine limit.
 
@@ -81,7 +82,7 @@ Hadron daemon's six-kind profile is a product-host choice, not an engine limit.
 The public formats are versioned independently and matched exactly:
 
 - graph source uses the generated schema at
-  [`workflow/graph/schema/workflow.schema.json`](../workflow/graph/schema/workflow.schema.json);
+  [`graph/schema/workflow.schema.json`](../graph/schema/workflow.schema.json);
 - compiled plans carry `compile.ExecutionPlanSchemaVersion` and immutable content
   digests;
 - offline artifacts carry `offline.ManifestSchemaVersion`; and
@@ -95,20 +96,18 @@ meaning, enum, required field, or exact-version behavior requires an explicit
 versioned contract decision, updated conformance fixtures, and migration or
 compatibility evidence appropriate to that boundary.
 
-[`workflow/public-api.txt`](../workflow/public-api.txt) snapshots exported Go
-declarations for every public `workflow/...` package, including adapters. The
-import/API guard fails on unreviewed drift, Hadron-internal dependencies, or
-unapproved core dependencies. The snapshot is change control while the engine
-remains in the Hadron module; downstream consumers should pin a reviewed module
-revision. It is not a claim that every concrete adapter is enabled by every
-host.
+[`public-api.txt`](../public-api.txt) snapshots exported Go declarations for
+every public package, including adapters. The import/API guard fails on
+unreviewed drift, host dependencies, or unapproved core dependencies. The
+snapshot is change control; downstream consumers must pin an immutable module
+release. It is not a claim that every concrete adapter is enabled by every host.
 
 Regenerate the graph schema and deliberately refresh a reviewed API change:
 
 ```sh
-go generate ./workflow/graph
-UPDATE_WORKFLOW_API=1 go test ./workflow/internal/importguard
-git diff -- workflow/graph/schema workflow/public-api.txt
+go generate ./graph ./compile
+UPDATE_PUBLIC_API=1 go test ./internal/importguard
+git diff -- graph/schema compile/schema public-api.txt
 ```
 
 ## Conformance
@@ -134,22 +133,28 @@ Fixture inputs are opaque to the harness. Each factory must create an isolated
 runner that exercises the downstream implementation; merely matching the
 fixture's expected outcome only tests harness wiring, not conformance.
 
-## Extraction readiness
+## Production adoption checklist
 
-A shared module extraction is appropriate only after all of these stay true
-through downstream adoption:
+A production host is ready only after all of these stay true:
 
-- the entire public tree has zero Hadron-internal or sibling-application
-  dependencies;
+- its `go.mod` pins one immutable `go-workflow` release and contains no local
+  `replace` directive;
+- the module dependency graph has no host-internal or sibling-application
+  dependency;
 - graph, plan, value, wait, runtime, and step-kind meanings remain stable under
   the API/schema guards and complete conformance suites;
-- at least one non-Hadron host implements durable store/timer/policy/executor
-  seams without importing Hadron product services;
-- package names and dependency roots are stable enough for a module-path move;
-  and
-- the extraction can preserve exact version/digest and migration behavior
-  without a second runtime or compatibility interpreter.
+- the host uses durable implementations for every enabled store, timer, wait,
+  artifact, cleanup, policy, and executor seam and proves restart recovery;
+- exact step-kind and verifier catalogs, policy identity, source/plan identity,
+  schemas, and adapter contracts are frozen and attested;
+- external effects are protected by durable claims, idempotency, authorization,
+  cancellation, and bounded cleanup; and
+- real host adapters pass `RunRequired`, `RunComplete`, and, when compensation
+  is enabled, `RunExhaustive`. An expectation-only runner does not qualify a
+  host.
 
-Nanite, Torque, Cerberus, and other applications are downstream consumers, not
-owners of this task. Their adoption and any eventual repository split require
-separate work and are intentionally out of scope here.
+The in-memory store is never acceptable evidence for a production durability
+claim. Nanite, Hadron, Torque, Cerberus, and other applications are downstream
+consumers and own their production composition.
+
+See the module's [stability policy](../STABILITY.md) before upgrading.

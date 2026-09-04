@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"strings"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
 )
 
 const (
-	compilePackagePath = "github.com/hollis-labs/hadron/workflow/compile"
-	graphPackagePath   = "github.com/hollis-labs/hadron/workflow/graph"
+	compilePackagePath = "github.com/hollis-labs/go-workflow/compile"
+	graphPackagePath   = "github.com/hollis-labs/go-workflow/graph"
 	graphSchemaID      = "https://schemas.hollis-labs.dev/workflow/graph/v1/workflow.schema.json"
 	planSchemaID       = "https://schemas.hollis-labs.dev/workflow/plan/v1/execution-plan.schema.json"
 )

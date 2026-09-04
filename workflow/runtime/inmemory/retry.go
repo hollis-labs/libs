@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strconv"
 
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
-	"github.com/hollis-labs/hadron/workflow/values"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 func (s *Store) LoadRetryActivation(ctx context.Context, id string) (workflowruntime.RetryActivationSnapshot, error) {

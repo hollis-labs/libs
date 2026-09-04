@@ -18,7 +18,7 @@ import (
 
 const (
 	hadronImportPath           = "github.com/hollis-labs/hadron"
-	workflowImportPath         = hadronImportPath + "/workflow"
+	workflowImportPath         = "github.com/hollis-labs/go-workflow"
 	workflowAdaptersImportPath = workflowImportPath + "/adapters"
 )
 
@@ -57,7 +57,7 @@ func (v violation) String() string {
 
 func TestWorkflowCoreImports(t *testing.T) {
 	root := moduleRoot(t)
-	err := validateImports(filepath.Join(root, "workflow"), workflowImportPath, skipNonCoreDirectory)
+	err := validateImports(root, workflowImportPath, skipNonCoreDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestWorkflowCoreImports(t *testing.T) {
 
 func TestWorkflowCoreDependencyGraph(t *testing.T) {
 	root := moduleRoot(t)
-	packages := goList(t, root, "-f", "{{.ImportPath}}", "./workflow/...")
+	packages := goList(t, root, "-f", "{{.ImportPath}}", "./...")
 	corePackages := packages[:0]
 	for _, packagePath := range packages {
 		if pathWithin(packagePath, workflowImportPath) && !pathWithin(packagePath, workflowAdaptersImportPath) {
@@ -85,7 +85,7 @@ func TestWorkflowCoreDependencyGraph(t *testing.T) {
 
 func TestEveryWorkflowPackageHasNoHadronInternalDependency(t *testing.T) {
 	root := moduleRoot(t)
-	dependencies := goList(t, root, "-deps", "-f", "{{.ImportPath}}", "./workflow/...")
+	dependencies := goList(t, root, "-deps", "-f", "{{.ImportPath}}", "./...")
 	var rejected []string
 	for _, dependency := range dependencies {
 		if pathWithin(dependency, hadronImportPath+"/internal") {
@@ -100,16 +100,16 @@ func TestEveryWorkflowPackageHasNoHadronInternalDependency(t *testing.T) {
 
 func TestForbiddenImportFixture(t *testing.T) {
 	root := moduleRoot(t)
-	fixture := filepath.Join(root, "workflow", "internal", "importguard", "testdata", "forbidden")
+	fixture := filepath.Join(root, "internal", "importguard", "testdata", "forbidden")
 	err := validateImports(fixture, workflowImportPath+"/forbiddenfixture", nil)
 	if err == nil {
 		t.Fatal("expected the forbidden-import fixture to fail the workflow core import guard")
 	}
 
 	const want = "workflow core import guard failed:\n" +
-		"- forbidden.go:5: github.com/hollis-labs/hadron/workflow/forbiddenfixture imports " +
+		"- forbidden.go:5: github.com/hollis-labs/go-workflow/forbiddenfixture imports " +
 		"\"github.com/hollis-labs/hadron/internal/persistence\": " +
-		"Hadron packages outside workflow core are host-owned"
+		"Hadron is a downstream host and is not a module dependency"
 	if err.Error() != want {
 		t.Fatalf("guard failure = %q, want %q", err, want)
 	}
@@ -129,7 +129,7 @@ func TestImportPolicy(t *testing.T) {
 			{name: "schema validator", importer: workflowImportPath + "/compile", imported: "github.com/santhosh-tekuri/jsonschema/v6"},
 			{name: "expression engine", importer: workflowImportPath + "/values", imported: "github.com/expr-lang/expr/vm"},
 			{name: "adapter dependency", importer: workflowAdaptersImportPath + "/mcp", imported: "github.com/mark3labs/mcp-go/mcp"},
-			{name: "Hadron host dependency", importer: hadronImportPath + "/internal/appworkflow", imported: "modernc.org/sqlite"},
+			{name: "non-module importer", importer: hadronImportPath + "/internal/appworkflow", imported: "modernc.org/sqlite"},
 		}
 
 		for _, tc := range cases {
@@ -147,8 +147,8 @@ func TestImportPolicy(t *testing.T) {
 			imported string
 			want     string
 		}{
-			{name: "Hadron internal", imported: hadronImportPath + "/internal/persistence", want: "host-owned"},
-			{name: "Hadron command", imported: hadronImportPath + "/cmd/hadrond", want: "host-owned"},
+			{name: "Hadron internal", imported: hadronImportPath + "/internal/persistence", want: "downstream host"},
+			{name: "Hadron command", imported: hadronImportPath + "/cmd/hadrond", want: "downstream host"},
 			{name: "workflow adapter", imported: workflowAdaptersImportPath + "/http", want: "adapter packages"},
 			{name: "Wails", imported: "github.com/wailsapp/wails/v2/pkg/runtime", want: "concrete UI"},
 			{name: "HTTP server", imported: "github.com/labstack/echo/v4", want: "concrete transport"},
@@ -334,7 +334,15 @@ func scanImports(root, importRoot string, skipDir func(string, fs.DirEntry) bool
 }
 
 func skipNonCoreDirectory(rel string, entry fs.DirEntry) bool {
-	return entry.Name() == "testdata" || rel == "adapters" || strings.HasPrefix(rel, "adapters/")
+	if entry.Name() == "testdata" || entry.Name() == ".git" {
+		return true
+	}
+	for _, excluded := range []string{"adapters", "docs", "examples", "test"} {
+		if rel == excluded || strings.HasPrefix(rel, excluded+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func forbiddenImportReason(importer, imported string) string {
@@ -356,7 +364,7 @@ func forbiddenImportReason(importer, imported string) string {
 		}
 	}
 	if pathWithin(imported, hadronImportPath) {
-		return "Hadron packages outside workflow core are host-owned"
+		return "Hadron is a downstream host and is not a module dependency"
 	}
 	for _, sibling := range siblingApplicationImports {
 		if pathWithin(imported, sibling) {

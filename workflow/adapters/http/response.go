@@ -13,8 +13,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
 )
 
 func (k *Kind) mapResponse(ctx context.Context, identity stepkind.InvocationIdentity, parsed config, response *nethttp.Response, redactor *values.Redactor, hops int, finalMethod, finalOrigin string) (values.ValueSet, error) {

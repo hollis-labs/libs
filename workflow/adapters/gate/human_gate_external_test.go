@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	gateadapter "github.com/hollis-labs/hadron/workflow/adapters/gate"
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	workflowgate "github.com/hollis-labs/hadron/workflow/gate"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/values"
-	workflowwait "github.com/hollis-labs/hadron/workflow/wait"
+	gateadapter "github.com/hollis-labs/go-workflow/adapters/gate"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	workflowgate "github.com/hollis-labs/go-workflow/gate"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/values"
+	workflowwait "github.com/hollis-labs/go-workflow/wait"
 )
 
 var gateTime = time.Date(2026, time.August, 24, 16, 0, 0, 0, time.UTC)

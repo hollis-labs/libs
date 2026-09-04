@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	workflowwait "github.com/hollis-labs/hadron/workflow/wait"
+	workflowwait "github.com/hollis-labs/go-workflow/wait"
 )
 
 // ChildTerminalWait is a bounded recovery candidate for a terminal child and

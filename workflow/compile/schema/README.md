@@ -12,13 +12,13 @@ a process-local compiler registry.
 From the repository root, regenerate both schema boundaries with:
 
 ```sh
-go generate ./workflow/graph ./workflow/compile
+go generate ./graph ./compile
 ```
 
 Then run:
 
 ```sh
-go test ./workflow/graph/... ./workflow/compile/...
+go test ./graph/... ./compile/...
 ```
 
 The compile schema test regenerates the plan schema in memory, rejects stale

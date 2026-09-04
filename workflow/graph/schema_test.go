@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/graph/internal/schemagen"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph/internal/schemagen"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -32,7 +32,7 @@ func TestGeneratedSchemaIsCurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(generated, committed) {
-		t.Fatal("workflow graph schema is stale; run: go generate ./workflow/graph")
+		t.Fatal("workflow graph schema is stale; run: go generate ./graph")
 	}
 }
 

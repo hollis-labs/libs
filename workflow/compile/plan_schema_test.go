@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/compile/internal/planschema"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/compile/internal/planschema"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -34,7 +34,7 @@ func TestGeneratedPlanSchemaIsCurrentAndDeterministic(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(generated, committed) {
-		t.Fatal("execution-plan schema is stale; run: go generate ./workflow/compile")
+		t.Fatal("execution-plan schema is stale; run: go generate ./compile")
 	}
 }
 

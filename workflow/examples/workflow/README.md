@@ -3,8 +3,8 @@
 ## Runnable with the stock daemon
 
 The files under [`production/`](production/) use only step kinds registered by
-the production Hadron host. File definitions are confined to the daemon's
-workflow source root, so stage the examples there before starting `hadrond`:
+the production Hadron host. To try them in Hadron, stage the examples in that
+host's workflow source root before starting `hadrond`:
 
 ```sh
 install -d "$HOME/.hadron/workflows"
@@ -44,13 +44,8 @@ runnable by the stock daemon:
   `cmd@v1`.
 - [`torque-task-bulk-create.workflow.yaml`](torque-task-bulk-create.workflow.yaml)
   is a fake-MCP integration fixture used by
-  `internal/mcpadapter/torque_bulk_create_e2e_test.go`. The stock daemon does
-  not register `mcp@v1`.
+  downstream integration tests. The stock daemon does not register `mcp@v1`.
 
 The wider adapter set remains available to embedders that construct and bind a
 host with an explicit capability and policy profile. It is never inferred from
 the presence of these fixtures.
-
-Beta-era blueprint and pipeline samples remain under
-[`../archive/legacy-blueprints-pipelines/`](../archive/legacy-blueprints-pipelines/)
-for rewrite/reference use only. They are not accepted by the active public CLI.

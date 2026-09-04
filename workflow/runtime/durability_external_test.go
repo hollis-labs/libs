@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
-	workflowruntime "github.com/hollis-labs/hadron/workflow/runtime"
+	"github.com/hollis-labs/go-workflow/graph"
+	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
 )
 
 func TestParseContinueAsNewRejectsNonConvergentPlansBeforeRecovery(t *testing.T) {

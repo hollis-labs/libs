@@ -10,9 +10,9 @@ import (
 	"slices"
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/diagnostic"
-	"github.com/hollis-labs/hadron/workflow/graph"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 const representativeLocator = "testdata/representative.workflow.yaml"
@@ -405,7 +405,7 @@ func assertSnapshot(t *testing.T, name string, got []byte) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatalf("snapshot %s is stale; run UPDATE_WORKFLOW_SNAPSHOTS=1 go test ./workflow/compile", name)
+		t.Fatalf("snapshot %s is stale; run UPDATE_WORKFLOW_SNAPSHOTS=1 go test ./compile", name)
 	}
 }
 

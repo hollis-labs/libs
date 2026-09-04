@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/hadron/workflow/graph/internal/schemagen"
+	"github.com/hollis-labs/go-workflow/graph/internal/schemagen"
 )
 
 func main() {

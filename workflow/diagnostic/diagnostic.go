@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 // Severity describes how a diagnostic affects the requested operation.

@@ -8,10 +8,10 @@ import (
 	"sort"
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/hadron/workflow/compile"
-	"github.com/hollis-labs/hadron/workflow/graph"
-	"github.com/hollis-labs/hadron/workflow/stepkind"
-	"github.com/hollis-labs/hadron/workflow/stepkind/stepkindtest"
+	workflowcompile "github.com/hollis-labs/go-workflow/compile"
+	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/go-workflow/stepkind/stepkindtest"
 )
 
 var activeAcceptanceExamples = []string{
@@ -27,7 +27,7 @@ type acceptanceCompilation struct {
 }
 
 func TestEveryActiveWorkflowExampleCompilesInfersAndValidates(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "workflow", "*.yaml"))
+	paths, err := filepath.Glob(filepath.Join("..", "examples", "workflow", "*.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestInvalidAcceptanceExampleDiagnosticSnapshot(t *testing.T) {
 
 func compileAcceptanceExample(t *testing.T, name string) acceptanceCompilation {
 	t.Helper()
-	path := filepath.Join("..", "..", "examples", "workflow", name)
+	path := filepath.Join("..", "examples", "workflow", name)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

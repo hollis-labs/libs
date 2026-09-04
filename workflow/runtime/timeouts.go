@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hollis-labs/hadron/workflow/graph"
+	"github.com/hollis-labs/go-workflow/graph"
 )
 
 // TimeoutKind distinguishes operational deadlines that have different retry

@@ -1,3 +1,3 @@
-// Package importguard verifies the extraction-ready workflow core dependency
-// boundary during tests.
+// Package importguard verifies the standalone module's dependency and public
+// API boundaries during tests.
 package importguard
