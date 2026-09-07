@@ -30,8 +30,3 @@ at `go-tether-client` instead, and send behavior changes there.
 consolidation (migration-map Decision 2), because its cadence follows the
 Tether service API rather than the agent runtime stack. That exclusion is
 still current.
-
-`TASK_AGENT_BOOT_PROMPT.md` at the root is a frozen April 2026 session handoff
-briefing an agent to build this scaffold into the client. That work shipped and
-has since been deprecated, so the file describes nothing that is still true.
-It is kept only pending a disposition decision — do not follow it.
