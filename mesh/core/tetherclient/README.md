@@ -54,6 +54,41 @@ func main() {
 }
 ```
 
+## Session bootstrap
+
+A launcher/host (e.g. agent-setup) can resolve and register a session's
+canonical identity at the launch boundary without requiring Tether to be
+running -- `ResolveSessionBootstrap` always returns a usable session id even
+when the daemon is unreachable, and `Result.Registered` reports whether the
+best-effort daemon registration actually happened. Calling it again with the
+same preassigned `SESSION` value is always safe: it never invents a competing
+identity.
+
+```go
+res, err := tether.ResolveSessionBootstrap(ctx, client, tether.BootstrapOptions{
+	// SessionID left empty: resolves from the SESSION env var, or mints
+	// a fresh one if that's also unset.
+	LogicalAgentID: "agt_worker", // optional: associate with a durable actor
+})
+if err != nil {
+	log.Fatal(err) // only a local mistake (e.g. id-minting failure) reaches here
+}
+os.Setenv("SESSION", res.SessionID) // inject into the child process regardless of res.Registered
+if !res.Registered {
+	log.Printf("tether unreachable, continuing offline: %v", res.RegisterErr)
+}
+```
+
+Shell equivalent (register a preassigned `SESSION` once Tether happens to be
+reachable; safe to run unconditionally, including when it isn't):
+
+```sh
+curl -s -X POST "http://127.0.0.1:7180/sessions/bootstrap" \
+  -H 'Content-Type: application/json' \
+  -d "{\"session_id\":\"$SESSION\",\"logical_agent_id\":\"agt_worker\"}" \
+  || true  # offline is not a failure -- SESSION is already set locally
+```
+
 ## AI gateway example
 
 ```go
@@ -77,6 +112,7 @@ The client covers:
 
 - health
 - session lifecycle
+- session bootstrap (canonical identity resolution + registration, offline-safe)
 - attach, wait, input, resize, send turn
 - checkpoints
 - catalog reads

@@ -8,6 +8,32 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 
 ## Unreleased
 
+### Added
+- Session bootstrap (messaging-vnext T08): the provider-neutral local
+  bootstrap/registration helper a launcher/host invokes at the launch
+  boundary.
+  - `ResolveSessionBootstrap` — resolves a session's canonical identity
+    (preassigned via `SESSION` env var, explicit option, or minted
+    fallback) and best-effort registers it with a running daemon. Always
+    returns a usable `SessionID` even when Tether is completely
+    unreachable (`Result.Registered` / `Result.RegisterErr` report the
+    registration outcome separately from the local resolution, which
+    never fails for daemon-reachability reasons).
+  - `Client.BootstrapSession` — the lower-level `POST /sessions/bootstrap`
+    wire call for a caller that has already decided the full payload.
+  - `CanonicalSessionEnvKey`, `BootstrapIntent`, `PublicationChoice`,
+    `ProviderMapping`, `BootstrapOptions`, `BootstrapResult`,
+    `SessionBootstrapRequest`, `SessionBootstrapResult`.
+  - Idempotent: a repeated call for the same preassigned session id never
+    errors and never invents a competing identity.
+
+### Notes
+- The `go-messaging` dependency remains pinned at `v0.2.0` in this
+  release. Tether's own daemon has moved past that version internally,
+  but nothing added in this change depends on `go-messaging` at all, and
+  bumping it is a separate, independently-reviewable change deferred
+  rather than bundled in here.
+
 ## v0.1.0 — 2026-05-25
 
 Initial public release as the successor to `go-agentmux-client`.
