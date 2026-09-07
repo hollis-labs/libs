@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -26,12 +27,119 @@ func TestHTTPStore_Contract(t *testing.T) {
 		srv := httptest.NewServer(newMsgTestHandler(ms, disp))
 		t.Cleanup(srv.Close)
 
-		client, err := tether.New(srv.URL)
+		// WithSelfURN is required for Get/Thread (see messaging_store.go) --
+		// this fake handler doesn't enforce Tether's real "?as= must be a
+		// party to the message" ownership check (that's Tether's own
+		// concern, covered by its own test suite), so any fixed identity
+		// unblocks the generic cross-implementation conformance suite here.
+		client, err := tether.New(srv.URL, tether.WithSelfURN("msg://agent/test/contract-caller"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		return client.AsStore()
 	})
+}
+
+// TestHTTPStore_GetAndThread_RequireSelfURN is the regression test for the
+// gap this task's own review found: Get and Thread have no
+// recipient/address parameter to derive Tether's required ?as= claim from,
+// so a Client built without WithSelfURN must fail fast, client-side,
+// instead of sending a request the daemon will reject.
+func TestHTTPStore_GetAndThread_RequireSelfURN(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawRequest = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := tether.New(srv.URL) // no WithSelfURN
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := client.AsStore()
+
+	if _, err := store.Get(context.Background(), "some-id"); !errors.Is(err, tether.ErrSelfURNRequired) {
+		t.Errorf("Get: got %v, want ErrSelfURNRequired", err)
+	}
+	if _, err := store.Thread(context.Background(), "some-thread", messaging.Filter{}); !errors.Is(err, tether.ErrSelfURNRequired) {
+		t.Errorf("Thread: got %v, want ErrSelfURNRequired", err)
+	}
+	if sawRequest {
+		t.Error("expected Get/Thread to fail client-side, without ever reaching the daemon")
+	}
+}
+
+// TestHTTPStore_SendsAsQueryParam is the regression test proving each read
+// call actually attaches Tether's required ?as= claim to the outgoing HTTP
+// request: Get/Thread assert the client's configured self URN, Inbox/
+// Subscribe assert the `to` address they were already called with.
+func TestHTTPStore_SendsAsQueryParam(t *testing.T) {
+	const self = "msg://agent/test/self"
+	to := messaging.Address{Kind: messaging.KindAgent, Authority: "test", ID: "bob"}
+
+	var gotQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "/thread/"), strings.Contains(r.URL.Path, "/inbox"):
+			json.NewEncoder(w).Encode(map[string]any{"messages": []messaging.Envelope{}}) //nolint:errcheck
+		case r.URL.Path == "/messages/subscribe":
+			flusher := w.(http.Flusher)
+			w.WriteHeader(http.StatusOK)
+			flusher.Flush()
+		default:
+			json.NewEncoder(w).Encode(messaging.Envelope{ //nolint:errcheck
+				ID:   "x",
+				Kind: messaging.MsgKindNotice,
+				From: messaging.Address{Kind: messaging.KindAgent, Authority: "test", ID: "alice"},
+				To:   to,
+			})
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := tether.New(srv.URL, tether.WithSelfURN(self))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := client.AsStore()
+	ctx := context.Background()
+
+	if _, err := store.Get(ctx, "some-id"); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got := gotQuery.Get("as"); got != self {
+		t.Errorf("Get: ?as=%q, want %q", got, self)
+	}
+
+	if _, err := store.Thread(ctx, "some-thread", messaging.Filter{}); err != nil {
+		t.Fatalf("Thread: %v", err)
+	}
+	if got := gotQuery.Get("as"); got != self {
+		t.Errorf("Thread: ?as=%q, want %q", got, self)
+	}
+
+	if _, err := store.Inbox(ctx, to, messaging.Filter{}); err != nil {
+		t.Fatalf("Inbox: %v", err)
+	}
+	if got := gotQuery.Get("as"); got != to.URN() {
+		t.Errorf("Inbox: ?as=%q, want %q (matching `to`)", got, to.URN())
+	}
+
+	subCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	ch, err := store.Subscribe(subCtx, to, messaging.Filter{})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	cancel()
+	for range ch {
+	}
+	if got := gotQuery.Get("as"); got != to.URN() {
+		t.Errorf("Subscribe: ?as=%q, want %q (matching `to`)", got, to.URN())
+	}
 }
 
 // msgTestHandler serves the /messages/* routes backed by an in-process memstore.

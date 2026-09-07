@@ -8,7 +8,28 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 
 ## Unreleased
 
+### Fixed
+- **Breaking-if-you-relied-on-the-old-behavior**: `Get` and `Thread` now
+  require the `Client` to be constructed with the new `WithSelfURN` option
+  (see below) and return `ErrSelfURNRequired` otherwise; `Inbox` and
+  `Subscribe` now always attach `?as=<to's own URN>` to the outgoing
+  request. Tether's daemon requires every messaging read to assert a
+  caller identity via `?as=` (ADR 0045) — this client previously omitted
+  it entirely on all four calls, so every one of them was rejected
+  (`400 invalid_request`) by a current Tether daemon. `Send`/`Consume`/
+  `Cancel` were unaffected (`Consume` already asserted the recipient
+  correctly).
+
 ### Added
+- `WithSelfURN(urn string)` client option: configures the caller's own
+  asserted identity, used by `Get`/`Thread` (which have no
+  recipient/address parameter of their own to derive `?as=` from — unlike
+  `Inbox`/`Subscribe`, which already take an explicit recipient and now use
+  it directly). Required for `Get`/`Thread`; not needed for
+  `Send`/`Inbox`/`Consume`/`Cancel`/`Subscribe`.
+- `ErrSelfURNRequired`: returned by `Get`/`Thread` when `WithSelfURN` was
+  not configured, instead of the call reaching the daemon and getting a
+  less specific `400`.
 - Session bootstrap (messaging-vnext T08): the provider-neutral local
   bootstrap/registration helper a launcher/host invokes at the launch
   boundary.

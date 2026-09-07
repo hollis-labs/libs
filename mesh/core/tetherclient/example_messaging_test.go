@@ -33,9 +33,11 @@ func ExampleClient_AsDispatcher() {
 }
 
 // ExampleClient_AsStore shows direct Store usage for sending and retrieving
-// a message via the /messages/* HTTP routes.
+// a message via the /messages/* HTTP routes. WithSelfURN is required here:
+// Get has no recipient parameter of its own, so it needs the client's own
+// asserted identity to satisfy Tether's required ?as= claim (ADR 0045).
 func ExampleClient_AsStore() {
-	client := tether.MustNew("")
+	client := tether.MustNew("", tether.WithSelfURN("msg://agent/nanite/alice"))
 	store := client.AsStore()
 
 	ctx := context.Background()

@@ -61,9 +61,17 @@ func (s *httpStore) Send(ctx context.Context, env messaging.Envelope) (messaging
 }
 
 // Get retrieves a single envelope by ID. Returns ErrNotFound if absent.
+// Requires the Client to be constructed with WithSelfURN: Tether's daemon
+// requires every read to assert a caller identity via ?as= (ADR 0045), and
+// Get has no recipient parameter of its own to derive that claim from.
 func (s *httpStore) Get(ctx context.Context, id string) (messaging.Envelope, error) {
+	if s.c.selfURN == "" {
+		return messaging.Envelope{}, ErrSelfURNRequired
+	}
+	q := url.Values{}
+	q.Set("as", s.c.selfURN)
 	var out messaging.Envelope
-	err := s.c.getJSON(ctx, "/messages/"+url.PathEscape(id), &out)
+	err := s.c.getJSON(ctx, withQuery("/messages/"+url.PathEscape(id), q), &out)
 	if err != nil {
 		return messaging.Envelope{}, mapStoreError(err)
 	}
@@ -71,9 +79,13 @@ func (s *httpStore) Get(ctx context.Context, id string) (messaging.Envelope, err
 }
 
 // Inbox returns undelivered envelopes for to, atomically marking them delivered.
+// Asserts ?as=to's own URN: Tether's daemon requires every mailbox read to
+// claim the mailbox owner's identity (ADR 0045), and `to` already names it
+// unambiguously -- unlike Get/Thread, no separate self-identity is needed.
 func (s *httpStore) Inbox(ctx context.Context, to messaging.Address, f messaging.Filter) ([]messaging.Envelope, error) {
 	q := url.Values{}
 	q.Set("to", to.URN())
+	q.Set("as", to.URN())
 	if len(f.Kind) > 0 {
 		kinds := make([]string, len(f.Kind))
 		for i, k := range f.Kind {
@@ -97,9 +109,16 @@ func (s *httpStore) Inbox(ctx context.Context, to messaging.Address, f messaging
 	return resp.Messages, nil
 }
 
-// Thread returns envelopes sharing a threadID. Read-only; no delivery side effects.
+// Thread returns envelopes sharing a threadID. Read-only; no delivery side
+// effects. Requires the Client to be constructed with WithSelfURN, same
+// reasoning as Get: a thread has two parties, not one addressee, so there
+// is no single `to` this call could derive ?as= from.
 func (s *httpStore) Thread(ctx context.Context, threadID string, f messaging.Filter) ([]messaging.Envelope, error) {
+	if s.c.selfURN == "" {
+		return nil, ErrSelfURNRequired
+	}
 	q := url.Values{}
+	q.Set("as", s.c.selfURN)
 	if len(f.Kind) > 0 {
 		kinds := make([]string, len(f.Kind))
 		for i, k := range f.Kind {
@@ -142,6 +161,11 @@ func (s *httpStore) Cancel(ctx context.Context, id string) error {
 func (s *httpStore) Subscribe(ctx context.Context, to messaging.Address, f messaging.Filter) (<-chan messaging.Envelope, error) {
 	q := url.Values{}
 	q.Set("to", to.URN())
+	// Asserts ?as=to's own URN -- same reasoning as Inbox above. Tether's
+	// daemon requires it (T11 security fix: subscribe used to accept a
+	// live stream with strictly less identity assertion than the
+	// equivalent one-shot Inbox read of the same mailbox).
+	q.Set("as", to.URN())
 	if len(f.Kind) > 0 {
 		kinds := make([]string, len(f.Kind))
 		for i, k := range f.Kind {

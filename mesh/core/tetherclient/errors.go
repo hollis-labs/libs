@@ -13,6 +13,14 @@ import (
 
 var ErrDaemonUnreachable = errors.New("tether daemon unreachable")
 
+// ErrSelfURNRequired is returned by httpStore.Get and httpStore.Thread when
+// the Client was constructed without WithSelfURN. Both calls have no
+// recipient/address parameter to derive Tether's required `?as=` claim
+// from, so failing fast client-side (rather than letting the daemon return
+// a 400) gives a caller a clear, actionable error instead of an opaque API
+// failure.
+var ErrSelfURNRequired = errors.New("tether: WithSelfURN must be configured to call Get or Thread")
+
 type ErrorResponse struct {
 	Error ErrorDetail `json:"error"`
 }

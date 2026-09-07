@@ -19,6 +19,7 @@ import (
 type Client struct {
 	baseURL string
 	http    *http.Client
+	selfURN string
 }
 
 type Option func(*Client)
@@ -36,6 +37,19 @@ func WithBaseURL(baseURL string) Option {
 		if baseURL != "" {
 			c.baseURL = strings.TrimRight(baseURL, "/")
 		}
+	}
+}
+
+// WithSelfURN configures the caller's own asserted identity (a `msg://...`
+// URN). Tether's messaging routes require every read to name a caller via
+// `?as=` (ADR 0045's same-host, self-asserted trust model) -- Get and
+// Thread have no recipient/address parameter of their own to derive that
+// claim from (unlike Inbox/Subscribe, which already take an explicit
+// recipient and use it directly), so a Client used for those two calls
+// must configure its own identity once, here, up front.
+func WithSelfURN(urn string) Option {
+	return func(c *Client) {
+		c.selfURN = urn
 	}
 }
 
