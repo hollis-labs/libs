@@ -17,7 +17,7 @@ versions; see [CHANGELOG.md](./CHANGELOG.md).
 go get github.com/hollis-labs/go-tether-client
 ```
 
-Requires Go 1.22 or newer.
+Requires Go 1.26.2 or newer.
 
 ## Default transport
 
@@ -131,6 +131,25 @@ timeout:
 - `AIChat`
 - `AIChatStream`
 - `StreamEvents`
+
+## Asserted caller identity (messaging reads)
+
+Tether's daemon requires every messaging **read** to assert who is asking,
+via an `?as=<urn>` query parameter (ADR 0045, same-host trust model). The
+client attaches it for you, but it needs to know your identity:
+
+- `Inbox` and `Subscribe` derive it from the recipient you already pass.
+- `Get` and `Thread` have no such parameter, so they read it from the
+  client-level `WithSelfURN` option and return `ErrSelfURNRequired` if it
+  was never set.
+- `Send`, `Consume` and `Cancel` do not need it.
+
+```go
+client := tether.MustNew("", tether.WithSelfURN("msg://agent/agent-mux/agt_xxxxxxxxxxxx"))
+```
+
+Get your URN from `mux registry register --print-urn-only`, or from
+`tether_whoami` over MCP.
 
 ## Migration
 

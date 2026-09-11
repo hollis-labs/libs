@@ -1,4 +1,4 @@
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/hollis-labs/go-messaging v0.2.0 h1:JypqjXMcgyFBbLmX+NlwTxJuwIAAjKd/3Qbm4+I84JE=
-github.com/hollis-labs/go-messaging v0.2.0/go.mod h1:tMiHRx7QHV1GWw5pZ1khnursbIQuzikScSRXWVdP8nk=
+github.com/hollis-labs/go-messaging v0.5.1 h1:qmOYQ8ycC5rxr/BSTGGkbtS9dNlBUQpQFo8cVV7IXTI=
+github.com/hollis-labs/go-messaging v0.5.1/go.mod h1:9KGpsIirex9jgJ9SXwW/PO6vcEl9xCZNguAjEFXlsSw=

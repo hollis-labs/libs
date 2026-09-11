@@ -6,7 +6,7 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
-## Unreleased
+## v0.2.0 — 2026-09-11
 
 ### Fixed
 - **Breaking-if-you-relied-on-the-old-behavior**: `Get` and `Thread` now
@@ -48,12 +48,26 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
   - Idempotent: a repeated call for the same preassigned session id never
     errors and never invents a competing identity.
 
+### Changed
+- `go-messaging` bumped from `v0.2.0` to `v0.5.1`, resolving the deferral
+  this changelog previously recorded. `v0.5.1` is the version Tether's own
+  daemon runs, so a consumer no longer links two different copies of the
+  shared contract. The upgrade is source-compatible here: the package's
+  `messagingtest` conformance suite passes unchanged against the
+  `messaging.Store` implementation in `messaging_store.go`.
+- **Minimum Go raised from 1.22 to 1.26.2**, with `toolchain go1.26.6`, to
+  match Tether's own floor. At `go 1.22` this module resolved to a
+  standard library with 13 known vulnerabilities reachable from its own
+  call paths (`AttachSession`/`BootstrapSession` through `crypto/x509`,
+  `crypto/tls` and `net/http`); `govulncheck` is clean at the new floor.
+  Every known consumer — Tether (1.26.2), Torque (1.26.6), Nanite
+  (1.26.7) — already requires more than this, so nothing in the portfolio
+  is constrained by the change.
+
 ### Notes
-- The `go-messaging` dependency remains pinned at `v0.2.0` in this
-  release. Tether's own daemon has moved past that version internally,
-  but nothing added in this change depends on `go-messaging` at all, and
-  bumping it is a separate, independently-reviewable change deferred
-  rather than bundled in here.
+- Typed `Claim`/`Ack`/`Nack` wrappers for the durable-delivery primitives
+  (`POST /messages/{id}/claim|ack|nack`) are still not in this client;
+  those routes remain raw-HTTP only. Tracked as CW-20260907-0038.
 
 ## v0.1.0 — 2026-05-25
 
