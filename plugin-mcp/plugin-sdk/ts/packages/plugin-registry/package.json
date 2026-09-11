@@ -1,0 +1,61 @@
+{
+  "name": "@hollis-labs/plugin-registry",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser half of the plugin contract — the registry wire types and the loader that resolves them.",
+  "keywords": [
+    "plugin",
+    "registry",
+    "loader",
+    "esm",
+    "dynamic-import"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollis-labs/plugin-sdk.git",
+    "directory": "ts/packages/plugin-registry"
+  },
+  "homepage": "https://github.com/hollis-labs/plugin-sdk/tree/main/ts/packages/plugin-registry#readme",
+  "bugs": {
+    "url": "https://github.com/hollis-labs/plugin-sdk/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.js",
+    "test:run": "npm run build && node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0"
+  }
+}

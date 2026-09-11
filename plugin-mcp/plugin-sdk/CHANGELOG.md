@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`registry`** — the Go view of the plugin registry wire contract: the
+  `Response` a host serves so a browser can find, load and resolve the UI its
+  plugins ship, the `Protocol` constant pinned at 1, and `Validate`. Types,
+  the constant and validation only: a host owns its own endpoint and its own
+  caching.
+- **`ts/`** — a TypeScript companion workspace, so the registry wire contract
+  is defined once with a Go view and a TypeScript view rather than
+  hand-matched across two repositories.
+- **`@hollis-labs/plugin-registry`** (`ts/packages/plugin-registry`) — the
+  browser half. `createPluginRegistry` dynamic-imports each plugin's ES
+  module, resolves the named exports the registry names, isolates and
+  attributes load failures per plugin, and notifies subscribers. It works with
+  no configuration; `adopt`, `reserved`, `importModule`, `stylesheets` and
+  `onDiagnostic` are overrides. The core entry point has no dependencies.
+- **`@hollis-labs/plugin-registry/react`** — the React adapter, behind an
+  optional peer dependency: `createReactPluginRegistry`, `reactAdopt`, and
+  `useSyncExternalStore` hooks.
+
+### Notes
+
+- The registry contract treats a contribution *kind* as an open string and its
+  metadata as opaque JSON. It deliberately does not build on `UIComponentType`
+  in `plugin.go`, which is one host's taxonomy that already lives in this
+  module.
+- The two views are authored rather than generated, and there is no shared
+  golden fixture. Both halves pin the protocol number and round-trip their own
+  types, so a host and a loader at different versions disagree about the
+  protocol rather than about a field — the same answer
+  `TestProtocolVersionLockedAt1` already gives for the subprocess wire.
+
 ## v0.3.1 — 2026-05-10
 
 ### Changed

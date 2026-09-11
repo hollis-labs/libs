@@ -11,6 +11,11 @@
 coverage.out
 coverage.txt
 
+# TypeScript companion (ts/) — dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Editor / OS scratch
 .DS_Store
 .idea/

@@ -1,11 +1,17 @@
 # plugin-sdk
 
-A host-neutral Go SDK for building plugins that talk to a host application over
-JSON-RPC 2.0 stdio. It owns the `Plugin` contract, the typed error and envelope
-types, the wire protocol, the `Serve` loop and an in-process test harness. It
-is deliberately not tied to any host product — hosts add their own registration
-surfaces in their own packages — and it has no dependencies outside the
-standard library.
+The plugin contract, in two halves, for plugins that talk to a host
+application over JSON-RPC 2.0 stdio and ship UI into its browser.
+
+The **Go module** owns the `Plugin` contract, the typed error and envelope
+types, the wire protocol, the `Serve` loop and an in-process test harness. The
+**TypeScript companion** under `ts/` owns the browser half: the registry a
+host publishes and the loader that resolves it.
+
+Both are deliberately not tied to any host product — hosts add their own
+registration surfaces in their own packages. The Go module has no dependencies
+outside the standard library, and the TypeScript core entry point has none at
+all; React is an optional peer behind a subpath.
 
 ## Start Here
 
@@ -22,6 +28,11 @@ standard library.
   helpers.
 - `subprocess/subprocesstest/` drives a plugin in-process, without spawning one.
 - `examples/hello` is a complete minimal plugin.
+- `registry/registry.go` owns the registry wire contract's Go view and
+  `Protocol`.
+- `ts/packages/plugin-registry/src/types.ts` owns the same contract's
+  TypeScript view; `loader.ts` owns `createPluginRegistry`, and `react.ts` the
+  optional React adapter.
 
 ## Commands
 
@@ -29,6 +40,13 @@ standard library.
 gofmt -l .
 go vet ./...
 go test -race -count=1 ./...
+```
+
+The browser half, from `ts/` (run `npm install` there once):
+
+```bash
+npm run typecheck
+npm test            # builds, then runs node --test against dist/
 ```
 
 There is no CI workflow or Makefile in this repo.
@@ -53,3 +71,30 @@ so a logging path that bypasses `mergeKVs` writes credentials into host logs.
 
 Keep the base contract host-neutral and dependency-free. The moment a host
 product's types appear here, every other host inherits them.
+
+`registry.Protocol` and `PROTOCOL` in the TypeScript half are the same number
+and are pinned on both sides. The two views are authored, not generated, and
+there is deliberately **no shared golden fixture**: both halves of a fixture
+are always at the same commit, so one can only catch drift introduced within a
+single change, while the real risk is a host and a loader shipped at different
+versions. Pinning the protocol on each side and round-tripping each side's own
+types makes that mismatch something the loader reports at runtime — the same
+answer `TestProtocolVersionLockedAt1` already gives for the subprocess wire.
+
+The registry contract knows nothing about what a contribution *kind* means. A
+kind is an open string and its metadata is opaque JSON, because one host's
+envelopes, widgets and slots are another host's something else. Note that
+`UIComponentType` in `plugin.go` is one host's taxonomy that already lives in
+this module: the registry contract does not build on it, and unifying the two
+would move a host's vocabulary into the shared contract. Also not here, and
+for the same reason: any host's trust or isolation model, where bundles are
+served from and under what CSP, and how a bundle obtains shared runtime
+dependencies such as a React copy.
+
+The loader derives its contribution table from the declared registry on every
+sync rather than maintaining it incrementally. That is load bearing: wiring
+contributions only when a bundle changed makes the contribution set a function
+of the bundle rather than of the host manifest, and a manifest edit that does
+not rebuild the bundle then never reaches the browser. The `regression:` tests
+in `ts/packages/plugin-registry/test/loader.test.js` pin this and three related
+refusals; each was verified to fail when the behaviour is reverted.

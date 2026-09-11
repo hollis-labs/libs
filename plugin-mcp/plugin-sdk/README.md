@@ -2,10 +2,16 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/plugin-sdk.svg)](https://pkg.go.dev/github.com/hollis-labs/plugin-sdk)
 
-Universal Go SDK for building plugins that talk to a host application
-over JSON-RPC stdio. The SDK is host-neutral — the base contract has
-zero dependencies on any specific host product, and host applications
-extend it with their own registration surfaces in their own packages.
+The plugin contract, in two halves. A universal **Go SDK** for building
+plugins that talk to a host application over JSON-RPC stdio, and a
+**TypeScript companion** (`ts/`) for the browser side — the registry a host
+publishes and the loader that resolves it.
+
+Both halves are host-neutral: neither has a dependency on any specific host
+product, and host applications extend them with their own registration
+surfaces in their own packages. They live in one repository so the registry
+wire contract is defined once, with a Go view and a TypeScript view of the
+same thing.
 
 ## Status
 
@@ -39,6 +45,15 @@ go get github.com/hollis-labs/plugin-sdk
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
+- `registry` — the Go view of the plugin registry wire contract: the
+  response a host serves so a browser can find, load and resolve the UI
+  its plugins ship, plus `Validate`.
+- `ts/packages/plugin-registry` — `@hollis-labs/plugin-registry`, the
+  browser half. The TypeScript view of the same contract, and a loader
+  that dynamic-imports each plugin's ES module, resolves the named
+  exports the registry names, and isolates load failures per plugin. The
+  core entry point has no dependencies; `@hollis-labs/plugin-registry/react`
+  adds the React adapter behind an optional peer.
 
 ## Quickstart
 
@@ -110,6 +125,21 @@ github.com/hollis-labs/plugin-sdk
         └── harness.go     in-process test harness
 ```
 
+The browser half, an npm workspace nested one level down so Go tooling and
+`node_modules/` stay out of each other's way:
+
+```
+ts/
+├── package.json           private workspace root
+└── packages/
+    └── plugin-registry/   @hollis-labs/plugin-registry
+        └── src/
+            ├── types.ts        the wire contract, TypeScript view
+            ├── loader.ts       createPluginRegistry
+            ├── stylesheets.ts  the stylesheet sink and its default
+            └── react.ts        the React adapter (optional peer)
+```
+
 ## Versioning
 
 Independent release cycle. Consumers pin a tagged version via `go.mod`.
@@ -119,6 +149,14 @@ See [CHANGELOG.md](./CHANGELOG.md) for per-release notes.
 
 ```bash
 go test ./...
+```
+
+The browser half builds and tests with `npm`, from `ts/`:
+
+```bash
+cd ts && npm install
+npm run typecheck
+npm test
 ```
 
 For wire-format fidelity, enable JSON roundtripping in the harness so

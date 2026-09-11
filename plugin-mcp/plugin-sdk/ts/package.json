@@ -1,0 +1,24 @@
+{
+  "name": "plugin-sdk-ts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TypeScript companion to the plugin-sdk Go module — the browser half of the plugin contract.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollis-labs/plugin-sdk.git",
+    "directory": "ts"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

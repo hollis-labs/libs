@@ -1,0 +1,14 @@
+{
+  "//": "Emit config. The base tsconfig is noEmit with allowImportingTsExtensions, which is right for typechecking and cannot emit; this turns both off. Source imports carry `.js` extensions on purpose — TypeScript resolves them to the `.ts` file and emits them unchanged, so the output runs in Node with no rewrite step and no bundler.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src"]
+}
