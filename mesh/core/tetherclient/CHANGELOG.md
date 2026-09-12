@@ -6,6 +6,59 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.3.0 — 2026-09-12
+
+### Added
+
+- **Typed durable-delivery wrappers** — `ClaimMessage`, `AckMessage` and
+  `NackMessage` over `POST /messages/{id}/claim|ack|nack`, which were
+  raw-HTTP only until now (CW-20260907-0038). These are the primitive
+  behind durable host acceptance: `Claim` takes custody, `Ack` reports a
+  stage (`host_accepted`, then `consumed`), `Nack` declines. Consume is
+  still the right call when one call is honest about what happened; this
+  cycle is for when taking custody and reporting the outcome must be
+  separable so a crash between them is recoverable.
+- `ClaimOptions` (`Holder`, `LeaseSeconds`) and `NackOptions`
+  (`Retryable`, `Reason`, `NextAttemptSeconds`). Both zero values are
+  valid: `ClaimOptions{}` lets the daemon default holder and lease, and
+  `NackOptions{}` dead-letters, because a Nack that says nothing is not
+  a request to retry.
+
+  Two behaviors worth knowing before you build on these:
+
+  - `ClaimMessage` returns the lease duration the daemon **granted**,
+    which may be shorter than requested — the daemon clamps to its own
+    maximum. Honor the returned value, not the requested one.
+  - A non-retryable `NackMessage` dead-letters, and that is a
+    **successful** outcome: it returns a nil error along with the
+    resulting delivery. Read `RecipientDelivery.Status` to see what
+    happened rather than treating a nil error as "still alive". A caller
+    that reads non-nil-error-means-failure would retry something already
+    dead-lettered.
+
+### Changed
+
+- `go-messaging` bumped to **`v0.5.2`**, which is **required** for these
+  wrappers rather than incidental. Before it, `delivery.RecipientDelivery`
+  and `delivery.Attempt` could not be decoded whenever no binding was
+  set — every response these three routes return — because a zero
+  `Address` marshaled to `"msg:////"` and failed its own unmarshal. The
+  wrappers were written against v0.5.1 and could not decode a single
+  real response; see that release's notes.
+
+### Notes
+
+- Importing `go-messaging/delivery` for `LeaseRef` links
+  `modernc.org/sqlite` into consumers, because `delivery/` bundles the
+  types with the SQLite driver in one package. The module was already in
+  this client's graph via go-messaging's own requirements, so this moves
+  it from *required* to *linked*. Mirroring the types locally was
+  considered and rejected: `RecipientDelivery` and `Attempt` are 15 and
+  17 fields over six supporting types, and duplicating a durability
+  contract inside the library whose purpose is to stop consumers
+  hand-rolling it is self-defeating. Splitting the types out of
+  `delivery/` is the real fix and belongs upstream.
+
 ## v0.2.0 — 2026-09-11
 
 ### Fixed

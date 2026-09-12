@@ -118,6 +118,7 @@ The client covers:
 - catalog reads
 - legacy broker envelopes
 - `go-messaging` store/dispatcher over `/messages/*`
+- durable delivery: claim / ack / nack (`ClaimMessage`, `AckMessage`, `NackMessage`)
 - event history and SSE event streaming
 - AI providers, models, routes, preview, explain
 - AI chat, chat stream, usage, budgets, audit
@@ -150,6 +151,29 @@ client := tether.MustNew("", tether.WithSelfURN("msg://agent/agent-mux/agt_xxxxx
 
 Get your URN from `mux registry register --print-urn-only`, or from
 `tether_whoami` over MCP.
+
+## Durable delivery
+
+`ClaimMessage` / `AckMessage` / `NackMessage` wrap the claim-ack-nack
+cycle. Reach for them when a host must durably accept a handoff before
+acknowledging it; `Consume` remains the right call when a single call is
+honest about what happened.
+
+```go
+env, lease, grantedSeconds, err := c.ClaimMessage(ctx, id, me, tether.ClaimOptions{})
+// ... durably accept ...
+_, _, err = c.AckMessage(ctx, id, me, lease, delivery.StageHostAccepted)
+// ... do the work ...
+_, _, err = c.AckMessage(ctx, id, me, lease, delivery.StageConsumed)
+```
+
+Pass `lease` back unmodified — it is the bearer credential for the
+matching Ack/Nack, and the daemon also checks it belongs to the message
+in the path. Honor `grantedSeconds` rather than what you requested; the
+daemon clamps. A non-retryable `NackMessage` dead-letters and returns a
+**nil** error, so read `RecipientDelivery.Status` for the outcome.
+
+Requires `go-messaging` v0.5.2 or newer.
 
 ## Migration
 
