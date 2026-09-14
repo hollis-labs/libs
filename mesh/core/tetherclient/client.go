@@ -160,6 +160,15 @@ func (c *Client) GetSession(ctx context.Context, sessionID string) (Session, err
 	return out, nil
 }
 
+// SessionHealth returns the live runtime health snapshot for sessionID via GET /sessions/{id}/health.
+func (c *Client) SessionHealth(ctx context.Context, sessionID string) (RuntimeHealthResponse, error) {
+	var out RuntimeHealthResponse
+	if err := c.getJSON(ctx, "/sessions/"+url.PathEscape(sessionID)+"/health", &out); err != nil {
+		return RuntimeHealthResponse{}, err
+	}
+	return out, nil
+}
+
 func (c *Client) StopSession(ctx context.Context, sessionID string) error {
 	return c.doNoBody(ctx, http.MethodPost, "/sessions/"+url.PathEscape(sessionID)+"/stop", nil, http.StatusNoContent)
 }

@@ -382,3 +382,31 @@ func writeCatalogResponse(t *testing.T, w http.ResponseWriter, path string) {
 		t.Fatalf("unexpected catalog path %s", path)
 	}
 }
+
+func TestSessionHealth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/sessions/s-123/health" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		writeTestJSON(t, w, RuntimeHealthResponse{
+			SessionID: "s-123",
+			Alive:     true,
+			PID:       1234,
+			LiveState: "idle",
+			TurnID:    "turn-1",
+			Caps: CapabilitiesDTO{
+				StreamingStdio: true,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := MustNew(srv.URL)
+	got, err := c.SessionHealth(context.Background(), "s-123")
+	if err != nil {
+		t.Fatalf("SessionHealth: %v", err)
+	}
+	if got.SessionID != "s-123" || !got.Alive || got.LiveState != "idle" || !got.Caps.StreamingStdio {
+		t.Fatalf("unexpected health response: %+v", got)
+	}
+}

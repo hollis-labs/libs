@@ -83,6 +83,28 @@ type Session struct {
 	SessionGroupID  string  `json:"session_group_id,omitempty"`
 }
 
+type CapabilitiesDTO struct {
+	PTY               bool `json:"pty"`
+	StreamingStdio    bool `json:"streaming_stdio"`
+	JsonRpcStdio      bool `json:"jsonrpc_stdio"`
+	ServeHTTP         bool `json:"serve_http"`
+	Resize            bool `json:"resize"`
+	ProviderSessionID bool `json:"provider_session_id"`
+	CheckpointResume  bool `json:"checkpoint_resume"`
+	BinaryRequired    bool `json:"binary_required"`
+}
+
+type RuntimeHealthResponse struct {
+	SessionID    string          `json:"session_id"`
+	Alive        bool            `json:"alive"`
+	PID          int             `json:"pid,omitempty"`
+	LiveState    string          `json:"live_state"`
+	TurnID       string          `json:"turn_id,omitempty"`
+	ProviderID   string          `json:"provider_id"`
+	ProviderKind string          `json:"provider_kind"`
+	Caps         CapabilitiesDTO `json:"caps"`
+}
+
 type CheckpointCreateRequest struct {
 	TaskID              string `json:"task_id,omitempty"`
 	WorkflowID          string `json:"workflow_id,omitempty"`
