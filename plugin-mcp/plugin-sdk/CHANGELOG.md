@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 — 2026-09-16
 
 ### Added
 
@@ -33,6 +33,12 @@
   types, so a host and a loader at different versions disagree about the
   protocol rather than about a field — the same answer
   `TestProtocolVersionLockedAt1` already gives for the subprocess wire.
+
+### Compatibility
+
+Fully backward compatible with v0.3.1. `registry` and `ts/` are new
+packages; no changes to existing exported symbols or to the
+`subprocess` wire protocol (`ProtocolVersion = 1` unchanged).
 
 ## v0.3.1 — 2026-05-10
 
