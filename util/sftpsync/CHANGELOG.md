@@ -4,6 +4,25 @@ All notable changes to `go-sftpsync` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.1.1 — 2026-09-17
+
+Documentation only. No code changed, no API moved, and the transferred bytes
+are identical — upgrading from `v0.1.0` is free and skipping it costs nothing.
+It exists because pkg.go.dev renders the docs for a tagged version, so the
+status notice below could not otherwise reach the place most readers meet
+this package.
+
+### Changed
+
+- `README.md` and the package doc now open with a status notice: pre-1.0, in
+  development, safety properties tested but not yet used in anger, API churn
+  expected in minor versions, and a pointer to the issue tracker.
+- The `## Status` section was folded into that notice rather than repeating
+  it. Its one substantive claim — that the documented opinions are the
+  contract, so changing one is a breaking change even where the function
+  signature does not move — moved down to those opinions, where a reader
+  meets them.
+
 ## v0.1.0 — 2026-09-17
 
 First release.
