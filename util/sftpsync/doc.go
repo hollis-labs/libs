@@ -3,13 +3,11 @@
 //
 // # Status
 //
-// Under active development, pre-1.0. v0.1.0 is the first release: it is
-// covered by a test suite that runs against a real in-process SFTP server,
-// but it has not yet been exercised against a variety of real servers,
-// filesystems or production trees — and it moves files on machines you care
-// about. Preview with [WithDryRun] before pointing it at anything that
-// matters, pin an exact version, and please report bugs at
-// https://github.com/hollis-labs/go-sftpsync/issues.
+// Pre-1.0 (v0.1.0), in development. The safety properties are tested but the
+// library has not yet been used in anger. Expect API churn in minor versions;
+// breaking changes are called out loudly in CHANGELOG.md. Bug reports welcome
+// — https://github.com/hollis-labs/go-sftpsync/issues is the fastest way to
+// get something fixed.
 //
 // It exists because [github.com/pkg/sftp] gives you the primitives — Walk,
 // ReadDir, MkdirAll, Chtimes — and leaves recursion, safety and options to

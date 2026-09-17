@@ -1,16 +1,10 @@
 # go-sftpsync
 
-> [!WARNING]
-> **Under active development. Use with caution.**
->
-> `v0.1.0` is the first release. It is covered by a test suite that runs against a real in-process
-> SFTP server, but it has not yet been exercised against a variety of real servers, filesystems or
-> production trees — and it moves files on machines you care about. Preview with
-> `WithDryRun(true)` before pointing it at anything that matters, and pin an exact version.
->
-> The API will break between `v0.x` releases. **Please report bugs**, including anything that looks
-> like a wrong answer about modes, symlinks or cancellation:
-> [github.com/hollis-labs/go-sftpsync/issues](https://github.com/hollis-labs/go-sftpsync/issues).
+> **Status: pre-1.0 (`v0.1.0`), in development.** The safety properties are tested but the library
+> has not yet been used in anger. Expect API churn in minor versions; breaking changes are called
+> out loudly in [`CHANGELOG.md`](CHANGELOG.md). Bug reports welcome —
+> [issues](https://github.com/hollis-labs/go-sftpsync/issues) are the fastest way to get something
+> fixed.
 
 Recursive directory transfer over an SFTP connection you already have. `go-sftpsync` walks a
 directory tree in either direction — local to remote or remote to local — carrying permission
@@ -19,17 +13,6 @@ renaming it into place, honouring `context.Context` between files and inside one
 report of what happened rather than a bare `error`. It takes a live `*sftp.Client` or `*ssh.Client`
 and never dials, authenticates, or reads `~/.ssh/config`: the connection is the caller's, and so
 are the decisions that made it trustworthy.
-
-## Status
-
-Pre-1.0 (`v0.1.x`), actively developed. The public API is small and intended to stay that way —
-four transfer functions, seven options, one result type — but minor breaks may still happen
-between `v0.x` releases. See [`CHANGELOG.md`](CHANGELOG.md), which calls out breaking changes
-loudly, and pin an exact version in your `go.mod`.
-
-The behaviours listed under [The opinions](#the-opinions) are the contract, not incidental
-detail: a change to any of them is a breaking change even where the function signature does not
-move.
 
 Documentation: [pkg.go.dev/github.com/hollis-labs/go-sftpsync](https://pkg.go.dev/github.com/hollis-labs/go-sftpsync).
 
@@ -107,7 +90,8 @@ dialling, key loading and `known_hosts` verification.
 ## The opinions
 
 A general-purpose "copy a directory" helper usually lacks these. They are what makes it safe to
-point at a real host.
+point at a real host — and they are the contract, not incidental detail: changing any of them is a
+breaking change even where the function signature does not move.
 
 **Permission bits are carried across.** An uploaded script that arrives `0644` does not fail at
 upload time; it fails an hour later, far from the transfer that caused it. Directory modes are
