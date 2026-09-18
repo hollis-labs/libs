@@ -58,6 +58,19 @@ type InitParams struct {
 	// nothing can ignore it. Read it through HasCapability, whose doc
 	// comment explains why an absent entry is not a refusal.
 	Granted []string `json:"granted,omitempty"`
+
+	// Identity is an opaque, host-verified identity/claims value for
+	// the connecting caller, carried through unparsed — plugin-sdk
+	// never inspects, validates, or picks a scheme for it; that stays
+	// entirely on the host side. Empty when the host has no caller
+	// identity to plumb (e.g. a single-tenant stdio deployment). This
+	// is the connection-level identity for the whole subprocess
+	// lifetime; individual requests may carry their own Identity too
+	// (see CommandExecParams, EventHandleParams, MCPCallRequest,
+	// HTTPRequest) since one inprocess-mode subprocess can still be
+	// called on behalf of different verified callers over time. See
+	// IdentityAware in types_sdk.go.
+	Identity json.RawMessage `json:"identity,omitempty"`
 }
 
 // HostInfo describes the host environment to the plugin.
@@ -117,6 +130,9 @@ type CommandExecParams struct {
 	Name      string `json:"name"`
 	SessionID string `json:"session_id"`
 	Args      string `json:"args"`
+	// Identity is an opaque, host-verified identity value for this
+	// call. See InitParams.Identity.
+	Identity json.RawMessage `json:"identity,omitempty"`
 }
 
 // CommandExecResult is returned by the plugin for command/execute.
@@ -133,6 +149,9 @@ type EventHandleParams struct {
 	Data      map[string]interface{} `json:"data"`
 	SessionID string                 `json:"session_id,omitempty"`
 	PreHook   bool                   `json:"pre_hook"` // true if host expects cancel/allow response
+	// Identity is an opaque, host-verified identity value for this
+	// call. See InitParams.Identity.
+	Identity json.RawMessage `json:"identity,omitempty"`
 }
 
 // EventHandleResult is returned by the plugin for event/handle.
@@ -174,6 +193,9 @@ type MCPCallRequest struct {
 	ToolName  string                 `json:"tool_name"`
 	Arguments map[string]interface{} `json:"arguments"`
 	SessionID string                 `json:"session_id,omitempty"`
+	// Identity is an opaque, host-verified identity value for this
+	// call. See InitParams.Identity.
+	Identity json.RawMessage `json:"identity,omitempty"`
 }
 
 // MCPCallResult is returned by the plugin for mcp/call_tool.
@@ -199,6 +221,14 @@ type HTTPRequest struct {
 	Headers   map[string]string `json:"headers,omitempty"`
 	Body      []byte            `json:"body,omitempty"`
 	SessionID string            `json:"session_id,omitempty"`
+	// Identity carries the same opaque, host-verified value as the
+	// other dispatch paths' Identity field (see InitParams.Identity).
+	// Headers can already carry a raw Authorization header, but that
+	// forces an HTTPHandler to parse and interpret it itself; Identity
+	// gives a plugin implementing both HTTPHandler and IdentityAware
+	// the caller's identity the same pre-verified way regardless of
+	// which dispatch method delivered the call.
+	Identity json.RawMessage `json:"identity,omitempty"`
 }
 
 // HTTPResponse is returned by the plugin for http/handle.

@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Identity passthrough plumbing** — an optional, opaque `Identity
+  json.RawMessage` field on `InitParams`, `CommandExecParams`,
+  `EventHandleParams`, `MCPCallRequest`, and `HTTPRequest` (and on the
+  SDK-friendly `CommandRequest`/`EventRequest`), plus a new
+  `subprocess.IdentityAware` capability interface. A host that has
+  already verified a caller (e.g. via `go-mcp/auth`) can plumb that
+  verified identity through to a plugin subprocess; plugin-sdk never
+  picks a token scheme or validates anything — it is a courier, not an
+  authority. `Serve` calls `IdentityAware.Identity` once after a
+  successful `plugin/init` when `InitParams.Identity` is set, and again
+  before any `Command`/`EventHandle`/`MCPCallTool`/`HTTPHandle`
+  dispatch whose request carries its own `Identity`; a plugin that
+  doesn't implement `IdentityAware` is unaffected, and one that doesn't
+  receive an `Identity` value is never called. (CW-20260918-0043)
+
+### Notes
+
+- Known gap, not fixed here: `subprocess.Serve`'s dispatch loop has no
+  case for `mcp/list_tools` (`MethodListTools`) and there is no
+  capability interface for it, so a plugin cannot answer it even though
+  the method name is declared in `protocol.go`. Filed as CW-20260918-0048.
+
 ## v0.5.0 — 2026-09-18
 
 ### Added

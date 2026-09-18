@@ -2,6 +2,7 @@ package subprocess
 
 import (
 	"context"
+	"encoding/json"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
 )
@@ -17,6 +18,9 @@ type CommandRequest struct {
 	Name      string
 	SessionID string
 	Args      string
+	// Identity is the opaque, host-verified identity value from the
+	// wire request, if any. See IdentityAware.
+	Identity json.RawMessage
 }
 
 // CommandResult is returned by a plugin's Command handler.
@@ -33,6 +37,9 @@ type EventRequest struct {
 	Data      map[string]interface{}
 	SessionID string
 	PreHook   bool // true if the host expects a cancel/allow response
+	// Identity is the opaque, host-verified identity value from the
+	// wire request, if any. See IdentityAware.
+	Identity json.RawMessage
 }
 
 // EventResult is returned by a plugin's EventHandle handler.
@@ -116,4 +123,29 @@ type MCPHandler interface {
 // event results instead.
 type HTTPHandler interface {
 	HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error)
+}
+
+// IdentityAware is implemented by plugins that want to be told the
+// opaque identity value a host has already verified for the current
+// caller. plugin-sdk never parses, validates, or picks a token scheme
+// for this value — it is a courier, not an authority; verification
+// happens entirely on the host side.
+//
+// Serve calls Identity once after a successful Init when
+// InitParams.Identity is non-empty (the connection-level identity for
+// this subprocess), and again before each Command/EventHandle/
+// MCPCallTool/HTTPHandle dispatch whose own request carries a
+// non-empty Identity — a single inprocess-mode subprocess can still
+// serve calls on behalf of different verified callers over its
+// lifetime, so a per-call Identity is not assumed to match Init's.
+// Serve never calls Identity with an empty value: a plugin that
+// implements IdentityAware but whose host never populates Identity
+// sees no calls at all.
+//
+// A plugin that doesn't implement IdentityAware is completely
+// unaffected — the Identity field remains directly readable off
+// CommandRequest / EventRequest / MCPCallRequest / HTTPRequest for a
+// plugin that would rather inspect it inline instead.
+type IdentityAware interface {
+	Identity(ctx context.Context, identity json.RawMessage)
 }

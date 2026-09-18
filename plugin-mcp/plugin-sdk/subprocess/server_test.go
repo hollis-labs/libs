@@ -448,6 +448,195 @@ func TestServe_MigrateMethodNotFound(t *testing.T) {
 	}
 }
 
+// --- Identity plumbing (CW-20260918-0043) ---
+
+// identityPlugin implements every capability whose params can carry
+// Identity, plus IdentityAware itself, so a single plugin proves
+// Identity reaches a handler two ways: directly off the request
+// struct, and via the IdentityAware.Identity callback. Fields are
+// mutex-protected because drive() dispatches concurrently.
+type identityPlugin struct {
+	basePlugin
+
+	mu       sync.Mutex
+	notified []string
+
+	lastCommandIdentity string
+	lastEventIdentity   string
+	lastMCPIdentity     string
+	lastHTTPIdentity    string
+}
+
+func (p *identityPlugin) Identity(ctx context.Context, identity json.RawMessage) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.notified = append(p.notified, string(identity))
+}
+
+func (p *identityPlugin) notifiedValues() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]string, len(p.notified))
+	copy(out, p.notified)
+	return out
+}
+
+func (p *identityPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	p.mu.Lock()
+	p.lastCommandIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return CommandResult{Action: "noop"}, nil
+}
+
+func (p *identityPlugin) commandIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastCommandIdentity
+}
+
+func (p *identityPlugin) EventHandle(ctx context.Context, req EventRequest) (EventResult, error) {
+	p.mu.Lock()
+	p.lastEventIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return EventResult{}, nil
+}
+
+func (p *identityPlugin) eventIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastEventIdentity
+}
+
+func (p *identityPlugin) MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCallResult, error) {
+	p.mu.Lock()
+	p.lastMCPIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return MCPCallResult{Content: json.RawMessage(`"ok"`)}, nil
+}
+
+func (p *identityPlugin) mcpIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastMCPIdentity
+}
+
+func (p *identityPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
+	p.mu.Lock()
+	p.lastHTTPIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return HTTPResponse{Status: 200}, nil
+}
+
+func (p *identityPlugin) httpIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastHTTPIdentity
+}
+
+func TestServe_IdentityAwareInit(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: InitParams{
+			PluginDir: "/tmp",
+			HostInfo:  HostInfo{Version: "test", Protocol: 1},
+			Identity:  json.RawMessage(`{"user_id":"u1"}`),
+		}},
+	})
+	if len(resps) != 1 || resps[0].Error != nil {
+		t.Fatalf("resps = %+v", resps)
+	}
+	if got := p.notifiedValues(); len(got) != 1 || got[0] != `{"user_id":"u1"}` {
+		t.Errorf("notified = %v, want one call with the Init identity", got)
+	}
+}
+
+func TestServe_IdentityAwareDispatchMethods(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	idA := json.RawMessage(`{"user_id":"cmd"}`)
+	idB := json.RawMessage(`{"user_id":"evt"}`)
+	idC := json.RawMessage(`{"user_id":"mcp"}`)
+	idD := json.RawMessage(`{"user_id":"http"}`)
+
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "x", Identity: idA}},
+		{JSONRPC: "2.0", ID: 2, Method: MethodEventHandle, Params: EventHandleParams{Type: "y", Identity: idB}},
+		{JSONRPC: "2.0", ID: 3, Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "z", Identity: idC}},
+		{JSONRPC: "2.0", ID: 4, Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x", Identity: idD}},
+	})
+	for _, r := range resps {
+		if r.Error != nil {
+			t.Errorf("id=%d error: %+v", r.ID, r.Error)
+		}
+	}
+
+	if got := p.commandIdentity(); got != string(idA) {
+		t.Errorf("CommandRequest.Identity = %q, want %q", got, idA)
+	}
+	if got := p.eventIdentity(); got != string(idB) {
+		t.Errorf("EventRequest.Identity = %q, want %q", got, idB)
+	}
+	if got := p.mcpIdentity(); got != string(idC) {
+		t.Errorf("MCPCallRequest.Identity = %q, want %q", got, idC)
+	}
+	if got := p.httpIdentity(); got != string(idD) {
+		t.Errorf("HTTPRequest.Identity = %q, want %q", got, idD)
+	}
+
+	notified := p.notifiedValues()
+	if len(notified) != 4 {
+		t.Fatalf("IdentityAware.Identity called %d times, want 4: %v", len(notified), notified)
+	}
+	want := map[string]bool{string(idA): true, string(idB): true, string(idC): true, string(idD): true}
+	for _, n := range notified {
+		if !want[n] {
+			t.Errorf("unexpected notified value %q", n)
+		}
+		delete(want, n)
+	}
+	if len(want) != 0 {
+		t.Errorf("missing notified values: %v", want)
+	}
+}
+
+// TestServe_IdentityNotCalledWhenAbsent proves IdentityAware is truly
+// zero-cost when the host never populates Identity: a plugin that
+// implements the capability gets no calls at all, not a call with an
+// empty value.
+func TestServe_IdentityNotCalledWhenAbsent(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
+	})
+	if len(resps) != 1 || resps[0].Error != nil {
+		t.Fatalf("resps = %+v", resps)
+	}
+	if got := p.notifiedValues(); len(got) != 0 {
+		t.Errorf("Identity() called with no identity present: %v", got)
+	}
+}
+
+// TestServe_IdentityIgnoredWithoutIdentityAware proves a plugin that
+// doesn't implement IdentityAware is completely unaffected by an
+// Identity value riding along on the request — dispatch behaves
+// exactly as it does without Identity present at all.
+func TestServe_IdentityIgnoredWithoutIdentityAware(t *testing.T) {
+	p := &commandPlugin{basePlugin: basePlugin{id: "cmd"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute,
+			Params: CommandExecParams{Name: "greet", Args: "world", Identity: json.RawMessage(`{"user_id":"u1"}`)}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res CommandExecResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if res.Action != "message" || res.Content != "hello world" {
+		t.Errorf("result = %+v, plugin without IdentityAware should be unaffected", res)
+	}
+}
+
 func TestServe_NilPlugin(t *testing.T) {
 	err := Serve(nil)
 	if err == nil {

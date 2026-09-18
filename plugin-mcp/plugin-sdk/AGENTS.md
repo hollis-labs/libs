@@ -85,6 +85,16 @@ The additive-in-both-directions property is pinned by
 `TestInitParamsForwardCompatNoGranted` and
 `TestInitParamsBackCompatOlderPluginIgnoresGranted` rather than argued.
 
+Carrying a caller's identity through the wire is in scope; verifying it is
+not. `InitParams`/`CommandExecParams`/`EventHandleParams`/`MCPCallRequest`/
+`HTTPRequest` carry an optional, opaque `Identity json.RawMessage`, and a
+plugin opts into receiving it via `subprocess.IdentityAware`. plugin-sdk never
+parses it, never picks a token scheme, and never validates it — a host (e.g.
+one already using `go-mcp/auth`) populates it with whatever it independently
+verified, and plugin-sdk is a courier, same as it already is for `SessionID`.
+This mirrors `go-mcp/auth`'s own `Provider` seam without depending on it: the
+host-side verification interface is that repo's concern, not this one's.
+
 `registry.Protocol` and `PROTOCOL` in the TypeScript half are the same number
 and are pinned on both sides. The two views are authored, not generated, and
 there is deliberately **no shared golden fixture**: both halves of a fixture

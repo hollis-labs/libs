@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,7 @@ func TestInitParamsRoundtripAllFields(t *testing.T) {
 		Config:    map[string]string{"k": "v"},
 		LogLevel:  "debug",
 		HostInfo:  HostInfo{Version: "1.2.3", Protocol: 1},
+		Identity:  json.RawMessage(`{"user_id":"u1"}`),
 	}
 
 	b, err := json.Marshal(in)
@@ -44,6 +46,9 @@ func TestInitParamsRoundtripAllFields(t *testing.T) {
 	}
 	if out.HostInfo.Version != in.HostInfo.Version {
 		t.Errorf("HostInfo.Version = %q, want %q", out.HostInfo.Version, in.HostInfo.Version)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity = %s, want %s", out.Identity, in.Identity)
 	}
 }
 
@@ -123,6 +128,7 @@ func TestMCPCallRequestRoundtrip(t *testing.T) {
 		ToolName:  "summarize",
 		Arguments: map[string]interface{}{"text": "hi", "max": float64(10)},
 		SessionID: "sess-1",
+		Identity:  json.RawMessage(`{"user_id":"u1","scopes":["read"]}`),
 	}
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -137,6 +143,23 @@ func TestMCPCallRequestRoundtrip(t *testing.T) {
 	}
 	if out.Arguments["text"] != "hi" {
 		t.Errorf("arguments lost: %+v", out.Arguments)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
+	}
+}
+
+// TestMCPCallRequestIdentityOmittedWhenEmpty verifies Identity is
+// opt-in on the wire: a request that never set it must not gain an
+// "identity" key, so an older plugin decoding a v0.4.0-shaped payload
+// sees exactly what it always saw.
+func TestMCPCallRequestIdentityOmittedWhenEmpty(t *testing.T) {
+	b, err := json.Marshal(MCPCallRequest{ToolName: "x"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(b), "identity") {
+		t.Errorf("expected no identity key in %s", b)
 	}
 }
 
@@ -160,11 +183,12 @@ func TestMCPCallResultRoundtrip(t *testing.T) {
 
 func TestHTTPRequestResponseRoundtrip(t *testing.T) {
 	req := HTTPRequest{
-		Method:  "POST",
-		Path:    "/x",
-		Query:   map[string]string{"a": "1"},
-		Headers: map[string]string{"Content-Type": "application/json"},
-		Body:    []byte(`{"ok":true}`),
+		Method:   "POST",
+		Path:     "/x",
+		Query:    map[string]string{"a": "1"},
+		Headers:  map[string]string{"Content-Type": "application/json"},
+		Body:     []byte(`{"ok":true}`),
+		Identity: json.RawMessage(`{"user_id":"u1"}`),
 	}
 	b, err := json.Marshal(req)
 	if err != nil {
@@ -176,6 +200,9 @@ func TestHTTPRequestResponseRoundtrip(t *testing.T) {
 	}
 	if gotReq.Method != "POST" || gotReq.Path != "/x" || string(gotReq.Body) != `{"ok":true}` {
 		t.Errorf("req roundtrip lost data: %+v", gotReq)
+	}
+	if string(gotReq.Identity) != string(req.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", gotReq.Identity, req.Identity)
 	}
 
 	resp := HTTPResponse{
@@ -230,5 +257,58 @@ func TestMigrateParamsResultRoundtrip(t *testing.T) {
 	}
 	if string(b) != "{}" {
 		t.Errorf("empty MigrateResult marshaled to %q, want %q", string(b), "{}")
+	}
+}
+
+// --- Identity plumbing (CW-20260918-0043) ---
+
+func TestCommandExecParamsRoundtrip(t *testing.T) {
+	in := CommandExecParams{
+		Name:      "greet",
+		SessionID: "sess-1",
+		Args:      "world",
+		Identity:  json.RawMessage(`{"user_id":"u1"}`),
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out CommandExecParams
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Name != in.Name || out.SessionID != in.SessionID || out.Args != in.Args {
+		t.Errorf("roundtrip lost scalars: %+v", out)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
+	}
+}
+
+func TestEventHandleParamsRoundtrip(t *testing.T) {
+	in := EventHandleParams{
+		Type:      "message.sending",
+		Source:    "chat",
+		Data:      map[string]interface{}{"k": "v"},
+		SessionID: "sess-1",
+		PreHook:   true,
+		Identity:  json.RawMessage(`{"user_id":"u1"}`),
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out EventHandleParams
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Type != in.Type || out.Source != in.Source || out.SessionID != in.SessionID || out.PreHook != in.PreHook {
+		t.Errorf("roundtrip lost scalars: %+v", out)
+	}
+	if out.Data["k"] != "v" {
+		t.Errorf("Data lost: %+v", out.Data)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
 	}
 }

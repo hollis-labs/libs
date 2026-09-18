@@ -31,8 +31,8 @@ import (
 //
 // The Plugin must implement the minimum Init/Load/Unload contract.
 // Optional capability interfaces (CommandHandler, EventHandler,
-// CRUDHandler, HealthChecker, Migrator) are detected via type
-// assertion at startup.
+// CRUDHandler, HealthChecker, Migrator, MCPHandler, HTTPHandler,
+// IdentityAware) are detected via type assertion at startup.
 //
 // A plugin main typically looks like:
 //
@@ -160,13 +160,14 @@ type server struct {
 	secrets *secretTracker
 
 	// Capability flags — populated by detectCapabilities.
-	asCommand CommandHandler
-	asEvent   EventHandler
-	asCRUD    CRUDHandler
-	asHealth  HealthChecker
-	asMigrate Migrator
-	asMCP     MCPHandler
-	asHTTP    HTTPHandler
+	asCommand  CommandHandler
+	asEvent    EventHandler
+	asCRUD     CRUDHandler
+	asHealth   HealthChecker
+	asMigrate  Migrator
+	asMCP      MCPHandler
+	asHTTP     HTTPHandler
+	asIdentity IdentityAware
 }
 
 func (s *server) detectCapabilities() {
@@ -191,6 +192,20 @@ func (s *server) detectCapabilities() {
 	if h, ok := s.plugin.(HTTPHandler); ok {
 		s.asHTTP = h
 	}
+	if ia, ok := s.plugin.(IdentityAware); ok {
+		s.asIdentity = ia
+	}
+}
+
+// notifyIdentity delivers identity to the plugin's IdentityAware
+// capability, if implemented — but only when the host actually
+// populated a value. A plugin implementing IdentityAware never
+// receives a call for a dispatch that carried no identity.
+func (s *server) notifyIdentity(ctx context.Context, identity json.RawMessage) {
+	if s.asIdentity == nil || len(identity) == 0 {
+		return
+	}
+	s.asIdentity.Identity(ctx, identity)
 }
 
 // dispatch routes a single RPCRequest to the plugin. For notifications
@@ -208,6 +223,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeError(req.ID, ErrCodeInternal, err.Error())
 			return
 		}
+		s.notifyIdentity(ctx, params.Identity)
 		s.writeResult(req.ID, res)
 
 	case MethodLoad:
@@ -248,10 +264,12 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
 			return
 		}
+		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asCommand.Command(ctx, CommandRequest{
 			Name:      params.Name,
 			SessionID: params.SessionID,
 			Args:      params.Args,
+			Identity:  params.Identity,
 		})
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
@@ -276,12 +294,14 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			}
 			return
 		}
+		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asEvent.EventHandle(ctx, EventRequest{
 			Type:      params.Type,
 			Source:    params.Source,
 			Data:      params.Data,
 			SessionID: params.SessionID,
 			PreHook:   params.PreHook,
+			Identity:  params.Identity,
 		})
 		if req.ID == 0 {
 			return // notification — drop response
@@ -309,6 +329,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
 			return
 		}
+		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asMCP.MCPCallTool(ctx, params)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
@@ -326,6 +347,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
 			return
 		}
+		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asHTTP.HTTPHandle(ctx, params)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)

@@ -39,9 +39,11 @@ go get github.com/hollis-labs/plugin-sdk
   entry point (handles stdin/stdout, dispatch, concurrency, panic
   recovery, signal-driven shutdown), capability interfaces
   (`CommandHandler`, `EventHandler`, `CRUDHandler`, `MCPHandler`,
-  `HTTPHandler`, `Migrator`, `HealthChecker`), config / data /
-  cache helpers, and a stderr JSON-lines logger with secret
-  redaction.
+  `HTTPHandler`, `Migrator`, `HealthChecker`, `IdentityAware`),
+  config / data / cache helpers, and a stderr JSON-lines logger with
+  secret redaction. An optional, opaque `Identity` value rides through
+  `InitParams`/`CommandExecParams`/`EventHandleParams`/`MCPCallRequest`/
+  `HTTPRequest` unparsed — plugin-sdk carries it, never verifies it.
 - `subprocess.CapabilityRequest` and `InitParams.Granted` — a capability
   declaration mechanism with an open vocabulary: a plugin declares what
   ambient access it needs, and the host reports back what it allowed. The
