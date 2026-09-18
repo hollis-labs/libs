@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -108,11 +107,13 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return Handle{}, fmt.Errorf("%w: %s exists and is not a plain directory", ErrTargetExists, targetAbs)
 		}
-		empty, err := isEmptyDir(targetAbs)
-		if err != nil {
-			return Handle{}, err
-		}
-		if !empty {
+		// os.Remove on a directory is rmdir(2): it fails atomically (ENOTEMPTY)
+		// rather than silently disturbing existing content, so this is the
+		// actual emptiness check, not a preflight racing a separate one. It
+		// also sidesteps relying on Root.Rename to replace an existing
+		// directory, which newer Go toolchains (tested: 1.26.1 allows it,
+		// 1.26.8 refuses it with EEXIST) no longer guarantee.
+		if err := os.Remove(targetAbs); err != nil {
 			return Handle{}, fmt.Errorf("%w: %s exists and is not empty", ErrTargetExists, targetAbs)
 		}
 	} else if !os.IsNotExist(err) {
@@ -303,22 +304,6 @@ func isAllowedPlatformAlias(path string) bool {
 		return false
 	}
 	return resolved == filepath.Join("/private", path)
-}
-
-func isEmptyDir(path string) (bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = f.Close() }()
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return false, nil
 }
 
 func randomSuffix() string {
