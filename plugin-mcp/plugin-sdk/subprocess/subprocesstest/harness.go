@@ -61,6 +61,7 @@ type Harness struct {
 	tempDir   string
 	config    map[string]string
 	hostInfo  subprocess.HostInfo
+	granted   []string
 	roundtrip bool
 }
 
@@ -88,6 +89,19 @@ func WithPluginDir(dir string) Option {
 func WithHostInfo(info subprocess.HostInfo) Option {
 	return func(h *Harness) {
 		h.hostInfo = info
+	}
+}
+
+// WithGranted seeds the capability names the mocked host allows, passed
+// to the plugin's Init via InitParams.Granted. The default is none, so
+// a plugin that degrades correctly is tested against an ungranting host
+// unless a test says otherwise.
+//
+// The SDK defines no capability names; these are whatever strings the
+// host under test uses.
+func WithGranted(names []string) Option {
+	return func(h *Harness) {
+		h.granted = names
 	}
 }
 
@@ -156,12 +170,14 @@ func (h *Harness) PluginDir() string { return h.pluginDir }
 func (h *Harness) DataDir() string { return filepath.Join(h.pluginDir, "data") }
 
 // Init invokes the plugin's Init method with the harness's mocked
-// InitParams (PluginDir + resolved config + default HostInfo).
+// InitParams (PluginDir + resolved config + default HostInfo + any
+// capabilities seeded by WithGranted).
 func (h *Harness) Init(ctx context.Context) (subprocess.InitResult, error) {
 	params := subprocess.InitParams{
 		PluginDir: h.pluginDir,
 		Config:    h.config,
 		HostInfo:  h.hostInfo,
+		Granted:   h.granted,
 	}
 	if err := h.maybeRoundtrip(&params); err != nil {
 		return subprocess.InitResult{}, err

@@ -42,6 +42,11 @@ go get github.com/hollis-labs/plugin-sdk
   `HTTPHandler`, `Migrator`, `HealthChecker`), config / data /
   cache helpers, and a stderr JSON-lines logger with secret
   redaction.
+- `subprocess.CapabilityRequest` and `InitParams.Granted` — a capability
+  declaration mechanism with an open vocabulary: a plugin declares what
+  ambient access it needs, and the host reports back what it allowed. The
+  SDK defines no capability names and enforces nothing; granting and
+  enforcement are the host's. See `docs/security-model.md`.
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
@@ -111,6 +116,10 @@ github.com/hollis-labs/plugin-sdk
 ├── errors.go              Error type, sentinels, constructors
 ├── envelope.go            EnvelopeOut, MessageOut
 ├── logger.go              Logger interface
+├── docs/
+│   ├── security-model.md  trust boundary, guarantees, and the seams
+│   ├── best-practices.md  patterns, with worked examples
+│   └── proposals/         open design proposals
 ├── examples/
 │   └── hello/             minimum-viable subprocess plugin
 └── subprocess/
@@ -139,6 +148,27 @@ ts/
             ├── stylesheets.ts  the stylesheet sink and its default
             └── react.ts        the React adapter (optional peer)
 ```
+
+## Security model and best practices
+
+Two documents for anyone building against this SDK:
+
+- **[`docs/security-model.md`](./docs/security-model.md)** — the trust boundary,
+  what the SDK guarantees (panic isolation, credentials that do not travel in
+  the environment, secret redaction in the logger, a pinned wire protocol), what
+  it deliberately leaves to the host (authentication, sandboxing, resource
+  limits, authorization, output filtering), and the seams where those guarantees
+  stop.
+- **[`docs/best-practices.md`](./docs/best-practices.md)** — patterns that hold
+  up, with worked examples from hosts and plugins built on this SDK.
+
+The one-line version, if you read nothing else: **whatever your plugin returns
+is published** — to a terminal, a log, an HTTP response, or an AI model's
+context window. Never return a vendor SDK type; map it onto your own, treat that
+mapping as an allow-list, and test that a credential field cannot appear in the
+output.
+
+Open proposals live in [`docs/proposals/`](./docs/proposals).
 
 ## Versioning
 

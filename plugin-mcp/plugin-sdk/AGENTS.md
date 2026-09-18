@@ -26,6 +26,8 @@ all; React is an optional peer behind a subpath.
 - `subprocess/log.go` owns the stderr JSON-lines logger and secret redaction.
 - `subprocess/config.go` and `subprocess/data.go` own config, data and cache
   helpers.
+- `subprocess/capability.go` owns `CapabilityRequest` and `HasCapability`; the
+  granted set lives on `InitParams` in `subprocess/types.go`.
 - `subprocess/subprocesstest/` drives a plugin in-process, without spawning one.
 - `examples/hello` is a complete minimal plugin.
 - `registry/registry.go` owns the registry wire contract's Go view and
@@ -71,6 +73,17 @@ so a logging path that bypasses `mergeKVs` writes credentials into host logs.
 
 Keep the base contract host-neutral and dependency-free. The moment a host
 product's types appear here, every other host inherits them.
+
+`subprocess/capability.go` is deliberately inert: it carries a declaration with
+an open vocabulary and nothing else. No capability name is defined here, and
+nothing in the SDK grants, resolves or enforces one, because both would be a
+host's trust model wearing a shared coat. `InitParams.Granted` is what the host
+says it allowed, which is why `HasCapability` documents that an absent entry is
+not a refusal — an older host and an ungranting one are indistinguishable on
+the wire, and a plugin that treats absence as denial breaks against the former.
+The additive-in-both-directions property is pinned by
+`TestInitParamsForwardCompatNoGranted` and
+`TestInitParamsBackCompatOlderPluginIgnoresGranted` rather than argued.
 
 `registry.Protocol` and `PROTOCOL` in the TypeScript half are the same number
 and are pinned on both sides. The two views are authored, not generated, and

@@ -47,6 +47,17 @@ type InitParams struct {
 	Config    map[string]string `json:"config"`    // resolved config values
 	LogLevel  string            `json:"log_level"` // host-requested level: "debug" | "info" | "warn" | "error"
 	HostInfo  HostInfo          `json:"host_info"` // host capabilities
+
+	// Granted lists the capability names the host allowed, in the
+	// host's own vocabulary (see CapabilityRequest). It is how a plugin
+	// discovers what it actually received instead of assuming it got
+	// what it asked for.
+	//
+	// The field is optional in both directions: a host that predates
+	// capability declaration omits it, and a plugin that requests
+	// nothing can ignore it. Read it through HasCapability, whose doc
+	// comment explains why an absent entry is not a refusal.
+	Granted []string `json:"granted,omitempty"`
 }
 
 // HostInfo describes the host environment to the plugin.
