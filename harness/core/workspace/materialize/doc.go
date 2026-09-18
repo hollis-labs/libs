@@ -1,8 +1,20 @@
-// Package materialize is the public API of the
-// github.com/hollis-labs/go-materialize shared library.
+// Package materialize defines the shared filesystem planning, write and
+// ownership contracts for materialized artifact trees.
 //
-// Atomic, manifest-tracked file-tree materialization for Go: safe writes, symlink/traversal-safe staging, and ownership-scoped reconcile.
+// The default engine validates a complete neutral artifact tree before any
+// destination mutation. Create writes into a private staging directory under an
+// os.Root opened on the target parent and publishes with Root.Rename only after
+// every entry has been written. The Unix threat model rejects symlinks anywhere
+// in the destination parent chain before opening that parent root, then relies on
+// os.Root methods to keep subsequent path traversal and path-swap races inside
+// the opened root. Platforms or modes that cannot uphold those guarantees should
+// return an unsupported or unsafe-target error instead of silently weakening the
+// boundary.
 //
-// This file carries the package-level documentation; the exported API
-// lives in the sibling source files.
+// Reconcile and refresh operate on existing mixed-ownership directories using a
+// saved manifest under .materialize/manifest.json. They preflight owned
+// paths and managed keys before mutation, preserve unowned content, and apply
+// each file with atomic replacement. They intentionally do not claim
+// whole-directory transaction semantics for mixed homes; interrupted multi-file
+// writes return an incomplete report and leave the previous manifest in place.
 package materialize

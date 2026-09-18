@@ -3,29 +3,37 @@
 Atomic, manifest-tracked file-tree materialization for Go: safe writes, symlink/traversal-safe staging, and ownership-scoped reconcile.
 
 Module path: `github.com/hollis-labs/go-materialize`
-Library package: `github.com/hollis-labs/go-materialize/materialize`
+Packages: `artifact` (provider-independent materialization inputs — `Entry`,
+`Tree`, `Digest`, `Ownership`, `Provenance`) and `materialize` (the write
+engine — `DefaultEngine.Apply`, `Reconcile`/`Refresh`, `MergeDocument`).
+
+Extracted from `agentkit`'s `artifact`/`materialize` packages (agentkit
+v0.6.1) so both agentkit and other tree-writing callers (e.g. folio) can
+depend on one shared, zero-runtime-dependency core instead of duplicating
+the write path. See each package's `doc.go` for the full contract.
 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-materialize/materialize
+go get github.com/hollis-labs/go-materialize
 ```
 
 ## Usage
 
 ```go
-import "github.com/hollis-labs/go-materialize/materialize"
+import (
+    "github.com/hollis-labs/go-materialize/artifact"
+    "github.com/hollis-labs/go-materialize/materialize"
+)
 ```
 
 ## Layout
 
-Scaffolded from folio's `go-lib` preset — an importable shared-library layout
-(a package at the module root, no `cmd/`, no `internal/`).
-
 ```
 .
-├── materialize/   # Library package — importable by other modules
-├── examples/                     # Runnable usage examples
+├── artifact/      # Entry/Tree value types, validation, content resolution
+├── materialize/   # DefaultEngine: Create (atomic staged write) + Reconcile/Refresh
+├── examples/       # Runnable usage examples
 ├── go.mod
 ├── CHANGELOG.md
 └── README.md (this file)
