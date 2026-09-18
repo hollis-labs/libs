@@ -183,6 +183,62 @@ Keep the operations that work without a credential working. ContextForge's
 `list_gateways` returns 401 — and that difference is exactly how an operator
 tells a down tunnel from a down gateway.
 
+### Declare the capabilities you need, and degrade without them
+
+Credentials are not the only ambient thing a plugin gets handed. A host that
+passes an agent socket or a container runtime socket into every plugin's
+environment has given each of them a live credential handle, whether or not any
+of them asked. `CapabilityRequest` exists so that asking is expressible:
+
+```go
+// In the host's manifest schema, not in your code — so a reviewer can see what
+// you want before you run.
+type CapabilityRequest struct {
+    Name     string          // open string, the host's vocabulary
+    Reason   string          // why you need it, for whoever approves
+    Optional bool            // true if you can work without it
+    Metadata json.RawMessage // host-defined narrowing
+}
+```
+
+The SDK defines no capability names. `Name` means whatever your host says it
+means, the same way a registry contribution *kind* does, because one host's
+vocabulary is not another's.
+
+**Read back what you actually got.** The host reports the names it allowed in
+`InitParams.Granted`:
+
+```go
+func (p *Plugin) Init(_ context.Context, params subprocess.InitParams) (subprocess.InitResult, error) {
+    // Choosing between two working paths — not deciding whether to load.
+    p.useRemoteRuntime = params.HasCapability("your-host.remote-runtime")
+    // ...
+}
+```
+
+**Do not treat an absent capability as a refusal.** A host that predates this
+mechanism sends no `Granted` at all, and a host that grants nothing sends an
+empty one; the wire does not distinguish them. A plugin that refuses to load
+when `Granted` is empty breaks every install on an older host, which is the
+same mistake as making a missing credential fatal. Degrade, and fail the
+*operation* that genuinely needs the capability with a message naming the
+recovery.
+
+**Do not build a policy layer out of it.** `Granted` is what the host says it
+allowed; it does not restrict your process, and checking it a second time before
+each call buys nothing. Enforcement is the host's, and a plugin that implements
+a parallel version of it will disagree with the host eventually.
+
+Test both paths. `subprocesstest.WithGranted` seeds the granted list, and the
+harness grants nothing by default — so the degraded path is the one your tests
+exercise unless you say otherwise.
+
+```go
+h := subprocesstest.New(t, &myPlugin{},
+    subprocesstest.WithGranted([]string{"your-host.remote-runtime"}),
+)
+```
+
 ### Resolve external binaries per call, not at startup
 
 If you shell out — to a cloud CLI, a credential helper, a container runtime —

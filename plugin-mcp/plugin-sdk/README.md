@@ -42,6 +42,11 @@ go get github.com/hollis-labs/plugin-sdk
   `HTTPHandler`, `Migrator`, `HealthChecker`), config / data /
   cache helpers, and a stderr JSON-lines logger with secret
   redaction.
+- `subprocess.CapabilityRequest` and `InitParams.Granted` — a capability
+  declaration mechanism with an open vocabulary: a plugin declares what
+  ambient access it needs, and the host reports back what it allowed. The
+  SDK defines no capability names and enforces nothing; granting and
+  enforcement are the host's. See `docs/security-model.md`.
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.

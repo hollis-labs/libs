@@ -167,3 +167,61 @@ func (*minimalPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
 	return subprocess.LoadResult{}, nil
 }
 func (*minimalPlugin) Unload(ctx context.Context) error { return nil }
+
+// capabilityPlugin records what the host granted at Init and reports
+// whether it took the degraded path — the shape a plugin author is
+// meant to test.
+type capabilityPlugin struct {
+	degraded bool
+	granted  []string
+}
+
+func (p *capabilityPlugin) Init(ctx context.Context, params subprocess.InitParams) (subprocess.InitResult, error) {
+	p.granted = params.Granted
+	p.degraded = !params.HasCapability("example.capability")
+	return subprocess.InitResult{
+		ID: "cap", Name: "Cap", Version: "0.0.1",
+		Description: "test", Protocol: subprocess.ProtocolVersion,
+	}, nil
+}
+
+func (p *capabilityPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
+	return subprocess.LoadResult{}, nil
+}
+
+func (p *capabilityPlugin) Unload(ctx context.Context) error { return nil }
+
+func TestHarnessWithGranted(t *testing.T) {
+	p := &capabilityPlugin{}
+	h := subprocesstest.New(t, p, subprocesstest.WithGranted([]string{"example.capability"}))
+	defer h.Close()
+
+	if _, err := h.Init(context.Background()); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if p.degraded {
+		t.Errorf("plugin degraded despite the capability being granted")
+	}
+	if len(p.granted) != 1 || p.granted[0] != "example.capability" {
+		t.Errorf("Granted = %v", p.granted)
+	}
+}
+
+// The default harness grants nothing, so a plugin that assumes a
+// capability it never received fails its own tests rather than the
+// operator's install.
+func TestHarnessGrantsNothingByDefault(t *testing.T) {
+	p := &capabilityPlugin{}
+	h := subprocesstest.New(t, p)
+	defer h.Close()
+
+	if _, err := h.Init(context.Background()); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if !p.degraded {
+		t.Errorf("plugin did not degrade against a host that granted nothing")
+	}
+	if p.granted != nil {
+		t.Errorf("Granted = %v, want nil", p.granted)
+	}
+}

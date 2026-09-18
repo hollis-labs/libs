@@ -38,6 +38,13 @@ audit it from inside, and it is not a capability grant you asked for. Treat
 anything ambient as something you happened to be handed rather than something
 you are entitled to use.
 
+That cuts both ways, and the second direction is easy to miss. An environment
+variable carrying a live credential handle — an agent socket, a runtime socket —
+reaches *every* plugin the host loaded, including the ones that asked for
+nothing. `CapabilityRequest` and `InitParams.Granted` exist so that "this plugin
+asked for X" and "the host allowed X" are at least expressible, but neither
+narrows what your process can actually reach. Only the host can do that.
+
 ## What the SDK guarantees
 
 **A panic will not take down the host.** `Serve` recovers panics per request
@@ -75,6 +82,7 @@ contract that decided them would impose one host's answer on every other.
 | Sandboxing / isolation | host | Your process has whatever access the OS gives it. Assume none is revoked. |
 | Resource limits, per-call deadlines | host | A host may or may not bound your call. Bound your own work. |
 | Authorization — what you may do | host | The host decides whether an operation runs. Do not implement your own parallel policy. |
+| Capability granting and enforcement | host | `CapabilityRequest` is a declaration with an open vocabulary, and `InitParams.Granted` reports what the host allowed. The SDK defines no capability names, grants nothing and enforces nothing — a granted list is a statement, not a boundary. |
 | Output filtering | host | See "The host trusts your output". |
 | Secret storage or rotation | host | You never reach a credential store. You receive values. |
 | Registration vocabulary | host | Commands, events, resources and UI contributions are declared in the host's own manifest schema, not here. |
@@ -122,6 +130,15 @@ working correctly. If your state depends on init config, guard it.
 fallback for data, because writing a plugin's persistent state to a guessed
 location is worse than failing. `ResolvedCacheDir()` does fall back to
 `os.TempDir()`, because losing a cache is survivable.
+
+**A granted capability is a claim, not a boundary — and so is an absent one.**
+`InitParams.Granted` tells you what the host says it allowed. It does not
+restrict your process, and a host that declares capabilities while still passing
+the same environment to every plugin has gained documentation rather than
+security. In the other direction, a capability missing from `Granted` does not
+mean the host refused: a host that predates the mechanism sends no list at all,
+and a host that grants nothing sends an empty one. The wire does not distinguish
+them. Degrade on absence; do not refuse to load on it.
 
 **A missing credential should not be fatal.** The host may legitimately load you
 without a secret — because it is not configured yet, or because the operator is

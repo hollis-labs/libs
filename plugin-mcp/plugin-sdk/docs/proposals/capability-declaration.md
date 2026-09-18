@@ -1,7 +1,12 @@
 # Proposal: capability declaration
 
-**Status:** proposed, not scheduled.
+**Status:** accepted and implemented, 2026-09-18.
 **Raised:** 2026-09-18, from a cross-host audit of Cerberus and Nanite.
+
+Implemented as `subprocess.CapabilityRequest`, `InitParams.Granted`,
+`InitParams.HasCapability` and `subprocesstest.WithGranted`. The resolution is
+recorded at the end of this document; the argument below is kept as written so
+the decision can be re-read against what raised it.
 
 ## The gap
 
@@ -107,11 +112,53 @@ Three properties worth preserving whatever the final shape:
   the host grants, not by what it claimed — which is the point, but it means the
   declaration is an input to a decision rather than a guarantee by itself.
 
-## Next step
+## Resolution
 
-A decision on whether the mechanism belongs here or in each host. That decision
-wants at least one host committed to enforcing it, because a declaration nobody
-acts on is worse than none: it reads like a control.
+**Accepted, as a declaration mechanism only.** The host-neutrality test the
+proposal set for itself is met, and it is met the same way the registry
+contract meets it: `Name` is an open string, `Metadata` is opaque JSON, and the
+SDK defines no capability names. Nothing in the module reads a
+`CapabilityRequest`. `AGENTS.md` records the boundary alongside the registry's.
+
+Two things were decided in the course of implementing it that the sketch did
+not settle.
+
+**An absent capability is not a refusal, and the SDK does not pretend
+otherwise.** A host that predates the mechanism omits `granted` entirely; a host
+that grants nothing sends an empty list. With `omitempty` — which the sketch
+specified and which keeps a non-participating host's payload byte-identical to
+what it sent before — those two are indistinguishable on the wire. Rather than
+add machinery to tell them apart, `HasCapability` documents the ambiguity and
+`docs/best-practices.md` gives the rule that follows from it: degrade on
+absence, and fail the *operation* that genuinely needs the capability, never the
+load. The alternative — a newer plugin refusing to start against an older host —
+would break working installs to enforce a control the SDK does not implement,
+which is the failure mode this proposal warns about, pointed the other way.
+
+**The degraded path is the default in tests.** `subprocesstest.WithGranted`
+seeds the granted list and the harness grants nothing without it, so a plugin
+that assumes a capability it never received fails its own suite rather than an
+operator's install.
+
+What did not change: the SDK still grants, resolves and enforces nothing, and
+`ProtocolVersion` is still 1. The "What this does not solve" section above
+stands in full, and the first item in it remains the load-bearing one. **A host
+that declares capabilities and then passes the same environment to every plugin
+has gained documentation, not security.** The mechanism is now available to be
+enforced; whether it is, is each host's to answer.
+
+## Next step — for the hosts, not this repo
+
+The SDK half is done. What remains is host work, and the audit that raised this
+is the tracking record for it:
+
+- Embed `CapabilityRequest` in the manifest schema, so a plugin's request is
+  reviewable before it runs.
+- Decide what to allow, and report it honestly in `InitParams.Granted` — a host
+  that grants everything and says so is at least auditable; one that grants
+  everything and says nothing is where we started.
+- Narrow the ambient environment to match. Until that happens the declaration
+  is documentation, which is worth having and is not a control.
 
 Cross-reference: `docs/plans/plugin-capability-audit.md` in
 `hollis-labs/cerberus` records the audit that raised this, including the full

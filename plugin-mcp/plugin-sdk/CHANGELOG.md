@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`subprocess.CapabilityRequest`** — a declaration mechanism with an open
+  vocabulary, so a plugin can say what ambient access it needs and a host can
+  decide what to allow. `Name` is an open string in the host's vocabulary and
+  `Metadata` is opaque JSON, following the precedent the registry contract sets
+  for contribution kinds. The SDK defines no capability names.
+- **`subprocess.InitParams.Granted`** — the capability names the host allowed,
+  travelling back on the existing `plugin/init` handshake, plus
+  `InitParams.HasCapability` to read it. A plugin can discover what it actually
+  received instead of assuming it got what it asked for.
+- **`subprocesstest.WithGranted`** — seeds the granted list on the harness's
+  mocked `InitParams`. The harness grants nothing by default, so a plugin's
+  degraded path is the one its tests exercise unless a test says otherwise.
+
+### Notes
+
+- This is a declaration mechanism and nothing more. The SDK grants nothing,
+  enforces nothing and names no capability, because a host's trust and
+  isolation model does not live in this module and a capability name here would
+  be one host's vocabulary inherited by every other. A granted list is a
+  statement, not a boundary — `docs/security-model.md` says so in the table and
+  in the seams.
+- An absent capability is not a refusal. A host that predates the mechanism
+  sends no `granted`, and a host that grants nothing sends an empty one; the
+  wire does not distinguish them, and `HasCapability` does not pretend to.
+  Plugins degrade on absence rather than refusing to load.
+
+### Compatibility
+
+Fully backward compatible with v0.4.0 and additive in both directions, asserted
+by tests rather than by argument: `TestInitParamsForwardCompatNoGranted` (a
+newer plugin against a host that sends no `granted`),
+`TestInitParamsBackCompatOlderPluginIgnoresGranted` (a v0.4.0-shaped plugin
+decoding init params from a host that does) and
+`TestInitParamsGrantedOmittedWhenUnused` (a host that grants nothing emits the
+same payload it emitted before the field existed). `ProtocolVersion` is
+unchanged at 1.
+
 ## v0.4.0 — 2026-09-16
 
 ### Added
