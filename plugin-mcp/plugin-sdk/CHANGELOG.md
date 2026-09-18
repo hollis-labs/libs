@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Unreleased — next release is v0.5.0
 
 ### Added
 
@@ -31,6 +31,11 @@
   Plugins degrade on absence rather than refusing to load.
 
 ### Compatibility
+
+**This is a minor bump, not a patch.** `CapabilityRequest`, `InitParams.Granted`,
+`InitParams.HasCapability` and `subprocesstest.WithGranted` are new exported
+API, and a patch release in this repo is documentation, examples and internal
+hardening only (see the Status section of `README.md`). Release this as v0.5.0.
 
 Fully backward compatible with v0.4.0 and additive in both directions, asserted
 by tests rather than by argument: `TestInitParamsForwardCompatNoGranted` (a
