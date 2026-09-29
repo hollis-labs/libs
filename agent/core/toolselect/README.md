@@ -3,15 +3,13 @@
 A deterministic BM25 ranker for MCP tool catalogs, and a pure evaluator that
 decides which tools of which servers a caller sees.
 
-Two packages, standard library only:
+## Packages
 
-- `toolselect` ranks a catalog against a free-text query. An exact name always
-  outranks a partial match, ties break by name, and the same inputs always give
-  the same order. It also applies the shared include / exclude / order rule
-  schema.
-- `toolselect/profile` evaluates a profile (servers on or off, allow and deny
-  globs, read-only, pinned order) against a catalog and reports both the
-  visible tools and why each hidden tool is hidden.
+| Package | Purpose | Imports |
+|---|---|---|
+| `toolselect` | Ranks a catalog against a free-text query: an exact name always outranks a partial match, ties break by name, the same inputs always give the same order. Also applies the shared include / exclude / order rule schema. | standard library only |
+| `toolselect/profile` | Evaluates a profile (servers on or off, allow and deny globs, read-only, pinned order) against a catalog and reports the visible tools and why each hidden tool is hidden. | standard library only |
+| `toolselect/launch` | Derives a per-launch profile from an Assignment's `grants.mcp` ceiling and a base profile. | `profile`, `agent-contracts-leaf` |
 
 It decides what a caller *sees*, not what it may *call*. Authorization belongs
 to go-permission.
@@ -20,16 +18,16 @@ to go-permission.
 
 **Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
 
-Not built yet: `toolselect/launch`, the helper that derives a per-launch
-profile from an Assignment's `grants.mcp` ceiling. It is deferred until
-`agent-contracts-leaf` is tagged, because it is the one package that would
-import it. Nothing in `toolselect` or `toolselect/profile` depends on it.
-
 ## Install
 
 ```sh
 go get github.com/hollis-labs/go-toolselect
 ```
+
+`toolselect/launch` depends on `github.com/hollis-labs/agent-contracts-leaf`
+(v0.1.0), a private module: set `GOPRIVATE=github.com/hollis-labs`. Importing
+only `toolselect` or `toolselect/profile` pulls in nothing outside the standard
+library.
 
 ## Usage
 
@@ -83,6 +81,32 @@ func main() {
 ```
 
 The same program lives in [`examples/hello`](./examples/hello/main.go).
+
+## How the launch derivation works
+
+`launch.FromAssignment(base, assignment)` narrows a base `profile.Profile` by
+the Assignment's `grants.mcp` `{allow, deny}`. Grants are a ceiling: the result
+shows no tool the base hides. Grant entries are `path.Match` globs on the
+origin-qualified tool name, like `ToolsAllow` and `ToolsDeny`; to scope a grant
+to a server, use a name glob such as `github_*`.
+
+Deny entries are unioned. A grant allow list is intersected with the base's
+(or used as is when the base allows everything); globs are never intersected
+symbolically, so an entry survives only when one side is a literal name the
+other matches, or the two are identical. Anything else is dropped, which only
+narrows. An empty result allows no tool, never an empty list (which would
+allow all). Every other field is copied, and the base is not modified.
+
+Known limitation: dropping overlapping glob-versus-glob entries is deliberately
+conservative. It can only over-restrict, never over-grant, so some legitimate
+overlapping combinations (for example base `a_*` and grant `a_b*`) narrow more
+than strictly necessary. Real glob intersection is not implemented. Grants also
+name tools only, not servers; per-server enable/disable stays in
+`profile.Profile.Servers`.
+
+```go
+derived, err := launch.FromAssignment(base, assignment)
+```
 
 ## How ranking works
 
@@ -144,8 +168,8 @@ listed there.
 - Per-field weighting (BM25F). One concatenated document per tool.
 - A status tool that reports `HiddenReason`, and progressive-discovery protocol
   extensions.
-- `toolselect/launch` (Assignment to profile derivation): deferred until
-  `agent-contracts-leaf` is tagged.
+- Deriving a profile from anything but an `agent-contracts-leaf` Assignment,
+  and server-level grants that need a catalog to resolve.
 
 ## Development
 
