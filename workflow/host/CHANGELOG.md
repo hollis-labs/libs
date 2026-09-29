@@ -31,3 +31,19 @@ refuses a tag whose CHANGELOG has no heading for it.
   reproduce the Hadron schema and SQL exactly.
 - Qualified by `conformance.RunExhaustive` on a fresh database per fixture, on
   the default schema and on a host-shaped run table with foreign keys enforced.
+- artifactfs: package `github.com/hollis-labs/go-workflow-host/artifactfs`, a crash-safe
+  local-filesystem `values.ArtifactStore` merged from two independent host implementations
+  (`New`, `Option`, `WithExternal`, `OwnerClaimAuthorizer`). The authority string is a required
+  argument and part of every persisted reference; the on-disk format and artifact ids are
+  unchanged from both implementations (pinned by golden id vectors). Where the two disagreed
+  the stricter behaviour was taken:
+  - `Stat` verifies the full payload digest, not only the size.
+  - Symlink components are rejected on every Stat, Open, Delete and Cleanup path, not only in `New`.
+  - The parent directory is fsynced after `Delete` and after each cleanup removal.
+  - References of another authority are routed only to delegates approved with `WithExternal`;
+    an unknown but well-formed authority is `ErrArtifactAuthority` for Stat, Open, Delete and
+    Cleanup (external kind), and a delegate reference without `RetentionExternal` is
+    `ErrArtifactRetention` on Delete. Malformed references of the local authority stay
+    `ErrArtifactInvalid`.
+  - `Put` checks a non-canonical `Store` (`ErrArtifactAuthority`) before authorization, then
+    authorizes, then rejects a canonical foreign store.
