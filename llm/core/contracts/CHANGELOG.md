@@ -11,4 +11,12 @@ refuses a tag whose CHANGELOG has no heading for it.
 
 ### Added
 
-- Initial scaffold.
+- `Assignment`, `RunPolicy` (`lifetime`, `attach`, `attended`, `resume`), `Scope`, `Grants`, `Limits`, `Task`,
+  `Launch`, `Trust` with `EffectiveTrust`, and the opaque `Requester` / `Correlation`, each with `Valid` or
+  `Validate` where it has a defined set.
+- `InstanceStatus` (seven values), `WaitingReason`, `StoppedReason` / `StoppedCause`, and a lossy `ToA2A`
+  mapping. `waiting.approval` maps to `input-required` provisionally.
+- `LaunchRecord` with four digests, `EffectiveGrants` and `GrantDiagnostic`, so an unenforced grant is reported
+  rather than silent.
+- Package `capabilities`: the `Name` vocabulary, `Level`, `Declaration`, `Set`, `Known` and `Check`, which takes no
+  force flag.

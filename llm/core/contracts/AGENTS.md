@@ -1,14 +1,17 @@
 # agent-contracts-leaf
 
-Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus and the capabilities vocabulary.
+Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus, LaunchRecord and the capabilities vocabulary.
 
-It is not: TODO(author) — the mistake this repo attracts.
+It is not a launcher, an enforcer or a store, and it is not the agent definition format: it is pure data that hosts share so they stop each inventing "what does it take to launch an agent". A change here that adds behaviour, a dependency or a host's taxonomy is almost certainly the wrong change.
 
 ## Start Here
 
-- `agentcontracts` package — the importable API; its `doc.go` is the package documentation.
-- `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- `assignment.go` — `Assignment` and its `Validate`; the shared launch contract. Orchestration (hooks, escalation, gates, dependencies) stays out of it.
+- `runpolicy.go` — `RunPolicy` is `{lifetime, attach, attended, resume}`. There is no mode field.
+- `status.go` — the fixed seven `InstanceStatus` values, waiting/stopped detail and `ToA2A`.
+- `launchrecord.go` — `LaunchRecord`, the one noun for "what was actually launched", with four digests.
+- `trust.go` — `EffectiveTrust`, which can only lower.
+- `capabilities/` — the capability vocabulary and `Check`; the root package imports it, never the reverse.
 
 ## Commands
 
@@ -22,5 +25,10 @@ CI (`.github/workflows/check.yml`) is the full gate.
 
 ## Boundaries
 
-- No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-- TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+- Standard library only. `go list -deps ./...` must show nothing else, and no hollis-labs lib may be imported (go-permission, go-materialize, agentkit, go-agentdef all depend on this direction, not the reverse).
+- Clean break: no aliases, shims or `Deprecated:` markers (D-22/D-25). The legacy launch mode words and `orphaned`/`done` have no compatibility constants; `TestNoRuledOutFields` and `TestEnumsRejectOutsiders` guard them.
+- `capabilities.Check` takes no force flag, and `EffectiveTrust` has no parameter that could raise its result. Overriding an unmet `requires` is the caller's decision, recorded in `LaunchRecord.Forced` — capabilities only, never grants, auth, posture or trust. `TestCheckTakesNoForceFlag` and `TestEffectiveTrustUnknownFailsSafe` guard it.
+- `Grants` is a ceiling, not an enforcement claim: a grant a host does not enforce is a `GrantDiagnostic` with `Enforced` false, never silence.
+- `Requester` and `Correlation` are opaque couriers; never interpret or authorize on them.
+- JSON tags are the wire contract; `TestAssignmentJSONGolden` pins the spellings. YAML tags are present but untested here so the module stays stdlib-only.
+- `waiting.approval` mapping to A2A `input-required` is provisional, and the A2A state names are unverified against the spec.
