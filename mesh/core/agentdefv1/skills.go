@@ -86,10 +86,25 @@ func ResolveSkills(fsys fs.FS, layerRoot string, d *Definition) ([]SkillRef, err
 
 // hashTree hashes every file under dir: sorted relative paths, each framed by
 // its path and length so no two distinct trees share a byte stream.
+// requireRegular rejects anything in a skill tree that is not a directory or a
+// regular file. A symlink is refused, not followed: on an os.DirFS root a link
+// pointing outside the skill would otherwise have its target hashed into the
+// pin and vendored by CopySkills, so a hash-pinned skill could silently include
+// a file from anywhere the process can read.
+func requireRegular(p string, e fs.DirEntry) error {
+	if e.IsDir() || e.Type().IsRegular() {
+		return nil
+	}
+	return fmt.Errorf("agentdef: skill file %q is a %s, not a regular file (symlinks and special files are refused)", p, e.Type().String())
+}
+
 func hashTree(fsys fs.FS, dir string) (string, error) {
 	var files []string
 	err := fs.WalkDir(fsys, dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
+			return err
+		}
+		if err := requireRegular(p, e); err != nil {
 			return err
 		}
 		if !e.IsDir() && e.Name() != ".DS_Store" {
@@ -158,6 +173,9 @@ func copyTree(src fs.FS, dir, target string) error {
 	return fs.WalkDir(src, dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if rerr := requireRegular(p, e); rerr != nil {
+			return rerr
 		}
 		out := filepath.Join(target, filepath.FromSlash(strings.TrimPrefix(strings.TrimPrefix(p, dir), "/")))
 		if e.IsDir() {

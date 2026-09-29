@@ -1,6 +1,7 @@
 package agentdef
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,4 +124,91 @@ func TestCopySkills_SourceDrift(t *testing.T) {
 	if err := CopySkills(t.TempDir(), refs); err == nil {
 		t.Error("source changed after pinning must be refused")
 	}
+}
+
+// writeSkillOnDisk lays a valid skill under root/skills/runbook and returns an
+// os.DirFS over root, where a symlink is followable — unlike fstest.MapFS.
+func writeSkillOnDisk(t *testing.T) (root string, fsys fs.FS) {
+	t.Helper()
+	root = t.TempDir()
+	dir := filepath.Join(root, "skills", "runbook")
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: runbook\ndescription: How to run incidents.\n---\n# Runbook\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return root, os.DirFS(root)
+}
+
+func symlinkOrSkip(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("cannot create symlinks here: %v", err)
+	}
+}
+
+// A symlink inside a skill must never be followed: its target would be hashed
+// into the pin and vendored, so a hash-pinned skill could silently include a
+// file from outside the tree.
+func TestSkillSymlinksAreRefused(t *testing.T) {
+	secret := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(secret, []byte("not part of the skill"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	def := &Definition{Skills: []string{"runbook"}}
+
+	t.Run("symlinked file", func(t *testing.T) {
+		root, fsys := writeSkillOnDisk(t)
+		symlinkOrSkip(t, secret, filepath.Join(root, "skills", "runbook", "scripts", "leak.sh"))
+
+		if _, err := hashTree(fsys, "skills/runbook"); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Errorf("hashTree = %v, want a refusal of the symlink", err)
+		}
+		if _, err := ResolveSkills(fsys, ".", def); err == nil {
+			t.Error("ResolveSkills must fail on a symlinked skill file")
+		}
+		if err := copyTree(fsys, "skills/runbook", t.TempDir()); err == nil {
+			t.Error("copyTree must fail on a symlinked skill file")
+		}
+	})
+
+	t.Run("symlinked directory", func(t *testing.T) {
+		root, fsys := writeSkillOnDisk(t)
+		symlinkOrSkip(t, filepath.Dir(secret), filepath.Join(root, "skills", "runbook", "linked"))
+		if _, err := hashTree(fsys, "skills/runbook"); err == nil {
+			t.Error("hashTree must refuse a symlinked directory")
+		}
+		if _, err := ResolveSkills(fsys, ".", def); err == nil {
+			t.Error("ResolveSkills must fail on a symlinked directory")
+		}
+	})
+
+	t.Run("symlinked SKILL.md", func(t *testing.T) {
+		root, fsys := writeSkillOnDisk(t)
+		md := filepath.Join(root, "skills", "runbook", "SKILL.md")
+		if err := os.Remove(md); err != nil {
+			t.Fatal(err)
+		}
+		symlinkOrSkip(t, secret, md)
+		if _, err := ResolveSkills(fsys, ".", def); err == nil {
+			t.Error("ResolveSkills must fail on a symlinked SKILL.md")
+		}
+	})
+
+	t.Run("swapped in after pinning", func(t *testing.T) {
+		root, fsys := writeSkillOnDisk(t)
+		refs, err := ResolveSkills(fsys, ".", def)
+		if err != nil {
+			t.Fatal(err)
+		}
+		symlinkOrSkip(t, secret, filepath.Join(root, "skills", "runbook", "scripts", "leak.sh"))
+		dst := t.TempDir()
+		if err := CopySkills(dst, refs); err == nil {
+			t.Error("CopySkills must fail when a symlink appears after pinning")
+		}
+		if _, statErr := os.Stat(filepath.Join(dst, "runbook")); statErr == nil {
+			t.Error("nothing may be vendored when the source tree is refused")
+		}
+	})
 }

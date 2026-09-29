@@ -18,6 +18,7 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `ResolveSkills` and `CopySkills`: find `skills/<name>/SKILL.md`, require `name` and `description`, and pin each skill by a hash over its whole tree.
 - `Lint`, and `CheckGenerated` / `ParseGeneratedSpans` / `CheckSpans` for `<!-- agentdef:generated -->` spans (the marker syntax is provisional).
 - `agentdef` command: `validate`, `lint`, `digest`, `check`, with repeatable `--layer`.
+- Skill trees refuse symlinks and other non-regular files: `ResolveSkills` and `CopySkills` return an error rather than following a link out of the skill and pinning or vendoring its target.
 
 ### Not yet done
 
