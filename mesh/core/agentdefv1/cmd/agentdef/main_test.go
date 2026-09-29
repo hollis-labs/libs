@@ -49,6 +49,27 @@ func TestValidate_Bad(t *testing.T) {
 	golden(t, "validate_bad", errs)
 }
 
+func TestValidate_UnknownCapability(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, front string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("---\nname: a\ndescription: d\n"+front+"---\nbody\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if code, _, errs := exec(t, "validate", write("ok.md", "requires: [mcp, sandbox]\nuses: [long-running]\n")); code != 0 {
+		t.Errorf("vocabulary names rejected: code=%d %q", code, errs)
+	}
+	code, _, errs := exec(t, "validate", write("bad.md", "requires: [mcp, warp-drive]\nuses: [teleport]\n"))
+	if code != 1 || !strings.Contains(errs, `requires`) || !strings.Contains(errs, `unknown capability "warp-drive"`) || !strings.Contains(errs, `unknown capability "teleport"`) {
+		t.Errorf("unknown capability not reported: code=%d %q", code, errs)
+	}
+	if strings.Contains(errs, `"mcp"`) {
+		t.Errorf("a known capability was reported: %q", errs)
+	}
+}
+
 func TestValidate_MissingFile(t *testing.T) {
 	code, _, errs := exec(t, "validate", "testdata/nope.md")
 	if code != 1 || !strings.HasPrefix(errs, "testdata/nope.md: ") {

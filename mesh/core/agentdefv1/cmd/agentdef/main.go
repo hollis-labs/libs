@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hollis-labs/agent-contracts-leaf/capabilities"
 	agentdef "github.com/hollis-labs/go-agentdef"
 )
 
@@ -277,11 +278,17 @@ func collisionLayers(err error) []string {
 	return []string{"layer"}
 }
 
+// knownCapability backs requires/uses validation with the shared capability
+// vocabulary. The library itself takes any func; only this CLI binds it.
+func knownCapability(name string) bool {
+	return capabilities.Known(capabilities.Name(name))
+}
+
 // validateTarget runs Validate and skill resolution; it reports each problem
 // as "<path>: <field>: <message>" and returns whether the target is clean.
 func validateTarget(t target, stderr io.Writer) bool {
 	ok := true
-	if err := t.def.Validate(); err != nil {
+	if err := t.def.Validate(agentdef.WithCapabilities(knownCapability)); err != nil {
 		reportErr(stderr, t.display, err)
 		ok = false
 	}

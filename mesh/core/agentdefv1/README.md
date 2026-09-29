@@ -99,7 +99,10 @@ launch-record digests it feeds settle on one.
 
 `Validate` checks the capability names in `requires` and `uses` against a
 catalog only when you pass `WithCapabilities(known)`; without it they are
-pattern-checked only.
+pattern-checked only. The `agentdef` CLI passes the shared vocabulary from
+[agent-contracts-leaf](https://github.com/hollis-labs/agent-contracts-leaf)
+(`capabilities.Known`), so `agentdef validate` rejects a capability name outside
+it.
 
 ### CLI
 

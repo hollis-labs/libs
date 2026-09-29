@@ -20,6 +20,9 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `agentdef` command: `validate`, `lint`, `digest`, `check`, with repeatable `--layer`.
 - Skill trees refuse symlinks (including a symlinked skill root or `skills/` directory) and other non-regular files: `ResolveSkills` and `CopySkills` return an error rather than following a link out of the skill and pinning or vendoring its target.
 
+- The `agentdef` CLI validates `requires` / `uses` against the shared capability vocabulary
+  (`agent-contracts-leaf`'s `capabilities.Known`, pinned by pseudo-version).
+
 ### Not yet done
 
-- `WithCapabilities` is not wired to `agent-contracts-leaf`'s capabilities package; the option takes a plain function. No release is tagged until that dependency can be pinned without a `replace`.
+- No release is tagged. The `agent-contracts-leaf` dependency is a pseudo-version pin until the leaf is tagged.
