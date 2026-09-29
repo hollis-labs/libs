@@ -15,7 +15,8 @@ refuses a tag whose CHANGELOG has no heading for it.
   `Launch`, `Trust` with `EffectiveTrust`, and the opaque `Requester` / `Correlation`, each with `Valid` or
   `Validate` where it has a defined set.
 - `InstanceStatus` (seven values), `WaitingReason`, `StoppedReason` / `StoppedCause`, and a lossy `ToA2A`
-  mapping. `waiting.approval` maps to `input-required` provisionally.
+  mapping. The A2A constants are the v0.3-era lowercase-hyphen spellings (A2A 1.0.0 uses `TASK_STATE_*` on the wire);
+  `waiting.approval` maps to `input-required` provisionally.
 - `LaunchRecord` with four digests, `EffectiveGrants` and `GrantDiagnostic`, so an unenforced grant is reported
   rather than silent.
 - Package `capabilities`: the `Name` vocabulary, `Level`, `Declaration`, `Set`, `Known` and `Check`, which takes no

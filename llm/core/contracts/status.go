@@ -130,9 +130,12 @@ func (d StoppedDetail) Validate() error {
 	return errors.Join(errs...)
 }
 
-// A2ATaskState mirrors the A2A protocol's task lifecycle. The names come from a
-// search summary, not the specification read end to end; verify them against
-// a2a-protocol.org before treating them as final.
+// A2ATaskState mirrors the eight task states of the A2A protocol's task
+// lifecycle. The constants use the lowercase-hyphen spellings of the v0.3-era
+// JSON encoding ("input-required"). A2A specification 1.0.0 names the same
+// eight states TASK_STATE_SUBMITTED, TASK_STATE_INPUT_REQUIRED and so on on the
+// wire, so a consumer emitting 1.0.0 JSON converts at its own boundary; this
+// package does not carry a second spelling.
 type A2ATaskState string
 
 // The A2A task states.

@@ -31,4 +31,5 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - `Grants` is a ceiling, not an enforcement claim: a grant a host does not enforce is a `GrantDiagnostic` with `Enforced` false, never silence.
 - `Requester` and `Correlation` are opaque couriers; never interpret or authorize on them.
 - JSON tags are the wire contract; `TestAssignmentJSONGolden` pins the spellings. YAML tags are present but untested here so the module stays stdlib-only.
-- `waiting.approval` mapping to A2A `input-required` is provisional, and the A2A state names are unverified against the spec.
+- `waiting.approval` mapping to A2A `input-required` is provisional: it is a real open question, not a verification gap.
+- `A2ATaskState` constants are the v0.3-era lowercase-hyphen JSON spellings; A2A 1.0.0 spells the wire values `TASK_STATE_*`, so a consumer converts at its own boundary.
