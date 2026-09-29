@@ -13,10 +13,10 @@ presets:
 inputs:
   agents_boundaries: |-
     - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+    - See AGENTS.md for the invariants and the tests that guard them.
   agents_start_here: |-
     - `sqlstore` package — the importable API; its `doc.go` is the package documentation.
-    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `README.md` — one section per package; the `sqlstore` go fence must keep compiling.
     - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
   copyright_holder: Hollis Labs
   description: 'Host-side companions for go-workflow: a SQLite runtime.StateStore (sqlstore) and a local-filesystem values.ArtifactStore (artifactfs).'

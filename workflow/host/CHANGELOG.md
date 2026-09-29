@@ -11,4 +11,23 @@ refuses a tag whose CHANGELOG has no heading for it.
 
 ### Added
 
-- Initial scaffold.
+- `sqlstore`: a SQLite `runtime.StateStore` for go-workflow v0.1.0, lifted from
+  the copy Hadron and Nanite each maintained. `Store` implements
+  `StateStore` and the 20 companion runtime store interfaces (cancellation,
+  child-terminal waits, control flow, external operations, fan-out,
+  memoization, pins, output reuse, value records, reactors, recovery, replay,
+  node inputs, retry, run controls, run policy, scheduler resources, services,
+  waits, compensation).
+- `sqlstore.New`, `Store.DB`, `Store.WriteTx` and `DBTX`: construct a store on
+  an open `*sql.DB` and run host statements inside the store's write
+  transaction.
+- `sqlstore.Migrate` and `sqlstore.Schema`: embedded final-shape DDL (tables,
+  indexes and append-only triggers), applied create-if-missing with its own
+  `sqlstore_schema_versions` table, or exposed as an `fs.FS` for a host's own
+  migration runner.
+- `sqlstore.WithRunColumns` / `RunColumns` and `sqlstore.WithHooks` / `Hooks`:
+  support a run table shared with host product data under other column names,
+  and mirror run and node writes inside the write transaction. Defaults
+  reproduce the Hadron schema and SQL exactly.
+- Qualified by `conformance.RunExhaustive` on a fresh database per fixture, on
+  the default schema and on a host-shaped run table with foreign keys enforced.
