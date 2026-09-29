@@ -1,8 +1,12 @@
 {
   "name": "@hollis-labs/plugin-registry",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Browser half of the plugin contract — the registry wire types and the loader that resolves them.",
+  "version": "0.1.0",
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "description": "Browser half of the plugin contract \u2014 the registry wire types and the loader that resolves them.",
   "keywords": [
     "plugin",
     "registry",
@@ -24,7 +28,9 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

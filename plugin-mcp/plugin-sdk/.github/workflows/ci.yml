@@ -1,0 +1,90 @@
+# The gate: two jobs, one per half of the repo (the Go module at the root, the
+# npm workspace under ts/). Gate only — nothing here publishes; the release
+# steps are a runbook in AGENTS.md ("Releasing the TS package").
+#
+# No govulncheck yet, on purpose. go.mod pins `go 1.26.1`, and govulncheck reads
+# the stdlib version from that line, so it would report advisories fixed in
+# go1.26.4-1.26.6 and turn this gate red on day one. Add it (pinned, not
+# @latest) once go.mod's `go` line is raised to the portfolio floor 1.26.6.
+#
+# Every step is its own `run:` so exit codes propagate; no `|| true` and no
+# `command -v tool && tool || echo skipping` idiom anywhere.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: go · gofmt · vet · test -race
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test -race
+        run: go test -race -count=1 ./...
+
+  ts:
+    name: ts · typecheck · build · test · pack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      # `npm ci` runs plugin-registry's `prepare`, which builds dist/. That is
+      # the same path a consumer's install takes, so a break in it is a break
+      # for them.
+      - name: install
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      # Build before test: the tests import dist/, which a fresh tree only has
+      # because `prepare` built it. `npm test` also builds, but naming the step
+      # keeps a build failure from reading as a test failure.
+      - name: build
+        run: npm run build
+
+      - name: test
+        run: npm test
+
+      # The published file list is a property of the package, checked before a
+      # human runs `npm publish`, not after.
+      - name: pack (dry run)
+        run: npm pack --dry-run -w @hollis-labs/plugin-registry
