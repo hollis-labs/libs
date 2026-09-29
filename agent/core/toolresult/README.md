@@ -106,8 +106,12 @@ the envelope's hint.
 This module is pre-1.0: minor releases may break the exported API. Pin an exact
 version, and read [CHANGELOG.md](./CHANGELOG.md) before upgrading — every
 breaking change is listed there. The text `HandleFetch`, `HandleSearch`,
-`DefaultFooter` and the specs emit is prompt surface; it is kept identical to
-Nanite's, and a change to it is a breaking change.
+`DefaultFooter` and the specs emit is prompt surface. Its text is pinned by 24
+goldens captured from copies of Nanite's functions (the harness is not
+committed), and a change to it is a breaking change. Parity was checked
+against a copy, not Nanite in place; Nanite's adoption should confirm it,
+and that its `*sql.DB` passes into `sqlstore` unchanged. `RunPurger` is not
+built.
 
 ## Out of scope
 

@@ -19,8 +19,8 @@ refuses a tag whose CHANGELOG has no heading for it.
     continuable), `CutUTF8`.
   - `Cache` over a `Store` port: `Present`, `Put`, `Read`, `Search`, `Purge`,
     `HandleFetch`, `HandleSearch`, with `Config`, `Meta`, `Pointer`, `View`,
-    `FooterData` and `DefaultFooter`. Header, footer and tool text match
-    Nanite byte for byte.
+    `FooterData` and `DefaultFooter`. Header, footer and tool text are pinned by goldens
+    captured from copies of Nanite's functions (see below).
   - `ToolSpec`, `FetchSpec` and `SearchSpec`: the agent-facing tool
     definitions as data.
   - `ErrNotFound`, `ErrExpired`, `ErrBodyNotStored`, `ErrEmptyScope`.
@@ -30,9 +30,18 @@ refuses a tag whose CHANGELOG has no heading for it.
   `Table{Name: "wiki_result_cache", ScopeColumn: "caller_id"}` matches Loom's.
   `DDL` renders the schema.
 - `storetest.Run`: conformance suite for any `Store`.
-- Golden parity tests against output captured from Nanite's code, fuzz tests
-  for paging, pointer selection, preview and search, and property tests for
+- `TestGoldenParityWithNanite` pins 24 outputs captured by running copies of
+  Nanite's functions in a scratch module; the harness is not committed. Only
+  those pinned outputs are byte-for-byte claims. Fuzz tests for paging, pointer selection, preview and search, and property tests for
   `CutUTF8` and paging.
+
+### Known limitations
+
+- Parity with Nanite was checked against a copy of its functions, not against
+  Nanite in place. It is not verified that Nanite's `*sql.DB` passes into
+  `sqlstore` unchanged. Nanite's adoption should confirm both.
+- `RunPurger` (a periodic purge loop) is not built; call `Cache.Purge`
+  yourself.
 
 ### Not carried over from Nanite
 

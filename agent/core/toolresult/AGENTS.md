@@ -30,7 +30,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - Do not add list, cursor or envelope logic (the seam is written up in `doc.go`). If the budget brief and this one disagree, stop and ask.
 - Scope is opaque and host-derived. Another scope's id and an absent id must be indistinguishable (`storetest` `CrossScopeAndAbsentAreIndistinguishable`, `CrossScopeReadIsNotFound`). Never accept a scope from tool `input`; the handlers take it as a separate argument (`HandlersUseSessionScopeOnly`).
 - Errors and `Config.Exempt` tools are never cached (`ErrorsAndExemptToolsPassThroughUncached`); Present on a store error returns the unmodified body and no pointer (`StoreFailureReturnsBodyAndError`).
-- The header, footer and tool-description text is prompt surface, byte-identical to Nanite's (`TestGoldenParityWithNanite`). Do not reword it without a decision; regenerate goldens only on purpose.
+- The header, footer and tool-description text is prompt surface, pinned by `TestGoldenParityWithNanite` (24 outputs captured from copies of Nanite's functions in a scratch module, not Nanite in place; the harness is not committed). Do not reword it without a decision; regenerate goldens only on purpose.
 - Pages never split a rune and always make progress; consecutive pages tile the body (`TestReadPageTilesTheBodyExactly`, `FuzzReadPage`). The preview never exceeds its budget (`FuzzPreview`); the recovery notice is additional.
 - `sqlstore` splices table and column names into SQL, so `New` and `DDL` panic on anything but a plain identifier (`TestInvalidIdentifiersPanic`). Values always use `?`.
 - No logging, no background goroutines, no default purge; TTL and purge policy are the host's (blocked decision, config only).
