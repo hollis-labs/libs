@@ -92,8 +92,8 @@ func NewPathGrants() *PathGrants {
 // the caller can emit a structured event for observability if desired.
 //
 // Strict-prefix only — no "fuzzy" patterns like a bare "config.yaml" or
-// a project name will auto-grant. The gate falls through to notify-pause
-// for those, per Q1.
+// a project name will auto-grant. The gate falls through to the host's
+// normal approval flow for those.
 //
 // Tokens that fail to expand (no $HOME) or fail to absolutize are
 // silently skipped. The downstream path-safety escape check still runs
@@ -115,7 +115,7 @@ func (g *PathGrants) RegisterFromUserMessage(sessionID, message string) []string
 		if !ok {
 			continue
 		}
-		// Q2 — register literal path AND its parent directory (single level).
+		// Register literal path AND its parent directory (single level).
 		// No recursive grant. Recursive coverage requires the user to mention
 		// the directory itself.
 		parent := filepath.Dir(abs)
@@ -166,7 +166,7 @@ const (
 // candidate, and classifies the match kind for diagnostic surfaces.
 // The check accepts the literal cleaned-absolute candidate AND any
 // granted root that is an ancestor of the candidate. This matches the
-// Q2 promise: a grant for "/foo/bar.go" implies the literal file plus
+// single-level promise: a grant for "/foo/bar.go" implies the literal file plus
 // its parent directory "/foo/" — and a tool call against "/foo/anything"
 // hits the parent grant.
 //
@@ -561,7 +561,7 @@ func ExtractPathMentions(message string) []string {
 }
 
 // isPathToken reports whether tok satisfies one of the three strict
-// prefixes (Q1) AND is not a known false-positive shape.
+// prefixes AND is not a known false-positive shape.
 func isPathToken(tok string) bool {
 	if len(tok) < 2 {
 		// Bare "/" or bare "~" — reject.

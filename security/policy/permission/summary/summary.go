@@ -1,4 +1,4 @@
-// Package summary renders a human-readable per-session permission summary
+// summary.go renders a human-readable per-session permission summary
 // suitable for inclusion in an agent's prompt or context window.
 //
 // Background. Path-access rules (an allow-list, session-scoped path grants,
