@@ -2,10 +2,9 @@
 # npm workspace under ts/). Gate only — nothing here publishes; the release
 # steps are a runbook in AGENTS.md ("Releasing the TS package").
 #
-# No govulncheck yet, on purpose. go.mod pins `go 1.26.1`, and govulncheck reads
-# the stdlib version from that line, so it would report advisories fixed in
-# go1.26.4-1.26.6 and turn this gate red on day one. Add it (pinned, not
-# @latest) once go.mod's `go` line is raised to the portfolio floor 1.26.6.
+# govulncheck is pinned (v1.8.0), not @latest: an unpinned scanner changes its
+# verdict without a commit. It reads the stdlib version from go.mod's `go` line,
+# which is the portfolio floor 1.26.6, so it judges the stdlib the build uses.
 #
 # Every step is its own `run:` so exit codes propagate; no `|| true` and no
 # `command -v tool && tool || echo skipping` idiom anywhere.
@@ -27,7 +26,7 @@ permissions:
 
 jobs:
   go:
-    name: go · gofmt · vet · test -race
+    name: go · gofmt · vet · test -race · govulncheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -50,6 +49,9 @@ jobs:
 
       - name: go test -race
         run: go test -race -count=1 ./...
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
   ts:
     name: ts · typecheck · build · test · pack

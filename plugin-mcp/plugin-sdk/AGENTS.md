@@ -51,10 +51,9 @@ npm run typecheck
 npm test            # builds, then runs node --test against dist/
 ```
 
-CI is `.github/workflows/ci.yml`: a `go` job (gofmt, vet, `test -race`) and a
-`ts` job (typecheck, build, test, `npm pack --dry-run`). It does not run
-govulncheck yet — see the comment at the top of the workflow. There is no
-Makefile.
+CI is `.github/workflows/ci.yml`: a `go` job (gofmt, vet, `test -race`,
+govulncheck pinned at v1.8.0) and a `ts` job (typecheck, build, test,
+`npm pack --dry-run`). There is no Makefile.
 
 ### Releasing the TS package
 
