@@ -51,7 +51,29 @@ npm run typecheck
 npm test            # builds, then runs node --test against dist/
 ```
 
-There is no CI workflow or Makefile in this repo.
+CI is `.github/workflows/ci.yml`: a `go` job (gofmt, vet, `test -race`,
+govulncheck pinned at v1.8.0) and a `ts` job (typecheck, build, test,
+`npm pack --dry-run`). There is no Makefile.
+
+### Releasing the TS package
+
+`@hollis-labs/plugin-registry` is published to npm by hand, by the owner of the
+`@hollis-labs` scope, in the same deliberate, separate step design-kit uses. CI
+gates; it never publishes. Its tag is `ts/plugin-registry/vX.Y.Z` — the repo's
+bare `vX.Y.Z` tags are Go-module tags and a bare tag would collide with them;
+`ts/` has no `go.mod`, so the prefixed tag names no Go module.
+
+1. `ts/packages/plugin-registry/CHANGELOG.md` has a `## X.Y.Z` heading, and CI is
+   green on the commit you will tag. Write the entry before the tag.
+2. `cd ts && npm ci && npm test && npm pack -w @hollis-labs/plugin-registry --dry-run`
+   — the file list is `dist/*`, `README.md`, `CHANGELOG.md`, `LICENSE`,
+   `package.json` and nothing else.
+3. `npm publish -w @hollis-labs/plugin-registry`, logged in as the scope owner.
+4. `git tag -a ts/plugin-registry/vX.Y.Z <sha>`, push the tag, then
+   `gh release create ts/plugin-registry/vX.Y.Z --latest=false --notes-file <the CHANGELOG section>`.
+   `--latest=false` because GitHub's "Latest" belongs to the Go module tags.
+5. `npm view @hollis-labs/plugin-registry version` prints X.Y.Z; install it in an
+   empty directory and import both entry points.
 
 ## Boundaries
 

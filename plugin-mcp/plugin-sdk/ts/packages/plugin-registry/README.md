@@ -11,6 +11,16 @@ dynamic-imports each plugin's ES module, pulls the named exports the registry
 names, and keeps a table you can look contributions up in. One bad bundle is
 one plugin's absence, not a blank surface.
 
+## Install
+
+```sh
+npm i @hollis-labs/plugin-registry
+```
+
+ESM only. Zero runtime dependencies; `react` `^19` is an optional peer, needed
+only for the `./react` entry point. Release history is in
+[CHANGELOG.md](./CHANGELOG.md).
+
 ## The model
 
 **The host manifest is authoritative.** A plugin does not declare at runtime
@@ -104,3 +114,24 @@ where bundles are served from and under what CSP; and how a bundle obtains
 shared runtime dependencies such as a React copy. Each of those has a
 different right answer in every host, and a shared package that learned one
 host's answer would impose it on the rest.
+
+## Compatibility
+
+`PROTOCOL` — the `protocol` number in the registry response — is the
+compatibility contract between a host and this loader, and the same number is
+pinned on the Go side (`registry.Protocol` in
+`github.com/hollis-labs/plugin-sdk`). A response whose `protocol` differs, or
+that lacks one, is refused whole rather than partly loaded. Within a protocol
+number the exported API follows semver; before 1.0, a minor release may break
+it and CHANGELOG.md says so.
+
+## Out of scope
+
+- What a contribution *kind* means, or any taxonomy of kinds.
+- Trust, capability, isolation and CSP: how plugin code is contained.
+- Serving bundles: where they live and under what headers.
+- A shared runtime, including a shared React copy, for plugin bundles.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
