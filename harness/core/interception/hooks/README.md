@@ -11,6 +11,21 @@ For that name to mean the same thing under Claude Code, Codex, Nanite or any
 other host, they need to agree on event names, decisions and layering. That
 agreement is this module.
 
+## Status
+
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
+Known gaps, unverified against the live Claude Code hooks reference (verify
+before relying on them for a real integration):
+
+- The `PostToolUse` result field name (`tool_result`) and whether a
+  PostToolUse output can rewrite the result (`updatedToolOutput`).
+- `PermissionRequest`: Claude nests its output as
+  `hookSpecificOutput.decision.behavior`, unlike this flat `Output`, and
+  `PermissionRequestInput.Reason` is not listed by either doc.
+- `SubagentStop`'s output fields (`decision`/`reason` plus
+  `hookSpecificOutput.additionalContext`, rather than `continue`/`stopReason`).
+
 ## Install
 
 ```sh
