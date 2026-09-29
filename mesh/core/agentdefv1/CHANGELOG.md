@@ -21,8 +21,8 @@ refuses a tag whose CHANGELOG has no heading for it.
 - Skill trees refuse symlinks (including a symlinked skill root or `skills/` directory) and other non-regular files: `ResolveSkills` and `CopySkills` return an error rather than following a link out of the skill and pinning or vendoring its target.
 
 - The `agentdef` CLI validates `requires` / `uses` against the shared capability vocabulary
-  (`agent-contracts-leaf`'s `capabilities.Known`, pinned by pseudo-version).
+  (`agent-contracts-leaf`'s `capabilities.Known`, pinned at v0.1.0).
 
 ### Not yet done
 
-- No release is tagged. The `agent-contracts-leaf` dependency is a pseudo-version pin until the leaf is tagged.
+- No release is tagged.

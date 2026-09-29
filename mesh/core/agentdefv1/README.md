@@ -6,8 +6,9 @@ Skills resolution and hash-pinning, and an `agentdef` CLI for CI.
 
 ## Status
 
-Pre-1.0 and unreleased. See [CHANGELOG.md](./CHANGELOG.md) for what exists and
-what changed.
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
+See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 
 ## Install
 
