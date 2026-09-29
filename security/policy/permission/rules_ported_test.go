@@ -100,7 +100,7 @@ func TestPathGlobSegmentBoundary(t *testing.T) {
 		{"**/*.env", "/a/b/c.env/d", false},
 		{"**/secret.txt", "/x/y/secret.txt", true},
 		{"**/secret.txt", "/x/y/other.txt", false},
-		// Plain filepath.Match behaviour is unchanged.
+		// Plain filepath.Match behavior is unchanged.
 		{"/tmp/*.txt", "/tmp/a.txt", true},
 		{"/tmp/*.txt", "/tmp/sub/a.txt", false},
 		// A malformed pattern never matches.
@@ -230,10 +230,10 @@ func TestMatcher(t *testing.T) {
 	ctx := context.Background()
 	e := NewEngine(ModeDefault, rs)
 
-	// Default keys: "paths" is not recognised, so the deny never fires.
+	// Default keys: "paths" is not recognized, so the deny never fires.
 	in := map[string]any{"paths": "/data/x"}
 	if got := e.Check(ctx, "s", "t", in, ToolMeta{}); got.Decision != DecisionAllow {
-		t.Errorf("unrecognised key should not match, got %s", got.Decision)
+		t.Errorf("unrecognized key should not match, got %s", got.Decision)
 	}
 
 	e = NewEngine(ModeDefault, rs, WithMatcher(Matcher{PathKeys: []string{"paths"}}))

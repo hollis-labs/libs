@@ -240,7 +240,7 @@ func (e *Engine) defaultDecision(mode Mode, toolName string, meta ToolMeta) Chec
 		}
 		return CheckResult{Decision: DecisionAllow, Reason: "accept-edits mode — read-only operation"}
 
-	default: // ModeDefault and any unrecognised mode
+	default: // ModeDefault and any unrecognized mode
 		if meta.IsDestructive {
 			return CheckResult{Decision: DecisionAsk, Reason: "default mode — destructive operation requires approval"}
 		}

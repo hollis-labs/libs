@@ -638,10 +638,9 @@ func absolutize(p string) (string, bool) {
 		if err != nil {
 			return "", false
 		}
-		switch {
-		case p == "~":
+		if p == "~" {
 			p = home
-		default:
+		} else {
 			p = filepath.Join(home, p[2:])
 		}
 	}

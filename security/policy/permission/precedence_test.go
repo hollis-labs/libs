@@ -12,7 +12,7 @@ import (
 //
 // They are characterization tests. Two results are surprising and
 // deliberate: yolo beats deny rules, and a session grant (keyed by tool
-// NAME only) beats deny rules. Changing either is a behaviour change.
+// NAME only) beats deny rules. Changing either is a behavior change.
 
 func grantSession(t *testing.T, e *Engine, session, tool string) {
 	t.Helper()

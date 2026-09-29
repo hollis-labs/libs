@@ -200,7 +200,7 @@ var (
 	defaultCommandKeys = []string{"command"}
 )
 
-// matchInput reports whether pattern matches any recognised input value. A nil
+// matchInput reports whether pattern matches any recognized input value. A nil
 // Matcher means the defaults.
 func (m *Matcher) matchInput(pattern string, input map[string]any) bool {
 	pathKeys, commandKeys := defaultPathKeys, defaultCommandKeys
@@ -265,7 +265,7 @@ func matchPathGlob(pattern, path string) bool {
 // LoadRulesFromFile reads a permissions YAML file, tags each rule's Source with
 // the path, and runs Validate on the result.
 func LoadRulesFromFile(path string) (*RuleSet, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the caller chooses which permissions file to load
 	if err != nil {
 		return nil, fmt.Errorf("read permissions file: %w", err)
 	}
@@ -311,8 +311,10 @@ func SaveRulesToFile(path string, rs *RuleSet) error {
 		return fmt.Errorf("marshal permissions: %w", err)
 	}
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// The file is a shared, non-secret project artifact; 0755/0644 (world-
+	// readable) is the long-standing behavior, so it is kept.
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301: shared non-secret permissions file
 		return fmt.Errorf("create permissions dir: %w", err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o644) //nolint:gosec // G306: shared non-secret permissions file
 }

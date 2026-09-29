@@ -109,6 +109,8 @@ func (e *Engine) Respond(requestID string, decision Decision, scope Scope, sessi
 	ctx := context.Background()
 	if decision == DecisionAllow {
 		switch scope {
+		case ScopeOnce:
+			// nothing to record
 		case ScopeSession:
 			e.mu.Lock()
 			if e.sessionGrants[req.SessionID] == nil {

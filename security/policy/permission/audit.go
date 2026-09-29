@@ -73,6 +73,8 @@ func (a SlogAuditor) Audit(ctx context.Context, e Event) {
 		l = slog.Default()
 	}
 	switch e.Kind {
+	case EventDecision, EventGrantRecorded, EventGrantsCleared:
+		// not logged
 	case EventApprovalRequested:
 		l.InfoContext(ctx, "permission: approval request created",
 			"id", e.RequestID, "tool", e.Tool, "session_id", e.SessionID)

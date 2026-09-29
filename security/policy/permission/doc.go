@@ -22,7 +22,7 @@
 // # Sharp edges
 //
 // A rule Pattern is matched only against input values under the Matcher's
-// recognised keys (path, file, directory, file_path, command by default);
+// recognized keys (path, file, directory, file_path, command by default);
 // a tool with another input key silently never matches a rule that has a
 // Pattern. Command matching is a plain substring test and is advisory, not a
 // security boundary: an allow pattern "git" also matches "git; rm -rf ~".

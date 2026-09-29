@@ -217,7 +217,7 @@ func TestLineage_BestSessionDir_WalksAncestor(t *testing.T) {
 func TestLineage_BestSessionDir_OwnBeatsAncestor(t *testing.T) {
 	parentDir := t.TempDir()                              // shorter path
 	workerDir := t.TempDir() + "/deeper-grant-fixture"    // longer path
-	if err := os.MkdirAll(workerDir, 0o755); err != nil { // ensure exists as dir
+	if err := os.MkdirAll(workerDir, 0o750); err != nil { // ensure exists as dir
 		t.Fatalf("mkdir: %v", err)
 	}
 
