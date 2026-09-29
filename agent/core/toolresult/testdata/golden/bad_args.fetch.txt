@@ -1,0 +1,8 @@
+=== fetch 0 error=true
+Error: 'id' is required
+=== fetch 1 error=true
+Error: offset must be a non-negative integer
+=== fetch 2 error=true
+Error: length must be a non-negative integer no greater than 1073741824
+=== fetch 3 error=true
+Error: cached result "nope" not found or expired
