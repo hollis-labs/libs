@@ -52,3 +52,13 @@ and callers-supply-policy.
   consulted. Every git call carries a `context.Context`.
 - Not carried over: environment parsing, `NoopManager`, Torque's branch-only
   `SweepMergedBranches` (deferred), `Config.KeepDays`.
+
+### Known limitations
+
+- `ReapShipped` re-checks HEAD and branch against the verdict before removing and
+  keeps a changed worktree as `changed-since-verdict`; a change in the few git
+  calls after that check is not caught.
+- The root package's `go test -race -count=20` takes about 488 seconds.
+- `gh` is exercised only through a shell-script stand-in.
+- Only git 2.47.0 on macOS has been exercised locally.
+- `DeleteMergedBranches` is not ported.

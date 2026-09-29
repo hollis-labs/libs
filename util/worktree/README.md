@@ -108,6 +108,10 @@ Lifted from three applications' worktree code (Torque `internal/worktree`, Nanit
 
 ## Known limitations
 
+- `ReapShipped` re-reads the worktree's HEAD and branch under the manager lock just before removal and keeps it (`changed-since-verdict`) if either differs from what the verdict saw. A commit or branch switch landing in the few git invocations between that check and the removal is not caught.
+- The root package's `go test -race -count=20` takes about 488 seconds.
+- `gh` is exercised only through a shell-script stand-in, never a real `gh`.
+- `DeleteMergedBranches` is not ported (also listed below).
 - Only git 2.47.0 on macOS has been exercised locally. Linux runs through CI once the repository is pushed. Windows is not supported.
 - The mutex serializes mutations through one `Manager` in one process. Two processes are serialized only by git's own locking, and there is a gap between `Inspect` and the removal that follows: git itself still refuses to remove a dirty worktree, but a commit made in that window is not caught.
 - Ignored files are deleted silently along with the worktree (git behavior; not detected).

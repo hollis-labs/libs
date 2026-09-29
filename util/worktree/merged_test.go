@@ -187,3 +187,71 @@ func TestMergedPR_InsideAnyKeepsOtherPoliciesWorking(t *testing.T) {
 		t.Fatalf("Report = %+v", rep)
 	}
 }
+
+// hookPolicy runs hook inside Verdict, then answers ReapShipped: it models the
+// worktree changing between the verdict and the removal.
+type hookPolicy struct{ hook func(wt worktree.Worktree) }
+
+func (h hookPolicy) Verdict(_ context.Context, wt worktree.Worktree, _ worktree.Status) worktree.Verdict {
+	h.hook(wt)
+	return worktree.ReapShipped
+}
+
+func assertChangedSinceVerdict(t *testing.T, rep worktree.Report, wt worktree.Worktree, repo string, branches ...string) {
+	t.Helper()
+	if len(rep.Removed) != 0 || len(rep.Errs) != 0 {
+		t.Fatalf("Report = %+v; nothing may be removed", rep)
+	}
+	if len(rep.Kept) != 1 || rep.Kept[0].Reason != "changed-since-verdict" {
+		t.Fatalf("Kept = %+v, want changed-since-verdict", rep.Kept)
+	}
+	if !exists(wt.Path) {
+		t.Fatal("worktree deleted")
+	}
+	for _, b := range branches {
+		if !hasBranch(t, repo, b) {
+			t.Errorf("branch %s deleted", b)
+		}
+	}
+}
+
+// TestSweep_ReapShippedKeepsWorktreeThatGainedCommit: a commit lands after the
+// proof was computed; the tree is clean, so only the re-check saves it.
+func TestSweep_ReapShippedKeepsWorktreeThatGainedCommit(t *testing.T) {
+	m, wt, _, repo := shippedFixture(t)
+	var late string
+	rep, err := m.Sweep(ctx, hookPolicy{hook: func(w worktree.Worktree) {
+		late = commitFile(t, w.Path, "late.go", "package late")
+	}}, worktree.SweepOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertChangedSinceVerdict(t, rep, wt, repo, "fix/CW-1")
+	if git(t, repo, "rev-parse", "fix/CW-1") != late {
+		t.Error("branch no longer points at the late commit")
+	}
+}
+
+// TestSweep_ReapShippedKeepsWorktreeThatSwitchedBranch: the branch proved
+// shipped is not the branch checked out at removal time.
+func TestSweep_ReapShippedKeepsWorktreeThatSwitchedBranch(t *testing.T) {
+	m, wt, _, repo := shippedFixture(t)
+	rep, err := m.Sweep(ctx, hookPolicy{hook: func(w worktree.Worktree) {
+		git(t, w.Path, "checkout", "-q", "-b", "other/work")
+	}}, worktree.SweepOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Same commit, different branch: HEAD is unchanged, branch differs.
+	assertChangedSinceVerdict(t, rep, wt, repo, "fix/CW-1", "other/work")
+}
+
+// TestSweep_ReapShippedUnchangedStillReaps guards against the re-check being
+// too eager.
+func TestSweep_ReapShippedUnchangedStillReaps(t *testing.T) {
+	m, wt, _, repo := shippedFixture(t)
+	rep, err := m.Sweep(ctx, hookPolicy{hook: func(worktree.Worktree) {}}, worktree.SweepOptions{})
+	if err != nil || len(rep.Removed) != 1 || exists(wt.Path) || hasBranch(t, repo, "fix/CW-1") {
+		t.Fatalf("%+v, %v", rep, err)
+	}
+}

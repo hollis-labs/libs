@@ -19,7 +19,10 @@ const (
 	// ReapShipped asks for removal on the strength of proof that the work is
 	// already on the remote. Ahead/unreachable checks are waived and the
 	// branch may be force-deleted; dirty and locked worktrees are still kept.
-	// Only return it when the policy has verified the proof itself.
+	// Only return it when the policy has verified the proof itself. The proof
+	// is tied to wt.HEAD and wt.Branch as passed to Verdict: if either has
+	// changed by the time of removal, the worktree is kept as
+	// "changed-since-verdict".
 	ReapShipped
 )
 
@@ -53,7 +56,7 @@ type SweepOptions struct {
 type Kept struct {
 	ID     string
 	Path   string
-	Reason string // "policy", "protected", "prunable" or a [RemoveResult.Reason]
+	Reason string // "policy", "protected", "prunable", "changed-since-verdict" or a [RemoveResult.Reason]
 }
 
 // Report is the outcome of a sweep.
@@ -116,6 +119,11 @@ func (m *Manager) Sweep(ctx context.Context, policy SweepPolicy, opts SweepOptio
 			m.mu.Unlock()
 		case ReapShipped:
 			m.mu.Lock()
+			if reason := m.changedSinceVerdict(ctx, wt); reason != "" {
+				m.mu.Unlock()
+				rep.Kept = append(rep.Kept, Kept{wt.ID, wt.Path, reason})
+				continue
+			}
 			res, err = m.remove(ctx, wt, RemoveOptions{Branch: DeleteBranch}, true)
 			m.mu.Unlock()
 		default:
@@ -139,6 +147,34 @@ func (m *Manager) Sweep(ctx context.Context, policy SweepPolicy, opts SweepOptio
 		}
 	}
 	return rep, nil
+}
+
+// changedSinceVerdict re-reads the worktree's current HEAD and branch and
+// compares them with the values the policy's verdict was computed from
+// (wt.HEAD and wt.Branch from the listing). ReapShipped waives the
+// ahead/unreachable checks and force-deletes the branch on the strength of
+// that proof, so the proof must still describe the worktree. It returns ""
+// when nothing changed, otherwise the Kept reason. It must be called with the
+// manager lock held. A commit or branch switch landing between this check and
+// git's own removal is still possible; that window is a few git invocations
+// wide and cannot be closed without git-level locking.
+func (m *Manager) changedSinceVerdict(ctx context.Context, wt Worktree) string {
+	head, err := m.r.Run(ctx, wt.Path, "rev-parse", "HEAD")
+	if err != nil {
+		return "inspect-failed: " + err.Error()
+	}
+	br, err := m.r.Run(ctx, wt.Path, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "inspect-failed: " + err.Error()
+	}
+	branch := trimNL(br)
+	if branch == "HEAD" {
+		branch = ""
+	}
+	if trimNL(head) != wt.HEAD || branch != wt.Branch {
+		return "changed-since-verdict"
+	}
+	return ""
 }
 
 // TTL reaps worktrees whose directory has not been modified for maxAge. A
