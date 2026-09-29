@@ -37,8 +37,10 @@ refuses a tag whose CHANGELOG has no heading for it.
   trace record carries a copy of `State.Attrs` as `attrs`.
 - Tests: the store-free evaluator (12), resolve (10) and recurrence (9) tests
   ported with type substitutions; fake-based engine, executor and telemetry
-  tests; one `Run` equivalence test per replaced pipeline with byte-for-byte
-  trace goldens; a race test for concurrent `Run` and `RefreshKinds`;
+  tests; one `Run` test per replaced pipeline (`TestRunEquivalence_*`) whose
+  trace goldens were transcribed from reading Nanite's code, not captured from
+  a Nanite run, and which pin this library's own trace shape (including
+  `attrs`, which differs from Nanite's trace on purpose); a race test for concurrent `Run` and `RefreshKinds`;
   `FuzzEvaluateTrigger`.
 
 ### Changed
@@ -65,6 +67,12 @@ refuses a tag whose CHANGELOG has no heading for it.
   degraded lookup already fails open with its own warning.
 
 ### Known limitations
+
+- Behavioral equivalence with Nanite's engine is not established. The
+  `TestRunEquivalence_*` goldens were transcribed from Nanite's code and pin
+  this library's own trace shape, which carries `attrs` where Nanite's trace
+  did not. Nanite's adoption must confirm equivalence against a real Nanite
+  trace.
 
 - Numeric signals are ints where 0 means unknown, so `cache_read_window = 0`
   is true for a host that does not report cache reads. Documented, not

@@ -16,6 +16,12 @@ only dependency, and nothing here imports an application.
 Every adopter other than Nanite is inferred, not established. Nanite does not
 consume this module yet.
 
+Behavioral equivalence with Nanite's engine is not established. The
+`TestRunEquivalence_*` goldens were transcribed from Nanite's code, not
+captured from a Nanite run, and they pin this library's own trace shape
+(which carries `attrs`). Nanite's adoption should confirm equivalence against
+a real Nanite trace.
+
 ## Install
 
 ```sh
