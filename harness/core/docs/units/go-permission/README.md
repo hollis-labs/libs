@@ -13,6 +13,10 @@ non-stdlib dependency (`gopkg.in/yaml.v3`).
 | `.../pathgrants` | session-scoped path grants from explicit path mentions, with parent-session lineage |
 | `.../summary` | renders effective path access as prompt text |
 
+## Status
+
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
 ## Install
 
 ```sh
