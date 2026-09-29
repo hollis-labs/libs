@@ -6,8 +6,9 @@ Skills resolution and hash-pinning, and an `agentdef` CLI for CI.
 
 ## Status
 
-Pre-1.0 and unreleased. See [CHANGELOG.md](./CHANGELOG.md) for what exists and
-what changed.
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
+See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 
 ## Install
 
@@ -99,7 +100,10 @@ launch-record digests it feeds settle on one.
 
 `Validate` checks the capability names in `requires` and `uses` against a
 catalog only when you pass `WithCapabilities(known)`; without it they are
-pattern-checked only.
+pattern-checked only. The `agentdef` CLI passes the shared vocabulary from
+[agent-contracts-leaf](https://github.com/hollis-labs/agent-contracts-leaf)
+(`capabilities.Known`), so `agentdef validate` rejects a capability name outside
+it.
 
 ### CLI
 

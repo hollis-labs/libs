@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
-## Unreleased
+## v0.1.0 — 2026-09-29
 
 ### Added
 
@@ -20,6 +20,9 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `agentdef` command: `validate`, `lint`, `digest`, `check`, with repeatable `--layer`.
 - Skill trees refuse symlinks (including a symlinked skill root or `skills/` directory) and other non-regular files: `ResolveSkills` and `CopySkills` return an error rather than following a link out of the skill and pinning or vendoring its target.
 
+- The `agentdef` CLI validates `requires` / `uses` against the shared capability vocabulary
+  (`agent-contracts-leaf`'s `capabilities.Known`, pinned at v0.1.0).
+
 ### Not yet done
 
-- `WithCapabilities` is not wired to `agent-contracts-leaf`'s capabilities package; the option takes a plain function. No release is tagged until that dependency can be pinned without a `replace`.
+- No release is tagged.

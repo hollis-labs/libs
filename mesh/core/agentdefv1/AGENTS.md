@@ -33,4 +33,4 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - `LoadLayers` never silently picks a winner at equal precedence (`TestLoadLayers_EqualPrecedenceCollides`), and skips a layer's top-level `skills/` directory.
 - Skill hashes cover the whole `skills/<name>/` tree (`TestResolveSkills_WholeTreeIsPinned`), not just `SKILL.md`.
 - No `--force` in the CLI. `cmd/agentdef` tests drive `run(args, stdout, stderr)` against `testdata` fixtures; regenerate goldens with `AGENTDEF_UPDATE_GOLDEN=1` and read the diff.
-- Wiring `WithCapabilities` to `agent-contracts-leaf`'s capabilities package is pending: that module must be pushable first, and this one takes no `replace` on it. Do not tag before then.
+- `WithCapabilities` takes a plain func, so the library imports nothing. Only `cmd/agentdef` binds it to `agent-contracts-leaf`'s `capabilities.Known`; the leaf is pinned at a tag (v0.1.0), never a `replace` and never a pseudo-version in a tagged release.
