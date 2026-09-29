@@ -91,20 +91,11 @@ type State struct {
 	// PrefixTokens is the most recent input prefix size, used by the
 	// prefix_pressure predicate. 0 means unknown.
 	PrefixTokens int `json:"prefix_tokens"`
-	// Attrs carries host-defined string signals for the attr predicate.
-	// Two keys have built-in meaning beyond attr: "scope_tier" and
-	// "execution_pattern" are also readable through the scope_tier and
-	// execution_pattern predicate kinds and are mirrored into the trace
-	// record, exactly as the State fields of the same names were in the
-	// source system.
+	// Attrs carries host-defined string signals for the attr predicate. The
+	// library gives no key a special meaning; every entry is copied into the
+	// trace record's attrs.
 	Attrs map[string]string `json:"attrs,omitempty"`
 }
-
-// Well-known Attrs keys carried over from the source system's State fields.
-const (
-	AttrScopeTier        = "scope_tier"
-	AttrExecutionPattern = "execution_pattern"
-)
 
 // EventSignal is a thin projection of an event-log entry for the event
 // trigger path.

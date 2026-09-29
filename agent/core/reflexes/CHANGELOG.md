@@ -31,9 +31,10 @@ refuses a tag whose CHANGELOG has no heading for it.
   `Apply` and `AfterEmit`; `ActionHandler`, `HandlerFunc`, `Firing`. The seven
   Nanite kinds are pre-registered; `resume_loop_run` needs an app-registered
   `PhaseAfterEmit` handler.
-- New generic `attr` predicate over `State.Attrs`. The `scope_tier` and
-  `execution_pattern` predicate kinds remain as aliases of `attr`, and the
-  trace record still carries `scope_tier` and `execution_pattern`.
+- New generic `attr` predicate over `State.Attrs`. There are no aliases for
+  Nanite's `scope_tier` and `execution_pattern` predicate kinds and no
+  special-cased keys: a host translates its own vocabulary to `attr`. The
+  trace record carries a copy of `State.Attrs` as `attrs`.
 - Tests: the store-free evaluator (12), resolve (10) and recurrence (9) tests
   ported with type substitutions; fake-based engine, executor and telemetry
   tests; one `Run` equivalence test per replaced pipeline with byte-for-byte
@@ -49,8 +50,9 @@ refuses a tag whose CHANGELOG has no heading for it.
   `hooks`, a reflex is conceptually a hook implementation, and this library's
   plugin-filter seam must not collide with it. This module does not import
   go-hooks.
-- `State.ScopeTier` and `State.ExecutionPattern` became `State.Attrs` entries
-  `scope_tier` and `execution_pattern`.
+- `State.ScopeTier` and `State.ExecutionPattern` are replaced by the generic
+  `State.Attrs`; Nanite's adoption sets them as ordinary entries and rewrites
+  its `scope_tier` / `execution_pattern` predicates to `attr`.
 - `Executor` is usable as a zero value; an unregistered kind other than the
   built-ins is an `unknown action_kind` error, including `resume_loop_run`
   (Nanite treated it as a no-op).

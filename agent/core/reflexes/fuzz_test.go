@@ -38,7 +38,7 @@ func FuzzEvaluateTrigger(f *testing.F) {
 }
 
 func TestEvaluator_AttrPredicate(t *testing.T) {
-	st := State{Attrs: map[string]string{"region": "eu", AttrScopeTier: "open", AttrExecutionPattern: "subagent"}}
+	st := State{Attrs: map[string]string{"region": "eu", "scope_tier": "open", "execution_pattern": "subagent"}}
 	cases := []struct {
 		name, spec string
 		want, err  bool
@@ -48,8 +48,8 @@ func TestEvaluator_AttrPredicate(t *testing.T) {
 		{"attr_mismatch", `{"kind":"attr","key":"region","value":"us"}`, false, false},
 		{"attr_missing_key_is_empty", `{"kind":"attr","key":"absent","value":""}`, true, false},
 		{"attr_requires_key", `{"kind":"attr","value":"eu"}`, false, true},
-		{"scope_tier_alias", `{"kind":"scope_tier","value":"open"}`, true, false},
-		{"execution_pattern_alias", `{"kind":"execution_pattern","op":"!=","value":"solo"}`, true, false},
+		{"scope_tier_is_not_a_predicate_kind", `{"kind":"scope_tier","value":"open"}`, false, true},
+		{"execution_pattern_is_not_a_predicate_kind", `{"kind":"execution_pattern","value":"subagent"}`, false, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

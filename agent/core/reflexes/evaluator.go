@@ -62,8 +62,6 @@ func EvaluateTrigger(triggerKind, triggerSpec string, state State) (bool, error)
 //	identical_output_window — last N outputs byte-identical
 //	prefix_pressure      — prefix_tokens ≥ factor × value (context window heuristic)
 //	attr                 — State.Attrs[key] string compare (op ∈ {=, !=}, default =)
-//	scope_tier           — alias of attr with key "scope_tier"
-//	execution_pattern    — alias of attr with key "execution_pattern"
 func evalPredicateNode(node map[string]any, state State) (bool, error) {
 	kind, _ := node["kind"].(string)
 	switch kind {
@@ -145,10 +143,6 @@ func evalPredicateNode(node map[string]any, state State) (bool, error) {
 			return false, fmt.Errorf("attr: key is required")
 		}
 		return evalStringEquals(node, state.Attrs[key]), nil
-	case "scope_tier":
-		return evalStringEquals(node, state.Attrs[AttrScopeTier]), nil
-	case "execution_pattern":
-		return evalStringEquals(node, state.Attrs[AttrExecutionPattern]), nil
 	default:
 		return false, fmt.Errorf("unknown predicate kind %q", kind)
 	}

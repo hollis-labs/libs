@@ -40,6 +40,5 @@
 // input_tokens_window, output_growth_window, regex_match_window,
 // user_regex_window, text_regex_window, entity_mention_window,
 // tool_name_window, envelope_type_window, mail_unread_count,
-// identical_output_window, prefix_pressure and attr, plus the scope_tier
-// and execution_pattern aliases of attr. See EvaluateTrigger.
+// identical_output_window, prefix_pressure and attr. See EvaluateTrigger.
 package reflexes

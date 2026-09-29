@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"maps"
 	"time"
 )
 
@@ -65,10 +66,8 @@ type traceRecord struct {
 	AgentID    string `json:"agent_id,omitempty"`
 	AgentClass string `json:"agent_class,omitempty"`
 	SessionID  string `json:"session_id,omitempty"`
-	// ScopeTier/ExecutionPattern mirror State.Attrs["scope_tier"] and
-	// State.Attrs["execution_pattern"] when the caller populated them.
-	ScopeTier        string `json:"scope_tier,omitempty"`
-	ExecutionPattern string `json:"execution_pattern,omitempty"`
+	// Attrs is a copy of State.Attrs when the caller populated it.
+	Attrs map[string]string `json:"attrs,omitempty"`
 
 	// Spec is the fired action's own action_kind-specific payload
 	// (agent_slug/confidence/reason for dispatch_to_agent, body for
@@ -156,17 +155,16 @@ func emitFirings(
 		}
 
 		rec := traceRecord{
-			ReflexID:         r.ID,
-			ReflexName:       r.Name,
-			ActionKind:       action.ActionKind,
-			ProvenanceTier:   r.ProvenanceTier,
-			Priority:         r.Priority,
-			AgentID:          fc.AgentID,
-			AgentClass:       fc.AgentClass,
-			SessionID:        state.SessionID,
-			ScopeTier:        state.Attrs[AttrScopeTier],
-			ExecutionPattern: state.Attrs[AttrExecutionPattern],
-			Spec:             action.Spec,
+			ReflexID:       r.ID,
+			ReflexName:     r.Name,
+			ActionKind:     action.ActionKind,
+			ProvenanceTier: r.ProvenanceTier,
+			Priority:       r.Priority,
+			AgentID:        fc.AgentID,
+			AgentClass:     fc.AgentClass,
+			SessionID:      state.SessionID,
+			Attrs:          maps.Clone(state.Attrs),
+			Spec:           action.Spec,
 		}
 
 		algo := ""
