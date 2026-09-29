@@ -16,8 +16,18 @@ refuses a tag whose CHANGELOG has no heading for it.
   `Decision` (`allow`, `deny`, `ask`); `Output` with `Validate`; `Kind`,
   `OnError` (no default), `Layer`, `MCPToolRef`; `Hook` with `Validate`
   reporting every violated field as `*ValidationError`; `Resolve` (pure,
-  whole-hook precedence by name, managed > user > project); `MatchesTool`;
-  `TruncateContext`.
+  whole-hook precedence by name, managed > user > project); `MatchesTool`
+  (Claude Code's matcher rule: match-all, exact name or `|`/`,` list, else an
+  unanchored regex; not a glob); `TruncateContext`.
+- Known unverified against the live hooks reference; verify before relying on
+  this for a real Claude Code integration: the `PostToolUse` result field name
+  (`tool_result`) and whether a PostToolUse output can rewrite the result
+  (`updatedToolOutput`); `PermissionRequest`'s output shape (Claude nests it as
+  `hookSpecificOutput.decision.behavior`/`updatedInput`, unlike this flat
+  `Output`) and `PermissionRequestInput.Reason`; `SubagentStop`'s output
+  (`decision`/`reason` at top level plus `hookSpecificOutput.additionalContext`
+  rather than `continue`/`stopReason`). Regex matchers are Go RE2, not
+  JavaScript.
 - `cmdhook.Runner.Run`: runs a command-kind hook with JSON on stdin, exit 0
   decodes stdout, exit 2 is a deny block, other nonzero exits and timeouts
   are errors; the timeout is enforced without a caller deadline.

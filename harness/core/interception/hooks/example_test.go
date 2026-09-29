@@ -30,9 +30,11 @@ func ExampleHook_Validate() {
 }
 
 func ExampleMatchesTool() {
-	fmt.Println(hooks.MatchesTool("mcp__memory__*", "mcp__memory__write"))
+	fmt.Println(hooks.MatchesTool("Edit|Write", "Write"))
+	fmt.Println(hooks.MatchesTool("mcp__memory__.*", "mcp__memory__write"))
 	fmt.Println(hooks.MatchesTool("Bash", "Edit"))
 	// Output:
+	// true
 	// true
 	// false
 }

@@ -151,6 +151,14 @@ listed there. Native Claude Code and Codex payloads are not identical to this
 contract (for example Claude nests some output under `hookSpecificOutput` and
 uses the word `block`); normalizing them is the host adapter's job.
 
+Verify against the live Claude Code hooks reference before relying on this for
+a real integration: the `PostToolUse` result field (`tool_result`) and any
+result-rewrite output (`updatedToolOutput`); `PermissionRequest`'s output
+(`hookSpecificOutput.decision.behavior`) and `Reason` input; and
+`SubagentStop`'s output fields. These are not confirmed. `MatchesTool` follows
+Claude's matcher rule (exact name or `|`/`,` list, else an unanchored regex);
+regexes are Go RE2, not JavaScript.
+
 ## Out of scope
 
 - No engine: no event-firing loop, no per-session registry, no aggregation

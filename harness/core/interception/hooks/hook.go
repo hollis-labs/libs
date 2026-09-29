@@ -60,8 +60,10 @@ type Hook struct {
 	Name  string
 	Event Event
 	Kind  Kind
-	// Matcher is a glob over tool_name for PreToolUse, PostToolUse and
-	// PermissionRequest; "" fires unconditionally. Every other event fires
+	// Matcher selects tool_name for PreToolUse, PostToolUse and
+	// PermissionRequest using Claude Code's rule (see MatchesTool): "" or
+	// "*" match all, a name or "A|B" / "A, B" list is exact, anything else
+	// is an unanchored regular expression. Every other event fires
 	// unconditionally regardless of Matcher.
 	Matcher string
 	// Command is an already-resolved argv[0] (Kind == command). go-hooks

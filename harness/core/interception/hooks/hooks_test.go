@@ -387,19 +387,32 @@ func TestMatchesTool(t *testing.T) {
 		{"", "Bash", true},
 		{"*", "anything", true},
 		{"**", "anything", true},
+		// exact names and lists
 		{"Bash", "Bash", true},
 		{"Bash", "Edit", false},
 		{"bash", "Bash", false},
-		{"Edit*", "EditNotebook", true},
-		{"mcp__*", "mcp__memory__write", true},
-		{"mcp__*", "dev_edit", false},
-		{"mcp__memory__*", "mcp__memory__write", true},
-		{"mcp__memory__*", "mcp__other__write", false},
-		{"*_edit", "dev_edit", true},
-		{"dev_?dit", "dev_edit", true},
-		{"[BE]*", "Edit", true},
-		{"[", "[", false}, // malformed pattern matches nothing
+		{"Bash", "BashOutput", false}, // exact, not a substring
+		{"Edit|Write", "Write", true},
+		{"Edit|Write", "Bash", false},
+		{"Edit, Write", "Write", true},
+		{"Edit,Write", "Edit", true},
+		{"mcp__memory__write", "mcp__memory__write", true},
+		{"mcp__memory__write", "mcp__memory__write2", false},
 		{"Bash", "", false},
+		// anything else is an unanchored regex
+		{"^Notebook", "NotebookEdit", true},
+		{"^Notebook", "MyNotebook", false},
+		{"Notebook", "MyNotebookEdit", false}, // name-list token: exact
+		{"Notebook.*", "MyNotebookEdit", true},
+		{"mcp__memory__.*", "mcp__memory__write", true},
+		{"mcp__memory__.*", "mcp__other__write", false},
+		{"^(Edit|Write)$", "Write", true},
+		{"^(Edit|Write)$", "EditX", false},
+		{"[BE].*", "Edit", true},
+		{"mcp__memory__*", "mcp__memory__write", true}, // regex: '_*' then unanchored; matches as a substring
+		{"mcp__memory__*", "dev_edit", false},
+		{"[", "[", false}, // does not compile: matches nothing
+		{"(", "(", false},
 	}
 	for _, tc := range cases {
 		if got := hooks.MatchesTool(tc.pattern, tc.name); got != tc.want {
