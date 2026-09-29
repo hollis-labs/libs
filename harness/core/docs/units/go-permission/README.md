@@ -95,6 +95,9 @@ input). `TestPrecedence_*` pins the order.
   (`paths`, `url`, `cmd`) never matches a rule that has a `Pattern`, so a deny
   rule with a `Pattern` silently does not apply to it. Widen the keys with
   `WithMatcher(permission.Matcher{PathKeys: ...})`; nothing is widened for you.
+- **Path matching is lexical.** A path from tool input is cleaned
+  (`filepath.Clean`) before matching, so `..` cannot step around a rule, but
+  symlinks are not resolved: a link is matched by the name it is given.
 - **Command matching is advisory.** By default a command pattern is a plain
   substring test, so an allow pattern `git` also matches `git; rm -rf ~`. Do not
   treat it as a security boundary; supply `Matcher.Command` (for example a

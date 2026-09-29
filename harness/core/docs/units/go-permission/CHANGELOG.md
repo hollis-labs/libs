@@ -43,9 +43,28 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `Evaluate` is a single pass and returns a copy of the matched rule.
 - A request can be answered once; a second `Respond` no longer records a grant.
 - File errors from load and save are wrapped with `%w`.
+- Path values from tool input are cleaned lexically (`filepath.Clean`) before
+  matching, so `/tmp/../etc/passwd` is matched as `/etc/passwd`: a `..` can no
+  longer dodge a deny rule or ride an allow rule out of its tree. The stricter
+  behaviour wins over the source engines, which matched the raw string.
+- A `WaitForApproval` that gives up (timeout or cancelled context) claims the
+  request, so a `Respond` that arrives later returns false and records nothing;
+  a `Respond` that won the race is returned to the waiter instead of a deny.
+  Previously a late allow could leave a session grant behind after the caller
+  had been told "denied".
+- `Respond` answers only with `allow` or `deny`; any other decision returns
+  false and leaves the request open.
 
 ### Notes
 
 - Check precedence is `yolo > plan > session grant > deny > ask > allow rules >
   mode default`. Session grants are keyed by tool name only. Both are pinned by
   tests and documented, not changed.
+
+### Known limitations
+
+- Path matching is lexical. Symlinks are not resolved, so a link is matched by
+  the name it is given, not by where it points.
+- `FuzzExtractPathMentions` failed once with a 10s "context deadline exceeded"
+  and passed on every later run at the same budget; it is treated as a fuzz
+  worker start-up timeout and has not been chased.
