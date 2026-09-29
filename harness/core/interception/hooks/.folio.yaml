@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T17:50:23.655392-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+  agents_start_here: |-
+    - `hooks` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Hooks contract: 11-event vocabulary, allow/deny/ask decisions, per-hook failure mode, layer resolution; hosts implement the engine.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: hooks
+  repo_name: go-hooks
+  stability: pre-1.0
+computed:
+  import_line: hooks "github.com/hollis-labs/go-hooks"
+  import_path: github.com/hollis-labs/go-hooks
+  module_path: github.com/hollis-labs/go-hooks
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:1fa399475248e38def849f63b970a89ca889a686ce97aaacb7563dc212ba9db1
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:e37d3f526e46318a7f7f4d9405500bcdb4c7dcdba0dcdc1d10089b9c4d91c19a
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:ed72906f27c90baa75a49faaeb99140a25d9bb5cc4b27fbcde3868a49b915587
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:506273a1a3be68f0ad333a380810e060e12d854cae1700e07ed4ecb5acc3c7e3
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:6598a5cad5e39570982a96685b79ec9fd3439107e3676bbea632099fe32db0a3
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:9ad13c2cd884885ec49a52d99890d77770cc178295333acbbbe3aa608178101d
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:cfe6cba5263cd27e36c82fe2e123f0e2d1c67d67f915c897f6f3c6c9dfb875b3
+  hooks.go:
+    preset: go-lib
+    digest_at_gen: sha256:89f0c1e4d67ea2db9208c11f060d6015d767ddf4565059aefcad3ca34b452543
+  hooks_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:578d112582e45f579c1b09b71d421960d8ab34b170aa4becad12e60f07863f4d
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+sync_history:
+  - at: 2026-09-29T17:50:23.655392-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0

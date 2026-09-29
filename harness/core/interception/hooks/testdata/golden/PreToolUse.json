@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","session_id":"sess-42","cwd":"/work/proj","transcript_path":"/workspace/user/.claude/t.jsonl","permission_mode":"default","tool_name":"Bash","tool_input":{"command":"ls"},"tool_use_id":"toolu_01ABC"}
