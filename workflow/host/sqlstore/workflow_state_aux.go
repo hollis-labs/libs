@@ -436,13 +436,13 @@ func (s *Store) Recovery(ctx context.Context, query workflowruntime.RecoveryQuer
 
 func (s *Store) loadWorkflowRecovery(ctx context.Context, query workflowruntime.RecoveryQuery) (workflowruntime.RecoverySnapshot, error) {
 	var result workflowruntime.RecoverySnapshot
-	runSQL := workflowRunSelect + ` WHERE r.status IN (?, ?, ?)`
+	runSQL := s.workflowRunSelect() + ` WHERE r.` + s.cols.Status + ` IN (?, ?, ?)` //nolint:gosec // G202: identifiers are validated plain SQL names (RunColumns.resolve)
 	runArgs := []any{workflowruntime.RunPending, workflowruntime.RunRunning, workflowruntime.RunWaiting}
 	if query.RunID != "" {
-		runSQL += ` AND r.run_id = ?`
+		runSQL += ` AND r.` + s.cols.ID + ` = ?`
 		runArgs = append(runArgs, query.RunID)
 	}
-	runSQL += ` ORDER BY r.run_id`
+	runSQL += ` ORDER BY r.` + s.cols.ID
 	runRows, runQueryErr := s.db.QueryContext(ctx, runSQL, runArgs...)
 	if runQueryErr != nil {
 		return result, fmt.Errorf("recover workflow runs: %w", runQueryErr)

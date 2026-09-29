@@ -35,10 +35,10 @@ func (s *Store) RecordChildRun(ctx context.Context, link workflowruntime.ChildRu
 		if !errors.Is(priorErr, sql.ErrNoRows) {
 			return priorErr
 		}
-		if _, err := loadWorkflowRun(ctx, query, link.ParentRunID); err != nil {
+		if _, err := s.loadWorkflowRun(ctx, query, link.ParentRunID); err != nil {
 			return err
 		}
-		if _, err := loadWorkflowRun(ctx, query, link.ChildRunID); err != nil {
+		if _, err := s.loadWorkflowRun(ctx, query, link.ChildRunID); err != nil {
 			return err
 		}
 		if _, err := loadWorkflowNode(ctx, query, link.Invocation); err != nil {
@@ -68,7 +68,7 @@ func (s *Store) ListChildRuns(ctx context.Context, parent workflowruntime.RunID)
 	if err := checkWorkflowContext(ctx); err != nil {
 		return nil, err
 	}
-	if _, err := loadWorkflowRun(ctx, s.db, parent); err != nil {
+	if _, err := s.loadWorkflowRun(ctx, s.db, parent); err != nil {
 		return nil, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT link_json FROM workflow_child_runs WHERE parent_run_id = ? ORDER BY child_run_id, node_id, iteration`, parent)
@@ -127,7 +127,7 @@ func (s *Store) RequestRunCancellation(ctx context.Context, request workflowrunt
 		if pending {
 			return workflowInvalid(errors.New("pending terminal intent owns run cancellation"))
 		}
-		run, runErr := loadWorkflowRun(ctx, query, request.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -141,7 +141,7 @@ func (s *Store) RequestRunCancellation(ctx context.Context, request workflowrunt
 			return &workflowruntime.TransitionError{Entity: "run", ID: string(run.ID), From: string(run.Status), To: string(workflowruntime.RunCanceled), Reason: "terminal status cannot be reopened"}
 		}
 		collector := workflowCancellationCollector{}
-		if cancelErr := cancelWorkflowRun(ctx, query, request.RunID, request.At.UTC(), request.Reason, request.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector); cancelErr != nil {
+		if cancelErr := s.cancelWorkflowRun(ctx, query, request.RunID, request.At.UTC(), request.Reason, request.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector); cancelErr != nil {
 			return cancelErr
 		}
 		result = workflowruntime.RequestRunCancellationResult{
@@ -173,17 +173,17 @@ type workflowCancellationCollector struct {
 	events  []workflowruntime.Event
 }
 
-func cancelWorkflowRun(ctx context.Context, query DBTX, runID workflowruntime.RunID, at time.Time, reason workflowruntime.Failure, key string, visited map[workflowruntime.RunID]bool, collector *workflowCancellationCollector) error {
-	return cancelWorkflowRunWithOptions(ctx, query, runID, at, reason, key, visited, collector, nil, true, true)
+func (s *Store) cancelWorkflowRun(ctx context.Context, query DBTX, runID workflowruntime.RunID, at time.Time, reason workflowruntime.Failure, key string, visited map[workflowruntime.RunID]bool, collector *workflowCancellationCollector) error {
+	return s.cancelWorkflowRunWithOptions(ctx, query, runID, at, reason, key, visited, collector, nil, true, true)
 }
 
-func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflowruntime.RunID, at time.Time, reason workflowruntime.Failure, key string, visited map[workflowruntime.RunID]bool, collector *workflowCancellationCollector, excluded map[workflowruntime.NodeInvocationID]struct{}, terminalize, recurseDirect bool) error {
+func (s *Store) cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflowruntime.RunID, at time.Time, reason workflowruntime.Failure, key string, visited map[workflowruntime.RunID]bool, collector *workflowCancellationCollector, excluded map[workflowruntime.NodeInvocationID]struct{}, terminalize, recurseDirect bool) error {
 	if visited[runID] {
 		return workflowInvalid(errors.New("child run cancellation cycle"))
 	}
 	visited[runID] = true
 	defer delete(visited, runID)
-	run, loadErr := loadWorkflowRun(ctx, query, runID)
+	run, loadErr := s.loadWorkflowRun(ctx, query, runID)
 	if loadErr != nil {
 		return loadErr
 	}
@@ -204,7 +204,7 @@ func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflo
 		if validationErr := nextRun.Validate(); validationErr != nil {
 			return workflowInvalid(validationErr)
 		}
-		if updateErr := updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); updateErr != nil {
 			return updateErr
 		}
 		event, eventErr := appendWorkflowEvent(ctx, query, workflowruntime.AppendEventRequest{
@@ -244,7 +244,7 @@ func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflo
 		}
 		switch node.Status {
 		case workflowruntime.NodePending, workflowruntime.NodeReady, workflowruntime.NodeBlocked:
-			if cancelErr := cancelWorkflowUnstartedNode(ctx, query, node, at, reason, collector); cancelErr != nil {
+			if cancelErr := s.cancelWorkflowUnstartedNode(ctx, query, node, at, reason, collector); cancelErr != nil {
 				return cancelErr
 			}
 		case workflowruntime.NodeRunning:
@@ -255,7 +255,7 @@ func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflo
 			}
 			collector.intents = append(collector.intents, intent)
 		case workflowruntime.NodeWaiting:
-			handled, waitingErr := cancelWorkflowWaitingNode(ctx, query, node, at, reason, key, collector)
+			handled, waitingErr := s.cancelWorkflowWaitingNode(ctx, query, node, at, reason, key, collector)
 			if waitingErr != nil {
 				return waitingErr
 			}
@@ -281,7 +281,7 @@ func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflo
 		switch link.Policy {
 		case graph.ParentCloseCancel:
 			if recurseDirect {
-				if cancelErr := cancelWorkflowRun(ctx, query, link.ChildRunID, at, reason, key, visited, collector); cancelErr != nil {
+				if cancelErr := s.cancelWorkflowRun(ctx, query, link.ChildRunID, at, reason, key, visited, collector); cancelErr != nil {
 					return cancelErr
 				}
 			}
@@ -298,7 +298,7 @@ func cancelWorkflowRunWithOptions(ctx context.Context, query DBTX, runID workflo
 	return nil
 }
 
-func cancelWorkflowUnstartedNode(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, collector *workflowCancellationCollector) error {
+func (s *Store) cancelWorkflowUnstartedNode(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, collector *workflowCancellationCollector) error {
 	if at.Before(node.UpdatedAt) {
 		return workflowInvalid(errors.New("node cancellation time must not regress"))
 	}
@@ -309,7 +309,7 @@ func cancelWorkflowUnstartedNode(ctx context.Context, query DBTX, node workflowr
 	if err := next.Validate(); err != nil {
 		return workflowInvalid(err)
 	}
-	if err := updateWorkflowNodeCAS(ctx, query, next, node.Generation); err != nil {
+	if err := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); err != nil {
 		return err
 	}
 	id := next.ID
@@ -321,9 +321,9 @@ func cancelWorkflowUnstartedNode(ctx context.Context, query DBTX, node workflowr
 	return nil
 }
 
-func cancelWorkflowWaitingNode(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, key string, collector *workflowCancellationCollector) (bool, error) {
+func (s *Store) cancelWorkflowWaitingNode(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, key string, collector *workflowCancellationCollector) (bool, error) {
 	if node.Wait != nil {
-		return true, cancelWorkflowGenericWait(ctx, query, node, at, reason, key, collector)
+		return true, s.cancelWorkflowGenericWait(ctx, query, node, at, reason, key, collector)
 	}
 	attemptID := workflowruntime.AttemptID{Invocation: node.ID, Number: node.LatestAttempt}
 	operation, operationErr := loadWorkflowExternalOperation(ctx, query, attemptID)
@@ -371,7 +371,7 @@ func cancelWorkflowWaitingNode(ctx context.Context, query DBTX, node workflowrun
 		next.Status, next.Lease = workflowruntime.NodeCanceled, nil
 		next.Generation++
 		next.UpdatedAt = at
-		if updateErr := updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
 			return true, updateErr
 		}
 		invocation, attempt := next.ID, activation.Attempt
@@ -402,7 +402,7 @@ func cancelWorkflowWaitingNode(ctx context.Context, query DBTX, node workflowrun
 			next.Status = workflowruntime.NodeCanceled
 			next.Generation++
 			next.UpdatedAt = at
-			if updateErr := updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
+			if updateErr := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
 				return true, updateErr
 			}
 			id := next.ID
@@ -420,7 +420,7 @@ func cancelWorkflowWaitingNode(ctx context.Context, query DBTX, node workflowrun
 	return false, nil
 }
 
-func cancelWorkflowGenericWait(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, key string, collector *workflowCancellationCollector) error {
+func (s *Store) cancelWorkflowGenericWait(ctx context.Context, query DBTX, node workflowruntime.NodeInvocationSnapshot, at time.Time, reason workflowruntime.Failure, key string, collector *workflowCancellationCollector) error {
 	wait, err := loadWorkflowWait(ctx, query, node.Wait.ID)
 	if err != nil {
 		return err
@@ -462,7 +462,7 @@ func cancelWorkflowGenericWait(ctx context.Context, query DBTX, node workflowrun
 	if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); err != nil {
 		return err
 	}
-	if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+	if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 		return err
 	}
 	invocation := node.ID
@@ -564,7 +564,7 @@ func (s *Store) ResolveCancellationIntent(ctx context.Context, request workflowr
 		if at.Before(intent.UpdatedAt) {
 			return workflowInvalid(errors.New("cancellation resolution time must not regress"))
 		}
-		if _, runErr := loadWorkflowRun(ctx, query, intent.RunID); runErr != nil {
+		if _, runErr := s.loadWorkflowRun(ctx, query, intent.RunID); runErr != nil {
 			return runErr
 		}
 		switch intent.Kind {
@@ -598,7 +598,7 @@ func (s *Store) ResolveCancellationIntent(ctx context.Context, request workflowr
 				if updateErr := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); updateErr != nil {
 					return updateErr
 				}
-				if updateErr := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); updateErr != nil {
+				if updateErr := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); updateErr != nil {
 					return updateErr
 				}
 				invocation, attemptID := nextNode.ID, nextAttempt.ID

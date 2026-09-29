@@ -282,7 +282,7 @@ func (s *Store) FinishCompensableAttempt(ctx context.Context, request workflowru
 	}
 	var result workflowruntime.FinishCompensableAttemptResult
 	writeErr := s.WriteTx(ctx, "finish compensable workflow attempt", func(query DBTX) error {
-		run, loadRunErr := loadWorkflowRun(ctx, query, request.Finish.InvocationID.RunID)
+		run, loadRunErr := s.loadWorkflowRun(ctx, query, request.Finish.InvocationID.RunID)
 		if loadRunErr != nil {
 			return loadRunErr
 		}
@@ -331,7 +331,7 @@ func (s *Store) FinishCompensableAttempt(ctx context.Context, request workflowru
 				return workflowInvalid(errors.New("compensation child receipt requires one exact durable child run link"))
 			}
 		}
-		finished, err := finishWorkflowNodeAttemptForCompensation(ctx, query, request.Finish)
+		finished, err := s.finishWorkflowNodeAttemptForCompensation(ctx, query, request.Finish)
 		if err != nil {
 			return err
 		}
@@ -452,7 +452,7 @@ func workflowCompensationValuesMatch(ctx context.Context, query DBTX, ref values
 	return digest == ref.Digest, nil
 }
 
-func finishWorkflowNodeAttemptForCompensation(ctx context.Context, query DBTX, request workflowruntime.FinishNodeAttemptRequest) (workflowruntime.FinishNodeAttemptResult, error) {
+func (s *Store) finishWorkflowNodeAttemptForCompensation(ctx context.Context, query DBTX, request workflowruntime.FinishNodeAttemptRequest) (workflowruntime.FinishNodeAttemptResult, error) {
 	currentNode, loadNodeErr := loadWorkflowNode(ctx, query, request.InvocationID)
 	if loadNodeErr != nil {
 		return workflowruntime.FinishNodeAttemptResult{}, loadNodeErr
@@ -460,7 +460,7 @@ func finishWorkflowNodeAttemptForCompensation(ctx context.Context, query DBTX, r
 	if currentNode.Generation != request.ExpectedNodeGeneration {
 		return workflowruntime.FinishNodeAttemptResult{}, workflowCAS("node invocation", request.ExpectedNodeGeneration, currentNode.Generation)
 	}
-	run, loadRunErr := loadWorkflowRun(ctx, query, currentNode.ID.RunID)
+	run, loadRunErr := s.loadWorkflowRun(ctx, query, currentNode.ID.RunID)
 	if loadRunErr != nil {
 		return workflowruntime.FinishNodeAttemptResult{}, loadRunErr
 	}
@@ -531,7 +531,7 @@ func finishWorkflowNodeAttemptForCompensation(ctx context.Context, query DBTX, r
 	if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, currentAttempt.Generation); err != nil {
 		return workflowruntime.FinishNodeAttemptResult{}, err
 	}
-	if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+	if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 		return workflowruntime.FinishNodeAttemptResult{}, err
 	}
 	invocation := nextNode.ID
@@ -572,7 +572,7 @@ func (s *Store) FreezeCompensation(ctx context.Context, r workflowruntime.Freeze
 			out = workflowruntime.FreezeCompensationResult{Outcome: workflowruntime.IdempotencyReplayed, Ledger: ledger, Entries: entries}
 			return nil
 		}
-		run, err := loadWorkflowRun(ctx, q, r.RunID)
+		run, err := s.loadWorkflowRun(ctx, q, r.RunID)
 		if err != nil {
 			return err
 		}
@@ -729,7 +729,7 @@ func (s *Store) BeginManualCompensation(ctx context.Context, r workflowruntime.B
 			out = workflowruntime.FreezeCompensationResult{Outcome: workflowruntime.IdempotencyReplayed, Ledger: ledger, Entries: entries}
 			return nil
 		}
-		run, err := loadWorkflowRun(ctx, q, r.RunID)
+		run, err := s.loadWorkflowRun(ctx, q, r.RunID)
 		if err != nil {
 			return err
 		}
@@ -914,7 +914,7 @@ func (s *Store) ActivateCompensationEntry(ctx context.Context, r workflowruntime
 			}
 		}
 		if ledger.Trigger == graph.CompensationManual {
-			run, loadErr := loadWorkflowRun(ctx, q, r.RunID)
+			run, loadErr := s.loadWorkflowRun(ctx, q, r.RunID)
 			if loadErr != nil || !run.Status.Terminal() {
 				if loadErr != nil {
 					return loadErr
@@ -944,7 +944,7 @@ func (s *Store) ActivateCompensationEntry(ctx context.Context, r workflowruntime
 		if err := node.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := insertWorkflowNode(ctx, q, node); err != nil {
+		if err := s.insertWorkflowNode(ctx, q, node); err != nil {
 			return err
 		}
 		entryPrior, ledgerPrior := entry.Generation, ledger.Generation
@@ -1017,7 +1017,7 @@ func (s *Store) FailCompensationEntry(ctx context.Context, r workflowruntime.Fai
 			}
 		}
 		if ledger.Trigger == graph.CompensationManual {
-			run, loadErr := loadWorkflowRun(ctx, q, r.RunID)
+			run, loadErr := s.loadWorkflowRun(ctx, q, r.RunID)
 			if loadErr != nil {
 				return loadErr
 			}
@@ -1251,7 +1251,7 @@ func (s *Store) CancelCompensation(ctx context.Context, r workflowruntime.Cancel
 				case workflowruntime.NodePending, workflowruntime.NodeReady, workflowruntime.NodeBlocked:
 					collector := workflowCancellationCollector{}
 					reason := workflowruntime.Failure{Code: "compensation_canceled", Message: r.Reason}
-					if err := cancelWorkflowUnstartedNode(ctx, q, node, r.At, reason, &collector); err != nil {
+					if err := s.cancelWorkflowUnstartedNode(ctx, q, node, r.At, reason, &collector); err != nil {
 						return err
 					}
 					active = true
@@ -1263,7 +1263,7 @@ func (s *Store) CancelCompensation(ctx context.Context, r workflowruntime.Cancel
 				case workflowruntime.NodeWaiting:
 					collector := workflowCancellationCollector{}
 					reason := workflowruntime.Failure{Code: "compensation_canceled", Message: r.Reason}
-					handled, cancelErr := cancelWorkflowWaitingNode(ctx, q, node, r.At, reason, r.IdempotencyKey, &collector)
+					handled, cancelErr := s.cancelWorkflowWaitingNode(ctx, q, node, r.At, reason, r.IdempotencyKey, &collector)
 					if cancelErr != nil {
 						return cancelErr
 					}

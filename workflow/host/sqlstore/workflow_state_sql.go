@@ -20,7 +20,9 @@ const workflowValueIDPrefix = "values-"
 // Store is a SQLite-backed runtime.StateStore. It owns the workflow_* tables
 // created by Migrate (or by Schema applied through a host's own runner).
 type Store struct {
-	db *sql.DB
+	db    *sql.DB
+	cols  RunColumns
+	hooks Hooks
 }
 
 // New wraps an open database. The database must already contain the store's
@@ -30,11 +32,20 @@ type Store struct {
 // The database should be opened with a busy timeout and, for a single writer
 // process, SetMaxOpenConns(1); WriteTx holds one connection for the duration of
 // each write transaction.
-func New(db *sql.DB) (*Store, error) {
+func New(db *sql.DB, opts ...Option) (*Store, error) {
 	if db == nil {
 		return nil, fmt.Errorf("workflow state store requires an open database")
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db, cols: DefaultRunColumns}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(s); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
 // DB returns the database the store was constructed with.

@@ -34,7 +34,12 @@ func TestWorkflowLibraryProductionStoreRunExhaustive(t *testing.T) {
 	conformance.RunExhaustive(t, conformance.EmbeddedFixtures(), storeConformanceHost{t: t})
 }
 
-type storeConformanceHost struct{ t *testing.T }
+type storeConformanceHost struct {
+	t *testing.T
+	// open builds a fresh database and store for one fixture; nil selects the
+	// default shape (Migrate + New).
+	open func(path string) (*testDB, *Store, error)
+}
 
 func (h storeConformanceHost) CompilerFactory() conformance.Factory         { return h.factory() }
 func (h storeConformanceHost) StateStoreFactory() conformance.Factory       { return h.factory() }
@@ -47,14 +52,13 @@ func (h storeConformanceHost) CompensationFactory() conformance.Factory     { re
 
 func (h storeConformanceHost) factory() conformance.Factory {
 	return func() (conformance.Runner, error) {
-		db, err := openTestDB(filepath.Join(h.t.TempDir(), "workflow-conformance.db"))
-		if err != nil {
-			return nil, fmt.Errorf("open workflow store database: %w", err)
+		open := h.open
+		if open == nil {
+			open = openDefaultStore
 		}
-		state, err := newTestStore(db)
+		db, state, err := open(filepath.Join(h.t.TempDir(), "workflow-conformance.db"))
 		if err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("construct workflow store: %w", err)
+			return nil, fmt.Errorf("open workflow store: %w", err)
 		}
 		h.t.Cleanup(func() { _ = db.Close() })
 		return &storeConformanceRunner{t: h.t, state: state}, nil
@@ -502,3 +506,16 @@ var (
 	_ workflowruntime.MemoStore         = (*Store)(nil)
 	_ workflowruntime.CompensationStore = (*Store)(nil)
 )
+
+func openDefaultStore(path string) (*testDB, *Store, error) {
+	db, err := openTestDB(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	state, err := newTestStore(db)
+	if err != nil {
+		_ = db.Close()
+		return nil, nil, err
+	}
+	return db, state, nil
+}

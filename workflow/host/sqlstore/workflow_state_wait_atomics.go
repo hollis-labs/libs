@@ -109,7 +109,7 @@ func (s *Store) SuspendNodeWait(ctx context.Context, request workflowruntime.Sus
 		if err := insertWorkflowWaitAttemptBinding(ctx, query, nextWait.Ref.ID, attempt.ID); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 			return err
 		}
 		invocation, attemptID := nextNode.ID, attempt.ID
@@ -272,7 +272,7 @@ func (s *Store) ResumeNodeWait(ctx context.Context, request workflowruntime.Resu
 		if err := updateWorkflowWaitCAS(ctx, query, nextWait, currentWait.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 			return err
 		}
 		events := make([]workflowruntime.Event, 0, 2)
@@ -405,7 +405,7 @@ func (s *Store) TimeoutWait(ctx context.Context, request workflowruntime.Timeout
 		if err := updateWorkflowWaitCAS(ctx, query, nextWait, currentWait.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 			return err
 		}
 		if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); err != nil {

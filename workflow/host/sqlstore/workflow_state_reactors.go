@@ -341,7 +341,7 @@ func (s *Store) FailReactor(ctx context.Context, request workflowruntime.FailRea
 			return workflowInvalid(errors.New("reactor failure does not match its current run"))
 		}
 		var runStatus, runUpdatedAt string
-		if runQueryErr := query.QueryRowContext(ctx, `SELECT status,updated_at FROM workflow_runs WHERE run_id=?`, request.RunID).Scan(&runStatus, &runUpdatedAt); runQueryErr != nil {
+		if runQueryErr := query.QueryRowContext(ctx, `SELECT `+s.cols.Status+`,updated_at FROM `+s.cols.Table+` WHERE `+s.cols.ID+`=?`, request.RunID).Scan(&runStatus, &runUpdatedAt); runQueryErr != nil {
 			return runQueryErr
 		}
 		parsedRunUpdatedAt, err := parseWorkflowTime("terminal reactor run updated_at", runUpdatedAt)
@@ -470,7 +470,7 @@ func (s *Store) RecoverReactors(ctx context.Context, limit int) ([]workflowrunti
 	if limit < 0 || limit > workflowruntime.MaximumReactorRecoveryLimit {
 		return nil, workflowInvalid(errors.New("reactor recovery limit is invalid"))
 	}
-	statement := workflowReactorSelect + ` WHERE status IN ('starting','rolling') OR (status='waiting' AND (event_count>=continue_after_events OR EXISTS (SELECT 1 FROM workflow_runs AS terminal_run WHERE terminal_run.run_id=current_run_id AND terminal_run.status IN ('succeeded','failed','canceled','timed_out','crashed')))) ORDER BY updated_at,reactor_id`
+	statement := workflowReactorSelect + ` WHERE status IN ('starting','rolling') OR (status='waiting' AND (event_count>=continue_after_events OR EXISTS (SELECT 1 FROM ` + s.cols.Table + ` AS terminal_run WHERE terminal_run.` + s.cols.ID + `=current_run_id AND terminal_run.` + s.cols.Status + ` IN ('succeeded','failed','canceled','timed_out','crashed')))) ORDER BY updated_at,reactor_id` //nolint:gosec // G202: identifiers are validated plain SQL names (RunColumns.resolve)
 	args := []any{}
 	if limit > 0 {
 		statement += ` LIMIT ?`

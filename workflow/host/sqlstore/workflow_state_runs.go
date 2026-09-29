@@ -70,7 +70,7 @@ FROM workflow_run_start_idempotency WHERE idempotency_key = ?`,
 		}
 
 		var existing int
-		if identityErr := query.QueryRowContext(ctx, `SELECT COUNT(1) FROM workflow_runs WHERE run_id = ?`, request.ID).Scan(&existing); identityErr != nil {
+		if identityErr := query.QueryRowContext(ctx, `SELECT COUNT(1) FROM `+s.cols.Table+` WHERE `+s.cols.ID+` = ?`, request.ID).Scan(&existing); identityErr != nil {
 			return fmt.Errorf("check workflow run identity: %w", identityErr)
 		}
 		if existing != 0 {
@@ -88,7 +88,7 @@ FROM workflow_run_start_idempotency WHERE idempotency_key = ?`,
 		if validationErr := result.Validate(); validationErr != nil {
 			return workflowInvalid(validationErr)
 		}
-		if err := insertWorkflowRun(ctx, query, result); err != nil {
+		if err := s.insertWorkflowRun(ctx, query, result); err != nil {
 			return err
 		}
 		resultJSON, encodeErr := encodeWorkflowJSON(result)
@@ -114,7 +114,7 @@ func (s *Store) LoadRun(ctx context.Context, id workflowruntime.RunID) (workflow
 	if err := checkWorkflowContext(ctx); err != nil {
 		return workflowruntime.RunSnapshot{}, err
 	}
-	return loadWorkflowRun(ctx, s.db, id)
+	return s.loadWorkflowRun(ctx, s.db, id)
 }
 
 // SaveRun implements runtime.StateStore and rejects lifecycle bypasses before
@@ -122,7 +122,7 @@ func (s *Store) LoadRun(ctx context.Context, id workflowruntime.RunID) (workflow
 func (s *Store) SaveRun(ctx context.Context, request workflowruntime.SaveRunRequest) (workflowruntime.RunSnapshot, error) {
 	var result workflowruntime.RunSnapshot
 	writeErr := s.WriteTx(ctx, "save workflow run", func(query DBTX) error {
-		current, loadErr := loadWorkflowRun(ctx, query, request.Snapshot.ID)
+		current, loadErr := s.loadWorkflowRun(ctx, query, request.Snapshot.ID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -160,7 +160,7 @@ func (s *Store) SaveRun(ctx context.Context, request workflowruntime.SaveRunRequ
 		if err := result.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		return updateWorkflowRunCAS(ctx, query, result, request.ExpectedGeneration)
+		return s.updateWorkflowRunCAS(ctx, query, result, request.ExpectedGeneration)
 	})
 	if writeErr != nil {
 		return workflowruntime.RunSnapshot{}, writeErr
@@ -175,7 +175,7 @@ func (s *Store) TransitionRun(ctx context.Context, request workflowruntime.RunTr
 	}
 	var result workflowruntime.RunTransitionResult
 	writeErr := s.WriteTx(ctx, "transition workflow run", func(query DBTX) error {
-		current, loadErr := loadWorkflowRun(ctx, query, request.RunID)
+		current, loadErr := s.loadWorkflowRun(ctx, query, request.RunID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -220,7 +220,7 @@ func (s *Store) TransitionRun(ctx context.Context, request workflowruntime.RunTr
 		if err := next.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowRunCAS(ctx, query, next, current.Generation); err != nil {
+		if err := s.updateWorkflowRunCAS(ctx, query, next, current.Generation); err != nil {
 			return err
 		}
 		event, eventErr := appendWorkflowEvent(ctx, query, workflowruntime.AppendEventRequest{
@@ -266,7 +266,7 @@ func (s *Store) CreateNodeInvocation(ctx context.Context, request workflowruntim
 		return workflowruntime.NodeInvocationSnapshot{}, workflowInvalid(err)
 	}
 	writeErr := s.WriteTx(ctx, "create workflow node", func(query DBTX) error {
-		parent, parentErr := loadWorkflowRun(ctx, query, next.ID.RunID)
+		parent, parentErr := s.loadWorkflowRun(ctx, query, next.ID.RunID)
 		if parentErr != nil {
 			return parentErr
 		}
@@ -280,7 +280,7 @@ func (s *Store) CreateNodeInvocation(ctx context.Context, request workflowruntim
 		if pending {
 			return workflowInvalid(errors.New("pending terminal intent fences node creation"))
 		}
-		return insertWorkflowNode(ctx, query, next)
+		return s.insertWorkflowNode(ctx, query, next)
 	})
 	if writeErr != nil {
 		return workflowruntime.NodeInvocationSnapshot{}, writeErr
@@ -345,7 +345,7 @@ func (s *Store) SaveNodeInvocation(ctx context.Context, request workflowruntime.
 		if err := result.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		return updateWorkflowNodeCAS(ctx, query, result, request.ExpectedGeneration)
+		return s.updateWorkflowNodeCAS(ctx, query, result, request.ExpectedGeneration)
 	})
 	if writeErr != nil {
 		return workflowruntime.NodeInvocationSnapshot{}, writeErr

@@ -69,7 +69,7 @@ func (s *Store) ClaimNode(ctx context.Context, request workflowruntime.ClaimNode
 			return recordWorkflowClaimIdempotency(ctx, query, request.IdempotencyKey, requestJSON, result)
 		}
 		now := request.Now.UTC()
-		run, err := loadWorkflowRun(ctx, query, current.ID.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, current.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func (s *Store) ClaimNode(ctx context.Context, request workflowruntime.ClaimNode
 		if err := releaseWorkflowSchedulerResources(ctx, query, current.ID); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
 			return err
 		}
 		result = workflowruntime.ClaimResult{Acquired: true, Lease: cloneWorkflowLease(next.Lease)}
@@ -208,7 +208,7 @@ func (s *Store) ReleaseNodeClaim(ctx context.Context, request workflowruntime.Re
 		if err := next.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		return updateWorkflowNodeCAS(ctx, query, next, current.Generation)
+		return s.updateWorkflowNodeCAS(ctx, query, next, current.Generation)
 	})
 }
 

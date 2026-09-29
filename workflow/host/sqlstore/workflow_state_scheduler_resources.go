@@ -71,7 +71,7 @@ func (s *Store) AdmitNode(ctx context.Context, request workflowruntime.AdmitNode
 		if expiryErr := expireWorkflowSchedulerHolders(ctx, query, request.Claim.Now); expiryErr != nil {
 			return expiryErr
 		}
-		run, err := loadWorkflowRun(ctx, query, current.ID.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, current.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (s *Store) AdmitNode(ctx context.Context, request workflowruntime.AdmitNode
 		if err := next.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
 			return err
 		}
 		for _, requirement := range request.Requirements {
@@ -209,7 +209,7 @@ func (s *Store) InspectSchedulerResources(ctx context.Context, request workflowr
 			if loadErr != nil {
 				return loadErr
 			}
-			run, runErr := loadWorkflowRun(ctx, query, waiter.Invocation.RunID)
+			run, runErr := s.loadWorkflowRun(ctx, query, waiter.Invocation.RunID)
 			if runErr != nil {
 				return runErr
 			}

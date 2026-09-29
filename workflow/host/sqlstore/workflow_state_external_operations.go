@@ -98,7 +98,7 @@ func (s *Store) SuspendExternalOperation(ctx context.Context, request workflowru
 		if insertErr := insertWorkflowExternalOperation(ctx, query, operation); insertErr != nil {
 			return insertErr
 		}
-		if updateErr := updateWorkflowNodeCAS(ctx, query, node, currentNode.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, node, currentNode.Generation); updateErr != nil {
 			return updateErr
 		}
 		events := make([]workflowruntime.Event, 0, 2)
@@ -213,7 +213,7 @@ func (s *Store) ApplyExternalOperation(ctx context.Context, request workflowrunt
 				return err
 			}
 		}
-		run, runErr := loadWorkflowRun(ctx, query, request.Attempt.Invocation.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.Attempt.Invocation.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -306,7 +306,7 @@ func (s *Store) ApplyExternalOperation(ctx context.Context, request workflowrunt
 			if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, currentAttempt.Generation); err != nil {
 				return err
 			}
-			if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+			if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 				return err
 			}
 			invocation, attempt := nextNode.ID, nextAttempt.ID

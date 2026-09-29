@@ -100,7 +100,7 @@ func (s *Store) TransitionNode(ctx context.Context, request workflowruntime.Node
 		if err := next.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, next, current.Generation); err != nil {
 			return err
 		}
 
@@ -217,7 +217,7 @@ func (s *Store) StartNodeAttempt(ctx context.Context, request workflowruntime.St
 		if err := attempt.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, current.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, current.Generation); err != nil {
 			return err
 		}
 		if err := insertWorkflowAttempt(ctx, query, attempt); err != nil {
@@ -259,7 +259,7 @@ func (s *Store) FinishNodeAttempt(ctx context.Context, request workflowruntime.F
 		if currentNode.Generation != request.ExpectedNodeGeneration {
 			return workflowCAS("node invocation", request.ExpectedNodeGeneration, currentNode.Generation)
 		}
-		run, runLoadErr := loadWorkflowRun(ctx, query, currentNode.ID.RunID)
+		run, runLoadErr := s.loadWorkflowRun(ctx, query, currentNode.ID.RunID)
 		if runLoadErr != nil {
 			return runLoadErr
 		}
@@ -334,7 +334,7 @@ func (s *Store) FinishNodeAttempt(ctx context.Context, request workflowruntime.F
 		if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, currentAttempt.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, currentNode.Generation); err != nil {
 			return err
 		}
 		invocation := nextNode.ID

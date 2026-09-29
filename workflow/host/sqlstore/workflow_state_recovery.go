@@ -64,7 +64,7 @@ func (s *Store) BindNodeInputs(ctx context.Context, request workflowruntime.Bind
 		if loadErr != nil {
 			return loadErr
 		}
-		run, loadErr := loadWorkflowRun(ctx, query, request.InvocationID.RunID)
+		run, loadErr := s.loadWorkflowRun(ctx, query, request.InvocationID.RunID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -105,7 +105,7 @@ func (s *Store) BindNodeInputs(ctx context.Context, request workflowruntime.Bind
 		if err := next.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, next, node.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); err != nil {
 			return err
 		}
 		event, err := appendWorkflowEvent(ctx, query, workflowruntime.AppendEventRequest{RunID: invocation.RunID, Invocation: &invocation, Type: workflowruntime.EventNodeInputsBound, OccurredAt: request.At, Attributes: map[string]string{"digest": ref.Digest}, Values: &ref, Redaction: values.RedactionPrivate, Retention: values.RetentionRun})
@@ -167,7 +167,7 @@ func (s *Store) ReconcileCrashedAttempt(ctx context.Context, request workflowrun
 		if node.Generation != request.ExpectedNodeGeneration {
 			return workflowCAS("node invocation", request.ExpectedNodeGeneration, node.Generation)
 		}
-		run, loadErr := loadWorkflowRun(ctx, query, node.ID.RunID)
+		run, loadErr := s.loadWorkflowRun(ctx, query, node.ID.RunID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -248,7 +248,7 @@ func (s *Store) ReconcileCrashedAttempt(ctx context.Context, request workflowrun
 		if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 			return err
 		}
 		invocation, attemptID := nextNode.ID, nextAttempt.ID
@@ -304,13 +304,13 @@ func (s *Store) BeginReplay(ctx context.Context, request workflowruntime.BeginRe
 			return fmt.Errorf("load replay idempotency: %w", replayErr)
 		}
 		var existing int
-		if err := query.QueryRowContext(ctx, `SELECT COUNT(1) FROM workflow_runs WHERE run_id = ?`, request.Provenance.RunID).Scan(&existing); err != nil {
+		if err := query.QueryRowContext(ctx, `SELECT COUNT(1) FROM `+s.cols.Table+` WHERE `+s.cols.ID+` = ?`, request.Provenance.RunID).Scan(&existing); err != nil {
 			return err
 		}
 		if existing != 0 {
 			return fmt.Errorf("%w: replay run", workflowruntime.ErrAlreadyExists)
 		}
-		source, loadErr := loadWorkflowRun(ctx, query, request.Provenance.SourceRunID)
+		source, loadErr := s.loadWorkflowRun(ctx, query, request.Provenance.SourceRunID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -407,11 +407,11 @@ func (s *Store) BeginReplay(ctx context.Context, request workflowruntime.BeginRe
 		if err := run.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := insertWorkflowRun(ctx, query, run); err != nil {
+		if err := s.insertWorkflowRun(ctx, query, run); err != nil {
 			return err
 		}
 		for _, node := range newNodes {
-			if err := insertWorkflowNode(ctx, query, node); err != nil {
+			if err := s.insertWorkflowNode(ctx, query, node); err != nil {
 				return err
 			}
 		}
@@ -477,7 +477,7 @@ func (s *Store) ListRunInvocations(ctx context.Context, runID workflowruntime.Ru
 	if err := checkWorkflowContext(ctx); err != nil {
 		return nil, err
 	}
-	if _, err := loadWorkflowRun(ctx, s.db, runID); err != nil {
+	if _, err := s.loadWorkflowRun(ctx, s.db, runID); err != nil {
 		return nil, err
 	}
 	rows, err := s.db.QueryContext(ctx, workflowNodeSelect+` WHERE n.run_id = ? ORDER BY n.node_id, n.iteration`, runID)

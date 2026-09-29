@@ -97,7 +97,7 @@ func (s *Store) RecordMemoEntry(ctx context.Context, entry workflowruntime.MemoE
 		if source.ID.NodeID != entry.NodeID || source.MemoKeyDigest != entry.MemoKeyDigest || source.Inputs == nil || source.Inputs.Digest != entry.InputDigest {
 			return workflowInvalid(errors.New("memo source binding changed"))
 		}
-		sourceRun, err := loadWorkflowRun(ctx, query, source.ID.RunID)
+		sourceRun, err := s.loadWorkflowRun(ctx, query, source.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -194,7 +194,7 @@ func (s *Store) BindPin(ctx context.Context, request workflowruntime.BindPinRequ
 		if request.Binding.BoundAt.Before(node.UpdatedAt) {
 			return workflowInvalid(errors.New("pin binding time must not regress"))
 		}
-		run, err := loadWorkflowRun(ctx, query, node.ID.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, node.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (s *Store) BindPin(ctx context.Context, request workflowruntime.BindPinRequ
 		if source.Status != workflowruntime.NodeSucceeded || source.Outputs == nil || *source.Outputs != request.Binding.Outputs || source.Origin != request.Binding.SourceOrigin {
 			return workflowInvalid(errors.New("pin source outcome changed"))
 		}
-		sourceRun, err := loadWorkflowRun(ctx, query, source.ID.RunID)
+		sourceRun, err := s.loadWorkflowRun(ctx, query, source.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -228,7 +228,7 @@ func (s *Store) BindPin(ctx context.Context, request workflowruntime.BindPinRequ
 		if validationErr := next.Validate(); validationErr != nil {
 			return workflowInvalid(validationErr)
 		}
-		if updateErr := updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
 			return updateErr
 		}
 		result = workflowruntime.BindPinResult{Outcome: workflowruntime.IdempotencyApplied, Binding: request.Binding, Node: next}
@@ -329,7 +329,7 @@ func (s *Store) ReuseNodeOutputs(ctx context.Context, request workflowruntime.Re
 		if claimErr := validateWorkflowLifecycleClaim(node, &request.Claim, request.At); claimErr != nil {
 			return claimErr
 		}
-		run, err := loadWorkflowRun(ctx, query, node.ID.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, node.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -346,7 +346,7 @@ func (s *Store) ReuseNodeOutputs(ctx context.Context, request workflowruntime.Re
 		if source.Status != workflowruntime.NodeSucceeded || source.Outputs == nil || *source.Outputs != request.Outputs || source.Origin != request.SourceOrigin {
 			return workflowInvalid(errors.New("reuse source outcome changed"))
 		}
-		sourceRun, err := loadWorkflowRun(ctx, query, source.ID.RunID)
+		sourceRun, err := s.loadWorkflowRun(ctx, query, source.ID.RunID)
 		if err != nil {
 			return err
 		}
@@ -388,7 +388,7 @@ func (s *Store) ReuseNodeOutputs(ctx context.Context, request workflowruntime.Re
 		if validationErr := next.Validate(); validationErr != nil {
 			return workflowInvalid(validationErr)
 		}
-		if updateErr := updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, next, node.Generation); updateErr != nil {
 			return updateErr
 		}
 		invocation := next.ID

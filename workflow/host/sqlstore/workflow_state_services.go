@@ -101,7 +101,7 @@ func (s *Store) SuspendServiceStart(ctx context.Context, request workflowruntime
 		if err := updateWorkflowServiceCAS(ctx, query, nextService, prior.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 			return err
 		}
 		events, err := appendWorkflowServiceEvents(ctx, query, nextService, &attempt.ID, workflowruntime.EventServiceSuspended, node.Status, nextNode.Status, request.At)
@@ -144,7 +144,7 @@ func (s *Store) RecoverServiceStart(ctx context.Context, request workflowruntime
 		if err := updateWorkflowServiceCAS(ctx, query, nextService, service.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 			return err
 		}
 		events, err := appendWorkflowServiceEvents(ctx, query, nextService, &attempt.ID, workflowruntime.EventServiceSuspended, node.Status, nextNode.Status, request.At)
@@ -224,7 +224,7 @@ func (s *Store) ApplyServiceReady(ctx context.Context, request workflowruntime.A
 			return err
 		}
 		if terminal {
-			if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+			if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 				return err
 			}
 			if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); err != nil {
@@ -333,7 +333,7 @@ func (s *Store) SuspendServiceTeardown(ctx context.Context, request workflowrunt
 		if err := updateWorkflowServiceCAS(ctx, query, nextService, service.Generation); err != nil {
 			return err
 		}
-		if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+		if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 			return err
 		}
 		events, err := appendWorkflowServiceEvents(ctx, query, nextService, &attempt.ID, workflowruntime.EventServiceStopping, node.Status, nextNode.Status, request.At)
@@ -408,7 +408,7 @@ func (s *Store) ApplyServiceStop(ctx context.Context, request workflowruntime.Ap
 			return err
 		}
 		if request.Failure != nil || request.Stopped {
-			if err := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
+			if err := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); err != nil {
 				return err
 			}
 			if err := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); err != nil {

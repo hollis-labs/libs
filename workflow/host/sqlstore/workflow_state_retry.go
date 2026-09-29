@@ -47,7 +47,7 @@ func (s *Store) ScheduleNodeRetry(ctx context.Context, request workflowruntime.S
 		if nodeErr != nil {
 			return nodeErr
 		}
-		run, runErr := loadWorkflowRun(ctx, query, request.Activation.Attempt.Invocation.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.Activation.Attempt.Invocation.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -136,7 +136,7 @@ INSERT INTO workflow_retry_activations(
 		if updateErr := updateWorkflowAttemptCAS(ctx, query, nextAttempt, attempt.Generation); updateErr != nil {
 			return updateErr
 		}
-		if updateErr := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); updateErr != nil {
 			return updateErr
 		}
 		invocation, attemptID := nextNode.ID, nextAttempt.ID
@@ -220,7 +220,7 @@ func (s *Store) ActivateNodeRetry(ctx context.Context, request workflowruntime.A
 		if now.Before(activation.FireAt) {
 			return fmt.Errorf("%w: fire_at %s", workflowruntime.ErrRetryNotDue, workflowTime(activation.FireAt))
 		}
-		run, runErr := loadWorkflowRun(ctx, query, activation.Attempt.Invocation.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, activation.Attempt.Invocation.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -277,7 +277,7 @@ WHERE activation_id = ? AND generation = ?`, nextActivation.Status, nextActivati
 		if rowErr := expectOneWorkflowRow(updated, "retry activation", activation.Generation, activation.Generation); rowErr != nil {
 			return rowErr
 		}
-		if nodeUpdateErr := updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); nodeUpdateErr != nil {
+		if nodeUpdateErr := s.updateWorkflowNodeCAS(ctx, query, nextNode, node.Generation); nodeUpdateErr != nil {
 			return nodeUpdateErr
 		}
 		invocation, attemptID := nextNode.ID, activation.Attempt

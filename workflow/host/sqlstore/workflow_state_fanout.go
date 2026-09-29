@@ -79,7 +79,7 @@ func (s *Store) ExpandFanOut(ctx context.Context, request workflowruntime.Expand
 	}
 	var result workflowruntime.ExpandFanOutResult
 	writeErr := s.WriteTx(ctx, "expand workflow fan-out", func(query DBTX) error {
-		run, runErr := loadWorkflowRun(ctx, query, request.FanOut.Parent.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.FanOut.Parent.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -129,7 +129,7 @@ func (s *Store) ExpandFanOut(ctx context.Context, request workflowruntime.Expand
 			if validationErr := child.Validate(); validationErr != nil {
 				return workflowInvalid(validationErr)
 			}
-			if insertErr := insertWorkflowNode(ctx, query, child); insertErr != nil {
+			if insertErr := s.insertWorkflowNode(ctx, query, child); insertErr != nil {
 				return insertErr
 			}
 			children[index] = child
@@ -163,7 +163,7 @@ func (s *Store) ExpandFanOut(ctx context.Context, request workflowruntime.Expand
 				return fmt.Errorf("insert workflow fan-out item: %w", execErr)
 			}
 		}
-		if updateErr := updateWorkflowNodeCAS(ctx, query, nextParent, parent.Generation); updateErr != nil {
+		if updateErr := s.updateWorkflowNodeCAS(ctx, query, nextParent, parent.Generation); updateErr != nil {
 			return updateErr
 		}
 		parentID := parent.ID
@@ -190,7 +190,7 @@ func (s *Store) CompleteFanOut(ctx context.Context, request workflowruntime.Comp
 	}
 	var result workflowruntime.CompleteFanOutResult
 	writeErr := s.WriteTx(ctx, "complete workflow fan-out", func(query DBTX) error {
-		run, runErr := loadWorkflowRun(ctx, query, request.Parent.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.Parent.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -281,7 +281,7 @@ func (s *Store) CompleteFanOut(ctx context.Context, request workflowruntime.Comp
 		if rowErr := expectOneWorkflowRow(updated, "fan-out aggregate", fanOut.Generation, fanOut.Generation); rowErr != nil {
 			return rowErr
 		}
-		if nodeUpdateErr := updateWorkflowNodeCAS(ctx, query, nextParent, parent.Generation); nodeUpdateErr != nil {
+		if nodeUpdateErr := s.updateWorkflowNodeCAS(ctx, query, nextParent, parent.Generation); nodeUpdateErr != nil {
 			return nodeUpdateErr
 		}
 		parentID := parent.ID

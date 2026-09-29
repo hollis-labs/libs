@@ -10,12 +10,15 @@ import (
 	"github.com/hollis-labs/go-workflow/values"
 )
 
-const workflowRunSelect = `
-SELECT r.run_id, p.plan_id, p.version, p.digest, p.schema_version,
-       r.status, r.inputs_ref_json, r.outputs_ref_json, r.generation,
-       r.created_at, r.updated_at
-FROM workflow_runs r
+func (s *Store) workflowRunSelect() string {
+	c := s.cols
+	return `
+SELECT r.` + c.ID + `, p.plan_id, p.version, p.digest, p.schema_version,
+       r.` + c.Status + `, r.inputs_ref_json, r.outputs_ref_json, r.` + c.Generation + `,
+       r.` + c.CreatedAt + `, r.updated_at
+FROM ` + c.Table + ` r
 JOIN workflow_plan_refs p ON p.digest = r.plan_digest`
+}
 
 const workflowNodeSelect = `
 SELECT n.run_id, n.node_id, n.iteration, n.phase, n.status, n.blocked_json,
@@ -43,8 +46,8 @@ SELECT run_id, sequence, invocation_json, attempt_json, event_type,
        occurred_at, attributes_json, values_ref_json, redaction, retention
 FROM workflow_events`
 
-func loadWorkflowRun(ctx context.Context, query DBTX, id workflowruntime.RunID) (workflowruntime.RunSnapshot, error) {
-	return scanWorkflowRun(query.QueryRowContext(ctx, workflowRunSelect+` WHERE r.run_id = ?`, id))
+func (s *Store) loadWorkflowRun(ctx context.Context, query DBTX, id workflowruntime.RunID) (workflowruntime.RunSnapshot, error) {
+	return scanWorkflowRun(query.QueryRowContext(ctx, s.workflowRunSelect()+` WHERE r.`+s.cols.ID+` = ?`, id))
 }
 
 func scanWorkflowRun(row workflowScanner) (workflowruntime.RunSnapshot, error) {

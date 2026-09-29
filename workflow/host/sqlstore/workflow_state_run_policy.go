@@ -38,9 +38,9 @@ func (s *Store) ApplyRunFailurePolicy(ctx context.Context, request workflowrunti
 				if priorRequest != requestJSON {
 					return workflowIdempotencyConflict("run failure policy", request.IdempotencyKey)
 				}
-				return loadWorkflowRunPolicyResult(ctx, query, prior, workflowruntime.RunFailureFailFast, &result)
+				return s.loadWorkflowRunPolicyResult(ctx, query, prior, workflowruntime.RunFailureFailFast, &result)
 			}
-			return loadWorkflowRunPolicyResult(ctx, query, prior, workflowruntime.RunFailureAlreadyDecided, &result)
+			return s.loadWorkflowRunPolicyResult(ctx, query, prior, workflowruntime.RunFailureAlreadyDecided, &result)
 		}
 		if !errors.Is(loadErr, workflowruntime.ErrNotFound) {
 			return loadErr
@@ -51,7 +51,7 @@ func (s *Store) ApplyRunFailurePolicy(ctx context.Context, request workflowrunti
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		run, err := loadWorkflowRun(ctx, query, request.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, request.RunID)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (s *Store) ApplyRunFailurePolicy(ctx context.Context, request workflowrunti
 		if validationErr := workflowruntime.ValidateNodeControlErrorValues(request.ErrorValues, source.ID, attempt, source.Status, expectedFailure); validationErr != nil {
 			return workflowInvalid(validationErr)
 		}
-		begin, err := beginWorkflowTerminalIntent(ctx, query, workflowruntime.BeginTerminalIntentRequest{RunID: request.RunID, ExpectedRunGeneration: request.ExpectedRunGeneration, IntendedStatus: request.IntendedStatus, Reason: &request.Reason, ErrorValues: request.ErrorValues, CompensationRequired: request.CompensationRequired, IdempotencyKey: request.IdempotencyKey, Finalizers: request.Finalizers, At: request.At})
+		begin, err := s.beginWorkflowTerminalIntent(ctx, query, workflowruntime.BeginTerminalIntentRequest{RunID: request.RunID, ExpectedRunGeneration: request.ExpectedRunGeneration, IntendedStatus: request.IntendedStatus, Reason: &request.Reason, ErrorValues: request.ErrorValues, CompensationRequired: request.CompensationRequired, IdempotencyKey: request.IdempotencyKey, Finalizers: request.Finalizers, At: request.At})
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (s *Store) ApplyRunFailurePolicy(ctx context.Context, request workflowrunti
 		}
 		collector := workflowCancellationCollector{}
 		cancelReason := workflowruntime.Failure{Code: "run_fail_fast", Message: "run fail-fast policy stopped remaining ordinary work", Details: map[string]string{"trigger_node": request.Trigger.NodeID}}
-		if cancelErr := cancelWorkflowRunWithOptions(ctx, query, request.RunID, request.At, cancelReason, request.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector, excluded, false, false); cancelErr != nil {
+		if cancelErr := s.cancelWorkflowRunWithOptions(ctx, query, request.RunID, request.At, cancelReason, request.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector, excluded, false, false); cancelErr != nil {
 			return cancelErr
 		}
 		decision := workflowruntime.RunPolicyDecisionSnapshot{RunID: request.RunID, Mode: graph.CompletionFailFast, Trigger: request.Trigger, SourceGeneration: request.ExpectedSourceGeneration, IntendedStatus: request.IntendedStatus, IdempotencyKey: request.IdempotencyKey, Generation: 1, CreatedAt: request.At}
@@ -164,8 +164,8 @@ func loadWorkflowRunPolicyDecisionRecord(ctx context.Context, query DBTX, runID 
 	return decision, requestJSON, nil
 }
 
-func loadWorkflowRunPolicyResult(ctx context.Context, query DBTX, decision workflowruntime.RunPolicyDecisionSnapshot, disposition workflowruntime.RunFailureDisposition, result *workflowruntime.ApplyRunFailurePolicyResult) error {
-	run, err := loadWorkflowRun(ctx, query, decision.RunID)
+func (s *Store) loadWorkflowRunPolicyResult(ctx context.Context, query DBTX, decision workflowruntime.RunPolicyDecisionSnapshot, disposition workflowruntime.RunFailureDisposition, result *workflowruntime.ApplyRunFailurePolicyResult) error {
+	run, err := s.loadWorkflowRun(ctx, query, decision.RunID)
 	if err != nil {
 		return err
 	}

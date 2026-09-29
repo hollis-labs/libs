@@ -215,7 +215,7 @@ func (s *Store) BeginTerminalIntent(ctx context.Context, request workflowruntime
 	var result workflowruntime.BeginTerminalIntentResult
 	writeErr := s.WriteTx(ctx, "begin workflow terminal intent", func(query DBTX) error {
 		var beginErr error
-		result, beginErr = beginWorkflowTerminalIntent(ctx, query, request)
+		result, beginErr = s.beginWorkflowTerminalIntent(ctx, query, request)
 		return beginErr
 	})
 	if writeErr != nil {
@@ -224,7 +224,7 @@ func (s *Store) BeginTerminalIntent(ctx context.Context, request workflowruntime
 	return result, nil
 }
 
-func beginWorkflowTerminalIntent(ctx context.Context, query DBTX, request workflowruntime.BeginTerminalIntentRequest) (workflowruntime.BeginTerminalIntentResult, error) {
+func (s *Store) beginWorkflowTerminalIntent(ctx context.Context, query DBTX, request workflowruntime.BeginTerminalIntentRequest) (workflowruntime.BeginTerminalIntentResult, error) {
 	request.At = request.At.UTC()
 	if request.ExpectedRunGeneration == 0 || request.At.IsZero() {
 		return workflowruntime.BeginTerminalIntentResult{}, workflowInvalid(errors.New("terminal intent requires run generation and timestamp"))
@@ -272,7 +272,7 @@ func beginWorkflowTerminalIntent(ctx context.Context, query DBTX, request workfl
 		if left != right || !equalValues {
 			return workflowruntime.BeginTerminalIntentResult{}, workflowIdempotencyConflict("terminal intent", request.IdempotencyKey)
 		}
-		run, err := loadWorkflowRun(ctx, query, request.RunID)
+		run, err := s.loadWorkflowRun(ctx, query, request.RunID)
 		if err != nil {
 			return workflowruntime.BeginTerminalIntentResult{}, err
 		}
@@ -281,7 +281,7 @@ func beginWorkflowTerminalIntent(ctx context.Context, query DBTX, request workfl
 	if !errors.Is(loadErr, workflowruntime.ErrNotFound) {
 		return workflowruntime.BeginTerminalIntentResult{}, loadErr
 	}
-	run, runErr := loadWorkflowRun(ctx, query, request.RunID)
+	run, runErr := s.loadWorkflowRun(ctx, query, request.RunID)
 	if runErr != nil {
 		return workflowruntime.BeginTerminalIntentResult{}, runErr
 	}
@@ -334,7 +334,7 @@ func beginWorkflowTerminalIntent(ctx context.Context, query DBTX, request workfl
 	if err := nextRun.Validate(); err != nil {
 		return workflowruntime.BeginTerminalIntentResult{}, workflowInvalid(err)
 	}
-	if err := updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); err != nil {
+	if err := s.updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); err != nil {
 		return workflowruntime.BeginTerminalIntentResult{}, err
 	}
 	immutableJSON, encodeErr := encodeWorkflowTerminalImmutable(candidate)
@@ -393,7 +393,7 @@ func (s *Store) CompleteTerminalIntent(ctx context.Context, request workflowrunt
 		if intentErr != nil {
 			return intentErr
 		}
-		run, runErr := loadWorkflowRun(ctx, query, request.RunID)
+		run, runErr := s.loadWorkflowRun(ctx, query, request.RunID)
 		if runErr != nil {
 			return runErr
 		}
@@ -480,7 +480,7 @@ func (s *Store) CompleteTerminalIntent(ctx context.Context, request workflowrunt
 		if err := nextIntent.Validate(); err != nil {
 			return workflowInvalid(err)
 		}
-		if err := updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); err != nil {
+		if err := s.updateWorkflowRunCAS(ctx, query, nextRun, run.Generation); err != nil {
 			return err
 		}
 		snapshotJSON, snapshotErr := encodeWorkflowJSON(nextIntent)
@@ -564,7 +564,7 @@ func (s *Store) RequestRunCancellationWithFinalizers(ctx context.Context, reques
 				return err
 			}
 			cancellation.Outcome = workflowruntime.IdempotencyReplayed
-			currentRun, err := loadWorkflowRun(ctx, query, request.Cancellation.RunID)
+			currentRun, err := s.loadWorkflowRun(ctx, query, request.Cancellation.RunID)
 			if err != nil {
 				return err
 			}
@@ -598,7 +598,7 @@ func (s *Store) RequestRunCancellationWithFinalizers(ctx context.Context, reques
 		}
 		plans := workflowCancellationTreePlans(request)
 		for index, plan := range plans {
-			run, err := loadWorkflowRun(ctx, query, plan.RunID)
+			run, err := s.loadWorkflowRun(ctx, query, plan.RunID)
 			if err != nil {
 				return err
 			}
@@ -627,7 +627,7 @@ func (s *Store) RequestRunCancellationWithFinalizers(ctx context.Context, reques
 		intents := make([]workflowruntime.TerminalIntentSnapshot, 0)
 		var rootIntent workflowruntime.TerminalIntentSnapshot
 		for index, plan := range plans {
-			run, err := loadWorkflowRun(ctx, query, plan.RunID)
+			run, err := s.loadWorkflowRun(ctx, query, plan.RunID)
 			if err != nil {
 				return err
 			}
@@ -640,7 +640,7 @@ func (s *Store) RequestRunCancellationWithFinalizers(ctx context.Context, reques
 			}
 			terminalize := len(plan.Finalizers) == 0 && !plan.CompensationRequired
 			if !terminalize {
-				begin, err := beginWorkflowTerminalIntent(ctx, query, workflowruntime.BeginTerminalIntentRequest{
+				begin, err := s.beginWorkflowTerminalIntent(ctx, query, workflowruntime.BeginTerminalIntentRequest{
 					RunID: plan.RunID, ExpectedRunGeneration: plan.ExpectedRunGeneration,
 					IntendedStatus: workflowruntime.RunCanceled, Reason: &request.Cancellation.Reason,
 					ErrorValues: plan.ErrorValues, IdempotencyKey: plan.IdempotencyKey,
@@ -657,11 +657,11 @@ func (s *Store) RequestRunCancellationWithFinalizers(ctx context.Context, reques
 					collector.events = append(collector.events, *begin.Event)
 				}
 			}
-			if err := cancelWorkflowRunWithOptions(ctx, query, plan.RunID, request.Cancellation.At, request.Cancellation.Reason, plan.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector, excluded, terminalize, false); err != nil {
+			if err := s.cancelWorkflowRunWithOptions(ctx, query, plan.RunID, request.Cancellation.At, request.Cancellation.Reason, plan.IdempotencyKey, make(map[workflowruntime.RunID]bool), &collector, excluded, terminalize, false); err != nil {
 				return err
 			}
 		}
-		currentRun, err := loadWorkflowRun(ctx, query, request.Cancellation.RunID)
+		currentRun, err := s.loadWorkflowRun(ctx, query, request.Cancellation.RunID)
 		if err != nil {
 			return err
 		}

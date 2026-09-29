@@ -47,7 +47,7 @@ FROM workflow_plan_refs WHERE digest = ?`, digest).Scan(
 	return plan, nil
 }
 
-func insertWorkflowRun(ctx context.Context, query DBTX, snapshot workflowruntime.RunSnapshot) error {
+func (s *Store) insertWorkflowRun(ctx context.Context, query DBTX, snapshot workflowruntime.RunSnapshot) error {
 	inputsJSON, err := encodeOptionalWorkflowJSON(snapshot.Inputs)
 	if err != nil {
 		return err
@@ -61,9 +61,9 @@ func insertWorkflowRun(ctx context.Context, query DBTX, snapshot workflowruntime
 		return err
 	}
 	if _, err := query.ExecContext(ctx, `
-INSERT INTO workflow_runs(
-    run_id, plan_digest, status, inputs_ref_json, outputs_ref_json,
-    generation, created_at, updated_at
+INSERT INTO `+s.cols.Table+`(
+    `+s.cols.ID+`, plan_digest, `+s.cols.Status+`, inputs_ref_json, outputs_ref_json,
+    `+s.cols.Generation+`, `+s.cols.CreatedAt+`, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		snapshot.ID, snapshot.Plan.Digest, snapshot.Status, inputsJSON, outputsJSON,
 		generation, workflowTime(snapshot.CreatedAt), workflowTime(snapshot.UpdatedAt),
@@ -73,10 +73,10 @@ INSERT INTO workflow_runs(
 		}
 		return fmt.Errorf("insert workflow run: %w", err)
 	}
-	return nil
+	return s.afterRunWritten(ctx, query, snapshot)
 }
 
-func updateWorkflowRunCAS(ctx context.Context, query DBTX, snapshot workflowruntime.RunSnapshot, expected uint64) error {
+func (s *Store) updateWorkflowRunCAS(ctx context.Context, query DBTX, snapshot workflowruntime.RunSnapshot, expected uint64) error {
 	inputsJSON, err := encodeOptionalWorkflowJSON(snapshot.Inputs)
 	if err != nil {
 		return err
@@ -94,19 +94,22 @@ func updateWorkflowRunCAS(ctx context.Context, query DBTX, snapshot workflowrunt
 		return err
 	}
 	result, err := query.ExecContext(ctx, `
-UPDATE workflow_runs
-SET status = ?, inputs_ref_json = ?, outputs_ref_json = ?, generation = ?, updated_at = ?
-WHERE run_id = ? AND generation = ?`,
+UPDATE `+s.cols.Table+`
+SET `+s.cols.Status+` = ?, inputs_ref_json = ?, outputs_ref_json = ?, `+s.cols.Generation+` = ?, updated_at = ?
+WHERE `+s.cols.ID+` = ? AND `+s.cols.Generation+` = ?`,
 		snapshot.Status, inputsJSON, outputsJSON, generation, workflowTime(snapshot.UpdatedAt),
 		snapshot.ID, expectedGeneration,
 	)
 	if err != nil {
 		return fmt.Errorf("update workflow run: %w", err)
 	}
-	return expectOneWorkflowRow(result, "run", expected, snapshot.Generation-1)
+	if err := expectOneWorkflowRow(result, "run", expected, snapshot.Generation-1); err != nil {
+		return err
+	}
+	return s.afterRunWritten(ctx, query, snapshot)
 }
 
-func insertWorkflowNode(ctx context.Context, query DBTX, snapshot workflowruntime.NodeInvocationSnapshot) error {
+func (s *Store) insertWorkflowNode(ctx context.Context, query DBTX, snapshot workflowruntime.NodeInvocationSnapshot) error {
 	blockedJSON, err := encodeOptionalWorkflowJSON(snapshot.Blocked)
 	if err != nil {
 		return err
@@ -147,10 +150,13 @@ INSERT INTO workflow_node_invocations(
 		}
 		return fmt.Errorf("insert workflow node: %w", err)
 	}
-	return replaceWorkflowLease(ctx, query, snapshot.ID, snapshot.Lease)
+	if err := replaceWorkflowLease(ctx, query, snapshot.ID, snapshot.Lease); err != nil {
+		return err
+	}
+	return s.afterNodeWritten(ctx, query, snapshot)
 }
 
-func updateWorkflowNodeCAS(ctx context.Context, query DBTX, snapshot workflowruntime.NodeInvocationSnapshot, expected uint64) error {
+func (s *Store) updateWorkflowNodeCAS(ctx context.Context, query DBTX, snapshot workflowruntime.NodeInvocationSnapshot, expected uint64) error {
 	blockedJSON, err := encodeOptionalWorkflowJSON(snapshot.Blocked)
 	if err != nil {
 		return err
@@ -196,7 +202,10 @@ WHERE run_id = ? AND node_id = ? AND iteration = ? AND generation = ?`,
 	if err := expectOneWorkflowRow(result, "node invocation", expected, snapshot.Generation-1); err != nil {
 		return err
 	}
-	return replaceWorkflowLease(ctx, query, snapshot.ID, snapshot.Lease)
+	if err := replaceWorkflowLease(ctx, query, snapshot.ID, snapshot.Lease); err != nil {
+		return err
+	}
+	return s.afterNodeWritten(ctx, query, snapshot)
 }
 
 func replaceWorkflowLease(ctx context.Context, query DBTX, id workflowruntime.NodeInvocationID, lease *workflowruntime.ClaimLease) error {
@@ -387,4 +396,18 @@ WHERE wait_id = ? AND generation = ?`,
 		return fmt.Errorf("update workflow wait: %w", err)
 	}
 	return expectOneWorkflowRow(result, "wait", expected, snapshot.Generation-1)
+}
+
+func (s *Store) afterRunWritten(ctx context.Context, query DBTX, snapshot workflowruntime.RunSnapshot) error {
+	if s.hooks == nil {
+		return nil
+	}
+	return s.hooks.AfterRunWritten(ctx, query, snapshot)
+}
+
+func (s *Store) afterNodeWritten(ctx context.Context, query DBTX, snapshot workflowruntime.NodeInvocationSnapshot) error {
+	if s.hooks == nil {
+		return nil
+	}
+	return s.hooks.AfterNodeWritten(ctx, query, snapshot)
 }

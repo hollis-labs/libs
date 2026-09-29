@@ -12,11 +12,12 @@ func (s *Store) RecoverChildTerminalWaits(ctx context.Context, limit int) ([]wor
 	if limit < 0 || limit > workflowruntime.MaximumRunQueryLimit {
 		return nil, workflowInvalid(errors.New("child terminal recovery limit is invalid"))
 	}
+	//nolint:gosec // G202: identifiers are validated plain SQL names (RunColumns.resolve)
 	statement := `SELECT l.link_json,w.wait_id,COUNT(*) OVER (PARTITION BY l.parent_run_id,l.node_id,l.iteration)
 FROM workflow_child_runs l
-JOIN workflow_runs c ON c.run_id=l.child_run_id
+JOIN ` + s.cols.Table + ` c ON c.` + s.cols.ID + `=l.child_run_id
 JOIN workflow_waits w ON w.run_id=l.parent_run_id AND w.node_id=l.node_id AND w.iteration=l.iteration
-WHERE c.status IN ('succeeded','failed','canceled','timed_out','crashed')
+WHERE c.` + s.cols.Status + ` IN ('succeeded','failed','canceled','timed_out','crashed')
   AND w.status='open'
   AND json_extract(w.record_json,'$.kind')=?
   AND json_extract(w.record_json,'$.wake_source')=?
