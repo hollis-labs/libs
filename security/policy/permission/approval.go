@@ -70,11 +70,9 @@ func (e *Engine) WaitForApproval(ctx context.Context, req *ApprovalRequest) Appr
 	case resp = <-req.Response:
 		kind = EventApprovalResolved
 	case <-timer.C:
-		resp = ApprovalResponse{Decision: DecisionDeny, Scope: ScopeOnce, TimedOut: true}
-		kind = EventApprovalTimeout
+		resp, kind = e.claimOrTake(req, ApprovalResponse{Decision: DecisionDeny, Scope: ScopeOnce, TimedOut: true}, EventApprovalTimeout)
 	case <-ctx.Done():
-		resp = ApprovalResponse{Decision: DecisionDeny, Scope: ScopeOnce}
-		kind = EventApprovalCanceled
+		resp, kind = e.claimOrTake(req, ApprovalResponse{Decision: DecisionDeny, Scope: ScopeOnce}, EventApprovalCanceled)
 	}
 	e.audit(ctx, Event{
 		Kind: kind, SessionID: req.SessionID, Tool: req.ToolName, RequestID: req.ID, Response: &resp,
@@ -82,10 +80,24 @@ func (e *Engine) WaitForApproval(ctx context.Context, req *ApprovalRequest) Appr
 	return resp
 }
 
+// claimOrTake settles the race between a waiter that gave up (timeout or
+// canceled context) and a concurrent Respond. The waiter claims the request
+// first; if it wins, Respond will return false and record nothing, so the
+// caller's "denied" is true. If a Respond already claimed it, that Respond has
+// recorded (or is recording) its grant and its response is on the buffered
+// channel, so the waiter returns it rather than a deny the grant contradicts.
+func (e *Engine) claimOrTake(req *ApprovalRequest, giveUp ApprovalResponse, giveUpKind EventKind) (ApprovalResponse, EventKind) {
+	if req.answered.CompareAndSwap(false, true) {
+		return giveUp, giveUpKind
+	}
+	return <-req.Response, EventApprovalResolved
+}
+
 // Respond delivers a response to a pending approval request. It returns false
-// when the request does not exist (already timed out or answered), or when
-// sessionID is not exactly the session the request was made for; an empty
-// sessionID does not bypass that check.
+// when the request does not exist (already timed out or answered), when
+// sessionID is not exactly the session the request was made for (an empty
+// sessionID does not bypass that check), or when decision is neither allow nor
+// deny.
 //
 // An allow at ScopeSession records a session grant for the tool name. An allow
 // at ScopeProject is handed to the RuleStore; with no RuleStore, or if Append
@@ -99,6 +111,11 @@ func (e *Engine) Respond(requestID string, decision Decision, scope Scope, sessi
 	req := val.(*ApprovalRequest)
 
 	if req.SessionID != sessionID {
+		return false
+	}
+	// Only allow and deny answer a request; anything else (including "") is not
+	// an answer, and must not use up the request.
+	if decision != DecisionAllow && decision != DecisionDeny {
 		return false
 	}
 	// Claim the request so a second Respond cannot record a second grant.

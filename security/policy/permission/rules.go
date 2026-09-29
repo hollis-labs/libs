@@ -171,8 +171,11 @@ func matchGlob(pattern, name string) bool {
 // Matcher controls how a rule's Pattern is matched against tool input. The
 // zero value uses the defaults below. Pass one to an Engine with WithMatcher.
 //
-// Sharp edges, both by design:
+// Sharp edges, all by design:
 //
+//   - Path values from input are cleaned lexically (filepath.Clean) before
+//     matching, so ".." segments cannot dodge a rule. Symlinks are NOT
+//     resolved: a link is matched by the name it is given.
 //   - A Pattern is only ever compared with input values stored under
 //     PathKeys or CommandKeys. A tool whose input uses another key (for
 //     example "paths", "url" or "cmd") never matches a rule that has a
@@ -220,7 +223,7 @@ func (m *Matcher) matchInput(pattern string, input map[string]any) bool {
 	}
 
 	for _, key := range pathKeys {
-		if s, ok := input[key].(string); ok && matchPathGlob(pattern, s) {
+		if s, ok := input[key].(string); ok && matchPathGlob(pattern, cleanInputPath(s)) {
 			return true
 		}
 	}
@@ -230,6 +233,18 @@ func (m *Matcher) matchInput(pattern string, input map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// cleanInputPath lexically normalizes a path taken from tool input before it is
+// matched, so "/tmp/../etc/passwd" is seen as "/etc/passwd" and a ".." cannot
+// step out from under an allow rule or around a deny rule. The pattern is left
+// alone. This is lexical only: symlinks are not resolved, so a link that points
+// elsewhere is matched by the name it is given.
+func cleanInputPath(p string) string {
+	if p == "" {
+		return p
+	}
+	return filepath.Clean(p)
 }
 
 // matchPathGlob matches a glob pattern against a file path. Besides
