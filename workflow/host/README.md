@@ -11,6 +11,10 @@ Every package is standard library plus go-workflow only.
 | [`sqlstore`](#sqlstore) | a SQLite `runtime.StateStore` (and every companion runtime store interface) |
 | [`artifactfs`](#artifactfs) | a local-filesystem `values.ArtifactStore` |
 
+## Status
+
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
 ## Install
 
 ```sh
@@ -149,6 +153,10 @@ func main() {
 	fmt.Println(string(body), reader.Verified())
 }
 ```
+
+`New` rejects a root whose path contains a symlink anywhere along it, so pass a
+resolved path (`filepath.EvalSymlinks`). On macOS a root under `/tmp` or `/var`
+is refused for this reason: both are symlinks into `/private`.
 
 `artifactfs.New(root, authority, authorizer, opts...)` requires the authority (matching
 `^[a-z][a-z0-9.-]{0,62}$`) and a `values.ArtifactAuthorizer`. `OwnerClaimAuthorizer`

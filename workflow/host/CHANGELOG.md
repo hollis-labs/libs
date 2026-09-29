@@ -47,3 +47,8 @@ refuses a tag whose CHANGELOG has no heading for it.
     `ErrArtifactInvalid`.
   - `Put` checks a non-canonical `Store` (`ErrArtifactAuthority`) before authorization, then
     authorizes, then rejects a canonical foreign store.
+
+### Known limitations
+
+- `artifactfs.New` rejects a root path that contains a symlink component anywhere along it. On macOS a root
+  under `/tmp` or `/var` is refused (both link into `/private`); callers must pass a resolved path.
