@@ -1,6 +1,7 @@
 package agentdef
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -209,6 +210,74 @@ func TestSkillSymlinksAreRefused(t *testing.T) {
 		}
 		if _, statErr := os.Stat(filepath.Join(dst, "runbook")); statErr == nil {
 			t.Error("nothing may be vendored when the source tree is refused")
+		}
+	})
+}
+
+// The walk root is stat'ed, which follows a link, so a symlink AT the root of a
+// skill (or at skills/ itself) is not seen by the per-entry check and needs its
+// own.
+func TestSkillRootSymlinkIsRefused(t *testing.T) {
+	def := &Definition{Skills: []string{"runbook"}}
+
+	// A complete, valid skill living OUTSIDE the layer.
+	outsideRoot, _ := writeSkillOnDisk(t)
+	outsideDir := filepath.Join(outsideRoot, "skills", "runbook")
+
+	t.Run("skills/<name> is a symlink", func(t *testing.T) {
+		layer := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(layer, "skills"), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		symlinkOrSkip(t, outsideDir, filepath.Join(layer, "skills", "runbook"))
+		fsys := os.DirFS(layer)
+
+		if _, err := ResolveSkills(fsys, ".", def); err == nil || !strings.Contains(err.Error(), "not a plain directory") {
+			t.Errorf("ResolveSkills = %v, want a refusal of the symlinked skill root", err)
+		}
+		if _, err := hashTree(fsys, "skills/runbook"); err == nil {
+			t.Error("hashTree must refuse a symlinked root")
+		}
+		if err := copyTree(fsys, "skills/runbook", t.TempDir()); err == nil {
+			t.Error("copyTree must refuse a symlinked root")
+		}
+	})
+
+	t.Run("skills is a symlink", func(t *testing.T) {
+		layer := t.TempDir()
+		symlinkOrSkip(t, filepath.Dir(outsideDir), filepath.Join(layer, "skills"))
+		if _, err := ResolveSkills(os.DirFS(layer), ".", def); err == nil {
+			t.Error("ResolveSkills must refuse a symlinked skills/ directory")
+		}
+	})
+
+	t.Run("root swapped for a symlink after pinning", func(t *testing.T) {
+		layer, fsys := writeSkillOnDisk(t)
+		refs, err := ResolveSkills(fsys, ".", def)
+		if err != nil {
+			t.Fatal(err)
+		}
+		skill := filepath.Join(layer, "skills", "runbook")
+		if err := os.RemoveAll(skill); err != nil {
+			t.Fatal(err)
+		}
+		symlinkOrSkip(t, outsideDir, skill)
+		dst := t.TempDir()
+		if err := CopySkills(dst, refs); err == nil {
+			t.Error("CopySkills must fail when the skill root becomes a symlink")
+		}
+		if _, statErr := os.Stat(filepath.Join(dst, "runbook")); statErr == nil {
+			t.Error("nothing may be vendored from a symlinked root")
+		}
+	})
+
+	t.Run("a missing skill is still a not-exist error", func(t *testing.T) {
+		layer := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(layer, "skills"), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ResolveSkills(os.DirFS(layer), ".", def); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("ResolveSkills = %v, want fs.ErrNotExist", err)
 		}
 	})
 }

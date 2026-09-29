@@ -45,6 +45,13 @@ func ResolveSkills(fsys fs.FS, layerRoot string, d *Definition) ([]SkillRef, err
 			return nil, fmt.Errorf("agentdef: skill %q: invalid skill name", name)
 		}
 		dir := path.Join(layerRoot, skillsDir, name)
+		// A missing directory falls through to the ReadFile below, which words the
+		// dangling-reference error; only a present-but-not-plain one is refused here.
+		for _, d := range []string{path.Join(layerRoot, skillsDir), dir} {
+			if err := requirePlainDir(fsys, d); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return nil, fmt.Errorf("agentdef: skill %q: %w", name, err)
+			}
+		}
 		data, err := fs.ReadFile(fsys, path.Join(dir, "SKILL.md"))
 		if err != nil {
 			return nil, fmt.Errorf("agentdef: skill %q: %w", name, err)
@@ -84,8 +91,31 @@ func ResolveSkills(fsys fs.FS, layerRoot string, d *Definition) ([]SkillRef, err
 	return refs, nil
 }
 
-// hashTree hashes every file under dir: sorted relative paths, each framed by
-// its path and length so no two distinct trees share a byte stream.
+// requirePlainDir refuses dir unless its own directory entry is a real
+// directory. fs.WalkDir stats its root, which follows a symlink, so a link at the
+// root of a skill tree (or at skills/ itself) is invisible to requireRegular,
+// which only sees entries below the root. The parent's listing reports the entry
+// without following it.
+func requirePlainDir(fsys fs.FS, dir string) error {
+	if dir == "." || dir == "" {
+		return nil
+	}
+	entries, err := fs.ReadDir(fsys, path.Dir(dir))
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.Name() != path.Base(dir) {
+			continue
+		}
+		if !e.IsDir() {
+			return fmt.Errorf("agentdef: %q is a %s, not a plain directory (symlinks are refused)", dir, e.Type().String())
+		}
+		return nil
+	}
+	return fmt.Errorf("agentdef: %q: %w", dir, fs.ErrNotExist)
+}
+
 // requireRegular rejects anything in a skill tree that is not a directory or a
 // regular file. A symlink is refused, not followed: on an os.DirFS root a link
 // pointing outside the skill would otherwise have its target hashed into the
@@ -98,7 +128,12 @@ func requireRegular(p string, e fs.DirEntry) error {
 	return fmt.Errorf("agentdef: skill file %q is a %s, not a regular file (symlinks and special files are refused)", p, e.Type().String())
 }
 
+// hashTree hashes every file under dir: sorted relative paths, each framed by
+// its path and length so no two distinct trees share a byte stream.
 func hashTree(fsys fs.FS, dir string) (string, error) {
+	if err := requirePlainDir(fsys, dir); err != nil {
+		return "", err
+	}
 	var files []string
 	err := fs.WalkDir(fsys, dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
@@ -170,6 +205,9 @@ func CopySkills(dst string, refs []SkillRef) error {
 }
 
 func copyTree(src fs.FS, dir, target string) error {
+	if err := requirePlainDir(src, dir); err != nil {
+		return err
+	}
 	return fs.WalkDir(src, dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
 			return err
