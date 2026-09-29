@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// TestExtractPathMentions_StrictPrefixOnly exercises Q1 of the locked
-// design — only ^~/, ^/, ^./ tokens auto-grant.
+// TestExtractPathMentions_StrictPrefixOnly exercises the strict-prefix rule —
+// only ^~/, ^/, ^./ tokens auto-grant.
 func TestExtractPathMentions_StrictPrefixOnly(t *testing.T) {
 	cases := []struct {
 		name string
@@ -107,7 +107,7 @@ func TestExtractPathMentions_StrictPrefixOnly(t *testing.T) {
 	}
 }
 
-// TestPathGrants_RegisterAndCheck covers Q2 (literal + parent-dir grant)
+// TestPathGrants_RegisterAndCheck covers the literal + parent-dir grant
 // and the basic auto-grant flow.
 func TestPathGrants_RegisterAndCheck(t *testing.T) {
 	g := NewPathGrants()
@@ -126,28 +126,28 @@ func TestPathGrants_RegisterAndCheck(t *testing.T) {
 		t.Fatalf("expected grants; got none")
 	}
 
-	// Q2: literal path is granted.
+	// literal path is granted.
 	if !g.IsPathAllowed("s1", subFile) {
 		t.Errorf("literal path not granted: %s", subFile)
 	}
-	// Q2: parent dir is granted.
+	// parent dir is granted.
 	if !g.IsPathAllowed("s1", filepath.Dir(subFile)) {
 		t.Errorf("parent dir not granted: %s", filepath.Dir(subFile))
 	}
-	// Q2: a sibling file under the parent dir IS reachable (single-level
+	// a sibling file under the parent dir IS reachable (single-level
 	// descent — parent-dir grant covers everything under it).
 	sibling := filepath.Join(filepath.Dir(subFile), "other.txt")
 	if !g.IsPathAllowed("s1", sibling) {
 		t.Errorf("sibling under granted parent dir not reachable: %s", sibling)
 	}
-	// Q2: grandparent should NOT be granted (no recursion above the
+	// grandparent should NOT be granted (no recursion above the
 	// literal mention).
 	if g.IsPathAllowed("s1", filepath.Dir(filepath.Dir(subFile))) {
 		t.Errorf("grandparent should not be granted")
 	}
 }
 
-// TestPathGrants_SessionIsolation covers Q3 — grants are scoped per
+// TestPathGrants_SessionIsolation covers session scoping — grants are scoped per
 // session and don't leak across.
 func TestPathGrants_SessionIsolation(t *testing.T) {
 	g := NewPathGrants()
@@ -161,7 +161,7 @@ func TestPathGrants_SessionIsolation(t *testing.T) {
 	}
 }
 
-// TestPathGrants_SessionPersists covers Q3 — once granted in a session,
+// TestPathGrants_SessionPersists covers persistence — once granted in a session,
 // the grant persists across multiple checks (no nag-again).
 func TestPathGrants_SessionPersists(t *testing.T) {
 	g := NewPathGrants()
@@ -258,7 +258,7 @@ func TestPathGrants_TildeExpansion_NoHOME(t *testing.T) {
 		t.Errorf("IsPathAllowed(c127, %q) = false; ListGrants = %v", expanded, g.ListGrants("c127"))
 	}
 	// Parent-dir grant: the home directory itself should be reachable,
-	// matching Q2 of the locked design.
+	// matching the parent-dir grant rule.
 	if !g.IsPathAllowed("c127", home) {
 		t.Errorf("IsPathAllowed(c127, %q) = false; parent-dir grant missing", home)
 	}
