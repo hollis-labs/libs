@@ -160,8 +160,8 @@ func TestResolve_symlinkCanonicalization(t *testing.T) {
 
 	linkParent := t.TempDir()
 	linkPath := filepath.Join(linkParent, "linked-workspace")
-	if err := os.Symlink(realCanonical, linkPath); err != nil {
-		t.Fatalf("create symlink: %v", err)
+	if symErr := os.Symlink(realCanonical, linkPath); symErr != nil {
+		t.Fatalf("create symlink: %v", symErr)
 	}
 
 	rs := &RuleSet{Rules: []Rule{

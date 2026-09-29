@@ -68,7 +68,7 @@ func ExampleWithMatcher() {
 		{Tool: "*", Pattern: "/secrets/**", Behavior: permission.DecisionDeny},
 	}}
 	// This tool passes its path under "target", which the defaults do not
-	// recognise; extend the keys so the rule can see it.
+	// recognize; extend the keys so the rule can see it.
 	e := permission.NewEngine(permission.ModeDefault, rules,
 		permission.WithMatcher(permission.Matcher{PathKeys: []string{"target"}}))
 	res := e.Check(context.Background(), "s", "copy", map[string]any{"target": "/secrets/key"}, permission.ToolMeta{})

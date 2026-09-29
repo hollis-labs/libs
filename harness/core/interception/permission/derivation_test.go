@@ -517,7 +517,7 @@ func TestDeriveSubagentRuleSet_RuleOrderingDenyFirst(t *testing.T) {
 
 	// Find the indices of each behavior — denies should precede asks should
 	// precede allows.
-	var firstAsk, firstAllow, lastDeny int = -1, -1, -1
+	firstAsk, firstAllow, lastDeny := -1, -1, -1
 	for i, r := range derived.Rules {
 		switch r.Behavior {
 		case DecisionDeny:

@@ -113,10 +113,10 @@ func TestPathGrants_RegisterAndCheck(t *testing.T) {
 	g := NewPathGrants()
 	tmp := t.TempDir()
 	subFile := filepath.Join(tmp, "subdir", "file.txt")
-	if err := os.MkdirAll(filepath.Dir(subFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(subFile), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.WriteFile(subFile, []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(subFile, []byte("x"), 0o600); err != nil {
 		t.Fatalf("writefile: %v", err)
 	}
 
