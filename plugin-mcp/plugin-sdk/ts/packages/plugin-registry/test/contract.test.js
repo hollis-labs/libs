@@ -3,10 +3,11 @@
  *
  * The Go view of this contract lives in `libs/plugin-sdk/registry/` and pins
  * the same protocol number in `TestProtocolLockedAt1`. Neither side generates
- * the other and there is no shared fixture: each side pins the version and
- * round-trips its own types, so a host and a loader built at different
- * versions disagree about the protocol number — which a loader reports at
- * runtime — rather than about a field, which nothing would notice.
+ * the other. Each side pins the version and round-trips its own types, so a
+ * host and a loader built at different versions disagree about the protocol
+ * number — which a loader reports at runtime — rather than about a field,
+ * which nothing would notice. `contract-fixtures.test.js` adds fixtures frozen
+ * per released protocol, shared with the Go half.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
