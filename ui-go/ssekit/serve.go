@@ -58,6 +58,13 @@ func WithOnSourceError(f func(error) (Event, bool)) ServeOption {
 // flush so the caller can abort upstream work, or the source's error. Serve
 // does not return until the goroutine it uses to wait on src has exited, so
 // src.Next must honor its context.
+//
+// Serve cannot preempt a blocked write. NewWriter clears the connection's
+// deadlines, so if the client's TCP connection stalls (no FIN, no window
+// updates) a Write or Flush can block indefinitely, and neither ctx nor
+// WithMaxLifetime can interrupt it. Bound it with TCP keepalive on the listener
+// or a per-write deadline set through http.ResponseController before each
+// Send.
 func Serve(ctx context.Context, w *Writer, src Source, o ...ServeOption) error {
 	cfg := serveConfig{heartbeat: 15 * time.Second, text: "keepalive"}
 	for _, f := range o {

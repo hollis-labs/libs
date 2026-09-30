@@ -20,7 +20,11 @@ refuses a tag whose CHANGELOG has no heading for it.
   `Client`, `NewClient`, `WithDefaults` and `Client.Stream` with `WithBackoff`,
   `WithIdleTimeout`, `WithStreamMaxEventBytes`, `WithIsTerminal`,
   `WithIsFinalStatus`, `WithContinuity`, `WithMaxReconnects`, `WithOnReconnect`;
-  `StatusError`, `GapError` and the sentinel errors.
+  `StatusError`, `GapError` and the sentinel errors. `WithMaxServerRetry`
+  (default 5 minutes, `DefaultMaxServerRetry`) caps a server-sent `retry:`.
+- Documented limitation: `Serve` cannot preempt a write blocked on a stalled
+  client connection (deadlines are cleared); use TCP keepalive or a per-write
+  deadline via `http.ResponseController`.
 - Package `ssetest`: `Script` (a scripted hostile server with `Emit`, `Drop`,
   `Close`, `Overlap`, `Gap`, `Status`, `Stall`, `Burst`, `Retry`, `Comment`,
   `Raw`, `Send`, `Wait`), `Record`, `Replay`, `Concat`.

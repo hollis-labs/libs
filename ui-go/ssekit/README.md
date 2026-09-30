@@ -116,7 +116,8 @@ These follow the brief's stated defaults and are all overridable: header wins ov
 - **Deadline clearing is best effort.** A `ResponseWriter` wrapper that does not implement `SetWriteDeadline` or `SetReadDeadline` keeps the server's timeouts, silently. Use `WithMaxLifetime` below the timeout when you cannot unwrap.
 - **HTTP/1.1 only in tests.** The suites use `httptest` over HTTP/1.1. HTTP/2, real proxies and Windows were not exercised.
 - **Client idle watchdog pauses while your loop body runs.** Consumer slowness is not read as server silence, so a consumer that blocks forever also never trips it.
-- **A server `retry:` replaces the backoff schedule** for the rest of that stream (the specification's reconnection time), without jitter.
+- **A server `retry:` replaces the backoff schedule** for the rest of that stream (the specification's reconnection time), without jitter. It is capped at 5 minutes by default; `WithMaxServerRetry` (a `ClientOption`) changes the cap.
+- **A stalled client connection can block `Serve` inside a write.** `NewWriter` clears the deadlines, so a write to a peer whose TCP connection has silently stalled has no timeout, and neither context cancellation nor `WithMaxLifetime` can preempt it. Enable TCP keepalive on the listener, or set a per-write deadline with `http.ResponseController.SetWriteDeadline` before each `Send`. The library does not do this for you.
 - **A 200 that is not `text/event-stream` is final** (`ErrNotEventStream`), as is a 204 (a clean end).
 - **Payloads are not validated as UTF-8.** The specification decodes as UTF-8 with replacement; this library passes bytes through. A lone CR inside `Data` is written as a line break, so it reads back as `\n`.
 - **`WithMaxEventBytes` counts the raw block** (field names, values, line breaks, comments), default 1 MiB, and the client's equivalent is `WithStreamMaxEventBytes`.

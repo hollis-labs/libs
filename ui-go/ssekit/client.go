@@ -14,9 +14,13 @@ import (
 
 // Client reads event streams over HTTP and reconnects with the last event id.
 type Client struct {
-	hc       *http.Client
-	defaults []StreamOption
+	hc             *http.Client
+	defaults       []StreamOption
+	maxServerRetry time.Duration
 }
+
+// DefaultMaxServerRetry is the default cap on a server-sent retry: value.
+const DefaultMaxServerRetry = 5 * time.Minute
 
 // ClientOption configures NewClient.
 type ClientOption func(*Client)
@@ -25,6 +29,18 @@ type ClientOption func(*Client)
 // to Stream itself come after and win.
 func WithDefaults(o ...StreamOption) ClientOption {
 	return func(c *Client) { c.defaults = append(c.defaults, o...) }
+}
+
+// WithMaxServerRetry caps the reconnect delay a server can set with retry:. A
+// server that sends a larger value (or a buggy or hostile one sending an absurd
+// value) would otherwise park the client for that long. d <= 0 keeps the
+// default, DefaultMaxServerRetry (5 minutes).
+func WithMaxServerRetry(d time.Duration) ClientOption {
+	return func(c *Client) {
+		if d > 0 {
+			c.maxServerRetry = d
+		}
+	}
 }
 
 // NewClient builds a Client on a copy of hc (http.DefaultClient when nil). The
@@ -36,7 +52,7 @@ func NewClient(hc *http.Client, o ...ClientOption) *Client {
 	}
 	cp := *hc
 	cp.Timeout = 0
-	c := &Client{hc: &cp}
+	c := &Client{hc: &cp, maxServerRetry: DefaultMaxServerRetry}
 	for _, f := range o {
 		f(c)
 	}
@@ -213,7 +229,7 @@ func (s *stream) run(ctx context.Context) {
 
 func (s *stream) delay(attempt int) time.Duration {
 	if s.serverWait > 0 {
-		return s.serverWait
+		return min(s.serverWait, s.c.maxServerRetry)
 	}
 	d := s.cfg.backoff[min(attempt, len(s.cfg.backoff)-1)]
 	if s.cfg.jitter > 0 {

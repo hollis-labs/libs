@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -584,5 +585,67 @@ func TestStream_NewReqCanCarryTheCursorInTheURL(t *testing.T) {
 	reqs := h.script.Requests()
 	if got := reqs[1].Query.Get("from"); got != "2" {
 		t.Fatalf("second request from = %q", got)
+	}
+}
+
+// retryStream answers the first request with a stream announcing `retry:` and
+// one event, then closes; later requests get 500 so the client keeps waiting.
+func retryStreamClient(retryLine string, opts ...ssekit.ClientOption) *ssekit.Client {
+	n := 0
+	hc := &http.Client{Transport: rtFunc(func(r *http.Request) (*http.Response, error) {
+		n++
+		if n == 1 {
+			return &http.Response{
+				StatusCode: 200, Status: "200 OK", Request: r,
+				Header: http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body:   io.NopCloser(strings.NewReader(retryLine + "\ndata: x\n\n")),
+			}, nil
+		}
+		return &http.Response{StatusCode: 500, Status: "500", Body: http.NoBody, Header: http.Header{}, Request: r}, nil
+	})}
+	return ssekit.NewClient(hc, opts...)
+}
+
+func firstReconnectDelay(t *testing.T, c *ssekit.Client) (delay, elapsed time.Duration) {
+	t.Helper()
+	start := time.Now()
+	got := false
+	for range c.Stream(t.Context(), func(string) (*http.Request, error) {
+		return http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
+	}, ssekit.WithMaxReconnects(1), ssekit.WithBackoff([]time.Duration{time.Hour}, 0),
+		ssekit.WithOnReconnect(func(r ssekit.Reconnect) {
+			if !got {
+				got, delay = true, r.Delay
+			}
+		})) {
+	}
+	return delay, time.Since(start)
+}
+
+func TestStream_ServerRetryIsCapped(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+		opts []ssekit.ClientOption
+		want time.Duration
+	}{
+		{"absurd value is clamped to the default cap", "retry: 99999999999", nil, ssekit.DefaultMaxServerRetry},
+		{"value below the cap is honored", "retry: 30000", nil, 30 * time.Second},
+		{"custom cap is respected", "retry: 99999999999", []ssekit.ClientOption{ssekit.WithMaxServerRetry(2 * time.Second)}, 2 * time.Second},
+		{"custom cap does not raise a smaller value", "retry: 500", []ssekit.ClientOption{ssekit.WithMaxServerRetry(2 * time.Second)}, 500 * time.Millisecond},
+		{"non-positive cap keeps the default", "retry: 99999999999", []ssekit.ClientOption{ssekit.WithMaxServerRetry(0)}, ssekit.DefaultMaxServerRetry},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				delay, elapsed := firstReconnectDelay(t, retryStreamClient(c.line, c.opts...))
+				if delay != c.want {
+					t.Fatalf("delay = %v, want %v", delay, c.want)
+				}
+				if elapsed != c.want { // one wait, on the virtual clock
+					t.Fatalf("virtual elapsed = %v, want %v", elapsed, c.want)
+				}
+			})
+		})
 	}
 }
