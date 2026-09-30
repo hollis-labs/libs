@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T22:17:07.968153-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - See the Boundaries section of AGENTS.md for the invariants and the tests that guard each.
+  agents_start_here: |-
+    - `sqlitebackup` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Safe SQLite backup, verify and restore over database/sql: VACUUM INTO, integrity check, checksum, atomic rename.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: sqlitebackup
+  repo_name: go-sqlite-backup
+  stability: pre-1.0
+computed:
+  import_line: sqlitebackup "github.com/hollis-labs/go-sqlite-backup"
+  import_path: github.com/hollis-labs/go-sqlite-backup
+  module_path: github.com/hollis-labs/go-sqlite-backup
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:22bfee31c9ca137c506c8a19475fb1501a8c6b5ed1797635b884abb1c141ac3a
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:90fcde6b475891562f12565a13c53c0573c2f3864d680b9a3f2fe21e78b7d20f
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:c5245213f10ecbaa9985b105b6f41219bcd9dc95e5bd946068d95724bb7ebd78
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:1784d395d514c4dcffc47e9a3ecc01781de41eb05ca5f36ef3fbeec7f18b112e
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:1288c2e8433a52a451e1a508d2b285f2279ac2e881544b672c6fa363a73003b4
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:e38cc48f794c96711fdc69856c9f50336974a61a7e4765bed2195e721cfc1742
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:7c787506708abf8699cbcfe114a1136373f1cd845db15092fd21ced90de734d4
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  sqlitebackup.go:
+    preset: go-lib
+    digest_at_gen: sha256:ba4b69f8ce4170b6ae009c75e0fd9ff8db12d3b2a63b0d2b77624052a7f650d4
+  sqlitebackup_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:0007e70201a05fe9d35f9f38a43ef2b8cce178298d3ad0f1be1903da8463b139
+sync_history:
+  - at: 2026-09-29T22:17:07.968153-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
