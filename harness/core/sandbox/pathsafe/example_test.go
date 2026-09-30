@@ -18,7 +18,7 @@ func ExampleResolveUnder() {
 
 	// A path that stays inside the root resolves to an absolute path, even if
 	// the leaf does not exist yet.
-	if _, err := pathsafe.ResolveUnder(root, "notes/todo.txt"); err == nil {
+	if _, rerr := pathsafe.ResolveUnder(root, "notes/todo.txt"); rerr == nil {
 		fmt.Println("inside: ok")
 	}
 

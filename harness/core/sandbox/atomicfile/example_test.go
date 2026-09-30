@@ -21,7 +21,7 @@ func ExampleWriteFile() {
 		fmt.Println(err)
 		return
 	}
-	got, _ := os.ReadFile(path)
+	got, _ := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 	fmt.Println(string(got))
 	// Output: {"ok":true}
 }

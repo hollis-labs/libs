@@ -23,13 +23,13 @@ func TestResolveUnder_Table(t *testing.T) {
 	root = mustEvalRoot(t, root)
 
 	// Seed: create root/sub/file.txt and root/other
-	if err := os.MkdirAll(filepath.Join(root, "sub"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "sub"), 0o755); err != nil { //nolint:gosec // test fixture in t.TempDir(); not a production path
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "sub", "file.txt"), []byte("hi"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "other"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "other"), 0o755); err != nil { //nolint:gosec // test fixture in t.TempDir(); not a production path
 		t.Fatal(err)
 	}
 

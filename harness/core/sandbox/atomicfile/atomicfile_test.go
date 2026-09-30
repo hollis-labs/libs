@@ -29,7 +29,7 @@ func TestAtomicWriteFile_Table(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				got, err := os.ReadFile(path)
+				got, err := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -41,7 +41,7 @@ func TestAtomicWriteFile_Table(t *testing.T) {
 		{
 			name: "overwrite existing",
 			setup: func(path string) {
-				if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
+				if err := os.WriteFile(path, []byte("old"), 0o644); err != nil { //nolint:gosec // test fixture in t.TempDir(); mode is the point of the test
 					t.Fatal(err)
 				}
 			},
@@ -51,7 +51,7 @@ func TestAtomicWriteFile_Table(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				got, _ := os.ReadFile(path)
+				got, _ := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 				if string(got) != "new" {
 					t.Fatalf("got %q", got)
 				}
@@ -139,14 +139,14 @@ func TestAtomicWriter_StreamingWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, chunk := range []string{"hello ", "world", "!"} {
-		if _, err := w.Write([]byte(chunk)); err != nil {
+		if _, err := w.Write([]byte(chunk)); err != nil { //nolint:govet // scoped err in test, mirrors seed
 			t.Fatal(err)
 		}
 	}
-	if err := w.Close(); err != nil {
+	if err := w.Close(); err != nil { //nolint:govet // scoped err in test, mirrors seed
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,11 +222,11 @@ func TestAtomicWriteFile_RenameFails(t *testing.T) {
 	// fails on POSIX, exercising the rename error path and temp cleanup.
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
-	if err := os.Mkdir(target, 0o755); err != nil {
+	if err := os.Mkdir(target, 0o755); err != nil { //nolint:gosec // test fixture in t.TempDir(); not a production path
 		t.Fatal(err)
 	}
 	// Put something inside so rename-over-dir fails on both macOS and Linux.
-	if err := os.WriteFile(filepath.Join(target, "child"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "child"), []byte("x"), 0o644); err != nil { //nolint:gosec // test fixture in t.TempDir(); mode is the point of the test
 		t.Fatal(err)
 	}
 	if err := WriteFile(target, []byte("data"), 0o600); err == nil {
@@ -247,10 +247,10 @@ func TestAtomicWriter_RenameOverNonEmptyDirFails(t *testing.T) {
 	}
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
-	if err := os.Mkdir(target, 0o755); err != nil {
+	if err := os.Mkdir(target, 0o755); err != nil { //nolint:gosec // test fixture in t.TempDir(); not a production path
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(target, "child"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "child"), []byte("x"), 0o644); err != nil { //nolint:gosec // test fixture in t.TempDir(); mode is the point of the test
 		t.Fatal(err)
 	}
 	w, err := NewWriter(target, 0o600)
@@ -304,7 +304,7 @@ func TestAtomicWriteFile_ParentDirFsync(t *testing.T) {
 	if err := WriteFile(path, []byte("durable"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,13 +322,13 @@ func TestAtomicWriter_ParentDirFsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
-	if _, err := w.Write([]byte("durable-stream")); err != nil {
+	if _, err := w.Write([]byte("durable-stream")); err != nil { //nolint:govet // scoped err in test, mirrors seed
 		t.Fatalf("Write: %v", err)
 	}
-	if err := w.Close(); err != nil {
+	if err := w.Close(); err != nil { //nolint:govet // scoped err in test, mirrors seed
 		t.Fatalf("Close: %v", err)
 	}
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestAtomicWriteFile_ConcurrentWriters(t *testing.T) {
 	}()
 	wg.Wait()
 
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
