@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
+## v0.2.0 — 2026-09-29
+
+### Added
+
+- `Limits.ToolOutputBytes`, Nanite's cumulative tool-output-per-turn ceiling. `nil` means "use the
+  host's default", matching the pointer-field convention every other `Limits` field already follows.
+
 ## v0.1.0 — 2026-09-29
 
 ### Added

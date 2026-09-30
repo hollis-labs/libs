@@ -84,12 +84,13 @@ func TestRunPolicy(t *testing.T) {
 // consumer silently, so they are pinned as a golden document.
 func TestAssignmentJSONGolden(t *testing.T) {
 	dur := int64(60000)
+	toolBytes := int64(1048576)
 	turns := 12
 	a := Assignment{
 		Agent:       AgentRef{Name: "incident-triage", Digest: "sha256:aa", Source: "repo"},
 		Scope:       Scope{Project: ProjectRef{ID: "p1", Root: "/work/p1"}, Workdirs: []string{"/work/p1"}, Isolation: IsolationSandbox},
 		Grants:      Grants{Tools: []string{"bash"}, Permissions: []string{"allow:read_file"}, MCP: MCPGrant{Allow: []string{"github"}, Deny: []string{"shell"}}},
-		Limits:      Limits{MaxDurationMs: &dur, MaxTurns: &turns},
+		Limits:      Limits{MaxDurationMs: &dur, ToolOutputBytes: &toolBytes, MaxTurns: &turns},
 		Run:         RunPolicy{Lifetime: LifetimeLongLived, Attach: true, Attended: false, Resume: ResumeOnFailure, Requires: capabilities.Set{capabilities.Resume}},
 		Task:        Task{Input: "triage", Files: []string{"alert.json"}},
 		Launch:      Launch{Profile: "default", Overrides: LaunchOverrides{Provider: "anthropic", Model: "sonnet"}},
@@ -101,7 +102,7 @@ func TestAssignmentJSONGolden(t *testing.T) {
 	const golden = `{"agent":{"name":"incident-triage","digest":"sha256:aa","source":"repo"},` +
 		`"scope":{"project":{"id":"p1","root":"/work/p1"},"workdirs":["/work/p1"],"isolation":"sandbox"},` +
 		`"grants":{"tools":["bash"],"permissions":["allow:read_file"],"mcp":{"allow":["github"],"deny":["shell"]}},` +
-		`"limits":{"max_duration_ms":60000,"max_turns":12},` +
+		`"limits":{"max_duration_ms":60000,"tool_output_bytes":1048576,"max_turns":12},` +
 		`"run":{"lifetime":"long-lived","attach":true,"attended":false,"resume":"on-failure","requires":["resume"]},` +
 		`"task":{"input":"triage","files":["alert.json"]},` +
 		`"launch":{"profile":"default","overrides":{"provider":"anthropic","model":"sonnet"}},` +
