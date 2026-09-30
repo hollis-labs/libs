@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_recieved\"}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"r\"}",
+  "status": "active"
+}

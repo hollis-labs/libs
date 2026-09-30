@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T21:13:17.370755-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - See the Boundaries section of AGENTS.md for the invariants and the tests that guard each.
+  agents_start_here: |-
+    - `reflexspec.go`, `trigger.go`, `action.go` — the importable API; `doc.go` is the package documentation. `conformance/` — the fixtures and runner.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Portable contract for one reflex definition: validates the record shape, the trigger predicate grammar and per-kind action_spec; hosts implement the engine.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: reflexspec
+  repo_name: reflex-definition-spec
+  stability: pre-1.0
+computed:
+  import_line: reflexspec "github.com/hollis-labs/reflex-definition-spec"
+  import_path: github.com/hollis-labs/reflex-definition-spec
+  module_path: github.com/hollis-labs/reflex-definition-spec
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:60050003bfc4d395ebbed9b2fd928a362c6229b9fd9e28a9ea66398bf63f5d45
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:f5dcb1c6281ee15c6ce3dbfdc39a6c3c6cd21bdeb0d7a2e4ba0b96b145bac1a6
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:11a105564fa6021295446dd1df7b5f284791a50201dcb401d8a4361f07df3a36
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:e247bd92ba350a319a00dcd8244cf7853d5e96c6a4f2c82f1b7d8d0ee278384d
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:5be474f43c9ffec1f9e2ca2e7d77198da4c3191aa83bbe37b588488c89df5d39
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:59240f20225448ff7f080d285c3940c8bb9d7bde8b2ba860eae9fc60d5818d07
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:e1f3afeeb267d28c215c088d5f14f092867b966d5f17cd4ff98595ce2805d6d3
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  reflexspec.go:
+    preset: go-lib
+    digest_at_gen: sha256:49c0d25584eeecad036a0fa16590f7c561497f6dc49ec793cc8c56fad0e5dac9
+  reflexspec_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:7774e912067aa3ad5e2505184cb84b0eb3e3730026ad9b66d0982ade81b61a50
+sync_history:
+  - at: 2026-09-29T21:13:17.370755-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0

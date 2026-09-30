@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_received\"}",
+  "action_kind": "force_tool_choice",
+  "action_spec": "{\"tool_name\":\"x\"}",
+  "status": "active"
+}

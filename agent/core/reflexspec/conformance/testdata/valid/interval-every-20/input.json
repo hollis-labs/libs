@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "interval",
+  "trigger_spec": "{\"every_n_ticks\":20}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"r\"}",
+  "status": "active"
+}

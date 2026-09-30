@@ -1,0 +1,15 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.name",
+      "code": "not_in_catalog"
+    }
+  ],
+  "reason": "injected event catalog catches a misspelled event name",
+  "options": {
+    "known_events": [
+      "mail_received"
+    ]
+  }
+}

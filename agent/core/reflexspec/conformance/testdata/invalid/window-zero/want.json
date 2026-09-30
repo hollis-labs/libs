@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.window",
+      "code": "out_of_range"
+    }
+  ],
+  "reason": "window <= 0 never fires"
+}

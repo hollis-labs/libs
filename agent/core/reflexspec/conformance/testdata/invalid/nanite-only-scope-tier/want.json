@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.kind",
+      "code": "unknown_predicate_kind"
+    }
+  ],
+  "reason": "scope_tier is Nanite's pre-attr special case; go-reflexes replaced it with attr"
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.op",
+      "code": "invalid_value"
+    }
+  ],
+  "reason": "op outside the comparison set is silently false in the engine"
+}

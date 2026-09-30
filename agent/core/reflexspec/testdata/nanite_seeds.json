@@ -1,0 +1,170 @@
+[
+ {
+  "source": "base",
+  "name": "drift_detector_echo",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":3},{\"kind\":\"cache_read_window\",\"op\":\"=\",\"value\":0,\"window\":3},{\"kind\":\"input_tokens_window\",\"op\":\"\\u003c\",\"value\":10,\"window\":3},{\"kind\":\"identical_output_window\",\"window\":3}],\"kind\":\"AND\"}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"drift_detector_echo: cache-miss singleton race\"}"
+ },
+ {
+  "source": "base",
+  "name": "runaway_superlative_detector",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":3},{\"factor\":1.5,\"kind\":\"output_growth_window\",\"window\":3},{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)(Beyond|Absolute|Ultimate|Maximum)\\\\s+(Emergency|Crisis|Unprecedented)\",\"window\":3}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Reorient: escalating-language pattern detected (Beyond/Absolute/Ultimate/Maximum + Emergency/Crisis). Pause and re-ground in concrete state. What is the actual next-action that advances the task?\",\"urgency\":\"warn\"}"
+ },
+ {
+  "source": "base",
+  "name": "wake_on_mail",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_received\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Mail in the inbox — call message_inbox to read it, then message_ack each message you handled before continuing. Reading does not clear the unread count; the ack is what stops this reminder.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "base",
+  "name": "context_pressure",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"context_window\":200000,\"kind\":\"prefix_pressure\",\"ratio\":0.85}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Context-pressure notice: prefix is over 85% of the window. Consider compacting or wrapping the current line of work before continuing.\",\"urgency\":\"warn\"}"
+ },
+ {
+  "source": "base",
+  "name": "clean_status_without_tools",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":2},{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)\\\\b(all clear|healthy|no issues|nominal|nothing new|looks good)\\\\b\",\"window\":2}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Grounding nudge: clean-status language appeared without recent tool calls. Check the relevant source-of-truth/probes before reporting another all-clear.\",\"urgency\":\"warn\"}"
+ },
+ {
+  "source": "base",
+  "name": "repeated_planning_without_action",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":4},{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)\\\\b(plan|next pass|will continue|should proceed|going to)\\\\b\",\"window\":4}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Action nudge: recent turns are planning without observable action. Pick one concrete tool/source-of-truth check or pause with an explicit blocker.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "base",
+  "name": "wake_on_mail",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_received\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Mail in the inbox — call message_inbox to read it, then message_ack each message you handled. Reading does not clear the unread count; the ack is what stops this reminder.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "base",
+  "name": "idle_drift_advisor",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":5},{\"kind\":\"input_tokens_window\",\"op\":\"\\u003c\",\"value\":5,\"window\":5}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Idle-drift advisory: 5 consecutive turns with no tool calls and minimal input. State the next concrete action or pause cleanly.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "base",
+  "name": "evidence_claim_without_tools",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"tool_calls_window\",\"op\":\"=\",\"value\":0,\"window\":2},{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)\\\\b(verified|confirmed|checked|looked up|current|latest|today|as of)\\\\b\",\"window\":2}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Grounding nudge: evidence/currentness language appeared without recent tool use. Cite the source if you have one; otherwise mark it as inference and verify before relying on it.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_open_subagent",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"scope_tier\",\"op\":\"=\",\"value\":\"open\"},{\"kind\":\"execution_pattern\",\"op\":\"=\",\"value\":\"subagent\"}],\"kind\":\"AND\"}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"planner\",\"confidence\":0.75,\"reason\":\"scope_tier=open + execution_pattern=subagent (migrated agent-broker Rule 5)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_background_long_task",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(in the background|async|when you get a chance|overnight|index the whole|crawl the entire)\",\"window\":1},{\"kind\":\"execution_pattern\",\"op\":\"=\",\"value\":\"background\"}],\"kind\":\"AND\"}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"worker\",\"confidence\":0.25,\"reason\":\"phrase match: background-long-task (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_planner_mention",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(let's plan|let's work on|sprint|plan this|plan out|create a plan)\",\"window\":1},{\"kind\":\"scope_tier\",\"op\":\"=\",\"value\":\"open\"}],\"kind\":\"AND\"}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"planner\",\"confidence\":0.2,\"reason\":\"phrase match: planner-mention (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_planner_large_task",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(big project|multi-step|break this down|sequence of|phases|end to end)\",\"window\":1},{\"clauses\":[{\"kind\":\"scope_tier\",\"op\":\"=\",\"value\":\"large\"},{\"kind\":\"scope_tier\",\"op\":\"=\",\"value\":\"open\"}],\"kind\":\"OR\"}],\"kind\":\"AND\"}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"planner\",\"confidence\":0.18,\"reason\":\"phrase match: planner-large-task (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_researcher_mention",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(research|investigate|look into|find out|dig into|what does|find all|summarize the state)\",\"window\":1}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"researcher\",\"confidence\":0.15,\"reason\":\"phrase match: researcher-mention (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_reviewer_mention",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(review|assess|second opinion|critique|audit|check this|give me feedback on)\",\"window\":1}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"reviewer\",\"confidence\":0.15,\"reason\":\"phrase match: reviewer-mention (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "dispatch_to_agent_worker_execute",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"user_regex_window\",\"pattern\":\"(?i)(build|implement|fix|refactor|write the code|add the feature|make it|run the migration)\",\"window\":1}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"agent_slug\":\"worker\",\"confidence\":0.1,\"reason\":\"phrase match: worker-execute (migrated from internal/promptrouter)\"}"
+ },
+ {
+  "source": "base",
+  "name": "task_complete_self_terminate",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"task_completed\"}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"task_complete_self_terminate\"}"
+ },
+ {
+  "source": "base",
+  "name": "task_timeout",
+  "trigger_kind": "interval",
+  "trigger_spec": "{\"every_n_ticks\":20}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"task_timeout: exceeded 20 ticks\"}"
+ },
+ {
+  "source": "loom",
+  "name": "check_before_answer",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"text_regex_window\",\"pattern\":\"(?i)\\\\b(envelope|boot[- ]?profile|mcp trust|durable[- ]?agent|plugin (architecture|system|sdk)|slot system|context broker|tool[- ]result cache|agent_profiles|reflex(es)?|wiki|loom curator|loom weaver)\\\\b\",\"scope\":\"user\",\"window\":2},{\"kind\":\"tool_name_window\",\"mode\":\"none\",\"pattern\":\"^(wiki_|loom_)\",\"window\":2}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Reflex check_before_answer: the recent question touches Nanite wiki-bundle topics and wiki_*/loom_* tools haven't been called yet this window. Search the nanite bundle via loom_page_search (then loom_page_get / loom_fetch_result / loom_search_result as needed) before answering from memory — per your own answer_with_sources procedure.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "loom",
+  "name": "capture_on_discovery",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)\\\\b(discovered|found that|turns out|worth documenting|worth capturing|worth keeping|noteworthy|TIL)\\\\b\",\"window\":2},{\"kind\":\"tool_calls_window\",\"op\":\"\\u003e\",\"value\":0,\"window\":2}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Reflex capture_on_discovery: recent output reads like a fresh finding backed by real tool activity. If this surfaced a gap, staleness, or contradiction worth keeping in the nanite wiki bundle, drop a concise note into Fragments Engine's inbox now via relay_*/message_* (affected page, source refs, observed gap, confidence) so Loom Curator's next pass can act on it — per your own propose_kb_update procedure.\",\"urgency\":\"info\"}"
+ },
+ {
+  "source": "loom",
+  "name": "capture_on_discovery",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"clauses\":[{\"kind\":\"regex_match_window\",\"pattern\":\"(?i)\\\\b(discovered|found that|turns out|worth documenting|worth capturing|worth keeping|noteworthy|TIL)\\\\b\",\"window\":2},{\"kind\":\"tool_calls_window\",\"op\":\"\\u003e\",\"value\":0,\"window\":2}],\"kind\":\"AND\"}",
+  "action_kind": "inject_reminder",
+  "action_spec": "{\"body\":\"Reflex capture_on_discovery: recent output reads like a fresh finding backed by real tool activity, outside the normal classify/compile flow. If it's a wiki-worthy observation not already covered by write_or_stage_page's staging step or scheduled_lint_and_export's inbox routing, drop a concise note into Fragments Engine's inbox now via relay_*/message_* so it isn't lost.\",\"urgency\":\"info\"}"
+ }
+]

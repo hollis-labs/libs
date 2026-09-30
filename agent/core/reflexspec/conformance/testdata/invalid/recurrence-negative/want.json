@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "recurrence_override_seconds",
+      "code": "out_of_range"
+    }
+  ],
+  "reason": "negative cooldown is meaningless; nil inherits, 0 is no-cooldown"
+}

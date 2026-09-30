@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec",
+      "code": "not_object"
+    }
+  ],
+  "reason": "trigger_spec must be an object"
+}

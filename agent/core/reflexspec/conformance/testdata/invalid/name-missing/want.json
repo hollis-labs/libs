@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "name",
+      "code": "required"
+    }
+  ],
+  "reason": "name is required"
+}
