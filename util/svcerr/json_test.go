@@ -72,7 +72,7 @@ func TestWriteJSONNeverWritesAnInvalidStatus(t *testing.T) {
 					t.Errorf("%s: WriteJSON panicked: %v", name, r)
 				}
 			}()
-			for _, fb := range []int{0, 99, 1000, -1, 500} {
+			for _, fb := range []int{0, 99, 1000, -1, 200, 204, 302, 500} {
 				if rec := write(e, fb); !validStatus(rec.Code) {
 					t.Errorf("%s fallback %d: wrote status %d", name, fb, rec.Code)
 				}
@@ -86,5 +86,22 @@ func TestWriteJSONFillsAnEmptyMessageFromTheStatus(t *testing.T) {
 	const want = `{"error":{"code":"not_found","message":"Not Found"}}` + "\n"
 	if rec.Body.String() != want {
 		t.Errorf("body = %q", rec.Body.String())
+	}
+}
+
+// A fallback of 200 or 204 must not turn a failure into a success. A 204 in
+// particular cannot carry a body, and the write error would be swallowed.
+func TestWriteJSONRefusesASuccessFallbackAndStillWritesTheBody(t *testing.T) {
+	for _, fb := range []int{100, 200, 204, 301, 304} {
+		rec := write(errors.New("boom"), fb)
+		const want = `{"error":{"code":"internal","message":"internal error"}}` + "\n"
+		if rec.Code != http.StatusInternalServerError || rec.Body.String() != want {
+			t.Errorf("fallback %d: status %d body %q, want 500 with a real JSON body", fb, rec.Code, rec.Body.String())
+		}
+	}
+	// An *Error whose own status is a success status is refused the same way.
+	rec := write(New(CodeConflict, "clash", WithStatus(204)), 200)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"conflict"`) {
+		t.Errorf("status %d body %q, want the code's default 409 with a body", rec.Code, rec.Body.String())
 	}
 }

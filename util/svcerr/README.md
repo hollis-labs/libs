@@ -53,7 +53,7 @@ func main() {
 
 - `Message` is never taken from a wrapped error. It is an explicit string you chose to show. `Err` is for logging.
 - `StatusFor` and `CodeFor` read the first `*Error` in the chain. For any other error they return your fallback, or the empty code. They never look at the error's text.
-- `Status` is never zero or invalid on the way out: an unset or out-of-range status falls back to the code's default, then to 500, because `http.ResponseWriter.WriteHeader` panics outside 100..999.
+- `Status` is always an error status (400 to 599) on the way out: an unset or non-error status (zero, 1xx, 2xx, 3xx, above 599) falls back to the code's default, then to 500. `WriteHeader` panics outside 100..999, and an error body under a success status would read as success (a 204 cannot even carry the body).
 
 `WriteJSON` and `Envelope` are one **optional** default for a new handler that has no error envelope yet, in `json.go`, and nothing else depends on them. The body is `{"error":{"code","message","field"?}}`, the nesting Tether already uses. For a non-`*Error` it writes your fallback status and a generic `internal error` body, and never the error's own text. An app with an existing wire shape keeps it and adopts only `Error`, `StatusFor` and `CodeFor` underneath.
 

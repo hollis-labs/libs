@@ -45,7 +45,7 @@ func DefaultStatus(c Code) (int, bool) {
 // rendered into Message or Error() automatically.
 type Error struct {
 	// Status is the HTTP status. New and Wrap fill it from the code; a zero or
-	// out-of-range Status (for example on a struct literal) is treated as
+	// non-error (outside 400..599) Status (for example on a struct literal) is treated as
 	// "unset" by [StatusFor] and [WriteJSON], which then use the code's default.
 	Status  int
 	Code    Code
@@ -134,9 +134,12 @@ func (e *Error) status() int {
 	return http.StatusInternalServerError
 }
 
-// validStatus reports whether s is a status http.ResponseWriter.WriteHeader
-// accepts (WriteHeader panics outside 100..999).
-func validStatus(s int) bool { return s >= 100 && s <= 999 }
+// validStatus reports whether s is a usable ERROR status: 400..599. Anything
+// else is refused, not just what http.ResponseWriter.WriteHeader would panic on
+// (outside 100..999): an error body under a 1xx, 2xx or 3xx status is a failure
+// reported as success or a redirect, and a 204 cannot carry a body at all, so
+// the client would see an empty success for a failure.
+func validStatus(s int) bool { return s >= 400 && s <= 599 }
 
 // StatusFor returns the HTTP status of the first *Error in err's chain, or
 // fallback when there is none. It never inspects the error's text.

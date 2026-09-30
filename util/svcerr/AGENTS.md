@@ -25,7 +25,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either. Standard library only.
 - `Message` is never derived from `Err`, and `Error()` and `WriteJSON` never render `Err`. Guarded by `TestTheInternalCauseIsReachableButNeverRendered` and `TestWriteJSONNeverLeaksAPlainErrorsText`.
 - A status is never guessed from error text: a non-`*Error` gets the caller's fallback. Guarded by `TestStatusForAndCodeForDoNotGuessFromText`.
-- A status handed to `WriteHeader` is always within 100..999 (it panics otherwise), and the sentinels carry their code's status so returning one directly is safe. Guarded by `TestStatusIsNeverZeroOrInvalid` and `TestWriteJSONNeverWritesAnInvalidStatus`.
+- A status handed to `WriteHeader` is always an error status, 400..599 (`WriteHeader` panics outside 100..999, and a success or redirect status would report a failure as success; a 204 cannot carry the body at all), and the sentinels carry their code's status so returning one directly is safe. Guarded by `TestStatusIsNeverZeroOrInvalid`, `TestNonErrorStatusesFallBackToTheCodesDefault`, `TestWriteJSONNeverWritesAnInvalidStatus` and `TestWriteJSONRefusesASuccessFallbackAndStillWritesTheBody`.
 - `Is` matches on `Code` only, so `errors.Is(err, ErrNotFound)` works through wrapping. Guarded by `TestIsMatchesThroughWrappingLayers`.
 - The sentinels are shared pointers: never modify them.
 - `Code` stays an open string type; do not turn it into a closed enum.

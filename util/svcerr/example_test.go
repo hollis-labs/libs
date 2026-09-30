@@ -44,9 +44,9 @@ func ExampleError_Is() {
 }
 
 func ExampleWithStatus() {
-	err := svcerr.New("approval_required", "an operator must approve this", svcerr.WithStatus(http.StatusAccepted))
+	err := svcerr.New("approval_required", "an operator must approve this", svcerr.WithStatus(http.StatusPaymentRequired))
 	fmt.Println(svcerr.StatusFor(err, 500))
-	// Output: 202
+	// Output: 402
 }
 
 func ExampleWriteJSON() {

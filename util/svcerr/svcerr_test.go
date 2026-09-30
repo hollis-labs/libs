@@ -103,7 +103,8 @@ func TestWithStatusOverridesTheDefault(t *testing.T) {
 
 // Returning a sentinel directly must carry a usable status, and a struct
 // literal or unknown code with no status must never yield 0: WriteHeader panics
-// outside 100..999 and a zero status is an unset one.
+// outside 100..999 and a zero status is an unset one; and only 400..599 counts as
+// an error status at all.
 func TestStatusIsNeverZeroOrInvalid(t *testing.T) {
 	for _, s := range []*Error{ErrInvalid, ErrNotFound, ErrConflict, ErrPermission, ErrUnavailable, ErrInternal} {
 		if !validStatus(s.Status) {
@@ -116,6 +117,7 @@ func TestStatusIsNeverZeroOrInvalid(t *testing.T) {
 		"explicit zero status":     New(CodeNotFound, "m", WithStatus(0)),
 		"status below 100":         New(CodeNotFound, "m", WithStatus(42)),
 		"status above 999":         New(CodeNotFound, "m", WithStatus(1000)),
+		"status 600":               New(CodeNotFound, "m", WithStatus(600)),
 		"empty code, empty status": {},
 	}
 	for name, e := range cases {
@@ -152,3 +154,22 @@ func TestNilReceiversDoNotPanic(t *testing.T) {
 }
 
 var _ error = (*Error)(nil)
+
+// An error must never go out under a success, informational or redirect status:
+// the client would read a failure as success (and a 204 cannot carry the body at
+// all). Anything outside 400..599 falls back to the code's default, then 500.
+func TestNonErrorStatusesFallBackToTheCodesDefault(t *testing.T) {
+	for _, bad := range []int{100, 101, 200, 201, 204, 302, 304, 399, 600, 999} {
+		if got := StatusFor(New(CodeNotFound, "m", WithStatus(bad)), 0); got != http.StatusNotFound {
+			t.Errorf("WithStatus(%d) on not_found: StatusFor = %d, want 404", bad, got)
+		}
+		if got := StatusFor(New("custom", "m", WithStatus(bad)), 0); got != http.StatusInternalServerError {
+			t.Errorf("WithStatus(%d) on a custom code: StatusFor = %d, want 500", bad, got)
+		}
+	}
+	for _, ok := range []int{400, 402, 418, 499, 500, 503, 599} {
+		if got := StatusFor(New("custom", "m", WithStatus(ok)), 0); got != ok {
+			t.Errorf("WithStatus(%d) was rewritten to %d", ok, got)
+		}
+	}
+}
