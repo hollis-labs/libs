@@ -249,7 +249,7 @@ func (d *httpDispatcher) Reply(ctx context.Context, parent messaging.Envelope, p
 		Payload:     payload,
 		ContentType: "application/json",
 	}
-	return d.httpStore.Send(ctx, resp)
+	return d.Send(ctx, resp)
 }
 
 // mapStoreError translates HTTP API errors into canonical messaging sentinel errors.

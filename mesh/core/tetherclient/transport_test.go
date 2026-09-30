@@ -19,7 +19,7 @@ func TestUnixTransportHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen unix: %v", err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {
@@ -27,7 +27,7 @@ func TestUnixTransportHealth(t *testing.T) {
 		}
 		writeTestJSON(t, w, Health{Status: "ok"})
 	})}
-	defer srv.Close()
+	defer func() { _ = srv.Close() }()
 	go func() { _ = srv.Serve(ln) }()
 
 	c := MustNew("unix:" + socketPath)
