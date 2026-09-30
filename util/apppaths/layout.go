@@ -69,16 +69,29 @@ func (l Layout) Describe() []Entry {
 	}
 }
 
-// materialize creates the Layout's directories with 0o755 permissions. It is
-// idempotent — MkdirAll on an existing directory is a no-op.
+// materialize creates the Layout's app-owned directories and forces DirMode
+// (0o700) onto each of them, including ones that already exist at a looser
+// mode — an install created by an earlier release retightens on the next
+// Resolve. It is idempotent.
+//
+// The app-owned set is the four base roots, the workspace directory and the
+// workspace database's directory. filepath.Dir(mainDB) is deliberately not
+// forced to 0o700 when it differs from that set: WithDBOverride and
+// <APP>_DB_PATH can point it at a path the operator chose and may share with
+// other tools, so it is only created (0o755 before umask), never chmodded.
 func (l Layout) materialize() error {
-	dirs := []string{
+	owned := []string{
 		l.dataDir, l.stateDir, l.cacheDir, l.configDir,
-		l.workspace.Dir, filepath.Dir(l.mainDB),
+		l.workspace.Dir, filepath.Dir(l.workspace.DBPath),
 	}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+	for _, dir := range owned {
+		if err := ensureOwnedDir(dir); err != nil {
 			return fmt.Errorf("apppaths: materialize %q: %w", dir, err)
+		}
+	}
+	if dbDir := filepath.Dir(l.mainDB); dbDir != filepath.Dir(l.workspace.DBPath) {
+		if err := os.MkdirAll(dbDir, 0o755); err != nil {
+			return fmt.Errorf("apppaths: materialize %q: %w", dbDir, err)
 		}
 	}
 	return nil

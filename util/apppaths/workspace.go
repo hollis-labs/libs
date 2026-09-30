@@ -65,7 +65,8 @@ func (l Layout) ResolveWorkspace(name string) Workspace {
 }
 
 // SelectWorkspace persists name as the active-workspace pointer (a text file
-// under StateDir) and ensures the workspace directory exists. The change
+// under StateDir, written at FileMode) and ensures the workspace directory
+// exists at DirMode. The change
 // takes effect on the next Resolve. WithWorkspace and the <APP>_WORKSPACE
 // environment variable still take precedence over the persisted pointer.
 func (l Layout) SelectWorkspace(name string) error {
@@ -76,15 +77,18 @@ func (l Layout) SelectWorkspace(name string) error {
 	if strings.ContainsAny(name, `/\`) {
 		return fmt.Errorf("apppaths: workspace name %q must not contain a path separator", name)
 	}
-	if err := os.MkdirAll(workspaceFor(l.dataDir, name).Dir, 0o755); err != nil {
+	if err := ensureOwnedDir(workspaceFor(l.dataDir, name).Dir); err != nil {
 		return fmt.Errorf("apppaths: create workspace %q: %w", name, err)
 	}
-	if err := os.MkdirAll(l.stateDir, 0o755); err != nil {
+	if err := ensureOwnedDir(l.stateDir); err != nil {
 		return fmt.Errorf("apppaths: prepare state dir: %w", err)
 	}
 	file := filepath.Join(l.stateDir, activeWorkspaceFile)
-	if err := os.WriteFile(file, []byte(name+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(name+"\n"), FileMode); err != nil {
 		return fmt.Errorf("apppaths: write active-workspace pointer: %w", err)
+	}
+	if err := chmodOwned(file, FileMode); err != nil {
+		return fmt.Errorf("apppaths: secure active-workspace pointer: %w", err)
 	}
 	return nil
 }
