@@ -1,0 +1,13 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"t1","type":"text-start"}
+{"delta":"Checking. ","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"dynamic":true,"toolCallId":"c1","toolName":"get_weather","type":"tool-input-start"}
+{"inputTextDelta":"{\"city\":","toolCallId":"c1","type":"tool-input-delta"}
+{"inputTextDelta":"\"Oslo\"}","toolCallId":"c1","type":"tool-input-delta"}
+{"dynamic":true,"input":{"city":"Oslo"},"toolCallId":"c1","toolName":"get_weather","type":"tool-input-available"}
+{"dynamic":true,"output":"sunny, 21C","toolCallId":"c1","type":"tool-output-available"}
+{"type":"finish-step"}
+{"finishReason":"tool-calls","messageMetadata":{"rawFinishReason":"tool_use"},"type":"finish"}
+[DONE]

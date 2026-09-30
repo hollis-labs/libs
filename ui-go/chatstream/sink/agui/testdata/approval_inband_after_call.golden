@@ -1,0 +1,6 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"timestamp":1767323045000,"toolCallId":"c1","toolCallName":"bash","type":"TOOL_CALL_START"}
+id=4 {"delta":"{\"cmd\":\"ls\"}","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_ARGS"}
+id=5 {"timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_END"}
+id=6 {"name":"chatstream.approval_request","timestamp":1767323045000,"type":"CUSTOM","value":{"approvalId":"ap-1","descriptor":{"tool":"bash","input":{"cmd":"ls"}},"reason":"runs a shell command","toolCallId":"c1"}}
+id=8 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

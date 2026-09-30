@@ -1,0 +1,12 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"messageId":"r1","timestamp":1767323045000,"type":"REASONING_START"}
+id=3 {"messageId":"r1","role":"reasoning","timestamp":1767323045000,"type":"REASONING_MESSAGE_START"}
+id=4 {"delta":"let me think ","messageId":"r1","timestamp":1767323045000,"type":"REASONING_MESSAGE_CONTENT"}
+id=5 {"delta":"about it","messageId":"r1","timestamp":1767323045000,"type":"REASONING_MESSAGE_CONTENT"}
+id=6 {"messageId":"r1","timestamp":1767323045000,"type":"REASONING_MESSAGE_END"}
+id=6 {"messageId":"r1","timestamp":1767323045000,"type":"REASONING_END"}
+id=6 {"encryptedValue":"sig-abc","entityId":"r1","subtype":"message","timestamp":1767323045000,"type":"REASONING_ENCRYPTED_VALUE"}
+id=7 {"messageId":"t1","role":"assistant","timestamp":1767323045000,"type":"TEXT_MESSAGE_START"}
+id=8 {"delta":"Answer.","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=9 {"messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_END"}
+id=11 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

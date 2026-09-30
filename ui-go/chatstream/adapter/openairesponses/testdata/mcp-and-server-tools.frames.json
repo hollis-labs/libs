@@ -1,0 +1,306 @@
+{
+  "name": "mcp-and-server-tools",
+  "description": "An mcp_list_tools item, an mcp_call with streamed arguments and output, an mcp_approval_request, and a web_search_call with status events and code-interpreter code deltas (preserved raw).",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "id": "mcpl_1",
+          "type": "mcp_list_tools",
+          "server_label": "docs",
+          "tools": []
+        }
+      }
+    },
+    {
+      "event": "response.mcp_list_tools.in_progress",
+      "data": {
+        "type": "response.mcp_list_tools.in_progress",
+        "sequence_number": 3,
+        "output_index": 0,
+        "item_id": "mcpl_1"
+      }
+    },
+    {
+      "event": "response.mcp_list_tools.completed",
+      "data": {
+        "type": "response.mcp_list_tools.completed",
+        "sequence_number": 4,
+        "output_index": 0,
+        "item_id": "mcpl_1"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 5,
+        "output_index": 0,
+        "item": {
+          "id": "mcpl_1",
+          "type": "mcp_list_tools",
+          "server_label": "docs",
+          "tools": [
+            {
+              "name": "search"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 6,
+        "output_index": 1,
+        "item": {
+          "id": "mcp_1",
+          "type": "mcp_call",
+          "server_label": "docs",
+          "name": "search",
+          "arguments": ""
+        }
+      }
+    },
+    {
+      "event": "response.mcp_call.in_progress",
+      "data": {
+        "type": "response.mcp_call.in_progress",
+        "sequence_number": 7,
+        "output_index": 1,
+        "item_id": "mcp_1"
+      }
+    },
+    {
+      "event": "response.mcp_call_arguments.delta",
+      "data": {
+        "type": "response.mcp_call_arguments.delta",
+        "sequence_number": 8,
+        "output_index": 1,
+        "item_id": "mcp_1",
+        "delta": "{\"q\":"
+      }
+    },
+    {
+      "event": "response.mcp_call_arguments.delta",
+      "data": {
+        "type": "response.mcp_call_arguments.delta",
+        "sequence_number": 9,
+        "output_index": 1,
+        "item_id": "mcp_1",
+        "delta": "\"go\"}"
+      }
+    },
+    {
+      "event": "response.mcp_call_arguments.done",
+      "data": {
+        "type": "response.mcp_call_arguments.done",
+        "sequence_number": 10,
+        "output_index": 1,
+        "item_id": "mcp_1",
+        "arguments": "{\"q\":\"go\"}"
+      }
+    },
+    {
+      "event": "response.mcp_call.completed",
+      "data": {
+        "type": "response.mcp_call.completed",
+        "sequence_number": 11,
+        "output_index": 1,
+        "item_id": "mcp_1"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 12,
+        "output_index": 1,
+        "item": {
+          "id": "mcp_1",
+          "type": "mcp_call",
+          "server_label": "docs",
+          "name": "search",
+          "arguments": "{\"q\":\"go\"}",
+          "output": "3 results",
+          "error": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 13,
+        "output_index": 2,
+        "item": {
+          "id": "mcpr_1",
+          "type": "mcp_approval_request",
+          "server_label": "docs",
+          "name": "delete",
+          "arguments": "{\"id\":7}"
+        }
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 14,
+        "output_index": 2,
+        "item": {
+          "id": "mcpr_1",
+          "type": "mcp_approval_request",
+          "server_label": "docs",
+          "name": "delete",
+          "arguments": "{\"id\":7}"
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 15,
+        "output_index": 3,
+        "item": {
+          "id": "ws_1",
+          "type": "web_search_call",
+          "status": "in_progress"
+        }
+      }
+    },
+    {
+      "event": "response.web_search_call.in_progress",
+      "data": {
+        "type": "response.web_search_call.in_progress",
+        "sequence_number": 16,
+        "output_index": 3,
+        "item_id": "ws_1"
+      }
+    },
+    {
+      "event": "response.web_search_call.searching",
+      "data": {
+        "type": "response.web_search_call.searching",
+        "sequence_number": 17,
+        "output_index": 3,
+        "item_id": "ws_1"
+      }
+    },
+    {
+      "event": "response.web_search_call.completed",
+      "data": {
+        "type": "response.web_search_call.completed",
+        "sequence_number": 18,
+        "output_index": 3,
+        "item_id": "ws_1"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 19,
+        "output_index": 3,
+        "item": {
+          "id": "ws_1",
+          "type": "web_search_call",
+          "status": "completed",
+          "action": {
+            "type": "search",
+            "query": "go"
+          }
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 20,
+        "output_index": 4,
+        "item": {
+          "id": "ci_1",
+          "type": "code_interpreter_call",
+          "status": "in_progress"
+        }
+      }
+    },
+    {
+      "event": "response.code_interpreter_call_code.delta",
+      "data": {
+        "type": "response.code_interpreter_call_code.delta",
+        "sequence_number": 21,
+        "output_index": 4,
+        "item_id": "ci_1",
+        "delta": "print(1)"
+      }
+    },
+    {
+      "event": "response.code_interpreter_call_code.done",
+      "data": {
+        "type": "response.code_interpreter_call_code.done",
+        "sequence_number": 22,
+        "output_index": 4,
+        "item_id": "ci_1",
+        "code": "print(1)"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 23,
+        "output_index": 4,
+        "item": {
+          "id": "ci_1",
+          "type": "code_interpreter_call",
+          "status": "completed",
+          "code": "print(1)"
+        }
+      }
+    },
+    {
+      "event": "response.completed",
+      "data": {
+        "type": "response.completed",
+        "sequence_number": 24,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

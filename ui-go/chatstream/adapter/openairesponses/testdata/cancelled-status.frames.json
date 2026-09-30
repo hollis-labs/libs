@@ -1,0 +1,42 @@
+{
+  "name": "cancelled-status",
+  "description": "A response reporting status cancelled (not a stream event in the reference): run.abort.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.completed",
+      "data": {
+        "type": "response.completed",
+        "sequence_number": 2,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "cancelled",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

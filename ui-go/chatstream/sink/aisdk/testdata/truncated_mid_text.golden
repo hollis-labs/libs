@@ -1,0 +1,8 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"t1","type":"text-start"}
+{"delta":"half a sen","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"type":"finish-step"}
+{"errorText":"the stream ended before the run finished: connection reset by peer","type":"error"}
+[DONE]

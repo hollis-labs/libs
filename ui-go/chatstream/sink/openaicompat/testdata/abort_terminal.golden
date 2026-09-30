@@ -1,0 +1,4 @@
+{"choices":[{"delta":{"content":"","role":"assistant"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"content":"partial"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"error":{"code":"run_aborted","message":"run aborted: user canceled","type":"aborted"}}
+[DONE]

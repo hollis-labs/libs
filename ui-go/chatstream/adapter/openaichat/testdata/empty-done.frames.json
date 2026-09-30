@@ -1,0 +1,9 @@
+{
+  "name": "empty-done",
+  "description": "A stream that is just [DONE]: bracketed and finished with reason other.",
+  "frames": [
+    {
+      "data_text": "[DONE]"
+    }
+  ]
+}

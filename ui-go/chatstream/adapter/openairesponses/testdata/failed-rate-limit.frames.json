@@ -1,0 +1,72 @@
+{
+  "name": "failed-rate-limit",
+  "description": "response.failed with rate_limit_exceeded after partial text; usage null.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "id": "msg_67c9fdcf37fc",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      }
+    },
+    {
+      "event": "response.output_text.delta",
+      "data": {
+        "type": "response.output_text.delta",
+        "sequence_number": 3,
+        "item_id": "msg_67c9fdcf37fc",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "Par",
+        "logprobs": []
+      }
+    },
+    {
+      "event": "response.failed",
+      "data": {
+        "type": "response.failed",
+        "sequence_number": 4,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "failed",
+          "error": {
+            "code": "rate_limit_exceeded",
+            "message": "Rate limit reached"
+          },
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

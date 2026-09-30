@@ -1,0 +1,7 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=3 event=slot_changed {"type":"slot_changed","content":"slot 2"}
+id=5 event=status {"content":"nanite.status","detail":"{\"text\":\"compacting\"}","event_id":5,"type":"status"}
+id=6 event=status {"content":"nanite.status","detail":"[{\"op\":\"replace\",\"path\":\"/text\",\"value\":\"done\"}]","event_id":6,"type":"status"}
+id=7 event=status {"content":"chatstream.state.snapshot","detail":"{\"todo\":[1,2]}","event_id":7,"type":"status"}
+id=8 event=replace_content {"content":"replaced","event_id":8,"type":"replace_content"}
+id=10 event=stream_end {"event_id":10,"message_id":"run-1","type":"stream_end","usage":{"input_tokens":0,"output_tokens":0,"stop_reason":"end_turn"}}

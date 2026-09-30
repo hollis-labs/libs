@@ -1,0 +1,104 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "anthropic",
+    "model": "claude-opus-5"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 25,
+      "output": 1,
+      "total": 26
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY:0",
+    "kind": "text"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY:0",
+    "text": "Hello"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY:0",
+    "text": "!"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY:0"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 25,
+      "output": 15,
+      "total": 40
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "raw_reason": "end_turn",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 25,
+      "output": 15,
+      "total": 40
+    }
+  }
+]

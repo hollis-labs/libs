@@ -1,0 +1,108 @@
+{
+  "name": "text-usage",
+  "description": "Plain text answer with include_usage: finish_reason arrives BEFORE the usage chunk, then [DONE]. prompt_tokens includes 600 cached tokens; completion_tokens includes 20 reasoning tokens.",
+  "frames": [
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "role": "assistant",
+              "content": ""
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": "Hello"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": ", world"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {},
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [],
+        "usage": {
+          "prompt_tokens": 1000,
+          "completion_tokens": 50,
+          "total_tokens": 1050,
+          "prompt_tokens_details": {
+            "cached_tokens": 600,
+            "audio_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 20,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 3
+          }
+        }
+      }
+    },
+    {
+      "data_text": "[DONE]"
+    }
+  ]
+}

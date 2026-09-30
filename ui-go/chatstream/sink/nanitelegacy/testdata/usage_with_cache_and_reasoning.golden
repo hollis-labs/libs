@@ -1,0 +1,4 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=5 event=delta {"content":"hmm","event_id":5,"phase":"thinking","type":"delta"}
+id=8 event=delta {"content":"done","event_id":8,"type":"delta"}
+id=11 event=stream_end {"event_id":11,"message_id":"run-1","type":"stream_end","usage":{"cache_creation_tokens":50,"cache_read_tokens":600,"input_tokens":400,"output_tokens":200,"stop_reason":"max_tokens"}}

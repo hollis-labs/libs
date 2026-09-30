@@ -1,0 +1,35 @@
+{
+ "name": "prompt-error",
+ "description": "The agent answers the prompt with a JSON-RPC error.",
+ "frames": [
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "Start"
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "error": {
+     "code": -32603,
+     "message": "Internal error",
+     "data": {
+      "detail": "model overloaded"
+     }
+    }
+   }
+  }
+ ]
+}

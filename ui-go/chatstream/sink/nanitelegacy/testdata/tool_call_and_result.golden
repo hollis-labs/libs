@@ -1,0 +1,5 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=5 event=delta {"content":"Checking. ","event_id":5,"type":"delta"}
+id=7 event=tool_call {"detail":"Oslo","event_id":7,"tool":"get_weather","tool_id":"c1","type":"tool_call"}
+id=13 event=tool_result {"event_id":13,"summary":"sunny, 21C","tool":"get_weather","tool_id":"c1","type":"tool_result"}
+id=16 event=stream_end {"event_id":16,"message_id":"run-1","type":"stream_end","usage":{"input_tokens":0,"output_tokens":0,"stop_reason":"tool_use"}}

@@ -1,0 +1,12 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"stepName":"call","timestamp":1767323045000,"type":"STEP_STARTED"}
+id=4 {"messageId":"t1","role":"assistant","timestamp":1767323045000,"type":"TEXT_MESSAGE_START"}
+id=5 {"delta":"Checking. ","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=6 {"messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_END"}
+id=7 {"timestamp":1767323045000,"toolCallId":"c1","toolCallName":"get_weather","type":"TOOL_CALL_START"}
+id=8 {"delta":"{\"city\":","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_ARGS"}
+id=9 {"delta":"\"Oslo\"}","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_ARGS"}
+id=10 {"timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_END"}
+id=13 {"content":"sunny, 21C","messageId":"res1","role":"tool","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_RESULT"}
+id=14 {"stepName":"call","timestamp":1767323045000,"type":"STEP_FINISHED"}
+id=16 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

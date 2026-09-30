@@ -1,0 +1,7 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"messageId":"t1","role":"assistant","timestamp":1767323045000,"type":"TEXT_MESSAGE_START"}
+id=4 {"delta":"line one\nline two\r\nquote \" backslash \\ \u2028 tab\t","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=5 {"delta":"data: not a frame\n\nevent: nope","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=6 {"delta":"héllo 世界 🌍 <script>&","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=7 {"messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_END"}
+id=9 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

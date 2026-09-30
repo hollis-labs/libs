@@ -1,0 +1,10 @@
+{
+  "name": "echo",
+  "description": "a two-line dialect used to test the conformance kit itself",
+  "frames": [
+    {"data": {"t": "text", "v": "Hello"}},
+    {"delay_ms": 20, "data": {"t": "text", "v": ", world"}},
+    {"delay_ms": 5, "data": {"t": "tool", "id": "c1", "args": "{\"a\":1}"}},
+    {"data": {"t": "done"}}
+  ]
+}

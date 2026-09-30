@@ -1,0 +1,82 @@
+{
+  "name": "incomplete-content-filter",
+  "description": "response.incomplete with incomplete_details.reason content_filter after partial text, with usage.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "id": "msg_67c9fdcf37fc",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      }
+    },
+    {
+      "event": "response.output_text.delta",
+      "data": {
+        "type": "response.output_text.delta",
+        "sequence_number": 3,
+        "item_id": "msg_67c9fdcf37fc",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "Once upon a",
+        "logprobs": []
+      }
+    },
+    {
+      "event": "response.incomplete",
+      "data": {
+        "type": "response.incomplete",
+        "sequence_number": 4,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "incomplete",
+          "error": null,
+          "incomplete_details": {
+            "reason": "content_filter"
+          },
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": {
+            "input_tokens": 1000,
+            "input_tokens_details": {
+              "cached_tokens": 600,
+              "cache_write_tokens": 0
+            },
+            "output_tokens": 200,
+            "output_tokens_details": {
+              "reasoning_tokens": 50
+            },
+            "total_tokens": 1200
+          }
+        }
+      }
+    }
+  ]
+}
