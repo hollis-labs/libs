@@ -109,7 +109,7 @@ var ErrInvalidPayload = errors.New("nanitelegacy: raw payload is not valid JSON"
 func compact(raw json.RawMessage) ([]byte, error) {
 	var b bytes.Buffer
 	if err := json.Compact(&b, raw); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidPayload, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPayload, err)
 	}
 	return b.Bytes(), nil
 }
