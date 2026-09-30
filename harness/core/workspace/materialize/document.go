@@ -53,7 +53,7 @@ func mergeJSONDocument(patch DocumentPatch) (DocumentMerge, error) {
 	object := map[string]json.RawMessage{}
 	if len(bytes.TrimSpace(patch.Existing)) > 0 {
 		if err := json.Unmarshal(patch.Existing, &object); err != nil {
-			return DocumentMerge{}, fmt.Errorf("%w: json: %v", ErrMalformedDocument, err)
+			return DocumentMerge{}, fmt.Errorf("%w: json: %w", ErrMalformedDocument, err)
 		}
 	}
 	for _, prev := range patch.Previous {

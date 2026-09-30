@@ -38,7 +38,7 @@ func SaveManifest(targetRoot string, manifest Manifest) error {
 		return err
 	}
 	path := ManifestPath(targetRoot)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".manifest-*.tmp")
@@ -47,11 +47,11 @@ func SaveManifest(targetRoot string, manifest Manifest) error {
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
-	if _, err := tmp.Write(data); err != nil {
+	if _, err = tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Close(); err != nil {
+	if err = tmp.Close(); err != nil {
 		return err
 	}
 	return os.Rename(tmpName, path)
@@ -97,6 +97,11 @@ func (e *DefaultEngine) planReconcile(ctx context.Context, req Request) (reconci
 	actions := []plannedAction{}
 	conflicts := []Change{}
 	for _, entry := range entries {
+		// Each entry may read the target from disk; stop between entries
+		// once the caller cancels.
+		if err := ctx.Err(); err != nil {
+			return reconcilePlan{}, err
+		}
 		if !selectionMatches(req.Selection, entry.Ownership) {
 			if prior, ok := previous[entry.Path]; ok {
 				manifestEntries = append(manifestEntries, entryFromManifest(prior))
@@ -229,7 +234,7 @@ func openExistingTargetRoot(target string) (*os.Root, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	if err := rejectSymlinkParents(filepath.Dir(targetAbs)); err != nil {
+	if err = rejectSymlinkParents(filepath.Dir(targetAbs)); err != nil {
 		return nil, "", err
 	}
 	info, err := os.Lstat(targetAbs)
@@ -330,7 +335,7 @@ func diskState(root, rel string) (ManifestEntry, bool, error) {
 	if !info.Mode().IsRegular() {
 		return ManifestEntry{}, false, fmt.Errorf("unsupported existing file mode %s", info.Mode())
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path is the caller's target root joined with a ValidateRelPath-checked rel
 	if err != nil {
 		return ManifestEntry{}, false, err
 	}

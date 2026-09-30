@@ -4,11 +4,7 @@ All notable changes to go-materialize are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Changed
-
-- Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
+## v0.1.0 — 2026-09-30
 
 ### Added
 
@@ -25,6 +21,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Raised the module's `go` directive to `1.26.6` (Go floor across the
+  portfolio); CI now uses `go-version-file: go.mod`.
 - Manifest path renamed from the agentkit-branded
   `.agentkit/materialize-manifest.json` to `.materialize/manifest.json`
   (breaking for existing agentkit consumers on upgrade — see the
@@ -33,3 +31,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.agentkit-tmp-`) renamed to `.materialize-stage-`/`.materialize-tmp-`.
 - `Manifest.SchemaVersion` renamed from `agentkit.materialize.v1` to
   `materialize.v1`.
+- `MergeDocument` wraps the underlying JSON decode error as well as
+  `ErrMalformedDocument` (`%w` for both), so `errors.As` reaches the
+  `*json.SyntaxError`; `errors.Is(err, ErrMalformedDocument)` is unchanged.
+- The manifest directory (`.materialize/`) is created `0o750` instead of
+  `0o755`.
+- Reconcile/Refresh planning checks the context between entries, so a
+  cancelled caller stops before reading the rest of the target.
+
+### Fixed
+
+- `golangci-lint` is clean against the repo's own config for the first
+  time since the extraction (shadowed `err`s renamed, test file and
+  directory modes tightened, reasoned `//nolint:gosec` where a read path
+  is the caller's by design). CI had failed at the lint step on every run.

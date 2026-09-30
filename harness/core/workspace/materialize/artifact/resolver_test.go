@@ -315,7 +315,7 @@ func TestFilesystemSymlinkPolicy(t *testing.T) {
 	})
 	t.Run("directory target", func(t *testing.T) {
 		root := t.TempDir()
-		if err := os.Mkdir(filepath.Join(root, "dir"), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(root, "dir"), 0o750); err != nil {
 			t.Fatalf("mkdir: %v", err)
 		}
 		if err := os.Symlink("dir", filepath.Join(root, "link")); err != nil {
@@ -350,14 +350,14 @@ func writeFixtureTree(t *testing.T, root string) {
 	writeFile(t, filepath.Join(root, "AGENTS.md"), []byte("hello\n"), 0o644)
 	writeFile(t, filepath.Join(root, "bin", "run.sh"), []byte("#!/bin/sh\n"), 0o755)
 	writeFile(t, filepath.Join(root, "nested", "data.bin"), []byte{0, 1, 2, 255}, 0o600)
-	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o750); err != nil {
 		t.Fatalf("mkdir empty: %v", err)
 	}
 }
 
 func writeFile(t *testing.T, p string, data []byte, mode os.FileMode) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(p, data, mode); err != nil {

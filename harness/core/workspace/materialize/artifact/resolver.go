@@ -103,32 +103,32 @@ func readFilesystemTree(ctx context.Context, src *FilesystemSource, limits Sourc
 		if walkErr != nil {
 			return walkErr
 		}
-		if err := ctx.Err(); err != nil {
-			return err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 		if p == root {
 			return nil
 		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return err
+		rel, relErr := filepath.Rel(root, p)
+		if relErr != nil {
+			return relErr
 		}
 		rel = filepath.ToSlash(rel)
-		if err := ValidateRelPath(rel); err != nil {
-			return err
+		if pathErr := ValidateRelPath(rel); pathErr != nil {
+			return pathErr
 		}
 		depth := strings.Count(rel, "/") + 1
 		if limits.MaxDepth > 0 && depth > limits.MaxDepth {
 			return fmt.Errorf("%w: depth %d exceeds %d", ErrLimitExceeded, depth, limits.MaxDepth)
 		}
-		info, err := d.Info()
-		if err != nil {
-			return err
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return infoErr
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			entry, err := resolveSymlink(p, rel, policy, allowed)
-			if err != nil {
-				return err
+			entry, linkErr := resolveSymlink(p, rel, policy, allowed)
+			if linkErr != nil {
+				return linkErr
 			}
 			entries = append(entries, entry)
 			return nil
@@ -140,9 +140,9 @@ func readFilesystemTree(ctx context.Context, src *FilesystemSource, limits Sourc
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("artifact: unsupported source file mode %s: %s", info.Mode(), rel)
 		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return err
+		data, readErr := os.ReadFile(p) //nolint:gosec // G304: p is walked from the caller-supplied FilesystemSource.Root; reading it is the point
+		if readErr != nil {
+			return readErr
 		}
 		entries = append(entries, Entry{
 			Path:   rel,
