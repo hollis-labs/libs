@@ -10,9 +10,8 @@ const (
 	// SlotUniversal is the position-0 universal rules slot emitted by the
 	// Context Broker for every dispatch (chat, sync subagent, async
 	// subagent, background job). SP-20260512-0008 W1A (CW-20260512-0104)
-	// reserved position 0; CW-20260512-0114 wired content via
-	// chat.AssembleSlotSources, which sources the block from
-	// chat.UniversalRulesBlock(). Non-compactable identity-class slot —
+	// reserved position 0; CW-20260512-0114 wired its content.
+	// Non-compactable identity-class slot —
 	// keeps the Anthropic cacheable prefix stable across agents.
 	SlotUniversal = "universal"
 	SlotSystem    = "system"
@@ -22,16 +21,15 @@ const (
 	// Sits between SlotAgent (identity) and SlotRules (policy) — modes
 	// modulate the agent's identity but don't override policy. Non-compactable
 	// so the active mode survives compaction the same way SlotAgent does.
-	// Distinct from the legacy AgentMode addendum that still lands inside
-	// SlotAgent — that handles the agent-scoped *store.AgentMode and stays
-	// for back-compat. SlotMode is for the session-scoped *store.Mode only.
+	// Distinct from the legacy agent-scoped mode addendum that still lands
+	// inside SlotAgent, which stays for back-compat. SlotMode is for the
+	// session-scoped mode only.
 	SlotMode  = "mode"
 	SlotRules = "rules"
 	// SlotPermissions carries the per-session path-access summary
-	// (CW-20260512-0118, SP-20260512-0010 W2). Sourced via
-	// permission.RenderPermissionSummary from the agent's resolved
-	// permission.RuleSet, the binary-scoped AllowedPaths list, and the
-	// session-scoped PathGrants bucket (own + lineage). The summary makes
+	// (CW-20260512-0118, SP-20260512-0010 W2). The consumer renders it from
+	// the agent's resolved permission rules, its allowed paths, and the
+	// session-scoped path grants (own + lineage). The summary makes
 	// the path-access substrate VISIBLE to the LLM so subagents read
 	// constraints and refuse instead of fabricating against inaccessible
 	// paths (the c160 turn-16 regression target). Sibling-split from
@@ -53,10 +51,8 @@ const (
 	// the user described as "project-local agent rules" in the
 	// harness-restoration design session.
 	//
-	// Source: internal/workspace.Cache.Refresh. Walk direction is
-	// innermost-first → outermost-last, matching opencode's findUp
-	// convention. Headers match opencode's instruction.ts:160 format:
-	// `Instructions from: <abs-path>` per block.
+	// Walk direction is innermost-first → outermost-last, with an
+	// `Instructions from: <abs-path>` header per block.
 	//
 	// Sits after SlotPermissions in the cacheable prefix: the workspace
 	// slot is per-session-per-working_dir-stable, which in normal
@@ -92,8 +88,8 @@ const (
 	SlotContext     = "context"      // dynamic enrichment (plugins, context broker)
 	SlotUserContext = "user_context" // J10 (CW-20260426-0008): user-authored session context prompt.
 	// Not compactable — survives compaction like SlotAgent/SlotRules.
-	// Populated from sessions.context_prompt. Composes with HandoffStash
-	// (CW-20260420-0024) — both are pinned slots that survive compaction.
+	// Populated from the session's context prompt. Composes with the
+	// handoff stash (CW-20260420-0024) — both are pinned slots that survive compaction.
 	// J11 (CW-20260426-0009) pin tool will also use this same pattern.
 	// Glass-3 (CW-20260502-0011): self-authored handoff, auto-injected post-compaction.
 	// Sits with user-pinned content but is auto-managed by the harness, not by the user.
@@ -227,8 +223,8 @@ func DefaultBudgets() map[string]int {
 		SlotMode:         500, // B1: session-mode addendum — small by design.
 		SlotRules:        500,
 		SlotPermissions:  800,  // CW-20260512-0118 — bounded by deny enumeration + provenance tags; per-session stable.
-		SlotWorkspace:    4000, // CW-20260512-0116 — generous; concatenated AGENTS.md/CLAUDE.md/NANITE.md across the walk path. Oversized payloads stash via the assembly decider's per-slot budget check.
-		SlotSkills:       2000, // CW-20260919-0012 — name + one-line description per skill; SkillEssentialCap (25) lines fit with headroom.
+		SlotWorkspace:    4000, // CW-20260512-0116 — generous; concatenated AGENTS.md/CLAUDE.md/NANITE.md across the walk path. Oversized payloads are stashed by the consumer's assembly step.
+		SlotSkills:       2000, // CW-20260919-0012 — name + one-line description per skill; a 25-line listing fits with headroom.
 		SlotTools:        0,    // proportional to selected tool count
 		SlotSession:      1000,
 		SlotContext:      0,                    // dynamic

@@ -2,9 +2,9 @@ package contextwindow
 
 import "context"
 
-// CompactionEvent is the context-package mirror of store.CompactionEvent, used to
-// decouple the compaction pipeline from the store. The service layer adapts between
-// them via CompactionEventWriter.
+// CompactionEvent is the metadata record the compaction pipeline emits after a
+// run. It decouples the pipeline from any persistence layer: the consumer
+// adapts it to its own storage via CompactionEventWriter.
 type CompactionEvent struct {
 	ID                   string
 	SessionID            string

@@ -15,7 +15,7 @@ import (
 )
 
 // CompactionMode determines how the summary prompt is shaped.
-// The active mode comes from the broker's Layer 3 classifier.
+// The active mode is chosen by the caller (e.g. from a classifier).
 const (
 	CompactionModeGeneral  = "general"
 	CompactionModeCode     = "code"

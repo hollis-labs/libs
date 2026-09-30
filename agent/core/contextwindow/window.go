@@ -153,7 +153,7 @@ func (cw *ContextWindow) Assemble() []SlotBlock {
 		}
 
 		// Agent instructions must survive final assembly intact, just as
-		// they survive the broker's stash decision. Enforce the per-slot
+		// they survive the consumer's own stash decision. Enforce the per-slot
 		// budget ceiling for other slots. LazyLoad is a
 		// pointer-sized payload by definition; ceiling is checked against
 		// the underlying full content (which the consumer would have to
