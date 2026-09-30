@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
-## v0.2.0 — Unreleased
+## v0.2.0 — 2026-09-30
 
 ### Added
 
