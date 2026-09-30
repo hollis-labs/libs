@@ -43,13 +43,18 @@ type Options struct {
 // Presentation is out of scope: an enqueued item starts in state presented
 // (revision 1) and is respondable at once.
 //
-// Expiry (D4): when a request carries expires_at, every operation that touches
-// the item at or after that instant first materializes the expired outcome
-// with a compare-and-set, so a respond or withdraw arriving late is refused
-// atomically even if ExpireDue has never run. That includes Get and Await:
-// materializing expiry is the store owner's policy transition, not a caller
-// mutation of the lifecycle. Service therefore also provides ExpireDue for a
-// sweeper, but nothing depends on one running.
+// Expiry (D4): when a request carries expires_at, a write (Respond or
+// Withdraw) arriving at or after that instant first materializes the expired
+// outcome with a compare-and-set, so a late reply is refused atomically even
+// if ExpireDue has never run. ExpireDue is the sweeper entry point; nothing
+// depends on one running.
+//
+// Get and Await never mutate. Past expires_at they report the logically
+// correct expired view, computed on the fly from the stored record and the
+// clock, and write nothing: no Store write, no revision bump. The computed view
+// is exactly what a later write persists (revision+1, terminated_at =
+// expires_at), so it does not change when it is later materialized. Only
+// Respond, Withdraw and ExpireDue materialize expiry, exactly once.
 type Service struct {
 	store Store
 	opts  Options
@@ -116,7 +121,7 @@ func (s *Service) Enqueue(ctx context.Context, req EnqueueRequest) (Handle, erro
 	if !created && got.Digest != digest {
 		return Handle{}, &IdempotencyConflictError{IdempotencyKey: req.IdempotencyKey, ExistingItemID: got.ItemID}
 	}
-	cur, err := s.current(ctx, got.ItemID, now)
+	cur, err := s.peek(ctx, got.ItemID, now)
 	if err != nil {
 		return Handle{}, err
 	}
@@ -155,12 +160,8 @@ func lapsed(rec Record, now time.Time) bool {
 
 // expire tries to move a lapsed record to expired. won reports that this call
 // performed the transition.
-func (s *Service) expire(ctx context.Context, rec Record, now time.Time) (Record, bool, error) {
-	next := rec
-	next.State = StateExpired
-	next.Revision = rec.Revision + 1
-	next.UpdatedAt = now
-	next.Outcome = Expired{ItemID: rec.ItemID, InteractionRevision: next.Revision, PolicyRef: ExpiryPolicyRef, TerminatedAt: now}
+func (s *Service) expire(ctx context.Context, rec Record) (Record, bool, error) {
+	next := expiredView(rec)
 	if err := s.store.Swap(ctx, rec.ItemID, rec.Revision, next); err != nil {
 		return rec, false, err
 	}
@@ -168,7 +169,30 @@ func (s *Service) expire(ctx context.Context, rec Record, now time.Time) (Record
 	return next, true, nil
 }
 
-// current loads a record, first materializing expiry if it has lapsed at now.
+// expiredView returns what expire would persist, without persisting it.
+func expiredView(rec Record) Record {
+	next := rec
+	next.State = StateExpired
+	next.Revision = rec.Revision + 1
+	next.UpdatedAt = *rec.ExpiresAt
+	next.Outcome = Expired{ItemID: rec.ItemID, InteractionRevision: next.Revision, PolicyRef: ExpiryPolicyRef, TerminatedAt: *rec.ExpiresAt}
+	return next
+}
+
+// peek loads a record for a read. If it has lapsed at now it returns the
+// computed expired view; it never writes.
+func (s *Service) peek(ctx context.Context, itemID string, now time.Time) (Record, error) {
+	rec, err := s.store.Get(ctx, itemID)
+	if err != nil {
+		return Record{}, err
+	}
+	if lapsed(rec, now) {
+		return expiredView(rec), nil
+	}
+	return rec, nil
+}
+
+// current loads a record for a write, first materializing expiry if it has lapsed at now.
 func (s *Service) current(ctx context.Context, itemID string, now time.Time) (Record, error) {
 	for range maxAttempts {
 		rec, err := s.store.Get(ctx, itemID)
@@ -178,7 +202,7 @@ func (s *Service) current(ctx context.Context, itemID string, now time.Time) (Re
 		if !lapsed(rec, now) {
 			return rec, nil
 		}
-		next, _, err := s.expire(ctx, rec, now)
+		next, _, err := s.expire(ctx, rec)
 		if err == nil {
 			return next, nil
 		}
@@ -190,8 +214,12 @@ func (s *Service) current(ctx context.Context, itemID string, now time.Time) (Re
 	return Record{}, fmt.Errorf("hitl: item %q kept changing while materializing expiry", itemID)
 }
 
-func (s *Service) scoped(ctx context.Context, itemID string, caller CallerAssertion, now time.Time) (Record, error) {
-	rec, err := s.current(ctx, itemID, now)
+func (s *Service) scoped(ctx context.Context, itemID string, caller CallerAssertion, now time.Time, write bool) (Record, error) {
+	load := s.peek
+	if write {
+		load = s.current
+	}
+	rec, err := load(ctx, itemID, now)
 	if err != nil {
 		return Record{}, err
 	}
@@ -214,7 +242,7 @@ func (s *Service) Get(ctx context.Context, cmd GetCommand) (RetrievalResult, err
 		return RetrievalResult{}, err
 	}
 	now := s.now()
-	rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now)
+	rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now, false)
 	if err != nil {
 		return RetrievalResult{}, err
 	}
@@ -244,7 +272,7 @@ func (s *Service) Await(ctx context.Context, cmd AwaitCommand) (RetrievalResult,
 	}
 	for {
 		now := s.now()
-		rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now)
+		rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now, false)
 		if err != nil {
 			return RetrievalResult{}, err
 		}
@@ -258,7 +286,7 @@ func (s *Service) Await(ctx context.Context, cmd AwaitCommand) (RetrievalResult,
 		case <-tick.C:
 		case <-timeout.C:
 			now = s.now()
-			rec, err = s.scoped(ctx, cmd.ItemID, cmd.Caller, now)
+			rec, err = s.scoped(ctx, cmd.ItemID, cmd.Caller, now, false)
 			if err != nil {
 				return RetrievalResult{}, err
 			}
@@ -319,7 +347,7 @@ func (s *Service) Withdraw(ctx context.Context, cmd WithdrawCommand) (Outcome, e
 	}
 	now := s.now()
 	for range maxAttempts {
-		rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now)
+		rec, err := s.scoped(ctx, cmd.ItemID, cmd.Caller, now, true)
 		if err != nil {
 			return nil, err
 		}
@@ -444,7 +472,7 @@ func (s *Service) ExpireDue(ctx context.Context) (int, error) {
 		}
 		progressed := false
 		for _, rec := range batch {
-			_, won, err := s.expire(ctx, rec, now)
+			_, won, err := s.expire(ctx, rec)
 			switch {
 			case err == nil && won:
 				total++

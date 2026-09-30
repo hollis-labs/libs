@@ -28,7 +28,7 @@ A terminal state MUST NOT be left and its outcome MUST NOT change or be replaced
 |---|---|---|---|
 | enqueue | `HITLEnqueueRequestCoreV1` | `HITLItemHandleCoreV1` | creates |
 | get | `HITLGetCommandV1` | `HITLGetRetrievalResultCoreV1` | never |
-| await | `HITLAwaitCommandV1` | `HITLRetrievalResultCoreV1` | never (see 6) |
+| await | `HITLAwaitCommandV1` | `HITLRetrievalResultCoreV1` | never |
 | withdraw | `HITLWithdrawCommandV1` | `HITLTerminalOutcomeCoreV1` | to `canceled` |
 
 Participant resolution is **not** a wire verb (it is presentation-bound). Only its result, a `resolved` outcome, and its `operation: "resolve"` stale error are specified. There is no `subscribe` and no `resume`; those are consumer-side.
@@ -73,7 +73,7 @@ Errors on the wire are `{"contract_version","code",...}`: `stale_revision`, `ide
 
 - An implementation MUST document whether it enforces `expires_at`. Enforcement is the optional capability `expiry-enforcement`.
 - **If it enforces**, a respond or withdraw that arrives at or after `expires_at` MUST be refused atomically, even if no sweeper has run: the item becomes `expired` and the caller receives the conflict carrying the expired outcome. A late reply MUST NOT be accepted until a sweep happens to notice. (Torque's behavior of accepting a late reply until its scheduler sweeps is the negative example.) The boundary instant belongs to expiry: `now >= expires_at` is late.
-- The reference `Service` materializes expiry on every operation that touches the item, including get and await, and additionally offers `ExpireDue` for a sweeper. Whether other implementations materialize on read is their choice; refusing late writes is the requirement.
+- **Get and Await never mutate, expiry included.** Past `expires_at` a read MUST report the logically correct expired state and outcome, computed at read time, so a caller never sees a stale pending item; it MUST NOT persist that (no store write, no revision bump, no event). Only writes materialize expiry: a late respond or withdraw, or a sweep (`ExpireDue` in the reference `Service`). The computed view is what the write later persists (revision+1, `terminated_at` = `expires_at`), so materializing it later changes nothing the reader saw. An await whose deadline passes while waiting returns the computed expired result.
 - Default-on-timeout (deny, cancel, fail, block) is caller policy and not part of this contract. Who runs the sweeper is not part of this contract. Whether an unenforced `expires_at` must be a validation error is not decided; an implementation that cannot enforce a deadline SHOULD reject it rather than pretend to honor it.
 - A transport deadline, an await timeout, a dropped connection or a process shutdown does not expire, withdraw or cancel an item.
 

@@ -598,3 +598,182 @@ func TestConcurrentLateRespondersWithNoSweeperAllLoseToTheSingleExpiry(t *testin
 		}
 	}
 }
+
+// ---- Reads never mutate (Get/Await report computed expiry; writes materialize it once).
+
+// spyStore counts writes and can be armed to fail any write.
+type spyStore struct {
+	hitl.Store
+	mu       sync.Mutex
+	writes   int
+	failOnWr bool
+}
+
+func (s *spyStore) arm()       { s.mu.Lock(); s.failOnWr = true; s.mu.Unlock() }
+func (s *spyStore) disarm()    { s.mu.Lock(); s.failOnWr = false; s.mu.Unlock() }
+func (s *spyStore) count() int { s.mu.Lock(); defer s.mu.Unlock(); return s.writes }
+
+func (s *spyStore) write() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writes++
+	if s.failOnWr {
+		return errors.New("spyStore: a write happened where none is allowed")
+	}
+	return nil
+}
+
+func (s *spyStore) Create(ctx context.Context, r hitl.Record) (hitl.Record, bool, error) {
+	if err := s.write(); err != nil {
+		return hitl.Record{}, false, err
+	}
+	return s.Store.Create(ctx, r)
+}
+
+func (s *spyStore) Swap(ctx context.Context, id string, expected int64, next hitl.Record) error {
+	if err := s.write(); err != nil {
+		return err
+	}
+	return s.Store.Swap(ctx, id, expected, next)
+}
+
+func spied(t testing.TB) (*hitl.Service, *fakeClock, *spyStore) {
+	t.Helper()
+	clock := newClock(t0)
+	spy := &spyStore{Store: memstore.New()}
+	return hitl.NewService(spy, hitl.Options{Clock: clock.Now, PollInterval: 2 * time.Millisecond}), clock, spy
+}
+
+func TestGetAndAwaitPastExpiresAtReportExpiredWithoutWriting(t *testing.T) {
+	ctx := context.Background()
+	s, clock, spy := spied(t)
+	exp := t0.Add(time.Minute)
+	h := mustEnqueue(t, s, withExpiry(request("k", nil), exp))
+	before, _ := spy.Get(ctx, h.ItemID)
+	writesAfterEnqueue := spy.count()
+	spy.arm() // any write from here on fails the read that caused it
+
+	// Before the deadline: pending, as stored.
+	if got := get(t, s, h.ItemID).Item; got.State.IsTerminal() {
+		t.Fatalf("expired early: %+v", got)
+	}
+
+	clock.Set(exp.Add(time.Hour))
+	got := get(t, s, h.ItemID)
+	if got.Item.State != hitl.StateExpired || got.Item.Revision != before.Revision+1 || got.Validate() != nil {
+		t.Fatalf("Get past deadline = %+v", got.Item)
+	}
+	ex, ok := got.Item.TerminalOutcome.(hitl.Expired)
+	if !ok || ex.PolicyRef != hitl.ExpiryPolicyRef || !ex.TerminatedAt.Equal(exp) || ex.InteractionRevision != got.Item.Revision {
+		t.Fatalf("computed outcome = %#v", got.Item.TerminalOutcome)
+	}
+	for _, wait := range []int{0, 30} {
+		aw, err := s.Await(ctx, hitl.AwaitCommand{ContractVersion: hitl.ContractVersion, ItemID: h.ItemID, Caller: caller, WaitMs: &wait})
+		if err != nil || aw.WaitStatus != hitl.WaitTerminal || aw.Item.State != hitl.StateExpired || aw.Validate() != nil {
+			t.Fatalf("Await(wait=%d) past deadline = %+v, %v", wait, aw, err)
+		}
+	}
+
+	after, err := spy.Get(ctx, h.ItemID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.State != before.State || after.Revision != before.Revision || after.Outcome != nil || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Fatalf("a read changed the stored record:\n before %+v\n after  %+v", before, after)
+	}
+	if spy.count() != writesAfterEnqueue {
+		t.Fatalf("reads performed %d store writes", spy.count()-writesAfterEnqueue)
+	}
+
+	// A subsequent write materializes it exactly once, and the persisted
+	// record equals the view the reads reported.
+	spy.disarm()
+	_, err = s.Respond(ctx, respond(h.ItemID, "approved"))
+	if !errors.Is(err, hitl.ErrTerminalConflict) {
+		t.Fatalf("late respond = %v", err)
+	}
+	rec, _ := spy.Get(ctx, h.ItemID)
+	if rec.State != hitl.StateExpired || rec.Revision != got.Item.Revision || fmt.Sprint(rec.Outcome) != fmt.Sprint(got.Item.TerminalOutcome) {
+		t.Fatalf("materialized %+v differs from the computed view %+v", rec, got.Item)
+	}
+	if spy.count() != writesAfterEnqueue+1 {
+		t.Fatalf("expiry was written %d times, want once", spy.count()-writesAfterEnqueue)
+	}
+	if n, err := s.ExpireDue(ctx); err != nil || n != 0 {
+		t.Fatalf("ExpireDue after materialization = %d, %v; want 0", n, err)
+	}
+	if spy.count() != writesAfterEnqueue+1 {
+		t.Fatal("ExpireDue rewrote an expired record")
+	}
+}
+
+func TestExpireDueMaterializesAReadOnlyExpiredItemExactlyOnce(t *testing.T) {
+	ctx := context.Background()
+	s, clock, spy := spied(t)
+	exp := t0.Add(time.Minute)
+	h := mustEnqueue(t, s, withExpiry(request("k", nil), exp))
+	clock.Set(exp)
+	viewed := get(t, s, h.ItemID).Item
+	base := spy.count()
+	if n, err := s.ExpireDue(ctx); err != nil || n != 1 {
+		t.Fatalf("ExpireDue = %d, %v; want 1", n, err)
+	}
+	if n, _ := s.ExpireDue(ctx); n != 0 {
+		t.Fatalf("second ExpireDue = %d", n)
+	}
+	if spy.count() != base+1 {
+		t.Fatalf("writes = %d, want exactly one", spy.count()-base)
+	}
+	rec, _ := spy.Get(ctx, h.ItemID)
+	if rec.Revision != viewed.Revision || fmt.Sprint(rec.Outcome) != fmt.Sprint(viewed.TerminalOutcome) {
+		t.Fatalf("stored %+v != previously computed view %+v", rec, viewed)
+	}
+}
+
+func TestAwaitWhoseDeadlinePassesWhileWaitingReturnsComputedExpiryWithoutWriting(t *testing.T) {
+	ctx := context.Background()
+	s, clock, spy := spied(t)
+	exp := t0.Add(time.Minute)
+	h := mustEnqueue(t, s, withExpiry(request("k", nil), exp))
+	base := spy.count()
+	spy.arm()
+	wait := 10000
+	done := make(chan hitl.RetrievalResult, 1)
+	go func() {
+		res, err := s.Await(ctx, hitl.AwaitCommand{ContractVersion: hitl.ContractVersion, ItemID: h.ItemID, Caller: caller, WaitMs: &wait})
+		if err != nil {
+			t.Error(err)
+		}
+		done <- res
+	}()
+	time.Sleep(20 * time.Millisecond)
+	clock.Set(exp)
+	select {
+	case res := <-done:
+		if res.WaitStatus != hitl.WaitTerminal || res.Item.State != hitl.StateExpired {
+			t.Fatalf("result = %+v", res)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Await did not return")
+	}
+	rec, _ := spy.Get(ctx, h.ItemID)
+	if rec.State.IsTerminal() || rec.Revision != 1 || spy.count() != base {
+		t.Fatalf("Await mutated the store: %+v, writes %d", rec, spy.count()-base)
+	}
+}
+
+func TestEnqueueReplayOfALapsedItemDoesNotWrite(t *testing.T) {
+	s, clock, spy := spied(t)
+	exp := t0.Add(time.Minute)
+	req := withExpiry(request("k", nil), exp)
+	mustEnqueue(t, s, req)
+	base := spy.count()
+	clock.Set(exp)
+	h := mustEnqueue(t, s, req)
+	if h.State != hitl.StateExpired {
+		t.Fatalf("replay handle = %+v, want the computed expired state", h)
+	}
+	if spy.count() != base+1 { // the replay's Create attempt is the only store call that may write
+		t.Fatalf("replay wrote %d times", spy.count()-base)
+	}
+}

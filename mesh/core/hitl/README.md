@@ -88,7 +88,7 @@ The lifecycle: `Enqueue` returns a handle; `Get`, `Await` and `Withdraw` take it
 Two details worth knowing before you build on it:
 
 - **Responder identity.** A `Participant` carries an open `responder{kind, ref}`, an open-string `assurance`, and an optional `proof{scheme, key_ref, binds}` for credentials such as a WebAuthn assertion. Core carries a proof; it does not verify one and does not rank it against `assurance`. Requiring a proof before honoring an outcome is caller policy.
-- **Expiry.** `expires_at` is enforced by whoever owns the record. A respond or withdraw arriving at or after `expires_at` is refused atomically even if no sweeper has ever run.
+- **Expiry.** `expires_at` is enforced by whoever owns the record. A respond or withdraw arriving at or after `expires_at` is refused atomically even if no sweeper has ever run. `Get` and `Await` never mutate: past `expires_at` they report the expired view computed on the fly and write nothing; only `Respond`, `Withdraw` and `ExpireDue` materialize expiry.
 
 ## Compatibility
 
@@ -101,7 +101,7 @@ The wire `contract_version` is `"1.0"` and is independent of the module version 
 - `Service` and `memstore` are in-process. `Await` wakes at once on changes made through the same `Service` and otherwise polls the store (250 ms by default); there is no cross-process notification.
 - `Service` does not verify a `Proof`, does not check that an `assurance` string is meaningful, and applies no profile vocabulary unless you set `Options.ValidateResponse`.
 - `memstore` keeps everything in memory; nothing is persisted. There is no SQL store yet.
-- Expiry materializes on any operation that touches a lapsed item, including `Get` and `Await`; this is a deliberate reading of "the store owner enforces expiry" and differs from Tangent's "Get and Await never mutate".
+- Who runs the expiry sweeper, and whether an unenforceable `expires_at` must be a validation error, are open questions the contract deliberately does not decide.
 - Fixtures and scenarios are exercised against the reference `Service` only. No other implementation has been run through them.
 
 ## Out of scope
