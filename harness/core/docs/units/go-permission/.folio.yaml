@@ -52,9 +52,6 @@ files:
   CHANGELOG.md:
     preset: go-baseline
     digest_at_gen: sha256:6077d0fa4199f7445fee250903c2e1b1af47aa991bc3aff5e8eae0ed0c79fe35
-  CLAUDE.md:
-    preset: go-baseline
-    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
   LICENSE:
     preset: go-baseline
     digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
