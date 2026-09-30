@@ -89,6 +89,7 @@ func Resolve(appName string, opts ...Option) (Layout, error) {
 		mainDB:      mainDB,
 		workspace:   workspace,
 		projectMode: cfg.projectMode,
+		warn:        cfg.warn,
 	}
 	if !cfg.skipMaterialize {
 		if err := layout.materialize(); err != nil {

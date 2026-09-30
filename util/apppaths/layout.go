@@ -20,6 +20,8 @@ type Layout struct {
 	mainDB      string
 	workspace   Workspace
 	projectMode bool
+	// warn is a pointer, not a func, so Layout stays comparable with ==.
+	warn *warner
 }
 
 // App returns the application name the Layout was resolved for.
@@ -85,7 +87,7 @@ func (l Layout) materialize() error {
 		l.workspace.Dir, filepath.Dir(l.workspace.DBPath),
 	}
 	for _, dir := range owned {
-		if err := ensureOwnedDir(dir); err != nil {
+		if err := ensureOwnedDir(dir, l.warn); err != nil {
 			return fmt.Errorf("apppaths: materialize %q: %w", dir, err)
 		}
 	}

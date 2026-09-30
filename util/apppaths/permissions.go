@@ -27,11 +27,11 @@ const modesSupported = runtime.GOOS != "windows"
 // onto dir itself. The chmod is load-bearing: MkdirAll's mode is masked by the
 // umask on creation and ignored entirely when dir already exists, so without
 // it a directory left at 0755 by an older release would stay that way forever.
-func ensureOwnedDir(dir string) error {
+func ensureOwnedDir(dir string, w *warner) error {
 	if err := os.MkdirAll(dir, DirMode); err != nil {
 		return err
 	}
-	return chmodOwned(dir, DirMode)
+	return chmodOwned(dir, DirMode, w)
 }
 
 // chmodOwned forces mode onto path, best effort, and never follows a symlink.
@@ -43,7 +43,7 @@ func ensureOwnedDir(dir string) error {
 //     over a directory we cannot tighten would be a worse outcome than
 //     leaving it as we found it.
 //   - On Windows it does nothing.
-func chmodOwned(path string, mode os.FileMode) error {
+func chmodOwned(path string, mode os.FileMode, w *warner) error {
 	if !modesSupported {
 		return nil
 	}
@@ -57,8 +57,30 @@ func chmodOwned(path string, mode os.FileMode) error {
 	if info.Mode().Perm() == mode {
 		return nil
 	}
-	if err := os.Chmod(path, mode); err != nil && !errors.Is(err, fs.ErrPermission) {
+	err = os.Chmod(path, mode)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, fs.ErrPermission):
+		w.warnf("apppaths: cannot tighten %s to %#o: %v", path, mode, err)
+		return nil
+	default:
 		return err
 	}
-	return nil
+}
+
+// warner carries the optional WithWarn callback. A nil *warner is valid and
+// silent, so callers never need a nil check.
+type warner struct {
+	logf func(format string, args ...any)
+}
+
+// warnf reports through the callback if one is set. A panicking callback is
+// recovered: diagnostics must never break path resolution.
+func (w *warner) warnf(format string, args ...any) {
+	if w == nil || w.logf == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	w.logf(format, args...)
 }

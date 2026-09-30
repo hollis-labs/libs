@@ -30,7 +30,9 @@
 // touched: a database directory chosen with WithDBOverride or <APP>_DB_PATH,
 // the shared XDG base directories, and symlinks (never followed). A path the
 // process is not permitted to chmod is left as found rather than failing
-// Resolve. On Windows the modes are not enforced.
+// Resolve; pass WithWarn(log.Printf) to be told which path and why. Only
+// permission-denied is reported: skipped symlinks and already-correct modes are
+// silent. On Windows the modes are not enforced.
 //
 // apppaths resolves paths only — it never opens the database and never
 // parses application config files.

@@ -43,7 +43,7 @@ umask masks it on a new one. Owned means the four base roots, the workspace
 directory and `filepath.Dir(workspace.DBPath)`. `filepath.Dir(mainDB)` is not
 owned when `WithDBOverride`/`<APP>_DB_PATH` set it — never chmod it — and
 `adopt.go`'s shared XDG base parents stay 0755. Symlinks are never followed and
-`ErrPermission` degrades silently. `paths/permissions.go` owns this;
+`ErrPermission` degrades (reported only through the optional `WithWarn`). `paths/permissions.go` owns this;
 `TestMaterializeDoesNotTightenDBOverrideDirectory` is the guard that matters.
 
 Adoption never clobbers. Legacy present with the target absent moves; legacy

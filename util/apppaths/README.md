@@ -89,7 +89,11 @@ Deliberately left alone:
 - **Symlinks.** A root that is a symlink is not followed for chmod, so nothing
   outside the app tree is modified.
 - **Paths you may not chmod** (owned by someone else, read-only mount). They are
-  left as found and `Resolve` still succeeds.
+  left as found and `Resolve` still succeeds. Silent by default; pass
+  `paths.WithWarn(log.Printf)` (any `func(format string, args ...any)`) to get
+  `apppaths: cannot tighten <path> to 0700: <reason>`. Only permission-denied
+  warns: skipped symlinks and already-correct modes do not, and a nil or
+  panicking callback cannot break `Resolve`.
 - **Windows**, where POSIX modes do not apply; the calls are no-ops there.
 
 Run `go run ./examples/ownerperms` to see a `0755` root converge to `0700`.
