@@ -2,13 +2,13 @@
 
 Small transport-agnostic typed error carrier: status, machine code, safe message, with errors.Is/As support.
 
-It is not: TODO(author) — the mistake this repo attracts.
+It is not an HTTP framework, a redaction layer or a wire-format standard: it is the shared carrier underneath the handler layers apps already have. A change that makes it choose a JSON shape for existing apps, render an internal error into a response, or guess a status from text is the wrong change.
 
 ## Start Here
 
-- `svcerr` package — the importable API; its `doc.go` is the package documentation.
-- `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- `svcerr.go` — `Error`, the codes and their default statuses, the sentinels, `StatusFor` and `CodeFor`. The whole contract.
+- `json.go` — the OPTIONAL `WriteJSON` and `Envelope`. Nothing in `svcerr.go` may depend on it.
+- `doc.go` — the package documentation and the two rules the package holds to.
 
 ## Commands
 
@@ -22,5 +22,11 @@ CI (`.github/workflows/check.yml`) is the full gate.
 
 ## Boundaries
 
-- No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-- TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+- No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either. Standard library only.
+- `Message` is never derived from `Err`, and `Error()` and `WriteJSON` never render `Err`. Guarded by `TestTheInternalCauseIsReachableButNeverRendered` and `TestWriteJSONNeverLeaksAPlainErrorsText`.
+- A status is never guessed from error text: a non-`*Error` gets the caller's fallback. Guarded by `TestStatusForAndCodeForDoNotGuessFromText`.
+- A status handed to `WriteHeader` is always within 100..999 (it panics otherwise), and the sentinels carry their code's status so returning one directly is safe. Guarded by `TestStatusIsNeverZeroOrInvalid` and `TestWriteJSONNeverWritesAnInvalidStatus`.
+- `Is` matches on `Code` only, so `errors.Is(err, ErrNotFound)` works through wrapping. Guarded by `TestIsMatchesThroughWrappingLayers`.
+- The sentinels are shared pointers: never modify them.
+- `Code` stays an open string type; do not turn it into a closed enum.
+- `WriteJSON`'s nesting deliberately matches Tether's existing `{"error":{"code","message"}}`; no existing app is asked to change its wire format.
