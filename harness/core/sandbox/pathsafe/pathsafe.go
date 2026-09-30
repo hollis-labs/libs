@@ -1,13 +1,3 @@
-// Package pathsafe provides bounded path resolution that prevents traversal
-// outside a caller-specified root directory.
-//
-// The canonical entry point is ResolveUnder. It cleans the user-supplied
-// path, joins it under the root, resolves symlinks where possible, and
-// refuses the result if it escapes the root — including via symlinks or
-// ".." components.
-//
-// Callers that need to classify escape errors can use errors.As to unwrap an
-// *EscapeError.
 package pathsafe
 
 import (
@@ -20,7 +10,9 @@ import (
 
 var _ error = (*EscapeError)(nil)
 
-// EscapeError is returned when a resolved path falls outside the root.
+// EscapeError is returned by ResolveUnder when a resolved path falls outside
+// the root. Root, Attempt and Resolved carry the inputs and the resolved
+// location for diagnostics; Cause, when non-nil, is the underlying error.
 type EscapeError struct {
 	Root     string
 	Attempt  string
@@ -28,6 +20,8 @@ type EscapeError struct {
 	Cause    error
 }
 
+// Error reports the attempted path and the root it escapes, including the
+// resolved path and the underlying cause when they are known.
 func (e *EscapeError) Error() string {
 	base := fmt.Sprintf("pathsafe: %q escapes root %q", e.Attempt, e.Root)
 	if e.Resolved != "" && e.Resolved != e.Attempt {
@@ -39,6 +33,8 @@ func (e *EscapeError) Error() string {
 	return base
 }
 
+// Unwrap returns the underlying cause, if any, so errors.Is and errors.As
+// see through an *EscapeError.
 func (e *EscapeError) Unwrap() error { return e.Cause }
 
 // ResolveUnder cleans userPath, joins it under root, and returns an absolute

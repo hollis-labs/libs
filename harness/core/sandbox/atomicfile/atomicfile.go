@@ -1,11 +1,3 @@
-// Package atomicfile provides crash-safe filesystem primitives.
-//
-// WriteFile and NewWriter write to a sibling temp file, fsync, then
-// os.Rename over the destination. The rename is atomic on POSIX so readers
-// never observe a partial or truncated file.
-//
-// Both primitives preserve the requested mode on the final file and remove
-// the temp file on any error path, including partial writes.
 package atomicfile
 
 import (
@@ -93,12 +85,12 @@ func WriteFile(path string, data []byte, mode os.FileMode) (retErr error) {
 	return nil
 }
 
-// NewWriter returns an io.WriteCloser whose Close renames the temp file
+// NewWriter returns a *Writer whose Close renames the temp file
 // over path. If Close is never called, or an error occurs before Close, the
 // temp file is removed.
 //
-// The returned writer is not safe for concurrent use. Callers may use an
-// Abort method (via the concrete *Writer) to explicitly discard.
+// The returned writer is not safe for concurrent use. Call Abort to
+// explicitly discard the temp file without publishing.
 //
 // Write semantics: the returned Write forwards directly to the underlying
 // *os.File and returns (n, err) per io.Writer. Callers are responsible for
@@ -124,6 +116,8 @@ func NewWriter(path string, mode os.FileMode) (*Writer, error) {
 
 var _ io.WriteCloser = (*Writer)(nil)
 
+// Writer streams data into a sibling temp file and publishes it atomically on
+// Close. Obtain one with NewWriter; it is not safe for concurrent use.
 type Writer struct {
 	f      *os.File
 	tmp    string
@@ -132,6 +126,8 @@ type Writer struct {
 	closed bool
 }
 
+// Write appends p to the temp file. It forwards to the underlying *os.File and
+// does not synthesize short-write errors. Write after Close returns an error.
 func (w *Writer) Write(p []byte) (int, error) {
 	if w.closed {
 		return 0, errors.New("atomicfile: write after close")
