@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T21:08:26.874707-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+  agents_start_here: |-
+    - `pathsafe` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Filesystem safety primitives: path confinement under a root and crash-safe atomic writes.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: subdir
+  package_name: pathsafe
+  repo_name: go-safefs
+  stability: pre-1.0
+computed:
+  import_line: '"github.com/hollis-labs/go-safefs/pathsafe"'
+  import_path: github.com/hollis-labs/go-safefs/pathsafe
+  module_path: github.com/hollis-labs/go-safefs
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:8cc0bcb76dbd49e182ccf77635931e028df214afdf71d4299ec45a29963a69e9
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:a3c59220bf3a988470f7c64d91de18f6c1ebc2ab2abcd7342ee0e56d5394dcdf
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:cf74947696ddbc8c5cbe464d7a9b61dda5c92c02892a936d796b9564eb01ebbe
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:4b6ebfdc3be5e011ac71c14380d819076faaf7812e8ff00cba691d2b402c58a8
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:6648495c7203037b1f7cb49b01bd624e8dcabafab04edbecbaeffaa7c43ed878
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  pathsafe/doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:000b8683e851029efe080319f87ab4f5ae0fbfade7b7289fc39c80b9608ec379
+  pathsafe/example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:e64a0318e18866e8145d455c264bba6f1f09738170cb3d8a319128dff2559c9e
+  pathsafe/pathsafe.go:
+    preset: go-lib
+    digest_at_gen: sha256:ab48fe680cb9cf616794ea20ff325783c8b5f222aaf2950da77ee9b4aa4a7478
+  pathsafe/pathsafe_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:b3043d5d9bec1afcd90eda17e8fad7cd387d7e4c52d4fdbe2263cab2aed98ac5
+sync_history:
+  - at: 2026-09-29T21:08:26.874707-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
