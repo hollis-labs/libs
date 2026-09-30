@@ -6,6 +6,26 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.6.0 — 2026-09-30
+
+Idempotent launch and resume, mirroring the daemon's idempotency surface
+(Tether PR #59). All additive: no existing exported symbol changes signature.
+
+### Added
+
+- **`LaunchRequest.IdempotencyKey`** (`idempotency_key`, optional; at most 512 bytes, no surrounding whitespace or control characters, else the daemon answers 400). Used by `CreateSessionWithInput` and `LaunchWithInput`.
+- **`LaunchResponse.Replayed`** (`replayed`, always present): true when the daemon answered from an earlier keyed request. A keyed `LaunchSession` on a session already past `created` returns 200 with `Replayed` true; an unkeyed one is still a 409 `conflict`.
+- **`Client.ResumeLogicalAgent(ctx, logicalAgentID, ResumeOptions)`** over `POST /logical-agents/{id}/resume`. `ResumeOptions` is just `{IdempotencyKey}`; the endpoint takes no checkpoint or parent parameters, and a zero value sends no body, as the endpoint has always allowed.
+- **`CodeIdempotencyConflict`** (`idempotency_conflict`, a 409 for a key reused with a different request) and **`CodeProviderSessionLost`** (`provider_session_lost`).
+
+### Changed
+
+- The create methods and `ResumeLogicalAgent` accept both 201 (fresh) and 200 (replay). Previously only 201 succeeded, which no daemon that predates idempotency ever contradicted.
+
+### Notes
+
+- Keys are one global space with no owner field; callers namespace their own keys.
+- A replay returns the bound session as it currently stands, including failed or stopped. The digest covers the request as sent; for resume it is `{op, logical_agent_id}`.
 ## v0.5.1 — 2026-09-30
 
 ### Fixed

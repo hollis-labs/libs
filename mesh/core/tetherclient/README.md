@@ -111,7 +111,7 @@ res, err := client.AIChat(ctx, tether.ChatRequest{
 The client covers:
 
 - health
-- session lifecycle
+- session lifecycle, including idempotent create/launch and `ResumeLogicalAgent`
 - session bootstrap (canonical identity resolution + registration, offline-safe)
 - attach, wait, input, resize, send turn
 - checkpoints
@@ -130,6 +130,17 @@ The registry, group and workstream methods return `*APIError` like the rest
 (`errors.Is(err, &APIError{StatusCode: 404})`). A group send whose @-mention is
 ambiguous returns a `*GroupAmbiguousMentionError` carrying the candidate URNs.
 
+### Idempotent launch and resume
+
+Set `LaunchRequest.IdempotencyKey` (or `ResumeOptions.IdempotencyKey` for
+`ResumeLogicalAgent`) and a retry returns the session already bound to that
+key instead of starting a second one. Every create, launch and resume response
+carries `Replayed`; create and resume answer 201 when fresh and 200 on a replay,
+and the client accepts both. A replay reports the bound session as it stands
+now, including one that has failed or stopped. Reusing a key for a different
+request is an `*APIError` with `Code == CodeIdempotencyConflict`. Keys are one
+global space, so namespace them yourself (for example `"<app>/<job-id>"`).
+
 Long-lived calls use caller context rather than the default short transport
 timeout:
 
@@ -139,6 +150,7 @@ timeout:
 - `AIChat`
 - `AIChatStream`
 - `StreamEvents`
+- `ResumeLogicalAgent`
 
 ## Asserted caller identity (messaging reads)
 

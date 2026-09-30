@@ -11,6 +11,13 @@ const (
 	ErrorCodeInternalError    = "internal_error"
 	ErrorCodeNotImplemented   = "not_implemented"
 
+	// CodeIdempotencyConflict is the 409 code for an idempotency key reused
+	// with a different request.
+	CodeIdempotencyConflict = "idempotency_conflict"
+	// CodeProviderSessionLost is the code for a session whose provider-side
+	// session no longer exists.
+	CodeProviderSessionLost = "provider_session_lost"
+
 	ScopeSession = "session"
 	ScopeDaemon  = "daemon"
 	ScopeBroker  = "broker"
@@ -34,6 +41,19 @@ type LaunchRequest struct {
 	Override        string `json:"override,omitempty"`
 	PromptAppend    string `json:"prompt_append,omitempty"`
 	Injection       string `json:"injection,omitempty"`
+
+	// IdempotencyKey makes the create replay-safe: the same key with the same
+	// request returns the session already bound to it. At most 512 bytes, no
+	// surrounding whitespace or control characters; the daemon answers 400
+	// otherwise. Keys are one global space, so callers namespace their own.
+	IdempotencyKey string `json:"idempotency_key,omitempty"`
+}
+
+// ResumeOptions are the optional inputs of ResumeLogicalAgent.
+type ResumeOptions struct {
+	// IdempotencyKey makes the resume replay-safe; see LaunchRequest.IdempotencyKey.
+	// The daemon's digest for a resume covers the operation and logical agent id.
+	IdempotencyKey string `json:"idempotency_key,omitempty"`
 }
 
 type LaunchResponse struct {
@@ -43,6 +63,11 @@ type LaunchResponse struct {
 	ProviderID     string `json:"provider_id"`
 	ProviderKind   string `json:"provider_kind,omitempty"`
 	LogicalAgentID string `json:"logical_agent_id,omitempty"`
+
+	// Replayed is true when the daemon answered from an earlier request that
+	// carried the same idempotency key (or, for launch, a keyed session already
+	// past created) rather than doing the work again. Always present on the wire.
+	Replayed bool `json:"replayed"`
 }
 
 type WaitResponse struct {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -96,19 +98,42 @@ func (c *Client) Ping(ctx context.Context) error {
 
 func (c *Client) CreateSession(ctx context.Context, launchID string) (LaunchResponse, error) {
 	var out LaunchResponse
-	err := c.doJSON(ctx, http.MethodPost, "/sessions", LaunchRequest{Launch: launchID}, http.StatusCreated, &out)
+	err := c.doJSONAccept(ctx, c.http, http.MethodPost, "/sessions", LaunchRequest{Launch: launchID}, &out, http.StatusCreated, http.StatusOK)
 	return out, err
 }
 
 func (c *Client) CreateSessionWithBootPrompt(ctx context.Context, launchID, bootPrompt string) (LaunchResponse, error) {
 	var out LaunchResponse
-	err := c.doJSON(ctx, http.MethodPost, "/sessions", LaunchRequest{Launch: launchID, BootPrompt: bootPrompt}, http.StatusCreated, &out)
+	err := c.doJSONAccept(ctx, c.http, http.MethodPost, "/sessions", LaunchRequest{Launch: launchID, BootPrompt: bootPrompt}, &out, http.StatusCreated, http.StatusOK)
 	return out, err
 }
 
+// CreateSessionWithInput creates a session. When req.IdempotencyKey is set the
+// daemon answers 201 for a fresh session and 200 for a replay of the same key;
+// both succeed, and LaunchResponse.Replayed tells them apart. Reusing a key
+// with a different request fails with an *APIError whose Code is
+// CodeIdempotencyConflict.
 func (c *Client) CreateSessionWithInput(ctx context.Context, req LaunchRequest) (LaunchResponse, error) {
 	var out LaunchResponse
-	err := c.doJSON(ctx, http.MethodPost, "/sessions", req, http.StatusCreated, &out)
+	err := c.doJSONAccept(ctx, c.http, http.MethodPost, "/sessions", req, &out, http.StatusCreated, http.StatusOK)
+	return out, err
+}
+
+// ResumeLogicalAgent resumes a logical agent (POST /logical-agents/{id}/resume).
+// With opts.IdempotencyKey set, the daemon answers 201 for a fresh resume and
+// 200 for a replay; a replay returns the bound session as it currently
+// stands, including one that has failed or stopped. A zero ResumeOptions sends
+// no body, as before idempotency existed.
+func (c *Client) ResumeLogicalAgent(ctx context.Context, logicalAgentID string, opts ResumeOptions) (LaunchResponse, error) {
+	if logicalAgentID == "" {
+		return LaunchResponse{}, errors.New("tether: logical agent id is required")
+	}
+	var body any
+	if opts.IdempotencyKey != "" {
+		body = opts
+	}
+	var out LaunchResponse
+	err := c.doJSONAccept(ctx, c.longLivedClient(), http.MethodPost, "/logical-agents/"+url.PathEscape(logicalAgentID)+"/resume", body, &out, http.StatusCreated, http.StatusOK)
 	return out, err
 }
 
@@ -527,6 +552,12 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any, want
 }
 
 func (c *Client) doJSONWithClient(ctx context.Context, httpClient *http.Client, method, path string, body any, wantStatus int, out any) error {
+	return c.doJSONAccept(ctx, httpClient, method, path, body, out, wantStatus)
+}
+
+// doJSONAccept is doJSONWithClient for routes with more than one success
+// status, such as the idempotent create and resume routes (201 fresh, 200 replay).
+func (c *Client) doJSONAccept(ctx context.Context, httpClient *http.Client, method, path string, body any, out any, wantStatuses ...int) error {
 	var r io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -547,7 +578,7 @@ func (c *Client) doJSONWithClient(ctx context.Context, httpClient *http.Client, 
 		return wrapIfUnreachable(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != wantStatus {
+	if !slices.Contains(wantStatuses, resp.StatusCode) {
 		return readAPIError(resp)
 	}
 	if out == nil {
