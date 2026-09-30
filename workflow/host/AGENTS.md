@@ -23,7 +23,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
 ## Boundaries
 
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-- Always run Go with `GOWORK=off`: the ambient `~/dev/hollis-labs/go.work` does not list this module and makes `go` refuse to run.
+- Always run Go with `GOWORK=off`: an ambient `go.work` that does not list this module makes `go` refuse to run.
 - Non-test code is standard library plus `github.com/hollis-labs/go-workflow` (exact tag, pre-v1) only. `modernc.org/sqlite` is a test-only dependency; no non-test file may import a driver.
 - The lifted files keep their Hadron names (`workflow_state_*.go`, `workflow_compensation.go`) so diffs against Hadron stay cheap. Keep bodies close to the source; do not restyle them.
 - Inside a `Store.WriteTx` callback (and inside `Hooks`) use only the `DBTX` you were handed, never `Store.DB`: the database is normally one connection and the transaction already holds it. Guarded by `TestWriteTxConcurrentOnSingleConnection`.
