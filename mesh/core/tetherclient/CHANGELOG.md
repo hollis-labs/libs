@@ -22,6 +22,8 @@ Idempotent launch and resume, mirroring the daemon's idempotency surface
 
 - The create methods and `ResumeLogicalAgent` accept both 201 (fresh) and 200 (replay). Previously only 201 succeeded, which no daemon that predates idempotency ever contradicted.
 
+- The repository is now licensed under MIT, replacing the earlier placeholder notice.
+
 ### Notes
 
 - Keys are one global space with no owner field; callers namespace their own keys.
