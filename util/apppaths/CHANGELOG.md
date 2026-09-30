@@ -4,6 +4,40 @@ All notable changes to go-apppaths are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.2.0 — 2026-09-30
+
+Targets v0.2.0 (not yet tagged). Implements the 0700 permission default
+(`factory_bootstrap_defaults.q35`, 2026-09-30).
+
+### Changed
+
+- **Behavior change: existing directories are retightened.** `Resolve` now
+  forces `0700` onto the four base roots, the workspace directory and the
+  workspace database's directory, and `0600` onto the `active_workspace`
+  pointer, *including when they already exist* at the `0755`/`0644` v0.1.x
+  created. The first `Resolve` after upgrading changes the modes of existing
+  installs; anything relying on another local user reading these paths will
+  stop working. This is a behavior change to existing paths rather than a new
+  feature, which is why it is a minor bump (v0.2.0) and not a patch; pre-1.0
+  semver permits it, and the path layout itself is unchanged.
+- The database directory named by `WithDBOverride` or `<APP>_DB_PATH` is still
+  only created (0o755), never chmodded: it may be an operator-chosen shared
+  path.
+
+### Security
+
+- Closes the world-listable-by-default gap: v0.1.x created every root `0755`,
+  exposing database and state contents to other local users. Tesseract carried
+  its own `internal/fsperm` workaround for this; other consumers had none.
+- Symlinked roots are not followed when tightening. A path the process may not
+  chmod is left as found instead of failing `Resolve`. On Windows the modes are
+  not enforced.
+
+### Added
+
+- Exported `DirMode` (`0o700`) and `FileMode` (`0o600`).
+- `examples/ownerperms` runnable example and `ExampleDirMode`.
+
 ## v0.1.0 — 2026-05-17
 
 First release. The `paths` package — the path/layout substrate every per-app
