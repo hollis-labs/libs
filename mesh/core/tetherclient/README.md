@@ -17,7 +17,7 @@ versions; see [CHANGELOG.md](./CHANGELOG.md).
 go get github.com/hollis-labs/go-tether-client
 ```
 
-Requires Go 1.26.2 or newer.
+Requires Go 1.26.6 or newer.
 
 ## Default transport
 

@@ -6,6 +6,25 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.4.0 — 2026-09-30
+
+### Added
+
+- **`Client.SessionHealth(ctx, sessionID)`** over `GET /sessions/{id}/health`.
+  It returns a `RuntimeHealthResponse` with the session's liveness, PID,
+  live state, current turn, provider identity and capabilities.
+- **`CapabilitiesDTO`**: the provider capability flags carried in that
+  response (`PTY`, `StreamingStdio`, `JsonRpcStdio`, `ServeHTTP`, `Resize`,
+  `ProviderSessionID`, `CheckpointResume`, `BinaryRequired`).
+
+### Changed
+
+- The module's `go` directive is now `1.26.6`, the portfolio floor. Consumers
+  on an older toolchain must upgrade to build against this version.
+- `golang.org/x/sys` (indirect, via go-messaging's SQLite driver) is bumped from
+  v0.22.0 to v0.48.0. That clears GO-2026-5024, which `govulncheck ./...`
+  reported as present in a required module but not reachable from this code.
+
 ## v0.3.0 — 2026-09-12
 
 ### Added
