@@ -1,0 +1,35 @@
+{
+  "description": "A contribution with no export is invalid.",
+  "response": {
+    "protocol": 1,
+    "plugins": {
+      "acme.widgets": {
+        "bundle_url": "/api/plugins/acme.widgets/ui/index.js"
+      }
+    },
+    "contributions": {
+      "envelope": {
+        "acme.report": {
+          "plugin_id": "acme.widgets"
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ErrInvalidContribution"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 0,
+    "refusals": [
+      {
+        "kind": "envelope",
+        "key": "acme.report",
+        "reason": "invalid"
+      }
+    ],
+    "imports": [
+      "/api/plugins/acme.widgets/ui/index.js"
+    ]
+  }
+}

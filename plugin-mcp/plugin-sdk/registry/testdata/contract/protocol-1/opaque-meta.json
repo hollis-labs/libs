@@ -1,0 +1,45 @@
+{
+  "description": "meta is opaque JSON: nested objects, arrays, null, numbers and strings survive untouched.",
+  "response": {
+    "protocol": 1,
+    "plugins": {
+      "acme.widgets": {
+        "bundle_url": "/api/plugins/acme.widgets/ui/index.js"
+      }
+    },
+    "contributions": {
+      "widget": {
+        "acme.chart": {
+          "plugin_id": "acme.widgets",
+          "export": "ReportView",
+          "meta": {
+            "a": {
+              "b": [
+                1,
+                2.5,
+                "x",
+                null,
+                {
+                  "c": true
+                }
+              ]
+            },
+            "label": "Chart",
+            "empty": {}
+          }
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 1,
+    "refusals": [],
+    "imports": [
+      "/api/plugins/acme.widgets/ui/index.js"
+    ]
+  }
+}

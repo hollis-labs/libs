@@ -1,0 +1,36 @@
+{
+  "description": "An empty contribution kind is invalid.",
+  "response": {
+    "protocol": 1,
+    "plugins": {
+      "acme.widgets": {
+        "bundle_url": "/api/plugins/acme.widgets/ui/index.js"
+      }
+    },
+    "contributions": {
+      "": {
+        "acme.report": {
+          "plugin_id": "acme.widgets",
+          "export": "ReportView"
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ErrInvalidContribution"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 0,
+    "refusals": [
+      {
+        "kind": "",
+        "key": "acme.report",
+        "reason": "invalid"
+      }
+    ],
+    "imports": [
+      "/api/plugins/acme.widgets/ui/index.js"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "description": "KNOWN ASYMMETRY, encoded on purpose: Go's Validate rejects a contribution naming a plugin the response does not describe; the TS loader declares it, leaves it unresolved, and does not refuse it (ownerOf still answers).",
+  "response": {
+    "protocol": 1,
+    "plugins": {},
+    "contributions": {
+      "envelope": {
+        "acme.report": {
+          "plugin_id": "acme.ghost",
+          "export": "ReportView"
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ErrUnknownPlugin"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 1,
+    "refusals": [],
+    "imports": []
+  }
+}

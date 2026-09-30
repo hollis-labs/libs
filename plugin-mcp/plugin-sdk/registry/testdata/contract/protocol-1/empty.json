@@ -1,0 +1,17 @@
+{
+  "description": "A host with no plugins: both top-level maps present and empty.",
+  "response": {
+    "protocol": 1,
+    "plugins": {},
+    "contributions": {}
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 0,
+    "refusals": [],
+    "imports": []
+  }
+}

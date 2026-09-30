@@ -118,13 +118,25 @@ This mirrors `go-mcp/auth`'s own `Provider` seam without depending on it: the
 host-side verification interface is that repo's concern, not this one's.
 
 `registry.Protocol` and `PROTOCOL` in the TypeScript half are the same number
-and are pinned on both sides. The two views are authored, not generated, and
-there is deliberately **no shared golden fixture**: both halves of a fixture
-are always at the same commit, so one can only catch drift introduced within a
-single change, while the real risk is a host and a loader shipped at different
-versions. Pinning the protocol on each side and round-tripping each side's own
-types makes that mismatch something the loader reports at runtime — the same
-answer `TestProtocolVersionLockedAt1` already gives for the subprocess wire.
+and are pinned on both sides. The two views are authored, not generated. They
+are also held to shared fixtures — `registry/testdata/contract/protocol-N/*.json`,
+read by `registry/contract_test.go` and by
+`ts/packages/plugin-registry/test/contract-fixtures.test.js` — but only in a
+form that answers the earlier objection to a golden file (both halves of a
+fixture sit at one commit, so it can only catch drift within a single change,
+while the real risk is a host and a loader shipped at different versions).
+The fixtures are **frozen per released protocol**: once protocol N ships, its
+directory is append-only, and a later change that breaks a frozen file — even
+one made to Go and TS together — has to bump the protocol, which is exactly the
+version-skew case. Only the directory for the current protocol runs, and both
+tests fail when they find none. One asymmetry is encoded, not fixed:
+`unknown-plugin.json` — Go's `Validate` rejects a contribution naming an
+undescribed plugin, the TS loader declares it and leaves it unresolved. Delete
+the fixtures and both tests when either view is generated from the other or
+both consume one schema. Pinning the protocol on each side, and round-tripping
+each side's own types, still makes a host/loader mismatch something the loader
+reports at runtime — the same answer `TestProtocolLockedAt1` gives for the
+subprocess wire.
 
 The registry contract knows nothing about what a contribution *kind* means. A
 kind is an open string and its metadata is opaque JSON, because one host's
