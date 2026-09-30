@@ -11,4 +11,7 @@ refuses a tag whose CHANGELOG has no heading for it.
 
 ### Added
 
-- Initial scaffold.
+- `tesseract` package: an HTTP client for Tesseract's memory API covering `Recall`, `RecallAll`, `GetCurrent`, `GetRevision`, `Deprecate`, `ListNamespaces` and `Health`, with `APIError`, `ErrNotFound`, `ErrUnavailable`, `ErrResponseTooLarge`, and `WithTimeout` / `WithMaxResponseBytes` (defaults 20s / 64 MiB).
+- `RecallFilters` and `RecallRequest` matching the server's recall contract, including `search_mode` and `filters` together. Filter keys use the server's Go field names.
+- `tesseracttest` package: an importable fake Tesseract with call counting, request recording, and failure, auth, paging and delay knobs.
+- Response size cap is enforced as an error rather than a truncated read.

@@ -154,7 +154,7 @@ func TestCancelledContextStopsTheRequest(t *testing.T) {
 		t.Errorf("err = %v, want it to match ErrUnavailable too", err)
 	}
 	if time.Since(start) > 3*time.Second {
-		t.Error("the call outlived its cancelled context")
+		t.Error("the call outlived its canceled context")
 	}
 }
 

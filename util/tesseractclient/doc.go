@@ -19,7 +19,7 @@
 //
 // Recall goes through POST /v1/memory/recall rather than GET /v1/recall
 // because only the POST route returns a manifest with results_total and
-// next_cursor and honours a cursor.
+// next_cursor and honors a cursor.
 //
 // # Errors
 //

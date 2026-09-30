@@ -12,7 +12,7 @@ var (
 
 	// ErrUnavailable is matched by errors.Is when Tesseract could not be
 	// reached or answered something unusable: a transport failure (including
-	// a cancelled or expired context, which also matches the context error),
+	// a canceled or expired context, which also matches the context error),
 	// a response body that could not be read or exceeded the size cap, or a
 	// 2xx body that did not decode. A non-2xx status is an *APIError and does
 	// not match, whatever the status. A caller can then say "Tesseract is

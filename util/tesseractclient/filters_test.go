@@ -105,12 +105,12 @@ func TestRecallFiltersFieldSetMirrorsTheServer(t *testing.T) {
 	}
 	for _, k := range serverFilterKeys {
 		if !slices.Contains(got, k) && !slices.Contains(omittedOnPurpose, k) {
-			t.Errorf("server filter key %q is neither modelled nor listed in omittedOnPurpose", k)
+			t.Errorf("server filter key %q is neither modeled nor listed in omittedOnPurpose", k)
 		}
 	}
 	for _, k := range omittedOnPurpose {
 		if slices.Contains(got, k) {
-			t.Errorf("%q is modelled but still listed in omittedOnPurpose", k)
+			t.Errorf("%q is modeled but still listed in omittedOnPurpose", k)
 		}
 		if !slices.Contains(serverFilterKeys, k) {
 			t.Errorf("omittedOnPurpose lists %q, which is not a server key", k)
