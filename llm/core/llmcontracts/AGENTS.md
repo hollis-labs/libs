@@ -16,6 +16,8 @@ adapters compose these without taking on a transport dependency.
   `ErrRequestExceedsRateBudget`; `circuit.go` owns `CircuitBreaker`.
 - `cache.go` owns the default cache strategy; `reasoning.go` carries
   reasoning config through context.
+- `contracttest/` is the reusable `Provider` conformance suite; its own tests
+  prove its assertions fail on violating doubles.
 - `examples/` has a runnable program per primitive.
 
 ## Commands

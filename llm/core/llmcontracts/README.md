@@ -72,6 +72,9 @@ Runnable examples for each major surface live under [`examples/`](examples/):
 - Rate-budget primitives: `TokenRateTracker`, `CircuitBreaker`,
   `ErrRequestExceedsRateBudget`, `PacingWait`, `CircuitState`,
   `DefaultCooldown`
+- Conformance suite: `contracttest.Run` (package `contracttest`) verifies the
+  `StreamChat`/`Complete` channel-protocol invariants of any `Provider` against
+  a deterministic double
 
 ## Dependencies
 
