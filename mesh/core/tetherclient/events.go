@@ -84,11 +84,12 @@ func (c *Client) streamEvents(ctx context.Context, opts StreamEventsOptions, out
 		value = strings.TrimPrefix(value, " ")
 		switch name {
 		case "id":
-			id, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				return fmt.Errorf("parse SSE id %q: %w", value, err)
+			// An SSE id is an opaque string. Tether's are numeric sequence
+			// numbers; one that is not is treated as absent (Seq stays 0)
+			// rather than ending the subscription.
+			if id, err := strconv.ParseInt(value, 10, 64); err == nil {
+				ev.Seq = id
 			}
-			ev.Seq = id
 		case "event":
 			ev.Kind = value
 		case "data":

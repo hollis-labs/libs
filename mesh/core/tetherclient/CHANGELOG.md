@@ -6,6 +6,12 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.5.1 — 2026-09-30
+
+### Fixed
+
+- `StreamEvents` no longer ends the subscription when an SSE event carries a non-numeric `id:` field. An SSE id is an opaque string, and the stream used to abort with `parse SSE id ...` on the first one that was not an integer. Such an event is now delivered with `Seq` 0, as if it had no id, and the stream continues. Tether's own ids are numeric, so nothing changes against the current daemon. This is a patch release: the only behavior that differs is a case that previously returned an error, and no exported symbol changes.
+
 ## v0.5.0 — 2026-09-30
 
 ### Changed
