@@ -3,6 +3,8 @@ package nanitelegacy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -62,7 +64,9 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 		e.runID = ev.RunID
 	}
 	var out []frame
-	e.mapEvent(&out, ev)
+	if err := e.mapEvent(&out, ev); err != nil {
+		return err
+	}
 	id := sink.FrameID(ev)
 	for _, f := range out {
 		if err := e.write(w, id, ev, f); err != nil {
@@ -79,7 +83,10 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 func (e *encoder) write(w sink.Writer, id string, ev chatstream.Event, f frame) error {
 	var data []byte
 	if f.raw != nil {
-		data = compact(f.raw)
+		var err error
+		if data, err = compact(f.raw); err != nil {
+			return err
+		}
 	} else {
 		f.body["type"] = f.typ
 		if ev.Seq != 0 && id != "" {
@@ -93,15 +100,21 @@ func (e *encoder) write(w sink.Writer, id string, ev chatstream.Event, f frame) 
 	return e.Send(w, id, f.typ, data)
 }
 
-func compact(raw json.RawMessage) []byte {
+// ErrInvalidPayload is returned by Encode for a nanite raw event whose Payload is
+// not valid JSON. Such a payload is written as a data line, so a newline in it
+// could smuggle in SSE fields; it is refused instead.
+var ErrInvalidPayload = errors.New("nanitelegacy: raw payload is not valid JSON")
+
+// compact is raw on one line; it fails when raw is not valid JSON.
+func compact(raw json.RawMessage) ([]byte, error) {
 	var b bytes.Buffer
-	if json.Compact(&b, raw) != nil {
-		return raw
+	if err := json.Compact(&b, raw); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidPayload, err)
 	}
-	return b.Bytes()
+	return b.Bytes(), nil
 }
 
-func (e *encoder) mapEvent(out *[]frame, ev chatstream.Event) {
+func (e *encoder) mapEvent(out *[]frame, ev chatstream.Event) error {
 	switch ev.Verb {
 	case chatstream.VerbRunStart:
 		body := obj{"message_id": ev.RunID}
@@ -110,11 +123,11 @@ func (e *encoder) mapEvent(out *[]frame, ev chatstream.Event) {
 		}
 		*out = append(*out, frame{typ: "stream_start", body: body})
 	case chatstream.VerbPartStart:
-		e.partStart(out, ev)
+		return e.partStart(out, ev)
 	case chatstream.VerbPartDelta:
-		e.partDelta(out, ev)
+		return e.partDelta(out, ev)
 	case chatstream.VerbPartEnd:
-		e.partEnd(out, ev)
+		return e.partEnd(out, ev)
 	case chatstream.VerbApprovalRequest:
 		e.approval(out, ev)
 	case chatstream.VerbUsage:
@@ -130,11 +143,16 @@ func (e *encoder) mapEvent(out *[]frame, ev chatstream.Event) {
 			}
 			_ = json.Unmarshal(ev.Value, &v)
 			*out = append(*out, frame{typ: "replace_content", body: obj{"content": v.Content}})
-			return
+			return nil
 		}
 		body := obj{"content": ev.Kind}
-		if d := string(compact(firstRaw(ev.Value, ev.Patch))); d != "" {
-			body["detail"] = d
+		// detail is a JSON string, so text that is not JSON is safe as it is.
+		d := firstRaw(ev.Value, ev.Patch)
+		if c, err := compact(d); err == nil {
+			d = c
+		}
+		if len(d) > 0 {
+			body["detail"] = string(d)
 		}
 		*out = append(*out, frame{typ: "status", body: body})
 	case chatstream.VerbGap:
@@ -165,6 +183,7 @@ func (e *encoder) mapEvent(out *[]frame, ev chatstream.Event) {
 			frame{typ: "stream_end", body: e.streamEnd(stopCancelled)})
 	default: // steps and messages have no Nanite event
 	}
+	return nil
 }
 
 func u(n uint64) string {
@@ -247,17 +266,21 @@ func StopReason(r chatstream.FinishReason, raw string) string {
 	}
 }
 
-func (e *encoder) partStart(out *[]frame, ev chatstream.Event) {
+func (e *encoder) partStart(out *[]frame, ev chatstream.Event) error {
+	if _, open := e.parts[ev.PartID]; open {
+		return sink.OutOfOrder(ev, "part is already open")
+	}
 	p := &partState{kind: ev.PartKind(), meta: ev, phase: sink.MetaString(ev, sink.MetaPhase)}
 	e.parts[ev.PartID] = p
 	if p.kind != chatstream.PartToolCall {
-		return
+		return nil
 	}
 	body := obj{"tool": firstNonEmpty(sink.MetaString(ev, sink.MetaName), "tool"), "tool_id": ev.PartID}
 	if d := sink.MetaString(ev, sink.MetaDetail); d != "" {
 		body["detail"] = d
 	}
 	*out = append(*out, frame{typ: "tool_call", body: body})
+	return nil
 }
 
 func firstNonEmpty(ss ...string) string {
@@ -269,15 +292,15 @@ func firstNonEmpty(ss ...string) string {
 	return ""
 }
 
-func (e *encoder) partDelta(out *[]frame, ev chatstream.Event) {
+func (e *encoder) partDelta(out *[]frame, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	switch p.kind {
 	case chatstream.PartText, chatstream.PartRefusal:
 		if ev.Text == "" {
-			return
+			return nil
 		}
 		body := obj{"content": ev.Text}
 		if p.phase != "" {
@@ -286,23 +309,24 @@ func (e *encoder) partDelta(out *[]frame, ev chatstream.Event) {
 		*out = append(*out, frame{typ: "delta", body: body})
 	case chatstream.PartReasoning:
 		if ev.Text == "" {
-			return
+			return nil
 		}
 		*out = append(*out, frame{typ: "delta", body: obj{"content": ev.Text, "phase": "thinking"}})
 	case chatstream.PartToolResult:
 		p.text.WriteString(ev.Text)
 	default: // tool arguments are not streamed to Nanite clients
 	}
+	return nil
 }
 
-func (e *encoder) partEnd(out *[]frame, ev chatstream.Event) {
+func (e *encoder) partEnd(out *[]frame, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	delete(e.parts, ev.PartID)
 	if p.kind != chatstream.PartToolResult {
-		return
+		return nil
 	}
 	summary := p.text.String()
 	if summary == "" && len(ev.Final) > 0 {
@@ -322,6 +346,7 @@ func (e *encoder) partEnd(out *[]frame, ev chatstream.Event) {
 		body["is_error"] = true
 	}
 	*out = append(*out, frame{typ: "tool_result", body: body})
+	return nil
 }
 
 // Truncate cuts s to Nanite's 500-byte summary limit, on a rune boundary, and

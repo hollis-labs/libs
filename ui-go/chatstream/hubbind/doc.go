@@ -16,4 +16,12 @@
 //     notices as in-band gap events.
 //   - A client resumes with the Last-Event-ID header only: use
 //     ssekit.ResumeCursor(r) without WithQueryKeys.
+//   - Resume replays events, not encoder state. The stateful sink encoders (aisdk,
+//     agui, openaicompat, nanitelegacy) keep per-run state (open parts, steps,
+//     tool calls), so a fresh encoder fed only the events after the cursor
+//     refuses them with sink.ErrOutOfOrder. On resume, replay the run from its
+//     first event (run.start) into a fresh encoder and write only the frames
+//     after the client's cursor, or keep the encoder alive across the
+//     reconnect. This needs the hub to retain the run from its start; a gap
+//     before the cursor is reported in-band and the encoder cannot repair it.
 package hubbind

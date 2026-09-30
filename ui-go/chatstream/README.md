@@ -6,6 +6,8 @@ Providers and protocols stream differently: Anthropic Messages and OpenAI Chat a
 
 ## Status
 
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
 Pre-1.0. The vocabulary follows the ratified wire contract (the event envelope, an AG-UI-style encoder, header-only `Last-Event-ID` resume, gaps signalled in-band) and is additive: new verbs, part kinds and optional fields do not change `SchemaVersion`.
 
 ## Install
@@ -83,7 +85,7 @@ The same program lives in [`examples/decode`](./examples/decode/main.go).
 - **Truncation is never success.** When the upstream ends without its terminal signal, the decoder closes what is open and emits `run.error` with code `upstream_truncated`. `DecodeFrames` enforces it for a whole stream, and `conformance.CheckTruncation` proves it at every frame boundary of a recorded stream.
 - **Usage cannot be double counted.** `Usage` is disjoint components (uncached input, cache read, cache write, output, reasoning) and `Total` is their sum. Providers whose prompt count includes cache reads (OpenAI) and providers whose input count excludes them (Anthropic) convert once, in the decoder, with `UsageFromInclusive` and `UsageFromExclusiveInput`.
 - **Capabilities are declared, not faked.** Each adapter's `Capabilities` states what its dialect streams (token, chunk or whole), and `Validate` rejects a contradictory declaration.
-- **The hub owns the cursor.** `Event.Seq` is the go-streamhub record's `Seq`; this module never counts its own, and resume is by the `Last-Event-ID` header only.
+- **The hub owns the cursor.** `Event.Seq` is the go-streamhub record's `Seq`; this module never counts its own, and resume is by the `Last-Event-ID` header only. Resume replays events, not encoder state: the stateful encoders (`aisdk`, `agui`, `openaicompat`, `nanitelegacy`) must be fed the run from `run.start` (a fresh encoder given only a tail returns `sink.ErrOutOfOrder` rather than silently dropping content), so a resumed subscription replays the run from its first event into a fresh encoder and writes only the frames past the client's cursor.
 
 ## Compatibility
 

@@ -64,7 +64,9 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 	}
 	var out []obj
 	var comment string
-	e.mapEvent(&out, &comment, ev)
+	if err := e.mapEvent(&out, &comment, ev); err != nil {
+		return err
+	}
 	if comment != "" {
 		if err := e.Comment(w, comment); err != nil {
 			return err
@@ -85,17 +87,17 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 	return nil
 }
 
-func (e *encoder) mapEvent(out *[]obj, comment *string, ev chatstream.Event) {
+func (e *encoder) mapEvent(out *[]obj, comment *string, ev chatstream.Event) error {
 	switch ev.Verb {
 	case chatstream.VerbRunStart:
 		e.begin(ev, out)
 	case chatstream.VerbPartStart:
 		e.begin(ev, out)
-		e.partStart(out, ev)
+		return e.partStart(out, ev)
 	case chatstream.VerbPartDelta:
-		e.partDelta(out, ev)
+		return e.partDelta(out, ev)
 	case chatstream.VerbPartEnd:
-		e.partEnd(out, ev)
+		return e.partEnd(out, ev)
 	case chatstream.VerbUsage:
 		e.foldUsage(ev)
 	case chatstream.VerbGap:
@@ -109,7 +111,7 @@ func (e *encoder) mapEvent(out *[]obj, comment *string, ev chatstream.Event) {
 		if reason == "" {
 			*out = append(*out, obj{"error": obj{
 				"message": "the run finished with reason error", "type": "server_error", "code": "error"}})
-			return
+			return nil
 		}
 		*out = append(*out, e.chunk(obj{}, reason))
 		if e.usage != nil {
@@ -136,6 +138,7 @@ func (e *encoder) mapEvent(out *[]obj, comment *string, ev chatstream.Event) {
 		*out = append(*out, obj{"error": obj{"message": msg, "type": "aborted", "code": "run_aborted"}})
 	default: // steps, messages, approvals, activity and raw events have no chunk
 	}
+	return nil
 }
 
 func itoa(n uint64) string {
@@ -156,11 +159,14 @@ func (e *encoder) foldUsage(ev chatstream.Event) {
 	e.usage = &u
 }
 
-func (e *encoder) partStart(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partStart(out *[]obj, ev chatstream.Event) error {
+	if _, open := e.parts[ev.PartID]; open {
+		return sink.OutOfOrder(ev, "part is already open")
+	}
 	p := &partState{kind: ev.PartKind()}
 	e.parts[ev.PartID] = p
 	if p.kind != chatstream.PartToolCall {
-		return
+		return nil
 	}
 	p.index = e.toolCount
 	e.toolCount++
@@ -169,12 +175,13 @@ func (e *encoder) partStart(out *[]obj, ev chatstream.Event) {
 		"index": p.index, "id": ev.PartID, "type": "function",
 		"function": obj{"name": name, "arguments": ""},
 	}}}, nil))
+	return nil
 }
 
-func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	switch p.kind {
 	case chatstream.PartText:
@@ -188,17 +195,19 @@ func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) {
 		*out = append(*out, e.chunk(obj{"tool_calls": []obj{{"index": p.index, "function": obj{"arguments": ev.JSONFragment}}}}, nil))
 	default: // tool results, sources, files and data are not part of an assistant chunk stream
 	}
+	return nil
 }
 
-func (e *encoder) partEnd(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partEnd(out *[]obj, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	delete(e.parts, ev.PartID)
 	if p.kind == chatstream.PartToolCall && len(ev.Final) > 0 && !p.streamed {
 		*out = append(*out, e.chunk(obj{"tool_calls": []obj{{"index": p.index, "function": obj{"arguments": string(ev.Final)}}}}, nil))
 	}
+	return nil
 }
 
 // Close writes "data: [DONE]". If the run had not ended it first writes an error

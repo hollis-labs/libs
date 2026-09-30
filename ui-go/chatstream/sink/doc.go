@@ -11,6 +11,19 @@
 // error returned to the caller, LF line endings, multi-line data split
 // correctly.
 //
+// Resume: an encoder is fed a run from its first event (run.start), not a tail.
+// A subscription resumed with Last-Event-ID delivers only the events after the
+// cursor, and a fresh Encoder cannot know which parts and steps those events
+// belong to. A resumed subscription must therefore replay the run from its first
+// event into a fresh Encoder (and skip writing the frames the client already
+// has), or keep the Encoder alive across the reconnect. An encoder never guesses:
+// an event for a part or step it has not seen open (a part.delta or part.end
+// with no part.start, a part opened twice, a step.finish for an unopened step)
+// is refused with an error wrapping ErrOutOfOrder and writes nothing. A tail
+// that happens to begin with an event that needs no earlier state (a run.finish,
+// a usage event) is accepted, and the output then lacks what the missing prefix
+// would have written.
+//
 // Every encoder keeps the same contract:
 //
 //   - Encode after the terminal event returns an error wrapping
@@ -21,4 +34,6 @@
 //     idempotent; Encode after Close returns ErrClosed.
 //   - Verbs an encoder does not know are skipped: the schema is additive.
 //   - A write or flush error is returned from Encode or Close and is sticky.
+//   - No event, however out of order, panics an encoder; an event that does not
+//     follow from the run so far is an ErrOutOfOrder error (see above).
 package sink

@@ -100,6 +100,19 @@ func TestValidateCatchesEachViolation(t *testing.T) {
 				x.PartID, x.Kind = "r", "tool_result"
 				x.Meta = map[string]json.RawMessage{chatstream.MetaCallID: json.RawMessage(`"ghost"`)}
 			}), end("r"), fin}, nil, conformance.RuleConvention, "not an earlier tool_call"},
+		{"final not JSON", []chatstream.Event{start, part("p", "text"), e(chatstream.VerbPartEnd, func(x *chatstream.Event) { x.PartID, x.Final = "p", json.RawMessage(`{"a":`) }), fin}, nil, conformance.RulePayload, "final is not valid JSON"},
+		{"descriptor not JSON", []chatstream.Event{start, e(chatstream.VerbApprovalRequest, func(x *chatstream.Event) {
+			x.ApprovalID, x.Mode, x.Descriptor = "a", chatstream.ApprovalInBand, json.RawMessage(`nope`)
+		}), fin}, nil, conformance.RulePayload, "descriptor is not valid JSON"},
+		{"value not JSON", []chatstream.Event{start, e(chatstream.VerbActivity, func(x *chatstream.Event) { x.Kind, x.Value = "k", json.RawMessage(`{`) }), fin}, nil, conformance.RulePayload, "value is not valid JSON"},
+		{"patch not JSON", []chatstream.Event{start, e(chatstream.VerbActivity, func(x *chatstream.Event) { x.Kind, x.Patch = "k", json.RawMessage(`[`) }), fin}, nil, conformance.RulePayload, "patch is not valid JSON"},
+		{"meta value not JSON", []chatstream.Event{start, e(chatstream.VerbPartStart, func(x *chatstream.Event) {
+			x.PartID, x.Kind = "p", "text"
+			x.Meta = map[string]json.RawMessage{"k": json.RawMessage(`{`)}
+		}), end("p"), fin}, nil, conformance.RulePayload, "meta k is not valid JSON"},
+		{"raw payload not JSON", []chatstream.Event{start, e(chatstream.VerbRaw, func(x *chatstream.Event) {
+			x.Raw = &chatstream.Raw{Dialect: "d", Payload: json.RawMessage("a\nb")}
+		}), fin}, nil, conformance.RulePayload, "raw.payload is not valid JSON"},
 		{"approval without mode", []chatstream.Event{start, e(chatstream.VerbApprovalRequest, func(x *chatstream.Event) { x.ApprovalID = "a" }), fin}, nil, conformance.RuleVocabulary, "approval mode"},
 	}
 	for _, tc := range tests {

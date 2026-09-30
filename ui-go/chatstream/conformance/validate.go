@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"unicode/utf8"
@@ -134,6 +135,7 @@ func (v *validator) event(i int, ev chatstream.Event) {
 	if !utf8.ValidString(ev.Text) || !utf8.ValidString(ev.JSONFragment) || !utf8.ValidString(ev.Message) {
 		v.add(i, ev, RulePayload, "text is not valid UTF-8")
 	}
+	v.jsonFields(i, ev)
 	switch ev.Verb {
 	case chatstream.VerbRunStart:
 		v.started = true
@@ -244,6 +246,29 @@ func (v *validator) event(i int, ev chatstream.Event) {
 		if !v.o.AllowGap {
 			v.add(i, ev, RuleLifecycle, "gap event from a decoder (gaps come from the hub)")
 		}
+	}
+}
+
+// jsonFields reports every raw JSON field of ev that is not valid JSON: an
+// encoder splices these into its output as they are.
+func (v *validator) jsonFields(i int, ev chatstream.Event) {
+	check := func(name string, raw json.RawMessage) {
+		if len(raw) > 0 && !json.Valid(raw) {
+			v.add(i, ev, RulePayload, "%s is not valid JSON", name)
+		}
+	}
+	check("final", ev.Final)
+	check("descriptor", ev.Descriptor)
+	check("value", ev.Value)
+	check("patch", ev.Patch)
+	for k, raw := range ev.Meta {
+		check("meta "+k, raw)
+	}
+	for k, raw := range ev.Ext {
+		check("ext "+k, raw)
+	}
+	if ev.Raw != nil {
+		check("raw.payload", ev.Raw.Payload)
 	}
 }
 

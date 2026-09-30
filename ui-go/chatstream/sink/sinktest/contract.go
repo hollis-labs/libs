@@ -119,6 +119,25 @@ func Contract(t *testing.T, newEnc func() sink.Encoder) {
 		}
 	})
 
+	t.Run("out-of-order and duplicate events never panic", func(t *testing.T) {
+		for _, hc := range hostileSequences() {
+			t.Run(hc.name, func(t *testing.T) {
+				enc := newEnc()
+				rec := &Recorder{}
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("%s panicked: %v", name, r)
+					}
+				}()
+				for _, ev := range hc.events {
+					_ = enc.Encode(rec, ev) // an error is fine; a panic is not
+				}
+				_ = enc.Close(rec, ErrCut)
+				Parse(t, rec.Bytes()) // and whatever was written is still valid SSE
+			})
+		}
+	})
+
 	t.Run("a second Writer is refused", func(t *testing.T) {
 		enc := newEnc()
 		evs := Named(t, "plain_text").Events // run.start, message.start, part.start, delta, ...
@@ -215,4 +234,113 @@ func driveErrs(enc sink.Encoder, w sink.Writer, sc Scenario) []error {
 		cause = sc.Cause
 	}
 	return append(errs, enc.Close(w, cause))
+}
+
+type hostile struct {
+	name   string
+	events []chatstream.Event
+}
+
+// hostileSequences are event sequences a well-formed run never produces, and
+// that a resumed or corrupted stream can: no encoder may panic on them.
+func hostileSequences() []hostile {
+	seq := func(f func(b *Builder)) []chatstream.Event { return Build(f) }
+	text := chatstream.PartText
+	call := chatstream.PartToolCall
+	return []hostile{
+		{"duplicate open part then finish", seq(func(b *Builder) {
+			b.Start()
+			b.Part("a", text, nil)
+			b.Part("a", text, nil)
+			b.End("a", "")
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+		{"duplicate open part then approval", seq(func(b *Builder) {
+			b.Start()
+			b.Part("a", text, nil)
+			b.Part("a", text, nil)
+			b.End("a", "")
+			b.Approval("ap", "c", chatstream.ApprovalInBand, `{"tool":"bash"}`)
+		})},
+		{"duplicate open part then replace_content", seq(func(b *Builder) {
+			b.Start()
+			b.Part("a", text, nil)
+			b.Part("a", text, nil)
+			b.End("a", "")
+			b.Activity(sink.ActivityReplaceContent, `{"content":"x"}`)
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+		{"duplicate open tool call", seq(func(b *Builder) {
+			b.Start()
+			b.Part("c", call, Meta(sink.MetaName, "bash"))
+			b.Part("c", call, Meta(sink.MetaName, "bash"))
+			b.End("c", `{}`)
+			b.End("c", `{}`)
+			b.Finish(chatstream.FinishToolCalls, "", nil)
+		})},
+		{"end twice", seq(func(b *Builder) {
+			b.Start()
+			b.Part("a", text, nil)
+			b.End("a", "")
+			b.End("a", "")
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+		{"delta and end for parts never opened", seq(func(b *Builder) {
+			b.Start()
+			b.Text("ghost", "x")
+			b.Frag("ghost", "{")
+			b.End("ghost", "")
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+		{"mid-run tail without run.start", seq(func(b *Builder) {
+			b.Text("a", "tail")
+			b.End("a", "")
+			b.Part("res", chatstream.PartToolResult, Meta(sink.MetaCallID, "c"))
+			b.Text("res", "out")
+			b.End("res", "")
+			b.Add(chatstream.VerbStepFinish, func(e *chatstream.Event) { e.StepID = "s1" })
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+		{"finish and approval alone", seq(func(b *Builder) {
+			b.Approval("ap", "", chatstream.ApprovalSuspend, `{}`)
+			b.Finish(chatstream.FinishStop, "", nil)
+		})},
+	}
+}
+
+// OutOfOrderErrors checks that a stateful encoder answers events that follow
+// from nothing it has seen (the tail of a run, as a resumed subscription would
+// deliver it; a part opened twice) with an error wrapping sink.ErrOutOfOrder,
+// instead of dropping them silently. It is not part of Contract: the native
+// encoder keeps no state and passes every event through.
+func OutOfOrderErrors(t *testing.T, newEnc func() sink.Encoder) {
+	t.Helper()
+	cases := map[string][]chatstream.Event{
+		"delta for a part never opened": Build(func(b *Builder) { b.Text("t1", "tail") }),
+		"end for a part never opened":   Build(func(b *Builder) { b.End("t1", "") }),
+		"delta after the part ended": Build(func(b *Builder) {
+			b.Start()
+			b.Part("t1", chatstream.PartText, nil)
+			b.End("t1", "")
+			b.Text("t1", "late")
+		}),
+		"part opened twice": Build(func(b *Builder) {
+			b.Start()
+			b.Part("t1", chatstream.PartText, nil)
+			b.Part("t1", chatstream.PartText, nil)
+		}),
+	}
+	for name, evs := range cases {
+		enc := newEnc()
+		rec := &Recorder{}
+		var err error
+		for _, ev := range evs {
+			if err = enc.Encode(rec, ev); err != nil {
+				break
+			}
+		}
+		if !errors.Is(err, sink.ErrOutOfOrder) {
+			t.Errorf("%s: %s: err = %v, want sink.ErrOutOfOrder", enc.Name(), name, err)
+		}
+	}
 }

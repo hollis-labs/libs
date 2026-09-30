@@ -2,6 +2,7 @@ package nanitelegacy_test
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -257,5 +258,28 @@ func TestHeadersMatchNanite(t *testing.T) {
 	h := nanitelegacy.New().Headers()
 	if h.Get("Content-Type") != "text/event-stream" || h.Get("Connection") != "keep-alive" || nanitelegacy.New().Name() != "nanitelegacy" {
 		t.Errorf("headers = %v", h)
+	}
+}
+
+func TestOutOfOrderEventsAreErrorsNotSilence(t *testing.T) {
+	sinktest.OutOfOrderErrors(t, newEnc)
+}
+
+// A nanite raw payload that is not JSON is refused: written as a data line, a
+// newline in it would inject SSE fields.
+func TestRawPayloadThatIsNotJSONIsRefused(t *testing.T) {
+	enc := nanitelegacy.New()
+	rec := &sinktest.Recorder{}
+	if err := enc.Encode(rec, sinktest.Build(func(b *sinktest.Builder) { b.Start() })[0]); err != nil {
+		t.Fatal(err)
+	}
+	before := rec.Len()
+	err := enc.Encode(rec, chatstream.Event{V: chatstream.SchemaVersion, RunID: "run-1", Verb: chatstream.VerbRaw,
+		Raw: &chatstream.Raw{Dialect: "nanite", Type: "status", Payload: json.RawMessage("not json\nevent: stream_end\ndata: {}")}})
+	if !errors.Is(err, nanitelegacy.ErrInvalidPayload) {
+		t.Fatalf("err = %v, want ErrInvalidPayload", err)
+	}
+	if rec.Len() != before {
+		t.Errorf("wrote %q for a refused payload", rec.String()[before:])
 	}
 }

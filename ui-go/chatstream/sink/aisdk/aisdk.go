@@ -20,7 +20,9 @@ func New() sink.Encoder {
 
 type partState struct {
 	kind     chatstream.PartKind
-	id       string // id used on the wire
+	key      string // the part's id in the stream
+	id       string // id used on the wire; a reopened text part gets a new one
+	open     bool   // a text or reasoning block is open on the wire
 	meta     chatstream.Event
 	text     strings.Builder
 	frags    strings.Builder
@@ -29,10 +31,11 @@ type partState struct {
 }
 
 type toolState struct {
-	name     string
-	input    bool // tool-input-available sent
-	done     bool
-	approved bool
+	name      string
+	announced bool // opened by a part.start (not only by an approval)
+	input     bool // tool-input-available sent
+	done      bool
+	approved  bool
 }
 
 type awaiting struct{ tool, callID string }
@@ -123,16 +126,42 @@ func (e *encoder) closeParts(out *[]chunk) {
 	for len(e.order) > 0 {
 		id := e.order[len(e.order)-1]
 		e.order = e.order[:len(e.order)-1]
-		p := e.parts[id]
-		delete(e.parts, id)
-		switch p.kind {
-		case chatstream.PartText, chatstream.PartRefusal:
-			*out = append(*out, chunk{"type": "text-end", "id": p.id})
-		case chatstream.PartReasoning:
-			*out = append(*out, chunk{"type": "reasoning-end", "id": p.id})
-		default: // only text-like parts are tracked as open
+		// The part stays known (closed on the wire): its later delta reopens it and
+		// its part.end is not out of order.
+		if p := e.parts[id]; p != nil {
+			e.endBlock(out, p)
 		}
 	}
+}
+
+// endBlock ends p's open text or reasoning block on the wire.
+func (e *encoder) endBlock(out *[]chunk, p *partState) {
+	if !p.open {
+		return
+	}
+	p.open = false
+	switch p.kind {
+	case chatstream.PartText, chatstream.PartRefusal:
+		*out = append(*out, chunk{"type": "text-end", "id": p.id})
+	case chatstream.PartReasoning:
+		*out = append(*out, chunk{"type": "reasoning-end", "id": p.id})
+	default: // only text-like parts have a block
+	}
+}
+
+// reopenBlock starts a new block for p after a step or an approval closed the old
+// one, under a new wire id so the client never sees an id restart.
+func (e *encoder) reopenBlock(out *[]chunk, p *partState) {
+	e.openStep(out)
+	p.open = true
+	e.order = append(e.order, p.key)
+	if p.kind == chatstream.PartReasoning {
+		p.id = e.nextID("reasoning")
+		*out = append(*out, chunk{"type": "reasoning-start", "id": p.id})
+		return
+	}
+	p.id = e.nextID("text")
+	*out = append(*out, chunk{"type": "text-start", "id": p.id})
 }
 
 func (e *encoder) closeStep(out *[]chunk) {
@@ -162,7 +191,9 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 		e.runID = ev.RunID
 	}
 	var out []chunk
-	e.mapEvent(&out, ev)
+	if err := e.mapEvent(&out, ev); err != nil {
+		return err
+	}
 	if err := e.sendAll(w, out); err != nil {
 		return err
 	}
@@ -172,7 +203,7 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 	return nil
 }
 
-func (e *encoder) mapEvent(out *[]chunk, ev chatstream.Event) {
+func (e *encoder) mapEvent(out *[]chunk, ev chatstream.Event) error {
 	switch ev.Verb {
 	case chatstream.VerbRunStart:
 		e.provider, e.model = ev.Provider, ev.Model
@@ -188,11 +219,11 @@ func (e *encoder) mapEvent(out *[]chunk, ev chatstream.Event) {
 		}
 	case chatstream.VerbMessageStart, chatstream.VerbMessageEnd:
 	case chatstream.VerbPartStart:
-		e.partStart(out, ev)
+		return e.partStart(out, ev)
 	case chatstream.VerbPartDelta:
-		e.partDelta(out, ev)
+		return e.partDelta(out, ev)
 	case chatstream.VerbPartEnd:
-		e.partEnd(out, ev)
+		return e.partEnd(out, ev)
 	case chatstream.VerbApprovalRequest:
 		e.approval(out, ev)
 	case chatstream.VerbUsage:
@@ -245,6 +276,7 @@ func (e *encoder) mapEvent(out *[]chunk, ev chatstream.Event) {
 		}
 		*out = append(*out, c)
 	}
+	return nil
 }
 
 func (e *encoder) foldUsage(ev chatstream.Event) {
@@ -260,10 +292,13 @@ func (e *encoder) foldUsage(ev chatstream.Event) {
 	e.usage = &u
 }
 
-func (e *encoder) partStart(out *[]chunk, ev chatstream.Event) {
+func (e *encoder) partStart(out *[]chunk, ev chatstream.Event) error {
+	if _, open := e.parts[ev.PartID]; open {
+		return sink.OutOfOrder(ev, "part is already open")
+	}
 	e.openStep(out)
 	kind := ev.PartKind()
-	p := &partState{kind: kind, id: ev.PartID, meta: ev}
+	p := &partState{kind: kind, key: ev.PartID, id: ev.PartID, meta: ev}
 	switch kind {
 	case chatstream.PartText, chatstream.PartRefusal:
 		e.trackPart(p)
@@ -277,8 +312,10 @@ func (e *encoder) partStart(out *[]chunk, ev chatstream.Event) {
 			name = "tool"
 		}
 		// A call an approval already created binds to that part instead of
-		// opening a second one.
-		if _, known := e.tools[ev.PartID]; known {
+		// opening a second one. A call id an earlier part.start already used is
+		// a reuse after part.end (Validate allows it): a new call.
+		if t, known := e.tools[ev.PartID]; known && !t.announced {
+			t.announced = true
 			for i, a := range e.awaiting {
 				if a.callID == ev.PartID {
 					e.awaiting = append(e.awaiting[:i], e.awaiting[i+1:]...)
@@ -287,7 +324,7 @@ func (e *encoder) partStart(out *[]chunk, ev chatstream.Event) {
 			}
 			p.bound = true
 			e.parts[ev.PartID] = p
-			return
+			return nil
 		}
 		for i, a := range e.awaiting {
 			if a.tool == name {
@@ -295,21 +332,24 @@ func (e *encoder) partStart(out *[]chunk, ev chatstream.Event) {
 				e.awaiting = append(e.awaiting[:i], e.awaiting[i+1:]...)
 				p.bound = true
 				e.parts[ev.PartID] = p
-				return
+				return nil
 			}
 		}
-		e.tools[ev.PartID] = &toolState{name: name}
+		delete(e.alias, ev.PartID)
+		e.tools[ev.PartID] = &toolState{name: name, announced: true}
 		e.stepTool = append(e.stepTool, ev.PartID)
 		e.parts[ev.PartID] = p
 		*out = append(*out, chunk{"type": "tool-input-start", "toolCallId": ev.PartID, "toolName": name, "dynamic": true})
 	default:
 		e.parts[ev.PartID] = p
 	}
+	return nil
 }
 
 func (e *encoder) trackPart(p *partState) {
-	e.parts[p.id] = p
-	e.order = append(e.order, p.id)
+	p.open = true
+	e.parts[p.key] = p
+	e.order = append(e.order, p.key)
 }
 
 func (e *encoder) callID(partID string) string {
@@ -319,15 +359,21 @@ func (e *encoder) callID(partID string) string {
 	return partID
 }
 
-func (e *encoder) partDelta(out *[]chunk, ev chatstream.Event) {
+func (e *encoder) partDelta(out *[]chunk, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	switch p.kind {
 	case chatstream.PartText, chatstream.PartRefusal:
+		if !p.open {
+			e.reopenBlock(out, p)
+		}
 		*out = append(*out, chunk{"type": "text-delta", "id": p.id, "delta": ev.Text})
 	case chatstream.PartReasoning:
+		if !p.open {
+			e.reopenBlock(out, p)
+		}
 		*out = append(*out, chunk{"type": "reasoning-delta", "id": p.id, "delta": ev.Text})
 	case chatstream.PartToolCall:
 		p.frags.WriteString(ev.JSONFragment)
@@ -339,19 +385,26 @@ func (e *encoder) partDelta(out *[]chunk, ev chatstream.Event) {
 		p.text.WriteString(ev.Text)
 		p.frags.WriteString(ev.JSONFragment)
 	}
+	return nil
 }
 
-func (e *encoder) partEnd(out *[]chunk, ev chatstream.Event) {
+func (e *encoder) partEnd(out *[]chunk, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	delete(e.parts, ev.PartID)
 	e.removeOrder(ev.PartID)
 	switch p.kind {
 	case chatstream.PartText, chatstream.PartRefusal:
-		*out = append(*out, chunk{"type": "text-end", "id": p.id})
+		e.endBlock(out, p)
 	case chatstream.PartReasoning:
+		if !p.open && len(ev.Final) > 0 {
+			// The final value rides on reasoning-end: reopen so it is not lost.
+			e.reopenBlock(out, p)
+			e.removeOrder(ev.PartID)
+		}
+		p.open = false
 		c := chunk{"type": "reasoning-end", "id": p.id}
 		if len(ev.Final) > 0 {
 			c["providerMetadata"] = chunk{"chatstream": chunk{"final": ev.Final}}
@@ -391,6 +444,7 @@ func (e *encoder) partEnd(out *[]chunk, ev chatstream.Event) {
 		}
 		*out = append(*out, chunk{"type": "data-" + name, "id": p.id, "data": data})
 	}
+	return nil
 }
 
 func (e *encoder) removeOrder(id string) {
@@ -532,21 +586,14 @@ func (e *encoder) approval(out *[]chunk, ev chatstream.Event) {
 // closeText ends open text and reasoning parts before a tool card appears, the
 // way the spike does, so a tool never renders inside a text block.
 func (e *encoder) closeText(out *[]chunk) {
-	keep := e.order[:0:0]
+	// The parts stay known, closed on the wire: a later delta reopens a block
+	// under a new id and the part's own end is still in order, so nothing is lost.
 	for _, id := range e.order {
-		p := e.parts[id]
-		switch p.kind {
-		case chatstream.PartText, chatstream.PartRefusal:
-			*out = append(*out, chunk{"type": "text-end", "id": p.id})
-			delete(e.parts, id)
-		case chatstream.PartReasoning:
-			*out = append(*out, chunk{"type": "reasoning-end", "id": p.id})
-			delete(e.parts, id)
-		default:
-			keep = append(keep, id)
+		if p := e.parts[id]; p != nil {
+			e.endBlock(out, p)
 		}
 	}
-	e.order = keep
+	e.order = nil
 }
 
 func (e *encoder) activity(out *[]chunk, ev chatstream.Event) {

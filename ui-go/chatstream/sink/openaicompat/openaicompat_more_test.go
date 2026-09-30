@@ -240,3 +240,7 @@ func sinktestJSON(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+func TestOutOfOrderEventsAreErrorsNotSilence(t *testing.T) {
+	sinktest.OutOfOrderErrors(t, newEnc)
+}

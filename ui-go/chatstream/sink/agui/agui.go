@@ -78,7 +78,9 @@ func (e *encoder) Encode(w sink.Writer, ev chatstream.Event) error {
 		e.runID = ev.RunID
 	}
 	var out []obj
-	e.mapEvent(&out, ev)
+	if err := e.mapEvent(&out, ev); err != nil {
+		return err
+	}
 	id := sink.FrameID(ev)
 	for i := range out {
 		if ms := sink.Milliseconds(ev.Time); ms != 0 {
@@ -106,7 +108,7 @@ func (e *encoder) emit(w sink.Writer, id string, o obj) error {
 	return e.Send(w, id, "", data)
 }
 
-func (e *encoder) mapEvent(out *[]obj, ev chatstream.Event) {
+func (e *encoder) mapEvent(out *[]obj, ev chatstream.Event) error {
 	switch ev.Verb {
 	case chatstream.VerbRunStart:
 		e.provider, e.model = ev.Provider, ev.Model
@@ -120,22 +122,27 @@ func (e *encoder) mapEvent(out *[]obj, ev chatstream.Event) {
 		if name == "" {
 			name = ev.StepID
 		}
+		if _, open := e.steps[ev.StepID]; open {
+			return sink.OutOfOrder(ev, "step is already open")
+		}
 		e.steps[ev.StepID] = name
 		e.stepOrder = append(e.stepOrder, ev.StepID)
 		*out = append(*out, obj{"type": "STEP_STARTED", "stepName": name})
 	case chatstream.VerbStepFinish:
-		if name, ok := e.steps[ev.StepID]; ok {
-			delete(e.steps, ev.StepID)
-			e.stepOrder = removeString(e.stepOrder, ev.StepID)
-			*out = append(*out, obj{"type": "STEP_FINISHED", "stepName": name})
+		name, ok := e.steps[ev.StepID]
+		if !ok {
+			return sink.OutOfOrder(ev, "step is not open")
 		}
+		delete(e.steps, ev.StepID)
+		e.stepOrder = removeString(e.stepOrder, ev.StepID)
+		*out = append(*out, obj{"type": "STEP_FINISHED", "stepName": name})
 	case chatstream.VerbMessageStart, chatstream.VerbMessageEnd:
 	case chatstream.VerbPartStart:
-		e.partStart(out, ev)
+		return e.partStart(out, ev)
 	case chatstream.VerbPartDelta:
-		e.partDelta(out, ev)
+		return e.partDelta(out, ev)
 	case chatstream.VerbPartEnd:
-		e.partEnd(out, ev)
+		return e.partEnd(out, ev)
 	case chatstream.VerbApprovalRequest:
 		e.approval(out, ev)
 	case chatstream.VerbUsage:
@@ -166,6 +173,7 @@ func (e *encoder) mapEvent(out *[]obj, ev chatstream.Event) {
 		if ev.Usage != nil {
 			e.foldUsage(ev)
 		}
+		e.closeAll(out)
 		o := obj{"type": "RUN_ERROR", "message": firstNonEmpty(ev.Message, ev.Code, "the run failed")}
 		if ev.Code != "" {
 			o["code"] = ev.Code
@@ -178,6 +186,7 @@ func (e *encoder) mapEvent(out *[]obj, ev chatstream.Event) {
 		e.addUsage(o)
 		*out = append(*out, o)
 	}
+	return nil
 }
 
 func firstNonEmpty(ss ...string) string {
@@ -239,7 +248,10 @@ func (e *encoder) addUsage(o obj) {
 	o["usage"] = []obj{t}
 }
 
-func (e *encoder) partStart(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partStart(out *[]obj, ev chatstream.Event) error {
+	if _, open := e.parts[ev.PartID]; open {
+		return sink.OutOfOrder(ev, "part is already open")
+	}
 	p := &partState{kind: ev.PartKind(), meta: ev}
 	e.parts[ev.PartID] = p
 	e.order = append(e.order, ev.PartID)
@@ -258,18 +270,24 @@ func (e *encoder) partStart(out *[]obj, ev chatstream.Event) {
 		*out = append(*out, obj{"type": "TOOL_CALL_START", "toolCallId": ev.PartID, "toolCallName": name})
 	default: // tool_result, source, file and data open nothing on the wire until they end
 	}
+	return nil
 }
 
-func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	switch p.kind {
 	case chatstream.PartText, chatstream.PartRefusal:
-		*out = append(*out, obj{"type": "TEXT_MESSAGE_CONTENT", "messageId": ev.PartID, "delta": ev.Text})
+		// AG-UI requires a non-empty delta.
+		if ev.Text != "" {
+			*out = append(*out, obj{"type": "TEXT_MESSAGE_CONTENT", "messageId": ev.PartID, "delta": ev.Text})
+		}
 	case chatstream.PartReasoning:
-		*out = append(*out, obj{"type": "REASONING_MESSAGE_CONTENT", "messageId": ev.PartID, "delta": ev.Text})
+		if ev.Text != "" {
+			*out = append(*out, obj{"type": "REASONING_MESSAGE_CONTENT", "messageId": ev.PartID, "delta": ev.Text})
+		}
 	case chatstream.PartToolCall:
 		p.streamed = p.streamed || ev.JSONFragment != ""
 		*out = append(*out, obj{"type": "TOOL_CALL_ARGS", "toolCallId": ev.PartID, "delta": ev.JSONFragment})
@@ -277,16 +295,18 @@ func (e *encoder) partDelta(out *[]obj, ev chatstream.Event) {
 		p.text.WriteString(ev.Text)
 		p.text.WriteString(ev.JSONFragment)
 	}
+	return nil
 }
 
-func (e *encoder) partEnd(out *[]obj, ev chatstream.Event) {
+func (e *encoder) partEnd(out *[]obj, ev chatstream.Event) error {
 	p, ok := e.parts[ev.PartID]
 	if !ok {
-		return
+		return sink.OutOfOrder(ev, "part is not open")
 	}
 	delete(e.parts, ev.PartID)
 	e.order = removeString(e.order, ev.PartID)
 	e.closePart(out, ev.PartID, p, ev.Final)
+	return nil
 }
 
 func (e *encoder) closePart(out *[]obj, id string, p *partState, final json.RawMessage) {
@@ -334,9 +354,11 @@ func (e *encoder) closeAll(out *[]obj) {
 	for len(e.order) > 0 {
 		id := e.order[len(e.order)-1]
 		e.order = e.order[:len(e.order)-1]
-		p := e.parts[id]
+		p, ok := e.parts[id]
 		delete(e.parts, id)
-		e.closePart(out, id, p, nil)
+		if ok {
+			e.closePart(out, id, p, nil)
+		}
 	}
 	for len(e.stepOrder) > 0 {
 		id := e.stepOrder[len(e.stepOrder)-1]

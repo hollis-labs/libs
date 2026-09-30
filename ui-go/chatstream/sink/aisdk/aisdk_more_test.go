@@ -364,3 +364,65 @@ func TestApprovalBindsByCallIDWhenToolNamesDiffer(t *testing.T) {
 		t.Errorf("chunks = %v", types(cs))
 	}
 }
+
+func TestOutOfOrderEventsAreErrorsNotSilence(t *testing.T) {
+	sinktest.OutOfOrderErrors(t, newEnc)
+}
+
+// A tool_call id reused after its part ended is a new call: it opens, streams
+// and completes again instead of being dropped.
+func TestToolCallIDReusedAfterEndIsANewCall(t *testing.T) {
+	cs := playEvents(t, scenario(t, func(b *sinktest.Builder) {
+		b.Start()
+		b.Part("c1", chatstream.PartToolCall, sinktest.Meta("name", "bash"))
+		b.End("c1", `{"cmd":"ls"}`)
+		b.Part("r1", chatstream.PartToolResult, sinktest.Meta("call_id", "c1"))
+		b.Text("r1", "a")
+		b.End("r1", "")
+		b.Part("c1", chatstream.PartToolCall, sinktest.Meta("name", "bash"))
+		b.End("c1", `{"cmd":"pwd"}`)
+		b.Finish(chatstream.FinishToolCalls, "", nil)
+	}))
+	if n := count(cs, "tool-input-start"); n != 2 {
+		t.Errorf("tool-input-start = %d, want 2: %v", n, types(cs))
+	}
+	if n := count(cs, "tool-input-available"); n != 2 {
+		t.Errorf("tool-input-available = %d, want 2: %v", n, types(cs))
+	}
+}
+
+// An approval or a replace_content closes the open text block on the wire, but
+// the part is still open: later deltas open a new block and are not dropped, and
+// the part's own end is not out of order.
+func TestTextDeltaAfterApprovalOrReplaceIsNotLost(t *testing.T) {
+	for name, mid := range map[string]func(b *sinktest.Builder){
+		"approval": func(b *sinktest.Builder) { b.Approval("ap", "c1", chatstream.ApprovalInBand, `{"tool":"bash"}`) },
+		"replace":  func(b *sinktest.Builder) { b.Activity(sinkReplace, `{"content":""}`) },
+	} {
+		cs := playEvents(t, scenario(t, func(b *sinktest.Builder) {
+			b.Start()
+			b.Part("t1", chatstream.PartText, nil)
+			b.Text("t1", "before ")
+			mid(b)
+			b.Text("t1", "after")
+			b.End("t1", "")
+			b.Finish(chatstream.FinishStop, "", nil)
+		}))
+		got := sinktest.JoinedText(t, framesOf(cs), "type", []string{"text-delta"}, "delta")
+		if got != "before after" {
+			t.Errorf("%s: text = %q, want %q: %v", name, got, "before after", types(cs))
+		}
+		if count(cs, "text-start") != count(cs, "text-end") {
+			t.Errorf("%s: unbalanced text blocks: %v", name, types(cs))
+		}
+	}
+}
+
+func framesOf(cs []map[string]any) []sinktest.Frame {
+	var out []sinktest.Frame
+	for _, c := range cs {
+		b, _ := json.Marshal(c)
+		out = append(out, sinktest.Frame{Data: string(b)})
+	}
+	return out
+}

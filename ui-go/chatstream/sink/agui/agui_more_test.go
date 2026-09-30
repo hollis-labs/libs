@@ -2,12 +2,14 @@ package agui_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 
 	chatstream "github.com/hollis-labs/go-chatstream"
+	"github.com/hollis-labs/go-chatstream/sink"
 	"github.com/hollis-labs/go-chatstream/sink/agui"
 	"github.com/hollis-labs/go-chatstream/sink/sinktest"
 )
@@ -189,7 +191,7 @@ func TestOutcomes(t *testing.T) {
 	}
 }
 
-func TestRunErrorEndsWhateverIsOpenWithoutClosingIt(t *testing.T) {
+func TestRunErrorClosesWhatIsOpenBeforeRunError(t *testing.T) {
 	es := play(t, sinktest.Build(func(b *sinktest.Builder) {
 		b.Start()
 		b.Part("t1", chatstream.PartText, nil)
@@ -197,8 +199,10 @@ func TestRunErrorEndsWhateverIsOpenWithoutClosingIt(t *testing.T) {
 		b.Add(chatstream.VerbRunError, func(e *chatstream.Event) { e.Code, e.Message = "boom", "it broke" })
 	}))
 	ts := typeList(es)
-	if ts[len(ts)-1] != "RUN_ERROR" || strings.Contains(strings.Join(ts, ","), "TEXT_MESSAGE_END") {
-		t.Errorf("types = %v; RUN_ERROR ends open items, the encoder does not have to close them", ts)
+	// Every TEXT_MESSAGE_START needs its END before RUN_ERROR, like RUN_FINISHED.
+	want := "RUN_STARTED,TEXT_MESSAGE_START,TEXT_MESSAGE_CONTENT,TEXT_MESSAGE_END,RUN_ERROR"
+	if strings.Join(ts, ",") != want {
+		t.Errorf("types = %v, want %s", ts, want)
 	}
 	if es[len(es)-1]["message"] != "it broke" || es[len(es)-1]["code"] != "boom" {
 		t.Errorf("RUN_ERROR = %v", es[len(es)-1])
@@ -369,5 +373,39 @@ func TestHeaders(t *testing.T) {
 	h := agui.New().Headers()
 	if h.Get("Content-Type") != "text/event-stream" || agui.New().Name() != "agui" {
 		t.Errorf("headers = %v", h)
+	}
+}
+
+func TestEmptyDeltaEmitsNoContentEvent(t *testing.T) {
+	es := play(t, sinktest.Build(func(b *sinktest.Builder) {
+		b.Start()
+		b.Part("t1", chatstream.PartText, nil)
+		b.Text("t1", "")
+		b.Text("t1", "x")
+		b.Part("r1", chatstream.PartReasoning, nil)
+		b.Text("r1", "")
+		b.End("r1", "")
+		b.End("t1", "")
+		b.Finish(chatstream.FinishStop, "", nil)
+	}))
+	for _, e := range es {
+		if d, ok := e["delta"]; ok && d == "" {
+			t.Errorf("%v has an empty delta", e)
+		}
+	}
+	if got := strings.Count(strings.Join(typeList(es), ","), "TEXT_MESSAGE_CONTENT"); got != 1 {
+		t.Errorf("TEXT_MESSAGE_CONTENT events = %d, want 1: %v", got, typeList(es))
+	}
+}
+
+func TestOutOfOrderEventsAreErrorsNotSilence(t *testing.T) {
+	sinktest.OutOfOrderErrors(t, newEnc)
+	enc := agui.New()
+	rec := &sinktest.Recorder{}
+	ev := sinktest.Build(func(b *sinktest.Builder) {
+		b.Add(chatstream.VerbStepFinish, func(e *chatstream.Event) { e.StepID = "s" })
+	})[0]
+	if err := enc.Encode(rec, ev); !errors.Is(err, sink.ErrOutOfOrder) {
+		t.Errorf("step.finish for a step never started: %v, want ErrOutOfOrder", err)
 	}
 }

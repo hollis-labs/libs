@@ -42,7 +42,24 @@ var (
 	// ErrWriterChanged is returned when an Encoder is handed a different Writer
 	// than the one it started on.
 	ErrWriterChanged = errors.New("sink: encoder was given a different Writer")
+	// ErrOutOfOrder is returned by Encode for an event that does not follow from
+	// the events the encoder has seen: a part.delta or part.end for a part that is
+	// not open, a part.start for an id that is already open, a step.finish for a
+	// step that is not open. The usual cause is an encoder fed the tail of a run
+	// (a resumed subscription) instead of the run from its first event. The event
+	// is refused, nothing is written for it and the encoder's state is unchanged.
+	ErrOutOfOrder = errors.New("sink: event out of order")
 )
+
+// OutOfOrder is the error Encode returns for an event that does not follow from
+// what the encoder has seen; it wraps ErrOutOfOrder.
+func OutOfOrder(ev chatstream.Event, why string) error {
+	id := ev.PartID
+	if id == "" {
+		id = ev.StepID
+	}
+	return fmt.Errorf("%w: %s %q: %s", ErrOutOfOrder, ev.Verb, id, why)
+}
 
 // SSEHeaders returns the headers an SSE response needs, the same defaults as
 // go-ssekit's NewWriter. Encoders start from these and add their own.
