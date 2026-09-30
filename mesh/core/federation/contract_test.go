@@ -14,7 +14,7 @@ import (
 func contractFactory(ops OpSet) messagingtest.Factory {
 	return func(t *testing.T) gomsg.Store {
 		client := validIdentity(t)
-		h := startHop(t, ops, []string{"test"}, []PeerConfig{peer("contract", client, "test")})
+		h := startHop(t, ops, []string{"test"}, []PeerConfig{peer("contract", client, "test")}, withSharedAuthorities())
 		return h.dial(client, WithOpSet(ops))
 	}
 }
@@ -32,4 +32,29 @@ func TestWidenedOpSetPassesTheWholeStoreContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	messagingtest.RunContract(t, contractFactory(wide))
+}
+
+// Outside shared-authority mode, a peer may not hold an authority this install
+// homes: it could originate mail as any local address.
+func TestNewServerRejectsPeerAuthorityOverlapUnlessMailboxOpsAreOn(t *testing.T) {
+	client := validIdentity(t)
+	reg, err := NewPeerRegistry([]PeerConfig{peer("p", client, "shared")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewServer(newSpy(), MTLSPinnedResolver(reg), DefaultOpSet(), []string{"shared"}); err == nil {
+		t.Fatal("default ops: a peer holding a local authority must be refused")
+	}
+	if _, err := NewServer(newSpy(), MTLSPinnedResolver(reg), DefaultOpSet(), []string{"other"}); err != nil {
+		t.Fatalf("disjoint authorities: %v", err)
+	}
+	for _, op := range []Op{OpInbox, OpSubscribe} {
+		wide, err := DefaultOpSet().Widen(op)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := NewServer(newSpy(), MTLSPinnedResolver(reg), wide, []string{"shared"}); err != nil {
+			t.Fatalf("%s enabled is shared-authority mode and must be allowed: %v", op, err)
+		}
+	}
 }

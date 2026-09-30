@@ -41,6 +41,7 @@ refuses a tag whose CHANGELOG has no heading for it.
 
 Deliberate hardening; each has a test.
 
+- `NewServer` (and so config loading) refuses a peer that claims an authority this install homes unless `Inbox` or `Subscribe` is enabled: outside that shared-authority mode such a peer could originate mail as any local address and nothing needs the overlap. With a mailbox operation on it is allowed and means trusting that peer for every address in the authority.
 - TLS 1.3 is the minimum (Torque: 1.2), and the pin is checked in `VerifyConnection`, which Go runs on resumed sessions too, rather than `VerifyPeerCertificate`, which it skips.
 - `Get`, `Consume` and `Cancel` answer 404 with the same body for an envelope the caller is not a party to as for a missing id (Torque: 403 versus 404, which tells a peer whether an id exists); the audit record keeps the difference.
 - A Thread is filtered to the envelopes the caller is a party to and answers 200 for a thread the caller has no part in, rather than 403 for a non-party: the response does not say whether a thread id exists, and a thread holding other parties' mail no longer shows it.

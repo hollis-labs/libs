@@ -91,15 +91,17 @@ func WithClock(now func() time.Time) ServerOption { return func(s *Server) { s.n
 // the authorizer checks that again on arrival. Wrapping the Router would let a
 // request be re-dispatched straight back out, the relay this design forbids.
 type Server struct {
-	store      gomsg.Store
-	resolver   IdentityResolver
-	ops        OpSet
-	authz      *authorizer
-	audit      func(AuditRecord)
-	maxPayload int
-	maxList    int
-	now        func() time.Time
-	handler    http.Handler
+	// sharedAuthorities skips the default-mode authority-overlap check; only tests set it.
+	sharedAuthorities bool
+	store             gomsg.Store
+	resolver          IdentityResolver
+	ops               OpSet
+	authz             *authorizer
+	audit             func(AuditRecord)
+	maxPayload        int
+	maxList           int
+	now               func() time.Time
+	handler           http.Handler
 }
 
 // NewServer builds the surface over local. resolver authenticates callers; ops
@@ -138,6 +140,18 @@ func NewServer(local gomsg.Store, resolver IdentityResolver, ops OpSet, localAut
 			return nil, errors.New("federation: NewServer got a nil ServerOption")
 		}
 		o(s)
+	}
+	if m, ok := resolver.(*mtlsResolver); ok && !s.sharedAuthorities && !ops.Allows(OpInbox) && !ops.Allows(OpSubscribe) {
+		// Without Inbox or Subscribe nothing needs a peer to hold an authority this
+		// install homes, and it would let that peer originate mail as any local
+		// address. Shared-authority mode exists only when a mailbox operation is on.
+		for _, p := range m.peers.peers {
+			for _, a := range p.Authorities() {
+				if authz.homes(a) {
+					return nil, fmt.Errorf("federation: peer %q claims authority %q, which this install homes; that is only allowed when the inbox or subscribe operation is enabled (shared-authority mode)", p.Label, a)
+				}
+			}
+		}
 	}
 	if s.audit == nil {
 		return nil, errors.New("federation: WithAuditor needs a function")
@@ -742,3 +756,8 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener, tlsConf *tls.Config
 	}
 	return err
 }
+
+// withSharedAuthorities lets a peer hold an authority this install homes without a
+// mailbox operation enabled. Unexported on purpose: the go-messaging contract runs
+// every party in one authority, and that is its only caller.
+func withSharedAuthorities() ServerOption { return func(s *Server) { s.sharedAuthorities = true } }
