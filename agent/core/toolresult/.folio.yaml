@@ -13,7 +13,7 @@ presets:
 inputs:
   agents_boundaries: |-
     - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+    - See the Boundaries section of AGENTS.md for the invariants and the tests that guard each.
   agents_start_here: |-
     - `toolresult` package — the importable API; its `doc.go` is the package documentation.
     - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
