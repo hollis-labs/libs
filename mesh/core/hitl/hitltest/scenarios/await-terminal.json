@@ -1,0 +1,51 @@
+{
+  "name": "await-terminal",
+  "description": "Await of an already terminal item returns await/terminal with the outcome.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:658",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "resolve",
+      "item": "a",
+      "as": "r",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "expect": {
+        "state": "resolved",
+        "decision": "approved"
+      }
+    },
+    {
+      "op": "await",
+      "item": "a",
+      "fields": {
+        "wait_ms": 50
+      },
+      "expect": {
+        "mode": "await",
+        "wait_status": "terminal",
+        "state": "resolved",
+        "outcome_equals": "r"
+      }
+    }
+  ]
+}

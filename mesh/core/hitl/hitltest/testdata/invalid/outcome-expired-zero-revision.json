@@ -1,0 +1,13 @@
+{
+  "def": "ExpiredTerminalOutcomeV1",
+  "name": "outcome-expired-zero-revision",
+  "rejects_because": "/interaction_revision",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "expired",
+    "item_id": "item_03",
+    "interaction_revision": 0,
+    "policy_ref": "request.expires_at",
+    "terminated_at": "2026-09-04T03:30:00Z"
+  }
+}

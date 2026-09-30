@@ -1,0 +1,8 @@
+{
+  "def": "ParticipantCaptureCoreV1",
+  "name": "participant-no-identity",
+  "rejects_because": "",
+  "doc": {
+    "assurance": "asserted"
+  }
+}

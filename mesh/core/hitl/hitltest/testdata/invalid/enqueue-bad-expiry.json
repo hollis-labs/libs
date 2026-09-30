@@ -1,0 +1,15 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-bad-expiry",
+  "rejects_because": "/expires_at",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "k-1",
+    "source": {
+      "application_id": "codex",
+      "agent_id": "msg://agent/codex/worker-7"
+    },
+    "expires_at": "tomorrow"
+  }
+}

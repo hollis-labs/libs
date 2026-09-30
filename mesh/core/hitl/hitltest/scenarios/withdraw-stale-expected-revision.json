@@ -1,0 +1,49 @@
+{
+  "name": "withdraw-stale-expected-revision",
+  "description": "A withdraw whose expected_revision is stale is a stale_revision error and changes nothing.",
+  "tangent_evidence": "T:/internal/hitl/service.go Withdraw (staleError)",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "withdraw",
+      "item": "a",
+      "fields": {
+        "expected_revision": 99
+      },
+      "expect": {
+        "code": "stale_revision"
+      }
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    }
+  ]
+}

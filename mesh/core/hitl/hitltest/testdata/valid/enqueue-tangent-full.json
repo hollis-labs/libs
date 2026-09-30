@@ -1,0 +1,24 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-tangent-full",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "k-1",
+    "source": {
+      "application_id": "codex",
+      "agent_id": "msg://agent/codex/worker-7"
+    },
+    "title": "t",
+    "summary": "s",
+    "request": "r",
+    "expires_at": "2026-12-01T00:00:00Z",
+    "correlations": {
+      "task": {
+        "authority": "torque",
+        "id": "CW-1"
+      }
+    },
+    "evidence": []
+  }
+}

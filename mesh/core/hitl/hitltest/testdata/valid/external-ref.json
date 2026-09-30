@@ -1,0 +1,10 @@
+{
+  "def": "ExternalRefV1",
+  "name": "external-ref",
+  "doc": {
+    "authority": "torque",
+    "id": "CW-1",
+    "revision": "4",
+    "label": "task"
+  }
+}

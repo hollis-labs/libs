@@ -1,0 +1,12 @@
+{
+  "def": "HITLTerminalOutcomeCoreV1",
+  "name": "outcome-superseded",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "superseded",
+    "item_id": "item_05",
+    "interaction_revision": 3,
+    "replacement_item_id": "item_06",
+    "terminated_at": "2026-09-04T03:30:00Z"
+  }
+}

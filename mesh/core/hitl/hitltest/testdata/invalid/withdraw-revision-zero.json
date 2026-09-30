@@ -1,0 +1,13 @@
+{
+  "def": "HITLWithdrawCommandV1",
+  "name": "withdraw-revision-zero",
+  "rejects_because": "/expected_revision",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "caller": {
+      "application_id": "codex"
+    },
+    "expected_revision": 0
+  }
+}

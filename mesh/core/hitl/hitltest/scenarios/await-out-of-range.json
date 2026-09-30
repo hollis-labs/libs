@@ -1,0 +1,45 @@
+{
+  "name": "await-out-of-range",
+  "description": "wait_ms outside 0..50000 is rejected, not clamped.",
+  "tangent_evidence": "T:/internal/hitl/service.go Await (maximumWait check)",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "await",
+      "item": "a",
+      "fields": {
+        "wait_ms": -1
+      },
+      "expect": {
+        "code": "validation_failed"
+      }
+    },
+    {
+      "op": "await",
+      "item": "a",
+      "fields": {
+        "wait_ms": 50001
+      },
+      "expect": {
+        "code": "validation_failed"
+      }
+    }
+  ]
+}

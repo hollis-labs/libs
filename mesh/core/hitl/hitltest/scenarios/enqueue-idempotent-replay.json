@@ -1,0 +1,60 @@
+{
+  "name": "enqueue-idempotent-replay",
+  "description": "The same idempotency key with identical content returns the original item and its current state.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:24 TestEnqueueAllocatesOneGlobalFIFOAndScopesIdempotency",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ]
+      }
+    },
+    {
+      "op": "enqueue",
+      "as": "a2",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {
+        "same_item_as": "a",
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    }
+  ]
+}

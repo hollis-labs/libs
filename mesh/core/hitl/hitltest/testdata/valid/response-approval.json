@@ -1,0 +1,8 @@
+{
+  "def": "ApprovalResponseV1",
+  "name": "response-approval",
+  "doc": {
+    "kind": "approval",
+    "decision": "approved"
+  }
+}

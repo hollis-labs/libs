@@ -1,0 +1,10 @@
+{
+  "def": "ApprovalResponseV1",
+  "name": "response-approval-blank-note",
+  "rejects_because": "/note",
+  "doc": {
+    "kind": "approval",
+    "decision": "approved",
+    "note": ""
+  }
+}

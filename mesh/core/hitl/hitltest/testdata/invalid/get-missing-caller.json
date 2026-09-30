@@ -1,0 +1,9 @@
+{
+  "def": "HITLGetCommandV1",
+  "name": "get-missing-caller",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01"
+  }
+}
