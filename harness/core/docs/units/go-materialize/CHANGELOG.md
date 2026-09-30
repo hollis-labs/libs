@@ -4,11 +4,7 @@ All notable changes to go-materialize are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Changed
-
-- Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
+## v0.1.0 — 2026-09-30
 
 ### Added
 
@@ -25,6 +21,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Raised the module's `go` directive to `1.26.6` (Go floor across the
+  portfolio); CI now uses `go-version-file: go.mod`.
 - Manifest path renamed from the agentkit-branded
   `.agentkit/materialize-manifest.json` to `.materialize/manifest.json`
   (breaking for existing agentkit consumers on upgrade — see the
