@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
-	"time"
 
 	ssekit "github.com/hollis-labs/go-ssekit"
+	"github.com/hollis-labs/go-ssekit/conformance"
 )
 
 func collect(t *testing.T, r io.Reader, o ...ssekit.ReadOption) ([]ssekit.Event, error) {
@@ -25,100 +25,13 @@ func collect(t *testing.T, r io.Reader, o ...ssekit.ReadOption) ([]ssekit.Event,
 	return evs, nil
 }
 
-type want struct {
-	id, name, data string
-	retry          time.Duration
-}
-
-// The WHATWG vectors. Each one is run whole, one byte per Read, and split at
-// every possible offset (TestRead_ChunkingInvariant).
-var vectors = []struct {
-	name string
-	in   string
-	want []want
-}{
-	{"lf", "id: 1\nevent: a\ndata: x\n\n", []want{{"1", "a", "x", 0}}},
-	{"crlf", "id: 1\r\nevent: a\r\ndata: x\r\n\r\n", []want{{"1", "a", "x", 0}}},
-	{"lone cr", "id: 1\revent: a\rdata: x\r\r", []want{{"1", "a", "x", 0}}},
-	{"mixed endings", "data: a\r\ndata: b\rdata: c\n\n", []want{{"", "", "a\nb\nc", 0}}},
-	{"cr then lf across the dispatch", "data: x\r\n\r\ndata: y\n\n", []want{{"", "", "x", 0}, {"", "", "y", 0}}},
-	{"bom at start", "\xef\xbb\xbfdata: x\n\n", []want{{"", "", "x", 0}}},
-	{"bom not at start", "data: a\n\n\xef\xbb\xbfdata: b\n\ndata: c\n\n", []want{{"", "", "a", 0}, {"", "", "c", 0}}},
-	{"comment", ": hi\n\ndata: x\n: mid\n\n", []want{{"", "", "x", 0}}},
-	{"data without space", "data:x\n\n", []want{{"", "", "x", 0}}},
-	{"data one leading space stripped", "data:  x\n\n", []want{{"", "", " x", 0}}},
-	{"empty data value dispatches", "data:\n\n", []want{{"", "", "", 0}}},
-	{"empty data with space dispatches", "data: \n\n", []want{{"", "", "", 0}}},
-	{"bare data field dispatches", "data\n\n", []want{{"", "", "", 0}}},
-	{"multi data join", "data: a\ndata: b\n\n", []want{{"", "", "a\nb", 0}}},
-	{"multi data with empty middle", "data: a\ndata:\ndata: b\n\n", []want{{"", "", "a\n\nb", 0}}},
-	{"no data no dispatch", "event: a\nid: 3\n\ndata: x\n\n", []want{{"3", "", "x", 0}}},
-	{"event name resets after dispatch", "event: a\ndata: 1\n\ndata: 2\n\n", []want{{"", "a", "1", 0}, {"", "", "2", 0}}},
-	{"event name discarded by a data-less block", "event: a\n\ndata: 2\n\n", []want{{"", "", "2", 0}}},
-	{"id persists", "id: 1\ndata: a\n\ndata: b\n\n", []want{{"1", "", "a", 0}, {"1", "", "b", 0}}},
-	{"id with NUL ignored", "id: 1\ndata: a\n\nid: a\x00b\ndata: b\n\n", []want{{"1", "", "a", 0}, {"1", "", "b", 0}}},
-	{"empty id resets", "id: 1\ndata: a\n\nid:\ndata: b\n\n", []want{{"1", "", "a", 0}, {"", "", "b", 0}}},
-	{"bare id resets", "id: 1\ndata: a\n\nid\ndata: b\n\n", []want{{"1", "", "a", 0}, {"", "", "b", 0}}},
-	{"retry", "retry: 1500\ndata: x\n\n", []want{{"", "", "x", 1500 * time.Millisecond}}},
-	{"retry on its own block rides the next event", "retry: 250\n\ndata: x\n\ndata: y\n\n", []want{{"", "", "x", 250 * time.Millisecond}, {"", "", "y", 0}}},
-	{"retry non-digit ignored", "retry: 12a\nretry: -5\nretry:\nretry: 1.5\ndata: x\n\n", []want{{"", "", "x", 0}}},
-	{"retry last valid wins", "retry: 10\nretry: 20\nretry: zz\ndata: x\n\n", []want{{"", "", "x", 20 * time.Millisecond}}},
-	{"unknown fields ignored", "foo: bar\nbaz\ndata: x\n\n", []want{{"", "", "x", 0}}},
-	{"field names are case sensitive", "DATA: no\nData: no\ndata: yes\n\n", []want{{"", "", "yes", 0}}},
-	{"colon in value", "data: a:b: c\n\n", []want{{"", "", "a:b: c", 0}}},
-	{"many blank lines", "\n\n\ndata: x\n\n\n\n", []want{{"", "", "x", 0}}},
-	{"incomplete event at EOF discarded", "data: a\n\ndata: b\n", []want{{"", "", "a", 0}}},
-	{"incomplete last line discarded", "data: a\n\ndata: b", []want{{"", "", "a", 0}}},
-	{"cr at EOF completes the line but not the event", "data: a\n\ndata: b\r", []want{{"", "", "a", 0}}},
-	{"empty stream", "", nil},
-	{"binary-ish payload kept opaque", "data: \xff\xfe\n\n", []want{{"", "", "\xff\xfe", 0}}},
-}
-
-func check(t *testing.T, got []ssekit.Event, w []want) {
-	t.Helper()
-	if len(got) != len(w) {
-		t.Fatalf("got %d events %+v, want %d %+v", len(got), got, len(w), w)
-	}
-	for i := range w {
-		g := got[i]
-		if g.ID != w[i].id || g.Name != w[i].name || string(g.Data) != w[i].data || g.Retry != w[i].retry {
-			t.Errorf("event %d = {id:%q name:%q data:%q retry:%v}, want %+v", i, g.ID, g.Name, g.Data, g.Retry, w[i])
-		}
-	}
-}
-
+// The WHATWG vectors live in package conformance so any other parser can run
+// them; here they are run against Read itself, whole and chunked (one byte per
+// Read and a split at every offset).
 func TestRead_WHATWGVectors(t *testing.T) {
-	for _, v := range vectors {
-		t.Run(v.name, func(t *testing.T) {
-			got, err := collect(t, strings.NewReader(v.in))
-			if err != nil {
-				t.Fatal(err)
-			}
-			check(t, got, v.want)
-		})
-	}
-}
-
-// Chunk boundaries must not change what is parsed: one byte per Read, and a
-// two-chunk split at every offset of every vector.
-func TestRead_ChunkingInvariant(t *testing.T) {
-	for _, v := range vectors {
-		t.Run(v.name, func(t *testing.T) {
-			got, err := collect(t, iotest.OneByteReader(strings.NewReader(v.in)))
-			if err != nil {
-				t.Fatal(err)
-			}
-			check(t, got, v.want)
-			for cut := 0; cut <= len(v.in); cut++ {
-				r := io.MultiReader(strings.NewReader(v.in[:cut]), strings.NewReader(v.in[cut:]))
-				got, err := collect(t, r)
-				if err != nil {
-					t.Fatalf("cut %d: %v", cut, err)
-				}
-				check(t, got, v.want)
-			}
-		})
-	}
+	conformance.Run(t, func(r io.Reader) ([]ssekit.Event, error) {
+		return collect(t, r)
+	})
 }
 
 func TestRead_DataIsCallerOwned(t *testing.T) {
@@ -227,8 +140,8 @@ func TestRoundTrip_WriterToReader(t *testing.T) {
 }
 
 func FuzzRead(f *testing.F) {
-	for _, v := range vectors {
-		f.Add([]byte(v.in))
+	for _, v := range conformance.Vectors {
+		f.Add([]byte(v.In))
 	}
 	f.Add([]byte("data: a\r\ndata: b\rid: 1\n\n\xef\xbb\xbf: c\n"))
 	f.Fuzz(func(t *testing.T, in []byte) {

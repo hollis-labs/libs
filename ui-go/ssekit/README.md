@@ -80,6 +80,7 @@ The same program lives in [`examples/hello`](./examples/hello/main.go); run it w
 | `Serve`, `Source` | Copies a `Source` to a `Writer` with a keepalive comment after 15 s of quiet, an optional maximum lifetime, a terminal-event predicate, and context cancellation. Returns write errors so the caller can abort upstream work. |
 | `ResumeCursor` | Reads `Last-Event-ID` and/or named query parameters into an opaque string. `HeaderFirst` (default), `QueryFirst`, or `Newest(cmp)` with your comparison. |
 | `Read` | A WHATWG event-stream parser over any `io.Reader`, as an `iter.Seq2[Event, error]`. |
+| `conformance.Run`, `conformance.Vectors` | The WHATWG raw-frame vector table `Read` is tested against, exported so any other SSE parser can run it (whole, one byte per `Read`, split at every offset). Raw-frame parsing only: no reconnection or HTTP behavior. |
 | `Client.Stream` | Connects, parses, and reconnects with `Last-Event-ID` (and hands it to your request builder for apps that resume by query parameter). Backoff 1, 2, 4, 8, 16 s with 20% jitter, honors a server `retry:`, idle watchdog (45 s) driven by any bytes including comments, terminal predicate, final-status policy (4xx except 408 and 429), continuity check yielding `*GapError`, reconnect limit. |
 | `ChanSource`, `SourceFunc`, `Merge`, `PollSource` | Sources: a channel, a function, a live fan-in of several sources, and a poll loop with an opaque cursor. |
 | `ssetest.Script` | A scripted, hostile server: `Emit`, `Drop`, `Close`, `Overlap`, `Gap`, `Status`, `Stall`, `Burst`, `Retry`, `Comment`, `Raw` chunks, and a record of every request seen. |
@@ -101,7 +102,7 @@ The brief allowed wrapping `github.com/tmaxmax/go-sse` v0.11.0 if a first spike 
 - does not expose `retry:` at all, which the client needs;
 - reports an oversize event as a bare `bufio.Scanner: token too long`.
 
-CRLF, lone CR, chunking one byte at a time and BOM handling passed. The spike was a throwaway program run once against those inputs; the vectors it used live on as `TestRead_WHATWGVectors`, which now runs against the stdlib parser.
+CRLF, lone CR, chunking one byte at a time and BOM handling passed. The spike was a throwaway program run once against those inputs; the vectors it used live on as `conformance.Vectors`, run by `TestRead_WHATWGVectors`, which now runs against the stdlib parser.
 
 ## Defaults the brief left open
 

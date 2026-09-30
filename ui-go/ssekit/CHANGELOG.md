@@ -7,6 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
+## v0.2.0 — Unreleased
+
+### Added
+
+- Package `conformance`: a reusable raw-wire-format suite for any SSE parser.
+  `Vectors` is the WHATWG vector table go-ssekit's own reader is tested
+  against (moved out of `read_test.go`, plus one new vector, "non-numeric id is
+  opaque"); `ParseFunc` and `Run(t, parse)` run every vector whole, one byte per
+  `Read`, and split in two at every offset. It tests raw-frame parsing only, not
+  reconnection, timeouts or HTTP behavior (that is `ssetest`).
+
+### Changed
+
+- `TestRead_WHATWGVectors` now runs `conformance.Run` against `Read` and
+  replaces `TestRead_ChunkingInvariant`; `FuzzRead` seeds from
+  `conformance.Vectors`. No change to the root package.
+
 ## v0.1.0 — 2026-09-29
 
 ### Added
