@@ -91,3 +91,43 @@ func TestEveryDialectThroughEverySink(t *testing.T) {
 		t.Fatalf("only %d combinations ran", total)
 	}
 }
+
+// A Nanite client pairs a tool_result with its tool_call by tool_id, so every
+// tool_result frame every dialect's fixtures produce must carry the tool_id of a
+// tool_call frame written earlier in the same stream.
+func TestNaniteToolResultIDsMatchAnEarlierToolCall(t *testing.T) {
+	results := 0
+	for aname, a := range adapters {
+		paths, err := filepath.Glob(filepath.Join("..", "..", "adapter", aname, "testdata", "*.frames.json"))
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("%s: no fixtures (%v)", aname, err)
+		}
+		for _, p := range paths {
+			fx, err := conformance.LoadFixture(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			events, err := conformance.DecodeFixture(a, fx)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", aname, fx.Name, err)
+			}
+			frames := sinktest.Play(t, nanitelegacy.New(), sinktest.Scenario{Name: fx.Name, Events: events})
+			calls := map[string]bool{}
+			for _, f := range frames {
+				switch f.Event {
+				case "tool_call":
+					calls[sinktest.MustJSON(t, f)["tool_id"].(string)] = true
+				case "tool_result":
+					results++
+					id, _ := sinktest.MustJSON(t, f)["tool_id"].(string)
+					if !calls[id] {
+						t.Errorf("%s/%s: tool_result tool_id %q does not match an earlier tool_call (%v)", aname, fx.Name, id, calls)
+					}
+				}
+			}
+		}
+	}
+	if results == 0 {
+		t.Fatal("no fixture produced a tool_result: the check ran on nothing")
+	}
+}

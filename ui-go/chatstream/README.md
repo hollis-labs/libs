@@ -87,6 +87,9 @@ The same program lives in [`examples/decode`](./examples/decode/main.go).
 - **Capabilities are declared, not faked.** Each adapter's `Capabilities` states what its dialect streams (token, chunk or whole), and `Validate` rejects a contradictory declaration.
 - **The hub owns the cursor.** `Event.Seq` is the go-streamhub record's `Seq`; this module never counts its own, and resume is by the `Last-Event-ID` header only. Resume replays events, not encoder state: the stateful encoders (`aisdk`, `agui`, `openaicompat`, `nanitelegacy`) must be fed the run from `run.start` (a fresh encoder given only a tail returns `sink.ErrOutOfOrder` rather than silently dropping content), so a resumed subscription replays the run from its first event into a fresh encoder and writes only the frames past the client's cursor.
 
+- **Cancellation is checked between frames.** `DecodeFrames` looks at its context before each frame; a frame source blocked in a read is not interrupted by it, so the reader behind the frames (an HTTP request, a connection, a process) must itself be bound to the same context.
+- **Frames and state are bounded.** `framing.SSE` accepts events up to 16 MiB (`framing.WithMaxEventBytes` changes it) and `framing.Lines` lines up to 16 MiB; an over-limit frame ends the run with the non-retryable `frame_too_large`, not a retryable truncation. The openaichat and anthropic decoders keep at most 1024 tool calls or content blocks open at once; more ends the run with the non-retryable `limit_exceeded`.
+
 ## Compatibility
 
 This module is pre-1.0: minor releases may break the exported API. Pin an exact

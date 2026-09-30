@@ -16,6 +16,12 @@ import (
 //     with that cause.
 //   - After the terminal event no further frame is read.
 //
+// Cancellation is observed only between frames: ctx is checked before each frame
+// is requested, so a frames sequence blocked in a read is not interrupted by it.
+// The reader behind frames must itself be bound to the context (an HTTP request
+// made with ctx, a connection with a deadline, a process killed on cancel), or a
+// canceled ctx does not end the run until the next frame or EOF arrives.
+//
 // A Decode error (ErrDecoderClosed is the only one a well-behaved decoder
 // returns) ends the sequence with it. If the consumer stops early the decoder
 // is closed and its closing events are discarded.
