@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T22:50:03.951941-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+  agents_start_here: |-
+    - `svcerr` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Small transport-agnostic typed error carrier: status, machine code, safe message, with errors.Is/As support.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: svcerr
+  repo_name: go-svcerr
+  stability: pre-1.0
+computed:
+  import_line: svcerr "github.com/hollis-labs/go-svcerr"
+  import_path: github.com/hollis-labs/go-svcerr
+  module_path: github.com/hollis-labs/go-svcerr
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:3e5dddf800d4c620a010c7cdc3b807cb4224842ce97b76ae2a1e0fd4166a07c9
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:5eeb681b65edf85a38c12f164b3247143a71ead21c6bb5c1e9ca8e066977f22b
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:13c13135d2c0fa95205e195f7cfbd10df9bf98943727e7b4e661e620f2ab6f89
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:579a1173caba2fcd7b9a218246497ed92b975629aa1927561f5113cc5fbf52ba
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:8d718772fac47a5d8ac43ed722f3d2e8fa61c7fa3dcfe3a668674db403e12315
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:e9dafcf28acd231fae3f3d44aa34a69733975410f8f8df71bfaa421f31b36f2b
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:a5d5f8576cd643a5c32120739d46f4440085cd2c9a3b760c5ed28c8dd4c99a95
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  svcerr.go:
+    preset: go-lib
+    digest_at_gen: sha256:a2464f23426a00a8d66ddea701a61d6f02c19663d15fed68597da564bc6eadc9
+  svcerr_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:2c8a1618d2ae0ee8c5cf8daf5cc5a8052e57f768a74c2a1a750b39907cf4b477
+sync_history:
+  - at: 2026-09-29T22:50:03.951941-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
