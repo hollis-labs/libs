@@ -23,7 +23,7 @@
 //     It may originate mail only from those (no impersonation), may have mail
 //     delivered only for authorities this install homes (no relay), and may touch
 //     only envelopes it is a party to. A thread shows a peer only its own
-//     envelopes. Consume must name an address of the envelope.
+//     envelopes. Consume must name an address of the envelope that the caller is authoritative for.
 //   - The surface is a configurable OpSet. DefaultOpSet is Torque's reference:
 //     Send, Get, Thread, Consume and Cancel on, Inbox and Subscribe off. A disabled
 //     operation is not mounted and its store is never called. Widening the set is a

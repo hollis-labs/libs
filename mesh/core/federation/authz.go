@@ -80,15 +80,20 @@ func (a *authorizer) authorizeEnvelopeAccess(op Op, id Identity, env gomsg.Envel
 	return nil
 }
 
-// authorizeConsume is envelope access plus a check that the recipient being
-// consumed for is itself one of the envelope's addresses: a party to an envelope
-// cannot mark it consumed on behalf of an unrelated recipient.
+// authorizeConsume is envelope access plus two checks on the recipient being
+// consumed for: it must be one of the envelope's addresses (a party cannot mark
+// an envelope consumed for an unrelated recipient), and the caller must be
+// authoritative for its authority (a peer holding only the sender side cannot
+// consume the local recipient's copy). Both refuse alike.
 func (a *authorizer) authorizeConsume(id Identity, env gomsg.Envelope, recipient gomsg.Address) error {
 	if err := a.authorizeEnvelopeAccess(OpConsume, id, env); err != nil {
 		return err
 	}
 	if recipient != env.To && recipient != env.From {
 		return fmt.Errorf("%w: recipient %s is not an address of envelope %q", errForbidden, recipient.URN(), env.ID)
+	}
+	if !id.IsAuthoritative(recipient.Authority) {
+		return fmt.Errorf("%w: %q is not authoritative for recipient %s of envelope %q", errForbidden, id.Label, recipient.URN(), env.ID)
 	}
 	return nil
 }

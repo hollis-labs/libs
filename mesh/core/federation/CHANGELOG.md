@@ -27,6 +27,11 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `NewServer` returns an error for `WithAuditor(nil)`, `WithClock(nil)`, a nil `ServerOption` and a typed-nil Store or `PeerRegistry`, instead of panicking at request time.
 - `Serve` no longer leaks its shutdown goroutine when the listener fails, and waits for the drain to finish before it returns.
 
+### Changed
+
+- `Consume` additionally requires the caller to be authoritative for the recipient's authority: a peer holding only the sender side could previously mark the local recipient's copy consumed. It is refused with the same 403 and body as consuming for an unrelated recipient.
+- `Send` with a non-empty `in_reply_to` or `thread_id` must name an exchange the caller is a party to: the reply target must exist and the caller be a party to it, and a thread that holds envelopes must hold at least one of the caller's. A missing and a foreign target are refused identically (403, fixed body, before any store write); the audit record keeps the reason. A fresh, unused thread id is allowed.
+
 ### Decisions
 
 - No self-asserted identity resolver in v1 (the ratified default): Tether's `?as=` pattern is not carried over, and no stub is left for it. If one is ever added it must be named unmistakably as insecure and be a later, explicit opt-in.
@@ -40,6 +45,8 @@ Deliberate hardening; each has a test.
 - `Get`, `Consume` and `Cancel` answer 404 with the same body for an envelope the caller is not a party to as for a missing id (Torque: 403 versus 404, which tells a peer whether an id exists); the audit record keeps the difference.
 - A Thread is filtered to the envelopes the caller is a party to and answers 200 for a thread the caller has no part in, rather than 403 for a non-party: the response does not say whether a thread id exists, and a thread holding other parties' mail no longer shows it.
 - `Consume` requires the recipient to be an address of the envelope: a party could otherwise mark an envelope consumed for an unrelated recipient.
+- Consume requires the caller be authoritative for the recipient's authority.
+- `Send` may reply to, or join the thread of, only an exchange the sender is a party to.
 - Envelope metadata under the reserved `fed.` prefix is refused (Torque ignored it), so no peer occupies the namespace before signed envelopes exist.
 - The caller is never sent authorization detail, store error text or a panic value; these go to the audit record.
 - `NewServer` returns an error for every misconfiguration; a nil `OpSet` means `DefaultOpSet` and an `OpSet` with nothing on is an error. Audit is a callback (`WithAuditor`, `SlogAuditor`), not `log.Printf`.

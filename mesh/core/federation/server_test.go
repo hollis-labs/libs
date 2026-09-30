@@ -167,15 +167,26 @@ func TestGetConsumeCancelRequireBeingAParty(t *testing.T) {
 		t.Errorf("Get unknown: %d", status)
 	}
 
-	if err := c.Consume(ctx, mine.ID, mine.To); err != nil {
+	if err := c.Consume(ctx, mine.ID, mine.To); err == nil {
+		t.Fatal("a sender-side peer consumed the local recipient's copy")
+	}
+	if err := c.Consume(ctx, mine.ID, mine.From); err != nil {
 		t.Fatalf("Consume own: %v", err)
 	}
 	if err := c.Consume(ctx, foreign.ID, foreign.To); err == nil {
 		t.Error("Consume of an envelope the peer is not a party to")
 	}
-	status, _ := f.do(http.MethodPost, BasePath+"/"+mine.ID+"/consume", `{"recipient":"`+agent("local", "somebody-else").URN()+`"}`)
+	status, unrelated := f.do(http.MethodPost, BasePath+"/"+mine.ID+"/consume", `{"recipient":"`+agent("local", "somebody-else").URN()+`"}`)
 	if status != 403 {
 		t.Errorf("Consume for an unrelated recipient: %d, want 403", status)
+	}
+	// the sender-side peer naming the local recipient is refused exactly so
+	mismatch, body := f.do(http.MethodPost, BasePath+"/"+mine.ID+"/consume", `{"recipient":"`+mine.To.URN()+`"}`)
+	if mismatch != 403 || body != unrelated {
+		t.Errorf("Consume for a recipient in an authority the peer lacks: %d %q, want %d %q", mismatch, body, status, unrelated)
+	}
+	if got, _ := f.store.Get(ctx, mine.ID); got.ConsumedAt == nil {
+		t.Error("the sender's own consume did not land")
 	}
 	for name, body := range map[string]string{"bad JSON": `{`, "no recipient": `{}`, "bad URN": `{"recipient":"nope"}`} {
 		want := map[string]int{"bad JSON": 400, "no recipient": 422, "bad URN": 422}[name]
@@ -636,5 +647,51 @@ func TestServeDoesNotLeakTheShutdownGoroutineOnAListenerError(t *testing.T) {
 	}
 	if after := runtime.NumGoroutine(); after > before {
 		t.Errorf("goroutines: %d before, %d after; Serve leaked its shutdown goroutine", before, after)
+	}
+}
+
+// A peer must not inject into another exchange's reply chain or thread. A
+// missing reply target and a foreign one are refused identically.
+func TestSendRefusesReplyAndThreadInjection(t *testing.T) {
+	f := newFixture(t, nil, nil)
+	ctx := context.Background()
+	foreign := notice(agent("local", "a"), agent("local", "b"))
+	foreign.ThreadID = "PRIVATE"
+	foreign = mustSend(t, f.store, foreign)
+	mine := notice(agent("remote", "a"), agent("local", "b"))
+	mine.ThreadID = "MINE"
+	mine = mustSend(t, f.store, mine)
+
+	send := func(mut func(*gomsg.Envelope)) (int, string) {
+		e := notice(agent("remote", "a"), agent("local", "b"))
+		mut(&e)
+		return f.do(http.MethodPost, BasePath, envJSON(t, e))
+	}
+	before := f.store.count("send")
+	sForeign, bForeign := send(func(e *gomsg.Envelope) { e.InReplyTo = foreign.ID })
+	reasonForeign := f.audit.last().Reason
+	sMissing, bMissing := send(func(e *gomsg.Envelope) { e.InReplyTo = "does-not-exist" })
+	reasonMissing := f.audit.last().Reason
+	if sForeign != 403 || sMissing != sForeign || bMissing != bForeign {
+		t.Errorf("reply refusals differ: foreign %d %q, missing %d %q", sForeign, bForeign, sMissing, bMissing)
+	}
+	if reasonForeign == reasonMissing || !strings.Contains(reasonForeign, "in_reply_to") {
+		t.Errorf("the audit record must keep the real reasons: %q / %q", reasonForeign, reasonMissing)
+	}
+	if s, b := send(func(e *gomsg.Envelope) { e.ThreadID = "PRIVATE" }); s != sForeign || b != bForeign {
+		t.Errorf("thread injection: %d %q, want %d %q", s, b, sForeign, bForeign)
+	}
+	if n := f.store.count("send") - before; n != 0 {
+		t.Errorf("%d refused sends reached the store", n)
+	}
+
+	if s, b := send(func(e *gomsg.Envelope) { e.InReplyTo = mine.ID; e.ThreadID = "MINE" }); s != 201 {
+		t.Errorf("a reply within its own exchange: %d %s", s, b)
+	}
+	if s, b := send(func(e *gomsg.Envelope) { e.ThreadID = "FRESH" }); s != 201 {
+		t.Errorf("starting a fresh thread: %d %s", s, b)
+	}
+	if got, err := f.store.Thread(ctx, "PRIVATE", gomsg.Filter{}); err != nil || len(got) != 1 {
+		t.Errorf("the foreign thread was written to: %+v, %v", got, err)
 	}
 }

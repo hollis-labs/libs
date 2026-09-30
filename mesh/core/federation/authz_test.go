@@ -74,17 +74,38 @@ func TestAuthorizeEnvelopeAccess(t *testing.T) {
 func TestAuthorizeConsumeRequiresAnAddressOfTheEnvelope(t *testing.T) {
 	a := authz(t, "local")
 	env := notice(agent("remote", "x"), agent("local", "y"))
-	if err := a.authorizeConsume(peerID, env, env.To); err != nil {
-		t.Errorf("consuming for the envelope's recipient: %v", err)
-	}
 	if err := a.authorizeConsume(peerID, env, env.From); err != nil {
-		t.Errorf("consuming for the envelope's sender: %v", err)
+		t.Errorf("consuming for the envelope's sender, which the peer holds: %v", err)
 	}
-	if err := a.authorizeConsume(peerID, env, agent("local", "somebody-else")); !errors.Is(err, errForbidden) {
+	if err := a.authorizeConsume(peerID, env, agent("remote", "somebody-else")); !errors.Is(err, errForbidden) {
 		t.Errorf("a party must not consume on behalf of an unrelated recipient: %v", err)
 	}
 	if err := a.authorizeConsume(peerID, notice(agent("local", "x"), agent("local", "y")), agent("local", "y")); !errors.Is(err, errForbidden) {
 		t.Errorf("a non-party must not consume at all: %v", err)
+	}
+}
+
+// A caller may consume only for a recipient in an authority it holds: a peer
+// authoritative for the sender side alone must not consume the local
+// recipient's copy.
+func TestAuthorizeConsumeRequiresTheCallerToHoldTheRecipientsAuthority(t *testing.T) {
+	a := authz(t, "local", "remote")
+	senderOnly := notice(agent("remote", "a"), agent("local", "victim"))
+	if err := a.authorizeConsume(peerID, senderOnly, senderOnly.To); !errors.Is(err, errForbidden) {
+		t.Errorf("a sender-side peer consumed the local recipient's copy: %v", err)
+	}
+	recipientSide := notice(agent("local", "a"), agent("remote", "mine"))
+	if err := a.authorizeConsume(peerID, recipientSide, recipientSide.To); err != nil {
+		t.Errorf("a recipient-side peer consuming for its own recipient: %v", err)
+	}
+	if err := a.authorizeConsume(peerID, recipientSide, recipientSide.From); !errors.Is(err, errForbidden) {
+		t.Errorf("a recipient-side peer consumed for the local sender: %v", err)
+	}
+	both := Identity{Label: "both", Authorities: []string{"remote", "local"}}
+	for _, r := range []gomsg.Address{senderOnly.To, senderOnly.From} {
+		if err := a.authorizeConsume(both, senderOnly, r); err != nil {
+			t.Errorf("a caller holding both sides consuming for %s: %v", r.URN(), err)
+		}
 	}
 }
 

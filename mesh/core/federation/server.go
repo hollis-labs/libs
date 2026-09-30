@@ -369,6 +369,13 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request, c reqCtx) {
 		s.reject(w, c.id, OpSend, env, err)
 		return
 	}
+	if err := s.authorizeExchange(r.Context(), c.id, env); err != nil {
+		// One fixed refusal whether the target is missing or foreign: no
+		// existence oracle. The audit record keeps the real reason.
+		s.auditEnv(c.id, OpSend, env, false, err.Error())
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	out, err := s.store.Send(r.Context(), env)
 	if err != nil {
 		s.storeError(w, c.id, OpSend, env, err)
@@ -376,6 +383,34 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request, c reqCtx) {
 	}
 	s.auditEnv(c.id, OpSend, out, true, "delivered")
 	writeJSON(w, http.StatusCreated, out)
+}
+
+// authorizeExchange checks that a Send naming an existing exchange belongs to
+// the caller: a non-empty InReplyTo must be an envelope the caller is a party to,
+// and a non-empty ThreadID must either hold no envelopes (a fresh thread) or hold
+// at least one the caller is a party to. Otherwise a peer could inject into
+// another pair's reply chain or thread. Store failures are returned as refusals
+// too (fail closed), with the store text in the audit reason only.
+func (s *Server) authorizeExchange(ctx context.Context, id Identity, env gomsg.Envelope) error {
+	if env.InReplyTo != "" {
+		target, err := s.store.Get(ctx, env.InReplyTo)
+		if err != nil {
+			return fmt.Errorf("%w: in_reply_to %q: %w", errForbidden, env.InReplyTo, err)
+		}
+		if err := s.authz.authorizeEnvelopeAccess(OpGet, id, target); err != nil {
+			return fmt.Errorf("in_reply_to %q: %w", env.InReplyTo, err)
+		}
+	}
+	if env.ThreadID != "" {
+		visible, scanned, err := s.callerThread(ctx, id, env.ThreadID, gomsg.Filter{Limit: 1})
+		if err != nil {
+			return fmt.Errorf("%w: thread_id %q: %w", errForbidden, env.ThreadID, err)
+		}
+		if scanned > 0 && len(visible) == 0 {
+			return fmt.Errorf("%w: %q is not a party to any envelope of thread_id %q", errForbidden, id.Label, env.ThreadID)
+		}
+	}
+	return nil
 }
 
 // usesReservedMetadata reports whether any key is in, or disguised as being in,
