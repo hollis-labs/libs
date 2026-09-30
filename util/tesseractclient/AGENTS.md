@@ -33,3 +33,4 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - **Auth is optional and static.** A non-empty token sends `Authorization: Bearer <token>`; an empty token sends no header at all. Guarded by `TestBearerTokenIsSentOnlyWhenSet` and `TestBearerTokenAgainstAServerThatRequiresOne`.
 - **`tesseracttest` decodes as strictly as the server** (unknown recall or filter keys are a 400). Loosening it hides exactly the drift this library exists to prevent.
 - No retries or backoff, and no untested new exported surface: every exported entry point has an `Example*`.
+- Paging loops (`RecallAll`, `ListNamespaces`) track every cursor they have used and fail on a repeat, and `ListNamespaces` has a page cap. Comparing only with the previous cursor is not enough (an A, B, A cycle got past it). Guarded by `TestRecallAllRefusesACursorCycle`, `TestListNamespacesRefusesACursorCycle` and `TestListNamespacesStopsAServerThatNeverEnds`.

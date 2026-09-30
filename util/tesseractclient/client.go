@@ -17,6 +17,10 @@ import (
 
 // DefaultBaseURL is where Tesseract's API service listens on this machine.
 // It answers on loopback without a credential.
+// maxNamespacePages bounds ListNamespaces: 1000 pages of 200 is 200,000
+// namespaces, far beyond any real registry.
+const maxNamespacePages = 1000
+
 const DefaultBaseURL = "http://127.0.0.1:8089"
 
 const (
@@ -100,12 +104,22 @@ func (c *Client) Recall(ctx context.Context, req RecallRequest) (RecallPage, err
 // RecallAll pages a recall to exhaustion by following manifest.next_cursor,
 // and reports whether it got everything. It stops at maxRecords rather than
 // paging without bound; in that case complete is false and the caller must
-// say so instead of presenting the result as the whole set. A zero req.Limit
-// becomes a page size of 500. A server that answers the same cursor twice
-// running is reported as an error rather than looped on forever.
+// say so instead of presenting the result as the whole set. maxRecords <= 0
+// means "the first page only": the loop always fetches one page, and returns
+// it with complete false if the server has more. A zero req.Limit becomes a
+// page size of 500.
+//
+// A server (or proxy) that hands back a cursor this call has already used
+// (the same one twice running, or a longer cycle such as A, B, A) is reported
+// as an error rather than looped on forever, whether or not the pages carry
+// results.
 func (c *Client) RecallAll(ctx context.Context, req RecallRequest, maxRecords int) (revisions []Revision, complete bool, err error) {
 	if req.Limit == 0 {
 		req.Limit = defaultPageLimit
+	}
+	seen := map[string]struct{}{}
+	if req.Cursor != "" {
+		seen[req.Cursor] = struct{}{}
 	}
 	for {
 		page, err := c.Recall(ctx, req)
@@ -122,9 +136,10 @@ func (c *Client) RecallAll(ctx context.Context, req RecallRequest, maxRecords in
 		if len(revisions) >= maxRecords {
 			return revisions, false, nil
 		}
-		if next == req.Cursor {
+		if _, dup := seen[next]; dup {
 			return nil, false, fmt.Errorf("tesseract: recall repeated cursor %q without advancing", next)
 		}
+		seen[next] = struct{}{}
 		req.Cursor = next
 	}
 }
@@ -170,10 +185,18 @@ func (c *Client) Deprecate(ctx context.Context, revisionID string) error {
 // ListNamespaces returns the registered namespaces under prefix
 // (GET /v1/namespaces/list), following the server's cursor to the end.
 // Defined by Station but not called in its production code today.
+//
+// It gives up with an error on a repeated cursor (including a cycle such as
+// A, B, A) and after maxNamespacePages pages, so a broken server or proxy
+// cannot make it grow its result without bound.
 func (c *Client) ListNamespaces(ctx context.Context, prefix string) ([]string, error) {
 	var out []string
 	cursor := ""
-	for {
+	seen := map[string]struct{}{}
+	for pages := 0; ; pages++ {
+		if pages >= maxNamespacePages {
+			return nil, fmt.Errorf("tesseract: namespace listing exceeded %d pages", maxNamespacePages)
+		}
 		q := url.Values{"prefix": {prefix}, "limit": {"200"}}
 		if cursor != "" {
 			q.Set("cursor", cursor)
@@ -194,9 +217,10 @@ func (c *Client) ListNamespaces(ctx context.Context, prefix string) ([]string, e
 		if !body.Truncated || body.NextCursor == "" {
 			return out, nil
 		}
-		if body.NextCursor == cursor {
-			return nil, fmt.Errorf("tesseract: namespace listing repeated cursor %q without advancing", cursor)
+		if _, dup := seen[body.NextCursor]; dup || body.NextCursor == cursor {
+			return nil, fmt.Errorf("tesseract: namespace listing repeated cursor %q without advancing", body.NextCursor)
 		}
+		seen[body.NextCursor] = struct{}{}
 		cursor = body.NextCursor
 	}
 }
