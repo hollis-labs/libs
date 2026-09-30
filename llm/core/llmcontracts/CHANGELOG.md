@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0 — Unreleased
+
+- Added the `contracttest` subpackage: `contracttest.Run` is a reusable
+  conformance suite for `Provider` implementations. Against a deterministic
+  double it checks that `Capabilities` does not panic, that `StreamChat`
+  never returns `(nil, nil)` or a channel alongside an error, that the
+  stream delivers exactly one turn-terminal event and then closes within a
+  bound, and that `Complete` returns within a bound. A `Provider` that
+  always fails `StreamChat` synchronously (a Complete-only client) passes.
+  No response-content, tool-call or error-taxonomy checks.
+- Raised the module's `go` directive to 1.26.6.
+- No changes to the root package's exported API; no new dependencies.
+
 ## v0.3.0 — 2026-05-20
 
 - `CacheHint` is now a type alias for `llmtypes.CacheHint`. Callers that use
