@@ -157,6 +157,9 @@ func (c *Client) CreateWorkstream(ctx context.Context, name, workflowID string) 
 
 // GetWorkstream fetches one workstream via GET /workstreams/{id}.
 func (c *Client) GetWorkstream(ctx context.Context, id string) (Workstream, error) {
+	if id == "" {
+		return Workstream{}, errEmptyArg("id")
+	}
 	var out Workstream
 	if err := c.getJSON(ctx, "/workstreams/"+url.PathEscape(id), &out); err != nil {
 		return Workstream{}, err
@@ -184,6 +187,9 @@ func (c *Client) ListWorkstreams(ctx context.Context, status, workflowID string)
 // AssignSessionWorkstream stamps a workstream onto a session via
 // POST /sessions/{id}/workstream. An empty workstreamID clears it.
 func (c *Client) AssignSessionWorkstream(ctx context.Context, sessionID, workstreamID string) error {
+	if sessionID == "" {
+		return errEmptyArg("sessionID")
+	}
 	return c.doNoBody(ctx, http.MethodPost, "/sessions/"+url.PathEscape(sessionID)+"/workstream",
 		sessionWorkstreamRequest{WorkstreamID: workstreamID}, http.StatusNoContent)
 }
@@ -191,6 +197,9 @@ func (c *Client) AssignSessionWorkstream(ctx context.Context, sessionID, workstr
 // EnsureSessionWorkstream returns the session's workstream, creating one for
 // its lineage when it has none.
 func (c *Client) EnsureSessionWorkstream(ctx context.Context, sessionID, name, workflowID string) (Workstream, error) {
+	if sessionID == "" {
+		return Workstream{}, errEmptyArg("sessionID")
+	}
 	var out Workstream
 	err := c.doJSON(ctx, http.MethodPost, "/sessions/"+url.PathEscape(sessionID)+"/workstream",
 		sessionWorkstreamRequest{Ensure: true, Name: name, WorkflowID: workflowID}, http.StatusOK, &out)
@@ -201,6 +210,9 @@ func (c *Client) EnsureSessionWorkstream(ctx context.Context, sessionID, name, w
 // content belongs in Tesseract's workspace. The daemon returns the location and
 // stores nothing; the caller writes to Tesseract itself.
 func (c *Client) SessionWorkstreamNamespace(ctx context.Context, sessionID string, opts ...SessionWorkstreamNamespaceOptions) (WorkstreamNamespaceResponse, error) {
+	if sessionID == "" {
+		return WorkstreamNamespaceResponse{}, errEmptyArg("sessionID")
+	}
 	q := url.Values{}
 	if len(opts) > 0 {
 		o := opts[0]
@@ -221,6 +233,9 @@ func (c *Client) SessionWorkstreamNamespace(ctx context.Context, sessionID strin
 // split into what it left behind and what it only consulted. It does not roll
 // up the lineage; WorkstreamDigest does.
 func (c *Client) SessionDigest(ctx context.Context, sessionID string, q DigestQuery) (DigestResponse, error) {
+	if sessionID == "" {
+		return DigestResponse{}, errEmptyArg("sessionID")
+	}
 	var out DigestResponse
 	if err := c.getJSON(ctx, withQuery("/sessions/"+url.PathEscape(sessionID)+"/digest", q.encode()), &out); err != nil {
 		return DigestResponse{}, err
@@ -231,6 +246,9 @@ func (c *Client) SessionDigest(ctx context.Context, sessionID string, q DigestQu
 // WorkstreamDigest fetches GET /workstreams/{id}/digest: the roll-up across
 // every session in the workstream.
 func (c *Client) WorkstreamDigest(ctx context.Context, workstreamID string, q DigestQuery) (DigestResponse, error) {
+	if workstreamID == "" {
+		return DigestResponse{}, errEmptyArg("workstreamID")
+	}
 	var out DigestResponse
 	if err := c.getJSON(ctx, withQuery("/workstreams/"+url.PathEscape(workstreamID)+"/digest", q.encode()), &out); err != nil {
 		return DigestResponse{}, err

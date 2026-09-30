@@ -6,7 +6,11 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
-## v0.5.0 — unreleased
+## v0.5.0 — 2026-09-30
+
+### Changed
+
+- The new group, workstream and session-workstream methods refuse an empty id with an error instead of sending it: an empty path segment would have been a request to the neighbouring collection route (`/groups/`, `/workstreams/`), whose answer a caller could mistake for the one it asked for.
 
 ### Added
 

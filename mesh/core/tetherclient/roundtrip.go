@@ -33,7 +33,7 @@ func (c *Client) roundTrip(ctx context.Context, method, path string, body any, o
 	if err != nil {
 		return 0, wrapIfUnreachable(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if !slices.Contains(ok, resp.StatusCode) {
 		return resp.StatusCode, errFn(resp)
 	}
@@ -44,4 +44,12 @@ func (c *Client) roundTrip(ctx context.Context, method, path string, body any, o
 		return resp.StatusCode, fmt.Errorf("decode %s %s response: %w", method, path, err)
 	}
 	return resp.StatusCode, nil
+}
+
+// errEmptyArg rejects an empty id that would become an empty path segment. An
+// empty segment is not an invalid request to the daemon: it is a request to the
+// neighbouring collection route ("/groups/", "/workstreams/"), whose answer a
+// caller could mistake for the one it asked for.
+func errEmptyArg(name string) error {
+	return fmt.Errorf("tether: %s must not be empty", name)
 }

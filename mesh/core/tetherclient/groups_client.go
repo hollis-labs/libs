@@ -175,6 +175,9 @@ func (gc *GroupsClient) Create(ctx context.Context, req CreateGroupRequest) (Reg
 
 // Lookup GETs /groups/{urn}. A URN that is not a group is a 404.
 func (gc *GroupsClient) Lookup(ctx context.Context, urn string) (RegistryProfile, error) {
+	if urn == "" {
+		return RegistryProfile{}, errEmptyArg("urn")
+	}
 	var out RegistryProfile
 	err := gc.do(ctx, http.MethodGet, groupPath(urn), nil, http.StatusOK, &out)
 	return out, err
@@ -182,6 +185,9 @@ func (gc *GroupsClient) Lookup(ctx context.Context, urn string) (RegistryProfile
 
 // ListForMember lists the groups memberURN belongs to, as a non-nil slice.
 func (gc *GroupsClient) ListForMember(ctx context.Context, memberURN string) ([]RegistryProfile, error) {
+	if memberURN == "" {
+		return nil, errEmptyArg("memberURN")
+	}
 	var env struct {
 		Groups []RegistryProfile `json:"groups"`
 	}
@@ -196,6 +202,9 @@ func (gc *GroupsClient) ListForMember(ctx context.Context, memberURN string) ([]
 
 // Archive archives the group on behalf of byURN and returns it.
 func (gc *GroupsClient) Archive(ctx context.Context, grpURN, byURN string) (RegistryProfile, error) {
+	if grpURN == "" {
+		return RegistryProfile{}, errEmptyArg("grpURN")
+	}
 	var out RegistryProfile
 	err := gc.do(ctx, http.MethodDelete, groupPath(grpURN)+"?as="+url.QueryEscape(byURN), nil, http.StatusOK, &out)
 	return out, err
@@ -203,6 +212,12 @@ func (gc *GroupsClient) Archive(ctx context.Context, grpURN, byURN string) (Regi
 
 // AddMember adds memberURN on behalf of byURN. An empty role means "member".
 func (gc *GroupsClient) AddMember(ctx context.Context, grpURN, memberURN, byURN string, role RegistryMemberRole) (GroupMember, error) {
+	if grpURN == "" {
+		return GroupMember{}, errEmptyArg("grpURN")
+	}
+	if memberURN == "" {
+		return GroupMember{}, errEmptyArg("memberURN")
+	}
 	var out GroupMember
 	err := gc.do(ctx, http.MethodPost, groupPath(grpURN, "members"),
 		map[string]string{"member": memberURN, "by": byURN, "role": string(role)}, http.StatusCreated, &out)
@@ -211,22 +226,43 @@ func (gc *GroupsClient) AddMember(ctx context.Context, grpURN, memberURN, byURN 
 
 // RemoveMember removes memberURN on behalf of byURN.
 func (gc *GroupsClient) RemoveMember(ctx context.Context, grpURN, memberURN, byURN string) error {
+	if grpURN == "" {
+		return errEmptyArg("grpURN")
+	}
+	if memberURN == "" {
+		return errEmptyArg("memberURN")
+	}
 	return gc.do(ctx, http.MethodDelete, groupPath(grpURN, "members", url.PathEscape(memberURN))+"?as="+url.QueryEscape(byURN), nil, http.StatusOK, nil)
 }
 
 // Leave removes memberURN from the group at its own request.
 func (gc *GroupsClient) Leave(ctx context.Context, grpURN, memberURN string) error {
+	if grpURN == "" {
+		return errEmptyArg("grpURN")
+	}
+	if memberURN == "" {
+		return errEmptyArg("memberURN")
+	}
 	return gc.do(ctx, http.MethodPost, groupPath(grpURN, "leave"), map[string]string{"member": memberURN}, http.StatusOK, nil)
 }
 
 // SetMemberRole changes a member's role on behalf of byURN.
 func (gc *GroupsClient) SetMemberRole(ctx context.Context, grpURN, memberURN string, role RegistryMemberRole, byURN string) error {
+	if grpURN == "" {
+		return errEmptyArg("grpURN")
+	}
+	if memberURN == "" {
+		return errEmptyArg("memberURN")
+	}
 	return gc.do(ctx, http.MethodPatch, groupPath(grpURN, "members", url.PathEscape(memberURN)),
 		map[string]string{"role": string(role), "by": byURN}, http.StatusOK, nil)
 }
 
 // ListMembers lists the group's members, as a non-nil slice.
 func (gc *GroupsClient) ListMembers(ctx context.Context, grpURN string) ([]GroupMember, error) {
+	if grpURN == "" {
+		return nil, errEmptyArg("grpURN")
+	}
 	var env struct {
 		Members []GroupMember `json:"members"`
 	}
@@ -242,6 +278,9 @@ func (gc *GroupsClient) ListMembers(ctx context.Context, grpURN string) ([]Group
 // Send posts a message to the group. A send whose @-mention is ambiguous fails
 // with a *GroupAmbiguousMentionError; an archived group answers 423.
 func (gc *GroupsClient) Send(ctx context.Context, grpURN string, req SendGroupRequest) (SendGroupResult, error) {
+	if grpURN == "" {
+		return SendGroupResult{}, errEmptyArg("grpURN")
+	}
 	var out SendGroupResult
 	err := gc.do(ctx, http.MethodPost, groupPath(grpURN, "messages"), map[string]any{
 		"from":         req.From,
@@ -256,6 +295,9 @@ func (gc *GroupsClient) Send(ctx context.Context, grpURN string, req SendGroupRe
 // ListMessages reads a page of the group's messages. It does not move the read
 // cursor; MarkRead does.
 func (gc *GroupsClient) ListMessages(ctx context.Context, grpURN string, p ListMessagesParams) (ListGroupMessagesResult, error) {
+	if grpURN == "" {
+		return ListGroupMessagesResult{}, errEmptyArg("grpURN")
+	}
 	q := url.Values{}
 	q.Set("as", p.As)
 	if p.SinceSeq != 0 {
@@ -280,6 +322,12 @@ func (gc *GroupsClient) ListMessages(ctx context.Context, grpURN string, p ListM
 // MarkRead advances memberURN's read cursor to upToSeq. It is monotonic: a
 // smaller value than the current cursor changes nothing.
 func (gc *GroupsClient) MarkRead(ctx context.Context, grpURN, memberURN string, upToSeq int64) error {
+	if grpURN == "" {
+		return errEmptyArg("grpURN")
+	}
+	if memberURN == "" {
+		return errEmptyArg("memberURN")
+	}
 	return gc.do(ctx, http.MethodPost, groupPath(grpURN, "read"),
 		map[string]any{"up_to_seq": upToSeq, "as": memberURN}, http.StatusOK, nil)
 }
