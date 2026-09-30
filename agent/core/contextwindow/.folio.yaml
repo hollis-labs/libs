@@ -1,0 +1,92 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T20:53:34.435807-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+  agents_start_here: |-
+    - `contextwindow` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: Fixed, ordered context-slot system with per-slot budgets, cache-key tracking and escalating compaction.
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: contextwindow
+  repo_name: go-context-window
+  stability: pre-1.0
+computed:
+  import_line: contextwindow "github.com/hollis-labs/go-context-window"
+  import_path: github.com/hollis-labs/go-context-window
+  module_path: github.com/hollis-labs/go-context-window
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:43702d0c9639fdc8fe55844956c5e25ef22fa0077e9ec7aab2bac2145f363311
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:53285e8f3b5a13e981fa32e7ce0db8db6a727f1c1977c754c1df0eeea363df70
+  CLAUDE.md:
+    preset: go-baseline
+    digest_at_gen: sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:6da13460df3be159d08e6000a3015d3770bec2896fbb653a4110e99f7af90e48
+  contextwindow.go:
+    preset: go-lib
+    digest_at_gen: sha256:5b1c16f312591f9c4df5eb4f4ee0eeb93efd6df0cce1ccc6fae918e79932e1b5
+  contextwindow_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:5c426a02f6f2afd304c0dc7c2214a61464b53edfcdc2f49f003d54691b1da211
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:c35fc2466fb9efbc91040a7d20109a3d6cccc911eeaffb3c360f0227b28d9e07
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:32ece390e20f07152f7ae3921b26d1721cacd940d8e11767503d00b847a7b199
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:2d07f684c20e654a3117c4d12789ffe4e9248a0540184534129635d24d91d291
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:8f678bf6f433c5c4d5ab54d3daf4b1d9b5238b5c4e355522565cb8c323bc8038
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+sync_history:
+  - at: 2026-09-29T20:53:34.435807-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
