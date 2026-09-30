@@ -4,6 +4,21 @@ All notable changes to go-apppaths are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `WithWarn(func(format string, args ...any))` option (log.Printf-shaped, as in
+  go-otel's `InitOrWarn`): reports each owned path that could not be tightened
+  because chmod was permission-denied. Default is silent, so nothing changes
+  for callers who do not opt in. Symlink skips are not reported.
+
+### Changed
+
+- A path the process may not chmod is still left as found instead of failing
+  `Resolve`, and is now reported through `WithWarn` when one is set (v0.2.0
+  degraded silently).
+
 ## v0.2.0 — 2026-09-30
 
 Targets v0.2.0 (not yet tagged). Implements the 0700 permission default

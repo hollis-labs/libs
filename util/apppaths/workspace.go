@@ -77,17 +77,17 @@ func (l Layout) SelectWorkspace(name string) error {
 	if strings.ContainsAny(name, `/\`) {
 		return fmt.Errorf("apppaths: workspace name %q must not contain a path separator", name)
 	}
-	if err := ensureOwnedDir(workspaceFor(l.dataDir, name).Dir); err != nil {
+	if err := ensureOwnedDir(workspaceFor(l.dataDir, name).Dir, l.warn); err != nil {
 		return fmt.Errorf("apppaths: create workspace %q: %w", name, err)
 	}
-	if err := ensureOwnedDir(l.stateDir); err != nil {
+	if err := ensureOwnedDir(l.stateDir, l.warn); err != nil {
 		return fmt.Errorf("apppaths: prepare state dir: %w", err)
 	}
 	file := filepath.Join(l.stateDir, activeWorkspaceFile)
 	if err := os.WriteFile(file, []byte(name+"\n"), FileMode); err != nil {
 		return fmt.Errorf("apppaths: write active-workspace pointer: %w", err)
 	}
-	if err := chmodOwned(file, FileMode); err != nil {
+	if err := chmodOwned(file, FileMode, l.warn); err != nil {
 		return fmt.Errorf("apppaths: secure active-workspace pointer: %w", err)
 	}
 	return nil

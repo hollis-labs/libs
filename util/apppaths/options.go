@@ -18,6 +18,7 @@ type config struct {
 	skipMaterialize bool
 	legacyNames     []string
 	warnWriter      io.Writer
+	warn            *warner
 }
 
 // WithWorkspace pins the active workspace by name. It overrides both the
@@ -53,6 +54,26 @@ func WithLegacyNames(names ...string) Option {
 // migration failures) to w. The default is os.Stderr.
 func WithWarnWriter(w io.Writer) Option {
 	return func(c *config) { c.warnWriter = w }
+}
+
+// WithWarn reports, through logf, each owned path Resolve or SelectWorkspace
+// could not tighten to DirMode/FileMode because the process lacks permission
+// to chmod it (owned by another user, read-only mount). Without it that case
+// is silent and the path is left as found. logf matches log.Printf, so the
+// stdlib logger can be passed directly: paths.WithWarn(log.Printf). A nil logf
+// is a no-op, and a panic in logf is recovered so it cannot break resolution.
+//
+// Only permission-denied is reported. Symlinks that are skipped on purpose,
+// paths that are already at the right mode, and hard errors (which Resolve
+// returns) do not call logf.
+func WithWarn(logf func(format string, args ...any)) Option {
+	return func(c *config) {
+		if logf == nil {
+			c.warn = nil
+			return
+		}
+		c.warn = &warner{logf: logf}
+	}
 }
 
 // WithoutMaterialize skips directory creation. By default Resolve MkdirAll's

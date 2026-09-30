@@ -1,9 +1,11 @@
 package paths
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -215,7 +217,7 @@ func TestChmodOwnedDegradesOnNonOwnedPath(t *testing.T) {
 		t.Skip("no /usr")
 	}
 	before := info.Mode().Perm()
-	if err := chmodOwned(root, DirMode); err != nil {
+	if err := chmodOwned(root, DirMode, nil); err != nil {
 		t.Fatalf("chmodOwned on a non-owned path must degrade, got %v", err)
 	}
 	wantMode(t, root, before)
@@ -223,7 +225,7 @@ func TestChmodOwnedDegradesOnNonOwnedPath(t *testing.T) {
 
 func TestChmodOwnedMissingPathIsAnError(t *testing.T) {
 	skipNoModes(t)
-	if err := chmodOwned(filepath.Join(t.TempDir(), "nope"), DirMode); err == nil {
+	if err := chmodOwned(filepath.Join(t.TempDir(), "nope"), DirMode, nil); err == nil {
 		t.Error("expected error for a missing path")
 	}
 }
@@ -235,5 +237,120 @@ func TestWithoutMaterializeCreatesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, ".local")); !os.IsNotExist(err) {
 		t.Errorf("WithoutMaterialize created directories: %v", err)
+	}
+}
+
+// nonOwnedRoot returns a directory the current user cannot chmod, or skips.
+func nonOwnedRoot(t *testing.T) string {
+	t.Helper()
+	skipNoModes(t)
+	if os.Geteuid() == 0 {
+		t.Skip("root may chmod anything")
+	}
+	if _, err := os.Stat("/usr"); err != nil {
+		t.Skip("no /usr")
+	}
+	return "/usr"
+}
+
+func TestChmodOwnedWarnsWhenPermissionDenied(t *testing.T) {
+	root := nonOwnedRoot(t)
+	var msgs []string
+	w := &warner{logf: func(format string, args ...any) {
+		msgs = append(msgs, fmt.Sprintf(format, args...))
+	}}
+	if err := chmodOwned(root, DirMode, w); err != nil {
+		t.Fatalf("chmodOwned: %v", err)
+	}
+	if len(msgs) != 1 || !strings.Contains(msgs[0], root) || !strings.Contains(msgs[0], "0700") {
+		t.Errorf("warnings = %q, want one naming %s and the mode", msgs, root)
+	}
+}
+
+func TestChmodOwnedDoesNotWarnOnSuccessOrCorrectMode(t *testing.T) {
+	skipNoModes(t)
+	calls := 0
+	w := &warner{logf: func(string, ...any) { calls++ }}
+	d := filepath.Join(t.TempDir(), "d")
+	if err := os.Mkdir(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := chmodOwned(d, DirMode, w); err != nil { // tightening succeeds
+		t.Fatal(err)
+	}
+	if err := chmodOwned(d, DirMode, w); err != nil { // already right
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(d, link); err == nil { // skipped symlink
+		if err := chmodOwned(link, DirMode, w); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 0 {
+		t.Errorf("warn called %d times, want 0", calls)
+	}
+}
+
+func TestEnsureOwnedDirWarnsOnPermissionDenied(t *testing.T) {
+	root := nonOwnedRoot(t)
+	var got []string
+	w := &warner{logf: func(f string, a ...any) { got = append(got, fmt.Sprintf(f, a...)) }}
+	if err := ensureOwnedDir(root, w); err != nil {
+		t.Fatalf("ensureOwnedDir: %v", err)
+	}
+	if len(got) != 1 || !strings.Contains(got[0], root) {
+		t.Errorf("warnings = %q", got)
+	}
+}
+
+func TestWithWarnIsCarriedByLayout(t *testing.T) {
+	hermeticHome(t)
+	l, err := Resolve("demo", WithWarn(func(string, ...any) {}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.warn == nil {
+		t.Error("Layout does not carry the WithWarn callback, SelectWorkspace could not report")
+	}
+	if l2, _ := Resolve("demo"); l2.warn != nil {
+		t.Error("default Layout must have no warner")
+	}
+}
+
+func TestResolveWithWarnHealthyInstallIsSilent(t *testing.T) {
+	hermeticHome(t)
+	calls := 0
+	l, err := Resolve("demo", WithWarn(func(string, ...any) { calls++ }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.SelectWorkspace("staging"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 {
+		t.Errorf("warn called %d times on a healthy install", calls)
+	}
+}
+
+func TestWarnDefaultsAndNilAndPanicAreSafe(t *testing.T) {
+	hermeticHome(t)
+	if _, err := Resolve("demo"); err != nil { // no option
+		t.Fatal(err)
+	}
+	if _, err := Resolve("demo", WithWarn(nil)); err != nil {
+		t.Fatal(err)
+	}
+	var zero Layout // zero Layout has a nil warner
+	zero.warn.warnf("x %d", 1)
+	boom := &warner{logf: func(string, ...any) { panic("boom") }}
+	boom.warnf("x") // must not propagate
+	if os.Geteuid() != 0 && runtime.GOOS != "windows" {
+		if err := chmodOwned("/usr", DirMode, boom); err != nil {
+			t.Fatalf("panicking warn broke chmodOwned: %v", err)
+		}
 	}
 }
