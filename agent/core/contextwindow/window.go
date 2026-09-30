@@ -148,7 +148,7 @@ func (cw *ContextWindow) Assemble() []SlotBlock {
 
 	for _, name := range SlotOrder {
 		s := cw.slots[name]
-		if s.Content == "" && !(s.Flags.LazyLoad && s.Flags.LoadHint != "") {
+		if s.Content == "" && (!s.Flags.LazyLoad || s.Flags.LoadHint == "") {
 			continue
 		}
 

@@ -463,6 +463,11 @@ func summarySystemPrompt(mode string) string {
 // serializeMessages converts a message list to a string for token estimation.
 // This is used internally by the compaction pipeline to update the conversation
 // slot content.
+//
+// The est parameter is unused but kept so the ported seed tests, which call
+// it with two arguments, stay unchanged.
+//
+//nolint:unparam // signature retained for the ported seed tests.
 func serializeMessages(msgs []llmtypes.ChatMessage, est TokenEstimator) string {
 	var b strings.Builder
 	for _, m := range msgs {
