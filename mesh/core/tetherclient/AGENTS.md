@@ -16,6 +16,9 @@ and it holds no daemon-side policy.
 - `messaging_store.go` implements `go-messaging`'s `Store` over the daemon's
   HTTP routes.
 - `ai_stream.go` owns the AI gateway streaming surface.
+- `registry_client.go`, `groups_client.go` and `workstream_client.go` own the
+  registry, group-messaging and workstream surfaces; `roundTrip` (in
+  `roundtrip.go`) is their shared request helper.
 - `errors.go` and `types.go` own `APIError` and the wire types.
 
 ## Commands
@@ -56,3 +59,15 @@ adding a route.
 
 `TestHTTPStore_Contract` runs `go-messaging`'s shared conformance suite. Keep
 this client passing it rather than special-casing behavior here.
+
+The registry, group and workstream types are hand-authored mirrors of the
+daemon's wire shape, not imports: the daemon keeps them in an `internal/`
+package no other module can import. A field changed daemon-side is changed here
+by hand, which is why the tests pin the wire keys. Two envelopes look alike and
+are not: `LookupBy` decodes the answer keyed on the SINGULAR kind, `Search` on
+the plural segment (`TestRegistryLookupByWrongEnvelopeKeyIsAnError`,
+`TestRegistrySearch`). Group URNs (`grp_`) belong to `/groups`, never
+`/registry`, so `registryKindSegmentFromURN` refuses them
+(`TestRegistryLookupKindFromURNPrefix`). `Sync` answers 204 with no body for "no
+callback" and 200 with the profile otherwise; the third return value is how a
+caller tells them apart (`TestRegistrySyncTwoShapes`).
