@@ -53,7 +53,7 @@ Full API reference: [pkg.go.dev/github.com/hollis-labs/go-llm-types](https://pkg
 - Request and conversation types: `ChatRequest`, `ChatMessage`, `SlotBlock`
 - Tool and content types: `ToolDefinition`, `ToolUseBlock`, `ContentBlock`
 - Streaming / event types: `StreamEvent`, `EventType`, `ThinkingBlock`
-- Metadata types: `Usage`, `CompleteResult`, `ProviderCapabilities`
+- Metadata types: `Usage` (token counts and a per-event `CostUSD` delta), `CompleteResult`, `ProviderCapabilities`
 - Helpers: `IsTurnComplete`, `ChatRequest.EffectiveSystemPrompt`
 
 ## What's Not Here

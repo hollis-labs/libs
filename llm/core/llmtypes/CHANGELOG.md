@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.0 — 2026-09-30
+
+- Added `Usage.CostUSD` (float64), the provider-reported cost of the work a
+  `Usage` covers. It is a per-event delta, not a running total, because
+  consumers sum usage events per run; an adapter whose CLI reports a cumulative
+  cost must emit the difference between events. Zero means no cost was
+  reported. Additive: existing `Usage` literals keep compiling.
+
 ## v0.3.0 — 2026-05-20
 
 - Added `CacheHint` (`Position`, `Index`) and `ChatRequest.CacheHints` so

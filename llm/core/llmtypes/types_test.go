@@ -50,3 +50,14 @@ func TestEffectiveSystemPromptWithSlots(t *testing.T) {
 		t.Fatalf("EffectiveSystemPrompt() = %q, want %q", got, want)
 	}
 }
+
+func TestUsageCostUSDZeroValueMeansNoCostReported(t *testing.T) {
+	var u Usage
+	if u.CostUSD != 0 {
+		t.Fatalf("zero Usage.CostUSD = %v, want 0", u.CostUSD)
+	}
+	u = Usage{OutputTokens: 4, CostUSD: 0.016}
+	if u.CostUSD != 0.016 {
+		t.Fatalf("CostUSD = %v", u.CostUSD)
+	}
+}

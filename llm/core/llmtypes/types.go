@@ -110,6 +110,13 @@ type Usage struct {
 	CacheCreationTokens int
 	CacheReadTokens     int
 	StopReason          string
+
+	// CostUSD is the provider-reported cost, in US dollars, of the work this
+	// Usage covers. It is a per-event DELTA, never a running total: consumers
+	// sum Usage events per run, so an adapter whose CLI reports a cumulative
+	// figure (Claude's total_cost_usd, for one) must emit the difference since
+	// the previous event. Zero means the provider reported no cost.
+	CostUSD float64
 }
 
 // CompleteResult contains the text and optional usage metadata for a
