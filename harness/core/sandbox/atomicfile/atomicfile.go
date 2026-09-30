@@ -9,6 +9,20 @@ import (
 	"runtime"
 )
 
+// Injection seams. Production always uses the defaults, which are exactly the
+// calls the code made before the seams existed. Tests substitute them (and
+// restore them) to observe or fail the durability steps, which an ordinary
+// filesystem never lets a test fail on demand. They are package-level, so a test
+// that replaces one must not run in parallel with other atomicfile tests.
+var (
+	// writeTemp writes WriteFile's data to its temp file.
+	writeTemp = func(f *os.File, p []byte) (int, error) { return f.Write(p) }
+	// syncFile fsyncs a temp file before it is published.
+	syncFile = func(f *os.File) error { return f.Sync() }
+	// syncDir fsyncs the parent directory after the rename.
+	syncDir = func(d *os.File) error { return d.Sync() }
+)
+
 // syncParentDir fsyncs the parent directory of path so the rename is
 // durable across power loss on POSIX. On Windows os.Open on a directory
 // returns an error and directory fsync is not a meaningful operation, so
@@ -21,7 +35,7 @@ func syncParentDir(path string) error {
 	if err != nil {
 		return fmt.Errorf("atomicfile: open parent dir: %w", err)
 	}
-	syncErr := dir.Sync()
+	syncErr := syncDir(dir)
 	closeErr := dir.Close()
 	if syncErr != nil {
 		return fmt.Errorf("atomicfile: parent dir fsync: %w", syncErr)
@@ -57,7 +71,7 @@ func WriteFile(path string, data []byte, mode os.FileMode) (retErr error) {
 		}
 	}()
 
-	n, err := tmp.Write(data)
+	n, err := writeTemp(tmp, data)
 	if err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("atomicfile: write: %w", err)
@@ -66,7 +80,7 @@ func WriteFile(path string, data []byte, mode os.FileMode) (retErr error) {
 		_ = tmp.Close()
 		return fmt.Errorf("atomicfile: short write: %d of %d bytes", n, len(data))
 	}
-	if err := tmp.Sync(); err != nil {
+	if err := syncFile(tmp); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("atomicfile: fsync: %w", err)
 	}
@@ -148,7 +162,7 @@ func (w *Writer) Close() (retErr error) {
 		}
 	}()
 
-	if err := w.f.Sync(); err != nil {
+	if err := syncFile(w.f); err != nil {
 		_ = w.f.Close()
 		return fmt.Errorf("atomicfile: fsync: %w", err)
 	}
