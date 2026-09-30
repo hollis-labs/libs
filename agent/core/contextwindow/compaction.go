@@ -2,6 +2,7 @@ package contextwindow
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	llmtypes "github.com/hollis-labs/go-llm-types"
 )
 
@@ -68,9 +68,9 @@ type CompactionPipeline struct {
 // Stage is a single compaction action. Returns true if it made progress.
 type Stage func(ctx context.Context, p *CompactionPipeline) (bool, error)
 
-// namedStage bundles a Stage function with a stable identifier for logging
+// NamedStage bundles a Stage function with a stable identifier for logging
 // and the stages_applied response on /compact.
-type namedStage struct {
+type NamedStage struct {
 	Name string
 	Fn   Stage
 }
@@ -85,8 +85,8 @@ type namedStage struct {
 // summarizing duplicate tool chatter, and BEFORE strip so strip's fallback
 // "N blocks removed" note doesn't hide the fact that some of those blocks
 // were exact duplicates.
-func DefaultStages() []namedStage {
-	return []namedStage{
+func DefaultStages() []NamedStage {
+	return []NamedStage{
 		{"drop_enrichment", stageDropEnrichment},
 		{"dedupe_tool_results", stageDedupeToolResults},
 		{"summarize_oldest", stageSummarizeOldest},
@@ -133,7 +133,7 @@ func (p *CompactionPipeline) runStages(ctx context.Context, recheckBetweenStages
 	// P8 CompactionContract: emit structured metadata if writer is available
 	if p.CompactionEventWriter != nil && p.SessionID != "" {
 		evt := CompactionEvent{
-			ID:                   uuid.New().String(),
+			ID:                   newEventID(),
 			SessionID:            p.SessionID,
 			CoverageWindowStart:  result.CoverageWindowStart,
 			CoverageWindowEnd:    result.CoverageWindowEnd,
@@ -476,4 +476,15 @@ func serializeMessages(msgs []llmtypes.ChatMessage, est TokenEstimator) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// newEventID returns an opaque, random, 32-character hex identifier for a
+// CompactionEvent. Consumers must treat it as an opaque string; it is not an
+// RFC 4122 UUID.
+func newEventID() string {
+	var b [16]byte
+	// crypto/rand.Read never returns an error (Go 1.24+); it crashes the
+	// program irrecoverably if the system entropy source fails.
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
