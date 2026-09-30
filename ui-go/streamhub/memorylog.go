@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const defaultPageSize = 128
+const defaultPageSize uint64 = 128
 
 // MemoryOption configures a [MemoryLog].
 type MemoryOption func(*MemoryLog)
@@ -18,7 +18,7 @@ type MemoryOption func(*MemoryLog)
 func WithPageSize(n int) MemoryOption {
 	return func(l *MemoryLog) {
 		if n > 0 {
-			l.pageSize = n
+			l.pageSize = Seq(n)
 		}
 	}
 }
@@ -41,7 +41,7 @@ func WithMemoryRetention(r Retention) MemoryOption {
 // MemoryLog is an in-memory [Log]: one bounded ring per stream. It is safe
 // for concurrent use. Its records do not survive the process.
 type MemoryLog struct {
-	pageSize  int
+	pageSize  Seq
 	now       func() time.Time
 	retention Retention
 
@@ -64,7 +64,7 @@ var _ Forgetter = (*MemoryLog)(nil)
 // NewMemoryLog returns an empty in-memory log.
 func NewMemoryLog(o ...MemoryOption) *MemoryLog {
 	l := &MemoryLog{
-		pageSize: defaultPageSize,
+		pageSize: Seq(defaultPageSize),
 		now:      time.Now,
 		streams:  make(map[string]*memStream),
 	}
@@ -156,8 +156,10 @@ func (l *MemoryLog) page(ctx context.Context, stream string, cursor Seq) ([]Reco
 			Missed: uint64(ms.pruned - cursor),
 		}}
 	}
-	start := int(cursor - ms.pruned)
-	end := min(start+l.pageSize, len(ms.recs))
+	// Slice indices may be any integer type; cursor is in [pruned, latest],
+	// so the offsets are within len(recs).
+	start := cursor - ms.pruned
+	end := min(start+l.pageSize, Seq(len(ms.recs)))
 	return append([]Record(nil), ms.recs[start:end]...), nil
 }
 

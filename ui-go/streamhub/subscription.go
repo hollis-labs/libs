@@ -88,6 +88,9 @@ type subscription struct {
 
 var _ Subscription = (*subscription)(nil)
 
+// endedLocked reports that the subscription takes no more records.
+func (s *subscription) endedLocked() bool { return s.closed || s.drainErr != nil }
+
 func (s *subscription) waitChLocked() chan struct{} {
 	if s.changed == nil {
 		s.changed = make(chan struct{})
@@ -142,7 +145,7 @@ func (s *subscription) resumeLocked() Seq {
 
 // drainCloseLocked ends the subscription after the queues drain.
 func (s *subscription) drainCloseLocked(err error) {
-	if s.closed || s.drainErr != nil {
+	if s.endedLocked() {
 		return
 	}
 	s.drainErr = err
@@ -198,7 +201,7 @@ func (s *subscription) dropOldestLocked() {
 func (s *subscription) offer(rec Record, terminal bool) (blocked, dead bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.drainErr != nil {
+	if s.endedLocked() {
 		return false, true
 	}
 	s.latestSeen = rec.Seq
@@ -242,7 +245,7 @@ func (s *subscription) offer(rec Record, terminal bool) (blocked, dead bool) {
 func (s *subscription) pushBlocking(ctx context.Context, rec Record, terminal bool) error {
 	for {
 		s.mu.Lock()
-		if s.closed || s.drainErr != nil {
+		if s.endedLocked() {
 			s.mu.Unlock()
 			return nil
 		}
@@ -419,7 +422,7 @@ func (s *subscription) Drops() uint64 {
 func (s *subscription) enqueueRec(ctx context.Context, rec Record) bool {
 	for {
 		s.mu.Lock()
-		if s.closed || s.drainErr != nil {
+		if s.endedLocked() {
 			s.mu.Unlock()
 			return false
 		}
@@ -444,7 +447,7 @@ func (s *subscription) enqueueRec(ctx context.Context, rec Record) bool {
 func (s *subscription) enqueueGap(g Gap) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.drainErr != nil {
+	if s.endedLocked() {
 		return false
 	}
 	s.q = append(s.q, entry{gap: &g})

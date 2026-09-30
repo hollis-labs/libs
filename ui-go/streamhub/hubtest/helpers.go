@@ -12,7 +12,7 @@ import (
 )
 
 // failTimeout bounds how long a helper waits before failing the test. It is
-// a safety net, never a synchronisation mechanism.
+// a safety net, never a synchronization mechanism.
 const failTimeout = 30 * time.Second
 
 // Next reads one item from sub, failing the test on an error or when nothing

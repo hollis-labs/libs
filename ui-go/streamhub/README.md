@@ -146,7 +146,7 @@ breaking change is listed there.
   replay goroutine. It must be fast, must not block, and must not call the Hub.
 - `Next` is meant for one goroutine per subscription.
 - `MemoryLog` is not durable, and its `Reopen` in the conformance suite is the
-  same log; real reopen behaviour is checked against a second test backend only.
+  same log; real reopen behavior is checked against a second test backend only.
 - When a hub starts over a populated `Log`, it decides whether a stream had
   already ended by applying the terminal predicate to the last retained record.
 - `Log.Trim` runs after each `Publish` when `WithRetention` is set. If it fails,

@@ -15,7 +15,7 @@ refuses a tag whose CHANGELOG has no heading for it.
   `MemoryLog`, a bounded in-memory ring per stream. `Log.After` returns a
   `*GapError` (matching `ErrGap`, and `ErrCursorAhead` for a cursor past the
   head) instead of a partial result.
-- `Hub`: `Publish` (Append and fan-out serialised per stream), `Subscribe`
+- `Hub`: `Publish` (Append and fan-out serialized per stream), `Subscribe`
   (register pending under the lock, replay outside it, de-duplicate by Seq),
   `Close` with `WithFinalizer`, `Open`, `Head`, `Shutdown`.
 - Gap notices as in-band `Item{Gap}` values, or as `*GapError` with
@@ -25,7 +25,7 @@ refuses a tag whose CHANGELOG has no heading for it.
   or as a `*SlowConsumerError` carrying the resume cursor.
 - Terminal guard (`WithTerminal`), retention grace for ended streams
   (`WithRetainAfterClose`, default 60s), `FromLatest`, per-subscription `Filter`.
-- `hubtest`: `Conformance` (Log backends), `HubSuite` (hub behaviour over any
+- `hubtest`: `Conformance` (Log backends), `HubSuite` (hub behavior over any
   Log), and the `GatedLog`, `Next`, `Drain` and `Seqs` helpers.
 - Tests ported as scenarios from Nanite's `stream_replay_test.go` and Tether's
   `bus_test.go`/`bus_integration_test.go`; a synctest concurrency and leak

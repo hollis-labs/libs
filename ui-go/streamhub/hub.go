@@ -57,7 +57,7 @@ func WithFinalizer(f func() (Event, bool)) CloseOption {
 }
 
 // Hub fans records out from a [Log] to subscribers with replay, gap
-// signalling and slow-consumer policies. Create one with [New]. All methods
+// signaling and slow-consumer policies. Create one with [New]. All methods
 // are safe for concurrent use.
 type Hub struct {
 	log Log
@@ -71,7 +71,7 @@ type Hub struct {
 
 // stream is the hub's state for one stream name.
 //
-// Locks, outermost first: pubMu (serialises Publish/Close: Append plus
+// Locks, outermost first: pubMu (serializes Publish/Close: Append plus
 // fan-out), then mu (subscriber set and the flags below), then a
 // subscription's own mu. initMu is taken alone. No Log method is ever called
 // with mu held; the only Log calls under a hub lock are Append, under pubMu,
@@ -113,7 +113,7 @@ func New(l Log, o ...Option) *Hub {
 	return h
 }
 
-// stream returns the initialised state for name, creating it when create is set.
+// stream returns the initialized state for name, creating it when create is set.
 func (h *Hub) stream(ctx context.Context, name string, create bool) (*stream, error) {
 	if name == "" {
 		return nil, fmt.Errorf("%w: empty stream name", ErrUnknownStream)
@@ -220,7 +220,7 @@ func (h *Hub) Head(ctx context.Context, stream string) (Head, error) {
 }
 
 // Publish appends e to the stream and fans the resulting record out. Publishes
-// to one stream are serialised: Append and fan-out happen as one step, so
+// to one stream are serialized: Append and fan-out happen as one step, so
 // subscribers see records in Seq order and a Subscribe never straddles half a
 // publish. It returns [ErrTerminated] once the stream has ended.
 //

@@ -54,13 +54,14 @@ func after(l streamhub.Log, stream string, cursor streamhub.Seq) ([]streamhub.Re
 
 func wantSeqs(t *testing.T, recs []streamhub.Record, first, last streamhub.Seq) {
 	t.Helper()
-	if want := int(last-first) + 1; last < first {
+	if last < first {
 		if len(recs) != 0 {
 			t.Fatalf("got %d records, want none", len(recs))
 		}
 		return
-	} else if len(recs) != want {
-		t.Fatalf("got %d records, want %d (%d..%d)", len(recs), want, first, last)
+	}
+	if uint64(len(recs)) != uint64(last-first)+1 {
+		t.Fatalf("got %d records, want %d..%d", len(recs), first, last)
 	}
 	for i, r := range recs {
 		if r.Seq != first+streamhub.Seq(i) {
@@ -309,8 +310,8 @@ func Conformance(t *testing.T, f Factory) {
 				t.Fatal(err)
 			}
 			wantSeqs(t, got, 4, 8)
-			if _, err := after(re, "s", 2); !errors.Is(err, streamhub.ErrGap) {
-				t.Fatalf("After(2) err = %v, want ErrGap", err)
+			if _, gerr := after(re, "s", 2); !errors.Is(gerr, streamhub.ErrGap) {
+				t.Fatalf("After(2) err = %v, want ErrGap", gerr)
 			}
 			r, err := re.Append(ctx, "s", streamhub.Event{})
 			if err != nil || r.Seq != 9 {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -38,9 +37,9 @@ func TestConcurrency_ChurnNoPanicNoLeak(t *testing.T) {
 
 func churn(t *testing.T, seed uint64) {
 	ctx := context.Background()
-	rng := rand.New(rand.NewPCG(seed, seed*7919))
+	rng := newLCG(seed)
 	// Never zero: a zero sleep would spin without letting virtual time advance.
-	jitter := func() time.Duration { return time.Duration(1+rng.IntN(4)) * time.Millisecond }
+	jitter := func() time.Duration { return time.Duration(1+rng.intn(4)) * time.Millisecond }
 	policies := []streamhub.SlowPolicy{
 		streamhub.CloseAndResume, streamhub.DropOldest, streamhub.DropNewest,
 		streamhub.EvictAfterN(3), streamhub.Block,
@@ -79,15 +78,15 @@ func churn(t *testing.T, seed uint64) {
 	}
 
 	for s := range 8 {
-		wr := rand.New(rand.NewPCG(seed, uint64(s)+1000)) // one source per goroutine
+		wr := newLCG(seed*1000 + uint64(s)) // one source per goroutine
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := range 40 {
 				cctx, cancel := context.WithCancel(ctx)
 				sub, err := h.Subscribe(cctx, streams[(s+i)%2], streamhub.SubscribeOptions{
-					After:  streamhub.Seq(wr.IntN(3)),
-					Buffer: 1 + wr.IntN(4), Policy: policies[(s+i)%len(policies)],
+					After:  wr.seqn(3),
+					Buffer: 1 + wr.intn(4), Policy: policies[(s+i)%len(policies)],
 					Filter: func(r streamhub.Record) bool { return r.Seq%3 != 1 },
 				})
 				if err != nil {
@@ -98,7 +97,7 @@ func churn(t *testing.T, seed uint64) {
 					return
 				}
 				var last streamhub.Seq
-				for n := wr.IntN(6); n > 0; n-- {
+				for n := wr.intn(6); n > 0; n-- {
 					nctx, ncancel := context.WithTimeout(ctx, 2*time.Millisecond)
 					it, err := sub.Next(nctx)
 					ncancel()
@@ -146,7 +145,7 @@ func churn(t *testing.T, seed uint64) {
 	wg.Wait()
 }
 
-// Cancelling the Subscribe context while replay is parked inside Log.After
+// Canceling the Subscribe context while replay is parked inside Log.After
 // ends the replay goroutine.
 func TestConcurrency_CancelDuringReplayLeaksNothing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -214,4 +213,20 @@ func TestConcurrency_ShutdownReleasesEverything(t *testing.T) {
 			}
 		}
 	})
+}
+
+// lcg is a tiny deterministic generator, one per goroutine (not safe for
+// concurrent use), so churn schedules are reproducible per seed.
+type lcg struct{ s uint64 }
+
+func newLCG(seed uint64) *lcg { return &lcg{s: seed*2862933555777941757 + 3037000493} }
+
+func (l *lcg) intn(n int) int {
+	l.s = l.s*6364136223846793005 + 1442695040888963407
+	return int(uint32(l.s>>33)) % n
+}
+
+func (l *lcg) seqn(n uint32) streamhub.Seq {
+	l.s = l.s*6364136223846793005 + 1442695040888963407
+	return streamhub.Seq(uint32(l.s>>33) % n)
 }

@@ -4,7 +4,7 @@
 // A backend author calls [Conformance] with a [Factory] to check a
 // streamhub.Log against the Log contract (cursor assignment, After ranges,
 // gap and cursor-ahead errors, paging, Trim, reopen). [HubSuite] runs the
-// hub-level behaviour (replay/live boundary, slow policies, terminal
+// hub-level behavior (replay/live boundary, slow policies, terminal
 // handling, lifecycle) on top of the same Log, so a durable backend is
 // exercised through the real Hub too.
 //

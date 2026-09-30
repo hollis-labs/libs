@@ -51,7 +51,7 @@
 //
 // # Terminal records
 //
-// [WithTerminal] gives the hub a predicate that recognises a stream's last
+// [WithTerminal] gives the hub a predicate that recognizes a stream's last
 // record. After it, [Hub.Publish] returns [ErrTerminated], subscribers get
 // io.EOF once drained, and a late subscriber replays through the terminal
 // record. [WithFinalizer] on [Hub.Close] synthesizes one if the producer never

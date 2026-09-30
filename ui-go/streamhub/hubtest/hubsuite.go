@@ -14,10 +14,9 @@ import (
 
 const stressIterations = 1000
 
-func newHub(t *testing.T, f Factory, o ...streamhub.Option) (*streamhub.Hub, streamhub.Log) {
+func newHub(t *testing.T, f Factory, o ...streamhub.Option) *streamhub.Hub {
 	t.Helper()
-	l := f.newLog(t)
-	return newHubOn(t, l, o...), l
+	return newHubOn(t, f.newLog(t), o...)
 }
 
 func newHubOn(t *testing.T, l streamhub.Log, o ...streamhub.Option) *streamhub.Hub {
@@ -36,9 +35,9 @@ func publishN(t testing.TB, h *streamhub.Hub, stream string, n int) {
 	}
 }
 
-func subscribe(t testing.TB, h *streamhub.Hub, stream string, o streamhub.SubscribeOptions) streamhub.Subscription {
+func subscribe(t testing.TB, h *streamhub.Hub, o streamhub.SubscribeOptions) streamhub.Subscription {
 	t.Helper()
-	sub, err := h.Subscribe(context.Background(), stream, o)
+	sub, err := h.Subscribe(context.Background(), "s", o)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
@@ -46,7 +45,14 @@ func subscribe(t testing.TB, h *streamhub.Hub, stream string, o streamhub.Subscr
 	return sub
 }
 
-func wantErr(t testing.TB, sub streamhub.Subscription, target error) error {
+func wantErr(t testing.TB, sub streamhub.Subscription, target error) {
+	t.Helper()
+	_ = nextErr(t, sub, target)
+}
+
+// nextErr reads one item, requires it to be an error matching target, and
+// returns that error.
+func nextErr(t testing.TB, sub streamhub.Subscription, target error) error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), failTimeout)
 	defer cancel()
@@ -74,7 +80,7 @@ func wantGap(t testing.TB, it streamhub.Item, reason streamhub.GapReason, missed
 func wantRecords(t testing.TB, items []streamhub.Item, first, last streamhub.Seq) {
 	t.Helper()
 	seqs := Seqs(t, items)
-	if len(seqs) != int(last-first)+1 {
+	if uint64(len(seqs)) != uint64(last-first)+1 {
 		t.Fatalf("got seqs %v, want %d..%d", seqs, first, last)
 	}
 	for i, s := range seqs {
@@ -84,7 +90,7 @@ func wantRecords(t testing.TB, items []streamhub.Item, first, last streamhub.Seq
 	}
 }
 
-// HubSuite runs the hub-level behaviour on top of the backend f builds:
+// HubSuite runs the hub-level behavior on top of the backend f builds:
 // the replay/live boundary, gaps, slow policies, terminal handling and
 // lifecycle. Call it next to [Conformance].
 func HubSuite(t *testing.T, f Factory) {
@@ -102,7 +108,7 @@ func HubSuite(t *testing.T, f Factory) {
 // contiguous: publishers racing Subscribe(after=x) must yield x+1..N with no
 // hole and no duplicate at the replay/live boundary.
 func contiguous(t *testing.T, f Factory) {
-	h, _ := newHub(t, f)
+	h := newHub(t, f)
 	ctx := context.Background()
 	for i := range stressIterations {
 		stream := fmt.Sprintf("s%d", i)
@@ -144,7 +150,7 @@ func replayNoLock(t *testing.T, f Factory) {
 	h := newHubOn(t, g)
 	publishN(t, h, "s", 5)
 	g.HoldAfter()
-	slow := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+	slow := subscribe(t, h, streamhub.SubscribeOptions{})
 	select {
 	case <-g.AfterEntered():
 	case <-time.After(failTimeout):
@@ -155,7 +161,7 @@ func replayNoLock(t *testing.T, f Factory) {
 	go func() {
 		defer close(done)
 		publishN(t, h, "s", 3)
-		live := subscribe(t, h, "s", streamhub.SubscribeOptions{After: streamhub.FromLatest})
+		live := subscribe(t, h, streamhub.SubscribeOptions{After: streamhub.FromLatest})
 		publishN(t, h, "s", 1)
 		if it := Next(t, live); it.Record.Seq != 9 {
 			t.Errorf("live sub got %+v", it)
@@ -186,7 +192,7 @@ func slowAppend(t *testing.T, f Factory) {
 	}()
 	// Whether or not the publisher has reached Append yet, Subscribe must
 	// return and replay must work.
-	sub := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+	sub := subscribe(t, h, streamhub.SubscribeOptions{})
 	wantRecords(t, Drain(t, sub, 2), 1, 2)
 	g.ReleaseAppend()
 	if err := <-pubDone; err != nil {
@@ -198,11 +204,11 @@ func slowAppend(t *testing.T, f Factory) {
 }
 
 func fromLatestFilter(t *testing.T, f Factory) {
-	h, _ := newHub(t, f)
+	h := newHub(t, f)
 	ctx := context.Background()
 	publishN(t, h, "s", 4)
-	live := subscribe(t, h, "s", streamhub.SubscribeOptions{After: streamhub.FromLatest})
-	odd := subscribe(t, h, "s", streamhub.SubscribeOptions{Filter: func(r streamhub.Record) bool { return r.Seq%2 == 1 }})
+	live := subscribe(t, h, streamhub.SubscribeOptions{After: streamhub.FromLatest})
+	odd := subscribe(t, h, streamhub.SubscribeOptions{Filter: func(r streamhub.Record) bool { return r.Seq%2 == 1 }})
 	for _, n := range []string{"a", "b", "c"} {
 		if _, err := h.Publish(ctx, "s", streamhub.Event{Name: n}); err != nil {
 			t.Fatal(err)
@@ -219,25 +225,25 @@ func fromLatestFilter(t *testing.T, f Factory) {
 }
 
 func gapsOnSubscribe(t *testing.T, f Factory) {
-	h, _ := newHub(t, f, streamhub.WithRetention(streamhub.Retention{MaxRecords: 3}))
+	h := newHub(t, f, streamhub.WithRetention(streamhub.Retention{MaxRecords: 3}))
 	publishN(t, h, "s", 10)
 
-	sub := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+	sub := subscribe(t, h, streamhub.SubscribeOptions{})
 	g := wantGap(t, Next(t, sub), streamhub.GapRetention, 7)
 	if g.Requested != 0 || g.OldestAvailable != 8 || g.Latest != 10 {
 		t.Fatalf("retention gap = %+v", g)
 	}
 	wantRecords(t, Drain(t, sub, 3), 8, 10)
 
-	ahead := subscribe(t, h, "s", streamhub.SubscribeOptions{After: 50})
+	ahead := subscribe(t, h, streamhub.SubscribeOptions{After: 50})
 	g = wantGap(t, Next(t, ahead), streamhub.GapCursorAhead, 40)
 	if g.Requested != 50 || g.Latest != 10 {
 		t.Fatalf("cursor-ahead gap = %+v", g)
 	}
 	wantRecords(t, Drain(t, ahead, 3), 8, 10)
 
-	strict := subscribe(t, h, "s", streamhub.SubscribeOptions{GapAsError: true})
-	err := wantErr(t, strict, streamhub.ErrGap)
+	strict := subscribe(t, h, streamhub.SubscribeOptions{GapAsError: true})
+	err := nextErr(t, strict, streamhub.ErrGap)
 	var ge *streamhub.GapError
 	if !errors.As(err, &ge) || ge.Gap.Reason != streamhub.GapRetention {
 		t.Fatalf("GapAsError err = %v", err)
@@ -245,7 +251,7 @@ func gapsOnSubscribe(t *testing.T, f Factory) {
 	wantErr(t, strict, streamhub.ErrClosed)
 
 	// A resume at the boundary is clean.
-	ok := subscribe(t, h, "s", streamhub.SubscribeOptions{After: 7})
+	ok := subscribe(t, h, streamhub.SubscribeOptions{After: 7})
 	wantRecords(t, Drain(t, ok, 3), 8, 10)
 }
 
@@ -253,22 +259,22 @@ func policies(t *testing.T, f Factory) {
 	ctx := context.Background()
 
 	t.Run("CloseAndResume", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 3}) // default policy
-		publishN(t, h, "s", 10)                                            // never blocks
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 3}) // default policy
+		publishN(t, h, "s", 10)                                       // never blocks
 		wantRecords(t, Drain(t, sub, 3), 1, 3)
-		err := wantErr(t, sub, streamhub.ErrSlowConsumer)
+		err := nextErr(t, sub, streamhub.ErrSlowConsumer)
 		var sc *streamhub.SlowConsumerError
 		if !errors.As(err, &sc) || sc.LastDelivered != 3 {
 			t.Fatalf("err = %v, want LastDelivered 3", err)
 		}
-		resumed := subscribe(t, h, "s", streamhub.SubscribeOptions{After: sc.LastDelivered, Buffer: 16})
+		resumed := subscribe(t, h, streamhub.SubscribeOptions{After: sc.LastDelivered, Buffer: 16})
 		wantRecords(t, Drain(t, resumed, 7), 4, 10)
 	})
 
 	t.Run("DropOldest", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 4, Policy: streamhub.DropOldest})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 4, Policy: streamhub.DropOldest})
 		publishN(t, h, "s", 10)
 		g := wantGap(t, Next(t, sub), streamhub.GapDropped, 6)
 		if g.Requested != 0 || g.OldestAvailable != 7 || g.Latest != 10 {
@@ -281,8 +287,8 @@ func policies(t *testing.T, f Factory) {
 	})
 
 	t.Run("DropNewest", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 4, Policy: streamhub.DropNewest})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 4, Policy: streamhub.DropNewest})
 		publishN(t, h, "s", 10)
 		wantRecords(t, Drain(t, sub, 4), 1, 4)
 		g := wantGap(t, Next(t, sub), streamhub.GapDropped, 6)
@@ -299,8 +305,8 @@ func policies(t *testing.T, f Factory) {
 	})
 
 	t.Run("EvictAfterNClosesOnExactlyN", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 2, Policy: streamhub.EvictAfterN(3)})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 2, Policy: streamhub.EvictAfterN(3)})
 		publishN(t, h, "s", 4) // 2 fit, 2 drops
 		if sub.Drops() != 2 {
 			t.Fatalf("Drops = %d, want 2", sub.Drops())
@@ -311,7 +317,7 @@ func policies(t *testing.T, f Factory) {
 			t.Fatalf("gap = %+v", g)
 		}
 		wantRecords(t, Drain(t, sub, 2), 4, 5)
-		err := wantErr(t, sub, streamhub.ErrSlowConsumer)
+		err := nextErr(t, sub, streamhub.ErrSlowConsumer)
 		var sc *streamhub.SlowConsumerError
 		if !errors.As(err, &sc) || sc.LastDelivered != 5 {
 			t.Fatalf("err = %v", err)
@@ -319,8 +325,8 @@ func policies(t *testing.T, f Factory) {
 	})
 
 	t.Run("EvictAfterNCountsConsecutiveOnly", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 2, Policy: streamhub.EvictAfterN(2)})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 2, Policy: streamhub.EvictAfterN(2)})
 		publishN(t, h, "s", 3) // 1,2 fit; 3 is a drop (run of 1)
 		wantGap(t, Next(t, sub), streamhub.GapDropped, 1)
 		wantRecords(t, Drain(t, sub, 2), 2, 3)
@@ -338,8 +344,8 @@ func policies(t *testing.T, f Factory) {
 	})
 
 	t.Run("BlockWaitsForConsumer", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 1, Policy: streamhub.Block})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 1, Policy: streamhub.Block})
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
@@ -353,8 +359,8 @@ func policies(t *testing.T, f Factory) {
 	})
 
 	t.Run("BlockHonoursContext", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{Buffer: 1, Policy: streamhub.Block})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{Buffer: 1, Policy: streamhub.Block})
 		publishN(t, h, "s", 1)
 		pctx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
 		defer cancel()
@@ -374,8 +380,8 @@ func terminal(t *testing.T, f Factory) {
 	ctx := context.Background()
 
 	t.Run("TerminalIsLast", func(t *testing.T) {
-		h, _ := newHub(t, f, streamhub.WithTerminal(isEnd))
-		live := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+		h := newHub(t, f, streamhub.WithTerminal(isEnd))
+		live := subscribe(t, h, streamhub.SubscribeOptions{})
 		publishN(t, h, "s", 2)
 		if _, err := h.Publish(ctx, "s", streamhub.Event{Name: "end"}); err != nil {
 			t.Fatal(err)
@@ -386,7 +392,7 @@ func terminal(t *testing.T, f Factory) {
 		wantRecords(t, Drain(t, live, 3), 1, 3)
 		wantErr(t, live, io.EOF)
 
-		late := subscribe(t, h, "s", streamhub.SubscribeOptions{After: 1})
+		late := subscribe(t, h, streamhub.SubscribeOptions{After: 1})
 		items := Drain(t, late, 2)
 		if items[1].Record.Name != "end" {
 			t.Fatalf("late replay = %+v", items)
@@ -400,8 +406,8 @@ func terminal(t *testing.T, f Factory) {
 	})
 
 	t.Run("FinalizerSynthesizes", func(t *testing.T) {
-		h, _ := newHub(t, f, streamhub.WithTerminal(isEnd))
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+		h := newHub(t, f, streamhub.WithTerminal(isEnd))
+		sub := subscribe(t, h, streamhub.SubscribeOptions{})
 		publishN(t, h, "s", 2)
 		err := h.Close(ctx, "s", streamhub.WithFinalizer(func() (streamhub.Event, bool) {
 			return streamhub.Event{Name: "end", Data: []byte("truncated")}, true
@@ -420,7 +426,7 @@ func terminal(t *testing.T, f Factory) {
 	})
 
 	t.Run("FinalizerSkippedWhenTerminalPublished", func(t *testing.T) {
-		h, _ := newHub(t, f, streamhub.WithTerminal(isEnd))
+		h := newHub(t, f, streamhub.WithTerminal(isEnd))
 		publishN(t, h, "s", 1)
 		if _, err := h.Publish(ctx, "s", streamhub.Event{Name: "end"}); err != nil {
 			t.Fatal(err)
@@ -442,8 +448,8 @@ func terminal(t *testing.T, f Factory) {
 	})
 
 	t.Run("CloseWithoutTerminalPredicate", func(t *testing.T) {
-		h, _ := newHub(t, f)
-		sub := subscribe(t, h, "s", streamhub.SubscribeOptions{})
+		h := newHub(t, f)
+		sub := subscribe(t, h, streamhub.SubscribeOptions{})
 		publishN(t, h, "s", 2)
 		if err := h.Close(ctx, "s"); err != nil {
 			t.Fatal(err)
@@ -459,7 +465,7 @@ func terminal(t *testing.T, f Factory) {
 // lifecycle: Publish, Subscribe, Close and cancellation racing each other
 // must neither panic nor deadlock.
 func lifecycle(t *testing.T, f Factory) {
-	h, _ := newHub(t, f, streamhub.WithRetainAfterClose(-1))
+	h := newHub(t, f, streamhub.WithRetainAfterClose(-1))
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
