@@ -54,12 +54,45 @@ lazy resolution — resolve it once and pass it where it's needed.
 - **Legacy adoption.** `WithLegacyNames(...)` migrates a prior app's
   directories on resolve — an idempotent move-if-target-absent that warns,
   and never clobbers, when both the old and new directory exist.
+- **Owner-only permissions.** Every app-owned directory is `0700` and the
+  active-workspace pointer is `0600` (`paths.DirMode`, `paths.FileMode`).
+  See [Permissions](#permissions).
 - **Materialization.** `Resolve` creates the resolved directories by
   default; `WithoutMaterialize()` opts out (e.g. for an `<app> path`
   introspection subcommand — see `layout.Describe()`).
 
 `go-apppaths` resolves paths only. It never opens the database (compose it
 with a separate sqlite layer) and never parses application config files.
+
+## Permissions
+
+Since v0.2.0 `Resolve` forces owner-only modes on everything the app owns:
+
+| Path | Mode |
+|---|---|
+| data, state, cache and config roots | `0700` |
+| workspace directory and the workspace database's directory | `0700` |
+| `active_workspace` pointer file (written by `SelectWorkspace`) | `0600` |
+
+The mode is set after creation, so it does not depend on the process umask and
+it **retightens directories that already exist** at `0755` (what v0.1.x
+created) on the next `Resolve`. There is no option to loosen it.
+
+Deliberately left alone:
+
+- **A database directory you named.** With `WithDBOverride` or `<APP>_DB_PATH`
+  pointing outside the workspace, that directory is created if missing but its
+  mode is never changed. Only the workspace's own database directory is forced
+  to `0700`.
+- **The shared XDG base directories** (`~/.local/share` and friends) that hold
+  the app roots.
+- **Symlinks.** A root that is a symlink is not followed for chmod, so nothing
+  outside the app tree is modified.
+- **Paths you may not chmod** (owned by someone else, read-only mount). They are
+  left as found and `Resolve` still succeeds.
+- **Windows**, where POSIX modes do not apply; the calls are no-ops there.
+
+Run `go run ./examples/ownerperms` to see a `0755` root converge to `0700`.
 
 ## Layout
 
@@ -70,6 +103,7 @@ no `internal/`.
 .
 ├── paths/                  # Library package — importable by other modules
 ├── examples/printpaths/    # Runnable example: resolve + Describe
+├── examples/ownerperms/    # Runnable example: 0755 root retightened to 0700
 ├── go.mod
 ├── CHANGELOG.md
 └── README.md (this file)
