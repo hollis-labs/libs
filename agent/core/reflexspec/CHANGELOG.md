@@ -17,3 +17,8 @@ refuses a tag whose CHANGELOG has no heading for it.
 - Open enums with optional catalogs: `WithKnownActionKinds`, `WithKnownStatuses`, `WithKnownProvenanceTiers`, `WithKnownEvents`.
 - `conformance` package: embedded valid and invalid fixtures and a reference runner.
 - Fuzz tests for the validator.
+
+### Adoption notes for Nanite
+
+- Six of Nanite's 21 seeded reflexes use its `scope_tier` / `execution_pattern` predicate kinds. This spec targets go-reflexes' grammar, where both are the generic `attr` predicate, so it rejects them as unknown kinds. Translate them to `attr` before validating.
+- Nanite's PATCH endpoint treats `recurrence_override_seconds: 0` as "clear the override". go-reflexes and this spec treat `0` as an explicit no-cooldown and `nil` as "inherit the kind default". Nanite's adoption must map its API behavior onto that.
