@@ -56,6 +56,10 @@ const (
 	// CodeMalformedFrame: a frame could not be decoded and the dialect gives no
 	// way to continue.
 	CodeMalformedFrame = "malformed_frame"
+	// CodeFrameTooLarge: one frame (an SSE event or a line) was over the framing
+	// layer's size limit. Not retryable, unlike truncation: a retry meets the same
+	// frame. Raise the limit (framing.WithMaxEventBytes, framing.Lines' maxLine).
+	CodeFrameTooLarge = "frame_too_large"
 	// CodeUpstreamError: the upstream reported an error event.
 	CodeUpstreamError = "upstream_error"
 )

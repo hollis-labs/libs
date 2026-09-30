@@ -2,6 +2,7 @@ package decodekit
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -175,6 +176,11 @@ func (b *Base) Truncated(cause error) []chatstream.Event {
 	}
 	ev := b.Event(chatstream.VerbRunError)
 	ev.Code, ev.Retryable, ev.Message = chatstream.CodeUpstreamTruncated, true, msg
+	if errors.Is(cause, chatstream.ErrFrameTooLarge) {
+		// The stream did not stop on its own: one frame was over the limit, and a
+		// retry would meet it again.
+		ev.Code, ev.Retryable, ev.Message = chatstream.CodeFrameTooLarge, false, fmt.Sprintf("a frame exceeded the size limit: %v", cause)
+	}
 	return b.Emit(out, ev)
 }
 

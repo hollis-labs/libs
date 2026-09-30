@@ -2,6 +2,7 @@ package framing_test
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing/iotest"
 
 	chatstream "github.com/hollis-labs/go-chatstream"
+	"github.com/hollis-labs/go-chatstream/adapter/openaichat"
 	"github.com/hollis-labs/go-chatstream/framing"
 )
 
@@ -95,5 +97,43 @@ func TestLinesFrameDataIsNotAliased(t *testing.T) {
 	frames[0].Data[0] = 'X'
 	if string(frames[1].Data) != "bbb" {
 		t.Fatal("frames share a buffer")
+	}
+}
+
+// go-ssekit's own default is 1 MiB; a legitimate large event must get through.
+func TestSSEAcceptsAnEventOverSsekitsDefault(t *testing.T) {
+	big := strings.Repeat("x", 2<<20)
+	frames, err := collect(t, framing.SSE(strings.NewReader("data: "+big+"\n\n")))
+	if err != nil || len(frames) != 1 || len(frames[0].Data) != len(big) {
+		t.Fatalf("frames %d, err %v; a 2 MiB event is within DefaultMaxEvent", len(frames), err)
+	}
+}
+
+func TestSSEOverLimitEventIsErrFrameTooLargeAndConfigurable(t *testing.T) {
+	in := "data: " + strings.Repeat("x", 5000) + "\n\n"
+	_, err := collect(t, framing.SSE(strings.NewReader(in), framing.WithMaxEventBytes(1024)))
+	if !errors.Is(err, chatstream.ErrFrameTooLarge) {
+		t.Fatalf("err = %v, want ErrFrameTooLarge", err)
+	}
+	if frames, err := collect(t, framing.SSE(strings.NewReader(in), framing.WithMaxEventBytes(1<<20))); err != nil || len(frames) != 1 {
+		t.Errorf("a larger limit accepts the event: %d frames, %v", len(frames), err)
+	}
+}
+
+// An over-limit frame is not a truncation: the decoder's run.error must not be
+// retryable, because a retry meets the same frame.
+func TestOverLimitFrameEndsTheRunNonRetryable(t *testing.T) {
+	in := "data: " + strings.Repeat("x", 5000) + "\n\n"
+	var last chatstream.Event
+	seq := chatstream.DecodeFrames(context.Background(), openaichat.New().NewDecoder(chatstream.DecodeOptions{RunID: "r"}),
+		framing.SSE(strings.NewReader(in), framing.WithMaxEventBytes(1024)))
+	for ev, err := range seq {
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = ev
+	}
+	if last.Verb != chatstream.VerbRunError || last.Code != chatstream.CodeFrameTooLarge || last.Retryable {
+		t.Errorf("last event = %+v, want a non-retryable %s run.error", last, chatstream.CodeFrameTooLarge)
 	}
 }
