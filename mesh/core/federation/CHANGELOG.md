@@ -19,6 +19,14 @@ refuses a tag whose CHANGELOG has no heading for it.
 - `Config`, `LoadConfig`, `Enable` and `Federation`: Torque's config schema plus an optional `ops` list. No file means federation is off; a bad file is an error. `Federation.Store` is a Router with each foreign route dialed; an install homing several authorities gets a guard that refuses unknown ones with `ErrNoRoute`.
 - It passes `messagingtest.RunContract` through a real mutual-TLS hop: without `Inbox`/`Subscribe` under `DefaultOpSet`, and whole under a widened set.
 
+### Fixed
+
+- A Thread applies the party filter before the list limit: other parties' envelopes ahead of the caller's in a thread no longer starve it. The store is asked for progressively more (it has no offset), bounded at ten times the server's list limit per request; the response shape is unchanged.
+- The reserved `fed.` metadata prefix is refused case-insensitively, after trimming surrounding whitespace, and any metadata key holding a control or format character (zero-width, bidi) is refused, with the same 422 as before.
+- Peer-controlled text in an `AuditRecord` (addresses, ids, reasons) has control and format characters replaced with U+FFFD, so a peer cannot forge a log line.
+- `NewServer` returns an error for `WithAuditor(nil)`, `WithClock(nil)`, a nil `ServerOption` and a typed-nil Store or `PeerRegistry`, instead of panicking at request time.
+- `Serve` no longer leaks its shutdown goroutine when the listener fails, and waits for the drain to finish before it returns.
+
 ### Decisions
 
 - No self-asserted identity resolver in v1 (the ratified default): Tether's `?as=` pattern is not carried over, and no stub is left for it. If one is ever added it must be named unmistakably as insecure and be a later, explicit opt-in.
@@ -29,6 +37,7 @@ refuses a tag whose CHANGELOG has no heading for it.
 Deliberate hardening; each has a test.
 
 - TLS 1.3 is the minimum (Torque: 1.2), and the pin is checked in `VerifyConnection`, which Go runs on resumed sessions too, rather than `VerifyPeerCertificate`, which it skips.
+- `Get`, `Consume` and `Cancel` answer 404 with the same body for an envelope the caller is not a party to as for a missing id (Torque: 403 versus 404, which tells a peer whether an id exists); the audit record keeps the difference.
 - A Thread is filtered to the envelopes the caller is a party to and answers 200 for a thread the caller has no part in, rather than 403 for a non-party: the response does not say whether a thread id exists, and a thread holding other parties' mail no longer shows it.
 - `Consume` requires the recipient to be an address of the envelope: a party could otherwise mark an envelope consumed for an unrelated recipient.
 - Envelope metadata under the reserved `fed.` prefix is refused (Torque ignored it), so no peer occupies the namespace before signed envelopes exist.

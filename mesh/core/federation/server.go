@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	gomsg "github.com/hollis-labs/go-messaging"
 )
@@ -27,6 +29,11 @@ const ReservedMetadataPrefix = "fed."
 const (
 	// DefaultMaxPayloadBytes caps an envelope payload (Torque's broker limit).
 	DefaultMaxPayloadBytes = 256 * 1024
+	// threadScanFactor bounds the work of one Thread call: the store is asked for
+	// at most threadScanFactor times the server's list limit in envelopes while
+	// looking for the caller's own. A thread whose first that-many envelopes hold
+	// fewer of the caller's than the cap yields those and no more.
+	threadScanFactor = 10
 	// DefaultMaxListLimit caps how many envelopes one Thread or Inbox call
 	// returns, and is used when the caller sends no limit.
 	DefaultMaxListLimit = 1000
@@ -44,7 +51,12 @@ type ServerOption func(*Server)
 
 // WithAuditor sets the function called with an AuditRecord for every request the
 // server refuses or serves. The default discards them. It must return quickly
-// and be safe for concurrent use.
+// and be safe for concurrent use. A nil f makes NewServer return an error.
+//
+// Records are sanitized before they reach f: control and format characters in
+// peer-controlled text (addresses, ids, reasons) are replaced with U+FFFD, so a
+// peer cannot forge a log line. An auditor should still not Printf a record's
+// fields raw into a line-oriented format; SlogAuditor logs them as attributes.
 func WithAuditor(f func(AuditRecord)) ServerOption { return func(s *Server) { s.audit = f } }
 
 // WithMaxPayloadBytes sets the largest envelope payload accepted (default
@@ -67,7 +79,8 @@ func WithMaxListLimit(n int) ServerOption {
 	}
 }
 
-// WithClock sets the server's clock, for the audit record's time. Tests only.
+// WithClock sets the server's clock, for the audit record's time. Tests only. A
+// nil now makes NewServer return an error.
 func WithClock(now func() time.Time) ServerOption { return func(s *Server) { s.now = now } }
 
 // Server is the federation HTTP surface: the operations of its OpSet over the
@@ -98,11 +111,14 @@ type Server struct {
 // operation), because a security boundary that half-starts is worse than one that
 // refuses to.
 func NewServer(local gomsg.Store, resolver IdentityResolver, ops OpSet, localAuthorities []string, opts ...ServerOption) (*Server, error) {
-	if local == nil {
+	if isNil(local) {
 		return nil, errors.New("federation: NewServer needs a local Store")
 	}
-	if resolver == nil {
+	if isNil(resolver) {
 		return nil, errors.New("federation: NewServer needs an IdentityResolver")
+	}
+	if m, ok := resolver.(*mtlsResolver); ok && isNil(m.peers) {
+		return nil, errors.New("federation: NewServer needs an IdentityResolver with a PeerRegistry")
 	}
 	ops, err := ops.validate()
 	if err != nil {
@@ -118,10 +134,34 @@ func NewServer(local gomsg.Store, resolver IdentityResolver, ops OpSet, localAut
 		now: time.Now,
 	}
 	for _, o := range opts {
+		if o == nil {
+			return nil, errors.New("federation: NewServer got a nil ServerOption")
+		}
 		o(s)
+	}
+	if s.audit == nil {
+		return nil, errors.New("federation: WithAuditor needs a function")
+	}
+	if s.now == nil {
+		return nil, errors.New("federation: WithClock needs a function")
 	}
 	s.handler = s.routes()
 	return s, nil
+}
+
+// isNil reports whether v is nil or an interface holding a nil pointer, map,
+// slice, func, chan or interface: a value that would panic on first use.
+func isNil(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() { //nolint:exhaustive // only the nilable kinds matter
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.Interface:
+		return rv.IsNil()
+	default:
+	}
+	return false
 }
 
 // Ops returns the operations this server exposes.
@@ -222,9 +262,29 @@ func (s *Server) identify(w http.ResponseWriter, r *http.Request, op Op) (Identi
 	return Identity{}, false
 }
 
+// record stamps rec, sanitizes the peer-controlled text in it and hands it to
+// the auditor.
 func (s *Server) record(rec AuditRecord) {
 	rec.Time = s.now()
+	rec.Peer = sanitize(rec.Peer)
+	rec.Fingerprint = sanitize(rec.Fingerprint)
+	rec.Authority = sanitize(rec.Authority)
+	rec.From = sanitize(rec.From)
+	rec.To = sanitize(rec.To)
+	rec.Reason = sanitize(rec.Reason)
 	s.audit(rec)
+}
+
+// sanitize replaces control and format characters (newlines, escapes, zero-width
+// and bidi controls) with U+FFFD, so peer-controlled text cannot forge or hide a
+// line in an audit log.
+func sanitize(in string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return unicode.ReplacementChar
+		}
+		return r
+	}, in)
 }
 
 func (s *Server) auditEnv(id Identity, op Op, env gomsg.Envelope, allowed bool, reason string) {
@@ -318,9 +378,19 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request, c reqCtx) {
 	writeJSON(w, http.StatusCreated, out)
 }
 
+// usesReservedMetadata reports whether any key is in, or disguised as being in,
+// the reserved namespace: matched case-insensitively after trimming surrounding
+// whitespace, and any key holding a control or format character (a zero-width
+// joiner, a bidi override) is refused outright, since it can hide the prefix.
 func usesReservedMetadata(m map[string]string) bool {
 	for k := range m {
-		if strings.HasPrefix(k, ReservedMetadataPrefix) {
+		for _, r := range k {
+			if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+				return true
+			}
+		}
+		k = strings.TrimSpace(k)
+		if len(k) >= len(ReservedMetadataPrefix) && strings.EqualFold(k[:len(ReservedMetadataPrefix)], ReservedMetadataPrefix) {
 			return true
 		}
 	}
@@ -342,7 +412,11 @@ func (s *Server) fetchForAccess(w http.ResponseWriter, r *http.Request, op Op, i
 		return gomsg.Envelope{}, false
 	}
 	if err := s.authz.authorizeEnvelopeAccess(op, id, env); err != nil {
-		s.reject(w, id, op, env, err)
+		// Whether the envelope is absent, unhomed or not the caller's, the caller
+		// gets the same 404 and body: the status must not say which ids exist. The
+		// audit record keeps the reason.
+		s.auditEnv(id, op, env, false, err.Error())
+		writeError(w, http.StatusNotFound, "not found")
 		return gomsg.Envelope{}, false
 	}
 	return env, true
@@ -368,15 +442,43 @@ func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, c reqCtx) 
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	envs, err := s.store.Thread(r.Context(), threadID, filter)
+	visible, scanned, err := s.callerThread(r.Context(), c.id, threadID, filter)
 	if err != nil {
 		s.storeError(w, c.id, OpThread, gomsg.Envelope{ThreadID: threadID}, err)
 		return
 	}
-	visible := s.authz.threadView(c.id, envs)
 	s.record(AuditRecord{Peer: c.id.Label, Fingerprint: c.id.Fingerprint, Op: OpThread, Allowed: true,
-		Reason: fmt.Sprintf("thread %s: %d of %d envelopes visible to the caller", threadID, len(visible), len(envs))})
+		Reason: fmt.Sprintf("thread %s: %d of %d envelopes visible to the caller", threadID, len(visible), scanned)})
 	writeJSON(w, http.StatusOK, map[string]any{"messages": visible})
+}
+
+// callerThread returns up to filter.Limit of the caller's own envelopes of a
+// thread, and how many envelopes it read from the store to find them. The store
+// applies its limit before the party filter can, so asking once for the cap would
+// let other parties' envelopes ahead of the caller's starve it. Instead the limit
+// is widened (the store has no offset) until the caller's cap is reached, the
+// thread is exhausted (the store returned fewer than asked), or the scan bound of
+// threadScanFactor times the server's list limit is hit; the last case yields the
+// caller's envelopes found within the bound, which is the conservative answer.
+func (s *Server) callerThread(ctx context.Context, id Identity, threadID string, filter gomsg.Filter) ([]gomsg.Envelope, int, error) {
+	capN := filter.Limit
+	scanMax := threadScanFactor * s.maxList
+	ask := capN
+	for {
+		filter.Limit = ask
+		envs, err := s.store.Thread(ctx, threadID, filter)
+		if err != nil {
+			return nil, 0, err
+		}
+		visible := s.authz.threadView(id, envs)
+		if len(visible) >= capN {
+			return visible[:capN], len(envs), nil
+		}
+		if len(envs) < ask || ask >= scanMax {
+			return visible, len(envs), nil
+		}
+		ask = min(ask*4, scanMax)
+	}
 }
 
 func (s *Server) handleConsume(w http.ResponseWriter, r *http.Request, c reqCtx) {
@@ -581,8 +683,16 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener, tlsConf *tls.Config
 		IdleTimeout:       90 * time.Second,
 		MaxHeaderBytes:    64 << 10,
 	}
+	served := make(chan struct{})
+	drained := make(chan struct{})
 	go func() { //nolint:gosec // ctx is already done when the drain starts; it needs a fresh deadline
-		<-ctx.Done()
+		defer close(drained)
+		select {
+		case <-ctx.Done():
+		case <-served:
+			// Serve failed on its own: there is nothing to drain.
+			return
+		}
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := hs.Shutdown(shutdown); err != nil {
@@ -590,6 +700,8 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener, tlsConf *tls.Config
 		}
 	}()
 	err := hs.Serve(tls.NewListener(ln, tlsConf))
+	close(served)
+	<-drained
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

@@ -6,6 +6,8 @@ Torque and Tether each hand-rolled federation over `go-messaging.Store`, with di
 
 ## Status
 
+**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+
 Pre-1.0 and security-sensitive: the exported API may change in a minor release, and any change to what a peer may do is called out in the CHANGELOG. It has been built in isolation; neither Torque nor Tether uses it yet.
 
 ## Install

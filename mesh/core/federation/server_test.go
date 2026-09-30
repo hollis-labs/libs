@@ -10,9 +10,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	gomsg "github.com/hollis-labs/go-messaging"
 	"github.com/hollis-labs/go-messaging/httpstore"
@@ -158,8 +160,8 @@ func TestGetConsumeCancelRequireBeingAParty(t *testing.T) {
 	if _, err := c.Get(ctx, foreign.ID); err == nil {
 		t.Fatal("a peer must not read an envelope it is not a party to")
 	}
-	if status, _ := f.do(http.MethodGet, BasePath+"/"+foreign.ID, ""); status != 403 {
-		t.Errorf("Get non-party: %d, want 403 (not disguised as 404)", status)
+	if status, _ := f.do(http.MethodGet, BasePath+"/"+foreign.ID, ""); status != 404 {
+		t.Errorf("Get non-party: %d, want 404 (the same answer as a missing id)", status)
 	}
 	if status, _ := f.do(http.MethodGet, BasePath+"/does-not-exist", ""); status != 404 {
 		t.Errorf("Get unknown: %d", status)
@@ -480,5 +482,159 @@ func TestServeRefusesAListenerThatDoesNotRequireClientCertificates(t *testing.T)
 			t.Errorf("%s: Serve started a listener that does not require client certificates", name)
 		}
 		cancel()
+	}
+}
+
+// A caller must not learn whether an id exists: an envelope it is not a party to
+// answers exactly as a missing one does, for every operation that takes an id.
+// The distinction is kept in the audit record only.
+func TestNonPartyAndMissingIDAnswerIdentically(t *testing.T) {
+	f := newFixture(t, nil, nil)
+	foreign := mustSend(t, f.store, notice(agent("local", "a"), agent("local", "b")))
+	consume := `{"recipient":"` + foreign.To.URN() + `"}`
+	for _, tc := range []struct{ name, method, suffix, body string }{
+		{"get", http.MethodGet, "", ""},
+		{"consume", http.MethodPost, "/consume", consume},
+		{"cancel", http.MethodPost, "/cancel", ""},
+	} {
+		s1, b1 := f.do(tc.method, BasePath+"/"+foreign.ID+tc.suffix, tc.body)
+		reasonExisting := f.audit.last().Reason
+		s2, b2 := f.do(tc.method, BasePath+"/does-not-exist"+tc.suffix, tc.body)
+		if s1 != 404 || s2 != 404 || b1 != b2 {
+			t.Errorf("%s: existing non-party %d %q, missing %d %q", tc.name, s1, b1, s2, b2)
+		}
+		if !strings.Contains(reasonExisting, "not a party") {
+			t.Errorf("%s: the audit record must keep the distinction: %q", tc.name, reasonExisting)
+		}
+	}
+	if got, _ := f.store.Get(context.Background(), foreign.ID); got.ID == "" || f.store.count("cancel") != 0 {
+		t.Fatal("a refused call reached the store")
+	}
+}
+
+// The store list limit must not let other parties' envelopes starve the caller's:
+// the party filter is applied before the cap.
+func TestThreadLimitIsAppliedAfterThePartyFilter(t *testing.T) {
+	f := newFixture(t, nil, nil)
+	for i := 0; i < 5; i++ {
+		e := notice(agent("local", "x"), agent("local", "y"))
+		e.ThreadID = "T"
+		mustSend(t, f.store, e)
+	}
+	for i := 0; i < 2; i++ {
+		e := notice(agent("remote", "a"), agent("local", "b"))
+		e.ThreadID = "T"
+		mustSend(t, f.store, e)
+	}
+	status, body := f.do(http.MethodGet, BasePath+"/thread/T?limit=3", "")
+	var out struct{ Messages []gomsg.Envelope }
+	_ = json.Unmarshal([]byte(body), &out)
+	if status != 200 || len(out.Messages) != 2 {
+		t.Fatalf("limit 3 with 5 foreign envelopes ahead: %d %q, want the caller's 2", status, body)
+	}
+	for _, m := range out.Messages {
+		if m.From != agent("remote", "a") {
+			t.Errorf("a foreign envelope leaked: %+v", m)
+		}
+	}
+	// the cap still holds over the caller's own envelopes
+	_, body = f.do(http.MethodGet, BasePath+"/thread/T?limit=1", "")
+	_ = json.Unmarshal([]byte(body), &out)
+	if len(out.Messages) != 1 {
+		t.Errorf("limit=1: %d messages", len(out.Messages))
+	}
+}
+
+func TestReservedMetadataPrefixIsRefusedWhateverItsSpelling(t *testing.T) {
+	f := newFixture(t, nil, nil)
+	for _, key := range []string{"fed.x", "FED.x", "Fed.x", " fed.x", "\tfed.x ", "fed\u200b.x", "f\u200ded.x", "\u200bfed.x", "fed\x00.x", "fed.\u202ex"} {
+		e := notice(agent("remote", "a"), agent("local", "b"))
+		e.Metadata = map[string]string{key: "forged"}
+		if status, _ := f.do(http.MethodPost, BasePath, envJSON(t, e)); status != 422 {
+			t.Errorf("metadata key %q: %d, want 422", key, status)
+		}
+	}
+	e := notice(agent("remote", "a"), agent("local", "b"))
+	e.Metadata = map[string]string{"feed.x": "ok", "federation": "ok"}
+	if status, body := f.do(http.MethodPost, BasePath, envJSON(t, e)); status != 201 {
+		t.Errorf("ordinary metadata keys: %d %s", status, body)
+	}
+}
+
+// Peer-controlled text reaches the audit record; it must not carry control
+// characters that could forge a log line.
+func TestAuditRecordsCarryNoControlCharacters(t *testing.T) {
+	f := newFixture(t, nil, nil)
+	f.do(http.MethodPost, BasePath, envJSON(t, notice(agent("remote", "a"), agent("local\nforged: allow", "b"))))
+	f.do(http.MethodGet, BasePath+"/thread/T%0AX%0D%1B%5Bforged", "")
+	f.do(http.MethodGet, BasePath+"/id%0Aforged", "")
+	recs := f.audit.all()
+	if len(recs) < 3 {
+		t.Fatalf("audit = %+v", recs)
+	}
+	for _, r := range recs {
+		for _, field := range []string{r.Peer, r.Fingerprint, r.Authority, r.From, r.To, r.Reason} {
+			for _, c := range field {
+				if unicode.IsControl(c) || unicode.Is(unicode.Cf, c) {
+					t.Errorf("control character %U in audit field %q of %+v", c, field, r)
+				}
+			}
+		}
+	}
+	if !strings.Contains(recs[0].To, "\uFFFD") {
+		t.Errorf("To = %q, want the control character replaced", recs[0].To)
+	}
+}
+
+func TestNewServerRefusesNilOptionsAndTypedNils(t *testing.T) {
+	reg, _ := NewPeerRegistry([]PeerConfig{peer("p", validIdentity(t), "a")})
+	res := MTLSPinnedResolver(reg)
+	st := newSpy()
+	var nilStore *spyStore
+	var nilReg *PeerRegistry
+	tests := map[string]func() error{
+		"nil auditor":         func() error { _, err := NewServer(st, res, nil, []string{"l"}, WithAuditor(nil)); return err },
+		"nil clock":           func() error { _, err := NewServer(st, res, nil, []string{"l"}, WithClock(nil)); return err },
+		"typed-nil store":     func() error { _, err := NewServer(nilStore, res, nil, []string{"l"}); return err },
+		"typed-nil registry":  func() error { _, err := NewServer(st, MTLSPinnedResolver(nilReg), nil, []string{"l"}); return err },
+		"nil option function": func() error { _, err := NewServer(st, res, nil, []string{"l"}, nil); return err },
+	}
+	for name, f := range tests {
+		func() {
+			defer func() {
+				if v := recover(); v != nil {
+					t.Errorf("%s: panicked: %v", name, v)
+				}
+			}()
+			if err := f(); err == nil {
+				t.Errorf("%s: accepted", name)
+			}
+		}()
+	}
+}
+
+// When the listener fails, Serve returns its error and must not leave the
+// shutdown goroutine parked on a context that is never canceled.
+func TestServeDoesNotLeakTheShutdownGoroutineOnAListenerError(t *testing.T) {
+	reg, _ := NewPeerRegistry([]PeerConfig{peer("p", validIdentity(t), "a")})
+	s, _ := NewServer(newSpy(), MTLSPinnedResolver(reg), nil, []string{"l"})
+	tc, err := ServerTLSConfig(validIdentity(t), reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := runtime.NumGoroutine()
+	for i := 0; i < 5; i++ {
+		ln := listenLoopback(t)
+		_ = ln.Close()
+		if err := s.Serve(context.Background(), ln, tc); err == nil {
+			t.Fatal("Serve on a closed listener returned nil")
+		}
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if after := runtime.NumGoroutine(); after > before {
+		t.Errorf("goroutines: %d before, %d after; Serve leaked its shutdown goroutine", before, after)
 	}
 }
