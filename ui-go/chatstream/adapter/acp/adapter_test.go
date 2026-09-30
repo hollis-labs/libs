@@ -132,6 +132,30 @@ func TestErrorResponseCodes(t *testing.T) {
 	conformance.Check(t, evs)
 }
 
+// A JSON-RPC error with loosely typed fields is still the terminal frame: it must
+// not be demoted to a raw event and read as a retryable truncation.
+func TestErrorResponseWithLooselyTypedFields(t *testing.T) {
+	tests := []struct {
+		name, line string
+		verb       chatstream.Verb
+		code, msg  string
+	}{
+		{"string code", `{"jsonrpc":"2.0","id":2,"error":{"code":"internal","message":"boom"}}`, chatstream.VerbRunError, "internal", "boom"},
+		{"float code", `{"jsonrpc":"2.0","id":2,"error":{"code":-32603.0,"message":"boom"}}`, chatstream.VerbRunError, "-32603", "boom"},
+		{"structured message", `{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":{"detail":"boom"}}}`, chatstream.VerbRunError, "-32603", `{"detail":"boom"}`},
+		{"error as a string", `{"jsonrpc":"2.0","id":2,"error":"boom"}`, chatstream.VerbRunError, chatstream.CodeUpstreamError, "boom"},
+		{"cancelled code as a string", `{"jsonrpc":"2.0","id":2,"error":{"code":"-32800","message":"x"}}`, chatstream.VerbRunAbort, "", ""},
+	}
+	for _, tc := range tests {
+		evs := run(t, tc.line)
+		e := last(evs)
+		if e.Verb != tc.verb || (tc.verb == chatstream.VerbRunError && (e.Code != tc.code || e.Message != tc.msg || e.Retryable)) {
+			t.Errorf("%s: terminal = %+v", tc.name, e)
+		}
+		conformance.Check(t, evs)
+	}
+}
+
 func TestPermissionRequestBecomesInBandApproval(t *testing.T) {
 	evs := run(t,
 		`{"jsonrpc":"2.0","id":"perm-9","method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc1","title":"Delete file"},"options":[{"optionId":"o1","name":"Allow","kind":"allow_once"}]}}`,
@@ -367,8 +391,14 @@ func TestEOFWithoutStopReasonIsTruncation(t *testing.T) {
 // tool_call part it answers, and an approval names the part it gates.
 func TestToolMetaConvention(t *testing.T) {
 	paths, _ := filepath.Glob("testdata/*.frames.json")
+	if len(paths) == 0 {
+		t.Fatal("no fixtures")
+	}
 	for _, p := range paths {
-		fx, _ := conformance.LoadFixture(p)
+		fx, err := conformance.LoadFixture(p)
+		if err != nil {
+			t.Fatal(err)
+		}
 		evs, err := conformance.DecodeFixture(acp.New(), fx)
 		if err != nil {
 			t.Fatal(err)

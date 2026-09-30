@@ -11,12 +11,12 @@ import (
 )
 
 type line struct {
-	Type     string                    `json:"type"`
-	ThreadID string                    `json:"thread_id"`
-	Message  string                    `json:"message"`
-	Usage    *rawUsage                 `json:"usage"`
-	Error    *struct{ Message string } `json:"error"`
-	Item     json.RawMessage           `json:"item"`
+	Type     string          `json:"type"`
+	ThreadID string          `json:"thread_id"`
+	Message  json.RawMessage `json:"message"` // a string, read leniently: it is the terminal error's text
+	Usage    *rawUsage       `json:"usage"`
+	Error    json.RawMessage `json:"error"` // an object with a message, or a bare string: read leniently
+	Item     json.RawMessage `json:"item"`
 }
 
 type rawUsage struct {
@@ -83,7 +83,7 @@ func (d *decoder) Decode(f chatstream.Frame) ([]chatstream.Event, error) {
 		return nil, nil
 	}
 	var l line
-	if !parses(f.Data, &l) || l.Type == "" {
+	if !parses(f.Data, &l) && !terminalShape(f.Data, l) || l.Type == "" {
 		return d.raw(d.start(""), "malformed", f.Data), nil
 	}
 	switch l.Type {
@@ -103,13 +103,9 @@ func (d *decoder) Decode(f chatstream.Frame) ([]chatstream.Event, error) {
 	case "turn.completed":
 		return d.completed(l), nil
 	case "turn.failed":
-		msg := ""
-		if l.Error != nil {
-			msg = l.Error.Message
-		}
-		return d.fail("turn_failed", msg), nil
+		return d.fail("turn_failed", errorText(l.Error)), nil
 	case "error":
-		return d.fail(chatstream.CodeUpstreamError, l.Message), nil
+		return d.fail(chatstream.CodeUpstreamError, errorText(l.Message)), nil
 	}
 	return d.raw(d.start(""), l.Type, f.Data), nil
 }
@@ -390,6 +386,48 @@ func (d *decoder) usage(r rawUsage) (chatstream.Usage, error) {
 		return delta, nil
 	}
 	return u, nil
+}
+
+// terminalShape reports whether data is a JSON object whose type is a terminal
+// one, although a field did not fit line's types (json.Unmarshal fills the
+// fields that do). A terminal frame with one mistyped field (an error that is a
+// string, a float token count) must still end the run as what it is, not be
+// demoted to a raw event and read as a retryable truncation.
+func terminalShape(data []byte, l line) bool {
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(data, &obj) != nil {
+		return false
+	}
+	switch l.Type {
+	case "turn.failed", "turn.completed", "error":
+		return true
+	}
+	return false
+}
+
+// errorText is the message of an error given as an object with a message (or
+// error, or text) field, as a bare string, or as any other JSON (its text).
+func errorText(raw json.RawMessage) string {
+	if !present(raw) {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var o struct {
+		Message string `json:"message"`
+		Error   string `json:"error"`
+		Text    string `json:"text"`
+	}
+	if json.Unmarshal(raw, &o) == nil {
+		for _, v := range []string{o.Message, o.Error, o.Text} {
+			if v != "" {
+				return v
+			}
+		}
+	}
+	return string(compact(raw))
 }
 
 func (d *decoder) fail(code, msg string) []chatstream.Event {

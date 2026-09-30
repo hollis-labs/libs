@@ -86,6 +86,10 @@ func TestTurnEndingLines(t *testing.T) {
 		{"completed without usage", `{"type":"turn.completed"}`, chatstream.VerbRunFinish, "", "", ""},
 		{"failed", `{"type":"turn.failed","error":{"message":"boom"}}`, chatstream.VerbRunError, "turn_failed", "boom", ""},
 		{"failed without message", `{"type":"turn.failed"}`, chatstream.VerbRunError, "turn_failed", "", ""},
+		{"failed with error as a string", `{"type":"turn.failed","error":"boom"}`, chatstream.VerbRunError, "turn_failed", "boom", ""},
+		{"failed with a structured error", `{"type":"turn.failed","error":{"message":{"a":1}}}`, chatstream.VerbRunError, "turn_failed", `{"message":{"a":1}}`, ""},
+		{"completed with float token counts", `{"type":"turn.completed","usage":{"input_tokens":1.0,"output_tokens":1}}`, chatstream.VerbRunFinish, "", "", ""},
+		{"stream error with a structured message", `{"type":"error","message":{"text":"gone"}}`, chatstream.VerbRunError, chatstream.CodeUpstreamError, "gone", ""},
 		{"stream error", `{"type":"error","message":"gone"}`, chatstream.VerbRunError, chatstream.CodeUpstreamError, "gone", ""},
 	}
 	for _, tc := range tests {
@@ -395,8 +399,14 @@ func TestEOFBeforeTheTurnEndsIsTruncation(t *testing.T) {
 
 func TestToolMetaConvention(t *testing.T) {
 	paths, _ := filepath.Glob("testdata/*.frames.json")
+	if len(paths) == 0 {
+		t.Fatal("no fixtures")
+	}
 	for _, p := range paths {
-		fx, _ := conformance.LoadFixture(p)
+		fx, err := conformance.LoadFixture(p)
+		if err != nil {
+			t.Fatal(err)
+		}
 		evs, err := conformance.DecodeFixture(codexjson.New(), fx)
 		if err != nil {
 			t.Fatal(err)

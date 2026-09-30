@@ -378,42 +378,51 @@ func (d *decoder) controlRequest(out []chatstream.Event, data []byte) []chatstre
 }
 
 func (d *decoder) result(out []chatstream.Event, data []byte) []chatstream.Event {
+	// The result frame is the terminal one, so every field but the envelope is
+	// read leniently: a field of an unexpected type (duration_ms as a float, errors
+	// as objects, result as an object) must not demote the frame to a raw event and
+	// turn a finished or failed run into a retryable truncation.
 	var w struct {
 		Subtype           string          `json:"subtype"`
-		IsError           bool            `json:"is_error"`
-		Result            string          `json:"result"`
-		StopReason        *string         `json:"stop_reason"`
-		TerminalReason    string          `json:"terminal_reason"`
-		Errors            []string        `json:"errors"`
-		NumTurns          *int            `json:"num_turns"`
-		DurationMS        *int64          `json:"duration_ms"`
-		TotalCostUSD      *float64        `json:"total_cost_usd"`
+		IsError           json.RawMessage `json:"is_error"`
+		Result            json.RawMessage `json:"result"`
+		StopReason        json.RawMessage `json:"stop_reason"`
+		TerminalReason    json.RawMessage `json:"terminal_reason"`
+		Errors            json.RawMessage `json:"errors"`
+		NumTurns          json.RawMessage `json:"num_turns"`
+		DurationMS        json.RawMessage `json:"duration_ms"`
+		TotalCostUSD      json.RawMessage `json:"total_cost_usd"`
 		PermissionDenials json.RawMessage `json:"permission_denials"`
-		Usage             *struct {
-			Input  int `json:"input_tokens"`
-			Output int `json:"output_tokens"`
-			CacheW int `json:"cache_creation_input_tokens"`
-			CacheR int `json:"cache_read_input_tokens"`
-		} `json:"usage"`
+		Usage             json.RawMessage `json:"usage"`
 	}
-	if err := json.Unmarshal(data, &w); err != nil {
+	// A type error in one field does not stop json.Unmarshal filling the rest, so
+	// only a frame that is not a JSON object at all is demoted to raw.
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil {
 		return d.Emit(out, d.raw("result", data))
 	}
+	_ = json.Unmarshal(data, &w)
 	out = d.m.CloseBlocks(out)
 	out = d.closeWhole(out)
 	out = d.Unwind(out)
 
 	var usage *chatstream.Usage
-	if w.Usage != nil {
-		if u, err := chatstream.UsageFromExclusiveInput(chatstream.UsageFinal, w.Usage.Input, w.Usage.CacheR, w.Usage.CacheW, w.Usage.Output); err == nil {
+	var wu struct {
+		Input  float64 `json:"input_tokens"`
+		Output float64 `json:"output_tokens"`
+		CacheW float64 `json:"cache_creation_input_tokens"`
+		CacheR float64 `json:"cache_read_input_tokens"`
+	}
+	if isPresent(w.Usage) && json.Unmarshal(w.Usage, &wu) == nil {
+		if u, err := chatstream.UsageFromExclusiveInput(chatstream.UsageFinal, int(wu.Input), int(wu.CacheR), int(wu.CacheW), int(wu.Output)); err == nil {
 			usage = &u
 		}
 	}
-	stop := ""
-	if w.StopReason != nil {
-		stop = *w.StopReason
-	}
-	reason := w.TerminalReason
+	isError := rawBool(w.IsError)
+	stop := rawString(w.StopReason)
+	terminalReason := rawString(w.TerminalReason)
+	errTexts := errorTexts(w.Errors)
+	reason := terminalReason
 	if reason == "" && w.Subtype == "error_max_turns" {
 		reason = "max_turns"
 	}
@@ -424,26 +433,24 @@ func (d *decoder) result(out []chatstream.Event, data []byte) []chatstream.Event
 	ext := map[string]json.RawMessage{}
 	put := func(k string, v any) { ext[k] = mustJSON(v) }
 	put("subtype", w.Subtype)
-	if w.TerminalReason != "" {
-		put("terminal_reason", w.TerminalReason)
+	if terminalReason != "" {
+		put("terminal_reason", terminalReason)
 	}
 	if stop != "" {
 		put("stop_reason", stop)
 	}
-	if w.NumTurns != nil {
-		put("num_turns", *w.NumTurns)
-	}
-	if w.DurationMS != nil {
-		put("duration_ms", *w.DurationMS)
-	}
-	if w.TotalCostUSD != nil {
-		put("total_cost_usd", *w.TotalCostUSD)
+	for k, raw := range map[string]json.RawMessage{"num_turns": w.NumTurns, "duration_ms": w.DurationMS, "total_cost_usd": w.TotalCostUSD} {
+		if isPresent(raw) {
+			if c := compact(raw); c != nil {
+				ext[k] = c
+			}
+		}
 	}
 	if isPresent(w.PermissionDenials) && string(compact(w.PermissionDenials)) != "[]" {
 		ext["permission_denials"] = compact(w.PermissionDenials)
 	}
-	if len(w.Errors) > 0 {
-		put("errors", w.Errors)
+	if len(errTexts) > 0 {
+		put("errors", errTexts)
 	}
 	extra := map[string]json.RawMessage{"claude": mustJSON(ext)}
 
@@ -470,7 +477,7 @@ func (d *decoder) result(out []chatstream.Event, data []byte) []chatstream.Event
 		return finish(out, chatstream.FinishTurnLimit)
 	case reason == "prompt_too_long":
 		return finish(out, chatstream.FinishContextExceeded)
-	case w.IsError || (w.Subtype != "" && w.Subtype != "success"):
+	case isError || (w.Subtype != "" && w.Subtype != "success"):
 		out = standaloneUsage(out)
 		ev := d.Event(chatstream.VerbRunError)
 		ev.Code = w.Subtype
@@ -480,9 +487,9 @@ func (d *decoder) result(out []chatstream.Event, data []byte) []chatstream.Event
 		if ev.Code == "" {
 			ev.Code = chatstream.CodeUpstreamError
 		}
-		ev.Message = strings.Join(w.Errors, "; ")
+		ev.Message = strings.Join(errTexts, "; ")
 		if ev.Message == "" {
-			ev.Message = w.Result
+			ev.Message = rawString(w.Result)
 		}
 		ev.Retryable = reason == "api_error" || reason == "model_error"
 		ev.Ext = extra
@@ -521,4 +528,65 @@ func mustJSON(v any) json.RawMessage {
 		panic(err)
 	}
 	return b
+}
+
+// rawString is a JSON string's value, "" for anything else.
+func rawString(r json.RawMessage) string {
+	var s string
+	if json.Unmarshal(r, &s) != nil {
+		return ""
+	}
+	return s
+}
+
+func rawBool(r json.RawMessage) bool {
+	var b bool
+	return json.Unmarshal(r, &b) == nil && b
+}
+
+// errorTexts reads the result frame's errors whatever their shape: an array of
+// strings, an array of objects (message, error or text field, else the object's
+// JSON), a single string or a single object.
+func errorTexts(r json.RawMessage) []string {
+	if !isPresent(r) {
+		return nil
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(r, &items) != nil {
+		items = []json.RawMessage{r}
+	}
+	var out []string
+	for _, it := range items {
+		if !isPresent(it) {
+			continue
+		}
+		if s := rawString(it); s != "" {
+			out = append(out, s)
+			continue
+		}
+		var o struct {
+			Message string `json:"message"`
+			Error   string `json:"error"`
+			Text    string `json:"text"`
+		}
+		if json.Unmarshal(it, &o) == nil {
+			if s := firstNonEmpty(o.Message, o.Error, o.Text); s != "" {
+				out = append(out, s)
+				continue
+			}
+		}
+		if c := compact(it); c != nil {
+			out = append(out, string(c))
+		}
+	}
+	return out
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
 }

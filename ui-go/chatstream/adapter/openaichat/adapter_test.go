@@ -15,6 +15,9 @@ func TestFixtures(t *testing.T) {
 
 func TestTruncationEveryPrefix(t *testing.T) {
 	paths, _ := filepath.Glob("testdata/*.frames.json")
+	if len(paths) == 0 {
+		t.Fatal("no fixtures")
+	}
 	for _, p := range paths {
 		fx, err := conformance.LoadFixture(p)
 		if err != nil {

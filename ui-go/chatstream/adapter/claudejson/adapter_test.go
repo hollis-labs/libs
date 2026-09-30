@@ -505,3 +505,40 @@ func TestApprovalCallIDIsThePartID(t *testing.T) {
 		}
 	}
 }
+
+// A result frame with one loosely typed field must still be classified: it is
+// the terminal frame, and demoting it to raw would report a finished or failed
+// run as a retryable truncation.
+func TestResultWithMistypedFieldsStillClassifies(t *testing.T) {
+	tests := []struct {
+		name, line string
+		verb       chatstream.Verb
+		code, msg  string
+	}{
+		{"errors as objects", `{"type":"result","subtype":"error_during_execution","is_error":true,"errors":[{"message":"boom"}]}`,
+			chatstream.VerbRunError, "error_during_execution", "boom"},
+		{"errors as a string", `{"type":"result","subtype":"error_during_execution","is_error":true,"errors":"boom"}`,
+			chatstream.VerbRunError, "error_during_execution", "boom"},
+		{"float duration", `{"type":"result","subtype":"success","duration_ms":1234.5,"result":"ok"}`,
+			chatstream.VerbRunFinish, "", ""},
+		{"float num_turns and object result", `{"type":"result","subtype":"success","num_turns":2.0,"result":{"answer":1}}`,
+			chatstream.VerbRunFinish, "", ""},
+		{"float token counts", `{"type":"result","subtype":"success","usage":{"input_tokens":10.0,"output_tokens":5}}`,
+			chatstream.VerbRunFinish, "", ""},
+	}
+	for _, tc := range tests {
+		evs := decode(t, chatstream.DecodeOptions{}, []string{initLine, tc.line}, nil, true)
+		terms := terminals(evs)
+		if len(terms) != 1 || terms[0].Verb != tc.verb {
+			t.Errorf("%s: terminals = %+v, want one %s", tc.name, terms, tc.verb)
+			continue
+		}
+		if tc.code != "" && (terms[0].Code != tc.code || terms[0].Message != tc.msg || terms[0].Retryable) {
+			t.Errorf("%s: %+v, want code %q message %q not retryable", tc.name, terms[0], tc.code, tc.msg)
+		}
+		if terms[0].Code == chatstream.CodeUpstreamTruncated {
+			t.Errorf("%s: demoted to truncation", tc.name)
+		}
+		conformance.Check(t, evs)
+	}
+}

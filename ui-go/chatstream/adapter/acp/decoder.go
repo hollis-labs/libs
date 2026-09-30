@@ -29,11 +29,9 @@ type message struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params"`
 	Result  json.RawMessage `json:"result"`
-	Error   *struct {
-		Code    int             `json:"code"`
-		Message string          `json:"message"`
-		Data    json.RawMessage `json:"data"`
-	} `json:"error"`
+	// Error is read leniently (see readError): a response whose error has a
+	// string code or a structured message is still the run's terminal frame.
+	Error json.RawMessage `json:"error"`
 }
 
 type update struct {
@@ -89,7 +87,7 @@ func (d *decoder) Decode(f chatstream.Frame) ([]chatstream.Event, error) {
 		return nil, nil
 	}
 	var m message
-	if !parses(f.Data, &m) || (m.JSONRPC == "" && m.Method == "" && m.Result == nil && m.Error == nil) {
+	if !parses(f.Data, &m) || (m.JSONRPC == "" && m.Method == "" && m.Result == nil && !present(m.Error)) {
 		return d.raw(d.start(), "malformed", f.Data), nil
 	}
 	hasID := len(m.ID) > 0 && string(m.ID) != "null"
@@ -100,7 +98,7 @@ func (d *decoder) Decode(f chatstream.Frame) ([]chatstream.Event, error) {
 		return d.permission(m), nil
 	case m.Method != "":
 		return d.raw(d.start(), m.Method, f.Data), nil
-	case m.Error != nil:
+	case present(m.Error):
 		return d.errorResponse(m), nil
 	case len(m.Result) > 0:
 		return d.response(m, f.Data), nil
@@ -479,17 +477,58 @@ func endTurnUsage(raw json.RawMessage) (chatstream.Usage, bool) {
 func (d *decoder) errorResponse(m message) []chatstream.Event {
 	out := d.closeMessage(d.closeOpenTool(d.start()))
 	out = d.Unwind(out)
-	if m.Error.Code == errorCodeCancelled {
+	code, msg, data := readError(m.Error)
+	if code == strconv.Itoa(errorCodeCancelled) {
 		ev := d.Event(chatstream.VerbRunAbort)
 		ev.Reason = "cancelled"
 		return d.Emit(out, ev)
 	}
 	ev := d.Event(chatstream.VerbRunError)
-	ev.Code, ev.Message = strconv.Itoa(m.Error.Code), m.Error.Message
-	if len(m.Error.Data) > 0 {
-		ev.Ext = map[string]json.RawMessage{DialectName: mustJSON(map[string]json.RawMessage{"data": compact(m.Error.Data)})}
+	ev.Code, ev.Message = code, msg
+	if present(data) {
+		ev.Ext = map[string]json.RawMessage{DialectName: mustJSON(map[string]json.RawMessage{"data": compact(data)})}
 	}
 	return d.Emit(out, ev)
+}
+
+// readError reads a JSON-RPC error object whatever its field types: the code as
+// a number (1.0 is 1) or a string, the message as a string or as any JSON (its
+// text). A bare string or other JSON in place of the object is the message. The
+// code is "" only when the error carries none, and then ev.Code falls back to
+// chatstream.CodeUpstreamError.
+func readError(raw json.RawMessage) (code, msg string, data json.RawMessage) {
+	var o struct {
+		Code    json.RawMessage `json:"code"`
+		Message json.RawMessage `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if json.Unmarshal(raw, &o) != nil {
+		return chatstream.CodeUpstreamError, textOf(raw), nil
+	}
+	switch {
+	case !present(o.Code):
+		code = chatstream.CodeUpstreamError
+	default:
+		var f float64
+		if json.Unmarshal(o.Code, &f) == nil && f == float64(int64(f)) {
+			code = strconv.FormatInt(int64(f), 10)
+		} else {
+			code = textOf(o.Code)
+		}
+	}
+	return code, textOf(o.Message), o.Data
+}
+
+// textOf is a JSON string's value, else the JSON's own text ("" for absent).
+func textOf(raw json.RawMessage) string {
+	if !present(raw) {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	return string(compact(raw))
 }
 
 func present(r json.RawMessage) bool {
