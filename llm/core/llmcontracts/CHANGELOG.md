@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.0 — Unreleased
+## v0.4.0 — 2026-09-30
 
 - Added the `contracttest` subpackage: `contracttest.Run` is a reusable
   conformance suite for `Provider` implementations. Against a deterministic
