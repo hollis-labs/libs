@@ -88,7 +88,7 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 	if err != nil {
 		return Handle{}, err
 	}
-	if err := ctx.Err(); err != nil {
+	if err = ctx.Err(); err != nil {
 		return Handle{}, err
 	}
 	targetAbs, err := filepath.Abs(req.TargetRoot)
@@ -97,10 +97,10 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 	}
 	parentAbs := filepath.Dir(targetAbs)
 	targetBase := filepath.Base(targetAbs)
-	if err := rejectSymlinkParents(parentAbs); err != nil {
+	if err = rejectSymlinkParents(parentAbs); err != nil {
 		return Handle{}, err
 	}
-	if info, err := os.Lstat(targetAbs); err == nil {
+	if info, statErr := os.Lstat(targetAbs); statErr == nil {
 		if req.ExistingTarget != ExistingTargetAllowEmpty {
 			return Handle{}, fmt.Errorf("%w: %s", ErrTargetExists, targetAbs)
 		}
@@ -113,11 +113,11 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 		// also sidesteps relying on Root.Rename to replace an existing
 		// directory, which newer Go toolchains (tested: 1.26.1 allows it,
 		// 1.26.8 refuses it with EEXIST) no longer guarantee.
-		if err := os.Remove(targetAbs); err != nil {
+		if rmErr := os.Remove(targetAbs); rmErr != nil {
 			return Handle{}, fmt.Errorf("%w: %s exists and is not empty", ErrTargetExists, targetAbs)
 		}
-	} else if !os.IsNotExist(err) {
-		return Handle{}, err
+	} else if !os.IsNotExist(statErr) {
+		return Handle{}, statErr
 	}
 	parentRoot, err := os.OpenRoot(parentAbs)
 	if err != nil {

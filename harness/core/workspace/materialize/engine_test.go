@@ -67,7 +67,7 @@ func TestCreatePublishesCompleteTreeWithManifestAndReport(t *testing.T) {
 
 func TestCreateAllowsPublishingIntoPreexistingEmptyDirectory(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "boot")
-	if err := os.Mkdir(target, 0o755); err != nil {
+	if err := os.Mkdir(target, 0o750); err != nil {
 		t.Fatalf("mkdir target: %v", err)
 	}
 	req := createRequest(target)
@@ -86,7 +86,7 @@ func TestCreateAllowsPublishingIntoPreexistingEmptyDirectory(t *testing.T) {
 func TestCreateFailureCasesLeaveDestinationAbsent(t *testing.T) {
 	t.Run("existing target", func(t *testing.T) {
 		target := filepath.Join(t.TempDir(), "boot")
-		if err := os.Mkdir(target, 0o755); err != nil {
+		if err := os.Mkdir(target, 0o750); err != nil {
 			t.Fatalf("mkdir target: %v", err)
 		}
 		_, err := NewEngine(EngineOptions{}).Apply(context.Background(), createRequest(target))
@@ -96,10 +96,10 @@ func TestCreateFailureCasesLeaveDestinationAbsent(t *testing.T) {
 	})
 	t.Run("non-empty existing target refused even with allow_if_empty", func(t *testing.T) {
 		target := filepath.Join(t.TempDir(), "boot")
-		if err := os.Mkdir(target, 0o755); err != nil {
+		if err := os.Mkdir(target, 0o750); err != nil {
 			t.Fatalf("mkdir target: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(target, "preexisting.txt"), []byte("keep"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(target, "preexisting.txt"), []byte("keep"), 0o600); err != nil {
 			t.Fatalf("seed existing file: %v", err)
 		}
 		req := createRequest(target)
@@ -180,7 +180,7 @@ func TestCreateRejectsSymlinkParentAndStagedPathSwap(t *testing.T) {
 	t.Run("symlink ancestor parent", func(t *testing.T) {
 		root := t.TempDir()
 		outside := t.TempDir()
-		if err := os.Mkdir(filepath.Join(outside, "sub"), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(outside, "sub"), 0o750); err != nil {
 			t.Fatalf("mkdir outside sub: %v", err)
 		}
 		link := filepath.Join(root, "link")
@@ -263,7 +263,7 @@ func fixedNow() time.Time {
 
 func assertFile(t *testing.T, path string, data []byte, mode os.FileMode) {
 	t.Helper()
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // G304: test helper reading a path the test itself built under t.TempDir()
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}

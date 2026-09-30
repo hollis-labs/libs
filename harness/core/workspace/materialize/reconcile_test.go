@@ -132,7 +132,9 @@ func TestReconcileConflictsAndPartialRecovery(t *testing.T) {
 	})
 	t.Run("user edited owned file", func(t *testing.T) {
 		target, manifest := createBoot(t)
-		if err := os.WriteFile(filepath.Join(target, "AGENTS.md"), []byte("user edit\n"), 0o644); err != nil {
+		// AGENTS.md already exists, so os.WriteFile keeps its mode; the
+		// argument only has to match what the assertion below expects.
+		if err := os.WriteFile(filepath.Join(target, "AGENTS.md"), []byte("user edit\n"), 0o644); err != nil { //nolint:gosec // G306: existing file, mode unchanged
 			t.Fatalf("user edit: %v", err)
 		}
 		req := createRequest(target)
@@ -202,10 +204,10 @@ func TestReconcileConflictsAndPartialRecovery(t *testing.T) {
 
 func TestReconcilePreservesUnownedContentAndDocumentKeys(t *testing.T) {
 	target, manifest := createBoot(t)
-	if err := os.WriteFile(filepath.Join(target, "unowned.txt"), []byte("keep\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "unowned.txt"), []byte("keep\n"), 0o600); err != nil {
 		t.Fatalf("write unowned: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(target, "nested", "unowned-child"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(target, "nested", "unowned-child"), 0o750); err != nil {
 		t.Fatalf("mkdir unowned nested child: %v", err)
 	}
 	removeReq := createRequest(target)
@@ -224,8 +226,8 @@ func TestReconcilePreservesUnownedContentAndDocumentKeys(t *testing.T) {
 	if !errors.Is(err, ErrConflict) {
 		t.Fatalf("err = %v, want ErrConflict for non-empty owned directory", err)
 	}
-	assertFile(t, filepath.Join(target, "unowned.txt"), []byte("keep\n"), 0o644)
-	if _, err := os.Stat(filepath.Join(target, "nested", "unowned-child")); err != nil {
+	assertFile(t, filepath.Join(target, "unowned.txt"), []byte("keep\n"), 0o600)
+	if _, err = os.Stat(filepath.Join(target, "nested", "unowned-child")); err != nil {
 		t.Fatalf("nested unowned child missing: %v", err)
 	}
 
@@ -241,10 +243,10 @@ func TestReconcilePreservesUnownedContentAndDocumentKeys(t *testing.T) {
 	if !strings.Contains(string(jsonMerge.Bytes), `"unowned": true`) || !strings.Contains(string(jsonMerge.Bytes), `"managed": "new"`) {
 		t.Fatalf("json merge did not preserve/update keys: %s", jsonMerge.Bytes)
 	}
-	if _, err := MergeDocument(DocumentPatch{Kind: DocumentJSON, Existing: []byte(`{"managed":"user"}`), Previous: []ManagedKey{{Key: "managed", Digest: digestForJSON(t, `"old"`)}}}); !errors.Is(err, ErrConflict) {
+	if _, err = MergeDocument(DocumentPatch{Kind: DocumentJSON, Existing: []byte(`{"managed":"user"}`), Previous: []ManagedKey{{Key: "managed", Digest: digestForJSON(t, `"old"`)}}}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("json managed-key edit err = %v, want ErrConflict", err)
 	}
-	if _, err := MergeDocument(DocumentPatch{Kind: DocumentJSON, Existing: []byte(`{"broken"`)}); !errors.Is(err, ErrMalformedDocument) {
+	if _, err = MergeDocument(DocumentPatch{Kind: DocumentJSON, Existing: []byte(`{"broken"`)}); !errors.Is(err, ErrMalformedDocument) {
 		t.Fatalf("malformed json err = %v, want ErrMalformedDocument", err)
 	}
 

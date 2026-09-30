@@ -33,3 +33,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.agentkit-tmp-`) renamed to `.materialize-stage-`/`.materialize-tmp-`.
 - `Manifest.SchemaVersion` renamed from `agentkit.materialize.v1` to
   `materialize.v1`.
+- `MergeDocument` wraps the underlying JSON decode error as well as
+  `ErrMalformedDocument` (`%w` for both), so `errors.As` reaches the
+  `*json.SyntaxError`; `errors.Is(err, ErrMalformedDocument)` is unchanged.
+- The manifest directory (`.materialize/`) is created `0o750` instead of
+  `0o755`.
+- Reconcile/Refresh planning checks the context between entries, so a
+  cancelled caller stops before reading the rest of the target.
+
+### Fixed
+
+- `golangci-lint` is clean against the repo's own config for the first
+  time since the extraction (shadowed `err`s renamed, test file and
+  directory modes tightened, reasoned `//nolint:gosec` where a read path
+  is the caller's by design). CI had failed at the lint step on every run.
