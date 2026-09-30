@@ -33,7 +33,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
   `slot.go`, and never "clean up" its interleaved comments in a way that moves
   a name. Any such change shifts every consumer's cacheable prefix and
   silently breaks prompt-cache economics; it compiles and passes a naive
-  suite. Nothing else guards it once this repo is separate from Nanite.
+  suite. Nothing else guards it.
 - Guarded by: `TestSlotOrder_MatchesSeedSnapshot` (hardcoded 15-element
   literal), `TestDefaults_MatchSeedSnapshot` (default budgets, compactability,
   constants, stage names and order), `TestDefaults_CompleteForSlotOrder`, and
@@ -56,6 +56,5 @@ CI (`.github/workflows/check.yml`) is the full gate.
   reintroduce `google/uuid` or add a shape check on it.
 - Dependencies are `go-llm-types`, `go-llm-contracts` and `yaml.v3` only.
   Every dependency's own `go` line must stay at or below this module's.
-- Comments keep bare `CW-`/`SP-`/`D-` ids as inert history; do not add
-  references to symbols or files in any consuming application.
+- Do not add references to symbols or files in any consuming application.
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
