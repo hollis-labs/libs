@@ -307,9 +307,9 @@ func TestStreamEventsParsesSSEAndExitsOnCancel(t *testing.T) {
 		if !ok {
 			t.Fatal("no flusher")
 		}
-		fmt.Fprint(w, ": ping\n\n")
-		fmt.Fprint(w, "id: 11\nevent: session.state_changed\ndata: {\"scope\":\"session\",\"session_id\":\"s1\",\"payload_json\":\"{\\\"to\\\":\\\"running\\\"}\"}\n\n")
-		fmt.Fprint(w, "id: 12\nevent: broker.envelope_created\ndata: {\"scope\":\"broker\",\"payload_json\":\"{\\\"id\\\":\\\"env1\\\"}\"}\n\n")
+		_, _ = fmt.Fprint(w, ": ping\n\n")
+		_, _ = fmt.Fprint(w, "id: 11\nevent: session.state_changed\ndata: {\"scope\":\"session\",\"session_id\":\"s1\",\"payload_json\":\"{\\\"to\\\":\\\"running\\\"}\"}\n\n")
+		_, _ = fmt.Fprint(w, "id: 12\nevent: broker.envelope_created\ndata: {\"scope\":\"broker\",\"payload_json\":\"{\\\"id\\\":\\\"env1\\\"}\"}\n\n")
 		flusher.Flush()
 		close(flushed)
 		<-r.Context().Done()

@@ -6,6 +6,48 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.5.0 — 2026-09-30
+
+### Changed
+
+- The new group, workstream and session-workstream methods refuse an empty id with an error instead of sending it: an empty path segment would have been a request to the neighbouring collection route (`/groups/`, `/workstreams/`), whose answer a caller could mistake for the one it asked for.
+
+### Added
+
+Three surfaces that until now existed only as MCP tools, over the daemon routes
+they proxy. All additive: no existing exported symbol changes.
+
+- **`Client.Registry()`** (`RegistryClient`): `Register`, `Lookup`,
+  `LookupWithInclude`, `LookupBy`, `LookupByWithInclude`, `Search`,
+  `UpdateSelf`, `Deregister`, `Merge` and `Sync` over `/registry/...`. `Sync`
+  returns `(profile, synced, err)`: the daemon answers 204 for an entry with no
+  callback and 200 with the refreshed profile otherwise. Types: `RegistryProfile`,
+  `RegistryKind`, `RegistryStatus`, `RegistryFilter`, `RegistryUpdatePatch`,
+  `RegistryArrayPatch[T]` and the skill, link, callback and external-id shapes.
+- **`Client.Groups()`** (`GroupsClient`): `Create`, `Lookup`, `ListForMember`,
+  `Archive`, `AddMember`, `RemoveMember`, `Leave`, `SetMemberRole`, `ListMembers`,
+  `Send`, `ListMessages`, `MarkRead` and `Mentions` over `/groups` and
+  `/mentions`. A send whose @-mention matches several entries returns a
+  `*GroupAmbiguousMentionError` carrying the token and candidate URNs; it also
+  matches `errors.Is(err, &APIError{StatusCode: 400})`.
+- **Workstreams**, flat on `Client` like the daemon's own route layout:
+  `CreateWorkstream`, `GetWorkstream`, `ListWorkstreams`,
+  `AssignSessionWorkstream`, `EnsureSessionWorkstream`,
+  `SessionWorkstreamNamespace`, `SessionDigest`, `WorkstreamDigest` and
+  `WorkstreamsForRef`, with `Workstream`, `DigestQuery` and the `DigestResponse`
+  tree.
+
+Errors are `*APIError` throughout, so `errors.Is(err, &APIError{StatusCode: 404})`
+and the `ErrDaemonUnreachable` wrap behave as they do for every other method.
+
+### Notes
+
+- The daemon's MCP-only routes that sit next to these are deliberately not
+  covered: registry bindings, bootstrap and reonboard, and the session-ref routes.
+- `SessionWorkstreamNamespaceOptions` has `Project`, `Owner` and `Tail` only; the
+  daemon's legacy `user`/`type` parameters are not exposed.
+- `messaging_store.go` is untouched.
+
 ## v0.4.0 — 2026-09-30
 
 ### Added

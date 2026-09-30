@@ -106,7 +106,7 @@ func (c *Client) ClaimMessage(ctx context.Context, messageID string, recipient m
 	path := withQuery("/messages/"+url.PathEscape(messageID)+"/claim", q)
 
 	var out claimResponse
-	body := claimRequest{Holder: opts.Holder, LeaseSeconds: opts.LeaseSeconds}
+	body := claimRequest(opts)
 	if err := c.doJSON(ctx, http.MethodPost, path, body, http.StatusOK, &out); err != nil {
 		return messaging.Envelope{}, delivery.LeaseRef{}, 0, mapStoreError(err)
 	}

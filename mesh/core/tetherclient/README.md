@@ -122,6 +122,13 @@ The client covers:
 - event history and SSE event streaming
 - AI providers, models, routes, preview, explain
 - AI chat, chat stream, usage, budgets, audit
+- the agent registry: `Client.Registry()` (register, lookup by URN or substrate id, search, update, deregister, merge, sync)
+- group messaging: `Client.Groups()` (groups, membership, sequenced messages, read cursors, mentions)
+- workstreams and digests, flat on `Client` (`CreateWorkstream`, `EnsureSessionWorkstream`, `SessionDigest`, `WorkstreamDigest`, ...)
+
+The registry, group and workstream methods return `*APIError` like the rest
+(`errors.Is(err, &APIError{StatusCode: 404})`). A group send whose @-mention is
+ambiguous returns a `*GroupAmbiguousMentionError` carrying the candidate URNs.
 
 Long-lived calls use caller context rather than the default short transport
 timeout:
