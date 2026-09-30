@@ -2,6 +2,7 @@ package decodekit_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	chatstream "github.com/hollis-labs/go-chatstream"
@@ -60,5 +61,47 @@ func TestUnwindClosesInnermostFirst(t *testing.T) {
 	}
 	if len(b.OpenParts()) != 0 {
 		t.Error("parts still open after Unwind")
+	}
+}
+
+func TestPartOpenTracksDuplicatesAndEnds(t *testing.T) {
+	b := decodekit.New(chatstream.DecodeOptions{RunID: "r"})
+	var out []chatstream.Event
+	open := func(id string) {
+		ev := b.Event(chatstream.VerbPartStart)
+		ev.PartID = id
+		out = b.Emit(out, ev)
+	}
+	end := func(id string) {
+		ev := b.Event(chatstream.VerbPartEnd)
+		ev.PartID = id
+		out = b.Emit(out, ev)
+	}
+	for i := 0; i < 5000; i++ {
+		open(fmt.Sprintf("p%d", i))
+	}
+	if !b.PartOpen("p0") || !b.PartOpen("p4999") || b.PartOpen("nope") {
+		t.Fatal("PartOpen is wrong for open and unknown ids")
+	}
+	end("p0")
+	if b.PartOpen("p0") || len(b.OpenParts()) != 4999 {
+		t.Errorf("after end: PartOpen(p0) %v, open %d", b.PartOpen("p0"), len(b.OpenParts()))
+	}
+	out = b.Unwind(out)
+	if b.PartOpen("p1") || len(b.OpenParts()) != 0 {
+		t.Error("Unwind left parts open")
+	}
+}
+
+func TestLimitExceededIsNonRetryableAndClosesEverything(t *testing.T) {
+	b := decodekit.New(chatstream.DecodeOptions{RunID: "r"})
+	out := b.EnsureStarted(nil)
+	ev := b.Event(chatstream.VerbPartStart)
+	ev.PartID = "p"
+	out = b.Emit(out, ev)
+	out = b.LimitExceeded(out, "things", 3)
+	fin := out[len(out)-1]
+	if fin.Verb != chatstream.VerbRunError || fin.Code != chatstream.CodeLimitExceeded || fin.Retryable || !b.Terminated() || b.PartOpen("p") {
+		t.Errorf("terminal %+v, open %v", fin, b.PartOpen("p"))
 	}
 }

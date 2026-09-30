@@ -31,6 +31,12 @@ type Config struct {
 	Dialect string
 }
 
+// MaxOpenBlocks is the most content blocks the Machine keeps open at once, by
+// distinct index. A stream that opens more (a malicious or broken upstream can
+// use any index) ends with a non-retryable run.error, chatstream.CodeLimitExceeded,
+// instead of growing without bound. The Messages API opens a handful.
+const MaxOpenBlocks = 1024
+
 // Machine is the block state machine of the Anthropic Messages stream: the
 // six message events, block by block. It is not safe for concurrent use.
 type Machine struct {
@@ -170,8 +176,12 @@ func (m *Machine) messageStart(out []chatstream.Event, data []byte) []chatstream
 	if err := json.Unmarshal(data, &w); err != nil {
 		return m.emit(out, m.raw("malformed", data))
 	}
-	// A new message begins: whatever the previous one left open is closed first.
+	// A new message begins: whatever the previous one left open is closed first,
+	// its blocks, then the message (and, in a host's stream, its step).
 	out = m.closeBlocks(out)
+	if m.b.MessageOpen() {
+		out = m.unwindMessage(out)
+	}
 	m.msgID = w.Message.ID
 	m.streamed[w.Message.ID] = true
 	m.usage = usageAcc{}
@@ -243,8 +253,14 @@ func (m *Machine) blockStart(out []chatstream.Event, data []byte) []chatstream.E
 	if err := json.Unmarshal(w.Block, &cb); err != nil {
 		return m.emit(out, m.raw("malformed", data))
 	}
+	if m.b.Terminated() {
+		return out
+	}
 	if old, open := m.blocks[w.Index]; open {
 		out = m.closeBlock(out, old) // a start for an open index replaces it
+	} else if len(m.blocks) >= MaxOpenBlocks {
+		out = m.closeBlocks(out)
+		return m.b.LimitExceeded(out, "open content blocks", MaxOpenBlocks)
 	}
 	bl := &block{index: w.Index, partID: m.partID(w.Index), blockType: cb.Type, raw: append(json.RawMessage(nil), w.Block...)}
 	meta := map[string]json.RawMessage{}
@@ -510,6 +526,9 @@ func (m *Machine) unwindMessage(out []chatstream.Event) []chatstream.Event {
 	me := m.b.Event(chatstream.VerbMessageEnd)
 	me.MessageID = m.msgID
 	out = m.emit(out, me)
+	if m.cfg.OwnsRun {
+		return out // the run has no steps here: the message is all there is to end
+	}
 	sf := m.b.Event(chatstream.VerbStepFinish)
 	sf.StepID = m.msgID
 	return m.emit(out, sf)

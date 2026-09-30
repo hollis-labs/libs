@@ -384,3 +384,59 @@ func TestToolCallPartsAlwaysCarryAName(t *testing.T) {
 	}
 	conformance.Check(t, cut)
 }
+
+// Some servers send finish_reason "" on every chunk. That is not a finish: it
+// must not close the open part or count as the stream having reached its end.
+func TestEmptyStringFinishReasonIsNotAFinish(t *testing.T) {
+	empty := func(delta string) string {
+		return fmt.Sprintf(`{"id":"c1","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":%s,"finish_reason":""}]}`, delta)
+	}
+	evs := run(t, empty(`{"role":"assistant","content":"a"}`), empty(`{"content":"b"}`), chunk(`{}`, "stop"), "[DONE]")
+	starts := 0
+	for _, e := range evs {
+		if e.Verb == chatstream.VerbPartStart && e.Kind == "text" {
+			starts++
+		}
+	}
+	if starts != 1 {
+		t.Errorf("text parts = %d, want 1: an empty finish_reason split the text: %s", starts, verbsOf(evs))
+	}
+	if fin := last(evs); fin.Verb != chatstream.VerbRunFinish || fin.Finish() != chatstream.FinishStop || fin.RawReason != "stop" {
+		t.Errorf("terminal = %+v", fin)
+	}
+	conformance.Check(t, evs)
+
+	// and a stream cut after only empty finish_reasons has not reached a finish
+	cut := run(t, empty(`{"content":"a"}`))
+	end := last(cut)
+	if end.Verb != chatstream.VerbRunError || end.Code != chatstream.CodeUpstreamTruncated {
+		t.Fatalf("terminal = %+v", end)
+	}
+	if _, seen := end.Ext["openai"]; seen {
+		t.Errorf("finish_reason_seen was set for an empty finish_reason: %s", end.Ext["openai"])
+	}
+}
+
+// The error frame is terminal: a mistyped field must not lose its message or its
+// classification.
+func TestErrorFrameWithLooselyTypedFields(t *testing.T) {
+	evs := run(t, chunk(`{"content":"x"}`, ""), `{"error":{"message":{"detail":"slow down"},"type":"server_error","code":500,"param":3}}`)
+	fin := last(evs)
+	if fin.Verb != chatstream.VerbRunError || fin.Code != "500" || !fin.Retryable || fin.Message != `{"detail":"slow down"}` {
+		t.Errorf("terminal = %+v", fin)
+	}
+	conformance.Check(t, evs)
+}
+
+func TestTooManyToolCallIndicesEndsTheRunNonRetryable(t *testing.T) {
+	var frames []string
+	for i := 0; i <= openaichat.MaxToolCalls; i++ {
+		frames = append(frames, chunk(fmt.Sprintf(`{"tool_calls":[{"index":%d,"id":"c%d","function":{"name":"f","arguments":"{"}}]}`, i, i), ""))
+	}
+	evs := run(t, frames...)
+	fin := last(evs)
+	if fin.Verb != chatstream.VerbRunError || fin.Code != chatstream.CodeLimitExceeded || fin.Retryable {
+		t.Fatalf("terminal = %+v", fin)
+	}
+	conformance.Check(t, evs)
+}

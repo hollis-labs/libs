@@ -41,6 +41,12 @@ func keySet(keys ...string) map[string]bool {
 	return m
 }
 
+// MaxToolCalls is the most tool calls (distinct tool_calls indices) the decoder
+// keeps open at once. A stream that names more ends with a non-retryable
+// run.error, chatstream.CodeLimitExceeded, instead of growing without bound; a
+// real response has a handful.
+const MaxToolCalls = 1024
+
 type toolState struct {
 	partID  string
 	name    string
@@ -245,7 +251,8 @@ func (d *decoder) choice(out []chatstream.Event, raw json.RawMessage, unknown ma
 	}
 	if v, ok := ch["finish_reason"]; ok {
 		var fr *string
-		if json.Unmarshal(v, &fr) == nil && fr != nil {
+		// "" is not a finish: some servers send finish_reason "" on every chunk.
+		if json.Unmarshal(v, &fr) == nil && fr != nil && *fr != "" {
 			d.finish, d.finishSet = *fr, true
 			out = d.closeAll(out)
 		}
@@ -307,8 +314,16 @@ const unknownTool = "unknown"
 // must carry the name. A call that ends with no name at all is opened as
 // "unknown" with Ext["openai"]["name_missing"].
 func (d *decoder) toolFragment(out []chatstream.Event, idx int, id, name, args string) []chatstream.Event {
+	if d.Terminated() {
+		return out
+	}
 	st := d.tools[idx]
 	if st == nil {
+		if len(d.tools) >= MaxToolCalls {
+			out = d.endContent(out)
+			out = d.endTools(out)
+			return d.LimitExceeded(out, "open tool calls", MaxToolCalls)
+		}
 		st = &toolState{partID: id}
 		if st.partID == "" {
 			st.partID = fmt.Sprintf("call-%d", idx)
@@ -419,17 +434,24 @@ func (d *decoder) done() []chatstream.Event {
 
 // fail handles an {"error": ...} frame.
 func (d *decoder) fail(raw json.RawMessage, frame []byte) []chatstream.Event {
-	var e struct {
-		Message string          `json:"message"`
-		Type    string          `json:"type"`
+	// The error frame is terminal, so its fields are read leniently: a message
+	// that is an object or a param that is a number must not lose the message or
+	// the classification.
+	var w struct {
+		Message json.RawMessage `json:"message"`
+		Type    json.RawMessage `json:"type"`
 		Code    json.RawMessage `json:"code"`
-		Param   string          `json:"param"`
+		Param   json.RawMessage `json:"param"`
 	}
-	var msg string
-	if json.Unmarshal(raw, &e) != nil {
+	var e struct {
+		Message, Type, Param string
+		Code                 json.RawMessage
+	}
+	if json.Unmarshal(raw, &w) != nil {
 		// error is a bare string (some compatible servers)
-		_ = json.Unmarshal(raw, &msg)
-		e.Message = msg
+		e.Message = lenientText(raw)
+	} else {
+		e.Message, e.Type, e.Param, e.Code = lenientText(w.Message), lenientText(w.Type), lenientText(w.Param), w.Code
 	}
 	code := strings.Trim(strings.TrimSpace(string(e.Code)), `"`)
 	if code == "null" {
@@ -457,6 +479,24 @@ func (d *decoder) fail(raw json.RawMessage, frame []byte) []chatstream.Event {
 	}
 	ev.Ext = openaiExt(ext)
 	return d.Emit(out, ev)
+}
+
+// lenientText is a JSON string's value, else the JSON's own text ("" for absent
+// or null).
+func lenientText(raw json.RawMessage) string {
+	s := bytes.TrimSpace(raw)
+	if len(s) == 0 || string(s) == "null" {
+		return ""
+	}
+	var str string
+	if json.Unmarshal(s, &str) == nil {
+		return str
+	}
+	var buf bytes.Buffer
+	if json.Compact(&buf, s) == nil {
+		return buf.String()
+	}
+	return string(s)
 }
 
 // Close implements chatstream.Decoder. See the package documentation for why a

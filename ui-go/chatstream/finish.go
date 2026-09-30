@@ -60,6 +60,10 @@ const (
 	// layer's size limit. Not retryable, unlike truncation: a retry meets the same
 	// frame. Raise the limit (framing.WithMaxEventBytes, framing.Lines' maxLine).
 	CodeFrameTooLarge = "frame_too_large"
+	// CodeLimitExceeded: a decoder's per-stream state limit was exceeded (too many
+	// concurrent tool-call or content-block indices). Not retryable: a retry meets
+	// the same stream.
+	CodeLimitExceeded = "limit_exceeded"
 	// CodeUpstreamError: the upstream reported an error event.
 	CodeUpstreamError = "upstream_error"
 )

@@ -16,7 +16,8 @@ type Base struct {
 	started    bool
 	terminated bool
 	closed     bool
-	openParts  []string // part ids in open order
+	openParts  []string       // part ids in open order
+	openSet    map[string]int // open part id -> times open, so PartOpen is O(1)
 	msgOpen    bool
 	msgID      string
 	openSteps  []string
@@ -24,7 +25,7 @@ type Base struct {
 
 // New returns a Base for one stream.
 func New(opts chatstream.DecodeOptions) *Base {
-	return &Base{opts: opts, runID: opts.RunID}
+	return &Base{opts: opts, runID: opts.RunID, openSet: map[string]int{}}
 }
 
 // Options returns the DecodeOptions the Base was built with.
@@ -89,7 +90,13 @@ func (b *Base) track(ev chatstream.Event) {
 		b.started = true
 	case chatstream.VerbPartStart:
 		b.openParts = append(b.openParts, ev.PartID)
+		b.openSet[ev.PartID]++
 	case chatstream.VerbPartEnd:
+		if b.openSet[ev.PartID] > 0 {
+			if b.openSet[ev.PartID]--; b.openSet[ev.PartID] == 0 {
+				delete(b.openSet, ev.PartID)
+			}
+		}
 		b.openParts = removeLast(b.openParts, ev.PartID)
 	case chatstream.VerbMessageStart:
 		b.msgOpen, b.msgID = true, ev.MessageID
@@ -119,12 +126,23 @@ func (b *Base) OpenParts() []string { return append([]string(nil), b.openParts..
 
 // PartOpen reports whether a part is open.
 func (b *Base) PartOpen(id string) bool {
-	for _, p := range b.openParts {
-		if p == id {
-			return true
-		}
-	}
-	return false
+	return b.openSet[id] > 0
+}
+
+// MessageOpen reports whether a message.start was emitted and its message.end
+// was not.
+func (b *Base) MessageOpen() bool { return b.msgOpen }
+
+// LimitExceeded ends the stream because a per-stream state limit was exceeded:
+// everything open is closed, then a run.error with chatstream.CodeLimitExceeded,
+// not retryable (a retry meets the same stream). what names the limit.
+func (b *Base) LimitExceeded(out []chatstream.Event, what string, limit int) []chatstream.Event {
+	out = b.EnsureStarted(out)
+	out = b.Unwind(out)
+	ev := b.Event(chatstream.VerbRunError)
+	ev.Code, ev.Retryable = chatstream.CodeLimitExceeded, false
+	ev.Message = fmt.Sprintf("more than %d %s in one stream", limit, what)
+	return b.Emit(out, ev)
 }
 
 // EnsureStarted emits a run.start (with the options' provider and model) if none

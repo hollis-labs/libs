@@ -3,6 +3,7 @@ package anthropic_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	chatstream "github.com/hollis-labs/go-chatstream"
 	"github.com/hollis-labs/go-chatstream/adapter/anthropic"
 	"github.com/hollis-labs/go-chatstream/conformance"
+	"github.com/hollis-labs/go-chatstream/internal/anthropicwire"
 )
 
 func TestCapabilitiesAreValid(t *testing.T) {
@@ -473,4 +475,42 @@ func TestResultCorrelation(t *testing.T) {
 			t.Error("a successful search result was flagged is_error")
 		}
 	}
+}
+
+// A second message_start while a message is open ends the open one first, as
+// blocks are ended: message.start inside an open message is a lifecycle
+// violation.
+func TestSecondMessageStartEndsTheOpenMessage(t *testing.T) {
+	frames := []fr{
+		{"message_start", `{"type":"message_start","message":{"id":"m1","role":"assistant","model":"mod"}}`},
+		{"content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`},
+		{"content_block_delta", `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}`},
+		{"message_start", `{"type":"message_start","message":{"id":"m2","role":"assistant","model":"mod"}}`},
+		{"message_delta", `{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}`},
+		{"message_stop", `{"type":"message_stop"}`},
+	}
+	evs := decode(t, chatstream.DecodeOptions{}, frames, nil, true)
+	conformance.Check(t, evs)
+	ends := 0
+	for _, e := range evs {
+		if e.Verb == chatstream.VerbMessageEnd {
+			ends++
+		}
+	}
+	if ends != 2 {
+		t.Errorf("message.end events = %d, want 2", ends)
+	}
+}
+
+func TestTooManyOpenBlocksEndsTheRunNonRetryable(t *testing.T) {
+	frames := []fr{{"message_start", `{"type":"message_start","message":{"id":"m1","role":"assistant","model":"mod"}}`}}
+	for i := 0; i <= anthropicwire.MaxOpenBlocks; i++ {
+		frames = append(frames, fr{"content_block_start", fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"text","text":""}}`, i)})
+	}
+	evs := decode(t, chatstream.DecodeOptions{}, frames, nil, true)
+	fin := last(evs)
+	if fin.Verb != chatstream.VerbRunError || fin.Code != chatstream.CodeLimitExceeded || fin.Retryable {
+		t.Fatalf("terminal = %+v", fin)
+	}
+	conformance.Check(t, evs)
 }
