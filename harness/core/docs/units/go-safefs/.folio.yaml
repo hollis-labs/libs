@@ -12,12 +12,9 @@ presets:
     resolved_path: bundled:presets/go-lib
 inputs:
   agents_boundaries: |-
-    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+    - See AGENTS.md ## Boundaries (edited by hand after generation).
   agents_start_here: |-
-    - `pathsafe` package — the importable API; its `doc.go` is the package documentation.
-    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+    - See AGENTS.md ## Start Here (edited by hand after generation).
   copyright_holder: Hollis Labs
   description: 'Filesystem safety primitives: path confinement under a root and crash-safe atomic writes.'
   github_owner: hollis-labs

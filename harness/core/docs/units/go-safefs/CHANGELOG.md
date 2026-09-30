@@ -11,4 +11,7 @@ refuses a tag whose CHANGELOG has no heading for it.
 
 ### Added
 
+- `pathsafe`: `ResolveUnder` and `EscapeError`, lifted verbatim from Nanite's `internal/pathsafe` (identical to go-sandbox's copy apart from one comment).
+- `atomicfile`: `WriteFile`, `NewWriter` and `Writer`, lifted from Nanite's `internal/fsutil` and renamed (`AtomicWriteFile` to `WriteFile`, `AtomicWriter` to `NewWriter`). `NewWriter` now returns the concrete `*Writer` instead of `io.WriteCloser`, and error strings use the `atomicfile:` prefix.
+- Seed test suites ported with mechanical renames; godoc examples for both packages.
 - Initial scaffold.

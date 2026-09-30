@@ -2,12 +2,12 @@
 
 Filesystem safety primitives: path confinement under a root and crash-safe atomic writes.
 
-It is not: TODO(author) — the mistake this repo attracts.
+It is not: a general filesystem utility library. It holds exactly two things, path confinement and atomic writes, and the mistake this repo attracts is growing a catch-all `fsutil`.
 
 ## Start Here
 
-- `pathsafe` package — the importable API; its `doc.go` is the package documentation.
-- `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+- `pathsafe/` and `atomicfile/` — the two sibling packages (no root package); each `doc.go` is that package's documentation.
+- `README.md` — one runnable `go` fence per package; keep them compiling against the current API (`ExampleResolveUnder` and `ExampleWriteFile` guard signature drift).
 - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
 
 ## Commands
@@ -23,4 +23,12 @@ CI (`.github/workflows/check.yml`) is the full gate.
 ## Boundaries
 
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-- TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+- Zero dependencies: `go.mod` has no `require` block and there is no `go.sum`. Do not add a dependency.
+- No root package. `pathsafe` (confinement) and `atomicfile` (atomic writes) are unrelated contracts and must not import each other.
+- No grab-bag helpers: no copy/walk/move/tree utilities, no `fsutil`-style catch-all. The `atomicfile` rename exists to stop that accumulation.
+- Longest-existing-ancestor symlink resolution: `ResolveUnder` resolves symlinks on the longest ancestor that exists and re-joins the missing suffix, so a not-yet-created leaf is still validated. Guarded by `TestResolveUnder_Table` (cases `nonexistent leaf`, `nonexistent deep path`, `symlink escape`, `symlink escape subpath`) and `TestResolveUnder_NonexistentRoot`.
+- `..` and symlink escapes must return `*EscapeError`. Guarded by `TestResolveUnder_Table` (`dotdot escape`, `dotdot mid-path`, `symlink escape*`, `null byte`).
+- Sibling-prefix rejection: `/root-evil` is not under `/root`; `isUnder` must compare path components (via `filepath.Rel`), never raw string prefixes. KNOWN GAP: no ported test covers this. Replacing `isUnder` with `strings.HasPrefix` leaves the suite green (checked by mutation). Any change to `isUnder` needs a sibling-prefix test added first.
+- fsync ordering in `atomicfile`: temp file fsync, then chmod, then rename, then parent-directory fsync (`syncParentDir`). Never publish before the temp file is synced; never skip the parent-dir sync. KNOWN GAP: `TestAtomicWriteFile_ParentDirFsync` and `TestAtomicWriter_ParentDirFsync` only assert the success path, and `TestAtomicWriteFile_ShortWriteSynthesizesError` asserts a string literal, not the code. Removing the parent-dir fsync, the short-write check, or the temp fsync keeps the suite green (checked by mutation). Treat those lines as unguarded and review such changes by hand.
+- The temp file is removed on every error path, and `Writer.Abort` after `Close` is a no-op. Guarded by `TestAtomicWriteFile_NoPartialOnError`, `TestAtomicWriter_AbortLeavesNoTemp`, `TestAtomicWriter_AbortAfterCloseIsNoOp`.
+- The source is lifted from `apps/nanite/internal/{pathsafe,fsutil}`. Behavior stays identical to the seed unless a CHANGELOG entry says otherwise; do not "improve" the lifted logic casually, it is security-relevant.
