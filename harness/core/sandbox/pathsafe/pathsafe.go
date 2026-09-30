@@ -115,11 +115,42 @@ func ResolveUnder(root, userPath string) (string, error) {
 // the standard technique for validating a target path that does not yet
 // exist (e.g., a file the caller is about to create).
 func resolveSymlinksBestEffort(p string) (string, error) {
-	p = filepath.Clean(p)
+	return resolveSymlinksDepth(filepath.Clean(p), 0)
+}
+
+// maxSymlinkFollow bounds how many dangling links resolveSymlinksDepth follows
+// by hand, so a chain of dangling links cannot loop.
+const maxSymlinkFollow = 40
+
+func resolveSymlinksDepth(p string, depth int) (string, error) {
 	if evald, err := filepath.EvalSymlinks(p); err == nil {
 		return evald, nil
 	} else if !os.IsNotExist(err) {
 		return "", err
+	}
+
+	// EvalSymlinks failed with not-exist. If p ITSELF is a symlink, it is a
+	// dangling one: the upward walk below starts at p's parent and would never
+	// look at p, so a link whose target is a not-yet-existing path outside the
+	// root would be reported as "root/link" and a caller creating that path would
+	// write through it. Follow it by hand and resolve where it points instead.
+	if info, err := os.Lstat(p); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		if depth >= maxSymlinkFollow {
+			return "", fmt.Errorf("too many symlinks resolving %q", p)
+		}
+		target, err := os.Readlink(p)
+		if err != nil {
+			return "", err
+		}
+		if !filepath.IsAbs(target) {
+			// A relative target is relative to the link's REAL directory.
+			realDir, err := filepath.EvalSymlinks(filepath.Dir(p))
+			if err != nil {
+				return "", err
+			}
+			target = filepath.Join(realDir, target)
+		}
+		return resolveSymlinksDepth(filepath.Clean(target), depth+1)
 	}
 
 	// Walk upward to find the longest existing ancestor.

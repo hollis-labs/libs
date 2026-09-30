@@ -174,3 +174,60 @@ func TestShortWriteIsAnErrorAndNothingIsPublished(t *testing.T) {
 	}
 	noTempLeft(t, dir)
 }
+
+// A failed Write must not be forgotten: a caller that ignores the error, or an
+// io.Copy that returns early, still calls Close, which used to fsync and rename a
+// truncated file over the target.
+func TestClosePublishesNothingAfterAFailedWrite(t *testing.T) {
+	boom := errors.New("injected write failure")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	w, err := NewWriter(path, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("good-prefix")); err != nil { //nolint:govet // scoped err in test
+		t.Fatal(err)
+	}
+	swap(t, &writeTemp, func(*os.File, []byte) (int, error) { return 0, boom })
+	if _, err := w.Write([]byte("more")); !errors.Is(err, boom) { //nolint:govet // scoped err in test
+		t.Fatalf("Write err = %v, want the injected failure", err)
+	}
+	// The failure is sticky: a later Write does not reach the file.
+	if _, err := w.Write([]byte("later")); !errors.Is(err, boom) { //nolint:govet // scoped err in test
+		t.Fatalf("Write after failure = %v, want the recorded error", err)
+	}
+	err = w.Close()
+	if !errors.Is(err, boom) {
+		t.Fatalf("Close err = %v, want it to return the write failure", err)
+	}
+	got, readErr := os.ReadFile(path) //nolint:gosec // test reads a path under t.TempDir()
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(got) != "original" {
+		t.Fatalf("target = %q, want the original untouched", got)
+	}
+	noTempLeft(t, dir)
+}
+
+// A short write with no error is a failed write too.
+func TestShortWriteOnAWriterAbortsTheClose(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	w, err := NewWriter(path, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	swap(t, &writeTemp, func(f *os.File, p []byte) (int, error) { return f.Write(p[:len(p)-1]) })
+	if _, err := w.Write([]byte("payload")); err == nil { //nolint:govet // scoped err in test
+		t.Fatal("a short write returned no error")
+	}
+	if err := w.Close(); err == nil || exists(path) { //nolint:govet // scoped err in test
+		t.Fatalf("Close = %v, target exists = %v; want an error and nothing published", err, exists(path))
+	}
+	noTempLeft(t, dir)
+}

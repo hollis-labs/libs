@@ -6,6 +6,12 @@
 // refuses the result if it escapes the root — including via symlinks or
 // ".." components.
 //
+// A symlink is followed even when it is the last component and dangles: a link
+// whose target does not exist yet is judged by where it points, because a caller
+// that creates the returned path writes through the link. Relative link targets
+// resolve against the link's real directory, and a chain of links is followed up
+// to a fixed depth.
+//
 // Callers that need to classify escape errors can use errors.As to unwrap an
 // *EscapeError.
 //

@@ -138,19 +138,39 @@ type Writer struct {
 	target string
 	mode   os.FileMode
 	closed bool
+	// writeErr is the first failed Write; once set, Close aborts instead of
+	// publishing.
+	writeErr error
 }
 
 // Write appends p to the temp file. It forwards to the underlying *os.File and
-// does not synthesize short-write errors. Write after Close returns an error.
+// does not synthesize short-write errors of its own, but it REMEMBERS a failed
+// write: the first error (or an io.ErrShortWrite when fewer bytes than asked
+// were stored with no error) is recorded, later Writes return it without writing,
+// and Close then discards the temp file and returns it instead of publishing a
+// truncated file. Write after Close returns an error.
 func (w *Writer) Write(p []byte) (int, error) {
 	if w.closed {
 		return 0, errors.New("atomicfile: write after close")
 	}
-	return w.f.Write(p)
+	if w.writeErr != nil {
+		return 0, w.writeErr
+	}
+	n, err := writeTemp(w.f, p)
+	if err == nil && n < len(p) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		w.writeErr = err
+	}
+	return n, err
 }
 
 // Close fsyncs and renames the temp over the target. If any step fails, the
-// temp is removed.
+// temp is removed. If an earlier Write failed, Close removes the temp and returns
+// that error without touching the target. The parent-directory fsync runs AFTER
+// the rename, so an error from it is returned even though the new content is
+// already in place. Close after Abort returns nil.
 func (w *Writer) Close() (retErr error) {
 	if w.closed {
 		return nil
@@ -162,6 +182,10 @@ func (w *Writer) Close() (retErr error) {
 		}
 	}()
 
+	if w.writeErr != nil {
+		_ = w.f.Close()
+		return fmt.Errorf("atomicfile: aborted after failed write: %w", w.writeErr)
+	}
 	if err := syncFile(w.f); err != nil {
 		_ = w.f.Close()
 		return fmt.Errorf("atomicfile: fsync: %w", err)
