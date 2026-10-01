@@ -235,3 +235,35 @@ func FuzzDecode(f *testing.F) {
 		}
 	})
 }
+
+func TestDecodeExtensionStrictAndAtomic(t *testing.T) {
+	type block struct {
+		UI struct {
+			Bundle string `json:"bundle"`
+		} `json:"ui"`
+	}
+	var got block
+	if err := manifest.DecodeExtension(json.RawMessage(`{"ui":{"bundle":"ui/index.js"}}`), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.UI.Bundle != "ui/index.js" {
+		t.Fatal("lost bundle")
+	}
+	for _, raw := range []string{`null`, `[]`, `{} {}`, `{"ui":{"Bundle":"other.js"}}`, `{"ui":{"bundle":"one.js","bundle":"two.js"}}`, `{"ui":{"bundle":0}}`, `{"ui":{"script":"bad.js"}}`} {
+		t.Run(raw, func(t *testing.T) {
+			before := got
+			if err := manifest.DecodeExtension(json.RawMessage(raw), &got); err == nil {
+				t.Fatal("accepted invalid extension")
+			}
+			if got != before {
+				t.Fatal("modified destination on failure")
+			}
+		})
+	}
+	var nilBlock *block
+	for _, dst := range []any{nil, nilBlock, block{}, new(string)} {
+		if err := manifest.DecodeExtension(json.RawMessage(`{}`), dst); err == nil {
+			t.Fatal("accepted invalid destination")
+		}
+	}
+}

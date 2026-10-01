@@ -35,6 +35,8 @@ and legacy host dialects are errors; there is no inference or fallback.
 - `cerberus`, `tangent`, `nanite`: optional opaque JSON objects with host-owned
   registrations. Each extension requires a corresponding `hosts` entry. The
   host must decode and validate its own block before applying registrations.
+  `DecodeExtension` supplies the same strict decoding checks for a host-owned
+  struct; the host validates that struct's meaning separately.
 
 No archive, signature, catalog tier or compiled-in runtime belongs to this
 contract. Archives and checksums belong to distribution catalogs.

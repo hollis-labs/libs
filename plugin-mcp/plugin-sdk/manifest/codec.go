@@ -131,6 +131,9 @@ func jsonValue(d *json.Decoder, depth int) error {
 // those aliases so a declaration cannot override a reviewed field through an
 // alternate spelling. Raw host extensions and schema objects stay opaque.
 func exactFields(raw []byte, typ reflect.Type) error {
+	if typ.Kind() == reflect.Pointer {
+		return exactFields(raw, typ.Elem())
+	}
 	if typ == reflect.TypeFor[json.RawMessage]() {
 		return nil
 	}
@@ -178,5 +181,36 @@ func exactFields(raw []byte, typ reflect.Type) error {
 			}
 		}
 	}
+	return nil
+}
+
+// DecodeExtension decodes a host-owned extension into a non-nil pointer to a
+// struct, applying the same size, nesting, duplicate-key and exact-field checks
+// as Decode. It leaves dst unchanged on failure. Hosts must separately validate
+// the decoded value's meaning before applying registrations or granting access.
+func DecodeExtension(raw json.RawMessage, dst any) error {
+	v := reflect.ValueOf(dst)
+	if v.Kind() != reflect.Pointer || v.IsNil() || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("manifest: extension destination must be a non-nil pointer to a struct")
+	}
+	if len(raw) > MaxBytes {
+		return fmt.Errorf("manifest exceeds %d bytes", MaxBytes)
+	}
+	if !object(raw) {
+		return fmt.Errorf("manifest: extension must be an object")
+	}
+	if err := checkJSON(raw); err != nil {
+		return err
+	}
+	if err := exactFields(raw, v.Elem().Type()); err != nil {
+		return err
+	}
+	tmp := reflect.New(v.Elem().Type())
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(tmp.Interface()); err != nil {
+		return err
+	}
+	v.Elem().Set(tmp.Elem())
 	return nil
 }
