@@ -52,6 +52,11 @@ go get github.com/hollis-labs/plugin-sdk
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
+- `manifest` — a shared subprocess declaration with host extension objects,
+  config/secrets, capabilities, tools and per-host contract ranges. Its
+  dependency-free encoder emits JSON (valid YAML) for `plugin.yaml`; its
+  decoder refuses legacy dialects, unknown fields and duplicate keys.
+  See [the manifest contract](docs/manifest.md).
 - `registry` — the Go view of the plugin registry wire contract: the
   response a host serves so a browser can find, load and resolve the UI
   its plugins ship, plus `Validate`.

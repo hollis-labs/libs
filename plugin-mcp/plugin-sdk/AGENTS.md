@@ -30,6 +30,9 @@ all; React is an optional peer behind a subpath.
   granted set lives on `InitParams` in `subprocess/types.go`.
 - `subprocess/subprocesstest/` drives a plugin in-process, without spawning one.
 - `examples/hello` is a complete minimal plugin.
+- `manifest/` owns the shared plugin declaration, structural validation and
+  dependency-free JSON generation/decoding; `docs/manifest.md` explains the
+  split between shared structure and host enforcement.
 - `registry/registry.go` owns the registry wire contract's Go view and
   `Protocol`.
 - `ts/packages/plugin-registry/src/types.ts` owns the same contract's
