@@ -110,11 +110,19 @@ derived, err := launch.FromAssignment(base, assignment)
 
 ## How ranking works
 
-Each tool is one document: name, title, description and tags, tokenized on
+Each tool is one document: name, title, description, tags, and each argument
+name and description in `Tool.Arguments`, tokenized on
 every non-letter, non-digit rune (so `torque_task_create` is three words),
 lower-cased, with tokens under two characters and a 46-word stopword list
 dropped. Document frequencies are catalog-wide, so a score does not change with
 the rules in play.
+
+Argument metadata is optional and supplied by the caller; hosts extract it from
+input schemas. For example, `Arguments: []toolselect.Argument{{Name: "path",
+Description: "Archive destination"}}` makes those terms searchable. Nested
+property paths may be flattened into names. The library parses no schemas and
+indexes no argument values. Omitting arguments preserves prior scoring. The
+index and returned hits copy the argument slice.
 
 Output order is by tier first, then score:
 
@@ -125,7 +133,11 @@ Output order is by tier first, then score:
 | `TierPrefix` | lower-cased `Name` is a prefix of the query, or the reverse |
 | `TierBM25` | everything else, by BM25 score descending |
 
-Ties break by `Tool.Name` ascending, so the order is total. A tool that shares
+Within `TierExactName`, a literal `Name` match leads case-folded name matches,
+which lead title-only matches. This keeps a tool queried by its exact name first
+even when another tool declares that name as its title (unless rules exclude it
+or explicitly pin another tool ahead). Remaining ties break by `Tool.Name`
+ascending, so the order is total. A tool that shares
 no term with the query and matches no tier is not returned; an empty query
 returns only pinned tools. `WithK1B`, `WithMaxResults` and `WithStopwords`
 tune the call (defaults k1 1.2, b 0.75, unlimited).

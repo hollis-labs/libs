@@ -30,7 +30,8 @@ type Index struct {
 
 // NewIndex builds a ranking index over catalog in O(len(catalog.Tools)). The
 // catalog is copied, so later changes to it do not affect the index. Each tool
-// is indexed as one document made of its name, title, description and tags.
+// is indexed as one document made of its name, title, description, tags,
+// argument names and argument descriptions.
 // An empty or duplicate Tool.Name is an error.
 func NewIndex(catalog Catalog) (*Index, error) {
 	idx := &Index{
@@ -49,11 +50,19 @@ func NewIndex(catalog Catalog) (*Index, error) {
 		}
 		idx.byName[t.Name] = i
 		t.Tags = slices.Clone(t.Tags)
+		t.Arguments = slices.Clone(t.Arguments)
 		idx.tools[i] = t
 
-		text := t.Name + " " + t.Title + " " + t.Description + " " + strings.Join(t.Tags, " ")
+		var text strings.Builder
+		text.WriteString(t.Name + " " + t.Title + " " + t.Description + " " + strings.Join(t.Tags, " "))
+		for _, argument := range t.Arguments {
+			text.WriteByte(' ')
+			text.WriteString(argument.Name)
+			text.WriteByte(' ')
+			text.WriteString(argument.Description)
+		}
 		d := doc{tf: map[string]int{}}
-		for _, tok := range tokenize(text) {
+		for _, tok := range tokenize(text.String()) {
 			if _, stop := builtinStopwords[tok]; stop {
 				continue
 			}
@@ -85,9 +94,10 @@ func Rank(catalog Catalog, query string, rules []Rule, opts ...Option) ([]Hit, e
 }
 
 type cand struct {
-	i     int
-	tier  MatchTier
-	score float64
+	i                    int
+	tier                 MatchTier
+	score                float64
+	exactCase, exactName bool
 }
 
 // Rank orders the index's catalog against query:
@@ -97,8 +107,9 @@ type cand struct {
 //     include rule applies, only included tools survive.
 //  2. Applicable [ActionOrder] rules pin tools to the front as [TierPinned],
 //     in Pin order.
-//  3. The rest are tiered as [TierExactName], [TierPrefix] or [TierBM25],
-//     BM25 by Score descending, with Tool.Name ascending as the final
+//  3. The rest are tiered as [TierExactName], [TierPrefix] or [TierBM25].
+//     Literal name matches lead case-folded names, then title-only matches
+//     within TierExactName. BM25 uses Score descending, with Tool.Name as the final
 //     tiebreak. Tools sharing no term with the query and not exact or prefix
 //     matches are omitted.
 //
@@ -158,7 +169,8 @@ func (idx *Index) Rank(query string, rules []Rule, opts ...Option) ([]Hit, error
 	}
 
 	// Stage 3: tier and score the rest.
-	q := strings.ToLower(strings.TrimSpace(query))
+	trimmedQuery := strings.TrimSpace(query)
+	q := strings.ToLower(trimmedQuery)
 	terms := idx.queryTerms(query, o)
 	weights := idx.idf(terms)
 	var rest []cand
@@ -171,6 +183,8 @@ func (idx *Index) Rank(query string, rules []Rule, opts ...Option) ([]Hit, error
 		switch {
 		case q != "" && (strings.EqualFold(t.Name, q) || (t.Title != "" && strings.EqualFold(t.Title, q))):
 			c.tier = TierExactName
+			c.exactCase = t.Name == trimmedQuery
+			c.exactName = strings.EqualFold(t.Name, q)
 		case q != "" && (strings.HasPrefix(strings.ToLower(t.Name), q) || strings.HasPrefix(q, strings.ToLower(t.Name))):
 			c.tier = TierPrefix
 		default:
@@ -185,6 +199,12 @@ func (idx *Index) Rank(query string, rules []Rule, opts ...Option) ([]Hit, error
 		x, y := rest[a], rest[b]
 		if x.tier != y.tier {
 			return x.tier < y.tier
+		}
+		if x.exactCase != y.exactCase {
+			return x.exactCase
+		}
+		if x.exactName != y.exactName {
+			return x.exactName
 		}
 		if x.score != y.score {
 			return x.score > y.score
@@ -208,6 +228,7 @@ func (idx *Index) Rank(query string, rules []Rule, opts ...Option) ([]Hit, error
 func (idx *Index) cloneTool(i int) Tool {
 	t := idx.tools[i]
 	t.Tags = slices.Clone(t.Tags)
+	t.Arguments = slices.Clone(t.Arguments)
 	return t
 }
 

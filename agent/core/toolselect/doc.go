@@ -14,7 +14,12 @@
 // title match, then a name-prefix match, then everything else by BM25 score.
 // The tier is compared before the score, never folded into it, so an exact
 // name always outranks a partial match however much a description repeats the
-// query words. Remaining ties break by Tool.Name ascending.
+// query words. Within the exact tier, literal names lead case-folded names,
+// then titles; remaining ties break by Tool.Name ascending.
+//
+// Each BM25 document includes name, title, description, tags and caller-supplied
+// [Argument] names/descriptions. Hosts extract schema metadata; the ranker
+// neither parses schemas nor indexes argument values.
 //
 // A tool with no term in common with the query and no exact or prefix match
 // is not returned. Pinned tools are returned regardless.
