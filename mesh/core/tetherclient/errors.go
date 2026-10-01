@@ -64,6 +64,14 @@ func (e *APIError) Is(target error) bool {
 	return true
 }
 
+// IsNotFound reports whether err is the daemon's 404 not_found, such as
+// POST /sessions naming a launch the catalog doesn't have. Match any other
+// code with errors.Is(err, &APIError{Code: CodeTurnFailed}).
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && (apiErr.StatusCode == http.StatusNotFound || apiErr.Code == ErrorCodeNotFound)
+}
+
 func readAPIError(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 	var env ErrorResponse
