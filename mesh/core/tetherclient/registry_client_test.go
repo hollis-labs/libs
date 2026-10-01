@@ -61,13 +61,21 @@ func TestRegistryRegister(t *testing.T) {
 		if _, set := body["urn"]; !set {
 			t.Errorf("urn is a required wire key (empty), missing from %v", body)
 		}
-		sendJSON(t, w, http.StatusCreated, RegistryProfile{URN: testAgentURN, Kind: RegistryKindAgent, DisplayName: "Ada", Status: RegistryStatusActive})
+		if _, old := body["mux_instance_id"]; old {
+			t.Errorf("register sent legacy instance key: %v", body)
+		}
+		if _, present := body["tether_instance_id"]; !present {
+			t.Errorf("register missing new instance key: %v", body)
+		}
+		// Raw daemon wire fixture avoids deriving the expected JSON key from
+		// the same client struct that is under test.
+		sendJSON(t, w, http.StatusCreated, map[string]any{"urn": testAgentURN, "kind": "agent", "display_name": "Ada", "status": "active", "tether_instance_id": "agent-mux"})
 	})
 	got, err := c.Registry().Register(context.Background(), RegistryKindAgent, RegistryProfile{DisplayName: "Ada", Role: "reviewer"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.URN != testAgentURN || got.Status != RegistryStatusActive {
+	if got.URN != testAgentURN || got.Status != RegistryStatusActive || got.TetherInstanceID != "agent-mux" {
 		t.Errorf("profile = %+v", got)
 	}
 }
@@ -87,10 +95,10 @@ func TestRegistryLookup(t *testing.T) {
 		if r.URL.RawQuery != "" {
 			t.Errorf("Lookup sends no query, got %q", r.URL.RawQuery)
 		}
-		sendJSON(t, w, http.StatusOK, RegistryProfile{URN: testAgentURN, Kind: RegistryKindAgent})
+		sendJSON(t, w, http.StatusOK, map[string]any{"urn": testAgentURN, "kind": "agent", "tether_instance_id": "agent-mux"})
 	})
 	got, err := c.Registry().Lookup(context.Background(), testAgentURN)
-	if err != nil || got.URN != testAgentURN {
+	if err != nil || got.URN != testAgentURN || got.TetherInstanceID != "agent-mux" {
 		t.Fatalf("Lookup = %+v, %v", got, err)
 	}
 }

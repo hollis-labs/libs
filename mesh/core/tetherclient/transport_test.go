@@ -14,7 +14,7 @@ import (
 
 func TestUnixTransportHealth(t *testing.T) {
 	dir := t.TempDir()
-	socketPath := filepath.Join(dir, "muxd.sock")
+	socketPath := filepath.Join(dir, "tetherd.sock")
 	ln, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Fatalf("listen unix: %v", err)
@@ -54,8 +54,8 @@ func TestExpandListenAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserHomeDir: %v", err)
 	}
-	got := expandListenAddr("unix:~/.tether/run/muxd.sock")
-	want := "unix:" + filepath.Join(home, ".tether/run/muxd.sock")
+	got := expandListenAddr("unix:~/.tether/run/tetherd.sock")
+	want := "unix:" + filepath.Join(home, ".tether/run/tetherd.sock")
 	if got != want {
 		t.Fatalf("expandListenAddr = %q, want %q", got, want)
 	}

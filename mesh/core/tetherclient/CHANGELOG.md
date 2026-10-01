@@ -6,6 +6,19 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## Unreleased
+
+### Changed (breaking)
+
+- Rename `RegistryProfile.MuxInstanceID` to `TetherInstanceID`, with JSON key
+  `tether_instance_id`, matching the renamed Tether daemon. No old-field or
+  JSON-key aliases are provided (CW-20261001-0653).
+- Change the default listen address to `unix:~/.tether/run/tetherd.sock` and
+  update socket fixtures and CLI examples. Release before or at daemon cutover;
+  the old client cannot decode the renamed instance key.
+- Preserve `msg://agent/agent-mux/...` URN authorities and lookup routing:
+  stored identity migration remains CW-20261001-0624.
+
 ## v0.7.0 — 2026-10-01
 
 Parity with the Tether daemon API as of 2026-10-01. All additive: no existing
