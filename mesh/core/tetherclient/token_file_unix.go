@@ -15,7 +15,7 @@ func readTokenFile(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("tether: open credential file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return "", fmt.Errorf("tether: stat credential file: %w", err)
