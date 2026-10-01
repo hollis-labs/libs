@@ -99,7 +99,7 @@ func TestRegistryRealRenamedDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	var wire map[string]any
 	if err := json.NewDecoder(response.Body).Decode(&wire); err != nil {
 		t.Fatal(err)
