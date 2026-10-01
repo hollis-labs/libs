@@ -5,6 +5,7 @@ package tether
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func credentialHome(t *testing.T) string {
@@ -200,4 +202,68 @@ func TestCredentialsAcrossRequestPaths(t *testing.T) {
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
+}
+
+func TestCredentialsOverUnixSocket(t *testing.T) {
+	credentialHome(t)
+	dir, err := os.MkdirTemp("/var/tmp", "tth-auth-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	socket := filepath.Join(dir, "s")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer unix-token" {
+			t.Error("missing bearer on Unix socket request")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.Path {
+		case "/health":
+			_, _ = io.WriteString(w, `{"status":"ok"}`)
+		case "/events/stream":
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, "event: daemon.ready\ndata: {\"scope\":\"daemon\"}\n\n")
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})}
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(listener) }()
+	t.Cleanup(func() { _ = server.Close(); <-done })
+	file := filepath.Join(dir, "token")
+	credentialFile(t, file, "unix-token")
+	for _, tc := range []struct {
+		name   string
+		option Option
+	}{
+		{"token", WithToken("unix-token")}, {"file", WithTokenFile(file)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := New("unix:"+socket, tc.option)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.http.CloseIdleConnections()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if _, err := c.Health(ctx); err != nil {
+				t.Fatal(err)
+			}
+			events, errs := c.StreamEvents(ctx, StreamEventsOptions{})
+			event, ok := <-events
+			if !ok || event.Kind != "daemon.ready" {
+				t.Fatalf("Unix stream returned no expected event: %+v", event)
+			}
+			for err := range errs {
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
 }
