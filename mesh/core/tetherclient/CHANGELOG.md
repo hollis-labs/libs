@@ -6,6 +6,25 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## Unreleased (proposed v0.7.0)
+
+Parity with the Tether daemon API as of 2026-10-01. All additive: no existing
+exported symbol changes signature or behavior.
+
+### Added
+
+- **`Client.Notify(ctx, NotifyRequest) (NotifyResult, error)`** over `POST /messages/notify`: stores a message and wakes a live session of the recipient. `NotifyResult` carries `message`, `unread_count`, `wake_attempted`, `wake_delivered`, `session_id`, `wake_error` and `wake_reason`. `wake_delivered` means the reminder turn was submitted, not that the message was read.
+- **`WakeReason*` constants**, the full `wake_reason` vocabulary: `busy`, `offline`, `offline-race`, `stale-generation`, `claim-unavailable`, `marker-write-failed`, `already-handled`, `settle-failed`, and `session-not-running` (Tether #71: the actor is bound to a session that is not running). **`Urgency*` constants** (`very-low`, `low`, `normal`, `high`).
+- **`CodeTurnFailed`** (`turn_failed`, 502): the session's agent process ran the turn and exited non-zero (Tether #70). The client never retries it. Also **`CodeForbidden`** (403) and **`CodeLocked`** (423, archived group), which the group routes already returned.
+- **`SessionState*` constants**, including **`SessionStateKilled`**: a stopped session now ends in `killed`, not `completed` (Tether #65). Plus **`IsTerminalSessionState(state)`** for the terminal set completed | failed | killed. `Session.State` stays a plain string.
+- **`SessionStateChange`** and **`ParseSessionStateChange(payloadJSON)`** to decode a `session.state_changed` event's payload (`from`, `to`, `exit_code`, `reason`); **`EventKindSessionStateChanged`**.
+- **`IsNotFound(err)`**: true for the daemon's 404 `not_found`, which `POST /sessions` now returns for an unknown launch instead of a 500 (Tether #67).
+
+### Notes
+
+- Branch on the session state, not the exit code: a stopped process may exit 0 or -1. `WaitSession` still returns only the exit code; call `GetSession` after it for the state.
+- The daemon's inbox `as_session` parameter (Tether #69) is deliberately not exposed. Only a Tether-launched session that is itself the recipient may send it (the daemon's MCP proxy does); a client listing someone's inbox must not settle deliveries.
+
 ## v0.6.0 — 2026-09-30
 
 Idempotent launch and resume, mirroring the daemon's idempotency surface

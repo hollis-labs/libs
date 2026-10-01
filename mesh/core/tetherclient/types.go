@@ -1,5 +1,10 @@
 package tether
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 const (
 	DefaultListenAddr = "unix:~/.tether/run/muxd.sock"
 
@@ -17,11 +22,72 @@ const (
 	// CodeProviderSessionLost is the code for a session whose provider-side
 	// session no longer exists.
 	CodeProviderSessionLost = "provider_session_lost"
+	// CodeTurnFailed is the 502 code for a turn the session's agent process
+	// ran and exited non-zero on (a subprocess runtime such as `codex exec`
+	// failing on its own terms). The daemon and the session are fine; the
+	// message carries the exit status and a tail of the process's stderr.
+	// The client never retries it: resending would run the turn again.
+	CodeTurnFailed = "turn_failed"
+	// CodeForbidden is the 403 code for a caller a group route refuses.
+	CodeForbidden = "forbidden"
+	// CodeLocked is the 423 code for an operation on an archived group.
+	CodeLocked = "locked"
 
 	ScopeSession = "session"
 	ScopeDaemon  = "daemon"
 	ScopeBroker  = "broker"
 )
+
+// Session states, as Session.State and a session.state_changed event's
+// from/to carry them. A session moves created → launching → running and
+// ends in exactly one terminal state, which is final.
+const (
+	SessionStateCreated   = "created"
+	SessionStateLaunching = "launching"
+	SessionStateRunning   = "running"
+	// SessionStateCompleted: the process exited on its own with code 0.
+	SessionStateCompleted = "completed"
+	// SessionStateFailed: the process exited on its own non-zero, the
+	// launch failed, or a daemon restart ended it (exit code -1).
+	SessionStateFailed = "failed"
+	// SessionStateKilled: the session was stopped (StopSession). Its exit
+	// code is whatever the stopped process returned, 0 included, so branch
+	// on the state, not the exit code.
+	SessionStateKilled = "killed"
+)
+
+// IsTerminalSessionState reports whether state is one a session never
+// leaves: completed, failed or killed.
+func IsTerminalSessionState(state string) bool {
+	switch state {
+	case SessionStateCompleted, SessionStateFailed, SessionStateKilled:
+		return true
+	}
+	return false
+}
+
+// EventKindSessionStateChanged is the kind of the event a session emits on
+// every state transition; its payload is a SessionStateChange.
+const EventKindSessionStateChanged = "session.state_changed"
+
+// SessionStateChange is a session.state_changed event's payload. ExitCode is
+// set on terminal transitions.
+type SessionStateChange struct {
+	From     string `json:"from"`
+	To       string `json:"to"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// ParseSessionStateChange decodes the PayloadJSON of a session.state_changed
+// Event or StreamEvent.
+func ParseSessionStateChange(payloadJSON string) (SessionStateChange, error) {
+	var c SessionStateChange
+	if err := json.Unmarshal([]byte(payloadJSON), &c); err != nil {
+		return SessionStateChange{}, fmt.Errorf("decode session.state_changed payload: %w", err)
+	}
+	return c, nil
+}
 
 type Health struct {
 	Status    string `json:"status"`
