@@ -13,6 +13,8 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 - `WithToken` and `WithTokenFile` carry daemon bearer credentials across all request paths, including long-lived/streaming calls. Lookup prefers an explicit file, then an explicit token, `TETHER_TOKEN`, and the default operator token file; a missing default file preserves anonymous/offline use. Explicit empty `WithToken` disables lookup.
 - POSIX token files must be current-user-owned regular 0600 files; symlinks/special files and insecure or missing explicit files fail closed. Clients never create files. Authenticated requests block cross-origin redirects and preserve caller-owned HTTP clients.
 
+## v0.8.0 — 2026-10-01
+
 ### Changed (breaking)
 
 - Rename `RegistryProfile.MuxInstanceID` to `TetherInstanceID`, with JSON key
