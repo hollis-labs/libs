@@ -8,6 +8,13 @@
 
 ### Added
 
+- `manifest`: shared schema version 2 declarations with dotted IDs, subprocess
+  entrypoints, host ranges and opaque host extensions, config fields and
+  host-resolved secrets, capability requests and manifest-authoritative tools.
+  Includes validation and a dependency-free JSON codec (valid YAML). Legacy
+  host dialects, builtin runtimes and release signature fields are refused.
+  Effects remain host-defined declarations, never SDK permission grants.
+
 - **Identity passthrough plumbing** — an optional, opaque `Identity
   json.RawMessage` field on `InitParams`, `CommandExecParams`,
   `EventHandleParams`, `MCPCallRequest`, and `HTTPRequest` (and on the
