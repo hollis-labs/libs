@@ -97,38 +97,38 @@ type RegistryCallback struct {
 }
 
 // RegistryProfile is a registry entry as the daemon serves it. On Register the
-// server assigns URN, Kind, MuxInstanceID, CreatedAt and UpdatedAt.
+// server assigns URN, Kind, TetherInstanceID, CreatedAt and UpdatedAt.
 type RegistryProfile struct {
-	URN           string                       `json:"urn"`
-	Kind          RegistryKind                 `json:"kind"`
-	Owner         string                       `json:"owner,omitempty"`
-	MuxInstanceID string                       `json:"mux_instance_id"`
-	DisplayName   string                       `json:"display_name"`
-	Title         string                       `json:"title,omitempty"`
-	Role          string                       `json:"role,omitempty"`
-	Description   string                       `json:"description,omitempty"`
-	Avatar        string                       `json:"avatar,omitempty"`
-	Project       string                       `json:"project,omitempty"`
-	Status        RegistryStatus               `json:"status"`
-	Callback      *RegistryCallback            `json:"callback,omitempty"`
-	CachedAt      *time.Time                   `json:"cached_at,omitempty"`
-	HealthStatus  string                       `json:"health_status,omitempty"`
-	LastSeenAt    *time.Time                   `json:"last_seen_at,omitempty"`
-	HostAddress   string                       `json:"host_address,omitempty"`
-	MergedInto    string                       `json:"merged_into,omitempty"`
-	KindMeta      json.RawMessage              `json:"kind_meta,omitempty"`
-	LastUpdatedBy string                       `json:"last_updated_by,omitempty"`
-	Tags          []string                     `json:"tags,omitempty"`
-	Guidelines    string                       `json:"guidelines,omitempty"`
-	EntryPoints   []string                     `json:"entry_points,omitempty"`
-	Props         map[string]string            `json:"props,omitempty"`
-	FieldMetadata map[string]RegistryFieldMeta `json:"field_metadata,omitempty"`
-	ExternalIDs   []RegistryExternalID         `json:"external_ids,omitempty"`
-	Capabilities  []string                     `json:"capabilities,omitempty"`
-	Skills        []RegistrySkill              `json:"skills,omitempty"`
-	Links         []RegistryLink               `json:"links,omitempty"`
-	CreatedAt     time.Time                    `json:"created_at"`
-	UpdatedAt     time.Time                    `json:"updated_at"`
+	URN              string                       `json:"urn"`
+	Kind             RegistryKind                 `json:"kind"`
+	Owner            string                       `json:"owner,omitempty"`
+	TetherInstanceID string                       `json:"tether_instance_id"`
+	DisplayName      string                       `json:"display_name"`
+	Title            string                       `json:"title,omitempty"`
+	Role             string                       `json:"role,omitempty"`
+	Description      string                       `json:"description,omitempty"`
+	Avatar           string                       `json:"avatar,omitempty"`
+	Project          string                       `json:"project,omitempty"`
+	Status           RegistryStatus               `json:"status"`
+	Callback         *RegistryCallback            `json:"callback,omitempty"`
+	CachedAt         *time.Time                   `json:"cached_at,omitempty"`
+	HealthStatus     string                       `json:"health_status,omitempty"`
+	LastSeenAt       *time.Time                   `json:"last_seen_at,omitempty"`
+	HostAddress      string                       `json:"host_address,omitempty"`
+	MergedInto       string                       `json:"merged_into,omitempty"`
+	KindMeta         json.RawMessage              `json:"kind_meta,omitempty"`
+	LastUpdatedBy    string                       `json:"last_updated_by,omitempty"`
+	Tags             []string                     `json:"tags,omitempty"`
+	Guidelines       string                       `json:"guidelines,omitempty"`
+	EntryPoints      []string                     `json:"entry_points,omitempty"`
+	Props            map[string]string            `json:"props,omitempty"`
+	FieldMetadata    map[string]RegistryFieldMeta `json:"field_metadata,omitempty"`
+	ExternalIDs      []RegistryExternalID         `json:"external_ids,omitempty"`
+	Capabilities     []string                     `json:"capabilities,omitempty"`
+	Skills           []RegistrySkill              `json:"skills,omitempty"`
+	Links            []RegistryLink               `json:"links,omitempty"`
+	CreatedAt        time.Time                    `json:"created_at"`
+	UpdatedAt        time.Time                    `json:"updated_at"`
 }
 
 // RegistryFilter narrows a Search; every field is optional and they combine
@@ -233,7 +233,7 @@ func (c *Client) Registry() *RegistryClient {
 
 // Register POSTs p under /registry/{kind}s and returns the canonical profile.
 // The server mints the URN and rejects a caller-supplied one with a 400; it
-// also assigns Kind, MuxInstanceID, CreatedAt and UpdatedAt.
+// also assigns Kind, TetherInstanceID, CreatedAt and UpdatedAt.
 func (rc *RegistryClient) Register(ctx context.Context, kind RegistryKind, p RegistryProfile) (RegistryProfile, error) {
 	seg, err := registryPluralSegment(kind)
 	if err != nil {
