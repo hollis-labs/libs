@@ -61,3 +61,47 @@ func TestUsageCostUSDZeroValueMeansNoCostReported(t *testing.T) {
 		t.Fatalf("CostUSD = %v", u.CostUSD)
 	}
 }
+
+func TestNormalizeStopReason(t *testing.T) {
+	cases := map[string]string{
+		// Anthropic / Claude
+		"end_turn":      StopReasonEndTurn,
+		"stop_sequence": StopReasonEndTurn,
+		"max_tokens":    StopReasonMaxTokens,
+		"tool_use":      StopReasonToolUse,
+		"refusal":       StopReasonRefusal,
+		// OpenAI chat / responses, Codex
+		"stop":              StopReasonEndTurn,
+		"length":            StopReasonMaxTokens,
+		"max_output_tokens": StopReasonMaxTokens,
+		"tool_calls":        StopReasonToolUse,
+		// OpenCode step reasons
+		"tool-calls": StopReasonToolUse,
+		// ACP stopReason
+		"max_turn_requests": StopReasonTurnLimit,
+		"cancelled":         StopReasonCancelled,
+		// near spellings, case and whitespace
+		"canceled":   StopReasonCancelled,
+		" End_Turn ": StopReasonEndTurn,
+		"Max Tokens": StopReasonMaxTokens,
+		"error":      StopReasonError,
+		// outside the vocabulary: passed through, trimmed
+		"pause_turn":  "pause_turn",
+		" weird-one ": "weird-one",
+		"":            "",
+	}
+	for raw, want := range cases {
+		if got := NormalizeStopReason(raw); got != want {
+			t.Errorf("NormalizeStopReason(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// Normalising is idempotent: a normalised value maps to itself.
+func TestNormalizeStopReasonIsIdempotent(t *testing.T) {
+	for _, v := range []string{StopReasonEndTurn, StopReasonMaxTokens, StopReasonToolUse, StopReasonTurnLimit, StopReasonRefusal, StopReasonCancelled, StopReasonError} {
+		if got := NormalizeStopReason(v); got != v {
+			t.Errorf("NormalizeStopReason(%q) = %q, want it unchanged", v, got)
+		}
+	}
+}

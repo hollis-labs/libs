@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.5.0 — 2026-10-01
+
+Additive (CW-20260930-0137, CW-20260930-0228). Existing literals keep compiling.
+
+- `StreamEvent.BlockID` and `StreamEvent.Phase`. Every delta of one content
+  block carries the same `BlockID` and the next block a different one, so a
+  consumer can separate consecutive blocks without provider-specific rules.
+  `Phase` classifies a delta as `PhaseNarration`, `PhaseFinal` or
+  `PhaseThinking` (new constants). Both are empty when an adapter cannot say.
+- A shared stop-reason vocabulary for `Usage.StopReason`: `StopReasonEndTurn`,
+  `StopReasonMaxTokens`, `StopReasonToolUse`, `StopReasonTurnLimit`,
+  `StopReasonRefusal`, `StopReasonCancelled`, `StopReasonError`.
+- `NormalizeStopReason` maps provider spellings onto it. Examples: `length`,
+  `max_output_tokens` → `max_tokens`; `stop` → `end_turn`; `tool-calls`,
+  `tool_calls` → `tool_use`; ACP `max_turn_requests` → `turn_limit`. It is
+  case- and separator-insensitive. A reason outside the vocabulary passes
+  through unchanged, so nothing is lost. Each value maps one-to-one onto a
+  go-chatstream finish reason.
+
 ## v0.4.0 — 2026-09-30
 
 - Added `Usage.CostUSD` (float64), the provider-reported cost of the work a
