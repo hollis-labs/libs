@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
+## v0.3.0 — 2026-10-01
+
+### Added
+
+- Package `runtimes`: the canonical runtime vocabulary (D-73). `ID` (claude, codex, opencode, copilot, pi,
+  antigravity), `Mode` (streaming-stdio, subprocess-per-turn, jsonrpc-stdio, http-sse, pty, acp-stdio, acp-tcp)
+  and `Capability` (resume, resume-keeps-id, typed-events, preflight, auth-classifier, session-lost-classifier,
+  approvals), each closed, with `Valid` and an ordered list. The overlapping enums in go-providers, agentkit and
+  go-agent-wrapper migrate to it with no aliases; the per-runtime facts live in the go-providers registry.
+
 ## v0.2.0 — 2026-09-29
 
 ### Added
