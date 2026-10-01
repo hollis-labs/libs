@@ -105,3 +105,10 @@ func TestNormalizeStopReasonIsIdempotent(t *testing.T) {
 		}
 	}
 }
+
+// One spelling end to end: the phase value is the wire's "thought".
+func TestPhaseValues(t *testing.T) {
+	if PhaseThinking != "thought" || PhaseNarration != "narration" || PhaseFinal != "final" {
+		t.Errorf("phases = %q %q %q", PhaseThinking, PhaseNarration, PhaseFinal)
+	}
+}

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.1 — 2026-10-01
+
+- Value fix: `PhaseThinking` is now `"thought"`, was `"thinking"`. The wire
+  already spells it `thought` (ACP's `agent_thought_chunk`, go-agent-wrapper's
+  `agent.delta`, the go-runtime-events conventions), so one concept keeps one
+  spelling end to end. Nothing consumed v0.5.0's value: it was tagged an hour
+  earlier and no module had adopted it.
+
 ## v0.5.0 — 2026-10-01
 
 Additive (CW-20260930-0137, CW-20260930-0228). Existing literals keep compiling.
