@@ -12,7 +12,7 @@ import tether "github.com/hollis-labs/go-tether-client"
 ## Default socket
 
 - Old: `unix:~/.agent-mux/run/muxd.sock`
-- New: `unix:~/.tether/run/muxd.sock`
+- New: `unix:~/.tether/run/tetherd.sock`
 
 ## Direct mappings
 
@@ -60,7 +60,21 @@ New methods:
 ## Recommended migration sequence
 
 1. Swap the module import.
-2. Let the default socket move to `~/.tether/run/muxd.sock`, or pass an explicit listen address during transition.
+2. Let the default socket move to `~/.tether/run/tetherd.sock`, or pass an explicit listen address during transition.
 3. Replace any direct use of old event-stream fields (`ID`, `Event`) with `Seq`, `Kind`.
 4. Prefer `SendTurn` over raw `SendInput` for daemon-managed conversational turns.
 5. Adopt the AI gateway methods instead of calling raw daemon endpoints.
+
+## Tether public rename (CW-20261001-0653)
+
+The renamed daemon emits only `tether_instance_id`. Replace uses of
+`RegistryProfile.MuxInstanceID` with `RegistryProfile.TetherInstanceID`; no
+legacy Go field or JSON alias is provided. The default is now
+`unix:~/.tether/run/tetherd.sock`. Explicit old socket addresses must be updated
+at cutover. Stored `msg://agent/agent-mux/...` URNs retain their authority;
+lookup routing continues to accept those identities (CW-20261001-0624).
+
+Release this client before or alongside the renamed daemon. An older client
+silently drops the new instance field, and its default socket reaches the old
+socket name. This release targets the renamed daemon; it does not decode the
+old instance key.

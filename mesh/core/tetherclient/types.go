@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	DefaultListenAddr = "unix:~/.tether/run/muxd.sock"
+	DefaultListenAddr = "unix:~/.tether/run/tetherd.sock"
 
 	ErrorCodeInvalidRequest   = "invalid_request"
 	ErrorCodeNotFound         = "not_found"

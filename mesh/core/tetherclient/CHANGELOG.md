@@ -13,6 +13,17 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 - `WithToken` and `WithTokenFile` carry daemon bearer credentials across all request paths, including long-lived/streaming calls. Lookup prefers an explicit file, then an explicit token, `TETHER_TOKEN`, and the default operator token file; a missing default file preserves anonymous/offline use. Explicit empty `WithToken` disables lookup.
 - POSIX token files must be current-user-owned regular 0600 files; symlinks/special files and insecure or missing explicit files fail closed. Clients never create files. Authenticated requests block cross-origin redirects and preserve caller-owned HTTP clients.
 
+### Changed (breaking)
+
+- Rename `RegistryProfile.MuxInstanceID` to `TetherInstanceID`, with JSON key
+  `tether_instance_id`, matching the renamed Tether daemon. No old-field or
+  JSON-key aliases are provided (CW-20261001-0653).
+- Change the default listen address to `unix:~/.tether/run/tetherd.sock` and
+  update socket fixtures and CLI examples. Release before or at daemon cutover;
+  the old client cannot decode the renamed instance key.
+- Preserve `msg://agent/agent-mux/...` URN authorities and lookup routing:
+  stored identity migration remains CW-20261001-0624.
+
 ## v0.7.0 — 2026-10-01
 
 Parity with the Tether daemon API as of 2026-10-01. All additive: no existing

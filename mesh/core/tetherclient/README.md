@@ -24,7 +24,7 @@ Requires Go 1.26.6 or newer.
 Passing an empty listen address uses:
 
 ```text
-unix:~/.tether/run/muxd.sock
+unix:~/.tether/run/tetherd.sock
 ```
 
 Supported listen address forms:
@@ -196,7 +196,7 @@ client attaches it for you, but it needs to know your identity:
 client := tether.MustNew("", tether.WithSelfURN("msg://agent/agent-mux/agt_xxxxxxxxxxxx"))
 ```
 
-Get your URN from `mux registry register --print-urn-only`, or from
+Get your URN from `tether registry register --print-urn-only`, or from
 `tether_whoami` over MCP.
 
 ## Durable delivery
