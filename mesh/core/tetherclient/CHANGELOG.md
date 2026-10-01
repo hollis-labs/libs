@@ -6,7 +6,7 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
-## Unreleased (proposed v0.7.0)
+## v0.7.0 — 2026-10-01
 
 Parity with the Tether daemon API as of 2026-10-01. All additive: no existing
 exported symbol changes signature or behavior.
