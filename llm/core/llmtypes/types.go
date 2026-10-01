@@ -93,8 +93,10 @@ const (
 	PhaseNarration = "narration"
 	// PhaseFinal is the turn's result text.
 	PhaseFinal = "final"
-	// PhaseThinking is text from inside a thinking block.
-	PhaseThinking = "thinking"
+	// PhaseThinking is text from inside a thinking block. Its value is
+	// "thought", the spelling the wire already uses (ACP's
+	// agent_thought_chunk, go-agent-wrapper's agent.delta).
+	PhaseThinking = "thought"
 )
 
 // StreamEvent represents a single event from a streaming provider response.
