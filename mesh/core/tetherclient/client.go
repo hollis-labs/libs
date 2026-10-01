@@ -19,9 +19,13 @@ import (
 )
 
 type Client struct {
-	baseURL string
-	http    *http.Client
-	selfURN string
+	baseURL      string
+	http         *http.Client
+	selfURN      string
+	token        string
+	tokenFile    string
+	tokenSet     bool
+	tokenFileSet bool
 }
 
 type Option func(*Client)
@@ -71,6 +75,9 @@ func New(listenAddr string, opts ...Option) (*Client, error) {
 	}
 	for _, opt := range opts {
 		opt(c)
+	}
+	if err := c.configureCredentials(); err != nil {
+		return nil, err
 	}
 	return c, nil
 }

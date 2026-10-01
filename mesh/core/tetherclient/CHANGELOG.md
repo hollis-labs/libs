@@ -6,6 +6,13 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## Unreleased
+
+### Added
+
+- `WithToken` and `WithTokenFile` carry daemon bearer credentials across all request paths, including long-lived/streaming calls. Lookup prefers an explicit file, then an explicit token, `TETHER_TOKEN`, and the default operator token file; a missing default file preserves anonymous/offline use. Explicit empty `WithToken` disables lookup.
+- POSIX token files must be current-user-owned regular 0600 files; symlinks/special files and insecure or missing explicit files fail closed. Clients never create files. Authenticated requests block cross-origin redirects and preserve caller-owned HTTP clients.
+
 ## v0.7.0 — 2026-10-01
 
 Parity with the Tether daemon API as of 2026-10-01. All additive: no existing
