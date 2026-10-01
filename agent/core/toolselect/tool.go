@@ -9,12 +9,22 @@ type Tool struct {
 	Title       string   // MCP title, if the upstream declared one; "" if not
 	Description string   // MCP description
 	Tags        []string // server-level catalog tags (not an MCP field)
+	// Arguments holds names and descriptions extracted by the caller from
+	// the input schema. It contains metadata, never argument values.
+	Arguments []Argument
 
 	// ReadOnly and Destructive are MCP tool-annotation hints, passed through
 	// verbatim. nil means the upstream did not declare the hint; it is never
 	// converted to false.
 	ReadOnly    *bool
 	Destructive *bool
+}
+
+// Argument is searchable input-schema metadata. Hosts own schema parsing and
+// may flatten nested property paths into Name; the ranker treats it as text.
+type Argument struct {
+	Name        string
+	Description string
 }
 
 // Catalog is every tool one ranking call may consider, already de-duplicated

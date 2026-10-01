@@ -4,6 +4,23 @@ All notable changes to go-toolselect are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `Argument` and `Tool.Arguments`: caller-supplied argument names/descriptions
+  join the existing BM25 document. Both index construction and returned hits
+  copy this metadata. Tools without arguments retain their previous scores.
+  Golden tests pin metadata-only queries and mixed-field ranking.
+
+### Fixed
+
+- Literal tool-name queries lead case-folded names and title-only matches
+  inside `TierExactName`, so a colliding title or differently cased name
+  cannot displace the requested tool under a result cap. Explicit rule pins
+  still lead the output. Golden tests cover these collisions and catalog order.
+  (CW-20260926-0012)
+
 ## v0.2.0 — 2026-09-29
 
 ### Added
