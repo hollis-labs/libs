@@ -54,6 +54,34 @@ func main() {
 }
 ```
 
+## Caller credentials
+
+`New` resolves a bearer credential in this order: `WithTokenFile(path)`,
+`WithToken(token)`, `TETHER_TOKEN`, then `~/.tether/run/operator.token`.
+An explicitly selected file takes precedence over a token option regardless of
+option order. A missing default file keeps the client anonymous, so offline
+bootstrap still works. `WithToken("")` explicitly disables automatic lookup.
+
+```go
+client, err := tether.New("", tether.WithTokenFile("/private/service.token"))
+```
+
+Clients read files once during construction and never create or repair them.
+On POSIX platforms, a file must be a regular file owned by the current user with
+exactly 0600 permissions. Symlinks, special files, loose permissions, malformed
+content and a missing explicit file fail `New` without falling back to another
+credential. Recreate the client after rotating a token file. On other platforms,
+use `WithToken` or `TETHER_TOKEN`; an existing token file is refused because POSIX
+ownership and mode checks cannot be established.
+
+The credential is sent as `Authorization: Bearer` on ordinary, bootstrap,
+long-lived and streaming requests. The client copies a supplied `http.Client`
+and preserves its timeouts and redirect policy. Authenticated requests refuse
+redirects to another origin before sending anything there. Credentials are
+opaque to the library; the daemon verifies them and applies its configured
+identity mode. `WithSelfURN` still supplies the messaging address; it does not
+establish verified identity.
+
 ## Session bootstrap
 
 A launcher/host (e.g. agent-setup) can resolve and register a session's
