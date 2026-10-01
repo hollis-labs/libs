@@ -7,7 +7,8 @@
 // It is pure data. There are no interfaces to satisfy, no I/O and no
 // dependencies outside the standard library; the capability vocabulary lives in
 // the sibling package capabilities, which this package imports and never the
-// reverse.
+// reverse. The runtime vocabulary (runtime ids, launch modes, runtime
+// capabilities) lives in the sibling package runtimes.
 //
 // The contract is deliberately narrow:
 //

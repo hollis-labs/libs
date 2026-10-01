@@ -1,6 +1,6 @@
 # agent-contracts-leaf
 
-Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus and the capabilities vocabulary.
+Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus, and the capabilities and runtime vocabularies.
 
 ## Status
 
@@ -54,7 +54,7 @@ exact version and read [CHANGELOG.md](./CHANGELOG.md) before upgrading.
 
 ## Out of scope
 
-- The launch-profile schema and provider/runtime configuration — those stay host-side.
+- The launch-profile schema and provider/runtime configuration — those stay host-side. Package `runtimes` names the runtimes, modes and runtime capabilities; which runtime supports what is the go-providers descriptor registry's.
 - Permission decisions: `Grants.Permissions` is an opaque list of rule tokens that go-permission interprets.
 - The go-materialize manifest: a host assembling a full persisted launch record attaches it around `LaunchRecord`.
 - The agent definition file format, its parser and digest (go-agentdef).
