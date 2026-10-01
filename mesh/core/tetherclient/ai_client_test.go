@@ -112,7 +112,11 @@ func TestAIChatStreamParsesEvents(t *testing.T) {
 		select {
 		case ev := <-ch:
 			got = append(got, ev)
-		case err := <-errCh:
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+				continue
+			}
 			t.Fatalf("stream err = %v", err)
 		case <-ctx.Done():
 			t.Fatal("timed out waiting for stream events")
