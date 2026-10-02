@@ -61,6 +61,11 @@ func (c *Client) resolveToken() (string, error) {
 	if token := os.Getenv("TETHER_TOKEN"); token != "" {
 		return token, nil
 	}
+	// A session/anonymous proxy must not acquire the operator's authority.
+	// Explicit credentials above still take precedence over this marker.
+	if os.Getenv("TETHER_MCP_TOKEN") != "" {
+		return "", nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("tether: locate default credential: %w", err)

@@ -21,6 +21,7 @@ func credentialHome(t *testing.T) string {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("TETHER_TOKEN", "")
+	t.Setenv("TETHER_MCP_TOKEN", "")
 	return dir
 }
 
@@ -205,7 +206,7 @@ func TestCredentialsAcrossRequestPaths(t *testing.T) {
 }
 
 func TestCredentialsOverUnixSocket(t *testing.T) {
-	credentialHome(t)
+	home := credentialHome(t)
 	dir, err := os.MkdirTemp("/var/tmp", "tth-auth-")
 	if err != nil {
 		t.Fatal(err)
@@ -216,12 +217,9 @@ func TestCredentialsOverUnixSocket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	seen := make(chan string, 2)
 	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer unix-token" {
-			t.Error("missing bearer on Unix socket request")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+		seen <- r.Header.Get("Authorization")
 		switch r.URL.Path {
 		case "/health":
 			_, _ = io.WriteString(w, `{"status":"ok"}`)
@@ -237,14 +235,23 @@ func TestCredentialsOverUnixSocket(t *testing.T) {
 	t.Cleanup(func() { _ = server.Close(); <-done })
 	file := filepath.Join(dir, "token")
 	credentialFile(t, file, "unix-token")
+	credentialFile(t, filepath.Join(home, ".tether", "run", "operator.token"), "operator-token")
 	for _, tc := range []struct {
-		name   string
-		option Option
+		name, marker, env, want string
+		opts                    []Option
 	}{
-		{"token", WithToken("unix-token")}, {"file", WithTokenFile(file)},
+		{"token", "", "", "Bearer unix-token", []Option{WithToken("unix-token")}},
+		{"file", "", "", "Bearer unix-token", []Option{WithTokenFile(file)}},
+		{"marked anonymous", "session-proxy", "", "", nil},
+		{"marked explicit file", "session-proxy", "env-token", "Bearer unix-token", []Option{WithToken("option-token"), WithTokenFile(file)}},
+		{"marked explicit token", "session-proxy", "env-token", "Bearer unix-token", []Option{WithToken("unix-token")}},
+		{"marked environment token", "session-proxy", "env-token", "Bearer env-token", nil},
+		{"unmarked operator", "", "", "Bearer operator-token", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c, err := New("unix:"+socket, tc.option)
+			t.Setenv("TETHER_MCP_TOKEN", tc.marker)
+			t.Setenv("TETHER_TOKEN", tc.env)
+			c, err := New("unix:"+socket, tc.opts...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -253,6 +260,9 @@ func TestCredentialsOverUnixSocket(t *testing.T) {
 			defer cancel()
 			if _, err := c.Health(ctx); err != nil {
 				t.Fatal(err)
+			}
+			if got := <-seen; got != tc.want {
+				t.Fatalf("ordinary call Authorization = %q, want %q", got, tc.want)
 			}
 			events, errs := c.StreamEvents(ctx, StreamEventsOptions{})
 			event, ok := <-events
@@ -263,6 +273,9 @@ func TestCredentialsOverUnixSocket(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+			}
+			if got := <-seen; got != tc.want {
+				t.Fatalf("streaming call Authorization = %q, want %q", got, tc.want)
 			}
 		})
 	}

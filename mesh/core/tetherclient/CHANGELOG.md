@@ -6,6 +6,12 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## v0.9.1 — 2026-10-02
+
+### Fixed
+
+- Session and anonymous proxies marked by non-empty `TETHER_MCP_TOKEN` no longer fall back to the operator token file when `TETHER_TOKEN` is empty. Explicit token/file options and non-empty `TETHER_TOKEN` still take precedence.
+
 ## v0.9.0 — 2026-10-02
 
 ### Added
