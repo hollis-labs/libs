@@ -182,6 +182,7 @@ timeout:
 - `AIChat`
 - `AIChatStream`
 - `StreamEvents`
+- `SubscribeChannel`
 - `ResumeLogicalAgent`
 
 ## Asserted caller identity (messaging reads)
@@ -202,6 +203,49 @@ client := tether.MustNew("", tether.WithSelfURN("msg://agent/agent-mux/agt_xxxxx
 
 Get your URN from `tether registry register --print-urn-only`, or from
 `tether_whoami` over MCP.
+
+## Named channel consumers and routing capabilities
+
+`ListChannels(ctx)` returns the stable channel names and their derived
+`msg://service/local/channel/<name>` addresses. `ChannelMessages(ctx, name,
+ChannelMessagesOptions{Since: cursor, Limit: 100})` returns history in ascending
+sequence order, plus `NextSince`. Set `Last: N` instead of `Since`/`Limit` to
+read the latest N publications, oldest first. Purged items carry `Purged` and
+`PurgedAt`, including on SSE replay. The cursor is exclusive and durable; sequence
+gaps are valid. Channel membership is not required. Configure `WithSelfURN` for
+an asserted caller, or a bearer credential for a verified caller.
+
+```go
+zero := int64(0) // nil starts live; &zero replays all history
+messages, streamErrors, err := client.SubscribeChannel(ctx, "ops", &zero)
+if err != nil {
+    return err
+}
+for message := range messages {
+    // Save message.Seq after processing; use it to reconnect explicitly.
+    fmt.Println(message.Seq, string(message.Payload))
+}
+if err := <-streamErrors; err != nil {
+    return err
+}
+```
+
+Cancel `ctx` to stop the stream. Initial HTTP errors are returned directly;
+stream decoding and transport errors arrive on `streamErrors`. A disconnected
+stream closes both channels. An incomplete SSE frame is discarded for replay
+on reconnect. Frames up to 1 MiB per line are supported.
+
+`RoutingCapabilities(ctx, "")` discovers gateway-wide support;
+`RoutingCapabilities(ctx, sessionID)` narrows the answer to that session. The
+answer carries `route_supported`, `reply_to_sender`, `interrupt`,
+`kinds_available`, `delivery`, and a `runtimes` map keyed by runtime/provider ID.
+Each runtime entry includes `final_text_confidence`. Availability describes the
+daemon's currently wired paths, so check it rather than inferring support from
+a runtime name. Delivery is `next-turn`.
+
+`ReplyOptions{Interrupt: true}` reserves the client reply seam for
+CW-20261002-0065. `Client.Reply` will be added once the daemon reply endpoint
+exists. Callers with a complete reply envelope can use `AsDispatcher().Reply`.
 
 ## Durable delivery
 
