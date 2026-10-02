@@ -244,9 +244,20 @@ Each runtime entry includes `final_text_confidence`. Availability describes the
 daemon's currently wired paths, so check it rather than inferring support from
 a runtime name. Delivery is `next-turn`.
 
-`ReplyOptions{Interrupt: true}` reserves the client reply seam for
-CW-20261002-0065. `Client.Reply` will be added once the daemon reply endpoint
-exists. Callers with a complete reply envelope can use `AsDispatcher().Reply`.
+`Reply(ctx, msgID, body, ReplyOptions{Interrupt: true, IdempotencyKey: "key"})`
+queues a reply as the publishing session's next turn. Configure `WithSelfURN`
+or a bearer credential for caller identity. The 202 `ReplyReceipt` confirms
+acceptance, not delivery; `Interrupt` reports the cancel outcome and `Duplicate`
+identifies a replay of the same key. The key goes in the `Idempotency-Key` header.
+The client does not automatically retry. Reuse the same key and body for a safe
+explicit retry.
+
+Refusals are `*APIError`; use `errors.Is(err, &APIError{Code:
+CodeInterruptUnsupported})` or `errors.As` to inspect the status and code.
+409 `interrupt_unsupported`, `turn_not_yet_started` and `turn_feed_unavailable`
+mean nothing was queued. 413 `payload_too_large` and 400 `invalid_request` /
+`reply_target_not_a_session` retain the daemon's typed error. The daemon limits
+reply text to 128 KiB and request JSON to 1 MiB.
 
 ## Durable delivery
 
