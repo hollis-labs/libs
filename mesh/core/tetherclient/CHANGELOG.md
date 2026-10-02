@@ -6,7 +6,7 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
-## v0.8.0 — 2026-10-01
+## v0.9.0 — 2026-10-02
 
 ### Added
 
