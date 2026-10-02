@@ -290,3 +290,11 @@ See [MIGRATION.md](./MIGRATION.md) for the `go-agentmux-client` to
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+`ReplyDelivery(ctx, receipt.ReplyID)` reads the current delivery record (200),
+including state, reason, attempts and timestamps. `ReplyPending`, `ReplyQueued`
+and `ReplyDelivering` are nonterminal; `ReplyDelivered` and `ReplyUndeliverable`
+are terminal. Exported `ReplyReason*` constants describe outcomes such as
+`ReplyReasonHandedOff`, `ReplyReasonTurnFailed` and
+`ReplyReasonInterruptUnconfirmed`. A delivered `turn_failed` reply was injected
+and must not be sent again. Unknown IDs return a typed 404 `APIError`.
