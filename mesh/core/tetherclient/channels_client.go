@@ -162,11 +162,3 @@ func (c *Client) SubscribeChannel(ctx context.Context, name string, since *int64
 	}()
 	return events, errs, nil
 }
-
-// ReplyOptions is the seam for Client.Reply(ctx, msgID, body, options).
-// TODO(CW-20261002-0065): add Reply after the daemon reply endpoint exists.
-// No endpoint is assumed here; AsDispatcher().Reply remains available for
-// callers that already have a complete reply envelope.
-type ReplyOptions struct {
-	Interrupt bool `json:"interrupt"`
-}
