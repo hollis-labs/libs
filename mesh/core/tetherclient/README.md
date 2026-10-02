@@ -61,6 +61,10 @@ func main() {
 An explicitly selected file takes precedence over a token option regardless of
 option order. A missing default file keeps the client anonymous, so offline
 bootstrap still works. `WithToken("")` explicitly disables automatic lookup.
+When `TETHER_MCP_TOKEN` is non-empty, it marks a session or anonymous proxy:
+without an explicit token/file option or non-empty `TETHER_TOKEN`, the client
+stays anonymous and never reads `operator.token`. The marker itself is not a
+daemon credential.
 
 ```go
 client, err := tether.New("", tether.WithTokenFile("/private/service.token"))
