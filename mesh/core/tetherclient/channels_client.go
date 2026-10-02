@@ -112,7 +112,7 @@ func (c *Client) SubscribeChannel(ctx context.Context, name string, since *int64
 		defer close(errs)
 		defer func() { _ = resp.Body.Close() }()
 		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
 		var data strings.Builder
 		event := ""
 		flush := func() error {

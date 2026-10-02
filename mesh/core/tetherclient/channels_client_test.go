@@ -20,12 +20,12 @@ func TestChannelHistoryAndList(t *testing.T) {
 		}
 		switch r.URL.Path {
 		case "/channels":
-			fmt.Fprint(w, `{"channels":[{"name":"ops","address":"msg://service/local/channel/ops"}]}`)
+			_, _ = fmt.Fprint(w, `{"channels":[{"name":"ops","address":"msg://service/local/channel/ops"}]}`)
 		case "/channels/ops/messages":
 			if r.URL.Query().Get("since") != "7" || r.URL.Query().Get("limit") != "2" {
 				t.Errorf("query = %s", r.URL.RawQuery)
 			}
-			fmt.Fprint(w, `{"name":"ops","address":"msg://service/local/channel/ops","messages":[{"seq":9,"id":"m1","kind":"notice","from":"msg://agent/local/sender","to":"msg://service/local/channel/ops","payload":"hello"}],"next_since":9}`)
+			_, _ = fmt.Fprint(w, `{"name":"ops","address":"msg://service/local/channel/ops","messages":[{"seq":9,"id":"m1","kind":"notice","from":"msg://agent/local/sender","to":"msg://service/local/channel/ops","payload":"hello"}],"next_since":9}`)
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 			w.WriteHeader(404)
@@ -48,7 +48,7 @@ func TestChannelLatestHistoryAndPurgeReceipt(t *testing.T) {
 		if r.URL.Query().Get("last") != "2" || r.URL.Query().Has("since") || r.URL.Query().Has("limit") {
 			t.Errorf("query=%s", r.URL.RawQuery)
 		}
-		fmt.Fprint(w, `{"name":"ops","address":"msg://service/local/channel/ops","messages":[{"seq":8,"purged":true,"purged_at":"2026-10-02T15:00:00Z"}],"next_since":8}`)
+		_, _ = fmt.Fprint(w, `{"name":"ops","address":"msg://service/local/channel/ops","messages":[{"seq":8,"purged":true,"purged_at":"2026-10-02T15:00:00Z"}],"next_since":8}`)
 	}))
 	defer srv.Close()
 	c := tether.MustNew(srv.URL, tether.WithToken(""))
@@ -69,8 +69,8 @@ func TestSubscribeChannelReplayAndCancellation(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.(http.Flusher).Flush()
 		time.Sleep(30 * time.Millisecond) // deliberately exceed HTTP timeout
-		payload, _ := json.Marshal(map[string]any{"seq": 42, "payload": strings.Repeat("x", 80*1024)})
-		fmt.Fprintf(w, ": ping\n\nevent: unrelated\ndata: ignored\n\nid: 42\nevent: message\ndata: %s\n\n", payload)
+		payload, _ := json.Marshal(map[string]any{"seq": 42, "payload": strings.Repeat("x", 2*1024*1024)})
+		_, _ = fmt.Fprintf(w, ": ping\n\nevent: unrelated\ndata: ignored\n\nid: 42\nevent: message\ndata: %s\n\n", payload)
 		w.(http.Flusher).Flush()
 		<-r.Context().Done()
 	}))
@@ -85,7 +85,7 @@ func TestSubscribeChannelReplayAndCancellation(t *testing.T) {
 	}
 	select {
 	case msg := <-events:
-		if msg.Seq != 42 || len(msg.Payload) != 80*1024+2 {
+		if msg.Seq != 42 || len(msg.Payload) != 2*1024*1024+2 {
 			t.Fatalf("message seq=%d size=%d", msg.Seq, len(msg.Payload))
 		}
 	case <-time.After(2 * time.Second):
@@ -113,11 +113,11 @@ func TestSubscribeChannelLiveAndErrors(t *testing.T) {
 					t.Error("live subscription sent since")
 				}
 				if malformed {
-					fmt.Fprint(w, "event: message\ndata: {broken\n\n")
+					_, _ = fmt.Fprint(w, "event: message\ndata: {broken\n\n")
 					return
 				}
 				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, `{"error":"forbidden"}`)
+				_, _ = fmt.Fprint(w, `{"error":"forbidden"}`)
 			}))
 			defer srv.Close()
 			c := tether.MustNew(srv.URL, tether.WithToken(""))

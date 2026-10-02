@@ -233,7 +233,8 @@ if err := <-streamErrors; err != nil {
 Cancel `ctx` to stop the stream. Initial HTTP errors are returned directly;
 stream decoding and transport errors arrive on `streamErrors`. A disconnected
 stream closes both channels. An incomplete SSE frame is discarded for replay
-on reconnect. Frames up to 1 MiB per line are supported.
+on reconnect. Frames up to 16 MiB per line are supported. `SubscribeChannel` does not
+auto-reconnect; the consumer resumes explicitly with the last received `Seq`.
 
 `RoutingCapabilities(ctx, "")` discovers gateway-wide support;
 `RoutingCapabilities(ctx, sessionID)` narrows the answer to that session. The
