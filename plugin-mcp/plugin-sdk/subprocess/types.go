@@ -215,8 +215,12 @@ type MCPCallResult struct {
 // plugin route is hit. Streaming is not supported on this path; use SSE
 // envelopes via EventHandleResult instead.
 type HTTPRequest struct {
-	Method    string            `json:"method"`
-	Path      string            `json:"path"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	// RawPath preserves optional escaped separators from URL.RawPath.
+	RawPath string `json:"raw_path,omitempty"`
+	// RawQuery preserves the encoded query, including repeated and empty values.
+	RawQuery  string            `json:"raw_query,omitempty"`
 	Query     map[string]string `json:"query,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
 	Body      []byte            `json:"body,omitempty"`

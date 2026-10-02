@@ -184,7 +184,9 @@ func TestMCPCallResultRoundtrip(t *testing.T) {
 func TestHTTPRequestResponseRoundtrip(t *testing.T) {
 	req := HTTPRequest{
 		Method:   "POST",
-		Path:     "/x",
+		Path:     "/x/one/two",
+		RawPath:  "/x/one%2Ftwo",
+		RawQuery: "a=1&a=2&empty=&bare",
 		Query:    map[string]string{"a": "1"},
 		Headers:  map[string]string{"Content-Type": "application/json"},
 		Body:     []byte(`{"ok":true}`),
@@ -198,7 +200,7 @@ func TestHTTPRequestResponseRoundtrip(t *testing.T) {
 	if err := json.Unmarshal(b, &gotReq); err != nil {
 		t.Fatalf("unmarshal req: %v", err)
 	}
-	if gotReq.Method != "POST" || gotReq.Path != "/x" || string(gotReq.Body) != `{"ok":true}` {
+	if gotReq.Method != "POST" || gotReq.Path != req.Path || gotReq.RawPath != req.RawPath || gotReq.RawQuery != req.RawQuery || string(gotReq.Body) != `{"ok":true}` {
 		t.Errorf("req roundtrip lost data: %+v", gotReq)
 	}
 	if string(gotReq.Identity) != string(req.Identity) {

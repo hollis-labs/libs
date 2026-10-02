@@ -362,7 +362,7 @@ type httpPlugin struct{ basePlugin }
 
 func (p *httpPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
 	if req.Method == "GET" && req.Path == "/ping" {
-		return HTTPResponse{Status: 200, Headers: map[string]string{"X-Echo": req.Query["msg"]}, Body: []byte("pong")}, nil
+		return HTTPResponse{Status: 200, Headers: map[string]string{"X-Echo": req.Query["msg"], "X-Raw-Query": req.RawQuery, "X-Raw-Path": req.RawPath}, Body: []byte("pong")}, nil
 	}
 	return HTTPResponse{Status: 404}, nil
 }
@@ -371,7 +371,7 @@ func TestServe_HTTPHandler(t *testing.T) {
 	p := &httpPlugin{basePlugin: basePlugin{id: "http"}}
 	resps := drive(t, p, []RPCRequest{
 		{JSONRPC: "2.0", ID: 1, Method: MethodHTTPHandle,
-			Params: HTTPRequest{Method: "GET", Path: "/ping", Query: map[string]string{"msg": "hi"}}},
+			Params: HTTPRequest{Method: "GET", Path: "/ping", RawPath: "/p%69ng", RawQuery: "msg=hi&msg=again&empty=", Query: map[string]string{"msg": "hi"}}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -383,7 +383,7 @@ func TestServe_HTTPHandler(t *testing.T) {
 	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if res.Status != 200 || string(res.Body) != "pong" || res.Headers["X-Echo"] != "hi" {
+	if res.Status != 200 || string(res.Body) != "pong" || res.Headers["X-Echo"] != "hi" || res.Headers["X-Raw-Query"] != "msg=hi&msg=again&empty=" || res.Headers["X-Raw-Path"] != "/p%69ng" {
 		t.Errorf("response = %+v", res)
 	}
 }
