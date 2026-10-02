@@ -211,3 +211,9 @@ honored for backward compatibility but is deprecated; prefer
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+HTTP hosts can populate `HTTPRequest.RawPath` and `RawQuery` from `net/url.URL`
+to preserve escaped path separators and the full query through `http/handle`.
+Plugins can parse `RawQuery` with `url.ParseQuery` to retain repeated and empty
+values instead of relying on a scalar query projection. These fields carry URL
+data; they do not verify a caller or grant route ownership.

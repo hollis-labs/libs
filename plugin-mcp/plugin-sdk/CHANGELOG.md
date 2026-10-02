@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.1 — 2026-10-02
+
+- HTTP requests now carry optional `RawPath` and `RawQuery` fields so hosts can
+  preserve escaped separators, repeated query values and empty parameters across
+  canonical `http/handle` dispatch. The subprocess protocol remains version 1.
+
 ## Unreleased
 
 ### Changed
