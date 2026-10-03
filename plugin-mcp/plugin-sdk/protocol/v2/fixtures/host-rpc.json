@@ -1,0 +1,1430 @@
+{
+  "status": "draft-unexecuted",
+  "profile": "protocol-2/host-rpc/1",
+  "description": "Raw structural DTO examples and fake-host behavioural obligations. Host-policy and byte-policy cases require ledger/runtime drivers; they are not plain JSON Schema assertions.",
+  "structural": [
+    {
+      "name": "host/storage/get positive params",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-StorageGet\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": true
+    },
+    {
+      "name": "host/storage/get positive result",
+      "schema": "StorageGetResult",
+      "raw": "{\"found\":false}",
+      "valid": true
+    },
+    {
+      "name": "host/storage/put positive params",
+      "schema": "StoragePutParams",
+      "raw": "{\"grant_id\":\"g-StoragePut\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"expected_revision\":null,\"operation_key\":\"put-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/storage/put positive result",
+      "schema": "StoragePutResult",
+      "raw": "{\"operation_key\":\"put-1\",\"revision\":\"r1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/storage/delete positive params",
+      "schema": "StorageDeleteParams",
+      "raw": "{\"grant_id\":\"g-StorageDelete\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"expected_revision\":\"r1\",\"operation_key\":\"delete-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/storage/delete positive result",
+      "schema": "StorageDeleteResult",
+      "raw": "{\"operation_key\":\"delete-1\",\"deleted\":true,\"revision\":\"r2\"}",
+      "valid": true
+    },
+    {
+      "name": "host/secrets/get positive params",
+      "schema": "SecretsGetParams",
+      "raw": "{\"grant_id\":\"g-SecretsGet\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"secret_ref\":\"declared-api-key\"}",
+      "valid": true
+    },
+    {
+      "name": "host/secrets/get positive result",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"c2VjcmV0\",\"expires_at\":\"2026-10-03T22:00:00Z\"}",
+      "valid": true
+    },
+    {
+      "name": "host/egress/request positive params",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-EgressRequest\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"POST\",\"url\":\"https://api.example.com/items\",\"headers\":[],\"body_base64\":\"e30=\",\"operation_key\":\"post-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/egress/request positive result",
+      "schema": "EgressRequestResult",
+      "raw": "{\"status\":200,\"headers\":[],\"body_base64\":\"e30=\",\"operation_key\":\"post-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/events/publish positive params",
+      "schema": "EventsPublishParams",
+      "raw": "{\"grant_id\":\"g-EventsPublish\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"event_name\":\"example.changed\",\"payload\":{\"value\":1},\"operation_key\":\"event-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/events/publish positive result",
+      "schema": "EventsPublishResult",
+      "raw": "{\"operation_key\":\"event-1\",\"accepted\":true,\"event_id\":\"event-1\"}",
+      "valid": true
+    },
+    {
+      "name": "host/log positive params",
+      "schema": "LogParams",
+      "raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}",
+      "valid": true
+    },
+    {
+      "name": "host/log positive result",
+      "schema": "LogResult",
+      "raw": "{\"accepted\":true}",
+      "valid": true
+    },
+    {
+      "name": "host/readonly/query positive params",
+      "schema": "ReadonlyQueryParams",
+      "raw": "{\"grant_id\":\"g-ReadonlyQuery\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"resource\":\"sessions\",\"schema_version\":1,\"params\":{\"limit\":10}}",
+      "valid": true
+    },
+    {
+      "name": "host/readonly/query positive result",
+      "schema": "ReadonlyQueryResult",
+      "raw": "{\"resource\":\"sessions\",\"schema_version\":1,\"data\":{\"items\":[]}}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/list_tools positive params",
+      "schema": "MCPListToolsParams",
+      "raw": "{\"grant_id\":\"g-MCPListTools\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"server_id\":\"example.server\"}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/list_tools positive result",
+      "schema": "MCPListToolsResult",
+      "raw": "{\"server_id\":\"example.server\",\"tools\":[]}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/call_tool positive params",
+      "schema": "MCPCallToolParams",
+      "raw": "{\"grant_id\":\"g-MCPCallTool\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"server_id\":\"example.server\",\"tool_name\":\"lookup\",\"tool_binding\":\"tool-binding-example\",\"arguments\":{\"key\":\"one\"}}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/call_tool positive result",
+      "schema": "MCPCallToolResult",
+      "raw": "{\"content\":[],\"is_error\":false}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/cancel_call positive params",
+      "schema": "MCPCancelCallParams",
+      "raw": "{\"grant_id\":\"g-MCPCancelCall\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"target_call_id\":2}",
+      "valid": true
+    },
+    {
+      "name": "host/mcp/cancel_call positive result",
+      "schema": "MCPCancelCallResult",
+      "raw": "{\"accepted\":true,\"already_terminal\":false}",
+      "valid": true
+    },
+    {
+      "name": "host/bindings/renew positive params",
+      "schema": "BindingsRenewParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"requested_lease_ms\":1000}",
+      "valid": true
+    },
+    {
+      "name": "host/bindings/renew positive result",
+      "schema": "BindingsRenewResult",
+      "raw": "{\"binding_id\":\"binding-example\",\"expires_at\":\"2026-10-03T22:00:00Z\",\"remaining_budgets\":{\"timeout_ms\":1000,\"bytes\":0}}",
+      "valid": true
+    },
+    {
+      "name": "missing context",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "null context",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":null,\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "missing binding",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "null binding",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":null,\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "missing parent",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "extra plugin depth",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17},\"depth\":0},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "forged caller",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17},\"identity\":{\"owner\":\"other\"}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "wrong-case context",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"Context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "wrong-case parent",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"Request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "null parent",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":null},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "invalid parent owner",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"user\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "parent zero",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":0}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "timeout zero",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":0,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "timeout unsafe",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":9007199254740992,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "raw timeout 1e3",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1e3,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      },
+      "validation": "raw-token+schema"
+    },
+    {
+      "name": "raw timeout 1.0",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1.0,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      },
+      "validation": "raw-token+schema"
+    },
+    {
+      "name": "raw timeout 9007199254740992",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":9007199254740992,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      },
+      "validation": "raw-token+schema"
+    },
+    {
+      "name": "duplicate binding decoded key",
+      "schema": "StorageGetParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"binding\\u005fid\":\"other\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      },
+      "validation": "raw-token"
+    },
+    {
+      "name": "put omission is not create-only",
+      "schema": "StoragePutParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"operation_key\":\"put-1\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "put null is create-only",
+      "schema": "StoragePutParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"expected_revision\":null,\"operation_key\":\"put-1\"}",
+      "valid": true
+    },
+    {
+      "name": "put missing operation key",
+      "schema": "StoragePutParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"expected_revision\":null}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "delete null revision",
+      "schema": "StorageDeleteParams",
+      "raw": "{\"grant_id\":\"g-storage\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"expected_revision\":null,\"operation_key\":\"delete-1\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "mutating egress without key",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"POST\",\"url\":\"https://api.example.com/items\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "read egress without key",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://api.example.com/items\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": true
+    },
+    {
+      "name": "get absent value must omit revision",
+      "schema": "StorageGetResult",
+      "raw": "{\"found\":false,\"revision\":\"r1\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "get found value required",
+      "schema": "StorageGetResult",
+      "raw": "{\"found\":true,\"revision\":\"r1\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "canonical padded base64",
+      "schema": "Base64",
+      "raw": "\"e30=\"",
+      "valid": true
+    },
+    {
+      "name": "base64 unpadded",
+      "schema": "Base64",
+      "raw": "\"e30\"",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "base64 whitespace",
+      "schema": "Base64",
+      "raw": "\"e 30=\"",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "cancel contradictory flags",
+      "schema": "MCPCancelCallResult",
+      "raw": "{\"accepted\":true,\"already_terminal\":true}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "renew zero unspent byte quota",
+      "schema": "BindingsRenewResult",
+      "raw": "{\"binding_id\":\"binding-example\",\"expires_at\":\"2026-10-03T22:00:00Z\",\"remaining_budgets\":{\"timeout_ms\":1000,\"bytes\":0}}",
+      "valid": true
+    },
+    {
+      "name": "renew same reference shape",
+      "schema": "BindingsRenewResult",
+      "raw": "{\"binding_id\":\"different-binding\",\"expires_at\":\"2026-10-03T22:00:00Z\",\"remaining_budgets\":{\"timeout_ms\":1000,\"bytes\":0}}",
+      "valid": true
+    },
+    {
+      "name": "typed parent error",
+      "schema": "ApplicationErrorResponse",
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32010,\"message\":\"Parent unavailable\",\"data\":{\"contract\":\"host-rpc/1\",\"code\":\"target_unavailable\",\"request_id\":1,\"effect_state\":\"not_started\",\"retryable\":false,\"detail\":\"parent_invalid\"}}}",
+      "valid": true
+    },
+    {
+      "name": "free-text detail rejected",
+      "schema": "HostRPCErrorData",
+      "raw": "{\"contract\":\"host-rpc/1\",\"code\":\"target_unavailable\",\"request_id\":1,\"effect_state\":\"not_started\",\"retryable\":false,\"detail\":\"parent_unknown\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    },
+    {
+      "name": "string request_id rejected",
+      "schema": "HostRPCErrorData",
+      "raw": "{\"contract\":\"host-rpc/1\",\"code\":\"target_unavailable\",\"request_id\":\"1\",\"effect_state\":\"not_started\",\"retryable\":false,\"detail\":\"parent_invalid\"}",
+      "valid": false,
+      "error": {
+        "code": -32602
+      }
+    }
+  ],
+  "policy": [
+    {
+      "name": "unknown parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "binding_id": "binding-example",
+        "connection": "live-connection",
+        "parent": {
+          "request_owner": "host",
+          "id": 17,
+          "binding_id": "binding-example",
+          "state": "active",
+          "remaining_ms": 500,
+          "depth": 2
+        },
+        "parent_lookup": "missing"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "parent_invalid",
+          "effect_state": "not_started",
+          "retryable": false,
+          "message": "Parent unavailable"
+        },
+        "backend_invocations": 0,
+        "audit_reason": "parent_unknown"
+      }
+    },
+    {
+      "name": "terminal parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "binding_id": "binding-example",
+        "connection": "live-connection",
+        "parent": {
+          "request_owner": "host",
+          "id": 17,
+          "binding_id": "binding-example",
+          "state": "completed",
+          "remaining_ms": 500,
+          "depth": 2
+        },
+        "parent_state": "completed"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "parent_terminal",
+          "effect_state": "not_started",
+          "retryable": false
+        },
+        "backend_invocations": 0,
+        "audit_reason": "parent_terminal"
+      }
+    },
+    {
+      "name": "wrong-owner parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "binding_id": "binding-example",
+        "connection": "live-connection",
+        "parent": {
+          "request_owner": "host",
+          "id": 17,
+          "binding_id": "binding-example",
+          "state": "active",
+          "remaining_ms": 500,
+          "depth": 2
+        },
+        "parent_record_owner": "plugin"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "parent_invalid",
+          "effect_state": "not_started",
+          "retryable": false,
+          "message": "Parent unavailable"
+        },
+        "backend_invocations": 0,
+        "audit_reason": "parent_wrong_owner"
+      }
+    },
+    {
+      "name": "wrong-binding parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "binding_id": "binding-example",
+        "connection": "live-connection",
+        "parent": {
+          "request_owner": "host",
+          "id": 17,
+          "binding_id": "binding-example",
+          "state": "active",
+          "remaining_ms": 500,
+          "depth": 2
+        },
+        "parent_record_binding": "another-binding"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "parent_invalid",
+          "effect_state": "not_started",
+          "retryable": false,
+          "message": "Parent unavailable"
+        },
+        "backend_invocations": 0,
+        "audit_reason": "parent_wrong_binding"
+      }
+    },
+    {
+      "name": "requested timeout cannot extend parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 10000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "parent_remaining_ms": 400,
+        "method_ceiling_ms": 1000,
+        "offer_ceiling_ms": 800,
+        "binding_remaining_ms": 900,
+        "grant_remaining_ms": 700,
+        "parent_depth": 2
+      },
+      "expect": {
+        "effective_timeout_ms": 400,
+        "child_depth": 3,
+        "backend_receives_timeout_at_most_ms": 400
+      }
+    },
+    {
+      "name": "requested timeout cannot extend method or offer",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 10000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "parent_remaining_ms": 2000,
+        "method_ceiling_ms": 1000,
+        "offer_ceiling_ms": 600
+      },
+      "expect": {
+        "effective_timeout_ms": 600
+      }
+    },
+    {
+      "name": "expired parent refuses before backend",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "parent_remaining_ms": 0,
+        "parent_state": "active"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "deadline_exceeded",
+          "effect_state": "not_started"
+        },
+        "backend_invocations": 0
+      }
+    },
+    {
+      "name": "depth comes only from ledger",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "parent_depth": 8,
+        "max_depth": 8
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "budget_exceeded",
+          "detail": "depth_exceeded",
+          "effect_state": "not_started"
+        },
+        "backend_invocations": 0
+      }
+    },
+    {
+      "name": "stale opaque tool binding",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/mcp/call_tool",
+        "params": {
+          "grant_id": "g-mcp",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "server_id": "example.server",
+          "tool_name": "lookup",
+          "tool_binding": "tool-binding-example",
+          "arguments": {
+            "key": "one"
+          }
+        }
+      },
+      "ledger": {
+        "tool_binding_current": false
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "stale_binding"
+        },
+        "tool_invocations": 0,
+        "retarget_cached_name": false
+      }
+    },
+    {
+      "name": "write tool requires operation key",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/mcp/call_tool",
+        "params": {
+          "grant_id": "g-mcp",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "server_id": "example.server",
+          "tool_name": "lookup",
+          "tool_binding": "tool-binding-example",
+          "arguments": {
+            "key": "one"
+          }
+        }
+      },
+      "ledger": {
+        "pinned_tool_effect": "write"
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "invalid_request",
+          "effect_state": "not_started"
+        },
+        "tool_invocations": 0
+      }
+    },
+    {
+      "name": "query descriptor resource mismatch",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/readonly/query",
+        "params": {
+          "grant_id": "g-query",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "resource": "sessions",
+          "schema_version": 1,
+          "params": {
+            "limit": 10
+          }
+        }
+      },
+      "ledger": {
+        "grant_resource": "usage",
+        "grant_schema_version": 1
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "scope_denied",
+          "effect_state": "not_started"
+        },
+        "query_invocations": 0
+      }
+    },
+    {
+      "name": "query host-owned params reject query language",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/readonly/query",
+        "params": {
+          "grant_id": "g-query",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "resource": "sessions",
+          "schema_version": 1,
+          "params": {
+            "sql": "SELECT * FROM private"
+          }
+        }
+      },
+      "ledger": {
+        "resource": "sessions",
+        "schema_version": 1,
+        "allowed_params": [
+          "limit"
+        ]
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32602
+        },
+        "query_invocations": 0
+      }
+    },
+    {
+      "name": "renew cannot replace binding",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/bindings/renew",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "requested_lease_ms": 1000
+        }
+      },
+      "host_result": {
+        "binding_id": "different-binding",
+        "expires_at": "2026-10-03T22:00:00Z",
+        "remaining_budgets": {
+          "timeout_ms": 1000,
+          "bytes": 0
+        }
+      },
+      "expect": {
+        "invalid_result": true,
+        "new_authority": false
+      }
+    },
+    {
+      "name": "same-input receipt does not repeat mutation",
+      "kind": "host-policy",
+      "requests": [
+        {
+          "method": "host/storage/put",
+          "params": {
+            "grant_id": "g-storage",
+            "context": {
+              "binding_id": "binding-example",
+              "timeout_ms": 1000,
+              "parent_call": {
+                "request_owner": "host",
+                "id": 17
+              }
+            },
+            "key": "preferences",
+            "value": {
+              "theme": "dark"
+            },
+            "expected_revision": null,
+            "operation_key": "put-1"
+          }
+        },
+        {
+          "method": "host/storage/put",
+          "params": {
+            "grant_id": "g-storage",
+            "context": {
+              "binding_id": "binding-example",
+              "timeout_ms": 1000,
+              "parent_call": {
+                "request_owner": "host",
+                "id": 17
+              }
+            },
+            "key": "preferences",
+            "value": {
+              "theme": "dark"
+            },
+            "expected_revision": null,
+            "operation_key": "put-1"
+          }
+        }
+      ],
+      "ledger": {
+        "current_grant": true,
+        "binding_live": true
+      },
+      "expect": {
+        "backend_commits": 1,
+        "replies": [
+          {
+            "operation_key": "put-1",
+            "revision": "r1"
+          },
+          {
+            "operation_key": "put-1",
+            "revision": "r1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "operation key conflict",
+      "kind": "host-policy",
+      "requests": [
+        {
+          "method": "host/storage/put",
+          "params": {
+            "grant_id": "g-storage",
+            "context": {
+              "binding_id": "binding-example",
+              "timeout_ms": 1000,
+              "parent_call": {
+                "request_owner": "host",
+                "id": 17
+              }
+            },
+            "key": "preferences",
+            "value": {
+              "theme": "dark"
+            },
+            "expected_revision": null,
+            "operation_key": "put-1"
+          }
+        },
+        {
+          "method": "host/storage/put",
+          "params": {
+            "grant_id": "g-storage",
+            "context": {
+              "binding_id": "binding-example",
+              "timeout_ms": 1000,
+              "parent_call": {
+                "request_owner": "host",
+                "id": 17
+              }
+            },
+            "key": "preferences",
+            "value": {
+              "theme": "light"
+            },
+            "expected_revision": null,
+            "operation_key": "put-1"
+          }
+        }
+      ],
+      "expect": {
+        "backend_commits": 1,
+        "second_error": {
+          "rpc_code": -32010,
+          "code": "conflict",
+          "effect_state": "not_started"
+        }
+      }
+    },
+    {
+      "name": "lost effect reply is not retryable",
+      "kind": "transport-policy",
+      "request": {
+        "method": "host/storage/put",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences",
+          "value": {
+            "theme": "dark"
+          },
+          "expected_revision": null,
+          "operation_key": "put-1"
+        }
+      },
+      "transport": {
+        "request_may_have_been_delivered": true,
+        "reply_received": false,
+        "connection_lost": true
+      },
+      "expect": {
+        "local_error": {
+          "code": "unknown_outcome",
+          "effect_state": "unknown",
+          "retryable": false
+        },
+        "automatic_retries": 0
+      }
+    },
+    {
+      "name": "encoded base64 budget includes JSON overhead",
+      "kind": "byte-policy",
+      "input": {
+        "decoded_body_bytes": 786432,
+        "base64_characters": 1048576,
+        "params_overhead_bytes": 1
+      },
+      "expect": {
+        "params_over_budget": true,
+        "backend_invocations": 0
+      }
+    },
+    {
+      "name": "provisional host/log concrete plugin/init parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/log",
+        "params": {
+          "grant_id": "g-log",
+          "context": {
+            "binding_id": "provisional-binding",
+            "timeout_ms": 100,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 3
+            }
+          },
+          "level": "info",
+          "message": "lifecycle"
+        }
+      },
+      "ledger": {
+        "grant": "log.write",
+        "binding_id": "provisional-binding",
+        "lifecycle_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/init",
+          "state": "in_flight",
+          "binding_id": "provisional-binding"
+        },
+        "parent_remaining_ms": 200
+      },
+      "expect": {
+        "result": {
+          "accepted": true
+        },
+        "effective_timeout_ms": 100,
+        "validated_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/init"
+        }
+      }
+    },
+    {
+      "name": "provisional host/log concrete plugin/load parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/log",
+        "params": {
+          "grant_id": "g-log",
+          "context": {
+            "binding_id": "provisional-binding",
+            "timeout_ms": 100,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 3
+            }
+          },
+          "level": "info",
+          "message": "lifecycle"
+        }
+      },
+      "ledger": {
+        "grant": "log.write",
+        "binding_id": "provisional-binding",
+        "lifecycle_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/load",
+          "state": "in_flight",
+          "binding_id": "provisional-binding"
+        },
+        "parent_remaining_ms": 200
+      },
+      "expect": {
+        "result": {
+          "accepted": true
+        },
+        "effective_timeout_ms": 100,
+        "validated_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/load"
+        }
+      }
+    },
+    {
+      "name": "provisional host/log concrete plugin/unload parent",
+      "kind": "host-policy",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/log",
+        "params": {
+          "grant_id": "g-log",
+          "context": {
+            "binding_id": "provisional-binding",
+            "timeout_ms": 100,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 3
+            }
+          },
+          "level": "info",
+          "message": "lifecycle"
+        }
+      },
+      "ledger": {
+        "grant": "log.write",
+        "binding_id": "provisional-binding",
+        "lifecycle_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/unload",
+          "state": "in_flight",
+          "binding_id": "provisional-binding"
+        },
+        "parent_remaining_ms": 200
+      },
+      "expect": {
+        "result": {
+          "accepted": true
+        },
+        "effective_timeout_ms": 100,
+        "validated_parent": {
+          "request_owner": "host",
+          "id": 3,
+          "method": "plugin/unload"
+        }
+      }
+    },
+    {
+      "name": "terminal other-binding parent reveals no existence",
+      "kind": "host-policy",
+      "request": {
+        "method": "host/storage/get",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences"
+        }
+      },
+      "ledger": {
+        "parent": {
+          "request_owner": "host",
+          "id": 17,
+          "binding_id": "other-binding",
+          "state": "completed"
+        }
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "target_unavailable",
+          "detail": "parent_invalid",
+          "message": "Parent unavailable",
+          "effect_state": "not_started"
+        },
+        "backend_invocations": 0,
+        "audit_reason": "parent_wrong_binding"
+      }
+    },
+    {
+      "name": "receipt survives incarnation restart",
+      "kind": "host-policy",
+      "receipt": {
+        "key": {
+          "owner_id": "example.plugin",
+          "method": "host/storage/put",
+          "effective_target": "preferences",
+          "operation_key": "put-1"
+        },
+        "original_execution": {
+          "host_instance": "epoch-old",
+          "owner_generation": 1
+        },
+        "semantic_input": {
+          "value": {
+            "theme": "dark"
+          },
+          "expected_revision": null
+        },
+        "result": {
+          "operation_key": "put-1",
+          "revision": "r1"
+        }
+      },
+      "request": {
+        "method": "host/storage/put",
+        "params": {
+          "grant_id": "g-new",
+          "context": {
+            "binding_id": "binding-new",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences",
+          "value": {
+            "theme": "dark"
+          },
+          "expected_revision": null,
+          "operation_key": "put-1"
+        }
+      },
+      "ledger": {
+        "current_runtime": {
+          "host_instance": "epoch-new",
+          "owner_id": "example.plugin",
+          "owner_generation": 2
+        },
+        "authority_valid": true
+      },
+      "expect": {
+        "authority_revalidated_before_disclosure": true,
+        "new_backend_commits": 0,
+        "result": {
+          "operation_key": "put-1",
+          "revision": "r1"
+        }
+      }
+    },
+    {
+      "name": "restart receipt still requires current authority",
+      "kind": "host-policy",
+      "receipt": {
+        "owner_id": "example.plugin",
+        "operation_key": "put-1",
+        "original_generation": 1
+      },
+      "ledger": {
+        "current_generation": 2,
+        "authority_valid": false
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "capability_denied",
+          "effect_state": "not_started"
+        },
+        "receipt_disclosed": false,
+        "new_backend_commits": 0
+      }
+    },
+    {
+      "name": "delete then create-only uses higher revision",
+      "kind": "host-policy",
+      "ledger": {
+        "owner_id": "example.plugin",
+        "key": "preferences",
+        "live_revision": "r7",
+        "revision_sequence": 7
+      },
+      "operations": [
+        {
+          "method": "host/storage/delete",
+          "expected_revision": "r7",
+          "operation_key": "delete-7"
+        },
+        {
+          "method": "host/storage/put",
+          "value": {
+            "theme": "dark"
+          },
+          "expected_revision": null,
+          "operation_key": "put-9"
+        }
+      ],
+      "expect": {
+        "delete_result": {
+          "operation_key": "delete-7",
+          "deleted": true,
+          "revision": "r8"
+        },
+        "put_result": {
+          "operation_key": "put-9",
+          "revision": "r9"
+        },
+        "revision_sequence_monotonic": true,
+        "tombstone_revision_reused": false
+      }
+    },
+    {
+      "name": "absent key delete is conflict",
+      "kind": "host-policy",
+      "ledger": {
+        "key": "preferences",
+        "present": false,
+        "tombstone_revision": "r8"
+      },
+      "request": {
+        "method": "host/storage/delete",
+        "params": {
+          "grant_id": "g-storage",
+          "context": {
+            "binding_id": "binding-example",
+            "timeout_ms": 1000,
+            "parent_call": {
+              "request_owner": "host",
+              "id": 17
+            }
+          },
+          "key": "preferences",
+          "expected_revision": "r8",
+          "operation_key": "delete-absent"
+        }
+      },
+      "expect": {
+        "error": {
+          "rpc_code": -32010,
+          "code": "conflict",
+          "effect_state": "not_started"
+        },
+        "backend_commits": 0
+      }
+    }
+  ]
+}
