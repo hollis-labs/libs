@@ -42,3 +42,4 @@ Each lib keeps its own `CHANGELOG.md` (the history of the old module, as written
   - `modernc.org/libc`: v1.70.0 (go-queue, go-sqlite) -> v1.77.1
   - `modernc.org/memory`: v1.11.0 (go-queue, go-sqlite) -> v1.12.1
   - `modernc.org/sqlite`: v1.48.1 (go-queue, go-sqlite) -> v1.60.1
+- The OpenTelemetry instrumentation scope names of `otel` and `otel/genai` are now their new import paths (`github.com/hollis-labs/libs/util/otel`, `github.com/hollis-labs/libs/util/otel/genai`), as they were the old ones before. Exported traces and metrics carry the new `otel.scope.name`; dashboards or alerts keyed on the old name need updating.

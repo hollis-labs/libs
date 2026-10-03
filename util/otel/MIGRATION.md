@@ -25,3 +25,4 @@
   - `golang.org/x/sys`: v0.44.0 -> v0.48.0
   - `golang.org/x/text`: v0.37.0 -> v0.42.0
 - **Files not carried to the new location** (git history still has them): `go.mod`, `go.sum`.
+- **Telemetry scope names change.** The tracer and meter names (`otel` and `otel/genai`) are the packages' import paths, as before, so they are now `github.com/hollis-labs/libs/util/otel` and `github.com/hollis-labs/libs/util/otel/genai`. Exported spans and metrics carry the new `otel.scope.name`; dashboards, alerts or filters keyed on the old name must be updated.
