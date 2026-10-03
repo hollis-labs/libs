@@ -7,7 +7,7 @@
 //
 // [Check] reports which required capabilities a host does not support. It takes
 // no force flag: overriding an unmet requirement is the caller's decision to
-// make and record (agentcontracts.LaunchRecord.Forced), never this package's to
+// make and record (contracts.LaunchRecord.Forced), never this package's to
 // grant.
 //
 // This package imports nothing from its parent module; the parent imports it.

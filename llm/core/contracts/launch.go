@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // LaunchOverrides are explicit per-launch overrides. Provider and model are
 // never bare fields on the assignment.

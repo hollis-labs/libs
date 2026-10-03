@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // MCPGrant is the ceiling for MCP server and tool visibility, not the
 // per-launch profile derived from it (that is tool selection's job).

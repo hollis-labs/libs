@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // Limits bounds a run. A nil field means "no limit stated here"; the host's own
 // maximum, which bounds a caller-supplied limit, is not this package's concern.

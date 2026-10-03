@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // Task carries what to do. There is no instructions-append field: task
 // instructions live in Input only, and the definition body is never replaced.

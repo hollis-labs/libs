@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // Trust is how far an assignment or a definition is trusted. The values match
 // the literals Torque already stores.

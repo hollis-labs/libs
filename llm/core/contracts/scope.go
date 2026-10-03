@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // AgentRef names the definition to launch. Exactly one of Name or ID is
 // authoritative: ID for identity:stable agents (resolved through the host's

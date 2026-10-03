@@ -1,4 +1,4 @@
-// Package agentcontracts holds the shared contract types for launching an
+// Package contracts holds the shared contract types for launching an
 // agent: what to launch and under what limits ([Assignment]), how it runs
 // ([RunPolicy]), and the auditable record of what was actually granted
 // ([LaunchRecord]).
@@ -28,4 +28,4 @@
 // configuration (host-side), permission decisions (go-permission), the
 // definition file format (go-agentdef), and the go-materialize manifest that a
 // full persisted launch record embeds (assembled by a higher layer).
-package agentcontracts
+package contracts

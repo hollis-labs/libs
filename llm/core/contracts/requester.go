@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 // Requester says who asked for a launch. It is an opaque courier: this package
 // never interprets, validates or authorizes on its contents, the same stance the

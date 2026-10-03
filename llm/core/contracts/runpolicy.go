@@ -1,4 +1,4 @@
-package agentcontracts
+package contracts
 
 import (
 	"errors"
