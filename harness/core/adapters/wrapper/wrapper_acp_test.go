@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // ---------------------------------------------------------------------

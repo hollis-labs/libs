@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
 )
 
 // Selection is what an app asks for: a runtime, a mode, and the few launch

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider/events"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // A turn is a question or an approval only if it ended on the signal. In headless

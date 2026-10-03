@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider/events"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // feed builds runtimeevents for one session.

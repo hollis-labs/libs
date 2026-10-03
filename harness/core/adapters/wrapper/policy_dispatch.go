@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/policy"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/interception/policy"
 )
 
 // observeToolUsePolicy is called from the wrapper's translator goroutine after

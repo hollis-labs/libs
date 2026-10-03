@@ -72,7 +72,7 @@ The classifier output feeds wrapper policy via
 
 ```go
 import (
-    "github.com/hollis-labs/go-agent-wrapper/classifybridge"
+    "github.com/hollis-labs/substrate/harness/interception/classifybridge"
     "github.com/hollis-labs/substrate/harness/interception/filters/classify"
 )
 

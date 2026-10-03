@@ -6,9 +6,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-providers/provider"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // turnMarks tracks the open turn and the one CancelTurn interrupted, so

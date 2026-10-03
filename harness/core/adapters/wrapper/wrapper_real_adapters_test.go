@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claude"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/codex"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/opencode"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/claude"
+	"github.com/hollis-labs/substrate/harness/adapters/codex"
+	"github.com/hollis-labs/substrate/harness/adapters/opencode"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // ---------------------------------------------------------------------

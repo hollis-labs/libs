@@ -5,9 +5,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/filters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/interception/filters"
 )
 
 // streamWriter is an io.Writer that surfaces a child-process byte

@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-providers/providertest"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/launch"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/launch"
 )
 
 // CW-20261001-0200: the cancel_turn delivery capability an adapter from

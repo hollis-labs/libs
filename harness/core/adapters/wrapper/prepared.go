@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-materialize/materialize"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	sandboxprofile "github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	pevents "github.com/hollis-labs/go-providers/provider/events"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 var (

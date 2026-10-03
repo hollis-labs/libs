@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 )
 
 // InitializeResult is the validated subset of ACP's initialize response that

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // ExampleNewNDJSONBridgeClient builds an ACP client for a hypothetical agent

@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/providertest"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/launch"
-	"github.com/hollis-labs/go-agent-wrapper/turnoutput"
-	"github.com/hollis-labs/go-agent-wrapper/wrapper"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/launch"
+	"github.com/hollis-labs/substrate/harness/adapters/turnoutput"
+	"github.com/hollis-labs/substrate/harness/adapters/wrapper"
 )
 
 // These tests run what real CLIs wrote (go-providers' providertest fixtures,

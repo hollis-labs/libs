@@ -3,9 +3,9 @@ package opencode
 import (
 	"errors"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-providers/provider"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // Adapter is the wrapper adapter for OpenCode's serve-http (HTTP/SSE)

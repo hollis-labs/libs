@@ -3,7 +3,7 @@ package wrapper
 import (
 	"sync"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // typedMarker is the StreamEvent type of a placeholder that holds a typed event's

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func TestAdapter_Name(t *testing.T) {

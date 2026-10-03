@@ -130,10 +130,10 @@ import (
     "context"
     "log"
 
-    "github.com/hollis-labs/go-agent-wrapper/activity"
-    "github.com/hollis-labs/go-agent-wrapper/adapters/claude"
-    "github.com/hollis-labs/go-agent-wrapper/wrapper"
-    runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+    "github.com/hollis-labs/substrate/harness/adapters/activity"
+    "github.com/hollis-labs/substrate/harness/adapters/claude"
+    "github.com/hollis-labs/substrate/harness/adapters/wrapper"
+    runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 func main() {
@@ -443,16 +443,16 @@ the complete symbol mapping.
   runtime, context, broker, prepared execution.
 - `github.com/hollis-labs/go-providers` (v0.40.0) — provider adapters and
   the runtime registry (runtimes, modes, defaults, posture mapping).
-- `github.com/hollis-labs/agent-contracts-leaf` (v0.3.0) — the `runtimes`
+- `github.com/hollis-labs/substrate/llm-core/contracts` (v0.3.0) — the `runtimes`
   id and mode vocabulary.
 - `github.com/hollis-labs/go-runtime-events` (v0.2.1) —
   runtime activity event envelope.
-- `github.com/hollis-labs/go-llm-types` (v0.5.1) — stream events, usage and
+- `github.com/hollis-labs/substrate/llm-core/llmtypes` (v0.5.1) — stream events, usage and
   the stop-reason vocabulary.
-- `github.com/hollis-labs/go-permission` (v0.1.0) — permission posture modes.
+- `github.com/hollis-labs/substrate/harness/interception/permission` (v0.1.0) — permission posture modes.
 - `github.com/hollis-labs/go-materialize` (v0.1.0) — artifact trees and the
   materialization engine behind `plant.SharedPlanter`.
-- `github.com/hollis-labs/go-harness-filters` (v0.1.1) —
+- `github.com/hollis-labs/substrate/harness/interception/filters` (v0.1.1) —
   classify + directive + repair (used via `classifybridge/` and `filters/`).
 - `github.com/hollis-labs/go-sandbox` (v0.5.1) — sandbox policies and profiles.
 - `github.com/hollis-labs/go-runner` (v0.7.0, indirect) — process supervision.

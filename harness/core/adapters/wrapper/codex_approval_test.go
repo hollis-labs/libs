@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/codex"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/codex"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // CW-20260930-0139: the native Codex app-server path answers Codex's

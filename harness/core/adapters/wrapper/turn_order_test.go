@@ -8,16 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claude"
-	"github.com/hollis-labs/go-agent-wrapper/launch"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/claude"
+	"github.com/hollis-labs/substrate/harness/adapters/launch"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // CW-20260930-0137 slice a (root cause of CW-20261001-0019). A native turn

@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	pevents "github.com/hollis-labs/go-providers/provider/events"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
 )
 
 func TestTranslateDelta(t *testing.T) {

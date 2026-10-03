@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
 )
 
 // writeRecordingACPScript writes a fake ACP agent that records every frame it

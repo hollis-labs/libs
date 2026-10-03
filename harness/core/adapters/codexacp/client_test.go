@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 func skipUnlessSh(t *testing.T) {

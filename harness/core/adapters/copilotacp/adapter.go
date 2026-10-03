@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 // ErrPTYUnsupported is returned by [Adapter.Resolve] when the caller

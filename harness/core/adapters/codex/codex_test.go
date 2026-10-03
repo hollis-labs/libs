@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 func TestNameStable(t *testing.T) {

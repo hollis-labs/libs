@@ -4,10 +4,10 @@ import (
 	"errors"
 	"os/exec"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // Adapter is the wrapper adapter for OpenCode's native ACP subprocess

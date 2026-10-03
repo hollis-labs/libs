@@ -3,10 +3,10 @@ package copilotacp
 import (
 	"encoding/json"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
 )
 
 // acpUpdate is the normalized, output-agnostic result of parsing one

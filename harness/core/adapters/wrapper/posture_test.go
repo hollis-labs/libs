@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	permission "github.com/hollis-labs/go-permission"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/providertest"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 
-	"github.com/hollis-labs/go-agent-wrapper/launch"
+	"github.com/hollis-labs/substrate/harness/adapters/launch"
 )
 
 // An explicit PermissionPosture on a native launch reaches the CLI as the

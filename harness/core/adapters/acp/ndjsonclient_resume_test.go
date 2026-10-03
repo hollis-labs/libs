@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // CW-20261001-0223: a launch that asks to resume a session on an agent without

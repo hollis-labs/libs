@@ -3,12 +3,12 @@ package launch
 import (
 	"fmt"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/registry"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
 )
 
 // nativeSpec is how the wrapper drives one native (runtime, mode): the wire

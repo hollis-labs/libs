@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
-	sandboxprofile "github.com/hollis-labs/go-sandbox/sandbox"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/copilotacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/opencodeacp"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/copilotacp"
+	"github.com/hollis-labs/substrate/harness/adapters/opencodeacp"
 )
 
 // CW-20260930-0237: Config.ProtectedPaths write-protects a host's

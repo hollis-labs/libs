@@ -3,7 +3,7 @@ package filters
 import (
 	"context"
 
-	hrepair "github.com/hollis-labs/go-harness-filters/repair"
+	hrepair "github.com/hollis-labs/substrate/harness/interception/filters/repair"
 )
 
 // RepairPipeline adapts go-harness-filters repairers to the wrapper's

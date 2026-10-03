@@ -8,10 +8,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
-	"github.com/hollis-labs/go-providers/layout"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 func TestNoOpPlanter(t *testing.T) {

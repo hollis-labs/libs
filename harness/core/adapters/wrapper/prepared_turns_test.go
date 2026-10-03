@@ -8,16 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/agentkit/agentlaunch/launcher"
-	"github.com/hollis-labs/agentkit/agentlaunch/providerplant"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/providertest"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
 )
 
 // nativeTestAdapter runs a real go-providers CLIAdapter through the wrapper,

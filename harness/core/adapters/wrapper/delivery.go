@@ -1,9 +1,9 @@
 package wrapper
 
 import (
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
 )
 
 // DeliveryCapabilities returns the configured adapter's static delivery/control

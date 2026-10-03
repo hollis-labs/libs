@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 func TestRuntimeCapsMapping(t *testing.T) {

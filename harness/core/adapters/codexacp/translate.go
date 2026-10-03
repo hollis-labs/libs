@@ -3,8 +3,8 @@ package codexacp
 import (
 	"encoding/json"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // handleNotification routes one inbound ACP notification (a JSON-RPC

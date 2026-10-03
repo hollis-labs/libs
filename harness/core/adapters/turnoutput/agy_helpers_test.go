@@ -3,8 +3,8 @@ package turnoutput
 import (
 	"testing"
 
-	gop "github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/providertest"
+	gop "github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 func newAgy() *gop.AntigravityAdapter { return gop.NewAntigravityAdapter() }

@@ -14,11 +14,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/internal/childoutput"
-	"github.com/hollis-labs/go-agent-wrapper/internal/closegate"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/internal/childoutput"
+	"github.com/hollis-labs/substrate/harness/internal/closegate"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // ndjsonProtocolVersion is the integer protocolVersion NDJSONBridgeClient sends

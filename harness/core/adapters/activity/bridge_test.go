@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 func TestBridgeBindsIdentity(t *testing.T) {

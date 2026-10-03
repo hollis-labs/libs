@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
 )
 
 func TestWrapperPlanDeliveryBeforeRunReportsOffline(t *testing.T) {

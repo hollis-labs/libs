@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-agent-wrapper/filters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/interception/filters"
 )
 
 func (w *Wrapper) filterStreamEvent(ctx context.Context, ev llmtypes.StreamEvent) llmtypes.StreamEvent {

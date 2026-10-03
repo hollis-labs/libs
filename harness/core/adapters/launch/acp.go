@@ -1,14 +1,14 @@
 package launch
 
 import (
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claudeacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/codexacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/copilotacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/opencodeacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/piacp"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/claudeacp"
+	"github.com/hollis-labs/substrate/harness/adapters/codexacp"
+	"github.com/hollis-labs/substrate/harness/adapters/copilotacp"
+	"github.com/hollis-labs/substrate/harness/adapters/opencodeacp"
+	"github.com/hollis-labs/substrate/harness/adapters/piacp"
 )
 
 // acpFactories is every ACP (runtime, mode) the wrapper launches. Binary is

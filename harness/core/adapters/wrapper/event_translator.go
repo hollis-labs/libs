@@ -3,9 +3,9 @@ package wrapper
 import (
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	pevents "github.com/hollis-labs/go-providers/provider/events"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // translateStreamEvent converts one [llmtypes.StreamEvent] from the

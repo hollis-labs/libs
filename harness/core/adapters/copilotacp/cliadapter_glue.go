@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // cliAdapterGlue is the [provider.CLIAdapter] [Adapter.CLIAdapter]

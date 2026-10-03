@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // CW-20261001-0129. Manager.Launch's failure path finishes the session from

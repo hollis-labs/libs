@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/provider/events"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 
-	"github.com/hollis-labs/go-agent-wrapper/turnoutput"
+	"github.com/hollis-labs/substrate/harness/adapters/turnoutput"
 )
 
 // These tests are the native path: a host (Tether) taps the real go-providers

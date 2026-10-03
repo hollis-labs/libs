@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
 )
 
 // CW-20261001-0262: Prompt registers its turn with turnWG.Add under c.mu, but

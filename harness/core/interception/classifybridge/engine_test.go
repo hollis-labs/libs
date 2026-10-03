@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-agent-wrapper/policy"
-	"github.com/hollis-labs/go-harness-filters/classify"
+	"github.com/hollis-labs/substrate/harness/interception/filters/classify"
+	"github.com/hollis-labs/substrate/harness/interception/policy"
 )
 
 func TestObserverSatisfiesPolicyObserverInterface(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // Bridge couples the wrapper's per-session emission context to a

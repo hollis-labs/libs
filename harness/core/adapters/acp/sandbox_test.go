@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 )
 
 // A remote or pre-existing endpoint cannot be kept from writing a protected

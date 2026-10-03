@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/go-agent-wrapper/plant"
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/plant"
 )
 
 type scenarioResult struct {

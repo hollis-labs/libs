@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claudeacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/codexacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/opencodeacp"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/piacp"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/claudeacp"
+	"github.com/hollis-labs/substrate/harness/adapters/codexacp"
+	"github.com/hollis-labs/substrate/harness/adapters/opencodeacp"
+	"github.com/hollis-labs/substrate/harness/adapters/piacp"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // CW-20261001-0223: a host that sets Config.SessionIDPreset on an ACP agent

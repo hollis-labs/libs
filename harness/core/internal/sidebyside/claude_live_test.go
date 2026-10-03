@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-agent-wrapper/acp"
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claude"
-	"github.com/hollis-labs/go-agent-wrapper/adapters/claudeacp"
-	"github.com/hollis-labs/go-agent-wrapper/internal/testgate"
-	"github.com/hollis-labs/go-agent-wrapper/wrapper"
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/substrate/harness/adapters/claude"
+	"github.com/hollis-labs/substrate/harness/adapters/claudeacp"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/adapters/wrapper"
+	"github.com/hollis-labs/substrate/harness/internal/testgate"
 )
 
 // ---------------------------------------------------------------------

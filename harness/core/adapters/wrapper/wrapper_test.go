@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/go-agent-wrapper/activity"
-	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
 )
 
 // stubAdapter implements [adapters.Adapter] but NOT

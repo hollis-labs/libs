@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 )
 
 // ClientAdapter is implemented by an ACP-backed wrapper adapter that can
