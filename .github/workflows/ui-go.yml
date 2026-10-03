@@ -1,0 +1,29 @@
+# Checks for the ui-go module only; runs when its files (or the shared module workflow) change.
+name: ui-go
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui-go/**"
+      - ".github/workflows/ui-go.yml"
+      - ".github/workflows/_module.yml"
+  pull_request:
+    paths:
+      - "ui-go/**"
+      - ".github/workflows/ui-go.yml"
+      - ".github/workflows/_module.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-go-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: ui-go
+      race: true

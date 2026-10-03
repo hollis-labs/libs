@@ -1,0 +1,29 @@
+# Checks for the util module only; runs when its files (or the shared module workflow) change.
+name: util
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "util/**"
+      - ".github/workflows/util.yml"
+      - ".github/workflows/_module.yml"
+  pull_request:
+    paths:
+      - "util/**"
+      - ".github/workflows/util.yml"
+      - ".github/workflows/_module.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: util-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: util
+      race: true

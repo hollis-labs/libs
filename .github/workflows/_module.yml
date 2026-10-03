@@ -1,0 +1,61 @@
+# Reusable per-module check, called by one small workflow per module (harness.yml, ...).
+# Each caller carries the path filter, so a change only runs the modules it touches.
+name: module
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        description: Module directory, for example mesh
+        required: true
+        type: string
+      race:
+        description: Also run the tests with the race detector
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ inputs.module }}
+    runs-on: ubuntu-latest
+    env:
+      # Never let a go.work leak in: every module builds on its own.
+      GOWORK: "off"
+    defaults:
+      run:
+        working-directory: ${{ inputs.module }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ inputs.module }}/go.mod
+          # A module with no dependencies has no go.sum; go.mod keeps the cache key valid.
+          cache-dependency-path: |
+            ${{ inputs.module }}/go.mod
+            ${{ inputs.module }}/go.sum
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy is clean
+        run: go mod tidy -diff
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test -count=1 ${{ inputs.race && '-race' || '' }} ./...

@@ -1,0 +1,38 @@
+# Repository-wide guards. No path filter: these protect the layout and the public
+# release, so they run on every push to main and every pull request.
+name: guards
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    name: layout, one-way rule, public hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the public-hygiene scan reads the full history
+
+      - name: layout (no go.work, no replace, one go.mod per module)
+        run: scripts/check-layout
+
+      - name: one-way dependency rule
+        run: scripts/check-one-way
+
+      - name: public hygiene (secrets, hosts, private paths; tree and history)
+        run: scripts/scan-public
+
+      - name: scripts parse (shellcheck, python syntax)
+        run: |
+          shellcheck -x scripts/repo.conf scripts/_common.sh scripts/check scripts/check-layout scripts/check-one-way scripts/release scripts/import-repo
+          python3 -c "import ast; ast.parse(open('scripts/scan-public').read())"

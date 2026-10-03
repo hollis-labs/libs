@@ -1,0 +1,29 @@
+# Checks for the plugin-mcp module only; runs when its files (or the shared module workflow) change.
+name: plugin-mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin-mcp/**"
+      - ".github/workflows/plugin-mcp.yml"
+      - ".github/workflows/_module.yml"
+  pull_request:
+    paths:
+      - "plugin-mcp/**"
+      - ".github/workflows/plugin-mcp.yml"
+      - ".github/workflows/_module.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-mcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: plugin-mcp
+      race: false

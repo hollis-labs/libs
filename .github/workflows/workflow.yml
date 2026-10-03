@@ -1,0 +1,29 @@
+# Checks for the workflow module only; runs when its files (or the shared module workflow) change.
+name: workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workflow/**"
+      - ".github/workflows/workflow.yml"
+      - ".github/workflows/_module.yml"
+  pull_request:
+    paths:
+      - "workflow/**"
+      - ".github/workflows/workflow.yml"
+      - ".github/workflows/_module.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: workflow
+      race: true
