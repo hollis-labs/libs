@@ -16,12 +16,12 @@ common constructor remains source-compatible as `New(store, runner)` and keeps
 the v0.1 polling defaults. See [MIGRATION.md](MIGRATION.md) for the exact store
 contract and downstream migration checklist, and pin `v0.2.0` in `go.mod`.
 
-Documentation: [pkg.go.dev/github.com/hollis-labs/go-scheduler](https://pkg.go.dev/github.com/hollis-labs/go-scheduler).
+Documentation: [pkg.go.dev/github.com/hollis-labs/libs/util/scheduler](https://pkg.go.dev/github.com/hollis-labs/libs/util/scheduler).
 
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-scheduler
+go get github.com/hollis-labs/libs/util/scheduler
 ```
 
 ## Usage
@@ -71,8 +71,8 @@ import (
 
     _ "modernc.org/sqlite"
 
-    scheduler "github.com/hollis-labs/go-scheduler"
-    "github.com/hollis-labs/go-scheduler/sqlstore"
+    scheduler "github.com/hollis-labs/libs/util/scheduler"
+    "github.com/hollis-labs/libs/util/scheduler/sqlstore"
 )
 
 type printRunner struct{}
@@ -143,7 +143,7 @@ given fire and only one can dispatch a given attempt.
 
 **Requirement: SQLite 3.35 or newer.** `sqlstore` uses `UPDATE ... RETURNING`, so any driver bundling an older SQLite (or a non-SQLite database) is unsupported. The tested driver, `modernc.org/sqlite`, comfortably exceeds this minimum; any other driver must be checked against it.
 
-`github.com/hollis-labs/go-scheduler/sqlstore` implements `Store` over a small
+`github.com/hollis-labs/libs/util/scheduler/sqlstore` implements `Store` over a small
 schema of its own (`gosched_schedules`, `gosched_fires`). It is for new
 adopters; applications with existing tables keep them and use `conformance`
 below instead. You open the `*sql.DB` with any SQLite driver, apply the schema
@@ -170,7 +170,7 @@ nanosecond precision.
 
 ## conformance: test any Store
 
-`github.com/hollis-labs/go-scheduler/conformance` is a portable suite for the
+`github.com/hollis-labs/libs/util/scheduler/conformance` is a portable suite for the
 `Store` contract, driven only through the `Store` interface, so it works
 against your own schema and adapter:
 

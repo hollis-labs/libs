@@ -11,9 +11,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
-	"github.com/hollis-labs/go-scheduler/conformance"
-	"github.com/hollis-labs/go-scheduler/sqlstore"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
+	"github.com/hollis-labs/libs/util/scheduler/conformance"
+	"github.com/hollis-labs/libs/util/scheduler/sqlstore"
 )
 
 func openDB(t *testing.T) *sql.DB {

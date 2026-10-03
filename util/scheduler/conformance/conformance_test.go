@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
-	"github.com/hollis-labs/go-scheduler/conformance"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
+	"github.com/hollis-labs/libs/util/scheduler/conformance"
 )
 
 // A correct store must pass the whole suite.

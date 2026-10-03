@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
 )
 
 // memStore is an in-memory scheduler.Store used to prove the suite itself.

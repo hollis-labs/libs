@@ -11,8 +11,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
-	"github.com/hollis-labs/go-scheduler/sqlstore"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
+	"github.com/hollis-labs/libs/util/scheduler/sqlstore"
 )
 
 func exampleStore() (*sqlstore.Store, func()) {

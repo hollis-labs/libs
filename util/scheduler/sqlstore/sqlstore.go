@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
 )
 
 //go:embed schema/*.sql

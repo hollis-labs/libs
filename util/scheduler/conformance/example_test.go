@@ -3,8 +3,8 @@ package conformance_test
 import (
 	"testing"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
-	"github.com/hollis-labs/go-scheduler/conformance"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
+	"github.com/hollis-labs/libs/util/scheduler/conformance"
 )
 
 // Run is called from an ordinary test. The factory must return a fresh store

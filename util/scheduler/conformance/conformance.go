@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	scheduler "github.com/hollis-labs/go-scheduler"
+	scheduler "github.com/hollis-labs/libs/util/scheduler"
 )
 
 // Factory returns a fresh, empty store for one subtest. It is called once per
