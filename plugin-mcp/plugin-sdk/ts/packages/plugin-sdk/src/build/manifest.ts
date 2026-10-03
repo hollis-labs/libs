@@ -12,7 +12,7 @@ const shape: Shape = { fields: {
   server:{fields:{runtime:'string',engines:{map:range},entry:'string'}},
   ui:{fields:{bundle:'string',stylesheet:'string',isolation:'string'},optional:['stylesheet']},
   artifact:{fields:{files:{array:{fields:{path:'string',sha256:'string',executable:'boolean'},optional:['executable']}},tree_sha256:'string'}},
-  hooks:{array:{fields:{name:'string',priority:'integer',once:'boolean',view:'string',mode:'string',timeout:'integer',on_error:'string'},optional:['priority','once','view'],preserve:['priority','once','view']}},
+  hooks:{array:{fields:{name:'string',priority:'integer',once:'boolean',view:'string',schema_digest:'string',mode:'string',timeout:'integer',on_error:'string'},optional:['priority','once','view','schema_digest'],preserve:['priority','once','view','schema_digest']}},
   capabilities:{array:{fields:{name:'string',reason:'string',optional:'boolean',metadata:'raw'},optional:['reason','optional','metadata'],preserve:['metadata']}},
   config:{fields:{fields:{map:field},secrets:{map:secret}},optional:['fields','secrets']},
   tools:{array:{fields:{name:'string',description:'string',input_schema:'raw',effect:'string',annotations},optional:['annotations'],preserve:['annotations']}},
@@ -84,7 +84,7 @@ export function validateManifest(value:unknown): asserts value is BuildManifest 
   demand(validBundlePath(m.server.entry)&&m.server.entry.startsWith('bin/'),'entry must be under bin/');
   demand(m.server.runtime==='binary'||/\.(?:js|mjs|cjs)$(?![\s\S])/u.test(m.server.entry),'entry must be compiled JavaScript');
   if(m.ui){demand(validBundlePath(m.ui.bundle)&&m.ui.bundle.startsWith('ui/')&&/\.(?:js|mjs)$(?![\s\S])/u.test(m.ui.bundle),'invalid ui bundle');demand(!m.ui.stylesheet||(validBundlePath(m.ui.stylesheet)&&m.ui.stylesheet.startsWith('ui/')&&m.ui.stylesheet.endsWith('.css')),'invalid stylesheet');demand(['sandboxed-frame','main-origin'].includes(m.ui.isolation),'invalid isolation preference');}
-  const seenHooks=new Set<string>();for(const h of m.hooks??[]){demand(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$(?![\s\S])/u.test(h.name)&&!seenHooks.has(h.name),'invalid/duplicate hook');seenHooks.add(h.name);demand(['sequential','parallel','bail','waterfall','async','after_commit'].includes(h.mode)&&h.timeout>0&&['open','closed'].includes(h.on_error),'invalid hook options');demand(h.view===undefined||token.test(h.view),'invalid hook view');}
+  const seenHooks=new Set<string>();for(const h of m.hooks??[]){demand(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$(?![\s\S])/u.test(h.name)&&!seenHooks.has(h.name),'invalid/duplicate hook');seenHooks.add(h.name);demand(['sequential','parallel','bail','waterfall','async','after_commit'].includes(h.mode)&&h.timeout>0&&['open','closed'].includes(h.on_error),'invalid hook options');demand(h.view===undefined||token.test(h.view),'invalid hook view');demand(h.schema_digest===undefined||!/^\p{White_Space}*$/u.test(h.schema_digest),'invalid hook schema_digest');}
   const seenCaps=new Set<string>();for(const c of m.capabilities??[]){demand(c.name.trim()&&!seenCaps.has(c.name),'invalid/duplicate capability');seenCaps.add(c.name);}
   for(const [name,f] of Object.entries(m.config?.fields??{})){
     demand(token.test(name)&&!Object.hasOwn(m.config?.secrets??{},name),'invalid/duplicate config field');demand(!f.env||env.test(f.env),'invalid field env');

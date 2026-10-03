@@ -40,6 +40,14 @@ Serve speak protocol 2. Do not use this manifest with that older Serve.
   never chooses a view. The host checks catalog kind/mode, name ownership, remote
   eligibility, schema, timeout cap and grants. SDK validation does not register
   callbacks, select a catalog or import plugin-hooks.
+  Optional `schema_digest` is an opaque nonblank string token: omission is
+  preserved, explicit `null` and blank strings are refused, and a supplied token
+  is preserved exactly without trimming, case folding, parsing or an algorithm
+  requirement. The host compares it byte-for-byte with the catalog's
+  `schema_digest` at plan/compat; a mismatch fails planning. It is a compatibility
+  assertion, not registration identity: identity remains the owner tuple plus
+  registration name (the manifest hook name). The SDK never interprets or
+  compares the digest. Absence makes no schema-digest assertion.
 - `capabilities`: existing `subprocess.CapabilityRequest` values. Names and
   metadata belong to the host; declaration grants nothing.
 - `config.fields`: named ordinary settings with type, label, description,

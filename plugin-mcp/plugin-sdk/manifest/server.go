@@ -26,14 +26,18 @@ type UI struct {
 
 // Hook is a declaration only. Catalog/admission, limits and grants are host-owned.
 // Priority nil means 10; explicit zero remains zero. Timeout is milliseconds.
+// SchemaDigest, when present, is an opaque nonblank compatibility assertion.
+// The host compares it byte-for-byte with its catalog during planning; it is
+// not registration identity and the SDK never interprets or normalizes it.
 type Hook struct {
-	Name     string  `json:"name"`
-	Priority *int    `json:"priority,omitempty"`
-	Once     *bool   `json:"once,omitempty"`
-	View     *string `json:"view,omitempty"`
-	Mode     string  `json:"mode"`
-	Timeout  int     `json:"timeout"`
-	OnError  string  `json:"on_error"`
+	Name         string  `json:"name"`
+	Priority     *int    `json:"priority,omitempty"`
+	Once         *bool   `json:"once,omitempty"`
+	View         *string `json:"view,omitempty"`
+	SchemaDigest *string `json:"schema_digest,omitempty"`
+	Mode         string  `json:"mode"`
+	Timeout      int     `json:"timeout"`
+	OnError      string  `json:"on_error"`
 }
 
 func (h Hook) EffectivePriority() int {
@@ -100,6 +104,9 @@ func (m Manifest) validateV2() error {
 		seen[h.Name] = true
 		if h.View != nil && !keyName.MatchString(*h.View) {
 			return fmt.Errorf("hooks[%d].view must be a nonblank token", i)
+		}
+		if h.SchemaDigest != nil && strings.TrimSpace(*h.SchemaDigest) == "" {
+			return fmt.Errorf("hooks[%d].schema_digest must be a nonblank token", i)
 		}
 		switch h.Mode {
 		case "sequential", "parallel", "bail", "waterfall", "async", "after_commit":
