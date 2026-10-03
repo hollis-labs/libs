@@ -10,11 +10,21 @@
 
 ### Changed
 
+- **Breaking:** Go and TS Serve require one protocol-2 Init with explicit
+  grants, capability contract 1 and a host-issued incarnation. Init objects are
+  closed; typed handshake failures precede plugin initialization. Removed
+  `Granted`/`granted`; discovery uses the shared capability Grant type.
+  Harness options now accept grants and incarnation. Optional reverse/hooks
+  offers are validated but declined until their transports pass conformance.
+- Grant scopes reject unsafe integer-form tokens and nonfinite numbers across
+  Go and TS. Strict JSON rejects lone Unicode surrogates. The current replay
+  corpus uses v2 Init prefixes while historical v1 files remain unchanged.
+
 - **Breaking:** manifest-v2 execution now requires protocol 2, `server`
   (`runtime`, inclusive `engines`, bundled `entry`) and an exact SHA-256 artifact
   inventory. Removed `entrypoint` and its Go type; protocol-1 manifests fail.
   Host/runtime compatibility uses numeric SemVer including prereleases, with no
-  local/0.x bypass. Go/TS Serve remains protocol 1 pending its separate update.
+  local/0.x bypass. Go/TS Serve now requires protocol 2.
   See [manifest layout, digest and enforcement](docs/manifest.md).
 
 

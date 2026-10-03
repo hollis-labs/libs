@@ -364,5 +364,41 @@
     "kind": "runtime",
     "input": "{\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":0}",
     "valid": false
+  },
+  {
+    "name": "scope-unsafe-int",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":9007199254740992},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "scope-negative-unsafe",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":-9007199254740992},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "scope-nonfinite",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":1e999},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "scope-in-range-int",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":9007199254740991},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "scope-fraction",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":1.25},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "scope-exponent",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"n\":1e3},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
   }
 ]

@@ -6,16 +6,16 @@ import (
 	"os"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
+	"github.com/hollis-labs/plugin-sdk/capability"
 )
 
 // ErrNoDataDir is returned by InitParams.ResolvedDataDir when the host
-// did not provide a DataDir. Plugins receiving this from a v0.1.1 host
-// (which doesn't populate DataDir) must decide how to proceed — there
-// is no safe default for persistent data.
+// did not provide a DataDir. Valid protocol-2 Init requires it; direct
+// helper callers may still have an incomplete value.
 var ErrNoDataDir = errors.New("subprocess: InitParams.DataDir not set by host")
 
 // ResolvedDataDir returns the host-provided DataDir, or ErrNoDataDir
-// if the host did not populate it (e.g. an older v0.1.1 host). Plugins
+// if the host did not populate it. Plugins
 // should treat an error here as fatal for any persistence path; there
 // is no safe fallback for data.
 func (p *InitParams) ResolvedDataDir() (string, error) {
@@ -26,7 +26,7 @@ func (p *InitParams) ResolvedDataDir() (string, error) {
 }
 
 // ResolvedCacheDir returns the host-provided CacheDir. If the host did
-// not populate it (e.g. an older v0.1.1 host), it falls back to
+// not populate it, it falls back to
 // os.TempDir(). The returned error is currently always nil; the
 // signature returns error to allow future validation without breaking
 // callers.
@@ -41,51 +41,63 @@ func (p *InitParams) ResolvedCacheDir() (string, error) {
 
 // InitParams is sent by the host during plugin/init.
 type InitParams struct {
-	PluginDir string            `json:"plugin_dir"`
-	DataDir   string            `json:"data_dir"`  // persistent per-plugin data root (absolute path)
-	CacheDir  string            `json:"cache_dir"` // ephemeral per-plugin cache root (absolute path)
-	Config    map[string]string `json:"config"`    // resolved config values
-	LogLevel  string            `json:"log_level"` // host-requested level: "debug" | "info" | "warn" | "error"
-	HostInfo  HostInfo          `json:"host_info"` // host capabilities
-
-	// Granted lists the capability names the host allowed, in the
-	// host's own vocabulary (see CapabilityRequest). It is how a plugin
-	// discovers what it actually received instead of assuming it got
-	// what it asked for.
-	//
-	// The field is optional in both directions: a host that predates
-	// capability declaration omits it, and a plugin that requests
-	// nothing can ignore it. Read it through HasCapability, whose doc
-	// comment explains why an absent entry is not a refusal.
-	Granted []string `json:"granted,omitempty"`
-
-	// Identity is an opaque, host-verified identity/claims value for
-	// the connecting caller, carried through unparsed — plugin-sdk
-	// never inspects, validates, or picks a scheme for it; that stays
-	// entirely on the host side. Empty when the host has no caller
-	// identity to plumb (e.g. a single-tenant stdio deployment). This
-	// is the connection-level identity for the whole subprocess
-	// lifetime; individual requests may carry their own Identity too
-	// (see CommandExecParams, EventHandleParams, MCPCallRequest,
-	// HTTPRequest) since one inprocess-mode subprocess can still be
-	// called on behalf of different verified callers over time. See
-	// IdentityAware in types_sdk.go.
-	Identity json.RawMessage `json:"identity,omitempty"`
+	PluginDir          string                     `json:"plugin_dir"`
+	DataDir            string                     `json:"data_dir"`
+	CacheDir           string                     `json:"cache_dir"`
+	Config             map[string]string          `json:"config"`
+	LogLevel           string                     `json:"log_level"`
+	HostInfo           HostInfo                   `json:"host_info"`
+	CapabilityContract int                        `json:"capability_contract"`
+	Incarnation        capability.RuntimeIdentity `json:"incarnation"`
+	Grants             capability.GrantSet        `json:"grants"`
+	// Identity is an optional opaque verified courier, never incarnation identity
+	// or an implicit initiating caller for subsequent requests.
+	Identity     json.RawMessage `json:"identity,omitempty"`
+	HostServices *HostServices   `json:"host_services,omitempty"`
+	HooksProfile *HooksProfile   `json:"hooks_profile,omitempty"`
 }
 
-// HostInfo describes the host environment to the plugin.
+// HostInfo advertises an exact subprocess protocol version.
 type HostInfo struct {
-	Version  string `json:"version"`  // host application version
-	Protocol int    `json:"protocol"` // protocol version (see ProtocolVersion)
+	Version  string `json:"version"`
+	Protocol int    `json:"protocol"`
 }
 
-// InitResult is returned by the plugin in response to plugin/init.
+// InitResult acknowledges the base contract and any selected optional profiles.
+// Current Serve declines both profiles and never advertises their support.
 type InitResult struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Protocol    int    `json:"protocol"` // protocol version the plugin supports
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Version             string `json:"version"`
+	Description         string `json:"description"`
+	Protocol            int    `json:"protocol"`
+	CapabilityContract  int    `json:"capability_contract"`
+	ReverseRPCVersion   *int   `json:"reverse_rpc_version,omitempty"`
+	HooksProfileVersion *int   `json:"hooks_profile_version,omitempty"`
+}
+
+// HooksProfile reserves the independent hooks offer; hook/handle is not implemented.
+type HooksProfile struct {
+	HooksProfileVersion int `json:"hooks_profile_version"`
+}
+
+// HostServices is an availability offer, never an authorization grant.
+type HostServices struct {
+	ReverseRPCVersion int                        `json:"reverse_rpc_version"`
+	Incarnation       capability.RuntimeIdentity `json:"incarnation"`
+	Methods           []string                   `json:"methods"`
+	Limits            HostServiceLimits          `json:"limits"`
+}
+type HostServiceLimits struct {
+	HostToPluginInflight uint32            `json:"host_to_plugin_inflight"`
+	PluginToHostInflight uint32            `json:"plugin_to_host_inflight"`
+	HostGlobalInflight   uint32            `json:"host_global_inflight"`
+	ControlSlots         uint32            `json:"control_slots"`
+	MaxFrameBytes        uint32            `json:"max_frame_bytes"`
+	MaxQueuedWriteBytes  uint32            `json:"max_queued_write_bytes"`
+	WriteTimeoutMS       uint32            `json:"write_timeout_ms"`
+	MaxDepth             uint32            `json:"max_depth"`
+	MethodTimeoutMS      map[string]uint32 `json:"method_timeout_ms"`
 }
 
 // --- Load registration manifest ---

@@ -1,3 +1,4 @@
+import { initParams } from './fixtures.js';
 // Execute with Node; pass the worker runtime and arguments, e.g.
 // node test/stdio-acceptance.js deno run --allow-env
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ async function run(signalStop) {
   const send=(id,method,params)=>child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');
   const reply=async()=>JSON.parse((await next.next()).value);
   try {
-    send(1,'plugin/init',{config:{token:'fixture-secret'}}); assert.equal((await reply()).result.protocol,1);
+    send(1,'plugin/init',initParams({config:{token:'fixture-secret'}})); assert.equal((await reply()).result.protocol,2);
     send(2,'plugin/load'); assert.equal((await reply()).result.skipped_registrations[0].id,'optional');
     if(signalStop) {
       send(3,'command/execute',{name:'wait-for-abort'}); await waiting; child.kill('SIGTERM');

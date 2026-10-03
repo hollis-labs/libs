@@ -1,0 +1,330 @@
+{
+  "level": "normative",
+  "profile": "full",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "command/execute",
+        "params": {
+          "name": "echo",
+          "args": "hello",
+          "session_id": "s",
+          "identity": {
+            "subject": "caller"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "action": "message",
+          "content": "hello",
+          "envelopes": [
+            {
+              "type": "fixture.echo",
+              "data": {
+                "name": "echo",
+                "identity": {
+                  "subject": "caller"
+                }
+              },
+              "session_id": "s"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "event/handle",
+        "params": {
+          "type": "check",
+          "source": "host",
+          "data": {},
+          "pre_hook": true
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "cancel": true,
+          "reason": "veto"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "event/handle",
+        "params": {
+          "type": "post",
+          "source": "host",
+          "data": {},
+          "pre_hook": false
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {}
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "crud/create",
+        "params": {
+          "resource_type": "notes",
+          "data": {
+            "text": "hello"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "data": {
+            "text": "hello"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "crud/read",
+        "params": {
+          "resource_type": "notes",
+          "id": "a"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "data": {
+            "id": "a",
+            "resource_type": "notes"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "crud/update",
+        "params": {
+          "resource_type": "notes",
+          "id": "a",
+          "data": {
+            "text": "updated"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "data": {
+            "text": "updated"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "crud/delete",
+        "params": {
+          "resource_type": "notes",
+          "id": "a"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "crud/list",
+        "params": {
+          "resource_type": "notes",
+          "filters": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "result": {
+          "items": []
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "mcp/call_tool",
+        "params": {
+          "tool_name": "echo",
+          "arguments": {
+            "x": 1
+          },
+          "identity": {
+            "subject": "caller"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "result": {
+          "content": {
+            "x": 1
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "mcp/call_tool",
+        "params": {
+          "tool_name": "tool-error",
+          "arguments": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "content": {},
+          "is_error": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "http/handle",
+        "params": {
+          "method": "POST",
+          "path": "/echo",
+          "raw_path": "/a%2Fb",
+          "raw_query": "q=a&q=b&empty=",
+          "query": {
+            "q": "b",
+            "empty": ""
+          },
+          "headers": {
+            "x-fixture": "yes"
+          },
+          "body": "AP+A",
+          "identity": {
+            "subject": "caller"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "result": {
+          "status": 201,
+          "headers": {
+            "content-type": "application/octet-stream"
+          },
+          "body": "AP+A"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "plugin/migrate",
+        "params": {
+          "from_version": "1.0",
+          "to_version": "2.0",
+          "data_dir": "/fixture/data"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "result": {}
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}

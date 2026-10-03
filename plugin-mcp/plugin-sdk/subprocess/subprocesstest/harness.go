@@ -38,6 +38,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hollis-labs/plugin-sdk/capability"
 	"github.com/hollis-labs/plugin-sdk/subprocess"
 )
 
@@ -55,14 +56,15 @@ const envJSONRoundtripLegacy = "NANITE_PLUGIN_SDK_JSON_ROUNDTRIP"
 // parameters. Call Init, Load, Unload, and capability-specific helpers
 // (Command, Event, CRUD*) to exercise the plugin under test.
 type Harness struct {
-	t         testing.TB
-	plugin    subprocess.Plugin
-	pluginDir string
-	tempDir   string
-	config    map[string]string
-	hostInfo  subprocess.HostInfo
-	granted   []string
-	roundtrip bool
+	t           testing.TB
+	plugin      subprocess.Plugin
+	pluginDir   string
+	tempDir     string
+	config      map[string]string
+	hostInfo    subprocess.HostInfo
+	grants      capability.GrantSet
+	incarnation capability.RuntimeIdentity
+	roundtrip   bool
 }
 
 // Option configures a Harness during New.
@@ -92,17 +94,12 @@ func WithHostInfo(info subprocess.HostInfo) Option {
 	}
 }
 
-// WithGranted seeds the capability names the mocked host allows, passed
-// to the plugin's Init via InitParams.Granted. The default is none, so
-// a plugin that degrades correctly is tested against an ungranting host
-// unless a test says otherwise.
-//
-// The SDK defines no capability names; these are whatever strings the
-// host under test uses.
-func WithGranted(names []string) Option {
-	return func(h *Harness) {
-		h.granted = names
-	}
+// WithGrants sets the mocked host's grants. They must match WithIncarnation.
+func WithGrants(grants capability.GrantSet) Option { return func(h *Harness) { h.grants = grants } }
+
+// WithIncarnation sets the host-issued owner generation tuple.
+func WithIncarnation(identity capability.RuntimeIdentity) Option {
+	return func(h *Harness) { h.incarnation = identity }
 }
 
 // WithJSONRoundtrip forces every request/response to be marshaled and
@@ -125,11 +122,12 @@ func WithJSONRoundtrip(enabled bool) Option {
 // Otherwise, call Close explicitly.
 func New(t testing.TB, p subprocess.Plugin, opts ...Option) *Harness {
 	h := &Harness{
-		t:         t,
-		plugin:    p,
-		config:    map[string]string{},
-		hostInfo:  subprocess.HostInfo{Version: "test", Protocol: subprocess.ProtocolVersion},
-		roundtrip: envTruthy(os.Getenv(envJSONRoundtrip)) || envTruthy(os.Getenv(envJSONRoundtripLegacy)),
+		t:           t,
+		incarnation: capability.RuntimeIdentity{HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1},
+		plugin:      p,
+		config:      map[string]string{},
+		hostInfo:    subprocess.HostInfo{Version: "test", Protocol: subprocess.ProtocolVersion},
+		roundtrip:   envTruthy(os.Getenv(envJSONRoundtrip)) || envTruthy(os.Getenv(envJSONRoundtripLegacy)),
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -171,19 +169,30 @@ func (h *Harness) DataDir() string { return filepath.Join(h.pluginDir, "data") }
 
 // Init invokes the plugin's Init method with the harness's mocked
 // InitParams (PluginDir + resolved config + default HostInfo + any
-// capabilities seeded by WithGranted).
+// grants seeded by WithGrants).
 func (h *Harness) Init(ctx context.Context) (subprocess.InitResult, error) {
 	params := subprocess.InitParams{
-		PluginDir: h.pluginDir,
-		Config:    h.config,
-		HostInfo:  h.hostInfo,
-		Granted:   h.granted,
+		PluginDir:          h.pluginDir,
+		Config:             h.config,
+		HostInfo:           h.hostInfo,
+		Grants:             h.grants,
+		Incarnation:        h.incarnation,
+		CapabilityContract: capability.ContractVersion,
+		DataDir:            h.DataDir(),
+		CacheDir:           filepath.Join(h.pluginDir, "cache"),
+		LogLevel:           "info",
+	}
+	if err := params.Validate(); err != nil {
+		return subprocess.InitResult{}, err
 	}
 	if err := h.maybeRoundtrip(&params); err != nil {
 		return subprocess.InitResult{}, err
 	}
 	res, err := h.plugin.Init(ctx, params)
 	if err != nil {
+		return res, err
+	}
+	if err := subprocess.ValidateInitResult(params, res); err != nil {
 		return res, err
 	}
 	if err := h.maybeRoundtrip(&res); err != nil {

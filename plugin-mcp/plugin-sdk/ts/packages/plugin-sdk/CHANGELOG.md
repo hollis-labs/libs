@@ -5,6 +5,11 @@
 - Added a separate Node-only `/build` export for manifest-v2 staged artifact
   hashing, canonical writing and verification, with Go/Node shared vectors.
   Worker Serve protocol remains independently versioned.
+- Breaking: protocol-2 strict Init, required grants/capability contract/incarnation,
+  typed handshake failures and initialization before handlers. Harness options
+  use `grants` and `incarnation`. Reverse/hooks offers are validated and declined.
+- Shared Go/TS Grant and Init fixtures, portable scope-number limits, Unicode
+  surrogate rejection and v2 replay corpus; historical v1 observations retained.
 
 ## 0.1.0
 

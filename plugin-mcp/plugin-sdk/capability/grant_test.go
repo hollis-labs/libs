@@ -10,7 +10,7 @@ import (
 )
 
 func validGrant() Grant {
-	return Grant{GrantID: "g-1", Name: "readonly.query", SchemaVersion: 1, Scope: json.RawMessage(`{"limit":9007199254740993,"nested":[null]}`), HostInstance: "epoch-1", OwnerID: "example.plugin", OwnerGeneration: 1, Audience: "host.private-stdio", IssuedAt: "2026-10-03T20:00:00.000000001Z", ExpiresAt: "2026-10-03T20:00:00.000000002Z", PolicyRevision: "policy-1"}
+	return Grant{GrantID: "g-1", Name: "readonly.query", SchemaVersion: 1, Scope: json.RawMessage(`{"limit":9007199254740991,"nested":[null]}`), HostInstance: "epoch-1", OwnerID: "example.plugin", OwnerGeneration: 1, Audience: "host.private-stdio", IssuedAt: "2026-10-03T20:00:00.000000001Z", ExpiresAt: "2026-10-03T20:00:00.000000002Z", PolicyRevision: "policy-1"}
 }
 
 func TestGrantRoundTrip(t *testing.T) {
@@ -26,7 +26,7 @@ func TestGrantRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(g, out) {
 		t.Fatalf("lost fields: %s", b)
 	}
-	if !bytes.Contains(out.Scope, []byte("9007199254740993")) {
+	if !bytes.Contains(out.Scope, []byte("9007199254740991")) {
 		t.Fatal("opaque integer rounded")
 	}
 	r := RuntimeIdentity{g.HostInstance, g.OwnerID, MaxSafeInteger}

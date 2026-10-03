@@ -37,7 +37,7 @@ type transcriptStep struct {
 }
 
 func TestProtocolTranscripts(t *testing.T) {
-	paths, err := filepath.Glob("../docs/protocol/v1/transcripts/*.json")
+	paths, err := filepath.Glob("../docs/protocol/v2/transcripts/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func compareTranscriptResponse(t *testing.T, step int, got json.RawMessage, want
 type transcriptBase struct{}
 
 func (*transcriptBase) Init(_ context.Context, _ InitParams) (InitResult, error) {
-	return InitResult{ID: "fixture", Name: "Fixture", Version: "1.0.0", Description: "conformance", Protocol: 1}, nil
+	return InitResult{ID: "fixture", Name: "Fixture", Version: "1.0.0", Description: "conformance", Protocol: 2, CapabilityContract: 1}, nil
 }
 func (*transcriptBase) Load(context.Context) (LoadResult, error) {
 	return LoadResult{SkippedRegistrations: []SkippedRegistration{{Kind: "command", ID: "optional", Reason: "no config"}}}, nil

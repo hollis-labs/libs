@@ -1,0 +1,56 @@
+{
+  "level": "observed-quirk",
+  "profile": "lifecycle-error",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32603,
+          "message": "missing"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/load"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32600,
+          "message": "successful init required"
+        }
+      },
+      "level": "normative"
+    }
+  ],
+  "preferred": "F4: lifecycle typed not-found and cancellation errors are flattened to -32603. Preferred: preserve the same typed error/cancellation mapping as ordinary handlers and reject load after failed init."
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Protocol-2 capability grant data (additive DTO only)",
-  "description": "This schema does not advertise implemented protocol-2 Serve or profile support. Runtime validators additionally reject duplicate keys, enforce decimal-only integer tokens, valid UTC timestamps with expires_at after issued_at, unique grant IDs, tuple equality and nesting <=128. Scope semantics remain descriptor-owned.",
+  "title": "Protocol-2 capability grant transport data",
+  "description": "Grant structure is shared by protocol-2 Init. Optional profile transports require separate conformance. Runtime validators additionally reject duplicate keys, enforce decimal-only integer tokens, valid UTC timestamps with expires_at after issued_at, unique grant IDs, tuple equality and nesting <=128. Scope semantics remain descriptor-owned. Runtime validators reject unpaired Unicode surrogates; scope integer-form tokens must be within ±9007199254740991 and numeric values must be finite. Descriptor schemas string-encode larger integers.",
   "oneOf": [
     {
       "$ref": "#/$defs/Grant"
@@ -57,7 +57,8 @@
         "scope": {
           "not": {
             "type": "null"
-          }
+          },
+          "description": "Normalized descriptor-owned non-null JSON. Portable numeric tokens: integer-form within ±9007199254740991; all numbers finite. Larger integers must be string-encoded."
         },
         "host_instance": {
           "type": "string",

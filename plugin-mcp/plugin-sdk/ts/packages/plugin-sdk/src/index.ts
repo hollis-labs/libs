@@ -7,3 +7,7 @@ export { PluginError, CancelledError, ErrCancelled, errNotFound, errConflict, er
 export type { Plugin, ServerPlugin, Context, Awaitable, CommandHandler, EventHandler, HealthChecker, CRUDHandler, MCPHandler, HTTPHandler, HTTPRequest, HTTPResponse, Migrator, IdentityAware } from './types.js';
 export { PROTOCOL_VERSION } from './wire.js';
 export type { RPCRequest, RPCResponse, RPCError, InitParams, InitResult, HostInfo, LoadResult, SkippedRegistration, EnvelopeOut, CommandExecParams, CommandExecResult, EventHandleParams, EventHandleResult, CRUDParams, CRUDResult, CRUDListResult, HealthResult, MCPCallRequest, MCPCallResult, MigrateParams, MigrateResult, CapabilityRequest } from './wire.js';
+
+export { InitError, encodeGrant, encodeInitParams, encodeInitResult, decodeGrant, decodeGrantSet, decodeRuntimeIdentity, decodeInitParams, decodeInitResult, validateInitResult } from './init-contract.js';
+export type { InitFailureCode } from './init-contract.js';
+export type { Grant, GrantSet, RuntimeIdentity, HostServices, HostServiceLimits, HooksProfile } from './wire.js';

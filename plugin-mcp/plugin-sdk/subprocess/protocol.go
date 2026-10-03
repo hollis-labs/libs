@@ -96,4 +96,4 @@ const (
 
 // ProtocolVersion is the current wire-protocol version negotiated during
 // the plugin/init handshake. Host and plugin must agree exactly.
-const ProtocolVersion = 1
+const ProtocolVersion = 2

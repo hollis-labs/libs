@@ -23,7 +23,16 @@ type basePlugin struct {
 }
 
 func (p *basePlugin) Init(ctx context.Context, params InitParams) (InitResult, error) {
-	return InitResult{ID: p.id, Name: p.name, Version: p.version, Description: "test", Protocol: ProtocolVersion}, nil
+	if p.id == "" {
+		p.id = "test"
+	}
+	if p.name == "" {
+		p.name = "Test"
+	}
+	if p.version == "" {
+		p.version = "1"
+	}
+	return InitResult{CapabilityContract: 1, ID: p.id, Name: p.name, Version: p.version, Description: "test", Protocol: ProtocolVersion}, nil
 }
 func (p *basePlugin) Load(ctx context.Context) (LoadResult, error) { return LoadResult{}, nil }
 func (p *basePlugin) Unload(ctx context.Context) error             { return nil }
@@ -71,6 +80,10 @@ func (p *crudPlugin) List(ctx context.Context, rt string, f map[string]interface
 // exits cleanly.
 func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 	t.Helper()
+	autoInit := len(reqs) > 0 && reqs[0].Method != MethodInit
+	if autoInit {
+		reqs = append([]RPCRequest{{JSONRPC: "2.0", ID: 8000, Method: MethodInit, Params: validInitParams()}}, reqs...)
+	}
 	in, inW := io.Pipe()
 	var out bytes.Buffer
 	var outMu sync.Mutex
@@ -113,6 +126,12 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 		if err := json.Unmarshal([]byte(l), &r); err != nil {
 			t.Fatalf("bad response line %q: %v", l, err)
 		}
+		if autoInit && r.ID == 8000 {
+			if r.Error != nil {
+				t.Fatalf("setup init: %+v", r.Error)
+			}
+			continue
+		}
 		resps = append(resps, r)
 	}
 	// Responses are produced concurrently — sort by ID so test
@@ -137,7 +156,7 @@ func (w *syncWriter) Write(b []byte) (int, error) {
 func TestServe_InitLoadUnload(t *testing.T) {
 	p := &basePlugin{id: "test", name: "Test", version: "0.0.1"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: InitParams{PluginDir: "/tmp", HostInfo: HostInfo{Version: "test", Protocol: 1}}},
+		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: validInitParams()},
 		{JSONRPC: "2.0", ID: 2, Method: MethodLoad},
 		{JSONRPC: "2.0", ID: 3, Method: MethodUnload},
 	})
@@ -154,7 +173,7 @@ func TestServe_InitLoadUnload(t *testing.T) {
 	if err := json.Unmarshal(resps[0].Result, &init); err != nil {
 		t.Fatalf("init result: %v", err)
 	}
-	if init.ID != "test" || init.Protocol != 1 {
+	if init.ID != "test" || init.Protocol != 2 {
 		t.Errorf("init result = %+v", init)
 	}
 }
@@ -535,12 +554,10 @@ func (p *identityPlugin) httpIdentity() string {
 
 func TestServe_IdentityAwareInit(t *testing.T) {
 	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	params := validInitParams()
+	params.Identity = json.RawMessage(`{"user_id":"u1"}`)
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: InitParams{
-			PluginDir: "/tmp",
-			HostInfo:  HostInfo{Version: "test", Protocol: 1},
-			Identity:  json.RawMessage(`{"user_id":"u1"}`),
-		}},
+		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: params},
 	})
 	if len(resps) != 1 || resps[0].Error != nil {
 		t.Fatalf("resps = %+v", resps)

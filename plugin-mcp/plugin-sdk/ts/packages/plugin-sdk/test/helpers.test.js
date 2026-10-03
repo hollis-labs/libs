@@ -12,7 +12,7 @@ test('config uses resolved host values, Go bool spelling, safe integers and expl
   assert.equal(c.has('empty'),true); assert.equal(c.has('toString'),false); assert.equal(c.string('toString'),'');
   assert.equal(c.required('space'),' '); assert.throws(() => c.required('empty'),/missing or empty/);
   assert.equal(new ConfigReader(null).string('missing'),'');
-  assert.equal(hasCapability({granted:['storage.read']},'storage.read'),true);
+  assert.equal(hasCapability({grants:[{name:'storage.read'}]},'storage.read'),true);
   assert.equal(hasCapability({},'storage.read'),false); assert.throws(() => resolvedDataDir({}),/not set by host/);
 });
 
@@ -43,9 +43,9 @@ test('harness direct mode preserves objects, optional JSON mode clones and rejec
   const seen = [];
   const p = {...fixturePlugin('full'),command(_ctx,r){seen.push(r.identity);return {action:'noop',envelopes:[{type:'x',data:{value:r.identity}}]};}};
   const direct = await createHarness(p,{jsonRoundtrip:false});
-  const wire = await createHarness(p,{jsonRoundtrip:true,granted:['fixture'],config:{key:'value'}});
+  const wire = await createHarness(p,{jsonRoundtrip:true,grants:[],config:{key:'value'}});
   t.after(()=>direct.close()); t.after(()=>wire.close());
-  assert.equal((await wire.init()).protocol,1); assert.equal((await wire.load()).skipped_registrations[0].id,'optional');
+  assert.equal((await wire.init()).protocol,2); assert.equal((await wire.load()).skipped_registrations[0].id,'optional');
   const identity = {subject:'one'};
   await direct.command('echo','s','',identity); assert.equal(seen[0],identity);
   const result = await wire.command('echo','s','',identity);

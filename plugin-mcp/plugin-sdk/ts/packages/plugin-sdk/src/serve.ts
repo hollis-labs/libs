@@ -85,6 +85,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
       try {
         const request = decodeRequest(line);
         const task = dispatcher.dispatch(request).then(async response => { if (response) await write(response); });
+        if(request.method === 'plugin/init') { await task; continue; }
         pending.add(task);
         void task.finally(() => pending.delete(task));
       } catch (error) {

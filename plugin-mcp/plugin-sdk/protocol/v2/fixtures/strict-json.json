@@ -125,5 +125,30 @@
     "name": "nan",
     "input": "NaN",
     "valid": false
+  },
+  {
+    "name": "lone-high-escape",
+    "input": "\"\\ud800\"",
+    "valid": false
+  },
+  {
+    "name": "lone-low-escape",
+    "input": "\"\\udfff\"",
+    "valid": false
+  },
+  {
+    "name": "surrogate-pair",
+    "input": "\"\\ud83d\\ude00\"",
+    "valid": true
+  },
+  {
+    "name": "lone-surrogate-key",
+    "input": "{\"\\ud800\":1}",
+    "valid": false
+  },
+  {
+    "name": "depth-limit",
+    "input": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+    "valid": false
   }
 ]
