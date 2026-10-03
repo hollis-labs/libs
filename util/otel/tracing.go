@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const tracerName = "github.com/hollis-labs/go-otel"
+const tracerName = "github.com/hollis-labs/libs/util/otel"
 
 // StartSpan creates a span using the global tracer provider.
 func StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {

@@ -1,6 +1,6 @@
 # go-otel
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-otel.svg)](https://pkg.go.dev/github.com/hollis-labs/go-otel)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/util/otel.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/util/otel)
 
 `go-otel` is an opinionated OpenTelemetry bootstrap for Go services. It
 wires up an OTLP HTTP trace exporter and (opt-in) OTLP exporters for
@@ -25,7 +25,7 @@ but minor breaks are possible across pre-1.0 minor versions. See
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-otel
+go get github.com/hollis-labs/libs/util/otel
 ```
 
 Requires Go 1.26 or later (see [`go.mod`](./go.mod)).
@@ -39,7 +39,7 @@ import (
     "context"
     "log"
 
-    "github.com/hollis-labs/go-otel"
+    "github.com/hollis-labs/libs/util/otel"
 )
 
 func main() {
@@ -72,7 +72,7 @@ go run ./examples/hello
 
 ## Documentation
 
-API reference: <https://pkg.go.dev/github.com/hollis-labs/go-otel>
+API reference: <https://pkg.go.dev/github.com/hollis-labs/libs/util/otel>
 
 ### Top-level package `hotel`
 

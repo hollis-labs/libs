@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/go-otel/internal"
+	"github.com/hollis-labs/libs/util/otel/internal"
 
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"

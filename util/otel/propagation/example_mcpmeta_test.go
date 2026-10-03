@@ -8,7 +8,7 @@ import (
 	otelpropagation "go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/hollis-labs/go-otel/propagation"
+	"github.com/hollis-labs/libs/util/otel/propagation"
 )
 
 // A client injects the active trace into a tool call's _meta object; the

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-otel/internal"
+	"github.com/hollis-labs/libs/util/otel/internal"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"

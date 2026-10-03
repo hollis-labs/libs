@@ -12,8 +12,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/hollis-labs/go-otel"
-	"github.com/hollis-labs/go-otel/genai"
+	"github.com/hollis-labs/libs/util/otel"
+	"github.com/hollis-labs/libs/util/otel/genai"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	hotel "github.com/hollis-labs/go-otel"
+	hotel "github.com/hollis-labs/libs/util/otel"
 )
 
 func ExampleInitOrWarn() {
