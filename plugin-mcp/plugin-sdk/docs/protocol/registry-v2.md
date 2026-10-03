@@ -11,7 +11,12 @@ Protocol-only, dual-key and unsupported registry-version documents fail by name
 with `ErrRegistryVersion`; no fallback or dual-key emission is allowed. Plugin
 protocol 2 is a separate stdio/grants contract. The response also requires `host_instance` (opaque host epoch),
 `revision` (positive integer, at most 2^53−1), `plugins`, `kinds`, `regions`,
-`contributions`, and `refusals`. Empty maps are `{}` and empty lists are `[]`.
+`contributions`, and `refusals`. Integer wire fields (`registry_version`,
+`revision`, kind `schema_version`, and contribution `schema_version`) require
+integer JSON number literals: decimal or exponent spellings such as `5.0`,
+`5e0`, or `1e2` are invalid even when their numeric value is integral. Opaque
+metadata and declarative JSON continue to allow decimal and exponent numbers.
+Empty maps are `{}` and empty lists are `[]`.
 Duplicate JSON object keys are collisions, including nested keys and case variants
 (using Unicode lowercase for collision comparison). Mis-cased spellings of known
 wire fields are invalid; only their exact documented spellings are accepted.

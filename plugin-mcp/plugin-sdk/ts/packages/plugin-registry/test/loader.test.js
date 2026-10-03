@@ -535,3 +535,18 @@ test("status withdrawal fences and disposes before the same generation is select
   assert.equal(captured.isActive(), false);
   assert.equal(imports, 1);
 });
+
+test("raw decimal revision is refused before normalization and preserves the serving registry", async () => {
+  const diagnostics = [];
+  const r = registry({ onDiagnostic: (e) => diagnostics.push(e) });
+  await r.sync(response());
+  const captured = r.get("panel", "p/main");
+  const raw = JSON.stringify(response(2)).replace(
+    '"revision":2',
+    '"revision":2.0',
+  );
+  assert.equal((await r.sync(raw)).accepted, false);
+  assert.equal(r.get("panel", "p/main"), captured);
+  assert.equal(captured.isActive(), true);
+  assert.equal(diagnostics.at(-1).reason, "ErrInvalidContribution");
+});

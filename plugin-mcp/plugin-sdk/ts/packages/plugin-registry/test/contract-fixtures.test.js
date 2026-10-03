@@ -37,7 +37,9 @@ for (const file of files) {
         parseRegistryResponse(
           fixture.response_raw ?? JSON.stringify(fixture.response),
         ),
-        fixture.response,
+        fixture.response_raw
+          ? JSON.parse(fixture.response_raw)
+          : fixture.response,
       );
     else
       assert.throws(
