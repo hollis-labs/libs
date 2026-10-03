@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/internal/decodekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/internal/decodekit"
 )
 
 // A malformed frame is kept as a raw event. Its bytes are not JSON, but the

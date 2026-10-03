@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
-	"github.com/hollis-labs/go-chatstream/sink/agui"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/agui"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 // outcomeCancel is AG-UI's wire spelling of the cancel outcome.

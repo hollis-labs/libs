@@ -7,9 +7,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
-	"github.com/hollis-labs/go-chatstream/conformance/timing"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance/timing"
 )
 
 const ms = time.Millisecond

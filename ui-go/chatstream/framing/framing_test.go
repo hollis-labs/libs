@@ -9,9 +9,9 @@ import (
 	"testing"
 	"testing/iotest"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/adapter/openaichat"
-	"github.com/hollis-labs/go-chatstream/framing"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/adapter/openaichat"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
 )
 
 func collect(t *testing.T, seq func(func(chatstream.Frame, error) bool)) ([]chatstream.Frame, error) {

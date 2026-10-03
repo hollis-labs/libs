@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink/nanitelegacy"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/nanitelegacy"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 // stopCancelled is the stop_reason Nanite clients see for an aborted run.

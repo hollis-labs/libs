@@ -3,8 +3,8 @@ package codexjson_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-chatstream/adapter/codexjson"
-	"github.com/hollis-labs/go-chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/adapter/codexjson"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
 )
 
 // ExampleNew decodes a recorded stream and prints how the run began and ended:

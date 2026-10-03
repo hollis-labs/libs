@@ -1,8 +1,8 @@
 package anthropic
 
 import (
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/internal/anthropicwire"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/internal/anthropicwire"
 )
 
 // DialectName is the adapter's Name and the Raw.Dialect of its raw events.

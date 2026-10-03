@@ -8,8 +8,8 @@ import (
 	"io"
 	"iter"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	ssekit "github.com/hollis-labs/go-ssekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // DefaultMaxEvent is the largest SSE event SSE accepts: 16 MiB, like Lines. It

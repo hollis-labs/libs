@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
 )
 
 // Shape names how a stream's frames were spread over time.

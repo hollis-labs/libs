@@ -3,9 +3,9 @@ package nanitelegacy_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/go-chatstream/sink"
-	"github.com/hollis-labs/go-chatstream/sink/nanitelegacy"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/nanitelegacy"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 func newEnc() sink.Encoder { return nanitelegacy.New() }

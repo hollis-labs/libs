@@ -6,8 +6,8 @@ import (
 	"iter"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/internal/decodekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/internal/decodekit"
 )
 
 // lineDecoder is a two-frame dialect: "t:<text>" is a text delta, "done"

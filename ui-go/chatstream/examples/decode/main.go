@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/adapter/anthropic"
-	"github.com/hollis-labs/go-chatstream/framing"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/adapter/anthropic"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
 )
 
 // A recorded Anthropic Messages stream that stops before message_stop: the

@@ -11,11 +11,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
-	"github.com/hollis-labs/go-chatstream/conformance/fakeserver"
-	"github.com/hollis-labs/go-chatstream/framing"
-	ssekit "github.com/hollis-labs/go-ssekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance/fakeserver"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 func collect(seq func(func(chatstream.Event, error) bool)) ([]chatstream.Event, error) {

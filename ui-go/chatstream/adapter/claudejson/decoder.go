@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/internal/anthropicwire"
-	"github.com/hollis-labs/go-chatstream/internal/decodekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/internal/anthropicwire"
+	"github.com/hollis-labs/libs/ui-go/chatstream/internal/decodekit"
 )
 
 type decoder struct {

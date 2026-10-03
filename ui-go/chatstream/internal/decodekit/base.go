@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // Base tracks one stream's lifecycle. It is not safe for concurrent use.

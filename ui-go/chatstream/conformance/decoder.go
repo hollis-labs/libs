@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // UpdateEnv is the environment variable that makes CheckDecoder rewrite golden

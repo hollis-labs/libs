@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // usageAcc merges Anthropic's usage objects field by field. message_start

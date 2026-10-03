@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
 )
 
 // Validate reports every broken invariant of a stream. This stream never ends.

@@ -11,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
-	"github.com/hollis-labs/go-chatstream/framing"
-	"github.com/hollis-labs/go-chatstream/hubbind"
-	"github.com/hollis-labs/go-chatstream/sink"
-	"github.com/hollis-labs/go-chatstream/sink/native"
-	ssekit "github.com/hollis-labs/go-ssekit"
-	streamhub "github.com/hollis-labs/go-streamhub"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
+	"github.com/hollis-labs/libs/ui-go/chatstream/hubbind"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/native"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 var t0 = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

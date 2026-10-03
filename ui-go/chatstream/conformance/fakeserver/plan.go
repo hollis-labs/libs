@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/ssetest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/ssetest"
 )
 
 // DefaultStall is how long Stall (and the Stuck scenario) keeps a connection

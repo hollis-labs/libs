@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hollis-labs/go-chatstream/framing"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
 )
 
 // SSE yields one frame per event; the last, unterminated event is discarded as

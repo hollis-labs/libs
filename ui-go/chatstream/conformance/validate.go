@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // Violation is one broken invariant.

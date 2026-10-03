@@ -1,6 +1,6 @@
 package acp
 
-import chatstream "github.com/hollis-labs/go-chatstream"
+import chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 
 // DialectName is the adapter's name and the Raw.Dialect / Ext key of its events.
 const DialectName = "acp"

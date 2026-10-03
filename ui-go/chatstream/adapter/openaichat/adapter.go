@@ -1,6 +1,6 @@
 package openaichat
 
-import chatstream "github.com/hollis-labs/go-chatstream"
+import chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 
 // Dialect is the adapter's name and the dialect on its raw events.
 const Dialect = "openai.chat"

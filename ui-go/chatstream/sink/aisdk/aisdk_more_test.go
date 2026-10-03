@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink/aisdk"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/aisdk"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 func chunks(t *testing.T, name string) []map[string]any {

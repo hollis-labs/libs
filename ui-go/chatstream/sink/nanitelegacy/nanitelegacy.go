@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
 )
 
 // SummaryLimit is Nanite's cap on a tool_result summary, in bytes.

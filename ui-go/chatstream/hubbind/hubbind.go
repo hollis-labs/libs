@@ -9,8 +9,8 @@ import (
 	"iter"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	streamhub "github.com/hollis-labs/go-streamhub"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // Publish publishes ev on stream with its verb as the event name and returns ev

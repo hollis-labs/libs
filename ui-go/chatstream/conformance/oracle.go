@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // CheckReplayEquivalence is the reducer oracle. For every cursor k it reduces

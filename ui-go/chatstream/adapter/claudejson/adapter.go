@@ -1,6 +1,6 @@
 package claudejson
 
-import chatstream "github.com/hollis-labs/go-chatstream"
+import chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 
 // DialectName is the adapter's Name and the Raw.Dialect of its raw events.
 const DialectName = "claude.stream-json"

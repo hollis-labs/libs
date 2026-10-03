@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
 )
 
 // Contract runs the tests every Encoder must pass, against fresh encoders from

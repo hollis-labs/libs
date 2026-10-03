@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-chatstream/adapter/openaichat"
-	"github.com/hollis-labs/go-chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/adapter/openaichat"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
 )
 
 func TestFixtures(t *testing.T) {

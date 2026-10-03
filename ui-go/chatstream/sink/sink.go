@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	ssekit "github.com/hollis-labs/go-ssekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // Writer is where an Encoder writes: bytes plus an explicit flush whose error

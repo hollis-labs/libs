@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
-	"github.com/hollis-labs/go-chatstream/conformance/timing"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance/timing"
 )
 
 // A provider that "streams" but holds the text back and delivers it at once looks

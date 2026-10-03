@@ -1,6 +1,6 @@
 package codexjson
 
-import chatstream "github.com/hollis-labs/go-chatstream"
+import chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 
 // DialectName is the adapter's name.
 const DialectName = "codex.exec-json"

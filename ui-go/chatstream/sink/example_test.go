@@ -3,7 +3,7 @@ package sink_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
 )
 
 // CauseText renders why a stream ended for the error frame an encoder writes.

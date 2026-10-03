@@ -6,8 +6,8 @@ import (
 	"iter"
 	"net/http"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/framing"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/framing"
 )
 
 // StatusError is DecodeOverHTTP's error for a response that is not 200 OK.

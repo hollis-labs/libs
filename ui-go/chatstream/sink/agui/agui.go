@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
 )
 
 // outcomeCancel is AG-UI's spelling of the cancel outcome type.

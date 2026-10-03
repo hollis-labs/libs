@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 )
 
 // OpenAI's prompt_tokens includes cached tokens and its completion_tokens

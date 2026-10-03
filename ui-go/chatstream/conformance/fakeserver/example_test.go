@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance/fakeserver"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance/fakeserver"
 )
 
 // A provider connection that dies mid-stream must not look like a success. The

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
-	"github.com/hollis-labs/go-chatstream/sink/native"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
-	ssekit "github.com/hollis-labs/go-ssekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/native"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 func TestStartAppliesTheEncodersHeadersAndStreams(t *testing.T) {

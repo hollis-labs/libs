@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink/agui"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/agui"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 // ExampleNew encodes a tiny run into the target's wire format. A real caller

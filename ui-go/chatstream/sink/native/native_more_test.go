@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
-	"github.com/hollis-labs/go-chatstream/sink/native"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/native"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 // What native writes decodes straight back into the events that went in, and

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink"
-	ssekit "github.com/hollis-labs/go-ssekit"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // UpdateEnv is the environment variable that, when set, makes CheckGolden rewrite golden files instead of

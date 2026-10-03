@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/sink/openaicompat"
-	"github.com/hollis-labs/go-chatstream/sink/sinktest"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/openaicompat"
+	"github.com/hollis-labs/libs/ui-go/chatstream/sink/sinktest"
 )
 
 func chunks(t *testing.T, evs []chatstream.Event) []map[string]any {

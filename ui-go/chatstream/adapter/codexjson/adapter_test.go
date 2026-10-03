@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/adapter/codexjson"
-	"github.com/hollis-labs/go-chatstream/conformance"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/adapter/codexjson"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
 )
 
 func TestFixtures(t *testing.T) {
