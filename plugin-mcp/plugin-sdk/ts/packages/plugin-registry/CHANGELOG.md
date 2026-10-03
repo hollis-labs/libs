@@ -1,19 +1,29 @@
 # @hollis-labs/plugin-registry
 
-## Unreleased
+## 0.2.0 - 2026-10-03
 
-- Reject decimal/exponent number literals in integer registry wire fields before
-  JSON normalization; preserve floats in opaque metadata and declarative JSON.
-  Shared raw fixtures exercise the same refusal in Go and TypeScript.
-
-- Breaking: replace the original registry shape with owner generations, host
-  epochs, safe revisions, explicit kind/region admission and three contribution
-  representations. No fallback to the previous registry shape.
-- Validate raw JSON duplicates and field casing against the shared Go fixtures;
-  enforce runtime ranges and SHA-256 integrity on the bytes actually imported.
+- Breaking: registry v2 requires `registry_version: 2` in place of `protocol`,
+  owner generations, host epochs, safe revisions, explicit kind/region admission
+  and three contribution representations. Legacy and dual-key documents fail by
+  name; there is no v1 fallback.
+- Require per-entry `status` and carry optional `status_reason`. Only `accepted`
+  entries activate. Inactive entries stay listed without import or mounting;
+  unknown statuses produce diagnostics. Top-level refusals remain authoritative.
 - Revoke before replacement import, dispose in reverse order, quarantine failed
   cleanup and reject stale completions. React components retain generation gates;
   unchanged data retains identity and one disposer.
+- Validate raw JSON duplicates and field casing against shared Go fixtures;
+  enforce runtime ranges and SHA-256 integrity on the exact bytes imported.
+- Require integer number literal spelling in integer wire fields before JSON
+  normalization; decimal/exponent tokens are refused while opaque metadata and
+  declarative JSON continue to allow floats.
+
+### Migration
+
+Hosts upgrading from 0.1.0 must emit registry v2 and implement explicit admission,
+runtime checks and generation disposal; no v1 fallback or shim is provided.
+Pass original JSON text to the loader so raw-key and integer-literal checks run.
+Nanite remains on 0.1.0 until its host adopts registry v2.
 
 ## 0.1.0 — 2026-09-29
 

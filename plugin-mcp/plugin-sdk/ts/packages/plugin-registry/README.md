@@ -4,7 +4,7 @@ The browser registry, loader and optional React adapter for
 `github.com/hollis-labs/plugin-sdk`. The Go and TypeScript views share the
 [registry contract](../../../docs/protocol/registry-v2.md) and conformance fixtures.
 The core has no runtime dependencies. React `^19` is an optional peer behind
-`./react`. This is a breaking replacement for the registry shape in 0.1.0;
+`./react`. Version 0.2.0 is a breaking replacement for the registry shape in 0.1.0;
 there is no compatibility fallback. Documents require `registry_version: 2`;
 legacy `protocol` keys, dual-key documents and unsupported versions fail with
 `ErrRegistryVersion`.
