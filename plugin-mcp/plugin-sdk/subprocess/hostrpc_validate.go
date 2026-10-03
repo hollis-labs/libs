@@ -341,6 +341,9 @@ func init() {
 		"BindingsRenewResult": hostRPCObject(map[string]hostRPCRule{"binding_id": hostRPCRef("Token"), "expires_at": hostRPCRef("Timestamp"), "remaining_budgets": hostRPCRef("RemainingBudgets")}),
 		"MCPTool":             hostRPCObject(map[string]hostRPCRule{"tool_name": hostRPCRef("Token"), "description": hostRPCString(16384, false), "input_schema": hostRPCRef("OpaqueJSON"), "output_schema": hostRPCRef("OpaqueJSON"), "effect": hostRPCEnum("read", "write", "destructive"), "tool_binding": hostRPCRef("Token")}, "description", "output_schema"),
 	}
+	for name, rule := range hostRPCErrorRules() {
+		hostRPCShapes[name] = rule
+	}
 	hostRPCShapes["StorageGetResult"] = hostRPCGetResult(hostRPCShapes["StorageGetResult"])
 	hostRPCShapes["EgressRequestParams"] = hostRPCEgressParams(hostRPCShapes["EgressRequestParams"])
 	hostRPCShapes["MCPCancelCallResult"] = hostRPCCancelResult(hostRPCShapes["MCPCancelCallResult"])

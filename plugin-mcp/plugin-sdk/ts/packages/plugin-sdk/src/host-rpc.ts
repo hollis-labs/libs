@@ -186,7 +186,34 @@ export interface MCPTool {
     effect: "read" | "write" | "destructive";
     tool_binding: string;
 }
+// TypeScript transport view of the capability leaf's existing vocabulary.
+// Keep these exact approved values; no SDK-specific failure classifications.
+export const HOST_RPC_ERROR_CODE = -32010 as const;
+export const HOST_RPC_FAILURE_CODES = ["invalid_request", "unauthenticated", "capability_denied", "scope_denied", "unsupported_capability", "target_unavailable", "budget_exceeded", "rate_limited", "cancelled", "deadline_exceeded", "unknown_outcome", "internal_error", "conflict"] as const;
+export const HOST_RPC_FAILURE_DETAILS = ["stale_binding", "callback_cycle", "depth_exceeded", "parent_invalid", "parent_terminal"] as const;
+export const HOST_RPC_EFFECT_STATES = ["not_started", "not_committed", "committed", "unknown"] as const;
+export interface HostRPCErrorData {
+    contract: 'host-rpc/1';
+    code: typeof HOST_RPC_FAILURE_CODES[number];
+    request_id: ParentCall['id'];
+    effect_state: typeof HOST_RPC_EFFECT_STATES[number];
+    retryable: false;
+    detail?: typeof HOST_RPC_FAILURE_DETAILS[number];
+}
+export interface HostRPCError {
+    code: typeof HOST_RPC_ERROR_CODE;
+    message: string;
+    data: HostRPCErrorData;
+}
+export interface ApplicationErrorResponse {
+    jsonrpc: '2.0';
+    id: ParentCall['id'];
+    error: HostRPCError;
+}
 export interface HostRPCDTOs {
+    HostRPCErrorData: HostRPCErrorData;
+    HostRPCError: HostRPCError;
+    ApplicationErrorResponse: ApplicationErrorResponse;
     "ParentCall": ParentCall;
     "ForwardContext": ForwardContext;
     "ReverseContext": ReverseContext;
@@ -390,6 +417,16 @@ const logFields: Rule = (raw, field) => {
         invalid(field, 'duplicate log field name');
 };
 const shapes: Record<string, Rule> = {
+    HostRPCErrorData: object({
+        contract: enumeration('host-rpc/1'), code: enumeration(...HOST_RPC_FAILURE_CODES),
+        request_id: reference('SafePositiveInteger'), effect_state: enumeration(...HOST_RPC_EFFECT_STATES),
+        retryable: (raw, field) => { if (raw.trim() !== 'false')
+            invalid(field, 'automatic retry prohibited'); },
+        detail: enumeration(...HOST_RPC_FAILURE_DETAILS),
+    }, ['detail']),
+    HostRPCError: object({ code: (raw, field) => { if (raw.trim() !== String(HOST_RPC_ERROR_CODE))
+            invalid(field, 'required application error code'); }, message: boundedString(256, false), data: reference('HostRPCErrorData') }),
+    ApplicationErrorResponse: object({ jsonrpc: enumeration('2.0'), id: reference('SafePositiveInteger'), error: reference('HostRPCError') }),
     Token: boundedString(4096, true), SafePositiveInteger: integer(1, Number.MAX_SAFE_INTEGER), TimeoutMs: integer(1, 4294967295), SchemaVersion: integer(1, 4294967295), OpaqueJSON: opaque, Timestamp: timestamp, Base64: base64, Headers: array(header, 128), LogFields: logFields, MCPContent: array(opaque, 1024),
     "ParentCall": object({ "request_owner": enumeration("host", "plugin"), "id": reference("SafePositiveInteger") }, [], []),
     "ForwardContext": object({ "binding_id": reference("Token"), "timeout_ms": reference("TimeoutMs") }, ["binding_id"], []),
@@ -424,6 +461,16 @@ const shapes: Record<string, Rule> = {
     "MCPTool": object({ "tool_name": reference("Token"), "description": boundedString(16384, false), "input_schema": reference("OpaqueJSON"), "output_schema": reference("OpaqueJSON"), "effect": enumeration("read", "write", "destructive"), "tool_binding": reference("Token") }, ["description", "output_schema"], []),
 };
 function refine(name: string, refinement: Rule): void { const base = shapes[name]!; shapes[name] = (raw, field) => { base(raw, field); refinement(raw, field); }; }
+refine('HostRPCErrorData', (raw, field) => {
+    const v = parseTokens(raw) as HostRPCErrorData;
+    if (v.code === 'unknown_outcome' && v.effect_state !== 'unknown')
+        invalid(field, 'unknown outcome requires unknown effect state');
+});
+refine('ApplicationErrorResponse', (raw, field) => {
+    const v = parseTokens(raw) as ApplicationErrorResponse;
+    if (v.id !== v.error.data.request_id)
+        invalid(field, 'request ID correlation mismatch');
+});
 refine('StorageGetResult', (raw, field) => { const v = parseTokens(raw) as Record<string, unknown>; const value = Object.hasOwn(v, 'value'), revision = Object.hasOwn(v, 'revision'); if (v.found ? (!value || !revision) : (value || revision))
     invalid(field, 'found/value/revision mismatch'); });
 refine('EgressRequestParams', (raw, field) => { const v = parseTokens(raw) as Record<string, unknown>; if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(v.method as string) && !Object.hasOwn(v, 'operation_key'))
@@ -537,3 +584,6 @@ export function decodeMCPCancelCallResult(raw: string): MCPCancelCallResult { re
 export function decodeBindingsRenewParams(raw: string): BindingsRenewParams { return decodeHostRPCDTO("BindingsRenewParams", raw); }
 export function decodeBindingsRenewResult(raw: string): BindingsRenewResult { return decodeHostRPCDTO("BindingsRenewResult", raw); }
 export function decodeMCPTool(raw: string): MCPTool { return decodeHostRPCDTO("MCPTool", raw); }
+export function decodeHostRPCErrorData(raw: string): HostRPCErrorData { return decodeHostRPCDTO('HostRPCErrorData', raw); }
+export function decodeHostRPCError(raw: string): HostRPCError { return decodeHostRPCDTO('HostRPCError', raw); }
+export function decodeApplicationErrorResponse(raw: string): ApplicationErrorResponse { return decodeHostRPCDTO('ApplicationErrorResponse', raw); }
