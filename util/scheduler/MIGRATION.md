@@ -1,3 +1,33 @@
+# Migration: go-scheduler -> libs/util/scheduler
+
+`github.com/hollis-labs/go-scheduler` moved into the libs monorepo as `util/scheduler/`, with its full git history (14 commits, 2026-05-15 to 2026-09-30; source HEAD `c3448558f4de`). The standalone module is no longer where new work happens.
+
+## Import paths
+
+| Old import path | New import path | Package |
+|---|---|---|
+| `github.com/hollis-labs/go-scheduler` | `github.com/hollis-labs/libs/util/scheduler` | `scheduler` |
+| `github.com/hollis-labs/go-scheduler/conformance` | `github.com/hollis-labs/libs/util/scheduler/conformance` | `conformance` |
+| `github.com/hollis-labs/go-scheduler/sqlstore` | `github.com/hollis-labs/libs/util/scheduler/sqlstore` | `sqlstore` |
+
+`go get github.com/hollis-labs/libs/util/scheduler@<version>` replaces `go get github.com/hollis-labs/go-scheduler@<version>`; the new module is `github.com/hollis-labs/libs/util`.
+
+## What changed
+
+- **Module.** The code is now part of the `github.com/hollis-labs/libs/util` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.1.1 v0.2.0 v0.3.0) were not carried over; the first release of the new module will be tagged `util/v0.1.0` (not tagged yet).
+- **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages and the history in `CHANGELOG.md` are left as written.
+- **API.** No symbol was renamed or changed by the move.
+- **Dependency versions.** Everything this lib required is at the same version it had before.
+- **Files not carried to the new location** (git history still has them): `.github`, `go.mod`, `go.sum`.
+
+---
+
+## Earlier migration guide (kept as written)
+
+`go-scheduler` already had its own migration guide before it moved. It is kept exactly as it was, below. It describes moves between releases of the old module, so any import path in it is the old one; use the table above to translate.
+
+---
+
 # Migrating to v0.2.0
 
 `v0.2.0` replaces v0.1's schedule-row rollback loop with durable fire records.
