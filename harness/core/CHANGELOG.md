@@ -10,6 +10,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ### Added
 
+- The packages of six former Hollis Labs modules, moved in with their git history at their final homes: `sandbox/atomicfile` and `sandbox/pathsafe` (from `go-safefs`), `interception/permission` with `pathgrants` and `summary` (from `go-permission`), `workspace/materialize` with `artifact` (from `go-materialize`), `interception/filters/{classify,directive,event,normalize,repair}` (from `go-harness-filters`), `interception/egress` (from `go-egress-proxy`) and `adapters/runtimeevents` (from `go-runtime-events`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/`, with a `MIGRATION.md` listing old and new import paths. The old modules' release tags were not carried over.
+- Requirement: `gopkg.in/yaml.v3` v3.0.1 (from `go-permission`).
 - Stdio process shim library and separate `cairn-shim` executable with a private
   authenticated Unix controller, durable shared event journal, replay, bounded
   immediate input/signals, generation-use pins and launch-time limits.
