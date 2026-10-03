@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Fast local checks for one or more modules: gofmt, go vet, go build, go test.
+#
+# Usage: scripts/check [-race] [module...]
+#
+# With no module, every module in the repository is checked, one after another.
+# Modules are always built with GOWORK=off. CI runs the same steps per module.
+set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
+
+usage() {
+  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+race=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -race) race="-race"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    -*) die "unknown flag: $1 (see --help)" ;;
+    *) break ;;
+  esac
+done
+
+if [ $# -gt 0 ]; then
+  mods="$*"
+else
+  mods="$(modules)"
+fi
+[ -n "$mods" ] || die "no modules found under $REPO_ROOT"
+
+for m in $mods; do
+  [ -f "$REPO_ROOT/$m/go.mod" ] || die "'$m' is not a module here (modules: $(modules | tr '\n' ' '))"
+done
+
+status=0
+for m in $mods; do
+  echo "== $m"
+  (
+    cd "$REPO_ROOT/$m" || exit 1
+    unformatted="$(gofmt -l .)"
+    if [ -n "$unformatted" ]; then
+      echo "gofmt needed:"
+      echo "$unformatted"
+      exit 1
+    fi
+    go vet ./... || exit 1
+    go build ./... || exit 1
+    # shellcheck disable=SC2086 # $race is intentionally unquoted: empty or one flag.
+    go test $race ./... || exit 1
+  ) || status=1
+done
+exit "$status"

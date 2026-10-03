@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Repository layout guard. Exits non-zero when:
+#   - a go.work or go.work.sum is tracked, or sits in the tree and is not ignored;
+#   - a go.mod exists anywhere but <module>/go.mod (none at the root, none nested);
+#   - a module path is not <MODULE_PREFIX>/<directory> (plus /vN for v2 and later);
+#   - a go.mod has no go directive, or contains a replace directive.
+#
+# Why: modules are released independently with module-prefixed tags. A go.work or a
+# replace directive makes a module build here and nowhere else, and a go.mod inside
+# another module silently carves that subtree out of it.
+#
+# Usage: scripts/check-layout
+set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
+
+fail=0
+bad() {
+  echo "FAIL: $*" >&2
+  fail=1
+}
+
+files="$(repo_files)"
+
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  [ -e "$REPO_ROOT/$f" ] || continue
+
+  case "$(basename "$f")" in
+    go.work | go.work.sum)
+      bad "$f: go.work is not allowed; build each module on its own (see README, 'Developing across modules')"
+      ;;
+  esac
+
+  case "$f" in */testdata/*) continue ;; esac
+  case "$f" in
+    go.mod)
+      bad "go.mod at the repository root; modules live one level down as <module>/go.mod"
+      ;;
+    */go.mod)
+      case "${f%/go.mod}" in
+        */*) bad "$f: nested go.mod; a module's go.mod must be <module>/go.mod, never inside another module" ;;
+      esac
+      ;;
+  esac
+done <<EOF
+$files
+EOF
+
+mods="$(modules)"
+[ -n "$mods" ] || bad "no modules found (expected <module>/go.mod)"
+
+count=0
+for m in $mods; do
+  count=$((count + 1))
+  gm="$REPO_ROOT/$m/go.mod"
+  want="$MODULE_PREFIX/$m"
+  path="$(awk '$1 == "module" { print $2; exit }' "$gm")"
+
+  if ! printf '%s\n' "$path" | grep -Eq "^$(re_escape "$want")(/v[2-9][0-9]*)?\$"; then
+    bad "$m/go.mod: module path is '$path'; want '$want' (or '$want/vN' for N >= 2)"
+  fi
+  if ! grep -Eq '^go[[:space:]]+[0-9]+\.[0-9]+' "$gm"; then
+    bad "$m/go.mod: no go directive"
+  fi
+  if grep -Eq '^[[:space:]]*replace([[:space:]]|\()' "$gm"; then
+    bad "$m/go.mod: replace directive; consumers cannot resolve it. For local cross-module work, replace temporarily and never commit it (see README)"
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  exit 1
+fi
+echo "ok: layout ($count modules: $(echo "$mods" | tr '\n' ' ')under $MODULE_PREFIX)"

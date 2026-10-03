@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# One-way dependency rule: this repository must not reference FORBIDDEN_PREFIXES
+# (set in scripts/repo.conf). For libs that is github.com/hollis-labs/substrate:
+# substrate may depend on libs, never the reverse.
+#
+# Checked in every go.mod, go.sum and go.work (any mention) and in every Go file's
+# import declarations. Comments and documentation may still name the other repository.
+#
+# Usage: scripts/check-one-way
+set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
+
+if [ -z "${FORBIDDEN_PREFIXES:-}" ]; then
+  echo "ok: $REPO_NAME forbids no module prefixes; nothing to check"
+  exit 0
+fi
+
+fail=0
+files="$(repo_files)"
+
+for prefix in $FORBIDDEN_PREFIXES; do
+  esc="$(re_escape "$prefix")"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -e "$REPO_ROOT/$f" ] || continue
+    hits=""
+    case "$f" in
+      go.mod | */go.mod | go.sum | */go.sum | go.work | */go.work)
+        hits="$(grep -nE "(^|[[:space:]\"])${esc}([/\"[:space:]]|\$)" "$REPO_ROOT/$f" || true)"
+        ;;
+      *.go)
+        hits="$(grep -nE "^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?\"${esc}(/[^\"]*)?\"" "$REPO_ROOT/$f" || true)"
+        ;;
+    esac
+    if [ -n "$hits" ]; then
+      while IFS= read -r h; do
+        echo "FAIL: $f:$h" >&2
+      done <<EOF
+$hits
+EOF
+      echo "      ^ $REPO_NAME must not depend on $prefix (one-way rule: substrate may depend on libs, never the reverse)" >&2
+      fail=1
+    fi
+  done <<EOF
+$files
+EOF
+done
+
+if [ "$fail" -ne 0 ]; then
+  exit 1
+fi
+echo "ok: no reference to $FORBIDDEN_PREFIXES in go.mod, go.sum, go.work or imports"
