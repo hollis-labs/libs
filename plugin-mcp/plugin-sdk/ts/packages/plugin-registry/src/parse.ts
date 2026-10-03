@@ -16,6 +16,15 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
     throw new RegistryError("ErrInvalidContribution");
   }
   let at = 0;
+  let invalidIntegerLiteral = false;
+  const integerField = (path: string[]): boolean =>
+    (path.length === 1 && ["registry_version", "revision"].includes(path[0])) ||
+    (path.length === 3 &&
+      path[0] === "kinds" &&
+      path[2] === "schema_version") ||
+    (path.length === 4 &&
+      path[0] === "contributions" &&
+      path[3] === "schema_version");
   const whitespace = () => {
     while (/\s/u.test(raw[at] ?? "") && at < raw.length) at++;
   };
@@ -31,7 +40,7 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
     }
     throw new RegistryError("ErrInvalidContribution");
   };
-  const value = (): void => {
+  const value = (path: string[] = []): void => {
     whitespace();
     if (raw[at] === "{") {
       at++;
@@ -43,12 +52,13 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
       }
       while (at < raw.length) {
         whitespace();
-        const key = foldKey(string());
-        if (keys.has(key)) throw new RegistryError("ErrCollision");
-        keys.add(key);
+        const key = string();
+        const folded = foldKey(key);
+        if (keys.has(folded)) throw new RegistryError("ErrCollision");
+        keys.add(folded);
         whitespace();
         at++;
-        value();
+        value([...path, key]);
         whitespace();
         const end = raw[at++];
         if (end === "}") return;
@@ -60,15 +70,24 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
         at++;
         return;
       }
+      let index = 0;
       while (at < raw.length) {
-        value();
+        value([...path, String(index++)]);
         whitespace();
         if (raw[at++] === "]") return;
       }
     } else if (raw[at] === '"') {
       string();
     } else {
+      const start = at;
       while (at < raw.length && !/[\s,}\]]/u.test(raw[at])) at++;
+      const literal = raw.slice(start, at);
+      if (
+        integerField(path) &&
+        /^-?\d/u.test(literal) &&
+        !/^-?(?:0|[1-9]\d*)$/u.test(literal)
+      )
+        invalidIntegerLiteral = true;
     }
   };
   try {
@@ -77,6 +96,13 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
     if (err instanceof RegistryError) throw err;
     throw new RegistryError("ErrInvalidContribution");
   }
+  // Go rejects legacy discriminator keys before decoding numeric wire fields.
+  const legacyKey =
+    parsed !== null &&
+    typeof parsed === "object" &&
+    Object.keys(parsed).some((key) => key.toLowerCase() === "protocol");
+  if (invalidIntegerLiteral && !legacyKey)
+    throw new RegistryError("ErrInvalidContribution");
   const invalid = validateResponse(parsed);
   if (invalid) throw new RegistryError(invalid);
   return parsed as PluginRegistryResponse;

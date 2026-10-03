@@ -194,3 +194,18 @@ test("public planning validates before host callbacks or admission", () => {
       error instanceof RegistryError && error.code === "ErrInvalidContribution",
   );
 });
+
+test("integer spelling checks use decoded wire paths and preserve duplicate precedence", () => {
+  const raw = JSON.stringify(response()).replace(
+    '"revision":1',
+    '"revi\\u0073ion":5e0',
+  );
+  assert.throws(
+    () => parseRegistryResponse(raw),
+    (e) => e instanceof RegistryError && e.code === "ErrInvalidContribution",
+  );
+  assert.throws(
+    () => parseRegistryResponse('{"revision":5.0,"REVISION":6}'),
+    (e) => e instanceof RegistryError && e.code === "ErrCollision",
+  );
+});

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reject decimal/exponent number literals in integer registry wire fields before
+  JSON normalization; preserve floats in opaque metadata and declarative JSON.
+  Shared raw fixtures exercise the same refusal in Go and TypeScript.
+
 - Breaking: replace the original registry shape with owner generations, host
   epochs, safe revisions, explicit kind/region admission and three contribution
   representations. No fallback to the previous registry shape.

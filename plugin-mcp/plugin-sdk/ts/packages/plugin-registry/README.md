@@ -57,7 +57,11 @@ const contribution = registry.get('panel', 'acme/main')
 keys discarded by a prior JSON parser. Original text is required at the wire
 boundary. Validation rejects case-insensitive duplicate keys at every nesting
 level, mis-cased known fields, unsafe revisions, unknown owners and malformed
-representations. Runtime bounds use normalized semantic versions, inclusive
+representations. Integer wire fields (`registry_version`, `revision`, and kind
+or contribution `schema_version`) require integer literal spelling; `5.0`, `5e0`,
+and `1e2` are rejected. Opaque metadata and declarative numbers may use floats.
+Object input cannot recover number spellings normalized by a prior parser.
+Runtime bounds use normalized semantic versions, inclusive
 endpoints and explicit prerelease opt-in.
 
 ## Verified bundles and lifecycle
