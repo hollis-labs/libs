@@ -1,0 +1,353 @@
+package launcher
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/agentkit/agentlaunch/matrix"
+	permission "github.com/hollis-labs/go-permission"
+	"github.com/hollis-labs/go-providers/registry"
+)
+
+// fixedTime is the pinned wall-clock value tests use to make Compile's
+// Provenance.CompiledAt deterministic.
+var fixedTime = time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC)
+
+// validPlanForCompile returns a plan that passes Validate AND is a
+// known legal (provider, runtime) pair in the matrix.
+func validPlanForCompile() agentlaunch.LaunchPlan {
+	return agentlaunch.LaunchPlan{
+		Project: agentlaunch.ProjectSpec{ID: "proj", Name: "Project"},
+		Agent:   agentlaunch.AgentSpec{ID: "agent", Name: "Agent"},
+		Provider: agentlaunch.ProviderSpec{
+			ID: "claude",
+		},
+		Runtime: runtimes.ModePTY,
+		Workspace: agentlaunch.WorkspaceSpec{
+			Mode:         agentlaunch.WorkspaceShared,
+			WorkspaceDir: "/abs/ws",
+		},
+		BootProfile: agentlaunch.BootProfileRef{
+			Inline: &agentlaunch.BootProfileInline{
+				BootPrompt: "persona",
+				BootMode:   agentlaunch.BootModePlanted,
+			},
+		},
+		Mode: agentlaunch.LaunchInteractive,
+	}
+}
+
+// TestCompileHeadlessClaudeNeedsPermission pins the fail-fast reject: a
+// claude launch in a non-interactive mode with no Provider.Permission is
+// refused at compile time rather than compiled into a launch that hangs.
+func TestCompileHeadlessClaudeNeedsPermission(t *testing.T) {
+	// background claude, no permission → rejected up front.
+	p := validPlanForCompile()
+	p.Mode = agentlaunch.LaunchBackground
+	if _, err := Compile(context.Background(), p); !errors.Is(err, ErrHeadlessClaudeNeedsPermission) {
+		t.Fatalf("background claude, empty Permission: err = %v, want ErrHeadlessClaudeNeedsPermission", err)
+	}
+
+	// background claude WITH a permission posture → accepted.
+	p = validPlanForCompile()
+	p.Mode = agentlaunch.LaunchBackground
+	p.Provider.Permission = permission.ModeAcceptEdits
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("background claude with Permission set: Compile = %v, want nil", err)
+	}
+
+	// interactive claude, no permission → accepted (a human answers prompts).
+	p = validPlanForCompile()
+	p.Mode = agentlaunch.LaunchInteractive
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("interactive claude, empty Permission: Compile = %v, want nil", err)
+	}
+
+	// codex is exempt — go-providers defaults an empty approval_policy to
+	// `never`, so a headless codex with no permission does not hang.
+	p = validPlanForCompile()
+	p.Provider.ID = "codex"
+	p.Runtime = runtimes.ModeSubprocessPerTurn
+	p.Mode = agentlaunch.LaunchBackground
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("background codex, empty Permission: Compile = %v, want nil (codex is exempt)", err)
+	}
+}
+
+// Provider.Permission is go-permission's Mode, the same for every provider
+// (D-72); a provider's own spelling is refused at compile time.
+func TestCompileRejectsAProviderPermissionSpelling(t *testing.T) {
+	for _, spelling := range []permission.Mode{"acceptEdits", "bypassPermissions", "on-request", "never", "bypass"} {
+		p := validPlanForCompile()
+		p.Provider.Permission = spelling
+		if _, err := Compile(context.Background(), p); !errors.Is(err, ErrInvalidPermission) {
+			t.Errorf("Permission %q: Compile = %v, want ErrInvalidPermission", spelling, err)
+		}
+	}
+	for _, mode := range []permission.Mode{permission.ModeDefault, permission.ModeAcceptEdits, permission.ModePlan, permission.ModeYolo} {
+		p := validPlanForCompile()
+		p.Provider.Permission = mode
+		if _, err := Compile(context.Background(), p); err != nil {
+			t.Errorf("Permission %q: Compile = %v", mode, err)
+		}
+	}
+}
+
+// TestCompileHappyPathDefaultsClaudePty exercises the most common path:
+// claude/pty with an inline boot profile.
+func TestCompileHappyPathDefaultsClaudePty(t *testing.T) {
+	plan := validPlanForCompile()
+	got, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+		WithSourceCatalog("/abs/catalog.yaml", "v1.2.3"),
+	)
+	if err != nil {
+		t.Fatalf("Compile = %v", err)
+	}
+	if got == nil {
+		t.Fatalf("Compile returned nil compiled")
+	}
+	if got.Plan == nil {
+		t.Fatalf("Compile.Plan is nil")
+	}
+	if got.Provenance.CompiledAt != fixedTime {
+		t.Fatalf("CompiledAt = %v, want %v", got.Provenance.CompiledAt, fixedTime)
+	}
+	if got.Provenance.CompilerVersion != agentlaunch.Version {
+		t.Fatalf("CompilerVersion = %q, want %q", got.Provenance.CompilerVersion, agentlaunch.Version)
+	}
+	if got.Provenance.SourceCatalog != "/abs/catalog.yaml" {
+		t.Fatalf("SourceCatalog = %q", got.Provenance.SourceCatalog)
+	}
+	if got.Provenance.SourceCatalogVersion != "v1.2.3" {
+		t.Fatalf("SourceCatalogVersion = %q", got.Provenance.SourceCatalogVersion)
+	}
+	if got.Provenance.PlanHash == "" {
+		t.Fatalf("PlanHash empty")
+	}
+	if got.ResolvedProviderBinary != "claude" {
+		t.Fatalf("ResolvedProviderBinary = %q, want \"claude\"", got.ResolvedProviderBinary)
+	}
+}
+
+// TestCompileBootDirIntentDefaults pins that the bootdir intent is read
+// from go-providers' layout table: the instructions, boot and MCP rows of the
+// plan's runtime and mode. An ACP-only runtime has no layout and no intent.
+func TestCompileBootDirIntentDefaults(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider string
+		runtime  runtimes.Mode
+		want     agentlaunch.BootDirIntent
+	}{
+		{
+			name:     "claude/pty",
+			provider: "claude",
+			runtime:  runtimes.ModePTY,
+			want:     agentlaunch.BootDirIntent{PerProviderBootFile: "CLAUDE.md", TransientBootFile: "boot.md", MCPDescriptorFile: ".mcp.json"},
+		},
+		{
+			name:     "codex/jsonrpc-stdio",
+			provider: "codex",
+			runtime:  runtimes.ModeJSONRPCStdio,
+			want:     agentlaunch.BootDirIntent{PerProviderBootFile: "AGENTS.md", TransientBootFile: "boot.md", MCPDescriptorFile: ".mcp.json"},
+		},
+		{
+			name:     "opencode/subprocess-per-turn names the agent file",
+			provider: "opencode",
+			runtime:  runtimes.ModeSubprocessPerTurn,
+			want:     agentlaunch.BootDirIntent{PerProviderBootFile: "agents/Agent.md", TransientBootFile: "boot.md", MCPDescriptorFile: ".mcp.json"},
+		},
+		{
+			name:     "antigravity/subprocess-per-turn",
+			provider: "agy",
+			runtime:  runtimes.ModeSubprocessPerTurn,
+			want:     agentlaunch.BootDirIntent{PerProviderBootFile: "AGENTS.md", TransientBootFile: "boot.md", MCPDescriptorFile: ".agents/plugins/tether/mcp_config.json"},
+		},
+		{
+			name:     "copilot/acp-stdio has no layout",
+			provider: "copilot",
+			runtime:  runtimes.ModeACPStdio,
+			want:     agentlaunch.BootDirIntent{},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			plan := validPlanForCompile()
+			plan.Provider.ID = tc.provider
+			plan.Runtime = tc.runtime
+			got, err := Compile(context.Background(), plan,
+				WithNow(func() time.Time { return fixedTime }),
+			)
+			if err != nil {
+				t.Fatalf("Compile = %v", err)
+			}
+			if got.BootDirIntent != tc.want {
+				t.Fatalf("BootDirIntent = %+v, want %+v", got.BootDirIntent, tc.want)
+			}
+		})
+	}
+}
+
+// TestCompileDeterministic confirms that two compiles of an identical
+// plan with identical options return identical PlanHash and identical
+// CompiledAt timestamps.
+func TestCompileDeterministic(t *testing.T) {
+	plan := validPlanForCompile()
+	a, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+		WithSourceCatalog("/abs/c.yaml", "v1"),
+	)
+	if err != nil {
+		t.Fatalf("Compile a = %v", err)
+	}
+	b, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+		WithSourceCatalog("/abs/c.yaml", "v1"),
+	)
+	if err != nil {
+		t.Fatalf("Compile b = %v", err)
+	}
+	if a.Provenance.PlanHash != b.Provenance.PlanHash {
+		t.Fatalf("PlanHash differs: %q vs %q", a.Provenance.PlanHash, b.Provenance.PlanHash)
+	}
+	if !a.Provenance.CompiledAt.Equal(b.Provenance.CompiledAt) {
+		t.Fatalf("CompiledAt differs: %v vs %v", a.Provenance.CompiledAt, b.Provenance.CompiledAt)
+	}
+}
+
+// TestCompileValidationWraps confirms that LaunchPlan.Validate errors
+// surface wrapped (errors.Is matches the sentinel through the wrap).
+func TestCompileValidationWraps(t *testing.T) {
+	plan := validPlanForCompile()
+	plan.Project.ID = "" // triggers ErrMissingProjectID
+
+	_, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+	)
+	if err == nil {
+		t.Fatalf("Compile = nil, want error")
+	}
+	if !errors.Is(err, agentlaunch.ErrMissingProjectID) {
+		t.Fatalf("Compile err = %v, want errors.Is %v", err, agentlaunch.ErrMissingProjectID)
+	}
+}
+
+// TestCompileMatrixErrorWraps confirms that matrix.Lookup failures
+// surface through Compile with the sentinel preserved.
+func TestCompileMatrixErrorWraps(t *testing.T) {
+	plan := validPlanForCompile()
+	plan.Provider.ID = "claude"
+	plan.Runtime = runtimes.ModeJSONRPCStdio // not a legal pair for claude
+
+	_, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+	)
+	if err == nil {
+		t.Fatalf("Compile = nil, want error")
+	}
+	if !errors.Is(err, matrix.ErrUnsupportedCombo) {
+		t.Fatalf("Compile err = %v, want errors.Is matrix.ErrUnsupportedCombo", err)
+	}
+}
+
+// TestCompileDefaultNowFallback exercises the unspecified-Now path —
+// CompiledAt should be roughly the current wall-clock UTC, certainly
+// not the zero value.
+func TestCompileDefaultNowFallback(t *testing.T) {
+	plan := validPlanForCompile()
+	before := time.Now().UTC().Add(-time.Second)
+	got, err := Compile(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("Compile = %v", err)
+	}
+	after := time.Now().UTC().Add(time.Second)
+	if got.Provenance.CompiledAt.IsZero() {
+		t.Fatalf("CompiledAt is zero with default Now")
+	}
+	if got.Provenance.CompiledAt.Before(before) || got.Provenance.CompiledAt.After(after) {
+		t.Fatalf("CompiledAt = %v, expected between %v and %v", got.Provenance.CompiledAt, before, after)
+	}
+}
+
+// TestCompileResolvedProviderBinaryOverride confirms that an explicit
+// Binary on the plan wins over the matrix default.
+func TestCompileResolvedProviderBinaryOverride(t *testing.T) {
+	plan := validPlanForCompile()
+	plan.Provider.Binary = "/abs/custom/claude"
+	got, err := Compile(context.Background(), plan,
+		WithNow(func() time.Time { return fixedTime }),
+	)
+	if err != nil {
+		t.Fatalf("Compile = %v", err)
+	}
+	if got.ResolvedProviderBinary != "/abs/custom/claude" {
+		t.Fatalf("ResolvedProviderBinary = %q, want %q", got.ResolvedProviderBinary, "/abs/custom/claude")
+	}
+}
+
+// Provider.MCPExclusive is the plan's request to be kept to the MCP servers it
+// plants. Compile refuses it for a runtime and mode go-providers declares no
+// mechanism for, naming provider and mode, before any filesystem work; a plan
+// that does not ask compiles as it always did (CW-20261001-0225).
+func TestCompileMCPExclusive(t *testing.T) {
+	for _, pair := range matrix.Supported() {
+		t.Run(pair.String(), func(t *testing.T) {
+			d, ok := registry.Lookup(string(pair.ProviderID))
+			if !ok {
+				t.Fatalf("%s: not in the registry", pair)
+			}
+			p := validPlanForCompile()
+			p.Provider.ID = string(pair.ProviderID)
+			p.Runtime = pair.Runtime
+			if _, err := Compile(context.Background(), p); err != nil {
+				t.Fatalf("not asked: Compile = %v", err)
+			}
+			p.Provider.MCPExclusive = true
+			_, err := Compile(context.Background(), p)
+			if d.MCPExclusivity(pair.Runtime).Exclusive() {
+				if err != nil {
+					t.Errorf("a mode with a mechanism: Compile = %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, agentlaunch.ErrMCPExclusiveUnsupported) {
+				t.Fatalf("a mode with no mechanism: Compile = %v, want ErrMCPExclusiveUnsupported", err)
+			}
+			for _, want := range []string{string(pair.ProviderID), string(pair.Runtime)} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+	// Anchors, so the table above cannot pass by every pair agreeing on nothing.
+	for _, c := range []struct {
+		provider string
+		runtime  runtimes.Mode
+		ok       bool
+	}{
+		{"claude", runtimes.ModePTY, true},
+		{"claude", runtimes.ModeStreamingStdio, true},
+		{"codex", runtimes.ModeSubprocessPerTurn, true},
+		{"opencode", runtimes.ModeSubprocessPerTurn, false},
+		{"antigravity", runtimes.ModeSubprocessPerTurn, false},
+		{"copilot", runtimes.ModeACPStdio, false},
+	} {
+		p := validPlanForCompile()
+		p.Provider.ID = c.provider
+		p.Runtime = c.runtime
+		p.Provider.MCPExclusive = true
+		_, err := Compile(context.Background(), p)
+		if c.ok != (err == nil) {
+			t.Errorf("%s/%s: Compile = %v, want ok=%v", c.provider, c.runtime, err, c.ok)
+		}
+	}
+}

@@ -1,0 +1,920 @@
+//go:build !windows
+
+package agentsessions
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/go-providers/provider"
+	pevents "github.com/hollis-labs/go-providers/provider/events"
+)
+
+// streamingStdioRuntime is the agentsessions.Runtime backed by a long-lived
+// non-PTY CLI subprocess speaking NDJSON over stdin/stdout. Selected by
+// NewFromAdapter when AdapterRuntimeConfig.Caps.StreamingStdio is true.
+//
+// Target consumer: Claude mode-5 (`claude -p --input-format stream-json
+// --output-format stream-json --verbose`). The child stays alive across
+// turns; SendInput frames one JSON object per call (the runtime appends '\n'
+// if absent) and writes to stdin under a write lock. The reader goroutine
+// scans stdout line by line and dispatches each line through the same
+// EventFanout + TypedEventCallback surfaces ptySession uses.
+//
+// Lifecycle (supervisor, idle-kill, restart-on-crash, watchdog, exit-cause
+// classification, restart-preserves-session-id) is identical to ptySession
+// — only the I/O loop changes.
+type streamingStdioRuntime struct {
+	cfg AdapterRuntimeConfig
+}
+
+func (r *streamingStdioRuntime) ID() string         { return r.cfg.ID }
+func (r *streamingStdioRuntime) Kind() string       { return r.cfg.Kind }
+func (r *streamingStdioRuntime) Caps() Capabilities { return r.cfg.Caps }
+
+func (r *streamingStdioRuntime) Prepare(_ context.Context) error {
+	if !r.cfg.Caps.BinaryRequired {
+		return nil
+	}
+	if _, ok := r.cfg.Adapter.Detect(); !ok {
+		return fmt.Errorf("agentsessions: adapter %q binary not found", r.cfg.Adapter.Name())
+	}
+	return nil
+}
+
+func (r *streamingStdioRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
+	var err error
+	opts, err = normalizeStartOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	if opts.Workdir == "" {
+		return nil, errors.New("agentsessions: StartOptions.Workdir is required for streaming-stdio runtime")
+	}
+
+	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	if err != nil {
+		return nil, err
+	}
+	opts = planted
+
+	logPath, err := resolveStreamingStdioLogPath(opts)
+	if err != nil {
+		cleanupBootDir(bootDir)
+		return nil, err
+	}
+	logF, err := openSessionLog(logPath)
+	if err != nil {
+		cleanupBootDir(bootDir)
+		return nil, fmt.Errorf("agentsessions: open log: %w", err)
+	}
+
+	s := &streamingStdioSession{
+		runtime:       r,
+		adapter:       sessionAdapter,
+		bootDir:       bootDir,
+		opts:          opts,
+		logFile:       logF,
+		done:          make(chan error, 1),
+		copyDone:      make(chan struct{}),
+		stopRequested: make(chan struct{}),
+	}
+	s.alive.Store(true)
+	s.state.Store(int32(LiveStateIdle))
+	// Pre-seed lastSessionID from preset so ProviderSessionID() returns
+	// the resume id immediately after Start (before any agent-side
+	// session/init event lands). Mirrors adapterSession's behavior.
+	// Compliance harness CapsProviderSessionID/PresetCarriedBeforeTurn
+	// pins this invariant.
+	s.lastSessionID.Store(opts.SessionIDPreset)
+
+	cmd, stdin, stdout, attemptCleanup, err := s.spawnAttempt(0)
+	if err != nil {
+		_ = logF.Close()
+		cleanupBootDir(bootDir)
+		return nil, err
+	}
+
+	if opts.Supervisor == nil {
+		s.legacyCleanup = attemptCleanup
+		s.spawnReaderLegacy(stdout)
+		s.spawnWaiterLegacy(cmd, stdin, stdout)
+	} else {
+		go s.runSupervised(ctx, cmd, stdin, stdout, attemptCleanup)
+	}
+
+	if opts.AutoFireFirstTurn && len(opts.FirstTurnPayload) > 0 {
+		// Skip when the boot-prompt-on-stdin convention already wrote a
+		// kickoff during spawnAttempt(0).
+		if opts.BootMode != "stdin" || opts.BootPrompt == "" {
+			if err := s.SendInput(ctx, opts.FirstTurnPayload); err != nil {
+				_ = s.Stop(ctx)
+				return nil, fmt.Errorf("agentsessions: auto-fire first turn: %w", err)
+			}
+		}
+	}
+
+	return s, nil
+}
+
+// resolveStreamingStdioLogPath picks the log destination per the two-dir
+// convention: LogPath if set, otherwise <WorkspaceDir>/logs/session.log. One
+// must be set — the runtime does not silently discard its log stream.
+func resolveStreamingStdioLogPath(opts StartOptions) (string, error) {
+	if opts.LogPath != "" {
+		return opts.LogPath, nil
+	}
+	if opts.WorkspaceDir == "" {
+		return "", errors.New("agentsessions: streaming-stdio runtime requires StartOptions.LogPath or StartOptions.WorkspaceDir")
+	}
+	logPath := filepath.Join(opts.WorkspaceDir, "logs", "session.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return "", fmt.Errorf("agentsessions: ensure log dir: %w", err)
+	}
+	return logPath, nil
+}
+
+// streamingStdioSession is the long-lived stdio-backed Session implementation.
+type streamingStdioSession struct {
+	runtime *streamingStdioRuntime
+	// adapter is the per-session CLIAdapter — usually a pointer alias to
+	// runtime.cfg.Adapter, but a per-session clone when AutoPlantBootDir
+	// fired bare-mode injection. Always non-nil after Start.
+	adapter provider.CLIAdapter
+	// bootDir is the absolute path of the AutoPlantBootDir-planted tempdir,
+	// or "" when no plant happened. Cleaned up exactly once at terminal
+	// state via cleanupBootDir.
+	bootDir string
+	opts    StartOptions
+
+	// cmd / stdin / stdout point at the CURRENT attempt's process + pipes.
+	// On the supervised path they are replaced each restart. SendInput
+	// takes ioLock and consults stdin directly.
+	cmd     *exec.Cmd
+	stdin   io.WriteCloser
+	stdout  io.ReadCloser
+	logFile *os.File
+	// stderrCap is the stderr capture of the current attempt, replaced
+	// with cmd under ioLock. It is nil unless the attempt resumes a
+	// provider session of an adapter that can classify a lost one.
+	stderrCap *stderrCapture
+
+	legacyCleanup func()
+
+	// ioLock serializes SendInput against itself (so concurrent payloads
+	// don't interleave bytes on stdin) and against the wait goroutine's
+	// nil-clear + Close pair. The reader goroutine captures stdout at
+	// spawn and does not take this lock.
+	ioLock stdioLock
+
+	state atomic.Int32 // LiveState
+	alive atomic.Bool
+	// readerFault is set when the stdout reader failed; the session is
+	// then no longer usable.
+	readerFault readerFault
+	// interrupts pairs InterruptTurn requests with the CLI's answers.
+	interrupts interrupts
+	startedPID atomic.Int32
+	lastPID    atomic.Int32
+	// spawnedAt is the most-recent successful cmd.Start time as unix
+	// nanoseconds. Set inside spawnAttempt after cmd.Start; read by the
+	// waiter paths to compute elapsed-since-spawn for the abnormal-wait
+	// diagnostic. Zero before the first attempt.
+	spawnedAt atomic.Int64
+
+	sandboxOutcome atomic.Value // SandboxOutcome
+
+	lastSessionID atomic.Value // string
+	// lost is set when a resume attempt exited because the provider no
+	// longer has the session (CW-20261001-0222). The session then accepts
+	// no input and is not restarted: a restart would resume the same id
+	// and fail the same way.
+	lost atomic.Pointer[SessionLostError]
+
+	activity activityTracker
+
+	done     chan error
+	waitOnce sync.Once
+	waitCode atomic.Int32
+	waitErr  atomic.Value // error
+
+	copyDone chan struct{}
+
+	stopOnce      sync.Once
+	stopRequested chan struct{}
+}
+
+// spawnAttempt creates a fresh non-PTY child for attempt N (0-indexed). On
+// success, sets s.cmd / s.stdin / s.stdout (under ioLock), updates pid
+// counters, and writes the boot prompt on attempt 0 when BootMode=stdin.
+// Returns the cmd + pipes (so callers can capture them) and a cleanup func
+// to invoke after cmd.Wait completes.
+func (s *streamingStdioSession) SandboxOutcome() (SandboxOutcome, bool) {
+	out, ok := s.sandboxOutcome.Load().(SandboxOutcome)
+	return out, ok
+}
+
+func (s *streamingStdioSession) reportSandboxOutcome(out SandboxOutcome) {
+	s.sandboxOutcome.Store(out)
+	if s.opts.SandboxOutcomeCallback != nil {
+		s.opts.SandboxOutcomeCallback(out)
+	}
+}
+
+func (s *streamingStdioSession) spawnAttempt(attempt int) (*exec.Cmd, io.WriteCloser, io.ReadCloser, func(), error) {
+	binary, ok := s.adapter.Detect()
+	if !ok {
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: adapter %q binary not found", s.adapter.Name())
+	}
+
+	systemPrompt := s.opts.BootPrompt
+	if s.opts.BootMode == "stdin" {
+		systemPrompt = ""
+	}
+
+	sessionIDPreset := s.opts.SessionIDPreset
+	if attempt > 0 && s.runtime.cfg.Caps.ProviderSessionID {
+		if sid, _ := s.lastSessionID.Load().(string); sid != "" {
+			sessionIDPreset = sid
+		}
+	}
+	args, err := spawnArgs(s.adapter, s.opts, "", systemPrompt, sessionIDPreset)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	cmd := exec.Command(binary, args...) //nolint:gosec // G204: adapter-sourced binary + args
+	configureCommandProcessGroup(cmd)
+	cmd.Dir = s.opts.Workdir
+	if s.opts.Env != nil {
+		cmd.Env = s.opts.Env
+	}
+	if len(s.opts.ExtraFiles) > 0 {
+		cmd.ExtraFiles = s.opts.ExtraFiles
+	}
+	// Route stderr: caller-supplied writer wins; otherwise tee into the
+	// log file so diagnostics aren't lost. Keep stderr separate from
+	// stdout so NDJSON parsing isn't confused by interleaved diagnostics.
+	if s.opts.Stderr != nil {
+		cmd.Stderr = s.opts.Stderr
+	} else {
+		cmd.Stderr = s.logFile
+	}
+
+	sandboxOutcome, sandboxCleanup, err := prepareSandboxForCommand(cmd, s.opts)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	limitCleanup, err := applyResourceLimits(cmd, s.opts.ResourceLimits)
+	if err != nil {
+		sandboxCleanup()
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: apply resource limits: %w", err)
+	}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		limitCleanup()
+		sandboxCleanup()
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: stdin pipe: %w", err)
+	}
+	// Own stdout ourselves: exec.Cmd.Wait closes StdoutPipe immediately on
+	// exit, racing the reader and discarding buffered final events.
+	stdout, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		_ = stdin.Close()
+		limitCleanup()
+		sandboxCleanup()
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: stdout pipe: %w", err)
+	}
+	cmd.Stdout = stdoutWriter
+
+	// An attempt that resumes a provider session gets its stderr through a
+	// pipe of ours, so its tail can be classified when it exits. The caller
+	// still receives every byte.
+	stderrCap, stderrWriter, err := newStderrCapture(s.adapter, cmd.Stderr, sessionIDPreset)
+	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stdoutWriter.Close()
+		limitCleanup()
+		sandboxCleanup()
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: stderr pipe: %w", err)
+	}
+	if stderrCap != nil {
+		cmd.Stderr = stderrWriter
+	}
+
+	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stdoutWriter.Close()
+		if stderrCap != nil {
+			stderrCap.abort(stderrWriter)
+		}
+		limitCleanup()
+		sandboxCleanup()
+		return nil, nil, nil, nil, fmt.Errorf("agentsessions: start: %w", err)
+	}
+	_ = stdoutWriter.Close() // only the child retains the write end
+	if stderrCap != nil {
+		stderrCap.start(stderrWriter)
+	}
+
+	s.reportSandboxOutcome(sandboxOutcome)
+
+	s.ioLock.Lock()
+	s.cmd = cmd
+	s.stdin = stdin
+	s.stdout = stdout
+	s.stderrCap = stderrCap
+	s.ioLock.Unlock()
+
+	if cmd.Process != nil {
+		if attempt == 0 {
+			s.startedPID.Store(int32(cmd.Process.Pid))
+		}
+		s.lastPID.Store(int32(cmd.Process.Pid))
+	}
+	s.spawnedAt.Store(time.Now().UnixNano())
+
+	if attempt == 0 && s.opts.BootMode == "stdin" && s.opts.BootPrompt != "" {
+		// Caller frames the boot prompt — we append nothing here. SendInput
+		// is the framing path; the boot-prompt write goes verbatim.
+		if _, werr := io.WriteString(stdin, s.opts.BootPrompt); werr != nil {
+			_ = signalProcessGroup(cmd, syscall.SIGKILL)
+			_ = cmd.Wait()
+			_ = stdin.Close()
+			_ = stdout.Close()
+			stderrCap.drain()
+			limitCleanup()
+			if sandboxCleanup != nil {
+				sandboxCleanup()
+			}
+			return nil, nil, nil, nil, fmt.Errorf("agentsessions: write boot prompt: %w", werr)
+		}
+		s.tickActivity()
+	}
+
+	cleanup := func() {
+		limitCleanup()
+		if sandboxCleanup != nil {
+			sandboxCleanup()
+		}
+	}
+	return cmd, stdin, stdout, cleanup, nil
+}
+
+func (s *streamingStdioSession) spawnReaderLegacy(stdout io.Reader) {
+	capture := s.currentStderrCapture() // this attempt's
+	go func() {
+		defer close(s.copyDone)
+		s.runReaderLoop(stdout, capture)
+	}()
+}
+
+// runReaderLoop reads stdout line by line, tees to logFile + Fanout, fans
+// out parsed events, ticks activity. Shared between legacy and supervised
+// paths. Returns at EOF (typically because the child exited and the pipe
+// closed). A line too long to route is skipped and noted, never left in the
+// pipe; a read failure marks the session unusable and keeps draining.
+func (s *streamingStdioSession) runReaderLoop(stdout io.Reader, capture *stderrCapture) {
+	var sink io.Writer = s.logFile
+	if s.opts.Fanout != nil {
+		sink = io.MultiWriter(s.logFile, s.opts.Fanout)
+	}
+
+	_, hasParser := s.adapter.(provider.EventParser)
+	interrupter, canInterrupt := s.adapter.(provider.TurnInterrupter)
+
+	err := readLines(stdout, func(raw []byte) {
+		s.tickActivity()
+		if canInterrupt {
+			s.interrupts.observe(interrupter, raw)
+		}
+		line := make([]byte, len(raw)+1)
+		copy(line, raw)
+		line[len(raw)] = '\n'
+		_, _ = sink.Write(line)
+
+		if evs, perr := s.adapter.ParseLine(raw); perr == nil {
+			for _, ev := range evs {
+				if ev.Type == llmtypes.EventSessionID && ev.SessionID != "" {
+					s.lastSessionID.Store(ev.SessionID)
+					capture.noteProgress()
+					if s.opts.OnSessionID != nil {
+						s.opts.OnSessionID(ev.SessionID)
+					}
+				}
+				if ev.Type == llmtypes.EventDone {
+					capture.noteProgress()
+				}
+				tryEventFanout(s.opts.EventFanout, ev)
+			}
+		}
+
+		if s.opts.TypedEventCallback != nil {
+			var typed []pevents.Event
+			if hasParser {
+				if t, perr := s.adapter.(provider.EventParser).ParseLineEvents(raw); perr == nil {
+					typed = t
+				}
+			}
+			for _, te := range typed {
+				s.opts.TypedEventCallback(te)
+			}
+		}
+	}, func(n int) { noteOversizeLine(s.logFile, "streaming-stdio", s.runtime.cfg.ID, n) })
+	if readerFailed(err) {
+		failReader(&s.readerFault, "streaming-stdio", s.runtime.cfg.ID, err, stdout)
+	}
+	// No answer can arrive on this output any more.
+	s.interrupts.failAll(ErrInterruptUnanswered)
+}
+
+// childOutputDrainTimeout bounds how long a waiter keeps reading a child's
+// output after the child has exited.
+const childOutputDrainTimeout = time.Second
+
+// drainChildOutput preserves buffered output after child exit, while
+// bounding a descendant that inherited the output and keeps it open. It
+// waits for the reader to reach EOF, then closes out. An ordinary child
+// closes its end on exit, so draining finishes at EOF without waiting for
+// the timeout; past the timeout out is closed, which unblocks the reader.
+//
+// Every long-lived runtime reads its child's output from a file it owns (an
+// os.Pipe read end, or the PTY master) rather than from exec.Cmd's
+// StdoutPipe, because Cmd.Wait closes StdoutPipe as soon as the child exits,
+// racing the reader and discarding the child's final lines.
+func drainChildOutput(out io.Closer, readerDone <-chan struct{}) {
+	timer := time.AfterFunc(childOutputDrainTimeout, func() { _ = out.Close() })
+	<-readerDone
+	timer.Stop()
+	_ = out.Close()
+}
+
+// spawnWaiterLegacy waits for the child, drains stdout, records terminal
+// state, then signals s.done.
+func (s *streamingStdioSession) spawnWaiterLegacy(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCloser) {
+	stderrCap := s.currentStderrCapture()
+	go func() {
+		err := cmd.Wait()
+
+		pid := 0
+		if cmd.Process != nil {
+			pid = cmd.Process.Pid
+		}
+		elapsed := time.Duration(0)
+		if t0 := s.spawnedAt.Load(); t0 > 0 {
+			elapsed = time.Since(time.Unix(0, t0))
+		}
+		logAbnormalWait("streaming-stdio", s.runtime.cfg.ID, pid, elapsed, err)
+
+		s.ioLock.Lock()
+		s.stdin = nil
+		s.stdout = nil
+		s.ioLock.Unlock()
+
+		_ = stdin.Close()
+		// The tail is complete once stderr is drained. The loss is decided
+		// before stdout is drained, which waits for the reader and so for
+		// any callback it is running; a SendInput from such a callback must
+		// find it. It is announced after the provider's own final output.
+		// Both precede the log close (the capture writes to the log) and the
+		// not-alive state (a SendInput that sees it must also see the loss).
+		stderrCap.drain()
+		lost := s.classifyExit(stderrCap, err, s.attemptEnded(context.Background(), ""))
+		drainChildOutput(stdout, s.copyDone)
+		s.announceLost(lost)
+		_ = s.logFile.Close()
+		s.alive.Store(false)
+		s.state.Store(int32(LiveStateStopped))
+
+		// Build a structured *ExitError the same way the supervised path
+		// does (buildExitError, supervision.go), so an unsupervised
+		// session's abnormal exit — a non-zero exit code, OR a signal
+		// death such as an external SIGKILL — is always surfaced through
+		// Wait() as a real, typed *agentsessions.ExitError, not silently
+		// downgraded to a nil error. Prior to this fix, cmd.Wait()'s
+		// *exec.ExitError case only stored the numeric code and never
+		// set waitErr, so Wait() returned (code, nil) for the
+		// overwhelming majority of abnormal exits (any signal death
+		// included) — indistinguishable from a clean exit to callers
+		// like internal/recovery/broker that classify via
+		// errors.As(err, &xe). Cause is left empty: no Supervisor is
+		// attached on this path to have driven the exit, matching the
+		// same "ordinary, non-supervisor-driven exit" convention
+		// documented on ExitError.Cause and already used by the
+		// supervised path's own restartEligible/CauseRestartExhausted
+		// handling.
+		exitErr := buildExitError(cmd.ProcessState, err, "")
+
+		s.waitOnce.Do(func() {
+			if exitErr == nil {
+				s.waitCode.Store(0)
+				s.done <- nil
+			} else {
+				s.waitCode.Store(int32(exitErr.Code))
+				s.waitErr.Store(exitErr)
+				s.done <- exitErr
+			}
+			close(s.done)
+		})
+		if s.legacyCleanup != nil {
+			s.legacyCleanup()
+		}
+		cleanupBootDir(s.bootDir)
+	}()
+}
+
+// runSupervised owns the supervised lifecycle. Mirrors ptySession.runSupervised
+// — only the per-attempt I/O setup (waitOnceSupervised) differs.
+func (s *streamingStdioSession) runSupervised(ctx context.Context, firstCmd *exec.Cmd, firstStdin io.WriteCloser, firstStdout io.ReadCloser, firstCleanup func()) {
+	sup := s.opts.Supervisor
+	maxRestarts := sup.RestartOnCrash
+	if maxRestarts < 0 {
+		maxRestarts = 0
+	}
+	cmd := firstCmd
+	stdin := firstStdin
+	stdout := firstStdout
+	cleanup := firstCleanup
+	var lastExit *ExitError
+
+	defer func() {
+		_ = s.logFile.Close()
+		s.alive.Store(false)
+		s.state.Store(int32(LiveStateStopped))
+		select {
+		case <-s.copyDone:
+		default:
+			close(s.copyDone)
+		}
+		s.waitOnce.Do(func() {
+			if lastExit == nil {
+				s.waitCode.Store(0)
+				s.done <- nil
+			} else {
+				s.waitCode.Store(int32(lastExit.Code))
+				s.waitErr.Store(lastExit)
+				s.done <- lastExit
+			}
+			close(s.done)
+		})
+		cleanupBootDir(s.bootDir)
+	}()
+
+	for attempt := 0; attempt <= maxRestarts; attempt++ {
+		exit := s.waitOnceSupervised(ctx, cmd, stdin, stdout, attempt)
+		cleanup()
+		lastExit = exit
+
+		if s.lost.Load() != nil {
+			return // a restart would resume the same lost id and fail again
+		}
+
+		if ctx.Err() != nil || s.isStopRequested() {
+			return
+		}
+
+		if exit == nil {
+			return // clean exit
+		}
+		if !restartEligible(exit) {
+			return // supervisor-driven kill
+		}
+		if attempt >= maxRestarts {
+			lastExit.Cause = CauseRestartExhausted
+			return
+		}
+
+		backoff := computeRestartBackoff(attempt+1, sup.MaxRestartBackoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.stopRequested:
+			return
+		case <-time.After(backoff):
+		}
+		if sup.OnRestart != nil {
+			sup.OnRestart(attempt+1, exit)
+		}
+		nextCmd, nextStdin, nextStdout, nextCleanup, err := s.spawnAttempt(attempt + 1)
+		if err != nil {
+			lastExit = &ExitError{Code: -1, Cause: CauseRestartExhausted, waitErr: err}
+			return
+		}
+		cmd = nextCmd
+		stdin = nextStdin
+		stdout = nextStdout
+		cleanup = nextCleanup
+	}
+}
+
+func (s *streamingStdioSession) waitOnceSupervised(ctx context.Context, cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCloser, attempt int) *ExitError {
+	stderrCap := s.currentStderrCapture() // this attempt's, before any restart replaces it
+	procDone := make(chan struct{})
+	readerDone := make(chan struct{})
+	cause := &supState{}
+	startedAt := time.Now()
+	s.activity.tick()
+
+	go func() {
+		defer close(readerDone)
+		s.runReaderLoop(stdout, stderrCap)
+	}()
+
+	sup := s.opts.Supervisor
+	var supWG sync.WaitGroup
+	if sup.IdleKill > 0 {
+		supWG.Add(1)
+		go func() {
+			defer supWG.Done()
+			s.superviseIdle(cmd, cause, procDone, startedAt)
+		}()
+	}
+	if sup.WatchdogTimeout > 0 {
+		supWG.Add(1)
+		go func() {
+			defer supWG.Done()
+			s.superviseWatchdog(cmd, cause, procDone, startedAt)
+		}()
+	}
+
+	stopWatcherDone := make(chan struct{})
+	go func() {
+		defer close(stopWatcherDone)
+		select {
+		case <-procDone:
+			return
+		case <-s.stopRequested:
+			killWithGrace(cmd, 5*time.Second, procDone)
+		case <-ctx.Done():
+			killWithGrace(cmd, 5*time.Second, procDone)
+		}
+	}()
+
+	waitErr := cmd.Wait()
+	close(procDone)
+	supWG.Wait()
+	<-stopWatcherDone
+
+	pid := 0
+	if cmd.Process != nil {
+		pid = cmd.Process.Pid
+	}
+	elapsed := time.Duration(0)
+	if t0 := s.spawnedAt.Load(); t0 > 0 {
+		elapsed = time.Since(time.Unix(0, t0))
+	}
+	logAbnormalWait("streaming-stdio", s.runtime.cfg.ID, pid, elapsed, waitErr)
+
+	s.ioLock.Lock()
+	s.stdin = nil
+	s.stdout = nil
+	s.ioLock.Unlock()
+	_ = stdin.Close()
+	// Decided before stdout is drained, announced after it: see the legacy
+	// waiter.
+	stderrCap.drain()
+	lost := s.classifyExit(stderrCap, waitErr, s.attemptEnded(ctx, cause.getCause()))
+	drainChildOutput(stdout, readerDone)
+	s.announceLost(lost)
+
+	_ = attempt
+	return buildExitError(cmd.ProcessState, waitErr, cause.getCause())
+}
+
+func (s *streamingStdioSession) isStopRequested() bool {
+	select {
+	case <-s.stopRequested:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *streamingStdioSession) tickActivity() {
+	s.activity.tick()
+	if sup := s.opts.Supervisor; sup != nil && sup.ActivityCallback != nil {
+		sup.ActivityCallback()
+	}
+}
+
+func (s *streamingStdioSession) superviseIdle(cmd *exec.Cmd, cause *supState, procDone <-chan struct{}, startedAt time.Time) {
+	threshold := s.opts.Supervisor.IdleKill
+	tick := threshold / 4
+	if tick < 100*time.Millisecond {
+		tick = 100 * time.Millisecond
+	}
+	timer := time.NewTicker(tick)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-procDone:
+			return
+		case <-timer.C:
+			idle := s.activity.idleSince(startedAt)
+			if idle < threshold {
+				continue
+			}
+			if !cause.trySetCause(CauseIdleTimeout) {
+				return
+			}
+			killWithGrace(cmd, 5*time.Second, procDone)
+			return
+		}
+	}
+}
+
+func (s *streamingStdioSession) superviseWatchdog(cmd *exec.Cmd, cause *supState, procDone <-chan struct{}, startedAt time.Time) {
+	threshold := s.opts.Supervisor.WatchdogTimeout
+	tick := threshold / 4
+	if tick < 100*time.Millisecond {
+		tick = 100 * time.Millisecond
+	}
+	timer := time.NewTicker(tick)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-procDone:
+			return
+		case <-timer.C:
+			idle := s.activity.idleSince(startedAt)
+			if idle < threshold {
+				continue
+			}
+			if !cause.trySetCause(CauseWatchdogKill) {
+				return
+			}
+			if cmd.Process != nil {
+				_ = signalProcessGroup(cmd, syscall.SIGKILL)
+			}
+			return
+		}
+	}
+}
+
+func (s *streamingStdioSession) Wait() (int, error) {
+	<-s.done
+	code := int(s.waitCode.Load())
+	var err error
+	if v := s.waitErr.Load(); v != nil {
+		err, _ = v.(error)
+	}
+	return code, err
+}
+
+func (s *streamingStdioSession) Stop(ctx context.Context) error {
+	var killErr error
+	s.stopOnce.Do(func() {
+		s.alive.Store(false)
+		s.state.Store(int32(LiveStateStopped))
+		close(s.stopRequested)
+
+		s.ioLock.Lock()
+		cmd := s.cmd
+		stdin := s.stdin
+		s.ioLock.Unlock()
+		// Close stdin first — well-behaved CLI agents (Claude mode-5
+		// included) exit cleanly on EOF. Give the child a short grace
+		// window to do so before escalating to SIGTERM/SIGKILL.
+		if stdin != nil {
+			_ = stdin.Close()
+		}
+		if cmd == nil || cmd.Process == nil {
+			return
+		}
+
+		const eofGrace = 2 * time.Second
+		eofTimer := time.NewTimer(eofGrace)
+		defer eofTimer.Stop()
+		select {
+		case <-s.done:
+			return
+		case <-eofTimer.C:
+		case <-ctx.Done():
+			// caller-cancelled wait — fall through to signal-based escalation
+		}
+
+		if err := signalProcessGroup(cmd, syscall.SIGTERM); err != nil {
+			return
+		}
+		const grace = 5 * time.Second
+		timer := time.NewTimer(grace)
+		defer timer.Stop()
+		select {
+		case <-s.done:
+		case <-timer.C:
+			if cmd.Process != nil {
+				killErr = signalProcessGroup(cmd, syscall.SIGKILL)
+			}
+		case <-ctx.Done():
+			if cmd.Process != nil {
+				killErr = signalProcessGroup(cmd, syscall.SIGKILL)
+			}
+		}
+	})
+	return killErr
+}
+
+func (s *streamingStdioSession) SendInput(ctx context.Context, data []byte) error {
+	if err := s.readerFault.get(); err != nil {
+		return err
+	}
+	// A session whose resume failed because the provider lost the session
+	// takes no more input; the caller starts a new one. The error still
+	// matches ErrNoInputChannel.
+	if lost := s.lost.Load(); lost != nil {
+		return &SessionLostError{RequestedID: lost.RequestedID, Err: ErrNoInputChannel}
+	}
+	if !s.alive.Load() {
+		return ErrNoInputChannel
+	}
+	if err := s.writeInput(data); err != nil {
+		return s.inputFailure(ctx, err)
+	}
+	return nil
+}
+
+// writeInput frames data as one line on the child's stdin.
+func (s *streamingStdioSession) writeInput(data []byte) error {
+	s.ioLock.Lock()
+	defer s.ioLock.Unlock()
+	if s.stdin == nil {
+		return ErrNoInputChannel
+	}
+	payload := data
+	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
+		payload = append(append([]byte(nil), data...), '\n')
+	}
+	if _, err := s.stdin.Write(payload); err != nil {
+		return err
+	}
+	s.tickActivity()
+	return nil
+}
+
+func (s *streamingStdioSession) Resize(_ context.Context, _ uint16, _ uint16) error {
+	// No PTY to resize. Honor the Caps.Resize declaration: this runtime
+	// declares it false by default; even if a caller flips it, Resize on a
+	// stdio child is a no-op.
+	return nil
+}
+
+func (s *streamingStdioSession) Health() HealthStatus {
+	pid := 0
+	if s.alive.Load() {
+		pid = int(s.startedPID.Load())
+	}
+	return HealthStatus{
+		Alive: s.alive.Load() && s.readerFault.get() == nil,
+		PID:   pid,
+		State: LiveState(s.state.Load()),
+	}
+}
+
+func (s *streamingStdioSession) CheckpointHints() (CheckpointHint, bool) {
+	if !s.runtime.cfg.Caps.CheckpointResume {
+		return nil, false
+	}
+	id, _ := s.lastSessionID.Load().(string)
+	if id == "" {
+		return nil, false
+	}
+	return CheckpointHint(id), true
+}
+
+func (s *streamingStdioSession) LivePID() int {
+	if !s.alive.Load() {
+		return 0
+	}
+	return int(s.startedPID.Load())
+}
+
+func (s *streamingStdioSession) LastPID() int {
+	return int(s.lastPID.Load())
+}
+
+func (s *streamingStdioSession) ProviderSessionID() string {
+	id, _ := s.lastSessionID.Load().(string)
+	return id
+}
+
+var (
+	_ Runtime     = (*streamingStdioRuntime)(nil)
+	_ Session     = (*streamingStdioSession)(nil)
+	_ PIDReporter = (*streamingStdioSession)(nil)
+)
