@@ -1,3 +1,5 @@
+import { decodeHookHandleResult } from '../dist/hooks.js';
+import { decodeJSONObject } from '../dist/strict-json.js';
 import { enableHooksFixture } from '../dist/hooks-fixture.js';
 import { ErrCancelled, errNotFound, errConflict, errValidation, PluginError } from '../dist/index.js';
 
@@ -18,12 +20,43 @@ export function fixturePlugin(profile) {
   };
   if (profile === 'hooks-fixture' || profile === 'hooks-declined') {
     const plugin = {...base, init(){return {...base.init(),hooks_profile_version:1};}, health(){return {ok:true};}, hookHandle(ctx,p) {
-      switch(p.metadata.fixture) {
-        case 'cancelled': case 'approval_required': return {invocation_id:p.invocation_id,status:p.metadata.fixture,reason:'fixture veto'};
-        case 'handler_error': throw new Error('private backend');
-        case 'panic': throw 'fixture panic';
+      const directive = p.metadata.fixture ?? 'echo';
+      const wait = ms => new Promise((resolve, reject) => {
+        if(ctx.signal.aborted) { reject(new Error('aborted')); return; }
+        const abort = () => { clearTimeout(timer); reject(new Error('aborted')); };
+        const timer = setTimeout(() => {ctx.signal.removeEventListener('abort',abort);resolve();},ms);
+        ctx.signal.addEventListener('abort',abort,{once:true});
+      });
+      switch(directive) {
+        case 'exit': process.exit(23); break;
+        case 'script': {
+          let script;
+          try {script=JSON.parse(p.metadata.script);} catch {return {invocation_id:p.invocation_id,status:'invalid'};}
+          if(!script || typeof script!=='object' || Array.isArray(script)) return {invocation_id:p.invocation_id,status:'invalid'};
+          return (async () => {
+            if(script.delay_ms!==undefined) {
+              if(!Number.isInteger(script.delay_ms)||script.delay_ms<0||script.delay_ms>4294967295) return {invocation_id:p.invocation_id,status:'invalid'};
+              await wait(script.delay_ms);
+            }
+            try {
+              const fields=decodeJSONObject(p.metadata.script,[],Object.keys(script));
+              fields.delete('delay_ms');fields.set('invocation_id',JSON.stringify(p.invocation_id));
+              return decodeHookHandleResult('{'+[...fields].map(([key,value])=>JSON.stringify(key)+':'+value).join(',')+'}');
+            } catch {return {invocation_id:p.invocation_id,status:'invalid'};}
+          })();
+        }
+        case 'veto': case 'cancelled': case 'approval_required': return {invocation_id:p.invocation_id,status:directive==='veto'?'cancelled':directive,reason:'fixture veto'};
+        case 'error': case 'handler_error': throw new Error('private backend');
+        case 'throw': case 'panic': throw 'fixture panic';
         case 'invalid_output': return {invocation_id:'wrong',status:'ok'};
         case 'wait': return new Promise(resolve=>ctx.signal.addEventListener('abort',()=>resolve({invocation_id:p.invocation_id,status:'ok'}),{once:true}));
+        case 'slow-notification': return wait(100).then(()=>({invocation_id:p.invocation_id,status:'ok'}));
+      }
+      if(directive.startsWith('fail:')) return {invocation_id:p.invocation_id,status:'failed',error:{code:directive.slice(5)}};
+      if(directive.startsWith('wait:')) {
+        const ms=Number(directive.slice(5));
+        if(!/^[0-9]+$/.test(directive.slice(5))||!Number.isInteger(ms)||ms>4294967295) throw new Error('invalid fixture delay');
+        return wait(ms).then(()=>({invocation_id:p.invocation_id,status:'ok',...(p.kind==='filter'?{payloadJSON:p.payloadJSON}:{})}));
       }
       return {invocation_id:p.invocation_id,status:'ok',...(p.kind==='filter'?{payloadJSON:p.payloadJSON}:{})};
     }};
