@@ -40,7 +40,7 @@ all; React is an optional peer behind a subpath.
   dependency-free JSON generation/decoding; `docs/manifest.md` explains the
   split between shared structure and host enforcement.
 - `registry/registry.go` owns the registry wire contract's Go view and
-  `Protocol`.
+  `RegistryVersion`.
 - `ts/packages/plugin-registry/src/types.ts` owns the same contract's
   TypeScript view; `loader.ts` owns `createPluginRegistry`, and `react.ts` the
   optional React adapter.
@@ -130,26 +130,14 @@ verified, and plugin-sdk is a courier, same as it already is for `SessionID`.
 This mirrors `go-mcp/auth`'s own `Provider` seam without depending on it: the
 host-side verification interface is that repo's concern, not this one's.
 
-`registry.Protocol` and `PROTOCOL` in the TypeScript half are the same number
-and are pinned on both sides. The two views are authored, not generated. They
-are also held to shared fixtures — `registry/testdata/contract/protocol-N/*.json`,
-read by `registry/contract_test.go` and by
-`ts/packages/plugin-registry/test/contract-fixtures.test.js` — but only in a
-form that answers the earlier objection to a golden file (both halves of a
-fixture sit at one commit, so it can only catch drift within a single change,
-while the real risk is a host and a loader shipped at different versions).
-The fixtures are **frozen per released protocol**: once protocol N ships, its
-directory is append-only, and a later change that breaks a frozen file — even
-one made to Go and TS together — has to bump the protocol, which is exactly the
-version-skew case. Only the directory for the current protocol runs, and both
-tests fail when they find none. One asymmetry is encoded, not fixed:
-`unknown-plugin.json` — Go's `Validate` rejects a contribution naming an
-undescribed plugin, the TS loader declares it and leaves it unresolved. Delete
-the fixtures and both tests when either view is generated from the other or
-both consume one schema. Pinning the protocol on each side, and round-tripping
-each side's own types, still makes a host/loader mismatch something the loader
-reports at runtime — the same answer `TestProtocolLockedAt1` gives for the
-subprocess wire.
+The registry Go and TypeScript views are authored, not generated, and share
+versioned fixtures read by `registry/contract_test.go` and
+`ts/packages/plugin-registry/test/contract-fixtures.test.js`. Both reject
+unknown owners and malformed contribution shapes. Raw JSON fixture responses
+exercise duplicate keys before parsing discards them: collision detection folds
+keys to lowercase recursively, and known fields require exact casing. Released
+registry fixture directories are append-only; breaking changes require a new
+registry version. The subprocess protocol is independently versioned.
 
 The registry contract knows nothing about what a contribution *kind* means. A
 kind is an open string and its metadata is opaque JSON, because one host's
@@ -162,9 +150,7 @@ served from and under what CSP, and how a bundle obtains shared runtime
 dependencies such as a React copy.
 
 The loader derives its contribution table from the declared registry on every
-sync rather than maintaining it incrementally. That is load bearing: wiring
-contributions only when a bundle changed makes the contribution set a function
-of the bundle rather than of the host manifest, and a manifest edit that does
-not rebuild the bundle then never reaches the browser. The `regression:` tests
-in `ts/packages/plugin-registry/test/loader.test.js` pin this and three related
-refusals; each was verified to fail when the behaviour is reverted.
+sync. Manifest-only additions and withdrawals must take effect without a bundle
+change. Loader and React tests cover verified-byte imports, admission refusals,
+revocation before replacement, rollback, stale completions and captured entry
+fencing. Keep tests focused on these behaviors and shared wire fixtures.
