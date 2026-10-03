@@ -3,12 +3,22 @@ package ssekit_test
 import (
 	"bytes"
 	"net/http"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hollis-labs/libs/ui-go/ssekit"
 )
+
+// ownImportPath is this package's import path, read from a type it exports instead of
+// written out. A goroutine started by this module shows it in its stack frames. It used
+// to be a literal naming the old standalone repository; when the code moved into the
+// ui-go module that literal matched nothing, and every leak check in this package passed
+// without checking anything.
+var ownImportPath = reflect.TypeOf(ssekit.Event{}).PkgPath()
 
 // noLeaks fails the test if goroutines started by this module are still alive
 // shortly after the test's own cleanups have run. Register it first: cleanups
@@ -36,7 +46,7 @@ func ourGoroutines() []string {
 	buf = buf[:runtime.Stack(buf, true)]
 	var out []string
 	for g := range strings.SplitSeq(string(buf), "\n\n") {
-		if !strings.Contains(g, "hollis-labs/go-ssekit") {
+		if !strings.Contains(g, ownImportPath) {
 			continue
 		}
 		// The goroutine running the test itself and the testing framework are
