@@ -165,3 +165,12 @@ compatibility, and real stdio worker acceptance on Node 22/24 and Deno. The
 stdio acceptance includes EOF, handler isolation, redacted stderr and SIGTERM.
 EOF concurrency and signal cooperation have separate behavior tests because the
 shared transcripts deliberately serialize request/reply steps.
+
+## Author build helpers
+
+`@hollis-labs/plugin-sdk/build` is a separate Node-only, zero-dependency author
+build surface for manifest-v2 artifact collection, canonical writing and bundle
+verification. It never enters the plugin worker/browser runtime and does not
+make the protocol-1 Serve described above speak protocol 2. See
+[the TypeScript authoring guide](../../../docs/ts-plugin-authoring.md) for staging,
+schema generation and host reload boundaries.

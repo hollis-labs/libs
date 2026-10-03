@@ -28,6 +28,13 @@
 
 ### Added
 
+- Node-only `@hollis-labs/plugin-sdk/build` subpath for strict manifest-v2
+  author declarations, file collection, SHA-256 inventory/tree digest, canonical
+  manifest writing and immutable staged-tree verification. Shared Go/Node
+  fixture includes binary/UTF-8/CRLF bytes and executable modes. Authoring guide
+  explains schema-first scaffolds and the future host reload boundary.
+
+
 - Manifest UI isolation preferences and catalog-shaped hook declarations,
   `TreeDigest` with a specified path/hash/executable-byte algorithm,
   `CheckCompatibility` with fail-closed runtime/host bounds, and `VerifyBundle`
