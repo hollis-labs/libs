@@ -41,8 +41,9 @@ budget adapters must be safe for concurrent calls. Never derive facts from calle
 headers, plugin session/agent IDs or Init's connection-level identity. A plugin
 actor ID must match its owner. Each authority must select either a verified
 initiating caller with a separate caller policy, or explicit `Background:true`
-with only approved background policy scope. Missing mode, both modes or a
-caller policy without a caller fails closed. Verified callers may be users
+for a plugin actor with only approved background policy scope. Non-plugin
+actors require a verified initiating caller and its policy. Missing mode, both
+modes or a caller policy without a caller fails closed. Verified callers may be users
 (`UserActor`), agents, sessions or MCP proxies. User callers do not receive
 bearer credentials from this library.
 
@@ -59,6 +60,7 @@ payloads or count actual response bytes.
 structurally valid live grant, active/available target, exact current policy
 revision, policy scopes and a lifecycle/grant/binding cancellation context.
 An epoch or generation mismatch returns target_unavailable/stale_binding.
+A grant or permit belonging to a different owner returns capability_denied.
 The selected descriptor owns the operation; two catalog descriptors cannot
 share an operation name. Scope envelopes use exact key casing and reject
 case variants or duplicate keys before interpreting authority.
@@ -122,7 +124,9 @@ validated effect states. No automatic retry or fictional rollback occurs.
 Outcomes include authenticated actor/initiating caller, tuple, grant/policy,
 request/trace, target/tool/effect and duration, with no arguments, content,
 credentials or raw error messages. Every audited identifier is limited to
-256 UTF-8 bytes; invalid/control-bearing values become a fixed marker.
+256 UTF-8 bytes; invalid, control, Unicode format and bidi-bearing values become
+the reserved wildcard marker `*`, which cannot be a valid identifier. A real
+identifier named `[invalid]` is preserved and remains distinguishable.
 Unauthenticated actor/caller assertions are scrubbed. Audit receives a context
 without request cancellation so a cancelled request cannot erase its outcome;
 the sink must apply its own bounded timeout. Sink errors/panics do not change

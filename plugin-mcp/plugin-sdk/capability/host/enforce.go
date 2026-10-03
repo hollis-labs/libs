@@ -196,6 +196,9 @@ func (e *Enforcer) check(ctx context.Context, call Call) (auth Authority, expiry
 		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
 	}
 	if auth.Background {
+		if auth.Actor.Kind != PluginActor {
+			return auth, time.Time{}, refusal(capability.InvalidRequest, call.Capability)
+		}
 		if auth.InitiatingCaller != nil || auth.CallerPolicy != nil {
 			return auth, time.Time{}, refusal(capability.InvalidRequest, call.Capability)
 		}
@@ -212,7 +215,10 @@ func (e *Enforcer) check(ctx context.Context, call Call) (auth Authority, expiry
 	if grant.Validate() != nil || grant.GrantID != call.GrantID || grant.Name != call.Capability {
 		return auth, time.Time{}, refusal(capability.CapabilityDenied, call.Capability)
 	}
-	if grant.HostInstance != auth.Owner.HostInstance || grant.OwnerID != auth.Owner.OwnerID || grant.OwnerGeneration != auth.Owner.OwnerGeneration {
+	if grant.OwnerID != auth.Owner.OwnerID {
+		return auth, time.Time{}, refusal(capability.CapabilityDenied, call.Capability)
+	}
+	if grant.HostInstance != auth.Owner.HostInstance || grant.OwnerGeneration != auth.Owner.OwnerGeneration {
 		return auth, time.Time{}, staleBinding(call.Capability)
 	}
 	if grant.Audience != e.audience {
@@ -409,6 +415,9 @@ func (p *Permit) Recheck() (err error) {
 	current, _, err := p.e.check(p.requestContext, p.call)
 	if err != nil {
 		return admissionFailure(err, p.call.Capability, p.call.RequestID)
+	}
+	if current.Owner.OwnerID != p.authority.Owner.OwnerID {
+		return refusal(capability.CapabilityDenied, p.call.Capability)
 	}
 	if current.Owner != p.authority.Owner {
 		return staleBinding(p.call.Capability)

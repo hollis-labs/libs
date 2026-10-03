@@ -2,9 +2,11 @@ package host
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/hollis-labs/plugin-sdk/capability"
 )
@@ -116,13 +118,15 @@ func (a *Auditor) Denials() map[DenialKey]uint64 {
 
 // MaxAuditIdentifierBytes caps every untrusted identifier copied to telemetry.
 const MaxAuditIdentifierBytes = 256
-const invalidAuditIdentifier = "[invalid]"
+
+// The wildcard is forbidden by identifier, so it cannot alias a real identifier.
+const invalidAuditIdentifier = "*"
 
 func auditIdentifier(value string) string {
 	if value == "" {
 		return ""
 	}
-	if len(value) > MaxAuditIdentifierBytes || !identifier(value) {
+	if len(value) > MaxAuditIdentifierBytes || !identifier(value) || strings.ContainsFunc(value, func(r rune) bool { return unicode.Is(unicode.Cf, r) }) {
 		return invalidAuditIdentifier
 	}
 	return value

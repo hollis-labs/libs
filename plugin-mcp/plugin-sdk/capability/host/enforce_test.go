@@ -316,6 +316,10 @@ func TestPerCallDeadlineCannotBeOmittedOrExtended(t *testing.T) {
 func TestNonPluginTransportScopeCannotBeOmittedOrWidened(t *testing.T) {
 	e, a, c, _, _, _ := enforcementFixture(t)
 	a.Actor = Subject{SessionClient, "session"}
+	a.Background = false
+	a.InitiatingCaller = &Subject{UserActor, "user"}
+	policy := cloneScope(a.Policy)
+	a.CallerPolicy = &policy
 	a.TransportScope = nil
 	failureCode(t, e.Run(context.Background(), c, func(context.Context, *Permit) error { t.Fatal("credential scope bypass"); return nil }), capability.CapabilityDenied)
 	scope := cloneScope(a.Policy)
@@ -454,7 +458,7 @@ func TestScopeAndTupleValidationCoverAllTrustedInputs(t *testing.T) {
 				want = capability.TargetUnavailable
 			case "owner":
 				a.Grant.OwnerID = "another"
-				want = capability.TargetUnavailable
+				want = capability.CapabilityDenied
 			case "generation":
 				a.Owner.OwnerGeneration = 0
 			case "policy schema":
