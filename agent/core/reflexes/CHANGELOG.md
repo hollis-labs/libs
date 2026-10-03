@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
+## v0.2.0 — 2026-10-03
+
+### Added
+
+- First-class `State.ScopeTier` and `State.ExecutionPattern` string signals
+  with optional `scope_tier` and `execution_pattern` JSON fields.
+- `scope_tier` and `execution_pattern` predicates with Nanite's exact scalar
+  semantics: case-sensitive `=` (default), `==` and `!=`; unknown operators
+  return false without error; missing/non-string values compare as empty.
+- Scalar predicate edge-case tests, state/trace JSON round-trips, attrs-only
+  regression coverage and dispatch pipeline goldens using first-class signals.
+
+### Changed
+
+- Firing traces mirror populated classification fields at top-level
+  `scope_tier` and `execution_pattern`, omitted when empty, without inserting
+  them into `attrs`. Hosts migrating these signals from `Attrs` must update
+  trace readers for this trace-shape change. Generic `Attrs` and `attr`
+  semantics are unchanged, including explicitly supplied classification keys.
+- Full Nanite behavioral equivalence still requires the host's real-trace
+  requalification against the released module; library goldens alone do not
+  establish it.
+
 ## v0.1.0 — 2026-09-29
 
 ### Added

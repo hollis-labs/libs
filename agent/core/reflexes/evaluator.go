@@ -61,6 +61,8 @@ func EvaluateTrigger(triggerKind, triggerSpec string, state State) (bool, error)
 //	mail_unread_count    — numeric comparison over unread agent mail
 //	identical_output_window — last N outputs byte-identical
 //	prefix_pressure      — prefix_tokens ≥ factor × value (context window heuristic)
+//	scope_tier           — State.ScopeTier string compare (op ∈ {=, !=}, default =)
+//	execution_pattern    — State.ExecutionPattern string compare (op ∈ {=, !=}, default =)
 //	attr                 — State.Attrs[key] string compare (op ∈ {=, !=}, default =)
 func evalPredicateNode(node map[string]any, state State) (bool, error) {
 	kind, _ := node["kind"].(string)
@@ -137,6 +139,10 @@ func evalPredicateNode(node map[string]any, state State) (bool, error) {
 		return evalIdenticalOutputWindow(node, state)
 	case "prefix_pressure":
 		return evalPrefixPressure(node, state)
+	case "scope_tier":
+		return evalStringEquals(node, state.ScopeTier), nil
+	case "execution_pattern":
+		return evalStringEquals(node, state.ExecutionPattern), nil
 	case "attr":
 		key, _ := node["key"].(string)
 		if key == "" {
@@ -148,8 +154,9 @@ func evalPredicateNode(node map[string]any, state State) (bool, error) {
 	}
 }
 
-// evalStringEquals compares a State scalar string signal (an Attrs entry) against node["value"]. op supports "=" (default) and
-// "!=". Unlike the *_window predicates above, these operate on a single
+// evalStringEquals compares a State scalar string signal (ScopeTier,
+// ExecutionPattern or an Attrs entry) against node["value"]. op supports
+// "=" (default), "==" and "!=". Unlike the *_window predicates above, these operate on a single
 // live-turn signal, not a message-history window — there is no "window"
 // arg and no cold-start guard. A reflex authored with an empty `value`
 // against an unset (also empty) signal would trivially match "="; callers

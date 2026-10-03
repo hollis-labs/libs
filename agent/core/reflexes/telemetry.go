@@ -66,6 +66,10 @@ type traceRecord struct {
 	AgentID    string `json:"agent_id,omitempty"`
 	AgentClass string `json:"agent_class,omitempty"`
 	SessionID  string `json:"session_id,omitempty"`
+	// ScopeTier and ExecutionPattern mirror the live State signals verbatim
+	// when populated; omitted for callers without a classification.
+	ScopeTier        string `json:"scope_tier,omitempty"`
+	ExecutionPattern string `json:"execution_pattern,omitempty"`
 	// Attrs is a copy of State.Attrs when the caller populated it.
 	Attrs map[string]string `json:"attrs,omitempty"`
 
@@ -155,16 +159,18 @@ func emitFirings(
 		}
 
 		rec := traceRecord{
-			ReflexID:       r.ID,
-			ReflexName:     r.Name,
-			ActionKind:     action.ActionKind,
-			ProvenanceTier: r.ProvenanceTier,
-			Priority:       r.Priority,
-			AgentID:        fc.AgentID,
-			AgentClass:     fc.AgentClass,
-			SessionID:      state.SessionID,
-			Attrs:          maps.Clone(state.Attrs),
-			Spec:           action.Spec,
+			ReflexID:         r.ID,
+			ReflexName:       r.Name,
+			ActionKind:       action.ActionKind,
+			ProvenanceTier:   r.ProvenanceTier,
+			Priority:         r.Priority,
+			AgentID:          fc.AgentID,
+			AgentClass:       fc.AgentClass,
+			SessionID:        state.SessionID,
+			ScopeTier:        state.ScopeTier,
+			ExecutionPattern: state.ExecutionPattern,
+			Attrs:            maps.Clone(state.Attrs),
+			Spec:             action.Spec,
 		}
 
 		algo := ""

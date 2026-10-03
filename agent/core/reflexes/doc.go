@@ -40,5 +40,17 @@
 // input_tokens_window, output_growth_window, regex_match_window,
 // user_regex_window, text_regex_window, entity_mention_window,
 // tool_name_window, envelope_type_window, mail_unread_count,
-// identical_output_window, prefix_pressure and attr. See EvaluateTrigger.
+// identical_output_window, prefix_pressure, scope_tier, execution_pattern
+// and attr. See EvaluateTrigger.
+//
+// ScopeTier and ExecutionPattern are live scalar signals supplied by the
+// host. Their predicates compare case-sensitive strings with = (default),
+// == or !=; unknown operators return false without an error. Missing or
+// non-string values become empty strings, so an unset signal matches an
+// empty value. There is no history-window or cold-start guard.
+//
+// Firing traces mirror populated ScopeTier and ExecutionPattern as top-level
+// scope_tier and execution_pattern fields, omitted when empty. They are not
+// inserted into Attrs. Generic attr predicates and the trace's copy of Attrs
+// retain their host-defined semantics.
 package reflexes
