@@ -102,3 +102,9 @@ canonical owner tuple, audience, expiry, caller policy, target, operation,
 effect and budgets before any side effect and again at a delayed commit
 boundary. Plugin authority uses the authenticated stdio connection and narrow-
 only bindings; bearer credentials are reserved for verified non-plugin clients.
+
+Host-only non-plugin credentials, selective lifecycle/client revocation and
+payload-free audit are available in `capability/host`; see
+[host credentials and audit](capability-credentials.md). Hosts supply verified
+identities, live reviewed grants and policy. The leaf `capability` DTO/catalog
+package never imports those host helpers or an application transport.

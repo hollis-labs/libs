@@ -50,6 +50,10 @@ go get github.com/hollis-labs/plugin-sdk
   ambient access it needs, and the host reports back what it allowed. The
   SDK validates grant structure; descriptor policy and execution
   enforcement belong to the host. See `docs/security-model.md`.
+- `capability` — shared descriptors, exact scope narrowing, typed host failures
+  and strict Grant/RuntimeIdentity DTOs. `capability/host` owns non-plugin scoped
+  credentials, selective revocation and payload-free audit helpers. Hosts supply
+  authentication and reviewed policy; see [host credentials](docs/capability-credentials.md).
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
