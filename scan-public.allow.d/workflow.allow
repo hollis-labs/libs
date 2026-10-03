@@ -1,0 +1,24 @@
+# scripts/scan-public findings for the workflow imports that were read and judged not to be exposure.
+# Format: RULE-ID  PATH-GLOB[@COMMIT]  REASON (one line). Every entry is still printed by the scan.
+# Do not quote the matched text in a reason: this file is scanned too.
+
+credentials-in-url workflow/adapters/http/http_test.go                                sample URL with user info on a reserved .test host, used to check that credentials are redacted; made-up; test-only
+credentials-in-url workflow/adapters/llm/llm_external_test.go                         sample URL with user info on a reserved .test host, used to check that credentials are redacted; made-up; test-only
+credentials-in-url workflow/runtime/memoization_external_test.go                      sample URL with user info on a reserved .test host, used to check that credentials are redacted; made-up; test-only
+generic-api-key    workflow/adapters/gate/human_gate_external_test.go                 idempotency key set to a descriptive made-up value in a test; gitleaks matched the field name; not a credential; test-only
+generic-api-key    workflow/adapters/generatedchild/generatedchild_external_test.go   idempotency key set to a descriptive made-up value in a test; gitleaks matched the field name; not a credential; test-only
+secret-assignment  workflow/adapters/agent/agent_external_test.go                     claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/adapters/call/runtime_integration_external_test.go        claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/adapters/checkpoint/checkpoint_external_test.go           secret reference URI (a pointer into a secret store, not a secret) used in a test of reference handling and redaction; test-only
+secret-assignment  workflow/adapters/checkpoint/checkpoint_runtime_external_test.go   claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/adapters/cmd/cmd_external_test.go                         secret reference URI (a pointer into a secret store, not a secret) used in a test of reference handling and redaction; test-only
+secret-assignment  workflow/adapters/emit/emit_external_test.go                       secret reference URI (a pointer into a secret store, not a secret) used in a test of reference handling and redaction; test-only
+secret-assignment  workflow/adapters/mcp/mcp_external_test.go                         secret reference URIs and placeholder words in redaction tests; none is a credential; test-only
+secret-assignment  workflow/adapters/wait/wait_external_test.go                       claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/host/sqlstore/workflow_compensation_test.go               claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/host/sqlstore/workflow_state_control_flow_test.go         claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/host/sqlstore/workflow_state_memoization_test.go          claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/host/sqlstore/workflow_state_scheduler_resources_test.go  claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/host/sqlstore/workflow_state_test.go                      claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/runtime/claims_events_recovery_external_test.go           claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
+secret-assignment  workflow/runtime/compensation_external_test.go                     claim or wait token field set to a descriptive made-up value in a test of the engine's token handling; an engine identifier, not a credential; test-only
