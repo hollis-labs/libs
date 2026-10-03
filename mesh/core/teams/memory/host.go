@@ -31,6 +31,7 @@ type Host struct {
 	workflows           map[string]string
 	workflowDefinitions map[string]teams.WorkflowDefinition
 	routing             map[string]teams.Routing
+	delegationStates    map[string]mesh.TaskState
 	deliveries          map[string]teams.Delivery
 	canceled            map[string]bool
 	ended               map[string]string
@@ -51,7 +52,7 @@ type Host struct {
 
 func New() *Host {
 	return &Host{
-		enrollments: map[mesh.URN]bool{}, actorBindings: map[mesh.URN]string{}, failedWorkflows: map[string]string{}, definitions: map[string]teams.Team{}, launches: map[string]teams.LaunchRecord{}, rosterHistory: map[string]map[uint64]teams.Roster{}, bindings: map[string]string{}, phaseSignals: map[string][]teams.PhaseSignalRecord{}, rosters: map[string]teams.Roster{}, signals: map[string]teams.SignalResolution{}, provisions: map[string]teams.Member{}, requests: map[string]teams.ProvisionRequest{}, workflows: map[string]string{}, workflowDefinitions: map[string]teams.WorkflowDefinition{}, routing: map[string]teams.Routing{}, deliveries: map[string]teams.Delivery{}, canceled: map[string]bool{}, ended: map[string]string{}, SpawnCapabilities: map[string]bool{}, Trust: teams.TrustAllow, NowTime: time.Unix(1700000000, 0).UTC(),
+		enrollments: map[mesh.URN]bool{}, actorBindings: map[mesh.URN]string{}, failedWorkflows: map[string]string{}, definitions: map[string]teams.Team{}, launches: map[string]teams.LaunchRecord{}, rosterHistory: map[string]map[uint64]teams.Roster{}, bindings: map[string]string{}, phaseSignals: map[string][]teams.PhaseSignalRecord{}, rosters: map[string]teams.Roster{}, signals: map[string]teams.SignalResolution{}, provisions: map[string]teams.Member{}, requests: map[string]teams.ProvisionRequest{}, workflows: map[string]string{}, workflowDefinitions: map[string]teams.WorkflowDefinition{}, routing: map[string]teams.Routing{}, deliveries: map[string]teams.Delivery{}, delegationStates: map[string]mesh.TaskState{}, canceled: map[string]bool{}, ended: map[string]string{}, SpawnCapabilities: map[string]bool{}, Trust: teams.TrustAllow, NowTime: time.Unix(1700000000, 0).UTC(),
 	}
 }
 func copyValue[T any](v T) T {
@@ -308,14 +309,46 @@ func (h *Host) SendMessage(ctx context.Context, d teams.Delivery) error {
 	if err := h.before(ctx, "send", d.Recipient.ID); err != nil {
 		return err
 	}
+	h.rosterMu.Lock()
+	defer h.rosterMu.Unlock()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if old, ok := h.deliveries[d.IdempotencyKey]; ok && !reflect.DeepEqual(old, d) {
-		return teams.ErrConflict
+	if old, ok := h.deliveries[d.IdempotencyKey]; ok {
+		if !reflect.DeepEqual(old, d) {
+			return teams.ErrConflict
+		}
+		return h.after("send", d.Recipient.ID)
+	}
+	if d.Verb == mesh.Reply && d.Route.Verb == mesh.Delegate {
+		original, ok := h.deliveries[d.InReplyTo]
+		if !ok || original.Verb != mesh.Delegate {
+			return teams.ErrNotFound
+		}
+		state := h.delegationStates[d.InReplyTo]
+		if !state.Valid() || state.Terminal() {
+			return teams.ErrConflict
+		}
+		roster := h.rosters[d.Route.RunID]
+		for _, wanted := range []teams.Member{original.Route.Sender, original.Recipient} {
+			found := false
+			for _, live := range roster.Members {
+				if live.ID == wanted.ID && live.Actor == wanted.Actor && live.SessionID == wanted.SessionID && live.Status == "active" {
+					found = true
+				}
+			}
+			if !found {
+				return teams.ErrUnavailable
+			}
+		}
+		h.delegationStates[d.InReplyTo] = mesh.TaskCompleted
+	}
+	if d.Verb == mesh.Delegate {
+		h.delegationStates[d.IdempotencyKey] = mesh.TaskWorking
 	}
 	h.deliveries[d.IdempotencyKey] = copyValue(d)
 	return h.after("send", d.Recipient.ID)
 }
+
 func (h *Host) GetSignal(ctx context.Context, runID, phaseID string) (teams.SignalResolution, error) {
 	if err := h.before(ctx, "get_signal", runID); err != nil {
 		return teams.SignalResolution{}, err
@@ -395,9 +428,6 @@ func (h *Host) FailWorkflow(ctx context.Context, key, reason string) error {
 }
 func (h *Host) Retire(ctx context.Context, key string, m teams.Member) error {
 	return h.end(ctx, key, m, "retired")
-}
-func (h *Host) Stop(ctx context.Context, key string, m teams.Member) error {
-	return h.end(ctx, key, m, "stopped")
 }
 func (h *Host) Release(ctx context.Context, key string, m teams.Member) error {
 	return h.end(ctx, key, m, "released")
@@ -514,4 +544,52 @@ func (h *Host) ListSignals(ctx context.Context, runID, phaseID string) ([]teams.
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return copyValue(h.phaseSignals[runID+"/"+phaseID]), nil
+}
+
+func (h *Host) GetDelivery(ctx context.Context, key string) (teams.Delivery, error) {
+	if err := ctx.Err(); err != nil {
+		return teams.Delivery{}, err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	d, ok := h.deliveries[key]
+	if !ok {
+		return teams.Delivery{}, teams.ErrNotFound
+	}
+	return copyValue(d), nil
+}
+
+// DelegationState returns the test host's current delegation task state.
+func (h *Host) DelegationState(ctx context.Context, key string) (mesh.TaskState, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	state, ok := h.delegationStates[key]
+	if !ok {
+		return "", teams.ErrNotFound
+	}
+	return state, nil
+}
+
+// EndDelegation simulates a host task ending independently of result delivery.
+func (h *Host) EndDelegation(ctx context.Context, key string, state mesh.TaskState) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !state.Terminal() {
+		return fmt.Errorf("delegation requires a terminal state")
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	current, ok := h.delegationStates[key]
+	if !ok {
+		return teams.ErrNotFound
+	}
+	if current.Terminal() && current != state {
+		return teams.ErrConflict
+	}
+	h.delegationStates[key] = state
+	return nil
 }

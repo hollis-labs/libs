@@ -25,6 +25,8 @@
 // Host adapters persist immutable keyed intents before external side effects,
 // recover existing resources on replay and reject changed requests. Reconcile
 // takes a caller-owned rotating cursor; there is no background scheduler.
+// LaunchRequest.PoolIdentities selects a run-scoped subset of the enrolled pool
+// for formation and later spawning; the full authored pool remains reserved.
 // Definitions require pinned definition references and distinct enrolled identity
 // references for pool slots. Concurrent activation requires a pool. Hosts verify
 // enrollment and definition pins; syntactic validation cannot query a registry.
@@ -47,7 +49,8 @@
 // within the parent's remaining budget. Quota reservations are committed
 // before provisioning. Transient errors retain quota; ErrProvisionFailed
 // cleans and fences the intent before marking it failed and freeing quota.
-// ReconcileMembers repairs both provisioning and termination acknowledgements.
+// ReconcileMembers repairs provisioning and termination acknowledgements.
+// Failed descendants block their ancestors while unrelated recovery continues.
 // Every termination is reserved as non-routable before external host calls.
 // Provisioner Retire/Release must fence racing keyed provisions; the library
 // also compensates a live result whose roster commit loses to cancellation.
@@ -68,6 +71,11 @@
 // resolution uses Spawn directly; host calls run without router/roster locks.
 // Dispatch rotation remains local to a Router instance. Broadcast addresses
 // include the sender, work dispatch may pick the sender, and history policy
-// is currently team-wide. EndRun releases stable identities, retires fresh
+// defaults to summary. Per-call history may narrow the team policy in order
+// full > filtered > summary > none. ReplyResult uses DeliveryStore accepted
+// delegations and current state to queue replies for the original next turn;
+// new results require both original member/session pairs to remain active.
+// Accepted result replay recovers lost acknowledgements without redelivery.
+// EndRun releases stable identities, retires fresh
 // identities and commits terminal membership; the host owns workflow state.
 package teams

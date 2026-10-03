@@ -59,7 +59,7 @@ func (p *Provider) Describe(ctx context.Context) (mesh.Descriptor, error) {
 	return p.descriptor(), nil
 }
 func (p *Provider) descriptor() mesh.Descriptor {
-	return mesh.Descriptor{Provider: "msg://service/fake/provider", Capabilities: []mesh.Capability{{URI: mesh.DispatchCapabilityURI, Verbs: []mesh.Verb{mesh.Assign, mesh.TaskLookup, mesh.EventFollow, mesh.ReportResult}, Modes: []string{"assign.actor-scoped", "assign.team-single", "follow.authorized", "replay.gap", "result.versioned"}}, {URI: CapabilityURI, Verbs: append([]mesh.Verb(nil), verbs...), Modes: []string{"cancel.cascade", "history.summary", "history.full", "history.filtered", "history.none"}}}, TaskStates: []mesh.TaskState{mesh.TaskSubmitted, mesh.TaskWorking, mesh.TaskInputRequired, mesh.TaskCompleted, mesh.TaskCanceled}, SessionStates: []mesh.SessionState{mesh.SessionRunning, mesh.SessionPaused, mesh.SessionEnded}, DefaultLimits: p.limits}
+	return mesh.Descriptor{Provider: "msg://service/fake/provider", Capabilities: []mesh.Capability{{URI: mesh.SpawnCapabilityURI, Verbs: []mesh.Verb{mesh.AgentLaunch}, Modes: []string{"required_limits", "parent_links", "cancel.cascade"}}, {URI: mesh.DispatchCapabilityURI, Verbs: []mesh.Verb{mesh.Assign, mesh.TaskLookup, mesh.EventFollow, mesh.ReportResult}, Modes: []string{"assign.actor-scoped", "assign.team-single", "follow.authorized", "replay.gap", "result.versioned"}}, {URI: CapabilityURI, Verbs: append([]mesh.Verb(nil), verbs...), Modes: []string{"delivery.at_idle", "cancel.cascade", "history.summary", "history.full", "history.filtered", "history.none"}}}, TaskStates: []mesh.TaskState{mesh.TaskSubmitted, mesh.TaskWorking, mesh.TaskInputRequired, mesh.TaskCompleted, mesh.TaskCanceled}, SessionStates: []mesh.SessionState{mesh.SessionRunning, mesh.SessionPaused, mesh.SessionEnded}, DefaultLimits: p.limits}
 }
 
 // GrantApproval grants this exact actor authority over this task. Actor kind grants nothing.
@@ -88,6 +88,12 @@ func (p *Provider) Invoke(ctx context.Context, r mesh.Request) (mesh.Response, e
 	}
 	if len(r.Body) > 0 && !json.Valid(r.Body) {
 		return mesh.Response{}, mesh.NewError(mesh.ErrorInvalid, "body is not JSON")
+	}
+	if r.Delivery != "" && r.Delivery != mesh.DeliveryAtIdle {
+		return mesh.Response{}, mesh.NewError(mesh.ErrorUnsupported, "unsupported delivery policy")
+	}
+	if r.Delivery != "" && r.Verb != mesh.MessageSend && r.Verb != mesh.MessageAddress && r.Verb != mesh.Reply && r.Verb != mesh.ReportResult {
+		return mesh.Response{}, mesh.NewError(mesh.ErrorUnsupported, "delivery policy requires a message or result")
 	}
 	if !r.History.Effective().Valid() {
 		return mesh.Response{}, mesh.NewError(mesh.ErrorInvalid, "invalid history policy")
@@ -209,13 +215,18 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 			for a := parent; a.Parent != ""; a = p.agents[a.Parent] {
 				depth++
 			}
-			children := 0
+			children, active := 0, 0
+			spent := 0.0
 			for _, a := range p.agents {
-				if a.Parent == r.Parent && a.SessionState != mesh.SessionEnded {
+				if a.Parent == r.Parent {
 					children++
+					spent += a.Limits.Budget
+					if a.SessionState != mesh.SessionEnded {
+						active++
+					}
 				}
 			}
-			if depth > parent.Limits.MaxDepth || children >= parent.Limits.MaxChildren || children >= parent.Limits.FanOut {
+			if depth > parent.Limits.MaxDepth || children >= parent.Limits.MaxChildren || active >= parent.Limits.FanOut || spent+limits.Budget > parent.Limits.Budget {
 				return out, mesh.NewError(mesh.ErrorLimit, "spawn limit exceeded")
 			}
 			if limits.MaxDepth > parent.Limits.MaxDepth || limits.MaxChildren > parent.Limits.MaxChildren || limits.FanOut > parent.Limits.FanOut || limits.Budget > parent.Limits.Budget || limits.Timeout > parent.Limits.Timeout {
@@ -413,7 +424,7 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 			t.Result = receipt.Result.Content
 			receipt.State = t.State
 			p.receipts[t.ID] = receipt
-			m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: []mesh.URN{t.Caller.URN}, Body: t.Result}
+			m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: []mesh.URN{t.Caller.URN}, Body: t.Result, InReplyTo: string(t.ID), Delivery: mesh.DeliveryAtIdle}
 			p.messages[m.ID] = m
 			out.Message = &m
 		}
@@ -487,7 +498,7 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 				recipients = recipients[:1]
 			}
 		}
-		m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: recipients, Body: r.Body, InReplyTo: r.InReplyTo, RosterVersion: version}
+		m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: recipients, Body: r.Body, InReplyTo: r.InReplyTo, RosterVersion: version, Delivery: r.Delivery}
 		p.messages[m.ID] = m
 		out.Message = &m
 	}

@@ -169,9 +169,12 @@ type TeamRun struct {
 	Status      mesh.TaskState `json:"status"`
 }
 type Roster struct {
-	RunID   string   `json:"run_id"`
-	Version uint64   `json:"version"`
-	Members []Member `json:"members"`
+	// ReservedIdentities retains the full authored pool even when this run selects a subset.
+	ReservedIdentities []mesh.URN            `json:"reserved_identities,omitempty"`
+	PoolIdentities     map[string][]mesh.URN `json:"pool_identities,omitempty"`
+	RunID              string                `json:"run_id"`
+	Version            uint64                `json:"version"`
+	Members            []Member              `json:"members"`
 }
 
 func (t Team) slot(name string) (Slot, bool) {

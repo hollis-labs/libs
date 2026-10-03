@@ -183,6 +183,10 @@ func Spawn(ctx context.Context, t Team, store RosterStore, p MemberProvisioner, 
 	if err != nil {
 		return Member{}, err
 	}
+	if identities, ok := r.PoolIdentities[target]; ok && slot.Resolution == Pool {
+		slot.Identities = clone(identities)
+		slot.Max = min(slot.Max, len(identities))
+	}
 	parent, err := r.member(parentActor)
 	if err != nil {
 		return Member{}, err
@@ -257,7 +261,7 @@ func Spawn(ctx context.Context, t Team, store RosterStore, p MemberProvisioner, 
 			if err != nil {
 				return err
 			}
-			intent := ProvisionRequest{ReservedIdentities: declaredIdentities(t), Identity: identity, IdempotencyKey: id, RunID: runID, MemberID: id, Slot: clone(slot), Parent: current.ID, Limits: limits}
+			intent := ProvisionRequest{ReservedIdentities: append(declaredIdentities(t), r.ReservedIdentities...), Identity: identity, IdempotencyKey: id, RunID: runID, MemberID: id, Slot: clone(slot), Parent: current.ID, Limits: limits}
 			result = Member{ID: id, Slot: target, Status: "provisioning", Parent: current.ID, Resolution: slot.Resolution, Budget: limits.Budget, Limits: limits, ProvisionDigest: digest, Intent: &intent}
 			r.Members = append(r.Members, clone(result))
 			return nil
@@ -322,7 +326,7 @@ func completeProvision(ctx context.Context, store RosterStore, p MemberProvision
 	})
 	if errors.Is(err, ErrConflict) || errors.Is(err, ErrNotFound) {
 		cleanupCtx := context.WithoutCancel(ctx)
-		cleanupErr := releaseOrStop(cleanupCtx, p, runID, m)
+		cleanupErr := endMember(cleanupCtx, p, runID, m)
 		// A cancellation already owns its terminal state. A conflicting actor
 		// projection still in provisioning must also become terminal and free
 		// quota after cleanup; otherwise its fenced key can never recover.
@@ -364,15 +368,20 @@ func ReconcileMembers(ctx context.Context, store RosterStore, p MemberProvisione
 	if err != nil {
 		return err
 	}
-	var failures []error
+	// Repair the entire termination forest before provisioning. A failed
+	// child acknowledgement must prevent stopping its ancestor on this pass.
+	var plan []Member
 	for _, m := range r.Members {
-		if m.Status == "provisioning" {
-			_, err = completeProvision(ctx, store, p, runID, m)
-		} else if terminating(m) {
-			err = finishMembers(ctx, store, p, runID, []Member{m})
-		} else {
+		if terminating(m) {
+			plan = append(plan, m)
+		}
+	}
+	failures := reconcileTerminations(ctx, store, p, runID, plan)
+	for _, m := range r.Members {
+		if m.Status != "provisioning" {
 			continue
 		}
+		_, err = completeProvision(ctx, store, p, runID, m)
 		if err != nil {
 			failures = append(failures, err)
 		}

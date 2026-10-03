@@ -64,6 +64,9 @@ func (d Descriptor) Validate() error {
 			return fmt.Errorf("invalid session state %q", s)
 		}
 	}
+	if err := ValidateSpawnCapabilities(d); err != nil {
+		return err
+	}
 	return d.DefaultLimits.Validate()
 }
 func (d Descriptor) Supports(v Verb) bool {
@@ -214,6 +217,7 @@ type Message struct {
 	Body          json.RawMessage `json:"body"`
 	InReplyTo     string          `json:"in_reply_to,omitempty"`
 	RosterVersion uint64          `json:"roster_version,omitempty"`
+	Delivery      DeliveryPolicy  `json:"delivery,omitempty"`
 }
 
 // Request is the portable command union. Target names the resource; Team scopes
@@ -236,6 +240,7 @@ type Request struct {
 	Slot           string          `json:"slot,omitempty"`
 	Role           string          `json:"role,omitempty"`
 	InReplyTo      string          `json:"in_reply_to,omitempty"`
+	Delivery       DeliveryPolicy  `json:"delivery,omitempty"`
 	Body           json.RawMessage `json:"body,omitempty"`
 	History        HistoryPolicy   `json:"history,omitempty"`
 	Limits         Limits          `json:"limits,omitempty"`

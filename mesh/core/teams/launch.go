@@ -30,6 +30,9 @@ type LaunchRequest struct {
 	Version uint64
 	Counts  map[string]int
 	Limits  mesh.Limits
+	// PoolIdentities selects an ordered subset of the enrolled pool for this run.
+	// The selection is persisted before provisioning and scopes later spawns.
+	PoolIdentities map[string][]mesh.URN
 }
 type MemberIntent struct {
 	Key      string
@@ -105,6 +108,11 @@ func (l *Launcher) Launch(ctx context.Context, req LaunchRequest) (TeamRun, erro
 			if err != nil {
 				return err
 			}
+			reservedIdentities := declaredIdentities(t)
+			t, err = launchPools(t, req.PoolIdentities)
+			if err != nil {
+				return err
+			}
 			definition, err := CompileTeam(t, t.Phases)
 			if err != nil {
 				return err
@@ -131,10 +139,13 @@ func (l *Launcher) Launch(ctx context.Context, req LaunchRequest) (TeamRun, erro
 					id := stableID(req.Key, slot.Name, fmt.Sprint(i))
 					identity := slot.Identity
 					if slot.Resolution == Pool {
+						if i >= len(slot.Identities) {
+							return fmt.Errorf("launch: pool selection exhausted")
+						}
 						identity = slot.Identities[i]
 					}
 					allocation := limits
-					record.Intents = append(record.Intents, MemberIntent{Key: id, Slot: clone(slot), MemberID: id, Request: ProvisionRequest{IdempotencyKey: id, MemberID: id, Slot: clone(slot), Identity: identity, ReservedIdentities: declaredIdentities(t), Limits: allocation}})
+					record.Intents = append(record.Intents, MemberIntent{Key: id, Slot: clone(slot), MemberID: id, Request: ProvisionRequest{IdempotencyKey: id, MemberID: id, Slot: clone(slot), Identity: identity, ReservedIdentities: reservedIdentities, Limits: allocation}})
 				}
 			}
 			if len(record.Intents) == 0 {
@@ -249,6 +260,17 @@ func (l *Launcher) advance(ctx context.Context, record *LaunchRecord) (TeamRun, 
 	}
 	if record.State == Launched {
 		err := l.Roster.Mutate(ctx, record.Run.ID, func(r *Roster) error {
+			if r.ReservedIdentities == nil {
+				r.ReservedIdentities = clone(record.Intents[0].Request.ReservedIdentities)
+			}
+			if r.PoolIdentities == nil {
+				r.PoolIdentities = map[string][]mesh.URN{}
+				for _, slot := range record.Team.Slots {
+					if slot.Resolution == Pool {
+						r.PoolIdentities[slot.Name] = clone(slot.Identities)
+					}
+				}
+			}
 			for _, intent := range record.Intents {
 				if intent.Member == nil {
 					return fmt.Errorf("launch: missing prepared member")
@@ -392,7 +414,7 @@ func (l *Launcher) finishAbort(ctx context.Context, record LaunchRecord) (TeamRu
 			m = clone(*intent.Member)
 			m.Intent = clone(&intent.Request)
 		}
-		if err := releaseOrStop(ctx, l.Provisioner, record.Key, m); err != nil {
+		if err := endMember(ctx, l.Provisioner, record.Key, m); err != nil {
 			return record.Run, errors.Join(failure, err)
 		}
 		intent.Cleaned = true
@@ -411,4 +433,35 @@ func (l *Launcher) finishAbort(ctx context.Context, record LaunchRecord) (TeamRu
 		return record.Run, errors.Join(failure, err)
 	}
 	return record.Run, failure
+}
+
+func launchPools(t Team, selections map[string][]mesh.URN) (Team, error) {
+	t = clone(t)
+	for name, identities := range selections {
+		slot, ok := t.slot(name)
+		if !ok || slot.Resolution != Pool {
+			return Team{}, fmt.Errorf("launch: identity selection requires a pool slot")
+		}
+		allowed := map[mesh.URN]bool{}
+		for _, id := range slot.Identities {
+			allowed[id] = true
+		}
+		seen := map[mesh.URN]bool{}
+		for _, id := range identities {
+			if !allowed[id] || seen[id] {
+				return Team{}, fmt.Errorf("launch: invalid pool identity selection")
+			}
+			seen[id] = true
+		}
+		if len(identities) < slot.Min {
+			return Team{}, fmt.Errorf("launch: pool selection below slot minimum")
+		}
+		for i := range t.Slots {
+			if t.Slots[i].Name == name {
+				t.Slots[i].Identities = append([]mesh.URN(nil), identities...)
+				t.Slots[i].Max = min(t.Slots[i].Max, len(identities))
+			}
+		}
+	}
+	return t, nil
 }
