@@ -20,8 +20,9 @@ func example() manifest.Manifest {
 		Description: "Save and retrieve links", License: "MIT",
 		Homepage:   "https://hollislabs.com/plugins/bookmarks",
 		Repository: "https://github.com/hollis-labs/nanite-plugins",
-		Protocol:   subprocess.ProtocolVersion, Runtime: manifest.Runtime,
-		Entrypoint:   manifest.Entrypoint{Command: "bin/bookmarks", Args: []string{"--stdio", "argument with spaces"}},
+		Protocol:   manifest.RequiredProtocol, Runtime: manifest.Runtime,
+		Server:       manifest.Server{Runtime: "binary", Entry: "bin/bookmarks", Engines: map[string]manifest.HostRange{"binary": {Min: "1.0.0"}}},
+		Artifact:     testArtifact("bin/bookmarks", true),
 		Hosts:        map[string]manifest.HostRange{"nanite": {Min: "0.1.0"}, "tangent": {Min: "1.0.0", Max: "2.0.0"}},
 		Capabilities: []subprocess.CapabilityRequest{{Name: "host.query", Reason: "Read session labels", Optional: true, Metadata: json.RawMessage(`{"scope":"sessions"}`)}},
 		Config: manifest.Config{
@@ -125,26 +126,6 @@ func TestValidateRefusesUnsafeOrIncompleteDeclarations(t *testing.T) {
 	}
 }
 
-func TestEntrypointCrossPlatformConfinement(t *testing.T) {
-	for _, command := range []string{"", ".", "./", "..", "../bin/plugin", "bin/../../plugin", "bin/../plugin", "/bin/plugin", `C:\bin\plugin.exe`, `C:/bin/plugin.exe`, `\\server\plugin`, `bin\..\plugin`, "python plugin.py", "bin/plugin;echo", "$(plugin)", "bin/plugin\x00", "~/plugin", "bin/plugin\u007f"} {
-		t.Run(command, func(t *testing.T) {
-			if err := (manifest.Entrypoint{Command: command}).Validate(); err == nil {
-				t.Fatal("accepted unsafe command")
-			}
-		})
-	}
-	for _, command := range []string{"bin/plugin", "./bin/plugin", "plugin.exe", "bin/..plugin"} {
-		if err := (manifest.Entrypoint{Command: command}).Validate(); err != nil {
-			t.Fatalf("%q: %v", command, err)
-		}
-	}
-	for _, arg := range []string{"bad\x00arg", "bad\narg", "bad\rarg"} {
-		if err := (manifest.Entrypoint{Command: "bin/plugin", Args: []string{arg}}).Validate(); err == nil {
-			t.Fatalf("accepted %q", arg)
-		}
-	}
-}
-
 func TestSemver(t *testing.T) {
 	for _, version := range []string{"0.0.0", "1.2.3", "1.2.3-0", "1.2.3-rc.1", "1.2.3+01", "1.2.3-beta+meta-01"} {
 		if !manifest.ValidVersion(version) {
@@ -167,7 +148,7 @@ func TestDecodeRefusesAmbiguousAndLegacyInput(t *testing.T) {
 	cases := map[string]string{
 		"legacy yaml":             "id: hello\nentrypoint: bin/plugin\n",
 		"legacy signature":        strings.Replace(valid, `"runtime": "subprocess"`, `"release":{"signature_url":"https://example.org/signature"},"runtime": "subprocess"`, 1),
-		"unknown nested field":    strings.Replace(valid, `"command": "bin/bookmarks"`, `"shell":true,"command": "bin/bookmarks"`, 1),
+		"unknown nested field":    strings.Replace(valid, `"entry": "bin/bookmarks"`, `"shell":true,"entry": "bin/bookmarks"`, 1),
 		"secret value":            strings.Replace(valid, `"api_key": {`, `"api_key": {"value":"do-not-store",`, 1),
 		"secret default":          strings.Replace(valid, `"api_key": {`, `"api_key": {"default":"do-not-store",`, 1),
 		"case alias":              strings.Replace(valid, `"runtime": "subprocess"`, `"Runtime":"builtin","runtime": "subprocess"`, 1),
