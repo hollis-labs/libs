@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "plugin-sdk protocol 2 wire shapes",
-  "description": "Strict init handshake. Non-init envelope and runtime payload quirks remain observed until the separate duplex hardening stage. Runtime validators reject unpaired Unicode surrogates; scope integer-form tokens must be within ±9007199254740991 and numeric values must be finite. Descriptor schemas string-encode larger integers.",
+  "description": "Protocol 2 strict Init handshake and normative JSON-RPC envelopes. IDs are strings or safe integers; raw decimal integer tokens only (no fractions/exponents). Duplicate top-level decoded keys and unpaired Unicode in envelope strings are rejected by runtime codecs. Null IDs only on error replies; absent request ID only denotes notification. Arrays/batches are invalid. Other payload, framing and shutdown policies retain their existing conformance levels. Runtime validators enforce portable descriptor scopes.",
   "oneOf": [
     {
       "$ref": "#/$defs/RPCRequest"
@@ -19,7 +19,7 @@
           "const": "2.0"
         },
         "id": {
-          "type": "integer"
+          "$ref": "#/$defs/RPCID"
         },
         "method": {
           "type": "string"
@@ -30,13 +30,29 @@
         "jsonrpc",
         "method"
       ],
-      "additionalProperties": true
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "result"
+            ]
+          },
+          {
+            "required": [
+              "error"
+            ]
+          }
+        ]
+      }
     },
     "RPCError": {
       "type": "object",
       "properties": {
         "code": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "message": {
           "type": "string"
@@ -57,7 +73,14 @@
           "const": "2.0"
         },
         "id": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RPCID"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "result": {},
         "error": {
@@ -78,6 +101,11 @@
             "required": [
               "error"
             ]
+          },
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/RPCID"
+            }
           }
         },
         {
@@ -90,7 +118,21 @@
             ]
           }
         }
-      ]
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "method"
+            ]
+          },
+          {
+            "required": [
+              "params"
+            ]
+          }
+        ]
+      }
     },
     "HostInfo": {
       "type": "object",
@@ -835,6 +877,15 @@
         "method_timeout_ms"
       ],
       "additionalProperties": false
+    },
+    "RPCID": {
+      "type": [
+        "string",
+        "integer"
+      ],
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "Integer IDs use decimal integer tokens only; no exponents or fractions."
     }
   },
   "x-protocol-version": 2,

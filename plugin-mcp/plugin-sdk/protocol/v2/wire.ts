@@ -4,7 +4,7 @@ export const PROTOCOL_VERSION = 2 as const;
 
 export interface RPCRequest {
   jsonrpc: "2.0";
-  id?: number;
+  id?: RPCID;
   method: string;
   params?: unknown;
 }
@@ -17,7 +17,7 @@ export interface RPCError {
 
 export interface RPCResponse {
   jsonrpc: "2.0";
-  id: number;
+  id: RPCID | null;
   result?: unknown;
   error?: RPCError;
 }
@@ -216,3 +216,5 @@ export interface HostServiceLimits {
   max_depth: number;
   method_timeout_ms: Record<string, number>;
 }
+
+export type RPCID = string | number;

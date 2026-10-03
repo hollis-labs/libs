@@ -96,3 +96,47 @@ export function decodeJSONObject(text: string, fields: readonly string[], option
   }
   return result;
 }
+
+// Syntax is checked by the envelope decoder first. Scan only top-level fields;
+// nested params remain opaque to envelope validation, without recursive traversal.
+export function inspectEnvelope(text: string): {fields: Map<string, string> | undefined; duplicates: Set<string>; invalidKeys: boolean} {
+  const duplicates = new Set<string>();
+  let invalidKeys = false;
+  let at = 0;
+  const space = () => { while (/[\x20\t\r\n]/.test(text[at] ?? 'x')) at++; };
+  const stringEnd = () => {
+    at++; // opening quote
+    while (at < text.length) {
+      const c = text[at++];
+      if (c === '"') break;
+      if (c === '\\') at++;
+    }
+  };
+  space();
+  if (text[at++] !== '{') return {fields: undefined, duplicates, invalidKeys};
+  const fields = new Map<string, string>();
+  space();
+  while (text[at] !== '}') {
+    const keyStart = at;
+    stringEnd();
+    const keyRaw = text.slice(keyStart, at);
+    try { validateJSON(keyRaw); } catch { invalidKeys = true; }
+    const key = JSON.parse(keyRaw) as string;
+    if (fields.has(key)) duplicates.add(key);
+    space(); at++; space(); // colon
+    const start = at;
+    let depth = 0;
+    while (at < text.length) {
+      const c = text[at];
+      if (c === '"') { stringEnd(); continue; }
+      if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') { if (depth === 0) break; depth--; }
+      else if (c === ',' && depth === 0) break;
+      at++;
+    }
+    fields.set(key, text.slice(start, at).trim());
+    if (text[at] !== ',') break;
+    at++; space();
+  }
+  return {fields, duplicates, invalidKeys};
+}

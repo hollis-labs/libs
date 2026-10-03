@@ -20,7 +20,7 @@ func TestRPCErrorImplementsError(t *testing.T) {
 func TestRPCRequestRoundtrip(t *testing.T) {
 	in := RPCRequest{
 		JSONRPC: "2.0",
-		ID:      42,
+		ID:      NumberID(42),
 		Method:  MethodCommandExecute,
 		Params: CommandExecParams{
 			Name:      "bookmark",
@@ -38,7 +38,7 @@ func TestRPCRequestRoundtrip(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if out.ID != in.ID {
-		t.Errorf("ID = %d, want %d", out.ID, in.ID)
+		t.Errorf("ID = %v, want %v", out.ID, in.ID)
 	}
 	if out.Method != in.Method {
 		t.Errorf("Method = %q, want %q", out.Method, in.Method)

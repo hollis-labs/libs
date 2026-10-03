@@ -1,3 +1,4 @@
+import { decodeEnvelope } from './envelope.js';
 import { decodeInitParams, decodeInitResult, encodeInitResult, validateInitResult, InitError } from './init-contract.js';
 import { decodeJSONObject, validateJSON } from './strict-json.js';
 import { Buffer } from 'node:buffer';
@@ -42,18 +43,10 @@ function params<T>(raw: unknown, fields: Record<string, Field>): T {
   } catch (error) { throw new RPCFault(-32602, `decode params: ${errorMessage(error)}`); }
 }
 const rawInit = new WeakMap<object,string>();
-export function decodeRequest(line: string): Wire.RPCRequest {
-  try {
-    const value: unknown = JSON.parse(line);
-    if (value == null) return { jsonrpc: '2.0', method: '' };
-    if (!record(value)) throw new Error('expected request object');
-    const method = field(value.method, 'string') as string;
-    const version = field(value.jsonrpc, 'string') as string;
-    const id = field(value.id, 'int') as number;
-    const request = { jsonrpc: version as '2.0', method, id, params: value.params };
-    if(method === 'plugin/init') rawInit.set(request,line);
-    return request;
-  } catch (error) { throw new RPCFault(-32700, `parse error: ${errorMessage(error)}`); }
+export function decodeRequest(line: string): Wire.RPCRequest | undefined {
+  const request = decodeEnvelope(line);
+  if(request?.method === 'plugin/init') rawInit.set(request,line);
+  return request;
 }
 const notImplemented = (name: string): never => { throw new RPCFault(-32601, `plugin does not implement ${name}`); };
 function optionalObject<T extends object>(result: T, keys: Array<keyof T>): Partial<T> {
@@ -76,12 +69,12 @@ export class Dispatcher {
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker) { this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown): Promise<void> { if (value !== undefined) await this.plugin.identity?.(this.context, value); }
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
-    const id = req.id ?? 0;
+    const id = req.id;
     try {
       const result = await this.call(req);
-      return id === 0 ? undefined : { jsonrpc: '2.0', id, result };
+      return id === undefined ? undefined : { jsonrpc: '2.0', id, result };
     } catch (error) {
-      if (id === 0) return undefined;
+      if (id === undefined) return undefined;
       const fault = error instanceof InitError ? {code:-32602,message:error.message,data:error.rpcData()} : error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
       return {jsonrpc: '2.0', id, error: fault};
     }
@@ -95,7 +88,7 @@ export class Dispatcher {
     if(req.method !== 'plugin/init' && !this.initialized) throw new RPCFault(-32600,'successful init required');
     switch (req.method) {
       case 'plugin/init': {
-        if (!Number.isSafeInteger(req.id) || (req.id ?? 0) <= 0) throw new RPCFault(-32600,'init requires a positive safe integer id');
+        if (typeof req.id !== 'number' || !Number.isSafeInteger(req.id) || req.id <= 0) throw new RPCFault(-32600,'init requires a positive safe integer id');
         if (this.attempted) throw new RPCFault(-32600,'init already attempted');
         this.attempted = true;
         let input: Wire.InitParams;

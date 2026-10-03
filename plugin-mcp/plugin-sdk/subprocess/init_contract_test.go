@@ -111,7 +111,7 @@ func TestServeInitAdmission(t *testing.T) {
 }
 func initLine(t *testing.T, id int64) string {
 	t.Helper()
-	b, err := json.Marshal(RPCRequest{JSONRPC: "2.0", ID: id, Method: MethodInit, Params: validInitParams()})
+	b, err := json.Marshal(RPCRequest{JSONRPC: "2.0", ID: NumberID(id), Method: MethodInit, Params: validInitParams()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestServeInitBarrierAndProfileDecline(t *testing.T) {
 	go func() { done <- serveWith(p, in, &out) }()
 	params := validInitParams()
 	params.HooksProfile = &HooksProfile{HooksProfileVersion: 1}
-	b, err := json.Marshal(RPCRequest{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: params})
+	b, err := json.Marshal(RPCRequest{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: params})
 	if err != nil {
 		t.Fatal(err)
 	}

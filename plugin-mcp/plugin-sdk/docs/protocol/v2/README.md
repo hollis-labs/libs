@@ -1,4 +1,4 @@
-# Protocol 2 Init handshake
+# Protocol 2 stdio contract
 
 Go `subprocess.ProtocolVersion` and TS `PROTOCOL_VERSION` are 2. Host and plugin
 use one strict Init exchange before load or ordinary handlers. The host builds,
@@ -50,9 +50,37 @@ fail before activation. No reverse RPC, hook dispatch or HTTP fallback is suppli
 Application host errors -32010 and contract `host-rpc/1` belong to the later
 reverse profile, not Init errors.
 
-`transcripts/` copies the v1 corpus with a valid v2 Init step and adjusts only
-contradictory handshake observations (repeat Init and load after failure).
-Remaining normative/observed-quirk levels are retained; general JSON-RPC ID/null,
-framing and shutdown quirks remain for later conformance work. The unchanged
-[v1 corpus](../v1/README.md) records historical protocol-1 behavior and is no longer
-replayed against the current Serve. Profiles require their own conformance gate.
+## JSON-RPC envelopes and IDs
+
+Each frame contains one JSON object with `jsonrpc` exactly `"2.0"`. Requests
+require a string `method`, never `result` or `error`. IDs are strings (including
+empty strings) or integers within ±9007199254740991. Numeric tokens must use
+integer form: fractions and exponents are invalid even when their value is
+integral. Zero and negative IDs are ordinary request IDs. Init additionally
+requires a positive safe integer ID. Only an absent ID denotes a notification;
+explicit null is invalid on a request. Notifications run without success/error
+replies. Method payload rules remain separate from envelope validation.
+
+Malformed JSON produces -32700 with `id:null`. Valid JSON with an invalid
+envelope, including any array/batch, produces -32600. A unique valid ID is echoed
+on structural errors; missing, invalid or duplicate IDs produce `id:null`.
+Duplicate top-level decoded keys (including escaped spellings) are invalid.
+String IDs and methods require valid Unicode, including paired surrogates.
+Responses require an ID and exactly one of `result` or an error object with an
+integer `code` and string `message`; null IDs are allowed only on error replies.
+Request/reply mixtures are invalid. Structurally valid unsolicited replies are
+dropped without dispatch or response: this runtime has no outgoing waiters yet.
+
+Go `subprocess.RPCID` is a comparable tagged value. Use `NumberID(n)` or
+`StringID(s)` in `RPCRequest` and `RPCResponse`, and `Integer()` / `Text()` to
+inspect it. Its zero value omits the request ID and encodes a null response ID;
+`NumberID(0)` and `StringID("")` remain present. This replaces the previous
+`int64` field with a source API break. TS uses `RPCID = string | number` and
+omits `id` for notifications; there is no bigint or rounded numeric ID support.
+
+`transcripts/decoder-findings.json`, `notifications.json` and `envelope-ids.json`
+assert normative envelopes in Go and TS. Other transcripts retain their existing
+normative/observed-quirk levels for payloads, framing and shutdown; those policies
+have separate conformance work. The unchanged [v1 corpus](../v1/README.md) records
+historical protocol-1 behavior and is no longer replayed against current Serve.
+Optional profiles require their own conformance gate.

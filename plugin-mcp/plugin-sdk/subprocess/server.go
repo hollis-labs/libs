@@ -14,7 +14,6 @@ import (
 	"syscall"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
-	"github.com/hollis-labs/plugin-sdk/capability"
 	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
 )
 
@@ -98,33 +97,17 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 		defer close(done)
 		for scanner.Scan() {
 			line := append([]byte{}, scanner.Bytes()...)
-			var envelope struct {
-				JSONRPC string          `json:"jsonrpc"`
-				ID      int64           `json:"id"`
-				Method  string          `json:"method"`
-				Params  json.RawMessage `json:"params"`
-			}
-			if err := json.Unmarshal(line, &envelope); err != nil {
-				// Parse errors must always surface per JSON-RPC 2.0 —
-				// write directly with id=0 bypassing the notification
-				// suppression in writeError.
-				srv.writeMessage(RPCResponse{
-					JSONRPC: "2.0",
-					Error:   &RPCError{Code: ErrCodeParse, Message: fmt.Sprintf("parse error: %v", err)},
-				})
+			req, fault := decodeEnvelope(line)
+			if fault != nil {
+				srv.writeMessage(*fault)
 				continue
 			}
-
-			req := RPCRequest{JSONRPC: envelope.JSONRPC, ID: envelope.ID, Method: envelope.Method, Params: envelope.Params}
+			if req == nil { // No outgoing calls exist yet; unsolicited replies have no waiter.
+				continue
+			}
 			// Reject requests admitted before init, even if their goroutine
 			// would otherwise run after a later successful handshake.
 			if req.Method != MethodInit {
-				// Keep legacy non-init decoding behavior for the later envelope
-				// conformance pass; only Init needs raw-token decoding here.
-				if err := json.Unmarshal(line, &req); err != nil {
-					srv.writeMessage(RPCResponse{JSONRPC: "2.0", Error: &RPCError{Code: ErrCodeParse, Message: fmt.Sprintf("parse error: %v", err)}})
-					continue
-				}
 				srv.initMu.Lock()
 				ready := srv.initialized
 				srv.initMu.Unlock()
@@ -136,7 +119,7 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 			// Preserve raw init params: map decoding loses duplicate keys and
 			// precise integer tokens. The handshake is a reader admission barrier.
 			if req.Method == MethodInit {
-				if req.ID <= 0 || uint64(req.ID) > capability.MaxSafeInteger {
+				if !req.ID.positiveInteger() {
 					srv.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID")
 					continue
 				}
@@ -172,11 +155,11 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 				srv.dispatch(ctx, req)
 			}
 			if req.Method == MethodInit {
-				run(req)
+				run(*req)
 				continue
 			}
 			wg.Add(1)
-			go func(req RPCRequest) { defer wg.Done(); run(req) }(req)
+			go func(req RPCRequest) { defer wg.Done(); run(req) }(*req)
 		}
 	}()
 
@@ -266,7 +249,7 @@ func (s *server) notifyIdentity(ctx context.Context, identity json.RawMessage) {
 }
 
 // dispatch routes a single RPCRequest to the plugin. For notifications
-// (req.ID == 0) the response is suppressed.
+// (req.ID == (RPCID{})) the response is suppressed.
 func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 	if req.Method != MethodInit {
 		s.initMu.Lock()
@@ -279,7 +262,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 	}
 	switch req.Method {
 	case MethodInit:
-		if req.ID <= 0 || uint64(req.ID) > capability.MaxSafeInteger {
+		if !req.ID.positiveInteger() {
 			s.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID")
 			return
 		}
@@ -373,7 +356,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		if s.asEvent == nil {
 			// Notifications with no handler: silently drop (no error
 			// back for fire-and-forget).
-			if req.ID == 0 {
+			if req.ID == (RPCID{}) {
 				return
 			}
 			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement EventHandler")
@@ -381,7 +364,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		}
 		var params EventHandleParams
 		if err := decodeParams(req.Params, &params); err != nil {
-			if req.ID != 0 {
+			if req.ID != (RPCID{}) {
 				s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
 			}
 			return
@@ -395,7 +378,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			PreHook:   params.PreHook,
 			Identity:  params.Identity,
 		})
-		if req.ID == 0 {
+		if req.ID == (RPCID{}) {
 			return // notification — drop response
 		}
 		if err != nil {
@@ -521,9 +504,9 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 }
 
 // writeResult encodes and writes a successful JSON-RPC response.
-// Writes are suppressed for notifications (id == 0).
-func (s *server) writeResult(id int64, result any) {
-	if id == 0 {
+// Writes are suppressed for notifications (absent ID).
+func (s *server) writeResult(id RPCID, result any) {
+	if id == (RPCID{}) {
 		return
 	}
 	payload, err := json.Marshal(result)
@@ -536,8 +519,8 @@ func (s *server) writeResult(id int64, result any) {
 }
 
 // writeError encodes and writes a JSON-RPC error response.
-func (s *server) writeError(id int64, code int, message string) {
-	if id == 0 {
+func (s *server) writeError(id RPCID, code int, message string) {
+	if id == (RPCID{}) {
 		return
 	}
 	resp := RPCResponse{
@@ -549,8 +532,8 @@ func (s *server) writeError(id int64, code int, message string) {
 }
 
 // writeInitError preserves the typed structural cause across the wire.
-func (s *server) writeInitError(id int64, err error) {
-	if id == 0 {
+func (s *server) writeInitError(id RPCID, err error) {
+	if id == (RPCID{}) {
 		return
 	}
 	var failure *InitError
@@ -563,8 +546,8 @@ func (s *server) writeInitError(id int64, err error) {
 // writeErrorFromPluginErr maps a plugin.Error (with HTTP-style code) to
 // the appropriate JSON-RPC application-level error code. Unknown error
 // types fall back to ErrCodeInternal.
-func (s *server) writeErrorFromPluginErr(id int64, err error) {
-	if id == 0 {
+func (s *server) writeErrorFromPluginErr(id RPCID, err error) {
+	if id == (RPCID{}) {
 		return
 	}
 	if errors.Is(err, plugin.ErrCancelled) {
@@ -594,10 +577,13 @@ func (s *server) writeErrorFromPluginErr(id int64, err error) {
 func (s *server) writeMessage(resp RPCResponse) {
 	data, err := json.Marshal(resp)
 	if err != nil {
-		// Last-resort: write a minimal parse-error frame. We cannot
+		// Last-resort: write a minimal internal-error frame. We cannot
 		// recurse into writeError because json.Marshal already failed.
-		fallback := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"error":{"code":%d,"message":"marshal failed: %s"}}`+"\n",
-			resp.ID, ErrCodeInternal, err.Error())
+		id, idErr := json.Marshal(resp.ID)
+		if idErr != nil {
+			id = []byte("null")
+		}
+		fallback := fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"error":{"code":%d,"message":"marshal failed"}}`+"\n", id, ErrCodeInternal)
 		s.writeMu.Lock()
 		_, _ = s.out.Write([]byte(fallback))
 		s.writeMu.Unlock()
@@ -610,13 +596,22 @@ func (s *server) writeMessage(resp RPCResponse) {
 }
 
 // decodeParams unmarshals req.Params (which is typed any from the
-// decoded RPCRequest) into a concrete struct. Because the outer
-// Unmarshal left Params as an interface{} (usually map[string]any), we
-// re-marshal and re-unmarshal; this is cheap for small payloads and
-// keeps the dispatch layer simple.
+// decoded RPCRequest) into a concrete struct. Params decoded from the wire
+// retain raw JSON tokens; programmatic requests may supply ordinary values.
 func decodeParams(raw any, dst any) error {
 	if raw == nil {
 		return nil
+	}
+	// Keep the existing non-init payload normalization in this envelope slice.
+	// Init alone requires raw tokens for its already strict contract decoder.
+	if _, init := dst.(*InitParams); !init {
+		if wire, ok := raw.(json.RawMessage); ok {
+			var value any
+			if err := json.Unmarshal(wire, &value); err != nil {
+				return fmt.Errorf("decode params: %w", err)
+			}
+			raw = value
+		}
 	}
 	b, err := json.Marshal(raw)
 	if err != nil {

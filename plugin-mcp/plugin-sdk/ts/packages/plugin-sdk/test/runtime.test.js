@@ -88,7 +88,7 @@ test('omitted/null fields get Go zero values; unsupported capability precedes pa
 });
 
 test('CRLF and final frame without LF decode across arbitrary byte chunks', {timeout:5000}, async () => {
-  const bytes = Buffer.from('{"id":1,"method":"plugin/health"}\r\n{"id":2,"method":"plugin/health"}');
+  const bytes = Buffer.from('{"jsonrpc":"2.0","id":1,"method":"plugin/health"}\r\n{"jsonrpc":"2.0","id":2,"method":"plugin/health"}');
   let text = ''; const output = new Writable({write(b,_e,cb){text += b.toString();cb();}});
   await serve(fixturePlugin('base'),{input:Readable.from([...bytes].map(byte=>Buffer.from([byte]))),output});
   assert.deepEqual(text.trim().split('\n').map(JSON.parse).map(r=>r.id).sort(),[1,2]);
@@ -102,7 +102,7 @@ test('frame cap counts UTF-8 bytes rather than JS characters', {timeout:5000}, a
 test('output errors reject serve after unload without an unhandled rejection', {timeout:5000}, async () => {
   let unloaded = false;
   const output = new Writable({write(_b,_e,cb){cb(new Error('output failed'));}});
-  await assert.rejects(serve({...fixturePlugin('base'),unload(){unloaded=true;}},{input:Readable.from(['{"id":1,"method":"plugin/health"}\n']),output}),/output failed/);
+  await assert.rejects(serve({...fixturePlugin('base'),unload(){unloaded=true;}},{input:Readable.from(['{"jsonrpc":"2.0","id":1,"method":"plugin/health"}\n']),output}),/output failed/);
   assert.equal(unloaded,true);
 });
 
@@ -120,15 +120,26 @@ test('wrapped typed error and cancellation precedence follow Go', {timeout:5000}
   r.input.end(); await r.done;
 });
 
-// These checks protect documented TS-specific behavior; they do not change the
-// language-neutral observed corpus or pretend Go has the same restrictions.
-test('unsafe numeric IDs are rejected rather than correlated after rounding', {timeout:5000}, async t => {
-  const r = await rig(t,fixturePlugin('base'));
-  r.input.write('{"id":9007199254740993,"method":"plugin/health"}\n');
-  assert.equal((await r.reply()).error.code,-32700);
-  r.input.write('{"id":1e0,"method":"plugin/health"}\n');
-  assert.equal((await r.reply()).id,1);
-  r.input.end(); await r.done;
+test('invalid envelopes never invoke handlers; IDs retain presence and exact values', {timeout:5000}, async t => {
+  let calls = 0;
+  const r = await rig(t,{...fixturePlugin('base'),health(){calls++;return {ok:true};}});
+  for (const token of ['null','9007199254740993','-9007199254740992','1e0','1.0','true','[]','{}']) {
+    r.input.write(`{"jsonrpc":"2.0","id":${token},"method":"plugin/health"}\n`);
+    assert.deepEqual(await r.reply(),{jsonrpc:'2.0',id:null,error:{code:-32600,message:'invalid request'}});
+  }
+  r.input.write('{"jsonrpc":"2.0","id":1,"id":2,"method":"plugin/health"}\n');
+  assert.equal((await r.reply()).id,null);
+  r.input.write('{"jsonrpc":"2.0","id":"recover","method":1,"method":"plugin/health"}\n');
+  assert.equal((await r.reply()).id,'recover');
+  assert.equal(calls,0);
+  for (const id of ['',0,-1,9007199254740991,-9007199254740991,'text']) {
+    r.send(id,'plugin/health');assert.equal((await r.reply()).id,id);
+  }
+  r.input.write('{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}\n');
+  r.input.write('{"jsonrpc":"2.0","id":"unsolicited","result":null}\n');
+  r.send(undefined,'plugin/health');
+  r.send('barrier','plugin/health');assert.equal((await r.reply()).id,'barrier');
+  r.input.end();await r.done;assert.equal(calls,8);
 });
 
 test('exception stringification and cause getters cannot escape handler isolation', {timeout:5000}, async t => {

@@ -16,9 +16,12 @@ def type_for(s):
         return json.dumps(s['const'])
     if 'enum' in s:
         return ' | '.join(json.dumps(v) for v in s['enum'])
+    if 'anyOf' in s:
+        return ' | '.join(type_for(v) for v in s['anyOf'])
     if isinstance(s.get('type'), list):
-        nonnull = dict(s, type=next(t for t in s['type'] if t != 'null'))
-        return type_for(nonnull) + ' | null'
+        return ' | '.join(type_for(dict(s, type=t)) for t in s['type'])
+    if s.get('type') == 'null':
+        return 'null'
     if '$ref' in s:
         return s['$ref'].split('/')[-1]
     kind = s.get('type')
