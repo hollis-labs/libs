@@ -1,6 +1,7 @@
 // Package fake implements a deterministic, in-memory mesh for host tests.
 // It launches no processes and provides no persistence or production trust policy.
-// Provider-side slot dispatch picks a deterministic member. Hosts that resolve
+// Fake cursor spellings expose sequence counts; production hosts must mint
+// opaque log-scoped cursors. Provider-side slot dispatch picks a deterministic member. Hosts that resolve
 // and authorize routing themselves send to the retained recipient URNs directly.
 package fake
 
@@ -11,7 +12,6 @@ import (
 	mesh "github.com/hollis-labs/substrate/mesh"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,20 +26,28 @@ type cached struct {
 	Response mesh.Response
 }
 type Provider struct {
-	mu        sync.Mutex
-	agents    map[mesh.URN]mesh.InstanceView
-	tasks     map[mesh.URN]mesh.Task
-	teams     map[mesh.URN]mesh.Team
-	messages  map[string]mesh.Message
-	approvals map[mesh.URN]map[mesh.URN]bool
-	cache     map[string]cached
-	events    []mesh.Event
-	next      uint64
-	limits    mesh.Limits
+	mu               sync.Mutex
+	receipts         map[mesh.URN]mesh.AssignmentReceipt
+	followGrants     map[mesh.URN]bool
+	cursors          []string
+	base             uint64
+	changed          chan struct{}
+	queueAssignments bool
+	definitions      map[mesh.URN]mesh.DefinitionRef
+	agents           map[mesh.URN]mesh.InstanceView
+	agentOwners      map[mesh.URN]mesh.Actor
+	tasks            map[mesh.URN]mesh.Task
+	teams            map[mesh.URN]mesh.Team
+	messages         map[string]mesh.Message
+	approvals        map[mesh.URN]map[mesh.URN]bool
+	cache            map[string]cached
+	events           []mesh.Event
+	next             uint64
+	limits           mesh.Limits
 }
 
 func New() *Provider {
-	return &Provider{agents: map[mesh.URN]mesh.InstanceView{}, tasks: map[mesh.URN]mesh.Task{}, teams: map[mesh.URN]mesh.Team{}, messages: map[string]mesh.Message{}, approvals: map[mesh.URN]map[mesh.URN]bool{}, cache: map[string]cached{}, limits: mesh.Limits{MaxDepth: 8, MaxChildren: 16, FanOut: 16, Budget: 100, Timeout: time.Hour}}
+	return &Provider{agentOwners: map[mesh.URN]mesh.Actor{}, definitions: map[mesh.URN]mesh.DefinitionRef{}, receipts: map[mesh.URN]mesh.AssignmentReceipt{}, followGrants: map[mesh.URN]bool{}, cursors: []string{"fake-bookmark-0"}, changed: make(chan struct{}), agents: map[mesh.URN]mesh.InstanceView{}, tasks: map[mesh.URN]mesh.Task{}, teams: map[mesh.URN]mesh.Team{}, messages: map[string]mesh.Message{}, approvals: map[mesh.URN]map[mesh.URN]bool{}, cache: map[string]cached{}, limits: mesh.Limits{MaxDepth: 8, MaxChildren: 16, FanOut: 16, Budget: 100, Timeout: time.Hour}}
 }
 func clone[T any](v T) T { b, _ := json.Marshal(v); var out T; _ = json.Unmarshal(b, &out); return out }
 func (p *Provider) Describe(ctx context.Context) (mesh.Descriptor, error) {
@@ -48,7 +56,10 @@ func (p *Provider) Describe(ctx context.Context) (mesh.Descriptor, error) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return mesh.Descriptor{Provider: "msg://service/fake/provider", Capabilities: []mesh.Capability{{URI: CapabilityURI, Verbs: append([]mesh.Verb(nil), verbs...), Modes: []string{"cancel.cascade", "history.summary", "history.full", "history.filtered", "history.none"}}}, TaskStates: []mesh.TaskState{mesh.TaskWorking, mesh.TaskInputRequired, mesh.TaskCompleted, mesh.TaskCanceled}, SessionStates: []mesh.SessionState{mesh.SessionRunning, mesh.SessionPaused, mesh.SessionEnded}, DefaultLimits: p.limits}, nil
+	return p.descriptor(), nil
+}
+func (p *Provider) descriptor() mesh.Descriptor {
+	return mesh.Descriptor{Provider: "msg://service/fake/provider", Capabilities: []mesh.Capability{{URI: mesh.DispatchCapabilityURI, Verbs: []mesh.Verb{mesh.Assign, mesh.TaskLookup, mesh.EventFollow, mesh.ReportResult}, Modes: []string{"assign.actor-scoped", "assign.team-single", "follow.authorized", "replay.gap", "result.versioned"}}, {URI: CapabilityURI, Verbs: append([]mesh.Verb(nil), verbs...), Modes: []string{"cancel.cascade", "history.summary", "history.full", "history.filtered", "history.none"}}}, TaskStates: []mesh.TaskState{mesh.TaskSubmitted, mesh.TaskWorking, mesh.TaskInputRequired, mesh.TaskCompleted, mesh.TaskCanceled}, SessionStates: []mesh.SessionState{mesh.SessionRunning, mesh.SessionPaused, mesh.SessionEnded}, DefaultLimits: p.limits}
 }
 
 // GrantApproval grants this exact actor authority over this task. Actor kind grants nothing.
@@ -84,19 +95,39 @@ func (p *Provider) Invoke(ctx context.Context, r mesh.Request) (mesh.Response, e
 	if _, err := json.Marshal(r); err != nil {
 		return mesh.Response{}, mesh.NewError(mesh.ErrorInvalid, "request cannot be encoded: "+err.Error())
 	}
+	if r.Verb == mesh.EventFollow {
+		return p.follow(ctx, clone(r))
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return mesh.Response{}, err
 	}
 	r = clone(r)
+	if r.Verb == mesh.TaskLookup {
+		return p.lookup(r)
+	}
 	key := string(r.Actor.URN) + "\x00" + r.IdempotencyKey
 	if r.IdempotencyKey != "" {
 		if c, ok := p.cache[key]; ok {
-			if !reflect.DeepEqual(c.Request, r) {
+			cachedRequest := c.Request
+			incomingRequest := r
+			if r.Verb == mesh.Assign || r.Verb == mesh.Delegate {
+				cachedRequest.CorrelationID = ""
+				incomingRequest.CorrelationID = ""
+			}
+			if !reflect.DeepEqual(cachedRequest, incomingRequest) {
 				return mesh.Response{}, mesh.NewError(mesh.ErrorConflict, "idempotency key reused with different command")
 			}
-			return clone(c.Response), nil
+			out := clone(c.Response)
+			if out.Receipt != nil {
+				receipt := p.receipts[out.Receipt.TaskURN]
+				receipt.State = p.tasks[receipt.TaskURN].State
+				out.Receipt = &receipt
+				task := p.tasks[receipt.TaskURN]
+				out.Task = &task
+			}
+			return clone(out), nil
 		}
 	}
 	supported := false
@@ -123,27 +154,7 @@ func (p *Provider) Invoke(ctx context.Context, r mesh.Request) (mesh.Response, e
 		p.next = before
 		return mesh.Response{}, err
 	}
-	p.next++
-	subject := r.Target
-	if out.Instance != nil {
-		subject = out.Instance.URN
-	}
-	if out.Task != nil {
-		subject = out.Task.ID
-	}
-	if out.Team != nil {
-		subject = out.Team.URN
-	}
-	if out.Message != nil && out.Task == nil {
-		subject = mesh.URN(out.Message.ID)
-	}
-	if subject == "" {
-		subject = r.Actor.URN
-	}
-	payload, _ := json.Marshal(out)
-	event := mesh.Event{SchemaVersion: "1", ID: fmt.Sprint(p.next), Kind: string(r.Verb), Time: time.Now().UTC(), App: "fake", Source: mesh.EventSource{Channel: "fake", Confidence: 1}, Actor: r.Actor, Subject: subject, CorrelationID: r.CorrelationID, InReplyTo: r.InReplyTo, Generation: 1, SourceSequence: p.next, Cursor: strconv.FormatUint(p.next, 10), ContentType: "application/json", PayloadSchema: "urn:hollis-labs:mesh:response/v1", IdempotencyKey: r.IdempotencyKey, Visibility: "private", Payload: payload}
-	p.events = append(p.events, event)
-	out.Events = []mesh.Event{event}
+	out.Events = []mesh.Event{p.emit(r, out)}
 	if r.IdempotencyKey != "" {
 		p.cache[key] = cached{r, clone(out)}
 	}
@@ -227,6 +238,7 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 		}
 		a := mesh.InstanceView{URN: id, SessionURN: p.id("session"), Parent: r.Parent, SessionState: mesh.SessionRunning, Limits: limits}
 		p.agents[id] = a
+		p.agentOwners[id] = r.Actor
 		out.Instance = &a
 	case mesh.AgentStatus, mesh.AgentStop, mesh.AgentResume, mesh.Steer, mesh.Interrupt:
 		a, ok := p.agents[r.Target]
@@ -319,16 +331,37 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 		p.teams[t.URN] = t
 		out.Team = &t
 	case mesh.Assign, mesh.Delegate:
-		a, ok := p.agents[r.Target]
+		if r.Verb == mesh.Assign && r.IdempotencyKey == "" {
+			return out, mesh.NewError(mesh.ErrorInvalid, "assign requires caller-scoped intent key")
+		}
+		if r.Team == "" && (r.Address != "" || r.Slot != "") {
+			return out, mesh.NewError(mesh.ErrorInvalid, "assignment address/slot requires team scope")
+		}
+		target := r.Target
+		var roster *mesh.RosterProvenance
+		if r.Team != "" {
+			var err error
+			target, roster, err = p.selectMember(r)
+			if err != nil {
+				return out, err
+			}
+		}
+		a, ok := p.agents[target]
 		if !ok {
 			return out, missing()
 		}
 		if a.SessionState != mesh.SessionRunning {
-			return out, conflict()
+			return out, mesh.NewDispatchError(mesh.ErrorConflict, mesh.DiagnosticTargetBusy, string(target), "wait for the explicit target")
+		}
+		if err := p.checkAdmission(r, target); err != nil {
+			return out, err
+		}
+		if err := assignmentLimits(r.Limits, a.Limits); err != nil {
+			return out, err
 		}
 		if r.Parent != "" {
 			parent, ok := p.tasks[r.Parent]
-			if !ok {
+			if !ok || !taskVisible(parent, r.Actor) {
 				return out, missing()
 			}
 			if parent.State.Terminal() {
@@ -336,11 +369,15 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 			}
 		}
 		t := mesh.Task{ID: p.id("task"), Agent: a.URN, Caller: r.Actor, Parent: r.Parent, State: mesh.TaskWorking, History: r.History.Effective()}
+		if p.queueAssignments {
+			t.State = mesh.TaskSubmitted
+		}
 		p.tasks[t.ID] = t
+		out.Receipt = ptr(p.admit(r, t, roster))
 		out.Task = &t
 	case mesh.RequestInput, mesh.RequestApproval, mesh.Approve, mesh.ReportResult:
 		t, ok := p.tasks[r.Target]
-		if !ok {
+		if !ok || (!taskVisible(t, r.Actor) && !(r.Verb == mesh.Approve && p.approvals[t.ID][r.Actor.URN])) {
 			return out, missing()
 		}
 		if t.State.Terminal() {
@@ -361,9 +398,22 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 			if r.Actor.URN != t.Agent {
 				return out, mesh.NewError(mesh.ErrorDenied, "only the assigned actor may report its result")
 			}
+			if p.receipts[t.ID].Delivery == mesh.DeliveryPending {
+				return out, conflict()
+			}
+			if r.Result == nil {
+				return out, mesh.NewError(mesh.ErrorInvalid, "versioned result required")
+			}
+			if err := r.Result.Validate(); err != nil {
+				return out, err
+			}
 			t.State = mesh.TaskCompleted
-			t.Result = append(json.RawMessage(nil), r.Body...)
-			m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: []mesh.URN{t.Caller.URN}, Body: r.Body}
+			receipt := p.receipts[t.ID]
+			receipt.Result = ptr(clone(*r.Result))
+			t.Result = receipt.Result.Content
+			receipt.State = t.State
+			p.receipts[t.ID] = receipt
+			m := mesh.Message{ID: string(p.id("message")), Sender: r.Actor, Recipients: []mesh.URN{t.Caller.URN}, Body: t.Result}
 			p.messages[m.ID] = m
 			out.Message = &m
 		}
@@ -371,6 +421,9 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 		out.Task = &t
 	case mesh.Cancel:
 		if t, ok := p.tasks[r.Target]; ok {
+			if !taskVisible(t, r.Actor) {
+				return out, missing()
+			}
 			if t.State.Terminal() {
 				return out, conflict()
 			}
@@ -378,6 +431,9 @@ func (p *Provider) apply(r mesh.Request) (mesh.Response, error) {
 			t = p.tasks[t.ID]
 			out.Task = &t
 		} else if a, ok := p.agents[r.Target]; ok {
+			if p.agentOwners[a.URN] != r.Actor && a.URN != r.Actor.URN {
+				return out, missing()
+			}
 			if a.SessionState == mesh.SessionEnded {
 				return out, conflict()
 			}
@@ -478,3 +534,32 @@ func (p *Provider) Task(id mesh.URN) (mesh.Task, bool) {
 }
 
 var _ mesh.Provider = (*Provider)(nil)
+
+func ptr[T any](v T) *T { return &v }
+
+// emit is called while holding the provider lock.
+func (p *Provider) emit(r mesh.Request, out mesh.Response) mesh.Event {
+	p.next++
+	subject := r.Target
+	if out.Instance != nil {
+		subject = out.Instance.URN
+	}
+	if out.Task != nil {
+		subject = out.Task.ID
+	}
+	if out.Team != nil {
+		subject = out.Team.URN
+	}
+	if out.Message != nil && out.Task == nil {
+		subject = mesh.URN(out.Message.ID)
+	}
+	if subject == "" {
+		subject = r.Actor.URN
+	}
+	payload, _ := json.Marshal(out)
+	event := mesh.Event{SchemaVersion: "1", ID: fmt.Sprint(p.next), Kind: string(r.Verb), Time: time.Now().UTC(), App: "fake", Source: mesh.EventSource{Channel: "fake", Confidence: 1}, Actor: r.Actor, Subject: subject, CorrelationID: r.CorrelationID, InReplyTo: r.InReplyTo, Generation: 1, SourceSequence: p.next, Cursor: p.bookmark(p.base + uint64(len(p.events)) + 1), ContentType: "application/json", PayloadSchema: "urn:hollis-labs:mesh:response/v1", IdempotencyKey: r.IdempotencyKey, Visibility: "private", Payload: payload}
+	p.events = append(p.events, event)
+	p.cursors = append(p.cursors, event.Cursor)
+	p.wake()
+	return event
+}

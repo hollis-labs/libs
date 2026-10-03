@@ -198,6 +198,7 @@ type DefinitionRef struct {
 // Callers receive their own copy; capability descriptors claim a subset.
 func Verbs() []Verb {
 	return []Verb{
+		TaskLookup, EventFollow,
 		Describe,
 		Negotiate,
 		AgentLaunch,

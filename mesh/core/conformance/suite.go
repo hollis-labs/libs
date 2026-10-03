@@ -119,7 +119,7 @@ func Run(t *testing.T, newFixture Factory) {
 			call := invoker(t, f.Provider)
 			call(mesh.Request{Verb: mesh.AgentLaunch, Target: worker.URN})
 			for _, v := range []mesh.Verb{mesh.Assign, mesh.Delegate} {
-				task := call(mesh.Request{Verb: v, Target: worker.URN}).Task
+				task := call(mesh.Request{Verb: v, Target: worker.URN, IdempotencyKey: string(v)}).Task
 				if task.State != mesh.TaskWorking || task.History != mesh.HistorySummary {
 					t.Fatal("incorrect assignment state/history")
 				}
@@ -134,7 +134,7 @@ func Run(t *testing.T, newFixture Factory) {
 				if task.State != mesh.TaskWorking {
 					t.Fatal("approval did not resume task")
 				}
-				result := call(mesh.Request{Verb: mesh.ReportResult, Actor: worker, Target: task.ID, Body: json.RawMessage(`{"answer":42}`)})
+				result := call(mesh.Request{Verb: mesh.ReportResult, Actor: worker, Target: task.ID, Result: &mesh.VersionedResult{SchemaVersion: mesh.ResultSchemaV1, ContentType: "application/json", Digest: mesh.ContentDigest([]byte(`{"answer":42}`)), Content: json.RawMessage(`{"answer":42}`)}})
 				task = result.Task
 				if result.Message == nil || len(result.Message.Recipients) != 1 || result.Message.Recipients[0] != caller.URN {
 					t.Fatal("result was not pushed back to caller")
@@ -150,7 +150,7 @@ func Run(t *testing.T, newFixture Factory) {
 			a := call(mesh.Request{Verb: mesh.AgentLaunch}).Instance
 			b := call(mesh.Request{Verb: mesh.AgentLaunch, Parent: a.URN}).Instance
 			root := call(mesh.Request{Verb: mesh.Delegate, Target: a.URN}).Task
-			child := call(mesh.Request{Verb: mesh.Assign, Target: b.URN, Parent: root.ID}).Task
+			child := call(mesh.Request{Verb: mesh.Assign, Target: b.URN, Parent: root.ID, IdempotencyKey: "child"}).Task
 			call(mesh.Request{Verb: mesh.Cancel, Target: root.ID, Cascade: true})
 			got, ok := f.ReadTask(child.ID)
 			if !ok || got.State != mesh.TaskCanceled {
