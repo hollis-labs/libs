@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hollis-labs/go-materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 type DocumentKind string

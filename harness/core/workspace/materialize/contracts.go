@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/go-materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 var (

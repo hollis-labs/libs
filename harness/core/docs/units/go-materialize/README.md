@@ -22,8 +22,8 @@ go get github.com/hollis-labs/go-materialize
 
 ```go
 import (
-    "github.com/hollis-labs/go-materialize/artifact"
-    "github.com/hollis-labs/go-materialize/materialize"
+    "github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+    "github.com/hollis-labs/substrate/harness/workspace/materialize"
 )
 ```
 
