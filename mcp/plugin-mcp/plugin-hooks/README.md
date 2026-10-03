@@ -99,6 +99,14 @@ returns an async receipt; overload must be surfaced after the transaction. This 
 in-memory scheduling, without retries or durable delivery. Always resolve a pending
 capability: the engine has no transaction driver.
 
+## Conformance and plugin tests
+
+`hookstest.Run` exercises a host dispatcher through a small factory and scope
+adapter. Requirements R01-R15 cover registration, execution and unload; waivers
+must name a requirement and a reason. The library's own run has zero waivers.
+`hookstest.NewHarness` drives plugin callbacks in process with an explicit catalog.
+See [hookstest usage and requirement list](hookstest/README.md).
+
 ## Known limitations
 
 Filter diffs compare JSON numbers by their literal text. Re-encoding an untouched

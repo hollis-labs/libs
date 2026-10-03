@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- `hookstest`: adapter-based requirements R01-R15 for host dispatchers, explicit
+  waivers with reasons, a reference Engine adapter and in-process plugin harness.
+  The reference run has zero waivers; the full gate repeats it under the race
+  detector. Covers ordering, errors, deadlines, lifecycle, depth, copying, views
+  and catalog admission.
+
 - Add explicit host catalog declarations and scoped action/filter registration.
 - Resolve options, preserve stable priority ties and enforce unique names.
 - Add opaque handles, atomic once claims and bounded generation disposal.
