@@ -1,224 +1,501 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 )
 
-// TestProtocolLockedAt1 pins the wire version.
-//
-// The registry contract has two views in two languages and is read by hosts
-// and loaders that ship as separately versioned artifacts. The protocol
-// number is how a mismatch announces itself instead of surfacing as a field
-// that silently stopped being read, so changing it is a coordinated act and
-// this test is the thing that makes it deliberate. The TypeScript side
-// carries the matching pin.
-func TestProtocolLockedAt1(t *testing.T) {
-	if Protocol != 1 {
-		t.Fatalf("Protocol = %d, want 1 — bump the TypeScript pin in the same change", Protocol)
+func validResponse() Response {
+	r := NewResponse("host-epoch", 2)
+	r.Plugins["notes"] = Plugin{OwnerGeneration: "1", BundleURL: "/notes.js", BundleVersion: BundleDigest([]byte("export const Panel = {};")), Runtime: []Runtime{{Name: "react", Min: "19.0.0", Max: "19.9.9"}}}
+	r.Kinds["panel"] = KindDescriptor{1, json.RawMessage(`{}`), []Representation{Component}, []string{"rail"}, []string{}}
+	r.Regions["rail"] = RegionDescriptor{[]string{"panel"}, []Representation{Component}, json.RawMessage(`{}`), "priority-ascending"}
+	_ = r.Set(Contribution{Status: StatusAccepted, OwnerID: "notes", OwnerGeneration: "1", LocalKey: "main", Kind: "panel", SchemaVersion: 1, Required: true, Representation: Component, Metadata: json.RawMessage(`{"title":"Notes"}`), Component: &ComponentRef{"Panel", "rail"}})
+	return r
+}
+func policyFor(r Response) AdmissionPolicy {
+	return AdmissionPolicy{Kinds: r.Kinds, Regions: r.Regions}
+}
+func TestRegistryVersionLockedAt2(t *testing.T) {
+	if RegistryVersion != 2 {
+		t.Fatal("registry version must be 2")
 	}
-	if got := NewResponse().Protocol; got != Protocol {
-		t.Errorf("NewResponse().Protocol = %d, want %d", got, Protocol)
+}
+func TestWireRoundtrip(t *testing.T) {
+	want := validResponse()
+	raw, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Response
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Fatal("roundtrip lost fields")
+	}
+	if err := got.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestInsertionNeverOverwrites(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.Component = &ComponentRef{"Other", "rail"}
+	if !errors.Is(r.Set(c), ErrCollision) {
+		t.Fatal("duplicate accepted")
+	}
+	if r.Contributions["panel"]["notes/main"].Component.Export != "Panel" {
+		t.Fatal("overwritten")
+	}
+}
+func TestOptionalUnknownAndRequiredAtomicFailure(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.Kind = "plugin.notes.future"
+	c.LocalKey = "future"
+	c.Required = false
+	_ = r.Set(c)
+	p, err := r.Plan(policyFor(r))
+	if err != nil || len(p.Accepted) != 1 || p.Refusals[0].Reason != "unsupported-kind" {
+		t.Fatalf("optional: %+v %v", p, err)
+	}
+	c.Required = true
+	r.Contributions[c.Kind][c.Key()] = c
+	p, err = r.Plan(policyFor(r))
+	if !errors.Is(err, ErrRequired) || !p.Refusals[0].Required {
+		t.Fatalf("required: %+v %v", p, err)
+	}
+}
+func TestKindRegionAndMetadataOptIn(t *testing.T) {
+	cases := []struct {
+		name, reason string
+		policy       func(Response) AdmissionPolicy
+	}{
+		{"kind", "unsupported-kind", func(r Response) AdmissionPolicy { p := policyFor(r); p.Kinds = map[string]KindDescriptor{}; return p }},
+		{"region", "unsupported-region", func(r Response) AdmissionPolicy {
+			p := policyFor(r)
+			p.Regions = map[string]RegionDescriptor{}
+			return p
+		}},
+		{"reserved", "reserved", func(r Response) AdmissionPolicy {
+			p := policyFor(r)
+			p.Reserved = func(_, key string) bool { return key == "notes/main" }
+			return p
+		}},
+		{"schema", "invalid-metadata", func(r Response) AdmissionPolicy {
+			p := policyFor(r)
+			p.ValidateMetadata = func(_, raw json.RawMessage) error { return errors.New("bad schema") }
+			return p
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validResponse()
+			p, err := r.Plan(tc.policy(r))
+			if !errors.Is(err, ErrRequired) || p.Refusals[0].Reason != tc.reason {
+				t.Fatalf("%+v %v", p, err)
+			}
+		})
+	}
+}
+func TestRepresentationsAndOwnership(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.OwnerGeneration = "old"
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("stale generation accepted")
+	}
+	r = validResponse()
+	c = r.Contributions["panel"]["notes/main"]
+	c.Declarative = json.RawMessage(`{}`)
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("two representations accepted")
+	}
+	r = NewResponse("epoch", 2)
+	r.Plugins["p"] = Plugin{OwnerGeneration: "1"}
+	for _, c := range []Contribution{
+		{Status: StatusAccepted, OwnerID: "p", OwnerGeneration: "1", LocalKey: "nav", Kind: "nav.item", SchemaVersion: 1, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{"label":"Hi"}`)},
+		{Status: StatusAccepted, OwnerID: "p", OwnerGeneration: "1", LocalKey: "tool", Kind: "mcp.tool", SchemaVersion: 1, Representation: Handler, Metadata: json.RawMessage(`{}`), Handler: &HandlerRef{ID: "notes.read"}},
+	} {
+		if err := r.Set(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestRuntimeAndIntegrity(t *testing.T) {
+	p := validResponse().Plugins["notes"]
+	bytes := []byte("export const Panel = {};")
+	if err := VerifyBundle(p, bytes, map[string]string{"react": "19.3.0"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(VerifyBundle(p, []byte("changed"), map[string]string{"react": "19.3.0"}, false), ErrIntegrity) {
+		t.Fatal("digest mismatch accepted")
+	}
+	for _, version := range []string{"20.0.0", "19.0.0-rc.1", "not-a-version", ""} {
+		if !errors.Is(CheckRuntimes(p.Runtime, map[string]string{"react": version}, false), ErrRuntime) {
+			t.Fatalf("accepted %q", version)
+		}
+	}
+	if err := CheckRuntimes([]Runtime{{Name: "r", Min: "0.2.0", Max: "0.2.9"}}, map[string]string{"r": "0.2.9"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckRuntimes([]Runtime{{Name: "r", Min: "1.0.0-alpha.2", Max: "1.0.0-alpha.10"}}, map[string]string{"r": "1.0.0-alpha.9"}, true); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestCatalogRevokeBeforeReplaceAndStaleFence(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	notifications := 0
+	unsubscribe := catalog.Subscribe(func() { notifications++; _ = catalog.Snapshot() })
+	defer unsubscribe()
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	next := clone(r)
+	next.Revision = 4
+	p := next.Plugins["notes"]
+	p.OwnerGeneration = "2"
+	next.Plugins["notes"] = p
+	c := next.Contributions["panel"]["notes/main"]
+	c.OwnerGeneration = "2"
+	next.Contributions[c.Kind][c.Key()] = c
+	if _, err := catalog.Activate(next, policyFor(next)); !errors.Is(err, ErrNeedsRevocation) {
+		t.Fatal("replacement without revoke")
+	}
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Snapshot().Contributions) != 0 {
+		t.Fatal("revoked view still listed")
+	}
+	if _, err := catalog.Activate(next, policyFor(next)); err != nil {
+		t.Fatal(err)
+	}
+	if err := catalog.Revoke("notes", "1"); !errors.Is(err, ErrStale) {
+		t.Fatal("stale revoke accepted")
+	}
+	stale := clone(r)
+	stale.Revision = 6
+	if _, err := catalog.Activate(stale, policyFor(stale)); !errors.Is(err, ErrRevoked) {
+		t.Fatal("revoked generation restored")
+	}
+	if notifications != 3 {
+		t.Fatalf("notifications: %d", notifications)
+	}
+	snapshot := catalog.Snapshot()
+	delete(snapshot.Plugins, "notes")
+	if len(catalog.Snapshot().Plugins) == 0 {
+		t.Fatal("snapshot mutation changed live state")
+	}
+}
+func TestScopeFencesAndContinuesCleanup(t *testing.T) {
+	scope, err := NewScope("epoch", "p", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []int
+	for i := range 3 {
+		_ = scope.Add(func(context.Context) error {
+			order = append(order, i)
+			if i == 1 {
+				panic("fixture")
+			}
+			return nil
+		})
+	}
+	ctx, err := scope.Admit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scope.Dispose(context.Background()); err == nil {
+		t.Fatal("panic disappeared")
+	}
+	if !reflect.DeepEqual(order, []int{2, 1, 0}) {
+		t.Fatalf("order: %v", order)
+	}
+	if ctx.Err() == nil || scope.Active() {
+		t.Fatal("scope not revoked")
+	}
+	if _, err := scope.Admit(); !errors.Is(err, ErrRevoked) {
+		t.Fatal("dispatch admitted")
+	}
+	if err := scope.Add(func(context.Context) error { return nil }); !errors.Is(err, ErrRevoked) {
+		t.Fatal("late registration admitted")
+	}
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Go(func() { _ = scope.Dispose(context.Background()) })
+	}
+	wg.Wait()
+	if !reflect.DeepEqual(order, []int{2, 1, 0}) {
+		t.Fatal("disposal repeated")
+	}
+}
+func TestDuplicateJSONKeysRefused(t *testing.T) {
+	var r Response
+	if err := json.Unmarshal([]byte(`{"registry_version":2,"registry_version":2}`), &r); !errors.Is(err, ErrCollision) {
+		t.Fatalf("duplicate: %v", err)
 	}
 }
 
-func TestNewResponseHasNonNilMaps(t *testing.T) {
-	r := NewResponse()
-	if r.Plugins == nil || r.Contributions == nil {
-		t.Fatal("NewResponse must initialize both maps so a loader always sees both keys")
+func TestCatalogWithdrawalRequiresRevoke(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
 	}
-	raw, err := json.Marshal(r)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
+	empty := NewResponse(r.HostInstance, 3)
+	if _, err := catalog.Activate(empty, policyFor(empty)); !errors.Is(err, ErrNeedsRevocation) {
+		t.Fatalf("withdrawal bypassed revoke: %v", err)
 	}
-	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	if len(catalog.Snapshot().Plugins) != 1 {
+		t.Fatal("failed withdrawal changed catalog")
 	}
-	for _, key := range []string{"protocol", "plugins", "contributions"} {
-		if _, ok := decoded[key]; !ok {
-			t.Errorf("empty response omits %q; the loader treats it as a stable dictionary", key)
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	empty.Revision = 4
+	if _, err := catalog.Activate(empty, policyFor(empty)); err != nil {
+		t.Fatal(err)
+	}
+	r.Revision = 5
+	if _, err := catalog.Activate(r, policyFor(r)); !errors.Is(err, ErrRevoked) {
+		t.Fatalf("withdrawn generation restored: %v", err)
+	}
+}
+
+func TestConcurrentCatalogActivationAndSnapshots(t *testing.T) {
+	catalog := NewCatalog("epoch")
+	var wg sync.WaitGroup
+	for revision := uint64(2); revision < 50; revision++ {
+		wg.Go(func() {
+			r := NewResponse("epoch", revision)
+			_, err := catalog.Activate(r, policyFor(r))
+			if err != nil && !errors.Is(err, ErrStale) {
+				t.Error(err)
+			}
+			snapshot := catalog.Snapshot()
+			if err := snapshot.Validate(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if catalog.Snapshot().Revision != 49 {
+		t.Fatal("newer revision lost")
+	}
+}
+
+func TestConcurrentDisposeWaitsForSingleCleanup(t *testing.T) {
+	scope, _ := NewScope("epoch", "notes", "1")
+	entered, release := make(chan struct{}), make(chan struct{})
+	calls := 0
+	_ = scope.Add(func(context.Context) error { calls++; close(entered); <-release; return errors.New("cleanup failed") })
+	results := make(chan error, 2)
+	go func() { results <- scope.Dispose(context.Background()) }()
+	<-entered
+	if _, err := scope.Admit(); !errors.Is(err, ErrRevoked) {
+		t.Fatal("call admitted during cleanup")
+	}
+	go func() { results <- scope.Dispose(context.Background()) }()
+	close(release)
+	first, second := <-results, <-results
+	if first == nil || second == nil || first.Error() != second.Error() || calls != 1 {
+		t.Fatal("disposal was not single/idempotent")
+	}
+}
+
+func TestRevokePreflightGenerationPreventsLateActivation(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Activate(r, policyFor(r)); !errors.Is(err, ErrRevoked) {
+		t.Fatalf("revoked pending owner activated: %v", err)
+	}
+}
+
+func TestRequiredFailurePreservesServingCatalog(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	candidate := clone(r)
+	candidate.Revision++
+	policy := policyFor(candidate)
+	policy.Kinds = map[string]KindDescriptor{}
+	if _, err := catalog.Activate(candidate, policy); !errors.Is(err, ErrRequired) {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(catalog.Snapshot(), r) {
+		t.Fatal("preflight failure replaced current catalog")
+	}
+}
+
+func TestCoreAndForeignNamespacesRefused(t *testing.T) {
+	for _, owner := range []string{"core", "notes"} {
+		r := NewResponse("epoch", 2)
+		r.Plugins[owner] = Plugin{OwnerGeneration: "1"}
+		kind := "plugin.someone_else.nav"
+		r.Kinds[kind] = KindDescriptor{1, json.RawMessage(`{}`), []Representation{Declarative}, []string{}, []string{}}
+		_ = r.Set(Contribution{Status: StatusAccepted, OwnerID: owner, OwnerGeneration: "1", LocalKey: "nav", Kind: kind, SchemaVersion: 1, Required: true, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{}`)})
+		plan, err := r.Plan(policyFor(r))
+		if !errors.Is(err, ErrRequired) || plan.Refusals[0].Reason != "reserved" {
+			t.Fatalf("namespace accepted: %+v %v", plan, err)
 		}
 	}
 }
 
-// TestResponseRoundTrip is the per-type roundtrip this repo already applies to
-// every wire message, for the same reason: the host and the browser are
-// separately built, so a field that stops surviving a marshal/unmarshal cycle
-// is a compatibility break rather than a local bug.
-func TestResponseRoundTrip(t *testing.T) {
-	meta, err := Meta(map[string]any{"slot": "nav-rail", "priority": 10})
-	if err != nil {
-		t.Fatalf("Meta: %v", err)
+func TestPublicBindingCollisionAndNestedDuplicateJSON(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.PublicBinding = "shared"
+	r.Contributions[c.Kind][c.Key()] = c
+	c.LocalKey = "other"
+	_ = r.Set(c)
+	if !errors.Is(r.Validate(), ErrCollision) {
+		t.Fatal("public binding collision accepted")
 	}
-	want := NewResponse()
-	want.Plugins["acme.widgets"] = Plugin{
-		BundleURL:     "/api/plugins/acme.widgets/ui/index.js",
-		StylesheetURL: "/api/plugins/acme.widgets/ui/index.css",
-		BundleVersion: "1757600000000",
-		Runtime:       &Runtime{Name: "react", Version: "^19.0.0"},
-	}
-	want.Set("envelope", "acme.report", Contribution{PluginID: "acme.widgets", Export: "ReportView"})
-	want.Set("slot", "acme.nav", Contribution{PluginID: "acme.widgets", Export: "AcmeNavPage", Meta: meta})
-
-	raw, err := json.Marshal(want)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var got Response
-	if err := json.Unmarshal(raw, &got); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("roundtrip changed the response:\n want %+v\n  got %+v", want, got)
+	raw := []byte(`{"registry_version":2,"metadata":{"nested":1,"nested":2}}`)
+	if !errors.Is(json.Unmarshal(raw, &r), ErrCollision) {
+		t.Fatal("nested duplicate key accepted")
 	}
 }
 
-// TestMetaSurvivesOpaquely is the structural guarantee that keeps a host's
-// taxonomy out of this package: whatever a host puts in Meta comes back
-// unread and unreshaped, including shapes this package has no types for.
-func TestMetaSurvivesOpaquely(t *testing.T) {
-	meta := json.RawMessage(`{"nested":{"deep":[1,2,{"x":null}]},"unicode":"café"}`)
-	r := NewResponse()
-	r.Plugins["p"] = Plugin{BundleURL: "/p.js"}
-	r.Set("whatever", "k", Contribution{PluginID: "p", Export: "E", Meta: meta})
-
-	raw, err := json.Marshal(r)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
+func TestRevokeRemovesOnlyMatchingGenerationRefusals(t *testing.T) {
+	r := validResponse()
+	r.Refusals = []Refusal{
+		{OwnerID: "notes", OwnerGeneration: "1", Kind: "future", LocalKey: "a", Reason: "unsupported-kind"},
+		{OwnerID: "notes", OwnerGeneration: "older", Kind: "future", LocalKey: "b", Reason: "unsupported-kind"},
+		{OwnerID: "other", OwnerGeneration: "1", Kind: "future", LocalKey: "c", Reason: "unsupported-kind"},
 	}
-	var got Response
-	if err := json.Unmarshal(raw, &got); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
 	}
-	var wantVal, gotVal any
-	if err := json.Unmarshal(meta, &wantVal); err != nil {
-		t.Fatalf("unmarshal want: %v", err)
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
 	}
-	if err := json.Unmarshal(got.Contributions["whatever"]["k"].Meta, &gotVal); err != nil {
-		t.Fatalf("unmarshal got: %v", err)
-	}
-	if !reflect.DeepEqual(wantVal, gotVal) {
-		t.Errorf("meta changed across the wire:\n want %v\n  got %v", wantVal, gotVal)
+	want := r.Refusals[1:]
+	if !reflect.DeepEqual(catalog.Snapshot().Refusals, want) {
+		t.Fatal("matching refusals survived or unrelated refusal removed")
 	}
 }
 
-func TestPluginOmitsEmptyOptionalFields(t *testing.T) {
-	raw, err := json.Marshal(Plugin{BundleURL: "/p.js"})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if got, want := string(raw), `{"bundle_url":"/p.js"}`; got != want {
-		t.Errorf("Plugin marshalled as %s, want %s", got, want)
-	}
-}
-
-func TestValidateAcceptsAWellFormedResponse(t *testing.T) {
-	r := NewResponse()
-	r.Plugins["p"] = Plugin{BundleURL: "/p.js"}
-	r.Set("envelope", "k", Contribution{PluginID: "p", Export: "E"})
-	if err := r.Validate(); err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-}
-
-// A plugin describing no browser half is valid. Its contributions are
-// attributable and unresolved, which is a state the loader reports.
-func TestValidateAcceptsAPluginWithNoBundle(t *testing.T) {
-	r := NewResponse()
-	r.Plugins["p"] = Plugin{}
-	r.Set("envelope", "k", Contribution{PluginID: "p", Export: "E"})
-	if err := r.Validate(); err != nil {
-		t.Fatalf("Validate rejected a bundle-less plugin: %v", err)
-	}
-}
-
-func TestValidateRejections(t *testing.T) {
-	newValid := func() Response {
-		r := NewResponse()
-		r.Plugins["p"] = Plugin{BundleURL: "/p.js"}
-		r.Set("envelope", "k", Contribution{PluginID: "p", Export: "E"})
-		return r
-	}
-
+func TestKnownWireFieldsRequireExactCase(t *testing.T) {
 	cases := []struct {
-		name    string
-		mutate  func(Response) Response
-		wantErr error
+		name   string
+		target any
+		raw    string
 	}{
-		{
-			name:    "protocol from a build we do not speak",
-			mutate:  func(r Response) Response { r.Protocol = Protocol + 1; return r },
-			wantErr: ErrProtocol,
-		},
-		{
-			name:    "contribution with no plugin_id",
-			mutate:  func(r Response) Response { r.Set("envelope", "k", Contribution{Export: "E"}); return r },
-			wantErr: ErrInvalidContribution,
-		},
-		{
-			// The defect this replaces: an export name inferred from an
-			// identifier rather than declared. An empty export is a host that
-			// dropped the field, and the loader must not guess at one.
-			name:    "contribution with no export",
-			mutate:  func(r Response) Response { r.Set("envelope", "k", Contribution{PluginID: "p"}); return r },
-			wantErr: ErrInvalidContribution,
-		},
-		{
-			name:    "empty contribution key",
-			mutate:  func(r Response) Response { r.Set("envelope", "", Contribution{PluginID: "p", Export: "E"}); return r },
-			wantErr: ErrInvalidContribution,
-		},
-		{
-			name: "empty contribution kind",
-			mutate: func(r Response) Response {
-				r.Set("", "k", Contribution{PluginID: "p", Export: "E"})
-				return r
-			},
-			wantErr: ErrInvalidContribution,
-		},
-		{
-			name: "malformed meta",
-			mutate: func(r Response) Response {
-				r.Set("envelope", "k", Contribution{PluginID: "p", Export: "E", Meta: json.RawMessage(`{nope`)})
-				return r
-			},
-			wantErr: ErrInvalidContribution,
-		},
-		{
-			// Unresolvable by construction. The loader's only honest response
-			// is to drop it, so the host finds out at serve time instead.
-			name: "contribution naming a plugin the response does not describe",
-			mutate: func(r Response) Response {
-				r.Set("envelope", "k", Contribution{PluginID: "ghost", Export: "E"})
-				return r
-			},
-			wantErr: ErrUnknownPlugin,
-		},
+		{"response", new(Response), `{"Revision":1}`},
+		{"plugin", new(Plugin), `{"Owner_generation":"1"}`},
+		{"runtime", new(Runtime), `{"Name":"react"}`},
+		{"contribution", new(Contribution), `{"Required":false}`},
+		{"refusal", new(Refusal), `{"Required":false}`},
+		{"kind", new(KindDescriptor), `{"Schema_version":1}`},
+		{"region", new(RegionDescriptor), `{"Ordering":"manifest"}`},
+		{"component", new(ComponentRef), `{"Export":"Panel"}`},
+		{"handler", new(HandlerRef), `{"Id":"handle"}`},
 	}
-
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.mutate(newValid()).Validate()
-			if !errors.Is(err, tc.wantErr) {
-				t.Fatalf("Validate() error = %v, want one wrapping %v", err, tc.wantErr)
+			if !errors.Is(json.Unmarshal([]byte(tc.raw), tc.target), ErrInvalidContribution) {
+				t.Fatal("mis-cased known field accepted")
 			}
 		})
 	}
 }
 
-func TestSetCreatesTheKindMap(t *testing.T) {
-	r := NewResponse()
-	r.Set("newkind", "k", Contribution{PluginID: "p", Export: "E"})
-	if got := r.Contributions["newkind"]["k"].Export; got != "E" {
-		t.Errorf("Set did not record the contribution, got export %q", got)
+func TestRevokeRefusalOnlyOwnerPublishesAbsence(t *testing.T) {
+	r := NewResponse("epoch", 2)
+	r.Refusals = []Refusal{{OwnerID: "pending", OwnerGeneration: "1", Kind: "unknown", LocalKey: "a", Reason: "unsupported-kind"}}
+	catalog := NewCatalog("epoch")
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	notifications := 0
+	catalog.Subscribe(func() { notifications++; _ = catalog.Snapshot() })
+	if err := catalog.Revoke("pending", "1"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := catalog.Snapshot()
+	if len(snapshot.Refusals) != 0 || snapshot.Revision != 3 || notifications != 1 {
+		t.Fatalf("refusal-only owner survived: %+v, notifications=%d", snapshot, notifications)
+	}
+	if err := catalog.Revoke("pending", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if notifications != 1 || catalog.Snapshot().Revision != 3 {
+		t.Fatal("idempotent revoke republished unchanged catalog")
 	}
 }
 
-func TestMetaRejectsUnmarshalableValues(t *testing.T) {
-	if _, err := Meta(make(chan int)); err == nil {
-		t.Error("Meta accepted a value json cannot marshal")
+func TestStatusProjectionNeverActivatesInactiveEntries(t *testing.T) {
+	for _, status := range []ContributionStatus{StatusDeclaredNotSelected, StatusUnavailable, "future_status"} {
+		t.Run(string(status), func(t *testing.T) {
+			r := validResponse()
+			c := r.Contributions["panel"]["notes/main"]
+			c.Status = status
+			r.Contributions[c.Kind][c.Key()] = c
+			if err := r.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := r.Plan(policyFor(r))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || plan.Listed[0].Status != status {
+				t.Fatal("inactive entry lost or activated")
+			}
+			if status == "future_status" && (len(plan.StatusDiagnostics) != 1 || plan.StatusDiagnostics[0].Reason != "unknown-status") {
+				t.Fatal("unknown status not diagnosed")
+			}
+			catalog := NewCatalog(r.HostInstance)
+			if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+				t.Fatal(err)
+			}
+			if catalog.Snapshot().Contributions[c.Kind][c.Key()].Status != status {
+				t.Fatal("projection status dropped")
+			}
+		})
+	}
+}
+
+func TestRefusedStatusHasSingleAuthoritativeRefusal(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.Required = false
+	c.Status = StatusRefused
+	c.StatusReason = "host-policy"
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("unbacked refused status accepted")
+	}
+	r.Refusals = []Refusal{{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, "host-policy", false}}
+	plan, err := r.Plan(policyFor(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || len(plan.Refusals) != 1 {
+		t.Fatal("refusal duplicated or activated")
+	}
+	c.Status = StatusAccepted
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("accepted/refused contradiction allowed")
 	}
 }
