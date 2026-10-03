@@ -1,0 +1,13 @@
+.DS_Store
+*.out
+*.test
+coverage.out
+
+# Agent / AI scaffolding — must never appear in this public repo.
+.agentrc/
+agentrc.yaml
+agentrc.yml
+.claude/
+AUDIT_RESULTS.md
+.lefthook.yml
+lefthook.yml
