@@ -26,3 +26,8 @@ executable catalog. No aliases or implicit permissions are introduced.
 Separate lifecycle tests exercise concurrent capacity/once/removal/disposal,
 queue overload and cancellation using controlled completion barriers. Extend
 this corpus when a shared observable execution or registration rule changes.
+
+These scenarios complement the dispatcher requirements in `hookstest/`.
+Fixture case names are independent of that package's stable R01-R15 identifiers,
+which remain unchanged. The Go final gate runs both suites; the TS suite runs
+the shared JSON scenarios and its lifecycle tests.
