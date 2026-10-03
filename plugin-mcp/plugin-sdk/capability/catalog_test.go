@@ -83,3 +83,12 @@ func TestWireFailureNeverRetries(t *testing.T) {
 		t.Fatalf("failure: %s", b)
 	}
 }
+
+func TestExtensionOperationsHaveOneDescriptorOwner(t *testing.T) {
+	makeDescriptor := func(name string) Descriptor {
+		return Descriptor{Name: name, SchemaVersion: 1, Description: "Private callback", EffectCeiling: Write, Operations: []string{"callback"}, ScopeSchema: ScopeSchema{Allowlists: []string{"operations", "targets", "effects"}}}
+	}
+	if _, err := NewCatalog(nil, []Descriptor{makeDescriptor("host.one.call"), makeDescriptor("host.two.call")}); err == nil {
+		t.Fatal("operation shared by different descriptors")
+	}
+}

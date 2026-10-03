@@ -2,9 +2,11 @@ package host
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/hollis-labs/plugin-sdk/capability"
 )
@@ -70,7 +72,7 @@ func (a *Auditor) Record(ctx context.Context, event AuditEvent) (ok bool) {
 			ok = false
 		}
 	}()
-	if err := a.sink.Record(ctx, event); err != nil {
+	if err := a.sink.Record(ctx, sanitizeAudit(event)); err != nil {
 		a.failures.Add(1)
 		return false
 	}
@@ -112,4 +114,45 @@ func (a *Auditor) Denials() map[DenialKey]uint64 {
 	}
 	a.denials.Range(func(key, value any) bool { out[key.(DenialKey)] = value.(*atomic.Uint64).Load(); return true })
 	return out
+}
+
+// MaxAuditIdentifierBytes caps every untrusted identifier copied to telemetry.
+const MaxAuditIdentifierBytes = 256
+
+// The wildcard is forbidden by identifier, so it cannot alias a real identifier.
+const invalidAuditIdentifier = "*"
+
+func auditIdentifier(value string) string {
+	if value == "" {
+		return ""
+	}
+	if len(value) > MaxAuditIdentifierBytes || !identifier(value) || strings.ContainsFunc(value, func(r rune) bool { return unicode.Is(unicode.Cf, r) }) {
+		return invalidAuditIdentifier
+	}
+	return value
+}
+func sanitizeAudit(e AuditEvent) AuditEvent {
+	e.TraceID = auditIdentifier(e.TraceID)
+	e.RequestID = auditIdentifier(e.RequestID)
+	e.Actor = Actor{auditIdentifier(e.Actor.Kind), auditIdentifier(e.Actor.ID)}
+	if e.InitiatingCaller != nil {
+		e.InitiatingCaller = &Actor{auditIdentifier(e.InitiatingCaller.Kind), auditIdentifier(e.InitiatingCaller.ID)}
+	}
+	e.Owner.HostInstance = auditIdentifier(e.Owner.HostInstance)
+	e.Owner.OwnerID = auditIdentifier(e.Owner.OwnerID)
+	if e.Owner.OwnerGeneration > capability.MaxSafeInteger {
+		e.Owner.OwnerGeneration = 0
+	}
+	e.Capability = auditIdentifier(e.Capability)
+	e.GrantID = auditIdentifier(e.GrantID)
+	e.PolicyRevision = auditIdentifier(e.PolicyRevision)
+	e.Target = auditIdentifier(e.Target)
+	e.Server = auditIdentifier(e.Server)
+	e.Tool = auditIdentifier(e.Tool)
+	switch e.Effect {
+	case capability.Read, capability.Write, capability.Destructive:
+	default:
+		e.Effect = ""
+	}
+	return e
 }

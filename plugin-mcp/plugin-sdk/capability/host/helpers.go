@@ -3,6 +3,7 @@ package host
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/hollis-labs/plugin-sdk/capability"
 )
@@ -11,7 +12,7 @@ func refusal(code capability.Code, name string) *capability.Error {
 	return &capability.Error{Code: code, Capability: name, EffectState: capability.NotStarted}
 }
 func identifier(v string) bool {
-	return v != "" && v != "*" && strings.TrimSpace(v) == v && !strings.ContainsFunc(v, unicode.IsControl)
+	return utf8.ValidString(v) && v != "" && v != "*" && strings.TrimSpace(v) == v && !strings.ContainsFunc(v, unicode.IsControl)
 }
 func validNames(values []string) bool {
 	seen := map[string]bool{}

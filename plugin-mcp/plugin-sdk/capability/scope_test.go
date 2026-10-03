@@ -62,3 +62,16 @@ func TestMalformedScopes(t *testing.T) {
 		}
 	}
 }
+
+func TestScopePortableLimitBoundary(t *testing.T) {
+	for _, value := range []int64{int64(MaxSafeInteger), int64(MaxSafeInteger) + 1, -1} {
+		s := Scope{Limits: map[string]int64{"bytes": value}}
+		err := s.Validate(ReadonlyQuery)
+		if value == int64(MaxSafeInteger) && err != nil {
+			t.Fatal("maximum safe limit rejected")
+		}
+		if value != int64(MaxSafeInteger) && err == nil {
+			t.Fatal("nonportable limit accepted")
+		}
+	}
+}
