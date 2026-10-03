@@ -8,8 +8,12 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.1.0 — 2026-10-03
+
 ### Added
 
+- A module README stating the v0 stability policy, and the MIT license in the module
+  directory so it travels with the module.
 - Explicit bounded-spawn capabilities and conformance checks for lifetime child,
   fanout, depth and budget ceilings, parent records and cascade cancellation.
 - Per-call work history, accepted-delegation result replies queued for the next
@@ -44,6 +48,9 @@ All notable changes to the `mesh` module are documented here. The format follows
 - Versioned result envelopes binding schema, media type and exact content digest;
   unsupported schemas cannot complete work.
 - Fake restart checkpoints, queued delivery and reusable dispatch conformance.
+- The complete, history-preserved packages from `go-messaging`,
+  `go-federation`, `go-tether-client`, and `go-hitl`, including their tests,
+  examples, contracts, and package documentation.
 
 ### Changed
 
@@ -53,17 +60,6 @@ All notable changes to the `mesh` module are documented here. The format follows
   supported versioned result envelope instead of a body-only result.
 - Task result content is encoded as bytes to preserve the exact digest input
   across JSON transport and snapshot reads.
-
-## v0.1.0
-
-### Added
-
-- The complete, history-preserved packages from `go-messaging`,
-  `go-federation`, `go-tether-client`, and `go-hitl`, including their tests,
-  examples, contracts, and package documentation.
-
-### Changed
-
 - The packages now share the `github.com/hollis-labs/substrate/mesh` module.
   Imports move as follows; no consumer adoption is included in this release
   preparation:
@@ -76,5 +72,4 @@ All notable changes to the `mesh` module are documented here. The format follows
   | `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/substrate/mesh/hitl` |
 - Federation and tether-client now import messaging as a package in the same
   module rather than requiring the former `go-messaging` module.
-- Old repository tags are not carried into substrate; the module's first tag
-  will be `mesh/v0.1.0` after approval.
+- Old repository tags are not carried into substrate.
