@@ -8,6 +8,14 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.1.0 — 2026-10-03
+
+First release of the harness module: the packages of eleven former Hollis Labs modules, moved in with their git history at their final homes, and a stdio process shim library with its `cairn-shim` executable, written in this module. The old modules' release tags were not carried over. The module requires `llm-core` v0.1.0 and `mesh` v0.1.0 and builds with Go 1.26.6.
+
+### Known issues
+
+- `TestNativeTurnOrder_CodexJSONRPCStdio` (`adapters/wrapper`) is skipped. Since agentkit v0.23.0 (commit 433cd74) both the wrapper's own turn lifecycle derivation and agentkit's Manager end a Codex JSON-RPC turn, so the test sees a second, empty turn lifecycle. The wrapper passes it against agentkit v0.21.0, the version it pinned, so a consumer that pins go-agent-wrapper v0.28.0 together with an older agentkit does not see the problem. Fixing it is part of the restructure that puts the wrapper on sessions.
+
 ### Added
 
 - The packages of six former Hollis Labs modules, moved in with their git history at their final homes: `sandbox/atomicfile` and `sandbox/pathsafe` (from `go-safefs`), `interception/permission` with `pathgrants` and `summary` (from `go-permission`), `workspace/materialize` with `artifact` (from `go-materialize`), `interception/filters/{classify,directive,event,normalize,repair}` (from `go-harness-filters`), `interception/egress` (from `go-egress-proxy`) and `adapters/runtimeevents` (from `go-runtime-events`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/`, with a `MIGRATION.md` listing old and new import paths. The old modules' release tags were not carried over.
@@ -28,10 +36,6 @@ All notable changes to the `harness` module are documented here. The format foll
 - Code that pinned a sibling at a tag now builds against the sibling's source at its old repository's `main`: `runner` (was `go-providers` v0.26.0, `go-sandbox` v0.3.0, `go-llm-types` v0.3.0), `adapters/provider` (was `go-llm-contracts` v0.1.0, `go-permission` v0.1.0) and `sandbox` (was `go-safefs` v0.1.0).
 - `agentkit`'s code, which pinned `go-materialize` v0.1.0, `go-permission` v0.1.0, `go-providers` v0.46.0, `go-runner` v0.8.2, `go-sandbox` v0.6.0 and `go-safefs` v0.1.0 at tags, builds against their packages in this module, and its llm-core requirements are `llm-core` v0.1.0.
 - `go-agent-wrapper`'s code, which pinned `agentkit` v0.21.0 and `go-runtime-events` v0.2.1 and the other sibling modules at tags, builds against their packages in this module: `agentkit` v0.26.1, `go-runtime-events` v0.2.2, the rest at their old repositories' `main`; its llm-core requirements are `llm-core` v0.1.0.
-
-### Known issues
-
-- `TestNativeTurnOrder_CodexJSONRPCStdio` (`adapters/wrapper`) is skipped. Since agentkit v0.23.0 (commit 433cd74) both the wrapper's own turn lifecycle derivation and agentkit's Manager end a Codex JSON-RPC turn, so the test sees a second, empty turn lifecycle. The wrapper passes it against agentkit v0.21.0, the version it pinned, so a consumer that pins go-agent-wrapper v0.28.0 together with an older agentkit does not see the problem. Fixing it is part of the restructure that puts the wrapper on sessions.
 
 ### Fixed
 
