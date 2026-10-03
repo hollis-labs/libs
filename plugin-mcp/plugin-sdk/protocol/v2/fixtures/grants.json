@@ -1,0 +1,368 @@
+[
+  {
+    "name": "complete",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "missing-grant_id",
+    "kind": "grant",
+    "input": "{\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-grant_id",
+    "kind": "grant",
+    "input": "{\"grant_id\":null,\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-name",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-name",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":null,\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-schema_version",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-schema_version",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":null,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-scope",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-scope",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":null,\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-host_instance",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-host_instance",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":null,\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-owner_id",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-owner_id",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":null,\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-owner_generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-owner_generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":null,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-audience",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-audience",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":null,\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-issued_at",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-issued_at",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":null,\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-expires_at",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null-expires_at",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":null,\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing-policy_revision",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\"}",
+    "valid": false
+  },
+  {
+    "name": "null-policy_revision",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":null}",
+    "valid": false
+  },
+  {
+    "name": "zero-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":0,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "safe-max",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":9007199254740991,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "unsafe-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":9007199254740992,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "schema-max",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":4294967295,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "schema-overflow",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":4294967296,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "schema-zero",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":0,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "string-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":\"1\",\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "fraction-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1.5,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "empty-id",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "blank-audience",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"  \",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "unknown-name",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"host.custom.new-operation\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "scalar-scope",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":false,\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "array-scope",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":[null,\"a\"],\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": true
+  },
+  {
+    "name": "offset-time",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00+00:00\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid-date",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-02-30T20:00:00Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid-time",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T24:00:00Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "leap-second",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:60Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "too-precise",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.1234567890Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "reversed-expiry",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T19:00:00Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "same-expiry",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000001Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "unknown-field",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\",\"extra\":true}",
+    "valid": false
+  },
+  {
+    "name": "wrong-case",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\",\"Grant_ID\":\"g-1\"}",
+    "valid": false
+  },
+  {
+    "name": "duplicate-grant-id",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"grant_id\":\"g-2\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "escaped-duplicate",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"grant_\\u0069d\":\"g-2\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "duplicate-scope-key",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"x\":1,\"x\":2},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "exponent-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1e0,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "decimal-generation",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1.0,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "rounded-fraction",
+    "kind": "grant",
+    "input": "{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":9007199254740991.4,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}",
+    "valid": false
+  },
+  {
+    "name": "empty-set",
+    "kind": "grants",
+    "input": "[]",
+    "valid": true
+  },
+  {
+    "name": "null-set",
+    "kind": "grants",
+    "input": "null",
+    "valid": false
+  },
+  {
+    "name": "object-set",
+    "kind": "grants",
+    "input": "{}",
+    "valid": false
+  },
+  {
+    "name": "null-entry",
+    "kind": "grants",
+    "input": "[null]",
+    "valid": false
+  },
+  {
+    "name": "duplicate-id-set",
+    "kind": "grants",
+    "input": "[{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"},{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}]",
+    "valid": false
+  },
+  {
+    "name": "names-only",
+    "kind": "grants",
+    "input": "[\"readonly.query\"]",
+    "valid": false
+  },
+  {
+    "name": "runtime",
+    "kind": "runtime",
+    "input": "{\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1}",
+    "valid": true
+  },
+  {
+    "name": "runtime-null",
+    "kind": "runtime",
+    "input": "null",
+    "valid": false
+  },
+  {
+    "name": "runtime-case",
+    "kind": "runtime",
+    "input": "{\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"Host_Instance\":\"other\"}",
+    "valid": false
+  },
+  {
+    "name": "runtime-zero",
+    "kind": "runtime",
+    "input": "{\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":0}",
+    "valid": false
+  }
+]
