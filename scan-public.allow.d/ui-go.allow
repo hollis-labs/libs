@@ -1,0 +1,8 @@
+# scripts/scan-public findings for the ui-go imports that were read and judged not to be exposure.
+# Format: RULE-ID  PATH-GLOB[@COMMIT]  REASON (one line). Every entry is still printed by the scan.
+# Do not quote the matched text in a reason: this file is scanned too.
+
+agent-box-host    (commit-message)@19cdf57ec1d8                    commit message of an already-public source repository that cites a tilde-relative path to an internal draft document in the maintainers' workspace; no credential, no host name, no user name; history is kept as written by design; pinned to this one commit
+secret-assignment ui-go/envelopes/admin/adminhttp/handler_test.go  test fixtures whose values are labelled synthetic in the text itself, used to check that secret values are not disclosed; test-only
+generic-api-key   ui-go/envelopes/admin/README.md                  false positive: gitleaks matched ordinary prose (a list of nouns), not a credential
+generic-api-key   ui-go/envelopes/schema_test.go                   placeholder value in a test that checks secret properties are not disclosed; test-only
