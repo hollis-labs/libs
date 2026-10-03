@@ -10,9 +10,21 @@
 
 ### Changed
 
+- **Breaking:** browser contribution registry protocol 2 replaces protocol 1.
+  Entries carry owner generation and representation-specific data, component,
+  or public handler references; hosts explicitly opt into kind/region schemas.
+  Bundle versions are SHA-256 digests with named runtime admission. No protocol-1
+  fallback; applications remain on their released SDK until separate adoption.
+
 - Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
 
 ### Added
+
+- `registry.Catalog` publishes atomic, epoch-bound revisions and refuses owner
+  replacement or withdrawal before explicit revocation. `registry.Scope` fences
+  calls, cancels admitted work, and attempts reverse-order idempotent disposal.
+  Optional contribution refusals remain visible; required refusals abort planning.
+  Protocol-2 shared fixtures and a [wire/lifecycle contract](docs/protocol/registry-v2.md).
 
 - `manifest`: shared schema version 2 declarations with dotted IDs, subprocess
   entrypoints, host ranges and opaque host extensions, config fields and

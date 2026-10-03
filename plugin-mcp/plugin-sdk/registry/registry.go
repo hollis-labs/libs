@@ -154,6 +154,18 @@ func validReps(reps []Representation) bool {
 	return true
 }
 
+func validStrings(values []string) bool {
+	if values == nil {
+		return false
+	}
+	for _, value := range values {
+		if value == "" {
+			return false
+		}
+	}
+	return true
+}
+
 // Validate checks shape/references only. Unknown optional kinds are admission refusals.
 func (r Response) Validate() error {
 	if r.Protocol != Protocol {
@@ -178,12 +190,12 @@ func (r Response) Validate() error {
 		}
 	}
 	for kind, d := range r.Kinds {
-		if kind == "" || d.SchemaVersion == 0 || d.SchemaVersion > MaxRevision || !validJSON(d.MetadataSchema) || !validReps(d.Representations) || d.Regions == nil || d.RequiredCapabilities == nil {
+		if kind == "" || d.SchemaVersion == 0 || d.SchemaVersion > MaxRevision || !validJSON(d.MetadataSchema) || !validReps(d.Representations) || !validStrings(d.Regions) || !validStrings(d.RequiredCapabilities) {
 			return ErrInvalidContribution
 		}
 	}
 	for region, d := range r.Regions {
-		if region == "" || d.Kinds == nil || !validReps(d.Representations) || !validJSON(d.ContextSchema) || (d.Ordering != "priority-ascending" && d.Ordering != "priority-descending" && d.Ordering != "manifest") {
+		if region == "" || !validStrings(d.Kinds) || !validReps(d.Representations) || !validJSON(d.ContextSchema) || (d.Ordering != "priority-ascending" && d.Ordering != "priority-descending" && d.Ordering != "manifest") {
 			return ErrInvalidContribution
 		}
 	}
@@ -343,7 +355,12 @@ func VerifyBundle(p Plugin, bytes []byte, runtimes map[string]string, allowPrere
 	return CheckRuntimes(p.Runtime, runtimes, allowPrerelease)
 }
 func CheckRuntimes(requirements []Runtime, versions map[string]string, allowPrerelease bool) error {
+	seen := map[string]bool{}
 	for _, r := range requirements {
+		if r.Name == "" || seen[r.Name] {
+			return ErrRuntime
+		}
+		seen[r.Name] = true
 		version, ok := parseVersion(versions[r.Name])
 		if !ok || !validBounds(r.Min, r.Max) || (!allowPrerelease && len(version.pre) > 0) {
 			return ErrRuntime

@@ -59,8 +59,10 @@ go get github.com/hollis-labs/plugin-sdk
   decoder refuses legacy dialects, unknown fields and duplicate keys.
   See [the manifest contract](docs/manifest.md).
 - `registry` — the Go view of the plugin registry wire contract: the
-  response a host serves so a browser can find, load and resolve the UI
-  its plugins ship, plus `Validate`.
+  protocol-2 catalog of owner-qualified declarative, component, and handler
+  contributions, with host kind/region admission, runtime and digest verification,
+  revision publication, and reverse-order disposal scopes. See the
+  [registry wire and lifecycle contract](docs/protocol/registry-v2.md).
 - `ts/packages/plugin-sdk` — zero-runtime-dependency Node/Deno stdio runtime,
   capability interfaces, config and redacting logger, plus the `/test` harness.
   See [the server package](ts/packages/plugin-sdk/README.md) and

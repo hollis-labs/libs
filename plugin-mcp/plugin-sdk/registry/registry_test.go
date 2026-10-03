@@ -248,3 +248,129 @@ func TestDuplicateJSONKeysRefused(t *testing.T) {
 		t.Fatalf("duplicate: %v", err)
 	}
 }
+
+func TestCatalogWithdrawalRequiresRevoke(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	empty := NewResponse(r.HostInstance, 3)
+	if _, err := catalog.Activate(empty, policyFor(empty)); !errors.Is(err, ErrNeedsRevocation) {
+		t.Fatalf("withdrawal bypassed revoke: %v", err)
+	}
+	if len(catalog.Snapshot().Plugins) != 1 {
+		t.Fatal("failed withdrawal changed catalog")
+	}
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	empty.Revision = 4
+	if _, err := catalog.Activate(empty, policyFor(empty)); err != nil {
+		t.Fatal(err)
+	}
+	r.Revision = 5
+	if _, err := catalog.Activate(r, policyFor(r)); !errors.Is(err, ErrRevoked) {
+		t.Fatalf("withdrawn generation restored: %v", err)
+	}
+}
+
+func TestConcurrentCatalogActivationAndSnapshots(t *testing.T) {
+	catalog := NewCatalog("epoch")
+	var wg sync.WaitGroup
+	for revision := uint64(2); revision < 50; revision++ {
+		wg.Go(func() {
+			r := NewResponse("epoch", revision)
+			_, err := catalog.Activate(r, policyFor(r))
+			if err != nil && !errors.Is(err, ErrStale) {
+				t.Error(err)
+			}
+			snapshot := catalog.Snapshot()
+			if err := snapshot.Validate(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if catalog.Snapshot().Revision != 49 {
+		t.Fatal("newer revision lost")
+	}
+}
+
+func TestConcurrentDisposeWaitsForSingleCleanup(t *testing.T) {
+	scope, _ := NewScope("epoch", "notes", "1")
+	entered, release := make(chan struct{}), make(chan struct{})
+	calls := 0
+	_ = scope.Add(func(context.Context) error { calls++; close(entered); <-release; return errors.New("cleanup failed") })
+	results := make(chan error, 2)
+	go func() { results <- scope.Dispose(context.Background()) }()
+	<-entered
+	if _, err := scope.Admit(); !errors.Is(err, ErrRevoked) {
+		t.Fatal("call admitted during cleanup")
+	}
+	go func() { results <- scope.Dispose(context.Background()) }()
+	close(release)
+	first, second := <-results, <-results
+	if first == nil || second == nil || first.Error() != second.Error() || calls != 1 {
+		t.Fatal("disposal was not single/idempotent")
+	}
+}
+
+func TestRevokePreflightGenerationPreventsLateActivation(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Activate(r, policyFor(r)); !errors.Is(err, ErrRevoked) {
+		t.Fatalf("revoked pending owner activated: %v", err)
+	}
+}
+
+func TestRequiredFailurePreservesServingCatalog(t *testing.T) {
+	r := validResponse()
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	candidate := clone(r)
+	candidate.Revision++
+	policy := policyFor(candidate)
+	policy.Kinds = map[string]KindDescriptor{}
+	if _, err := catalog.Activate(candidate, policy); !errors.Is(err, ErrRequired) {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(catalog.Snapshot(), r) {
+		t.Fatal("preflight failure replaced current catalog")
+	}
+}
+
+func TestCoreAndForeignNamespacesRefused(t *testing.T) {
+	for _, owner := range []string{"core", "notes"} {
+		r := NewResponse("epoch", 2)
+		r.Plugins[owner] = Plugin{OwnerGeneration: "1"}
+		kind := "plugin.someone_else.nav"
+		r.Kinds[kind] = KindDescriptor{1, json.RawMessage(`{}`), []Representation{Declarative}, []string{}, []string{}}
+		_ = r.Set(Contribution{OwnerID: owner, OwnerGeneration: "1", LocalKey: "nav", Kind: kind, SchemaVersion: 1, Required: true, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{}`)})
+		plan, err := r.Plan(policyFor(r))
+		if !errors.Is(err, ErrRequired) || plan.Refusals[0].Reason != "reserved" {
+			t.Fatalf("namespace accepted: %+v %v", plan, err)
+		}
+	}
+}
+
+func TestPublicBindingCollisionAndNestedDuplicateJSON(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.PublicBinding = "shared"
+	r.Contributions[c.Kind][c.Key()] = c
+	c.LocalKey = "other"
+	_ = r.Set(c)
+	if !errors.Is(r.Validate(), ErrCollision) {
+		t.Fatal("public binding collision accepted")
+	}
+	raw := []byte(`{"protocol":2,"metadata":{"nested":1,"nested":2}}`)
+	if !errors.Is(json.Unmarshal(raw, &r), ErrCollision) {
+		t.Fatal("nested duplicate key accepted")
+	}
+}
