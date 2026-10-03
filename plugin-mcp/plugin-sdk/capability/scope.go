@@ -61,7 +61,7 @@ func (s Scope) Validate(name string) error {
 		}
 	}
 	for k, v := range s.Limits {
-		if k == "" || v < 0 {
+		if k == "" || v < 0 || uint64(v) > MaxSafeInteger {
 			return refusal(InvalidRequest, name)
 		}
 	}

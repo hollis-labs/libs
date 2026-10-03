@@ -108,3 +108,7 @@ payload-free audit are available in `capability/host`; see
 [host credentials and audit](capability-credentials.md). Hosts supply verified
 identities, live reviewed grants and policy. The leaf `capability` DTO/catalog
 package never imports those host helpers or an application transport.
+
+Scope integer ceilings must fit the shared safe-integer range (0 through
+9007199254740991). Larger integers require a separately specified string-encoded
+schema. No seed or proposed descriptor requires a larger numeric ceiling.
