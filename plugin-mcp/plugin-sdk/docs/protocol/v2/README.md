@@ -1,5 +1,9 @@
 # Protocol 2 Init handshake
 
+See the [reverse-RPC field contract](host-rpc.md) for the approved optional
+profile schema and unexecuted fixtures. Transport implementation and profile
+acknowledgement remain separately gated.
+
 Go `subprocess.ProtocolVersion` and TS `PROTOCOL_VERSION` are 2. Host and plugin
 use one strict Init exchange before load or ordinary handlers. The host builds,
 validates and encodes the complete payload before spawning the plugin. There is
