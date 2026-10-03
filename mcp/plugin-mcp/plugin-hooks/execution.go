@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unicode/utf8"
 )
 
@@ -22,6 +23,7 @@ var (
 	ErrQueueFull        = errors.New("async queue full")
 	ErrEngineClosed     = errors.New("execution engine closed")
 	ErrCommitRequired   = errors.New("confirmed commit required")
+	ErrTransport        = errors.New("hook transport failed")
 	ErrUnsupportedMode  = errors.New("unsupported hook mode")
 )
 
@@ -57,27 +59,38 @@ type DispatchResult struct {
 
 // ExecutionConfig uses documented provisional defaults when fields are zero.
 // Limits apply across all dispatches, not just one hook invocation.
-type ExecutionConfig struct{ MaxActive, MaxActivePerOwner, MaxDepth, QueueCapacity, Workers int }
+type ExecutionConfig struct {
+	MaxActive, MaxActivePerOwner, MaxDepth, QueueCapacity, Workers int
+	Breaker                                                        BreakerConfig
+	Clock                                                          Clock
+	Sink                                                           Sink
+}
 
 // Engine is the sole execution layer for its Registry. Call Shutdown to release
 // its worker goroutines. Host validators must be bounded, nonblocking callbacks.
 type Engine struct {
-	registry *Registry
-	config   ExecutionConfig
-	total    chan struct{}
-	mu       sync.Mutex
-	owners   map[scopeKey]chan struct{}
-	closed   bool
-	lifetime context.Context
-	cancel   context.CancelFunc
-	queue    chan *dispatch
-	workers  sync.WaitGroup
-	done     chan struct{}
-	ids      atomic.Uint64
+	registry          *Registry
+	config            ExecutionConfig
+	total             chan struct{}
+	mu                sync.Mutex
+	owners            map[scopeKey]chan struct{}
+	closed            bool
+	lifetime          context.Context
+	cancel            context.CancelFunc
+	queue             chan *dispatch
+	workers           sync.WaitGroup
+	done              chan struct{}
+	ids               atomic.Uint64
+	traceIDs          atomic.Uint64
+	telemetryFailures atomic.Uint64
+	breakerMu         sync.Mutex
+	breakers          map[scopeKey]*breaker
 }
 type depthKey struct{}
 type dispatch struct {
 	ctx        context.Context
+	trace      TraceRecord
+	beganAt    time.Time
 	cancel     context.CancelFunc
 	stop       func() bool
 	definition Definition
@@ -105,13 +118,31 @@ func NewEngine(r *Registry, c ExecutionConfig) (*Engine, error) {
 			*p = defaults[i]
 		}
 	}
+	if c.Breaker.FailureThreshold < 0 || c.Breaker.Cooldown < 0 {
+		return nil, ErrInvalidOptions
+	}
+	if c.Breaker.FailureThreshold == 0 {
+		c.Breaker.FailureThreshold = 5
+	}
+	if c.Breaker.Cooldown == 0 {
+		c.Breaker.Cooldown = 30 * time.Second
+	}
+	if c.Clock == nil {
+		c.Clock = systemClock{}
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.engine != nil {
 		return nil, ErrDuplicate
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	e := &Engine{registry: r, config: c, total: make(chan struct{}, c.MaxActive), owners: map[scopeKey]chan struct{}{}, lifetime: ctx, cancel: cancel, queue: make(chan *dispatch, c.QueueCapacity), done: make(chan struct{})}
+	e := &Engine{breakers: map[scopeKey]*breaker{}, registry: r, config: c, total: make(chan struct{}, c.MaxActive), owners: map[scopeKey]chan struct{}{}, lifetime: ctx, cancel: cancel, queue: make(chan *dispatch, c.QueueCapacity), done: make(chan struct{})}
+	for key, state := range r.scopes {
+		b := e.breakerLocked(key)
+		if state.disposed {
+			b.snapshot.State = BreakerDisposed
+		}
+	}
 	r.engine = e
 	for range c.Workers {
 		e.workers.Go(func() {
@@ -154,7 +185,18 @@ func cloneMetadata(v map[string]string) map[string]string {
 	return out
 }
 func (d *dispatch) cleanup() { d.stop(); d.cancel() }
-func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessage, metadata map[string]string, kind Kind, detached bool) (*dispatch, error) {
+func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessage, metadata map[string]string, kind Kind, detached bool) (prepared *dispatch, prepareErr error) {
+	trace := e.dispatchRecord(ctx, hook)
+	beganAt := trace.StartedAt
+	defer func() {
+		if prepareErr != nil {
+			trace.EndedAt = e.config.Clock.Now()
+			trace.DurationMS = elapsed(trace.EndedAt, beganAt)
+			trace.Outcome = string(dispatchFailure(prepareErr).Status)
+			trace.ErrorClass = classify(prepareErr)
+			e.record(trace)
+		}
+	}()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -194,7 +236,7 @@ func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessa
 		cancel()
 		return nil, err
 	}
-	return &dispatch{ctx: ctx, cancel: cancel, stop: stop, definition: d, entries: e.registry.snapshot(hook), payload: private, metadata: cloneMetadata(metadata), id: fmt.Sprintf("inv-%d", e.ids.Add(1)), permits: make(chan struct{}, d.MaxParallelism)}, nil
+	return &dispatch{trace: trace, beganAt: beganAt, ctx: ctx, cancel: cancel, stop: stop, definition: d, entries: e.registry.snapshot(hook), payload: private, metadata: cloneMetadata(metadata), id: trace.InvocationID, permits: make(chan struct{}, d.MaxParallelism)}, nil
 }
 
 func dispatchFailure(err error) DispatchResult {
@@ -210,10 +252,10 @@ func dispatchFailure(err error) DispatchResult {
 func (e *Engine) EmitAction(ctx context.Context, hook string, payload json.RawMessage, metadata map[string]string) (DispatchResult, error) {
 	def, ok := e.registry.definitions[hook]
 	if !ok {
-		return DispatchResult{Status: FailedClosed}, ErrUnknownHook
+		return e.rejectDispatch(ctx, hook, ErrUnknownHook)
 	}
 	if def.Mode == AfterCommit {
-		return DispatchResult{Status: FailedClosed}, ErrCommitRequired
+		return e.rejectDispatch(ctx, hook, ErrCommitRequired)
 	}
 	d, err := e.prepare(ctx, hook, payload, metadata, Action, def.Mode == Async)
 	if err != nil {
@@ -256,7 +298,12 @@ func (f *Future) Await(ctx context.Context) (DispatchResult, error) {
 		return r, f.err
 	}
 }
-func (e *Engine) enqueue(d *dispatch) (DispatchResult, error) {
+func (e *Engine) enqueue(d *dispatch) (result DispatchResult, enqueueErr error) {
+	defer func() {
+		if enqueueErr != nil {
+			e.finishDispatch(d, result, enqueueErr)
+		}
+	}()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closed {
@@ -291,26 +338,31 @@ func (e *Engine) PrepareAfterCommit(ctx context.Context, hook string, payload js
 	}
 	if d.definition.Mode != AfterCommit {
 		d.cleanup()
+		e.finishDispatch(d, DispatchResult{Status: FailedClosed}, ErrInvalidOptions)
 		return nil, ErrInvalidOptions
 	}
 	return &PendingCommit{engine: e, dispatch: d}, nil
 }
 func (p *PendingCommit) Commit() (DispatchResult, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if p.used {
+		p.mu.Unlock()
 		return DispatchResult{Status: FailedClosed}, ErrUnavailable
 	}
 	p.used = true
+	p.mu.Unlock()
 	return p.engine.enqueue(p.dispatch)
 }
 func (p *PendingCommit) Rollback() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !p.used {
-		p.used = true
-		p.dispatch.cleanup()
+	if p.used {
+		p.mu.Unlock()
+		return
 	}
+	p.used = true
+	p.mu.Unlock()
+	p.dispatch.cleanup()
+	p.engine.finishDispatch(p.dispatch, DispatchResult{Status: Cancelled}, ErrCancelled)
 }
 func (e *Engine) capacity(ctx context.Context, k scopeKey) (func(), error) {
 	e.mu.Lock()
@@ -335,6 +387,7 @@ func (e *Engine) capacity(ctx context.Context, k scopeKey) (func(), error) {
 }
 
 type callResult struct {
+	class   string
 	payload json.RawMessage
 	err     error
 }
@@ -347,6 +400,22 @@ func classify(err error) string {
 		return "cancelled"
 	case errors.Is(err, ErrApprovalRequired):
 		return "approval_required"
+	case errors.Is(err, ErrDepthExceeded):
+		return "depth_rejected"
+	case errors.Is(err, ErrUnknownHook):
+		return "unknown_hook"
+	case errors.Is(err, ErrInvalidPayload):
+		return "invalid_payload"
+	case errors.Is(err, ErrQueueFull):
+		return "queue_full"
+	case errors.Is(err, ErrEngineClosed):
+		return "engine_closed"
+	case errors.Is(err, ErrCommitRequired):
+		return "commit_required"
+	case errors.Is(err, ErrInvalidOptions):
+		return "invalid_options"
+	case errors.Is(err, ErrTransport):
+		return "transport_error"
 	case errors.Is(err, ErrPanic):
 		return "panic"
 	case errors.Is(err, ErrUnavailable):
@@ -361,14 +430,28 @@ func classify(err error) string {
 		return "handler_error"
 	}
 }
-func outcome(d *dispatch, entry *entry, err error) HandlerOutcome {
+func outcome(d *dispatch, entry *entry, err error, class string) HandlerOutcome {
+	if class == "" {
+		class = classify(err)
+	}
 	r := entry.registration
-	return HandlerOutcome{Hook: r.Hook, Owner: r.Owner, Generation: r.Generation, Name: r.Name, Handle: r.Handle, InvocationID: d.id, Error: err, Class: classify(err)}
+	return HandlerOutcome{Hook: r.Hook, Owner: r.Owner, Generation: r.Generation, Name: r.Name, Handle: r.Handle, InvocationID: d.id, Error: err, Class: class}
 }
 
 // invoke is called in priority admission order. Capacity is reserved synchronously
 // before the goroutine and once claim; its release follows actual completion.
-func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage) (<-chan callResult, error) {
+func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, validate func(json.RawMessage) (json.RawMessage, error)) (channel <-chan callResult, invokeErr error) {
+	call := e.observedCall(d, entry)
+	defer func() {
+		if invokeErr != nil {
+			call.finish(invokeErr)
+		}
+	}()
+	ticket, err := e.admitBreaker(entry.scope.key)
+	if err != nil {
+		return nil, err
+	}
+	call.ticket, call.admitted = ticket, true
 	ctx, cancelDeadline := context.WithTimeout(d.ctx, entry.registration.Options.Timeout)
 	stopRemoval := context.AfterFunc(entry.removalContext, cancelDeadline)
 	cancel := func() { stopRemoval(); cancelDeadline() }
@@ -396,6 +479,10 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage) (<-c
 		cancel()
 		return nil, err
 	}
+	call.started = true
+	call.record.Started = true
+	call.record.QueueMS = elapsed(e.config.Clock.Now(), call.beganAt)
+	handlerCtx := context.WithValue(l.ctx, traceContextKey{}, TraceContext{TraceID: call.record.TraceID, SpanID: call.record.SpanID})
 	result := make(chan callResult, 1)
 	input := bytes.Clone(payload)
 	metadata := cloneMetadata(d.metadata)
@@ -409,10 +496,13 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage) (<-c
 			}()
 			v := Invocation{ID: d.id, Hook: d.definition.Name, Owner: entry.registration.Owner, Generation: entry.registration.Generation, Registration: entry.registration.Name, Payload: input, Metadata: metadata}
 			if entry.action != nil {
-				out.err = entry.action(l.ctx, v)
+				out.err = entry.action(handlerCtx, v)
 			} else {
-				out.payload, out.err = entry.filter(l.ctx, v)
+				out.payload, out.err = entry.filter(handlerCtx, v)
 				out.payload = bytes.Clone(out.payload)
+			}
+			if validate != nil && out.err == nil {
+				out.payload, out.err = validate(out.payload)
 			}
 		}()
 		if ctx.Err() != nil {
@@ -431,33 +521,33 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage) (<-c
 	// retains its permits. Normal completion cancellation must not mask its result.
 	wrapped := make(chan callResult, 1)
 	go func() {
+		var terminal callResult
 		select {
-		case out := <-result:
-			wrapped <- out
+		case terminal = <-result:
 		case <-l.ctx.Done():
 			select {
-			case out := <-result:
-				wrapped <- out
-				return
+			case terminal = <-result:
 			default:
+				terminal.err = l.ctx.Err()
+				e.registry.mu.Lock()
+				removed := entry.removed || entry.scope.disposed
+				e.registry.mu.Unlock()
+				if removed {
+					terminal.err = ErrUnavailable
+				} else if ctx.Err() == nil || (errors.Is(ctx.Err(), context.Canceled) && d.ctx.Err() == nil) {
+					terminal = <-result
+				}
 			}
-			err := l.ctx.Err()
-			e.registry.mu.Lock()
-			removed := entry.removed || entry.scope.disposed
-			e.registry.mu.Unlock()
-			if removed {
-				err = ErrUnavailable
-			} else if ctx.Err() == nil || (errors.Is(ctx.Err(), context.Canceled) && d.ctx.Err() == nil) {
-				wrapped <- <-result
-				return
-			}
-			wrapped <- callResult{err: err}
 		}
+		terminal.class = call.finish(terminal.err)
+		wrapped <- terminal
 	}()
 	return wrapped, nil
 }
-func (e *Engine) execute(d *dispatch) (DispatchResult, error) {
-	result := DispatchResult{InvocationID: d.id, Status: Success}
+func (e *Engine) execute(d *dispatch) (result DispatchResult, executeErr error) {
+	d.trace.QueueMS = elapsed(e.config.Clock.Now(), d.beganAt)
+	defer func() { e.finishDispatch(d, result, executeErr) }()
+	result = DispatchResult{InvocationID: d.id, Status: Success}
 	def := d.definition
 	if err := d.ctx.Err(); err != nil {
 		return DispatchResult{InvocationID: d.id, Status: CallerCancelled}, err
@@ -491,40 +581,27 @@ func (e *Engine) execute(d *dispatch) (DispatchResult, error) {
 		}
 		// Projection can share decoded subtrees with full, but only encoded private
 		// bytes enter handlers; full and view are never exposed as Go values.
-		ch, callErr := e.invoke(d, entry, encode(view))
+		var validate func(json.RawMessage) (json.RawMessage, error)
+		if def.Kind == Filter {
+			validate = func(raw json.RawMessage) (json.RawMessage, error) {
+				return validateFilterResult(def, full, view, entry.registration.Options.View, raw)
+			}
+		}
+		ch, callErr := e.invoke(d, entry, encode(view), validate)
 		out := callResult{err: callErr}
 		if callErr == nil {
 			select {
 			case out = <-ch:
 			case <-d.ctx.Done():
-				result.Outcomes = append(result.Outcomes, outcome(d, entry, d.ctx.Err()))
+				result.Outcomes = append(result.Outcomes, outcome(d, entry, d.ctx.Err(), ""))
 				result.Status = CallerCancelled
 				return result, d.ctx.Err()
 			}
 		}
 		if def.Kind == Filter && out.err == nil {
-			if len(out.payload) > def.MaxPayloadBytes || !utf8.Valid(out.payload) || !json.Valid(out.payload) {
-				out.err = ErrInvalidOutput
-			} else {
-				output, decodeErr := decode(out.payload)
-				if decodeErr != nil {
-					out.err = ErrInvalidOutput
-				} else {
-					merged, mergeErr := mergeOutput(full, view, output, def, entry.registration.Options.View)
-					if mergeErr != nil {
-						out.err = ErrInvalidOutput
-					} else {
-						accepted := encode(merged)
-						if err := validateJSON(accepted, def.MaxPayloadBytes, def.ValidateOutput); err != nil {
-							out.err = ErrInvalidOutput
-						} else {
-							current = bytes.Clone(accepted)
-						}
-					}
-				}
-			}
+			current = bytes.Clone(out.payload)
 		}
-		result.Outcomes = append(result.Outcomes, outcome(d, entry, out.err))
+		result.Outcomes = append(result.Outcomes, outcome(d, entry, out.err, out.class))
 		if err := d.ctx.Err(); err != nil {
 			result.Status = CallerCancelled
 			return result, err
@@ -565,7 +642,7 @@ func (e *Engine) parallel(d *dispatch) (DispatchResult, error) {
 		case <-d.ctx.Done():
 			out.err = d.ctx.Err()
 		}
-		result.Outcomes = append(result.Outcomes, outcome(d, p.entry, out.err))
+		result.Outcomes = append(result.Outcomes, outcome(d, p.entry, out.err, out.class))
 		if out.err != nil {
 			if p.entry.registration.Options.OnError == Closed {
 				if closedErr == nil {
@@ -595,7 +672,7 @@ func (e *Engine) parallel(d *dispatch) (DispatchResult, error) {
 			view := project(v, d.definition.Views[name])
 			input = encode(view)
 		}
-		ch, err := e.invoke(d, entry, input)
+		ch, err := e.invoke(d, entry, input, nil)
 		if err != nil {
 			chResult := make(chan callResult, 1)
 			chResult <- callResult{err: err}
@@ -611,4 +688,23 @@ func (e *Engine) parallel(d *dispatch) (DispatchResult, error) {
 		return result, err
 	}
 	return result, closedErr
+}
+
+func validateFilterResult(def Definition, full, view any, viewName string, raw json.RawMessage) (json.RawMessage, error) {
+	if len(raw) > def.MaxPayloadBytes || !utf8.Valid(raw) || !json.Valid(raw) {
+		return nil, ErrInvalidOutput
+	}
+	output, err := decode(raw)
+	if err != nil {
+		return nil, ErrInvalidOutput
+	}
+	merged, err := mergeOutput(full, view, output, def, viewName)
+	if err != nil {
+		return nil, ErrInvalidOutput
+	}
+	accepted := encode(merged)
+	if err := validateJSON(accepted, def.MaxPayloadBytes, def.ValidateOutput); err != nil {
+		return nil, ErrInvalidOutput
+	}
+	return accepted, nil
 }

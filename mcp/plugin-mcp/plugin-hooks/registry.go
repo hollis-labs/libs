@@ -2,6 +2,8 @@ package pluginhooks
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -66,6 +68,7 @@ type ScopeConfig struct {
 type scopeKey struct{ owner, generation string }
 type scopeState struct {
 	key      scopeKey
+	remote   bool
 	allowed  map[string]bool
 	disposed bool
 	active   int
@@ -87,6 +90,7 @@ type entry struct {
 type Registry struct {
 	mu                     sync.Mutex
 	catalogVersion         string
+	hostInstance           string
 	definitions            map[string]Definition
 	scopes                 map[scopeKey]*scopeState
 	entries                map[uint64]*entry
@@ -99,7 +103,11 @@ func NewRegistry(c Catalog) (*Registry, error) {
 	if c.Version == "" {
 		return nil, fmt.Errorf("%w: catalog version required", ErrInvalidDefinition)
 	}
-	r := &Registry{catalogVersion: c.Version, definitions: map[string]Definition{}, scopes: map[scopeKey]*scopeState{}, entries: map[uint64]*entry{}}
+	var epoch [16]byte
+	if _, err := rand.Read(epoch[:]); err != nil {
+		return nil, fmt.Errorf("create registry epoch: %w", err)
+	}
+	r := &Registry{hostInstance: hex.EncodeToString(epoch[:]), catalogVersion: c.Version, definitions: map[string]Definition{}, scopes: map[scopeKey]*scopeState{}, entries: map[uint64]*entry{}}
 	for _, d := range c.Definitions {
 		d = copyDefinition(d)
 		if err := validateDefinition(d); err != nil {
@@ -154,7 +162,7 @@ func (r *Registry) NewScope(c ScopeConfig) (*Scope, error) {
 	if _, ok := r.scopes[k]; ok {
 		return nil, ErrDuplicate
 	}
-	state := &scopeState{key: k, allowed: allowed, changed: make(chan struct{})}
+	state := &scopeState{key: k, remote: c.Remote, allowed: allowed, changed: make(chan struct{})}
 	r.scopes[k] = state
 	return &Scope{r, state}, nil
 }
@@ -308,8 +316,28 @@ func (r *Registry) RemoveByPlugin(owner, generation string) {
 // again; a timeout never reopens the generation.
 func (s *Scope) Dispose(ctx context.Context) error {
 	r := s.registry
-	r.mu.Lock()
+	// Read the immutable engine pointer and clock outside lifecycle locks. Retry
+	// only if an engine was installed concurrently while reading the clock.
+	var engine *Engine
+	var now time.Time
+	for {
+		r.mu.Lock()
+		engine = r.engine
+		r.mu.Unlock()
+		if engine != nil {
+			now = engine.config.Clock.Now()
+		}
+		r.mu.Lock()
+		if engine == r.engine {
+			break
+		}
+		r.mu.Unlock()
+	}
 	s.state.disposed = true
+	var event *BreakerEvent
+	if engine != nil {
+		event = engine.disposeBreakerLocked(s.state.key, now)
+	}
 	var c []context.CancelFunc
 	for _, e := range r.entries {
 		if e.scope == s.state {
@@ -317,6 +345,9 @@ func (s *Scope) Dispose(ctx context.Context) error {
 		}
 	}
 	r.mu.Unlock()
+	if engine != nil {
+		engine.breakerEvent(event)
+	}
 	for _, cancel := range c {
 		cancel()
 	}
@@ -453,3 +484,7 @@ func (s *Scope) validateRegistrationLocked(hook, name string, kind Kind, o Optio
 	}
 	return v, nil
 }
+
+// HostInstance is the random registry-process epoch used in tracing and host
+// bindings. A new Registry gets a new epoch; it is not an authentication token.
+func (r *Registry) HostInstance() string { return r.hostInstance }

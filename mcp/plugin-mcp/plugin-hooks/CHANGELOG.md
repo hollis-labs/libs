@@ -15,3 +15,8 @@
 - Retain structured deprecation warnings without redirects; name removal failures.
 - Add one provider-based discovery endpoint for independently versioned catalogs.
 - Document explicit lifecycle adapter mappings and proposed filter declarations.
+- Add generation circuit breakers with single half-open probes and operator reset.
+- Exclude control/caller/unload failures and retain permits across timeout/reset.
+- Add injectable clocks, sanitized tracing/transition sinks and nested trace context.
+- Validate filter output before lifecycle completion and breaker accounting.
+- Add observability wiring examples and concurrent breaker/telemetry checks.
