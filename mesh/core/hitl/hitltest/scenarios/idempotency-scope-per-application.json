@@ -1,0 +1,44 @@
+{
+  "name": "idempotency-scope-per-application",
+  "description": "Keys are scoped per caller application: the same key from another application creates a distinct item.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:24 (same key in another application_id)",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "enqueue",
+      "as": "b",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-b",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {
+        "distinct_item_from": "a"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-no-source",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "k-1"
+  }
+}

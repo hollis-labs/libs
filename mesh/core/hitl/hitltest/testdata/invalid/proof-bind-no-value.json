@@ -1,0 +1,14 @@
+{
+  "def": "ProofV1",
+  "name": "proof-bind-no-value",
+  "rejects_because": "/binds/0",
+  "doc": {
+    "scheme": "webauthn",
+    "key_ref": "cred:1",
+    "binds": [
+      {
+        "name": "nonce"
+      }
+    ]
+  }
+}

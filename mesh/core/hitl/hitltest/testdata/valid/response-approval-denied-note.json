@@ -1,0 +1,9 @@
+{
+  "def": "HITLResponseV1",
+  "name": "response-approval-denied-note",
+  "doc": {
+    "kind": "approval",
+    "decision": "denied",
+    "note": "add a rollback test"
+  }
+}

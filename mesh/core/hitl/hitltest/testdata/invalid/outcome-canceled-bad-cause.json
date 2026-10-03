@@ -1,0 +1,14 @@
+{
+  "def": "CanceledTerminalOutcomeV1",
+  "name": "outcome-canceled-bad-cause",
+  "rejects_because": "/cause",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "canceled",
+    "item_id": "item_02",
+    "interaction_revision": 3,
+    "cause": "policy",
+    "reason": "superseded by a newer plan",
+    "terminated_at": "2026-09-04T03:30:00Z"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "def": "HITLResponseCoreV1",
+  "name": "response-core-open-decision",
+  "doc": {
+    "kind": "choice",
+    "decision": "option-b",
+    "extra_member": 1
+  }
+}

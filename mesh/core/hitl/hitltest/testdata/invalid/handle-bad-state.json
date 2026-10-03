@@ -1,0 +1,11 @@
+{
+  "def": "HITLItemHandleCoreV1",
+  "name": "handle-bad-state",
+  "rejects_because": "/state",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "closed",
+    "revision": 3
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "idempotency-conflict",
+  "description": "The same key with different immutable content is an idempotency_conflict naming the existing item and changes nothing.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:24, :611 TestEnqueueRejectsConcurrentGenericIdempotencyWinner",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "enqueue",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "A different title",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {
+        "code": "idempotency_conflict",
+        "existing_item_id_is": "a"
+      }
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    }
+  ]
+}

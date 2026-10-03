@@ -1,0 +1,49 @@
+{
+  "name": "get-terminal",
+  "description": "Get of a terminal item returns its outcome.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:766 TestWithdrawResolveRaceAndDistinctTerminalCauses",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "withdraw",
+      "item": "a",
+      "as": "w",
+      "fields": {
+        "reason": "done"
+      },
+      "expect": {
+        "state": "canceled",
+        "outcome_cause": "caller_withdrawn"
+      }
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "mode": "get",
+        "wait_status": "not_waited",
+        "state": "canceled",
+        "outcome_state": "canceled",
+        "outcome_cause": "caller_withdrawn",
+        "outcome_equals": "w"
+      }
+    }
+  ]
+}

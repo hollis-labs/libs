@@ -1,0 +1,30 @@
+{
+  "def": "HITLItemViewCoreV1",
+  "name": "view-failed",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "failed",
+    "revision": 2,
+    "request_snapshot": {
+      "contract_version": "1.0",
+      "kind": "approval",
+      "idempotency_key": "k-1",
+      "source": {
+        "application_id": "codex",
+        "agent_id": "msg://agent/codex/worker-7"
+      }
+    },
+    "enqueued_at": "2026-09-04T03:28:00Z",
+    "updated_at": "2026-09-04T03:30:00Z",
+    "terminal_outcome": {
+      "contract_version": "1.0",
+      "state": "failed",
+      "item_id": "item_04",
+      "interaction_revision": 2,
+      "error_code": "materialization_failed",
+      "message": "could not stage",
+      "terminated_at": "2026-09-04T03:30:00Z"
+    }
+  }
+}

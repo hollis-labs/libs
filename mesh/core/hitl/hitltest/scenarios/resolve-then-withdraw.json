@@ -1,0 +1,46 @@
+{
+  "name": "resolve-then-withdraw",
+  "description": "A withdraw that lost to a resolution is a terminal_conflict carrying the resolved outcome.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:766",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "resolve",
+      "item": "a",
+      "as": "r",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "expect": {
+        "state": "resolved"
+      }
+    },
+    {
+      "op": "withdraw",
+      "item": "a",
+      "expect": {
+        "code": "terminal_conflict",
+        "outcome_state": "resolved",
+        "outcome_equals": "r"
+      }
+    }
+  ]
+}

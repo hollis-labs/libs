@@ -1,0 +1,13 @@
+{
+  "def": "FailedTerminalOutcomeV1",
+  "name": "outcome-failed-no-message",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "failed",
+    "item_id": "item_04",
+    "interaction_revision": 2,
+    "error_code": "materialization_failed",
+    "terminated_at": "2026-09-04T03:30:00Z"
+  }
+}

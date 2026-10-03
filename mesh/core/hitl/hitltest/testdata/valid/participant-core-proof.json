@@ -1,0 +1,33 @@
+{
+  "def": "ParticipantCaptureCoreV1",
+  "name": "participant-core-proof",
+  "doc": {
+    "responder": {
+      "kind": "human",
+      "ref": "operator@example.test"
+    },
+    "assurance": "authenticated",
+    "proof": {
+      "scheme": "webauthn",
+      "key_ref": "cred:3f9a",
+      "binds": [
+        {
+          "name": "approval_id",
+          "value": "appr_01"
+        },
+        {
+          "name": "plan_hash",
+          "value": "sha256:ab12"
+        },
+        {
+          "name": "operation",
+          "value": "deploy"
+        },
+        {
+          "name": "nonce",
+          "value": "n-77"
+        }
+      ]
+    }
+  }
+}

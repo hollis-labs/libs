@@ -1,0 +1,10 @@
+{
+  "def": "HITLItemHandleCoreV1",
+  "name": "handle-no-revision",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "staged"
+  }
+}

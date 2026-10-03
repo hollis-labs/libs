@@ -1,0 +1,48 @@
+{
+  "name": "expiry-refuses-late-respond",
+  "description": "A respond arriving after expires_at is refused atomically even though no sweeper has run; the expired outcome wins.",
+  "tangent_evidence": "none: Tangent has no public expiry path (ExpireInteraction is host-privileged, 0 production callers)",
+  "requires": [
+    "expiry-enforcement"
+  ],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r",
+        "expires_at": "2000-01-01T00:00:00Z"
+      },
+      "expect": {}
+    },
+    {
+      "op": "resolve",
+      "item": "a",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "expect": {
+        "code": "terminal_conflict",
+        "outcome_state": "expired"
+      }
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "state": "expired",
+        "outcome_state": "expired"
+      }
+    }
+  ]
+}
