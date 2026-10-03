@@ -110,3 +110,16 @@ test('raw hook responses respect narrowed frame limits',async()=>{
   const authored={invocation_id:'call-1',status:'ok',payloadJSON:raw};
   assert.ok(sdk.encodeHookHandleResult(authored).includes(raw));
 });
+
+test('programmable bridge fixture preserves scripts and rejects invalid output',async()=>{
+  const plugin=fixturePlugin('hooks-fixture'),p=sdk.decodeHookHandleParams(base.raw);
+  const literal='{"n":1.50,"large":9007199254740993,"x\\u005b":"<x>&"}';
+  p.metadata={fixture:'script',script:'{"status":"ok","payload":'+literal+'}'};
+  const result=await plugin.hookHandle(context(),p);
+  assert.equal(sdk.hookPayloadJSON(result),literal);
+  p.metadata.script='{"status":"ok","payload":{},"unknown":true}';
+  assert.equal((await plugin.hookHandle(context(),p)).status,'invalid');
+  for(const code of ['remote_not_allowed','latency_budget_exceeded','stale_scope','stale_binding','capacity_exhausted','deadline_exceeded','caller_cancelled','depth_exceeded','callback_cycle','transport_failure','handler_panic','invalid_output','handler_error','schema_mismatch','profile_unavailable']) {
+    p.metadata={fixture:'fail:'+code};assert.equal((await plugin.hookHandle(context(),p)).error.code,code);
+  }
+});

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -32,20 +33,72 @@ func (p *hookTranscriptPlugin) Init(ctx context.Context, params InitParams) (Ini
 	return r, err
 }
 func (p *hookTranscriptPlugin) HookHandle(ctx context.Context, r HookHandleParams) (HookHandleResult, error) {
-	switch r.Metadata["fixture"] {
-	case "cancelled", "approval_required":
+	directive := r.Metadata["fixture"]
+	switch {
+	case directive == "exit":
+		os.Exit(23)
+	case directive == "script":
+		var script struct {
+			DelayMS uint32 `json:"delay_ms"`
+		}
+		raw := []byte(r.Metadata["script"])
+		if json.Unmarshal(raw, &script) != nil {
+			return HookHandleResult{InvocationID: r.InvocationID, Status: "invalid"}, nil
+		}
+		if script.DelayMS > 0 {
+			if err := hookFixtureWait(ctx, time.Duration(script.DelayMS)*time.Millisecond); err != nil {
+				return HookHandleResult{}, err
+			}
+		}
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(raw, &fields) != nil {
+			return HookHandleResult{InvocationID: r.InvocationID, Status: "invalid"}, nil
+		}
+		delete(fields, "delay_ms")
+		fields["invocation_id"], _ = json.Marshal(r.InvocationID)
+		var members [][]byte
+		for key, value := range fields {
+			name, _ := json.Marshal(key)
+			members = append(members, append(append(name, ':'), value...))
+		}
+		raw = append(append([]byte("{"), bytes.Join(members, []byte(","))...), '}')
+		var result HookHandleResult
+		if json.Unmarshal(raw, &result) != nil {
+			return HookHandleResult{InvocationID: r.InvocationID, Status: "invalid"}, nil
+		}
+		return result, nil
+	case strings.HasPrefix(directive, "fail:"):
+		return HookHandleResult{InvocationID: r.InvocationID, Status: "failed", Error: &HookFailure{Code: strings.TrimPrefix(directive, "fail:")}}, nil
+	case directive == "veto" || directive == "cancelled" || directive == "approval_required":
+		status := directive
+		if status == "veto" {
+			status = "cancelled"
+		}
 		reason := "fixture veto"
-		return HookHandleResult{InvocationID: r.InvocationID, Status: r.Metadata["fixture"], Reason: &reason}, nil
-	case "handler_error":
+		return HookHandleResult{InvocationID: r.InvocationID, Status: status, Reason: &reason}, nil
+	case directive == "error" || directive == "handler_error":
 		return HookHandleResult{}, errors.New("private backend")
-	case "panic":
+	case directive == "panic" || directive == "throw":
 		panic("fixture panic")
-	case "invalid_output":
+	case directive == "invalid_output":
 		return HookHandleResult{InvocationID: "wrong", Status: "ok"}, nil
-	case "wait":
+	case directive == "wait":
 		<-ctx.Done()
 		return HookHandleResult{}, ctx.Err()
+	case strings.HasPrefix(directive, "wait:") || directive == "slow-notification":
+		delay := 100 * time.Millisecond
+		if directive != "slow-notification" {
+			ms, err := strconv.ParseUint(strings.TrimPrefix(directive, "wait:"), 10, 32)
+			if err != nil {
+				return HookHandleResult{}, errors.New("invalid fixture delay")
+			}
+			delay = time.Duration(ms) * time.Millisecond
+		}
+		if err := hookFixtureWait(ctx, delay); err != nil {
+			return HookHandleResult{}, err
+		}
 	}
+
 	result := HookHandleResult{InvocationID: r.InvocationID, Status: "ok"}
 	if r.Kind == "filter" {
 		result.Payload = append(json.RawMessage(nil), r.Payload...)
@@ -176,7 +229,10 @@ func TestHookChild(t *testing.T) {
 	if profile == "hooks-fixture" {
 		hookFixtureSetup = func(s *server) { s.hooksFixtureEnabled = true }
 	}
-	if err := Serve(&hookTranscriptPlugin{}); err != nil {
+	// The programmable raw lane is a NON-SDK fake-reply test double. The
+	// request still enters Serve, but the output wrapper replaces only named replies.
+	raw := &hookFixtureRaw{replies: map[string]json.RawMessage{}}
+	if err := ServeWithOptions(&hookTranscriptPlugin{}, ServeOptions{Input: raw.input(os.Stdin), Output: raw}); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -325,5 +381,141 @@ func TestHookRepliesRespectFrameLimits(t *testing.T) {
 				t.Fatalf("partial success %s", frames[0])
 			}
 		})
+	}
+}
+
+func hookFixtureWait(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// hookFixtureRaw is confined to the SDK TEST binary. raw:<name> deliberately
+// bypasses SDK result validation and is never evidence of SDK author behaviour.
+type hookFixtureRaw struct {
+	mu      sync.Mutex
+	replies map[string]json.RawMessage
+}
+
+func (f *hookFixtureRaw) input(in io.Reader) io.Reader {
+	reader, writer := io.Pipe()
+	go func() {
+		scanner := bufio.NewScanner(in)
+		scanner.Buffer(make([]byte, 4096), MaxHookDTOBytes+4096)
+		for scanner.Scan() {
+			line := bytes.Clone(scanner.Bytes())
+			var request struct {
+				ID     json.RawMessage `json:"id"`
+				Method string          `json:"method"`
+				Params struct {
+					InvocationID string            `json:"invocation_id"`
+					Metadata     map[string]string `json:"metadata"`
+				} `json:"params"`
+			}
+			if json.Unmarshal(line, &request) == nil && request.Method == MethodHookHandle && len(request.ID) > 0 {
+				directive := request.Params.Metadata["fixture"]
+				if strings.HasPrefix(directive, "raw:") {
+					if result := hookFixtureRawResult(strings.TrimPrefix(directive, "raw:"), request.Params.InvocationID); result != nil {
+						f.mu.Lock()
+						f.replies[string(request.ID)] = result
+						f.mu.Unlock()
+					}
+				}
+			}
+			if _, err := writer.Write(append(line, '\n')); err != nil {
+				return
+			}
+		}
+		_ = writer.CloseWithError(scanner.Err())
+	}()
+	return reader
+}
+func (f *hookFixtureRaw) Write(line []byte) (int, error) {
+	inputLength := len(line)
+	var response struct {
+		ID json.RawMessage `json:"id"`
+	}
+	if json.Unmarshal(line, &response) == nil {
+		f.mu.Lock()
+		replacement, ok := f.replies[string(response.ID)]
+		delete(f.replies, string(response.ID))
+		f.mu.Unlock()
+		if ok {
+			line = append(append(append([]byte(`{"jsonrpc":"2.0","id":`), response.ID...), []byte(`,"result":`)...), replacement...)
+			line = append(line, '}', '\n')
+		}
+	}
+	_, err := os.Stdout.Write(line)
+	// Writers must report the size of the SDK frame, not the injected frame.
+	if err != nil {
+		return 0, err
+	}
+	return inputLength, nil
+}
+func hookFixtureRawResult(name, id string) json.RawMessage {
+	quoted, _ := json.Marshal(id)
+	prefix := `{"invocation_id":` + string(quoted)
+	switch name {
+	case "unknown-status":
+		return json.RawMessage(prefix + `,"status":"success"}`)
+	case "unknown-code":
+		return json.RawMessage(prefix + `,"status":"failed","error":{"code":"cancelled"}}`)
+	case "action-output":
+		return json.RawMessage(prefix + `,"status":"ok","payload":null}`)
+	case "non-ok-output":
+		return json.RawMessage(prefix + `,"status":"failed","payload":{},"error":{"code":"handler_error"}}`)
+	case "wrong-id":
+		return json.RawMessage(`{"invocation_id":"wrong","status":"ok"}`)
+	}
+	return nil
+}
+
+func TestHookBridgeFixtureDirectives(t *testing.T) {
+	plugin := &hookTranscriptPlugin{}
+	for _, code := range []string{"remote_not_allowed", "latency_budget_exceeded", "stale_scope", "stale_binding", "capacity_exhausted", "deadline_exceeded", "caller_cancelled", "depth_exceeded", "callback_cycle", "transport_failure", "handler_panic", "invalid_output", "handler_error", "schema_mismatch", "profile_unavailable"} {
+		t.Run(code, func(t *testing.T) {
+			p := hookTestParams(t)
+			p.Metadata = map[string]string{"fixture": "fail:" + code}
+			r := hookInvoke(context.Background(), plugin, p)
+			if r.Error == nil || r.Error.Code != code {
+				t.Fatalf("%+v", r)
+			}
+		})
+	}
+	p := hookTestParams(t)
+	literal := `{"n":1.50,"large":9007199254740993,"x\u005b":"<x>&"}`
+	p.Metadata = map[string]string{"fixture": "script", "script": `{"status":"ok","payload":` + literal + `}`}
+	r := hookInvoke(context.Background(), plugin, p)
+	if string(r.Payload) != literal {
+		t.Fatalf("script literal lost: %s", r.Payload)
+	}
+	p.Metadata["script"] = `{"status":"ok","payload":{},"unknown":true}`
+	if r = hookInvoke(context.Background(), plugin, p); r.Error == nil || r.Error.Code != "invalid_output" {
+		t.Fatalf("invalid script accepted: %+v", r)
+	}
+	for _, directive := range []string{"wait:1000", "slow-notification"} {
+		p.Metadata = map[string]string{"fixture": directive}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if _, err := plugin.HookHandle(ctx, p); !errors.Is(err, context.Canceled) {
+			t.Fatalf("wait ignored cancellation: %v", err)
+		}
+	}
+	for _, name := range []string{"unknown-status", "unknown-code", "action-output", "non-ok-output", "wrong-id"} {
+		raw := hookFixtureRawResult(name, p.InvocationID)
+		result, err := DecodeHookHandleResult(raw)
+		p.Kind = "action"
+		p.Mode = "bail"
+		if err == nil {
+			err = ValidateHookResultFor(p, result)
+		}
+		if err == nil {
+			t.Fatalf("raw fake reply %s unexpectedly valid", name)
+		}
 	}
 }
