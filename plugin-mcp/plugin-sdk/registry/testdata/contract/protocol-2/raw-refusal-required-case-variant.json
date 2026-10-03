@@ -1,0 +1,10 @@
+{
+  "description": "Case variants cannot downgrade a required refusal.",
+  "response_raw": "{\"protocol\":2,\"host_instance\":\"host-epoch\",\"revision\":3,\"plugins\":{},\"kinds\":{},\"regions\":{},\"contributions\":{},\"refusals\":[{\"owner_id\":\"p\",\"owner_generation\":\"2\",\"kind\":\"future\",\"local_key\":\"x\",\"required\":true,\"REQUIRED\":false,\"reason\":\"unsupported-kind\"}]}",
+  "go": {
+    "validate": "ErrCollision"
+  },
+  "ts": {
+    "validate": "ErrCollision"
+  }
+}

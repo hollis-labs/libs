@@ -9,7 +9,9 @@ or compatibility shim. Nanite remains pinned to its released SDK during wave 1.
 The response requires `protocol: 2`, `host_instance` (opaque host epoch),
 `revision` (positive integer, at most 2^53−1), `plugins`, `kinds`, `regions`,
 `contributions`, and `refusals`. Empty maps are `{}` and empty lists are `[]`.
-Duplicate JSON object keys are collisions, including nested keys.
+Duplicate JSON object keys are collisions, including nested keys and case variants
+(using Unicode lowercase for collision comparison). Mis-cased spellings of known
+wire fields are invalid; only their exact documented spellings are accepted.
 
 `plugins[owner_id]` contains `owner_generation` and optional `bundle_url`,
 `bundle_version`, `stylesheet_url`, and `runtime`. Bundle URL and version appear
@@ -86,7 +88,7 @@ cancellation: an in-process library cannot forcibly stop arbitrary code.
 
 ## Shared fixtures and split ownership
 
-`registry/testdata/contract/protocol-2/*.json` carries `description`, `response`,
+`registry/testdata/contract/protocol-2/*.json` carries `description`, `response` (or `response_raw` for raw-JSON inputs),
 `go.validate`, and `ts.validate`. Validation expectations describe structural
 validation, not host-specific admission. The unknown-optional fixture is `ok`
 structurally and must separately exercise `unsupported-kind` admission.

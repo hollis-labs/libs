@@ -41,8 +41,9 @@ func TestContractFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			var fx struct {
-				Response json.RawMessage `json:"response"`
-				Go       struct {
+				Response    json.RawMessage `json:"response"`
+				ResponseRaw *string         `json:"response_raw"`
+				Go          struct {
 					Validate string `json:"validate"`
 				} `json:"go"`
 			}
@@ -50,7 +51,11 @@ func TestContractFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			var response Response
-			err = json.Unmarshal(fx.Response, &response)
+			payload := fx.Response
+			if fx.ResponseRaw != nil {
+				payload = []byte(*fx.ResponseRaw)
+			}
+			err = json.Unmarshal(payload, &response)
 			if err == nil {
 				err = response.Validate()
 			}

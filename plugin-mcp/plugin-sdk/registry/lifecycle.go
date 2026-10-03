@@ -137,6 +137,13 @@ func (c *Catalog) Revoke(owner, generation string) error {
 			delete(c.response.Contributions, kind)
 		}
 	}
+	refusals := make([]Refusal, 0, len(c.response.Refusals))
+	for _, refusal := range c.response.Refusals {
+		if refusal.OwnerID != owner || refusal.OwnerGeneration != generation {
+			refusals = append(refusals, refusal)
+		}
+	}
+	c.response.Refusals = refusals
 	c.response.Revision++
 	callbacks := c.callbacks()
 	c.mu.Unlock()

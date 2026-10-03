@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"reflect"
+	"strings"
 )
 
 // UnmarshalJSON rejects duplicate object keys rather than allowing last-writer-wins.
@@ -18,7 +20,7 @@ func (r *Response) UnmarshalJSON(raw []byte) error {
 	}
 	type wire Response
 	var decoded wire
-	if err := json.Unmarshal(raw, &decoded); err != nil {
+	if err := decodeExact(raw, &decoded); err != nil {
 		return err
 	}
 	*r = Response(decoded)
@@ -45,10 +47,11 @@ func walkJSON(d *json.Decoder) error {
 			if !ok {
 				return ErrInvalidContribution
 			}
-			if seen[key] {
+			folded := strings.ToLower(key)
+			if seen[folded] {
 				return ErrCollision
 			}
-			seen[key] = true
+			seen[folded] = true
 			if err := walkJSON(d); err != nil {
 				return err
 			}
@@ -68,7 +71,7 @@ func walkJSON(d *json.Decoder) error {
 func (c *Contribution) UnmarshalJSON(raw []byte) error {
 	type wire Contribution
 	var value wire
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := decodeExact(raw, &value); err != nil {
 		return err
 	}
 	var fields map[string]json.RawMessage
@@ -123,7 +126,7 @@ func optionalStrings(fields map[string]json.RawMessage, names ...string) error {
 func (p *Plugin) UnmarshalJSON(raw []byte) error {
 	type wire Plugin
 	var value wire
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := decodeExact(raw, &value); err != nil {
 		return err
 	}
 	var fields map[string]json.RawMessage
@@ -145,8 +148,8 @@ func (p *Plugin) UnmarshalJSON(raw []byte) error {
 func (r *Runtime) UnmarshalJSON(raw []byte) error {
 	type wire Runtime
 	var value wire
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return ErrRuntime
+	if err := decodeExact(raw, &value); err != nil {
+		return err
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
@@ -161,7 +164,7 @@ func (r *Runtime) UnmarshalJSON(raw []byte) error {
 func (f *Refusal) UnmarshalJSON(raw []byte) error {
 	type wire Refusal
 	var value wire
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := decodeExact(raw, &value); err != nil {
 		return err
 	}
 	var fields map[string]json.RawMessage
@@ -172,5 +175,63 @@ func (f *Refusal) UnmarshalJSON(raw []byte) error {
 		return ErrInvalidContribution
 	}
 	*f = Refusal(value)
+	return nil
+}
+
+// decodeExact rejects case variants of defined tags before encoding/json can
+// bind them case-insensitively. Unknown extension keys remain forward-compatible.
+func decodeExact[T any](raw []byte, value *T) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	typ := reflect.TypeOf(value).Elem()
+	for i := 0; i < typ.NumField(); i++ {
+		tag := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+		if tag == "" || tag == "-" {
+			continue
+		}
+		for key := range fields {
+			if key != tag && strings.EqualFold(key, tag) {
+				return ErrInvalidContribution
+			}
+		}
+	}
+	return json.Unmarshal(raw, value)
+}
+func (d *KindDescriptor) UnmarshalJSON(raw []byte) error {
+	type wire KindDescriptor
+	var value wire
+	if err := decodeExact(raw, &value); err != nil {
+		return err
+	}
+	*d = KindDescriptor(value)
+	return nil
+}
+func (d *RegionDescriptor) UnmarshalJSON(raw []byte) error {
+	type wire RegionDescriptor
+	var value wire
+	if err := decodeExact(raw, &value); err != nil {
+		return err
+	}
+	*d = RegionDescriptor(value)
+	return nil
+}
+func (r *ComponentRef) UnmarshalJSON(raw []byte) error {
+	type wire ComponentRef
+	var value wire
+	if err := decodeExact(raw, &value); err != nil {
+		return err
+	}
+	*r = ComponentRef(value)
+	return nil
+}
+func (r *HandlerRef) UnmarshalJSON(raw []byte) error {
+	type wire HandlerRef
+	var value wire
+	if err := decodeExact(raw, &value); err != nil {
+		return err
+	}
+	*r = HandlerRef(value)
 	return nil
 }
