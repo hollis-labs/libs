@@ -25,6 +25,20 @@
   calls, cancels admitted work, and attempts reverse-order idempotent disposal.
   Optional contribution refusals remain visible; required refusals abort planning.
   Protocol-2 shared fixtures and a [wire/lifecycle contract](docs/protocol/registry-v2.md).
+- Optional manifest tool `annotations` using MCP names: `title`,
+  `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint`,
+  preserving explicit false. The only cross-field refusal is read-only plus
+  destructive; idempotent reads and destructive tools are valid, and effects
+  remain host-defined. Hints never grant authority. Historical golden
+  definitions for context_pin, context_unpin and reminder_set are pinned to
+  Nanite source commit `2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe`.
+  Existing manifests decode unchanged, but manifests using annotations require
+  the SDK release carrying this field: older strict hosts refuse them with
+  `manifest: unknown field "annotations"` (documented fixture in
+  `manifest/testdata/annotations/older-strict-host-error.txt`). Rollout order:
+  SDK release, Nanite SDK bump, then updated nanite-plugins manifests.
+  No schema, subprocess protocol or package version changes; host MCP
+  registration is separate.
 
 - `manifest`: shared schema version 2 declarations with dotted IDs, subprocess
   entrypoints, host ranges and opaque host extensions, config fields and

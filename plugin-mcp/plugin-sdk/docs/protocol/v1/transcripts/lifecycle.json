@@ -1,4 +1,5 @@
 {
+  "level": "normative",
   "profile": "base",
   "steps": [
     {
@@ -85,7 +86,9 @@
         "result": {
           "ok": true
         }
-      }
+      },
+      "level": "observed-quirk",
+      "preferred": "Explicit unload should enter terminal shutdown and cleanup exactly once; EOF after acknowledgement must not call unload again. The transcript observes the acknowledgement and EOF only; the repeated cleanup is verified by runtime tests/code, not its reply assertions."
     }
   ]
 }

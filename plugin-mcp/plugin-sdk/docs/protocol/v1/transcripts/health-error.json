@@ -1,4 +1,5 @@
 {
+  "level": "observed-quirk",
   "profile": "health-error",
   "steps": [
     {
@@ -16,5 +17,6 @@
         }
       }
     }
-  ]
+  ],
+  "preferred": "F4: a health-handler failure becomes a successful ok:false result. Preferred: reserve ok:false for an intentional health status; report a thrown/rejected handler as an RPC error with ordinary typed mapping."
 }

@@ -1,4 +1,5 @@
 {
+  "level": "normative",
   "status": "proposed",
   "finding": "F1: no reverse RPC dispatcher in either Go Serve or plugin-host Conn; hypothetical host adapter required",
   "profile": "duplex",

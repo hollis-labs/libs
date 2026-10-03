@@ -1,4 +1,5 @@
 {
+  "level": "observed-quirk",
   "profile": "base",
   "steps": [
     {
@@ -6,5 +7,6 @@
       "repeat": 8388608
     }
   ],
-  "termination": "frame-too-large"
+  "termination": "frame-too-large",
+  "preferred": "F5: Go scanner terminates at this input boundary without an RPC error while output is uncapped. Preferred: define explicit frame budgets in both directions and a deterministic oversize transport outcome in protocol 2."
 }

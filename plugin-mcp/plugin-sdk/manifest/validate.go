@@ -138,6 +138,10 @@ func (m Manifest) Validate() error {
 		seenTools[tool.Name] = true
 		add(strings.TrimSpace(tool.Description) != "", prefix+".description is required")
 		add(strings.TrimSpace(tool.Effect) != "", prefix+".effect is required (host-defined vocabulary)")
+		if a := tool.Annotations; a != nil {
+			add(!(a.ReadOnlyHint != nil && *a.ReadOnlyHint && a.DestructiveHint != nil && *a.DestructiveHint),
+				prefix+" ("+tool.Name+").annotations.readOnlyHint=true cannot accompany destructiveHint=true")
+		}
 		var schema map[string]json.RawMessage
 		var schemaType string
 		if !object(tool.InputSchema) || checkJSON(tool.InputSchema) != nil || json.Unmarshal(tool.InputSchema, &schema) != nil || json.Unmarshal(schema["type"], &schemaType) != nil || schemaType != "object" {
