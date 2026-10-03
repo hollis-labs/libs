@@ -1,0 +1,17 @@
+# No go.work anywhere: modules are built one at a time with GOWORK=off.
+# See README.md ("Developing across modules"). CI fails if one is committed.
+go.work
+go.work.sum
+
+# Local environment and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+
+# Build and test output
+*.test
+*.out
+coverage.*
