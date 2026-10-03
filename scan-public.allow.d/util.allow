@@ -1,0 +1,10 @@
+# scripts/scan-public findings that were read and judged not to be exposure.
+# Format: RULE-ID  PATH-GLOB  REASON (one line). Every entry is still printed by the scan.
+# Add an entry only after reading the matched line, and say what you checked. Do not quote
+# the matched text in the reason: this file is scanned too.
+
+home-path-linux  util/sftpsync/result_test.go        sample source path in a result-formatting test; a made-up user name, not a real home directory; test-only
+internal-ip      util/svcerr/json_test.go            private-range sample address inside a test that asserts it is NOT leaked in an error response; test-only
+home-path-linux  util/worktree/example_test.go       placeholder repository path in path-computation examples; made-up user name; test-only
+home-path-linux  util/worktree/placement_test.go     placeholder repository path in path-computation tests; made-up user name; test-only
+home-path-linux  util/worktree/preset_torque_test.go placeholder repository path in path-computation tests; made-up user name; test-only
