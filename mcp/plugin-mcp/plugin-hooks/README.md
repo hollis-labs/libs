@@ -99,6 +99,14 @@ returns an async receipt; overload must be surfaced after the transaction. This 
 in-memory scheduling, without retries or durable delivery. Always resolve a pending
 capability: the engine has no transaction driver.
 
+## Known limitations
+
+Filter diffs compare JSON numbers by their literal text. Re-encoding an untouched
+number can be rejected as invalid output when its path is immutable: for example,
+`1.50` becoming `1.5`, `1e3` becoming `1000`, or a large integer being rounded by
+`float64`. Go handlers should preserve untouched values byte-for-byte (for example,
+using `json.RawMessage`), or change only paths declared mutable and visible.
+
 ## Current boundary
 
 All six declared modes execute. Breaker, tracing, remote wire, schema compiler,
