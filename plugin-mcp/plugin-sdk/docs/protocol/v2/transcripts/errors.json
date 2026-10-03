@@ -1,0 +1,277 @@
+{
+  "level": "normative",
+  "profile": "full",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "command/execute",
+        "params": {
+          "name": "not-found"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32000,
+          "message": "missing"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "command/execute",
+        "params": {
+          "name": "conflict"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32001,
+          "message": "exists"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "command/execute",
+        "params": {
+          "name": "validation"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "error": {
+          "code": -32002,
+          "message": "invalid"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "command/execute",
+        "params": {
+          "name": "cancelled"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "error": {
+          "code": -32003,
+          "message": "wrapped: plugin: action cancelled by hook"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "command/execute",
+        "params": {
+          "name": "internal"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "error": {
+          "code": -32603,
+          "message": "failed"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "command/execute",
+        "params": {
+          "name": "other-status"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "error": {
+          "code": -32603,
+          "message": "denied"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "command/execute",
+        "params": {
+          "name": "panic"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "error": {
+          "code": -32603,
+          "message": "panic: fixture panic"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "event/handle",
+        "params": {
+          "type": "cancelled",
+          "pre_hook": true
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "error": {
+          "code": -32003,
+          "message": "wrapped: plugin: action cancelled by hook"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "crud/read",
+        "params": {
+          "id": "not-found"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "error": {
+          "code": -32000,
+          "message": "missing"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "mcp/call_tool",
+        "params": {
+          "tool_name": "validation"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "error": {
+          "code": -32002,
+          "message": "invalid"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "http/handle",
+        "params": {
+          "path": "conflict"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "error": {
+          "code": -32001,
+          "message": "exists"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "plugin/migrate",
+        "params": {
+          "from_version": "not-found"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "error": {
+          "code": -32000,
+          "message": "missing"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "command/execute",
+        "params": []
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "error": {
+          "code": -32602
+        }
+      },
+      "message_prefix": "decode params:"
+    }
+  ]
+}

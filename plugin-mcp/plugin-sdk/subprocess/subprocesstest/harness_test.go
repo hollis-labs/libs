@@ -2,6 +2,8 @@ package subprocesstest_test
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/hollis-labs/plugin-sdk/capability"
 	"os"
 	"testing"
 
@@ -15,7 +17,7 @@ type echoPlugin struct{}
 func (echoPlugin) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
 	return subprocess.InitResult{
 		ID: "echo", Name: "Echo", Version: "0.0.1",
-		Description: "test", Protocol: subprocess.ProtocolVersion,
+		Description: "test", Protocol: subprocess.ProtocolVersion, CapabilityContract: 1,
 	}, nil
 }
 
@@ -173,15 +175,15 @@ func (*minimalPlugin) Unload(ctx context.Context) error { return nil }
 // meant to test.
 type capabilityPlugin struct {
 	degraded bool
-	granted  []string
+	granted  capability.GrantSet
 }
 
 func (p *capabilityPlugin) Init(ctx context.Context, params subprocess.InitParams) (subprocess.InitResult, error) {
-	p.granted = params.Granted
+	p.granted = params.Grants
 	p.degraded = !params.HasCapability("example.capability")
 	return subprocess.InitResult{
 		ID: "cap", Name: "Cap", Version: "0.0.1",
-		Description: "test", Protocol: subprocess.ProtocolVersion,
+		Description: "test", Protocol: subprocess.ProtocolVersion, CapabilityContract: 1,
 	}, nil
 }
 
@@ -193,7 +195,7 @@ func (p *capabilityPlugin) Unload(ctx context.Context) error { return nil }
 
 func TestHarnessWithGranted(t *testing.T) {
 	p := &capabilityPlugin{}
-	h := subprocesstest.New(t, p, subprocesstest.WithGranted([]string{"example.capability"}))
+	h := subprocesstest.New(t, p, subprocesstest.WithGrants(capability.GrantSet{{GrantID: "g", Name: "example.capability", SchemaVersion: 1, Scope: json.RawMessage(`{}`), HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1, Audience: "test", IssuedAt: "2026-10-03T00:00:00Z", ExpiresAt: "2026-10-04T00:00:00Z", PolicyRevision: "1"}}))
 	defer h.Close()
 
 	if _, err := h.Init(context.Background()); err != nil {
@@ -202,7 +204,7 @@ func TestHarnessWithGranted(t *testing.T) {
 	if p.degraded {
 		t.Errorf("plugin degraded despite the capability being granted")
 	}
-	if len(p.granted) != 1 || p.granted[0] != "example.capability" {
+	if len(p.granted) != 1 || p.granted[0].Name != "example.capability" {
 		t.Errorf("Granted = %v", p.granted)
 	}
 }

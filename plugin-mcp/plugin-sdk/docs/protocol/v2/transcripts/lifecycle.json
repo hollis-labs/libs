@@ -1,0 +1,98 @@
+{
+  "level": "normative",
+  "profile": "base",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {
+            "key": "value"
+          },
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": [],
+          "identity": {
+            "subject": "caller"
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/load"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "skipped_registrations": [
+            {
+              "kind": "command",
+              "id": "optional",
+              "reason": "no config"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "plugin/unload"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "ok": true
+        }
+      },
+      "level": "observed-quirk",
+      "preferred": "Explicit unload should enter terminal shutdown and cleanup exactly once; EOF after acknowledgement must not call unload again. The transcript observes the acknowledgement and EOF only; the repeated cleanup is verified by runtime tests/code, not its reply assertions."
+    }
+  ]
+}

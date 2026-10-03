@@ -93,7 +93,7 @@ func (g Grant) Validate() error {
 	if g.SchemaVersion == 0 {
 		return invalid("schema_version", "required positive uint32")
 	}
-	if bytes.Equal(bytes.TrimSpace(g.Scope), []byte("null")) || strictjson.Validate(g.Scope) != nil {
+	if bytes.Equal(bytes.TrimSpace(g.Scope), []byte("null")) || strictjson.ValidatePortable(g.Scope) != nil {
 		return invalid("scope", "required non-null JSON without duplicate keys")
 	}
 	issued, err := timestamp("issued_at", g.IssuedAt)

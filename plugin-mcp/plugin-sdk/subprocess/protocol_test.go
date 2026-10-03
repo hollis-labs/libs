@@ -45,11 +45,11 @@ func TestRPCRequestRoundtrip(t *testing.T) {
 	}
 }
 
-func TestProtocolVersionLockedAt1(t *testing.T) {
+func TestProtocolVersionLockedAt2(t *testing.T) {
 	// Bumping this constant is a breaking change that must be coordinated
 	// across host + all plugins. Fail loudly if someone changes it
 	// inadvertently.
-	if ProtocolVersion != 1 {
+	if ProtocolVersion != 2 {
 		t.Errorf("ProtocolVersion = %d; bump requires cross-repo coordination", ProtocolVersion)
 	}
 }

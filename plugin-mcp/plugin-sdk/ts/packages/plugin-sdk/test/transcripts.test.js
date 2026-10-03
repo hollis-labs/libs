@@ -6,7 +6,7 @@ import { createInterface } from 'node:readline';
 import { serve, FrameTooLargeError } from '../dist/index.js';
 import { fixturePlugin } from './fixtures.js';
 
-const directory = new URL('../../../../docs/protocol/v1/transcripts/', import.meta.url);
+const directory = new URL('../../../../docs/protocol/v2/transcripts/', import.meta.url);
 const names = (await readdir(directory)).filter(name => name.endsWith('.json')).sort();
 assert.ok(names.length, 'missing shared protocol corpus');
 for (const name of names) {

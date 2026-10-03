@@ -3,6 +3,7 @@ package subprocess
 import (
 	"encoding/json"
 	"errors"
+	"github.com/hollis-labs/plugin-sdk/capability"
 	"os"
 	"strings"
 	"testing"
@@ -10,13 +11,15 @@ import (
 
 func TestInitParamsRoundtripAllFields(t *testing.T) {
 	in := InitParams{
-		PluginDir: "/plugins/foo",
-		DataDir:   "/data/foo",
-		CacheDir:  "/cache/foo",
-		Config:    map[string]string{"k": "v"},
-		LogLevel:  "debug",
-		HostInfo:  HostInfo{Version: "1.2.3", Protocol: 1},
-		Identity:  json.RawMessage(`{"user_id":"u1"}`),
+		PluginDir:          "/plugins/foo",
+		DataDir:            "/data/foo",
+		CacheDir:           "/cache/foo",
+		Config:             map[string]string{"k": "v"},
+		LogLevel:           "debug",
+		HostInfo:           HostInfo{Version: "1.2.3", Protocol: 2},
+		CapabilityContract: 1,
+		Incarnation:        capability.RuntimeIdentity{HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1},
+		Identity:           json.RawMessage(`{"user_id":"u1"}`),
 	}
 
 	b, err := json.Marshal(in)
@@ -52,33 +55,14 @@ func TestInitParamsRoundtripAllFields(t *testing.T) {
 	}
 }
 
-// TestInitParamsForwardCompatV011 verifies that a v0.1.1-shaped payload
-// (no data_dir / cache_dir / log_level) decodes cleanly into the v0.1.2
-// struct, leaving the new fields at their zero values.
-func TestInitParamsForwardCompatV011(t *testing.T) {
-	raw := `{
-		"plugin_dir": "/plugins/foo",
-		"config": {"k": "v"},
-		"host_info": {"version": "1.1.0", "protocol": 1}
-	}`
-
+func TestInitParamsRejectsV1(t *testing.T) {
 	var out InitParams
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	if json.Unmarshal([]byte(`{"plugin_dir":"/plugins/foo","host_info":{"version":"test","protocol":1}}`), &out) == nil {
+		t.Fatal("v1 accepted")
 	}
-
-	if out.PluginDir != "/plugins/foo" {
-		t.Errorf("PluginDir = %q", out.PluginDir)
-	}
-	if out.DataDir != "" {
-		t.Errorf("DataDir = %q, want empty", out.DataDir)
-	}
-	if out.CacheDir != "" {
-		t.Errorf("CacheDir = %q, want empty", out.CacheDir)
-	}
-	if out.LogLevel != "" {
-		t.Errorf("LogLevel = %q, want empty", out.LogLevel)
-	}
+}
+func validInitParams() InitParams {
+	return InitParams{PluginDir: "/plugins/test", DataDir: "/data/test", CacheDir: "/cache/test", Config: map[string]string{}, LogLevel: "info", HostInfo: HostInfo{Version: "test", Protocol: 2}, CapabilityContract: 1, Incarnation: capability.RuntimeIdentity{HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1}}
 }
 
 func TestResolvedDataDirPopulated(t *testing.T) {

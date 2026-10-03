@@ -2,6 +2,7 @@ package subprocess
 
 import (
 	"encoding/json"
+	"github.com/hollis-labs/plugin-sdk/capability"
 	"testing"
 )
 
@@ -77,146 +78,28 @@ func TestCapabilityRequestMinimalOmitsOptionalFields(t *testing.T) {
 	}
 }
 
-func TestInitParamsRoundtripGranted(t *testing.T) {
-	in := InitParams{
-		PluginDir: "/plugins/foo",
-		HostInfo:  HostInfo{Version: "1.2.3", Protocol: ProtocolVersion},
-		Granted:   []string{"alpha", "beta"},
+func TestHasCapabilityUsesGrantNames(t *testing.T) {
+	p := InitParams{Grants: capability.GrantSet{{Name: "alpha"}, {Name: "beta"}}}
+	if !p.HasCapability("alpha") || !p.HasCapability("beta") || p.HasCapability("gamma") {
+		t.Fatal("grant name lookup")
 	}
-
-	b, err := json.Marshal(in)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var out InitParams
-	if err := json.Unmarshal(b, &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	if len(out.Granted) != 2 || out.Granted[0] != "alpha" || out.Granted[1] != "beta" {
-		t.Errorf("Granted = %v, want [alpha beta]", out.Granted)
-	}
-	if !out.HasCapability("alpha") || !out.HasCapability("beta") {
-		t.Errorf("HasCapability missed a granted name: %v", out.Granted)
-	}
-	if out.HasCapability("gamma") {
-		t.Errorf("HasCapability(gamma) = true, want false")
+	if (&InitParams{}).HasCapability("alpha") {
+		t.Fatal("empty grants")
 	}
 }
-
-// A host on this SDK that grants nothing must produce the same init
-// payload it produced before the field existed, so a plugin that never
-// heard of capabilities sees an unchanged wire.
-func TestInitParamsGrantedOmittedWhenUnused(t *testing.T) {
-	b, err := json.Marshal(InitParams{PluginDir: "/plugins/foo"})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+func TestEmptyGrantsAreExplicit(t *testing.T) {
+	p := validInitParams()
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(b, &fields); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	if err := json.Unmarshal([]byte(mustMarshal(t, p)), &fields); err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := fields["granted"]; ok {
-		t.Errorf("granted present in %s, want omitted", string(b))
+	if string(fields["grants"]) != "[]" {
+		t.Fatal("empty grants omitted")
 	}
-}
-
-// An older host sends no granted at all. A newer plugin must decode it
-// cleanly and read the absence as "the host said nothing" — never as a
-// decode failure, and never as a grant.
-func TestInitParamsForwardCompatNoGranted(t *testing.T) {
-	raw := `{
-		"plugin_dir": "/plugins/foo",
-		"data_dir": "/data/foo",
-		"cache_dir": "/cache/foo",
-		"config": {"k": "v"},
-		"log_level": "info",
-		"host_info": {"version": "1.1.0", "protocol": 1}
-	}`
-
-	var out InitParams
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	if out.Granted != nil {
-		t.Errorf("Granted = %v, want nil", out.Granted)
-	}
-	if out.HasCapability("anything") {
-		t.Errorf("HasCapability = true against a host that sent no granted")
-	}
-	// Everything the older host did send must still arrive.
-	if out.PluginDir != "/plugins/foo" || out.DataDir != "/data/foo" || out.LogLevel != "info" {
-		t.Errorf("older payload lost fields: %+v", out)
-	}
-}
-
-// The mirror case: an older *plugin*, built against an InitParams that
-// has no Granted field, receives init params from a newer host that
-// sends one. It must decode cleanly and keep every field it knows.
-//
-// initParamsV040 is the shape of InitParams as of v0.4.0, before
-// capability declaration. Do not add fields to it.
-type initParamsV040 struct {
-	PluginDir string            `json:"plugin_dir"`
-	DataDir   string            `json:"data_dir"`
-	CacheDir  string            `json:"cache_dir"`
-	Config    map[string]string `json:"config"`
-	LogLevel  string            `json:"log_level"`
-	HostInfo  HostInfo          `json:"host_info"`
-}
-
-func TestInitParamsBackCompatOlderPluginIgnoresGranted(t *testing.T) {
-	newer := InitParams{
-		PluginDir: "/plugins/foo",
-		DataDir:   "/data/foo",
-		CacheDir:  "/cache/foo",
-		Config:    map[string]string{"k": "v"},
-		LogLevel:  "debug",
-		HostInfo:  HostInfo{Version: "9.9.9", Protocol: ProtocolVersion},
-		Granted:   []string{"alpha"},
-	}
-
-	b, err := json.Marshal(newer)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
-	var old initParamsV040
-	if err := json.Unmarshal(b, &old); err != nil {
-		t.Fatalf("older plugin failed to decode newer init params: %v", err)
-	}
-
-	if old.PluginDir != newer.PluginDir || old.DataDir != newer.DataDir ||
-		old.CacheDir != newer.CacheDir || old.LogLevel != newer.LogLevel {
-		t.Errorf("older plugin lost fields: %+v", old)
-	}
-	if old.Config["k"] != "v" {
-		t.Errorf("Config = %v, want k=v", old.Config)
-	}
-	if old.HostInfo.Protocol != ProtocolVersion {
-		t.Errorf("HostInfo.Protocol = %d, want %d", old.HostInfo.Protocol, ProtocolVersion)
-	}
-}
-
-// Capability declaration is additive. It must not move the negotiated
-// protocol version, which TestProtocolVersionLockedAt1 also pins.
-func TestCapabilityDeclarationDoesNotBumpProtocol(t *testing.T) {
-	if ProtocolVersion != 1 {
-		t.Errorf("ProtocolVersion = %d, want 1: capability declaration is additive", ProtocolVersion)
-	}
-}
-
-func TestHasCapabilityOnEmptyGrant(t *testing.T) {
-	// A host that explicitly grants nothing and a host that has never
-	// heard of capabilities are indistinguishable here, by design.
-	for name, p := range map[string]InitParams{
-		"nil":   {},
-		"empty": {Granted: []string{}},
-	} {
-		if p.HasCapability("alpha") {
-			t.Errorf("%s: HasCapability = true, want false", name)
-		}
+	delete(fields, "grants")
+	raw, _ := json.Marshal(fields)
+	if json.Unmarshal(raw, &p) == nil {
+		t.Fatal("missing grants accepted")
 	}
 }
 

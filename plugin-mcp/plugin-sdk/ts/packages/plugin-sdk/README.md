@@ -1,7 +1,7 @@
 # @hollis-labs/plugin-sdk
 
 A host-neutral, zero-runtime-dependency server SDK for Node 22+ and Deno's
-Node compatibility layer. Workers speak plugin-sdk stdio protocol 1. This
+Node compatibility layer. Workers speak plugin-sdk stdio protocol 2. This
 package is separate from the browser's `@hollis-labs/plugin-registry`.
 
 ```ts
@@ -12,7 +12,7 @@ const plugin: ServerPlugin = {
     const token = ctx.config.secret('api_key'); // registers redaction
     ctx.logger.info('initialized', { hasToken: Boolean(token) });
     return { id: 'hello', name: 'Hello', version: '0.1.0',
-      description: 'Example', protocol: PROTOCOL_VERSION };
+      description: 'Example', protocol: PROTOCOL_VERSION, capability_contract: 1 };
   },
   load() { return {}; },
   unload() {},
@@ -89,7 +89,7 @@ host-resolved config. `required` throws on missing/empty, not whitespace.
 `bool` follows Go's true spellings; invalid values return false. `int` accepts
 signed decimal JavaScript-safe integers, otherwise zero. `secret` records a
 nonempty value in the instance's shared SecretTracker. `hasCapability(params,
-name)` checks granted membership; false is not proof of denial. `resolvedDataDir`
+name)` checks grant-name membership; a match is discovery data and still needs live host authorization. `resolvedDataDir`
 throws when the host supplies no persistent data directory.
 
 `ctx.logger` writes JSON lines to stderr with ts/level/msg. `with(fields)`
@@ -105,7 +105,7 @@ This redaction is stronger than Go's exact-match top-level field redaction.
 ```ts
 import { createHarness } from '@hollis-labs/plugin-sdk/test';
 const h = await createHarness(plugin, {
-  config: { api_key: 'fixture' }, granted: ['host-defined-capability'],
+  config: { api_key: 'fixture' }, grants: [],
   jsonRoundtrip: true,
 });
 try {
@@ -131,9 +131,9 @@ covers the wire layer.
 
 ## Shared contract and known differences
 
-Wire types are generated from `protocol/v1/schema.json` by
-`python3 protocol/v1/generate.py`; do not edit src/wire.ts. The shared corpus
-at `docs/protocol/v1/transcripts` is replayed by test/transcripts.test.js. Every
+Wire types are generated from `protocol/v2/schema.json` by
+`python3 protocol/v2/generate.py`; do not edit src/wire.ts. The shared corpus
+at `docs/protocol/v2/transcripts` is replayed by test/transcripts.test.js. Every
 observed fixture must pass; proposed reverse `host/*` and `mcp/list_tools`
 fixtures stay skipped. The SDK implements neither proposal.
 
@@ -171,6 +171,12 @@ shared transcripts deliberately serialize request/reply steps.
 `@hollis-labs/plugin-sdk/build` is a separate Node-only, zero-dependency author
 build surface for manifest-v2 artifact collection, canonical writing and bundle
 verification. It never enters the plugin worker/browser runtime and does not
-make the protocol-1 Serve described above speak protocol 2. See
+implement worker transport profiles. See
 [the TypeScript authoring guide](../../../docs/ts-plugin-authoring.md) for staging,
 schema generation and host reload boundaries.
+Protocol 2 requires the strict Init contract described in
+[the handshake](../../../docs/protocol/v2/README.md). Harness options `grants`
+and `incarnation` replace the old name-only grant option; default grants are
+empty and the harness supplies a test incarnation. Results acknowledge both
+`protocol:2` and `capability_contract:1`. Optional reverse/hook offers are
+validated and declined by the current runtime; their transports are not implemented.

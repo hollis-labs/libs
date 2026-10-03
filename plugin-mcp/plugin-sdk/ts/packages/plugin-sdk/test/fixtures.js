@@ -11,7 +11,7 @@ function fail(name) {
 }
 export function fixturePlugin(profile) {
   const base = {
-    init() { return { id: 'fixture', name: 'Fixture', version: '1.0.0', description: 'conformance', protocol: 1 }; },
+    init() { return { id: 'fixture', name: 'Fixture', version: '1.0.0', description: 'conformance', protocol: 2, capability_contract:1 }; },
     load() { return { skipped_registrations: [{ kind: 'command', id: 'optional', reason: 'no config' }] }; },
     unload() {},
   };
@@ -35,3 +35,5 @@ export function fixturePlugin(profile) {
     migrate(_ctx, from) { fail(from); }, health() { return { ok: true }; },
   };
 }
+
+export function initParams(overrides = {}) { return {plugin_dir:'/fixture',data_dir:'/fixture/data',cache_dir:'/fixture/cache',config:{},log_level:'info',host_info:{version:'fixture',protocol:2},capability_contract:1,incarnation:{host_instance:'fixture-host',owner_id:'fixture',owner_generation:1},grants:[],...overrides}; }

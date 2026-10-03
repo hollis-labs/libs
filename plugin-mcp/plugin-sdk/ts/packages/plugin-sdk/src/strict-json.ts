@@ -2,7 +2,7 @@
 // Closed DTO decoders consume raw fields; opaque values keep their own casing.
 export const MAX_JSON_DEPTH = 128;
 
-function inspect(text: string): Map<string, string> | undefined {
+function inspect(text: string, portable = false): Map<string, string> | undefined {
   let at = 0;
   let root: Map<string, string> | undefined;
   const fail = (): never => { throw new SyntaxError('Invalid or ambiguous JSON'); };
@@ -12,7 +12,17 @@ function inspect(text: string): Map<string, string> | undefined {
     if (text[at++] !== '"') fail();
     while (at < text.length) {
       const c = text[at++];
-      if (c === '"') return JSON.parse(text.slice(start, at)) as string;
+      if (c === '"') {
+        const decoded = JSON.parse(text.slice(start, at)) as string;
+        for (let i = 0; i < decoded.length; i++) {
+          const unit = decoded.charCodeAt(i);
+          if (unit >= 0xd800 && unit <= 0xdbff) {
+            const low = decoded.charCodeAt(++i);
+            if (!(low >= 0xdc00 && low <= 0xdfff)) fail();
+          } else if (unit >= 0xdc00 && unit <= 0xdfff) fail();
+        }
+        return decoded;
+      }
       if (c === '\\') at++;
     }
     return fail();
@@ -60,7 +70,12 @@ function inspect(text: string): Map<string, string> | undefined {
     } else {
       const token = /^(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/.exec(text.slice(at));
       if (!token) fail();
-      at += token![0].length;
+      const raw = token![0];
+      if (portable && /^-?[0-9]/.test(raw)) {
+        if (!Number.isFinite(Number(raw))) fail();
+        if (!/[.eE]/.test(raw) && (BigInt(raw) > 9007199254740991n || BigInt(raw) < -9007199254740991n)) fail();
+      }
+      at += raw.length;
     }
   };
   value(0);
@@ -70,12 +85,13 @@ function inspect(text: string): Map<string, string> | undefined {
 }
 
 export function validateJSON(text: string): void { inspect(text); }
+export function validatePortableJSON(text: string): void { inspect(text, true); }
 
 // Return unparsed field JSON, preserving numeric tokens for DTO range checks.
 // All fields are required/non-null and extra/case-folded spellings are refused.
-export function decodeJSONObject(text: string, fields: readonly string[]): Map<string, string> {
+export function decodeJSONObject(text: string, fields: readonly string[], optional: readonly string[] = []): Map<string, string> {
   const result = inspect(text);
-  if (!result || result.size !== fields.length || fields.some(key => !result.has(key) || result.get(key) === 'null')) {
+  if (!result || fields.some(key => !result.has(key)) || [...result].some(([key, raw]) => (!fields.includes(key) && !optional.includes(key)) || raw === 'null')) {
     throw new SyntaxError('Expected closed JSON object with required non-null fields');
   }
   return result;

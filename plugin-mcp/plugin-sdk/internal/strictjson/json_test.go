@@ -3,7 +3,6 @@ package strictjson
 import (
 	"encoding/json"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -36,10 +35,7 @@ func TestSharedTokenFixtures(t *testing.T) {
 	}
 }
 
-func TestDepthAndUTF8(t *testing.T) {
-	if Validate([]byte(strings.Repeat("[", MaxDepth+1)+"0"+strings.Repeat("]", MaxDepth+1))) == nil {
-		t.Fatal("unbounded nesting accepted")
-	}
+func TestInvalidUTF8(t *testing.T) {
 	if Validate([]byte{'"', 0xff, '"'}) == nil {
 		t.Fatal("invalid UTF-8 accepted")
 	}

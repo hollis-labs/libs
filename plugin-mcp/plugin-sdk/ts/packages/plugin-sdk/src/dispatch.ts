@@ -1,3 +1,5 @@
+import { decodeInitParams, decodeInitResult, encodeInitResult, validateInitResult, InitError } from './init-contract.js';
+import { decodeJSONObject, validateJSON } from './strict-json.js';
 import { Buffer } from 'node:buffer';
 import { ConfigReader } from './config.js';
 import { errorMessage, pluginError } from './errors.js';
@@ -39,6 +41,7 @@ function params<T>(raw: unknown, fields: Record<string, Field>): T {
     return Object.fromEntries(Object.entries(fields).map(([name, kind]) => [name, field((source as Record<string, unknown>)[name], kind)])) as T;
   } catch (error) { throw new RPCFault(-32602, `decode params: ${errorMessage(error)}`); }
 }
+const rawInit = new WeakMap<object,string>();
 export function decodeRequest(line: string): Wire.RPCRequest {
   try {
     const value: unknown = JSON.parse(line);
@@ -47,7 +50,9 @@ export function decodeRequest(line: string): Wire.RPCRequest {
     const method = field(value.method, 'string') as string;
     const version = field(value.jsonrpc, 'string') as string;
     const id = field(value.id, 'int') as number;
-    return { jsonrpc: version as '2.0', method, id, params: value.params };
+    const request = { jsonrpc: version as '2.0', method, id, params: value.params };
+    if(method === 'plugin/init') rawInit.set(request,line);
+    return request;
   } catch (error) { throw new RPCFault(-32700, `parse error: ${errorMessage(error)}`); }
 }
 const notImplemented = (name: string): never => { throw new RPCFault(-32601, `plugin does not implement ${name}`); };
@@ -66,6 +71,8 @@ export class Dispatcher {
   readonly plugin: ServerPlugin;
   private readonly secrets: SecretTracker;
   context: Context;
+  private attempted = false;
+  private initialized = false;
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker) { this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown): Promise<void> { if (value !== undefined) await this.plugin.identity?.(this.context, value); }
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
@@ -75,7 +82,7 @@ export class Dispatcher {
       return id === 0 ? undefined : { jsonrpc: '2.0', id, result };
     } catch (error) {
       if (id === 0) return undefined;
-      const fault = error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
+      const fault = error instanceof InitError ? {code:-32602,message:error.message,data:error.rpcData()} : error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
       return {jsonrpc: '2.0', id, error: fault};
     }
   }
@@ -85,13 +92,33 @@ export class Dispatcher {
   private async call(req: Wire.RPCRequest): Promise<unknown> {
     const p = this.plugin;
     const ctx = this.context;
+    if(req.method !== 'plugin/init' && !this.initialized) throw new RPCFault(-32600,'successful init required');
     switch (req.method) {
       case 'plugin/init': {
-        const input = params<Wire.InitParams>(req.params, {plugin_dir:'string',data_dir:'string',cache_dir:'string',config:'strings',log_level:'string',host_info:'host',granted:'strlist',identity:'json'});
+        if (!Number.isSafeInteger(req.id) || (req.id ?? 0) <= 0) throw new RPCFault(-32600,'init requires a positive safe integer id');
+        if (this.attempted) throw new RPCFault(-32600,'init already attempted');
+        this.attempted = true;
+        let input: Wire.InitParams;
+        try {
+          const raw = rawInit.get(req);
+          if(raw) {
+            validateJSON(raw);
+            // Envelope fields retain the existing envelope policy; Init parameters are closed.
+            const envelope = JSON.parse(raw) as Record<string,unknown>;
+            const keys = Object.keys(envelope);
+            const f = decodeJSONObject(raw,keys);
+            if(req.jsonrpc !== '2.0') throw new RPCFault(-32600,'init requires JSON-RPC 2.0');
+            input = decodeInitParams(f.get('params') ?? 'null');
+          } else input = decodeInitParams(JSON.stringify(req.params));
+        } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
         this.context = { ...ctx, config: new ConfigReader(input.config, this.secrets) };
-        const result = await this.lifecycle(() => p.init(this.context, input));
+        const authored = await this.lifecycle(() => p.init(this.context, input));
+        const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
+        const result = decodeInitResult(encodeInitResult(base));
+        validateInitResult(input,result);
         await this.identity(input.identity);
-        return {id: result.id ?? '',name: result.name ?? '',version: result.version ?? '',description: result.description ?? '',protocol: result.protocol ?? 0};
+        this.initialized = true;
+        return result;
       }
       case 'plugin/load': {
         const result = await this.lifecycle(() => p.load(ctx));

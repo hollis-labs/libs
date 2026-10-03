@@ -41,7 +41,7 @@ you are entitled to use.
 That cuts both ways, and the second direction is easy to miss. An environment
 variable carrying a live credential handle — an agent socket, a runtime socket —
 reaches *every* plugin the host loaded, including the ones that asked for
-nothing. `CapabilityRequest` and `InitParams.Granted` exist so that "this plugin
+nothing. `CapabilityRequest` and `InitParams.Grants` exist so that "this plugin
 asked for X" and "the host allowed X" are at least expressible, but neither
 narrows what your process can actually reach. Only the host can do that.
 
@@ -82,7 +82,7 @@ contract that decided them would impose one host's answer on every other.
 | Sandboxing / isolation | host | Your process has whatever access the OS gives it. Assume none is revoked. |
 | Resource limits, per-call deadlines | host | A host may or may not bound your call. Bound your own work. |
 | Authorization — what you may do | host | The host decides whether an operation runs. Do not implement your own parallel policy. |
-| Capability granting and enforcement | host | `CapabilityRequest` is a declaration with an open vocabulary, and `InitParams.Granted` reports what the host allowed. The SDK defines no capability names, grants nothing and enforces nothing — a granted list is a statement, not a boundary. |
+| Capability granting and enforcement | host | `CapabilityRequest` is a declaration with an open vocabulary, and `InitParams.Grants` reports what the host allowed. The transport validates grant structure; live host policy and OS permissions provide the boundary. |
 | Output filtering | host | See "The host trusts your output". |
 | Secret storage or rotation | host | You never reach a credential store. You receive values. |
 | Registration vocabulary | host | Commands, events, resources and UI contributions are declared in the host's own manifest schema, not here. |
@@ -118,27 +118,25 @@ avoid:
 If your error carries a recovery instruction, phrase it so nothing in it looks
 like a credential — and add a test that the instruction survives.
 
-**`Init` and `Load` are not guaranteed to be serialized with your other
-calls.** `Serve` dispatches each request in its own goroutine. A well-behaved
-host sends `Init`, waits, sends `Load`, waits, and only then calls a tool — but
-your plugin should not *depend* on that, and a test driver that pipes all three
-at once will race the handshake and get an empty answer from a plugin that is
-working correctly. If your state depends on init config, guard it.
+**Successful `Init` precedes runtime handlers.** Protocol-2 Serve validates
+Init before plugin code and treats it as an admission barrier, including
+pipelined requests. Calls before successful Init and repeated Init fail. Load
+and ordinary handlers remain concurrent afterward; a host must wait for Load
+before activation, and plugin state shared by handlers needs normal synchronization.
 
-**`DataDir` may be empty.** `InitParams.ResolvedDataDir()` returns
-`ErrNoDataDir` if the host did not populate it. The SDK deliberately provides no
-fallback for data, because writing a plugin's persistent state to a guessed
-location is worse than failing. `ResolvedCacheDir()` does fall back to
-`os.TempDir()`, because losing a cache is survivable.
+**Valid Init includes explicit data and cache roots.** The host resolves these
+before spawn. Direct helper callers with an incomplete value still receive
+`ErrNoDataDir` for absent persistent data; the cache helper keeps its temporary
+directory fallback. Neither fallback relaxes the strict Init contract.
 
-**A granted capability is a claim, not a boundary — and so is an absent one.**
-`InitParams.Granted` tells you what the host says it allowed. It does not
-restrict your process, and a host that declares capabilities while still passing
-the same environment to every plugin has gained documentation rather than
-security. In the other direction, a capability missing from `Granted` does not
-mean the host refused: a host that predates the mechanism sends no list at all,
-and a host that grants nothing sends an empty one. The wire does not distinguish
-them. Degrade on absence; do not refuse to load on it.
+**A grant is discovery data; the host enforces execution.**
+`InitParams.Grants` carries the approved normalized scopes and host-issued
+incarnation. Protocol 2 requires an explicit array: `[]` means no granted
+authority; omission is a protocol failure. `HasCapability` checks membership
+only. A host must still check live ownership, current expiry, policy and the
+specific scope at execution. OS permissions are resolved before spawn; Init
+cannot provide an OS sandbox. The separate opaque identity courier never
+replaces these checks.
 
 **A missing credential should not be fatal.** The host may legitimately load you
 without a secret — because it is not configured yet, or because the operator is

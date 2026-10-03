@@ -24,7 +24,7 @@ export class ConfigReader {
   }
   has(key: string): boolean { return Object.hasOwn(this.values, key); }
 }
-export function hasCapability(params: InitParams, name: string): boolean { return params.granted?.includes(name) ?? false; }
+export function hasCapability(params: InitParams, name: string): boolean { return params.grants?.some(grant => grant.name === name) ?? false; }
 export function resolvedDataDir(params: InitParams): string {
   if (!params.data_dir) throw new Error('subprocess: InitParams.DataDir not set by host');
   return params.data_dir;

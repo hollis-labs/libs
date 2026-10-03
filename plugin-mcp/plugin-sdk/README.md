@@ -16,7 +16,7 @@ same thing.
 
 ## Status
 
-Pre-1.0 (`v0.x`). The wire protocol (`subprocess.ProtocolVersion = 1`)
+Pre-1.0 (`v0.x`). The wire protocol (`subprocess.ProtocolVersion = 2`)
 and exported interfaces are stable in practice but the API may still
 shift between minor versions; treat any minor bump as potentially
 breaking and read the CHANGELOG before upgrading. Patch bumps
@@ -45,18 +45,17 @@ go get github.com/hollis-labs/plugin-sdk
   secret redaction. An optional, opaque `Identity` value rides through
   `InitParams`/`CommandExecParams`/`EventHandleParams`/`MCPCallRequest`/
   `HTTPRequest` unparsed — plugin-sdk carries it, never verifies it.
-- `subprocess.CapabilityRequest` and `InitParams.Granted` — a capability
+- `subprocess.CapabilityRequest` and `InitParams.Grants` — a capability
   declaration mechanism with an open vocabulary: a plugin declares what
   ambient access it needs, and the host reports back what it allowed. The
-  SDK defines no capability names and enforces nothing; granting and
-  enforcement are the host's. See `docs/security-model.md`.
+  SDK validates grant structure; descriptor policy and execution
+  enforcement belong to the host. See `docs/security-model.md`.
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
 - `manifest` — a shared subprocess declaration with host extension objects,
   config/secrets, capabilities, tools, hooks, server/UI artifacts and inclusive
-  host/engine ranges. It requires protocol 2; Serve's protocol-2 implementation
-  follows separately. Its dependency-free encoder emits JSON for `plugin.yaml`;
+  host/engine ranges. It requires protocol 2, as does Serve. Its dependency-free encoder emits JSON for `plugin.yaml`;
   decoding rejects legacy dialects, unknown fields and duplicate keys. Helpers
   check semantic version bounds and verify immutable bundle inventories.
   See [the manifest contract](docs/manifest.md).
@@ -68,7 +67,7 @@ go get github.com/hollis-labs/plugin-sdk
 - `ts/packages/plugin-sdk` — zero-runtime-dependency Node/Deno stdio runtime,
   capability interfaces, config and redacting logger, plus the `/test` harness.
   See [the server package](ts/packages/plugin-sdk/README.md) and
-  [the provisional protocol spec](docs/protocol/v1/README.md).
+  [the protocol 2 handshake](docs/protocol/v2/README.md).
 - `ts/packages/plugin-registry` — `@hollis-labs/plugin-registry`, the
   browser half. The TypeScript view of the same contract, and a loader
   that dynamic-imports each plugin's ES module, resolves the named
@@ -98,6 +97,7 @@ func (hello) Init(ctx context.Context, p subprocess.InitParams) (subprocess.Init
         Name:     "Hello",
         Version:  "0.1.0",
         Protocol: subprocess.ProtocolVersion,
+        CapabilityContract: 1,
     }, nil
 }
 

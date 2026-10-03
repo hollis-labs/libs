@@ -1,0 +1,309 @@
+[
+  {
+    "name": "complete-empty",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": true
+  },
+  {
+    "name": "complete-result",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"name\":\"Fixture\",\"version\":\"1.0.0\",\"description\":\"conformance\",\"protocol\":2,\"capability_contract\":1}",
+    "valid": true
+  },
+  {
+    "name": "complete-grants",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}]}",
+    "valid": true
+  },
+  {
+    "name": "missing-plugin_dir",
+    "kind": "params",
+    "input": "{\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-plugin_dir",
+    "kind": "params",
+    "input": "{\"plugin_dir\":null,\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-data_dir",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-data_dir",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":null,\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-cache_dir",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-cache_dir",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":null,\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-config",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-config",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":null,\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-log_level",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-log_level",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":null,\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-host_info",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-host_info",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":null,\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-capability_contract",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-capability_contract",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":null,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-incarnation",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "null-incarnation",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":null,\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "missing-grants",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1}}",
+    "valid": false
+  },
+  {
+    "name": "null-grants",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":null}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-id",
+    "kind": "result",
+    "input": "{\"name\":\"Fixture\",\"version\":\"1.0.0\",\"description\":\"conformance\",\"protocol\":2,\"capability_contract\":1}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-name",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"version\":\"1.0.0\",\"description\":\"conformance\",\"protocol\":2,\"capability_contract\":1}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-version",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"name\":\"Fixture\",\"description\":\"conformance\",\"protocol\":2,\"capability_contract\":1}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-description",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"name\":\"Fixture\",\"version\":\"1.0.0\",\"protocol\":2,\"capability_contract\":1}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-protocol",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"name\":\"Fixture\",\"version\":\"1.0.0\",\"description\":\"conformance\",\"capability_contract\":1}",
+    "valid": false
+  },
+  {
+    "name": "result-missing-capability_contract",
+    "kind": "result",
+    "input": "{\"id\":\"fixture\",\"name\":\"Fixture\",\"version\":\"1.0.0\",\"description\":\"conformance\",\"protocol\":2}",
+    "valid": false
+  },
+  {
+    "name": "protocol-v1",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":1},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false,
+    "code": "protocol_mismatch"
+  },
+  {
+    "name": "contract-2",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":2,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false,
+    "code": "capability_contract_mismatch"
+  },
+  {
+    "name": "foreign-grant",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[{\"grant_id\":\"g-1\",\"name\":\"readonly.query\",\"schema_version\":1,\"scope\":{\"resources\":[\"sessions\"]},\"host_instance\":\"epoch-1\",\"owner_id\":\"example.plugin\",\"owner_generation\":1,\"audience\":\"host.private-stdio\",\"issued_at\":\"2026-10-03T20:00:00.000000001Z\",\"expires_at\":\"2026-10-03T20:00:00.000000002Z\",\"policy_revision\":\"policy-1\"}]}",
+    "valid": false,
+    "code": "invalid_init"
+  },
+  {
+    "name": "old-granted",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[],\"granted\":[]}",
+    "valid": false,
+    "code": "invalid_init"
+  },
+  {
+    "name": "case-fold",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[],\"GRANTS\":[]}",
+    "valid": false,
+    "code": "invalid_init"
+  },
+  {
+    "name": "unknown",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[],\"future\":true}",
+    "valid": false,
+    "code": "invalid_init"
+  },
+  {
+    "name": "hooks-future",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[],\"hooks_profile\":{\"hooks_profile_version\":2}}",
+    "valid": false,
+    "code": "profile_mismatch"
+  },
+  {
+    "name": "duplicate-key",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [],\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "hooks-offer",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[],\"hooks_profile\":{\"hooks_profile_version\":1}}",
+    "valid": true
+  },
+  {
+    "name": "invalid-config-value",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{\"token\":null},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "generation-1.0",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1.0},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "generation-1e0",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1e0},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "generation-9007199254740991.4",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":9007199254740991.4},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "generation-9007199254740992",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":9007199254740992},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "generation-0",
+    "kind": "params",
+    "input": "{\"plugin_dir\":\"/fixture\",\"data_dir\":\"/fixture/data\",\"cache_dir\":\"/fixture/cache\",\"config\":{},\"log_level\":\"info\",\"host_info\":{\"version\":\"fixture\",\"protocol\":2},\"capability_contract\":1,\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":0},\"grants\":[]}",
+    "valid": false
+  },
+  {
+    "name": "reverse-offer",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [\"host/readonly/query\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}}",
+    "valid": true
+  },
+  {
+    "name": "foreign-service-incarnation",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 2}, \"methods\": [\"host/readonly/query\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}}",
+    "valid": false
+  },
+  {
+    "name": "unknown-service",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [\"host/unknown\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}}",
+    "valid": false
+  },
+  {
+    "name": "missing-timeout",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [\"host/readonly/query\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {}}}}",
+    "valid": false
+  },
+  {
+    "name": "too-few-control-slots",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [\"host/readonly/query\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 1, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}}",
+    "valid": false
+  },
+  {
+    "name": "null-services",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": null}",
+    "valid": false
+  },
+  {
+    "name": "null-hooks",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [\"host/readonly/query\"], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}, \"hooks_profile\": null}",
+    "valid": false
+  },
+  {
+    "name": "service-null-method",
+    "kind": "params",
+    "input": "{\"plugin_dir\": \"/fixture\", \"data_dir\": \"/fixture/data\", \"cache_dir\": \"/fixture/cache\", \"config\": {}, \"log_level\": \"info\", \"host_info\": {\"version\": \"fixture\", \"protocol\": 2}, \"capability_contract\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"grants\": [], \"host_services\": {\"reverse_rpc_version\": 1, \"incarnation\": {\"host_instance\": \"fixture-host\", \"owner_id\": \"fixture\", \"owner_generation\": 1}, \"methods\": [null], \"limits\": {\"host_to_plugin_inflight\": 16, \"plugin_to_host_inflight\": 8, \"host_global_inflight\": 64, \"control_slots\": 2, \"max_frame_bytes\": 8388608, \"max_queued_write_bytes\": 16777216, \"write_timeout_ms\": 1000, \"max_depth\": 8, \"method_timeout_ms\": {\"host/readonly/query\": 1000}}}}",
+    "valid": false
+  }
+]

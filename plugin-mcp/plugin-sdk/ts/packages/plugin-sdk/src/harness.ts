@@ -1,3 +1,4 @@
+import { encodeInitParams, validateInitResult } from './init-contract.js';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,7 +13,8 @@ export interface HarnessOptions {
   pluginDir?: string;
   config?: Record<string, string>;
   hostInfo?: Wire.HostInfo;
-  granted?: string[];
+  grants?: Wire.Grant[];
+  incarnation?: Wire.RuntimeIdentity;
   identity?: unknown;
   jsonRoundtrip?: boolean;
   writeLog?: (line: string) => void;
@@ -55,7 +57,11 @@ export class Harness {
   private async invoke<P,R>(input: P, call: (params: P) => Awaitable<R>): Promise<R> { return this.roundtrip(await call(this.roundtrip(input))); }
   private missing(name: string): never { throw new Error(`plugin does not implement ${name}`); }
   async init(): Promise<Wire.InitResult> {
-    return this.invoke({plugin_dir:this.pluginDir,data_dir:this.dataDir,cache_dir:this.cacheDir,config:this.options.config ?? {},log_level:'info',host_info:this.options.hostInfo ?? {version:'test',protocol:1},granted:this.options.granted,identity:this.options.identity}, input => this.plugin.init(this.context,input));
+    const input: Wire.InitParams = {plugin_dir:this.pluginDir,data_dir:this.dataDir,cache_dir:this.cacheDir,config:this.options.config ?? {},log_level:'info',host_info:this.options.hostInfo ?? {version:'test',protocol:2},capability_contract:1,incarnation:this.options.incarnation ?? {host_instance:'test-host',owner_id:'test-plugin',owner_generation:1},grants:this.options.grants ?? [],...(this.options.identity === undefined ? {} : {identity:this.options.identity})};
+    encodeInitParams(input);
+    const result = await this.invoke(input, p => this.plugin.init(this.context,p));
+    validateInitResult(input,result);
+    return result;
   }
   async load(): Promise<Wire.LoadResult> { return this.roundtrip(await this.plugin.load(this.context)); }
   async unload(): Promise<void> { await this.plugin.unload(this.context); }
