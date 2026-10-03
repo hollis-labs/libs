@@ -23,3 +23,9 @@ All notable changes to the `mesh` module are documented here. The format follows
   approval grants, result delivery, bounded spawn lineage and cascading cancellation.
 - Reusable MVP provider conformance checks, including refusal of unclaimed verbs,
   plus tests for event attribution, snapshot isolation and concurrent idempotency.
+- Portable `teams` configuration and flex-phase compiler, authority checks,
+  roster-version routing, bounded spawning and journaled launch recovery.
+- Enrolled stable pool identities and ephemeral fresh identities with keyed
+  cleanup, host interfaces and an in-memory host for contract tests.
+- Test-only composition check for the teams host and mesh provider contracts.
+
