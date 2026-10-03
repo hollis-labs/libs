@@ -7,10 +7,10 @@ these libraries. These libraries never depend on substrate.
 
 ## Status
 
-Pre-release skeleton. Each module below exists and builds, but is empty: code
-arrives through history-preserving imports of existing repositories, and no
-version has been tagged yet. Expect the layout of each module to change while
-that happens.
+`util`, `ui-go` and `workflow` hold code that was imported, with its git history,
+from earlier standalone repositories. `plugin-mcp` is a held stub: it builds and
+is empty. Releases are per module and tagged `<module>/vX.Y.Z`; the versions of
+a module are listed in its own `CHANGELOG.md`.
 
 ## Modules
 
