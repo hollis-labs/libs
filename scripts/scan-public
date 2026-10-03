@@ -2,7 +2,7 @@
 """Scan a repository for content that must not become public.
 
 Usage: scripts/scan-public [--repo DIR] [--tree | --history] [--no-gitleaks]
-                           [--allowlist FILE]
+                           [--allowlist FILE | --no-allowlist]
 
 Scans the working tree (tracked files, and untracked files that are not ignored)
 AND the full history (every ref, every added line, every commit message), for:
@@ -21,7 +21,10 @@ Every match is reported. Secret values are redacted in the output; other matches
 are shown in full so they can be triaged. There is no built-in allowlist. A file
 given with --allowlist (lines: RULE-ID PATH-GLOB REASON, RULE-ID may be *) moves
 matching findings to a separate "allowlisted" section that is still printed and
-counted, so nothing is suppressed silently.
+counted, so nothing is suppressed silently. Without --allowlist, a scan-public.allow
+file at the repository root and every scan-public.allow.d/*.allow file are used when they
+exist (one file per module, so branches do not conflict), so a local run and CI agree;
+--no-allowlist ignores them and shows every raw finding.
 
 Exit status: 0 clean, 1 findings, 2 a scanner could not run.
 """
@@ -271,12 +274,23 @@ def main():
     ap.add_argument("--history", action="store_true", help="scan only the history")
     ap.add_argument("--no-gitleaks", action="store_true", help="do not run gitleaks even if installed")
     ap.add_argument("--allowlist", help="file of 'RULE-ID PATH-GLOB REASON' lines; still reported")
+    ap.add_argument("--no-allowlist", action="store_true", help="ignore scan-public.allow and show every raw finding")
     args = ap.parse_args()
 
     repo = os.path.realpath(args.repo)
     do_tree = args.tree or not args.history
     do_history = args.history or not args.tree
-    allow = load_allowlist(args.allowlist) if args.allowlist else []
+    allow_files = [args.allowlist] if args.allowlist else []
+    if not allow_files and not args.no_allowlist:
+        root_file = os.path.join(repo, "scan-public.allow")
+        if os.path.exists(root_file):
+            allow_files.append(root_file)
+        d = os.path.join(repo, "scan-public.allow.d")
+        if os.path.isdir(d):
+            allow_files.extend(os.path.join(d, f) for f in sorted(os.listdir(d)) if f.endswith(".allow"))
+    allow = []
+    for f in allow_files:
+        allow.extend(load_allowlist(f))
     findings = Findings()
     errors = []
     stats = {}
@@ -313,6 +327,9 @@ def main():
                         )
 
     print("scan-public: %s" % os.path.basename(repo))  # not the full path: reports get pasted around
+    if allow_files:
+        print("  allowlist: %s (%d entries; every allowlisted finding is still printed below)" % (
+            ", ".join(os.path.relpath(f, repo) for f in allow_files), len(allow)))
     print("  scope: %s; gitleaks: %s" % (
         " + ".join(s for s, on in (("working tree", do_tree), ("full history", do_history)) if on), gl_status))
     if do_tree:
