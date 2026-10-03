@@ -30,7 +30,7 @@ func TestRejectsBrokenAdapters(t *testing.T) {
 		{"panic-siblings", "R07"}, {"once", "R08"}, {"stale-handle", "R09"},
 		{"unload-no-sweep", "R10"}, {"unload-late-output", "R10"}, {"depth", "R11"},
 		{"capacity", "R12"}, {"payload", "R13"}, {"view", "R14"}, {"catalog", "R15"},
-		{"remote-latency", "R16"}, {"remote-veto", "R17"}, {"remote-fence", "R18"}, {"remote-breaker", "R22"},
+		{"remote-latency", "R16"}, {"remote-veto", "R17"}, {"remote-fence", "R18"}, {"remote-breaker", "R22"}, {"remote-ancestry", "R19"}, {"remote-batch", "R20"}, {"remote-notification", "R21"},
 	} {
 		t.Run(probe.fault, func(t *testing.T) {
 			// #nosec G204 -- The executable is this test binary; arguments are fixed suite requirement IDs.
@@ -215,6 +215,12 @@ func TestFaultProbe(t *testing.T) {
 
 func (s faultScope) AddRemoteAction(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (hookstest.Handle, error) {
 	remote := s.Scope.(hookstest.RemoteScope)
+	if s.fault == "remote-notification" && r.Notifier != nil {
+		r.Notifier = nil
+		r.Handler = hooks.RemoteHandlerFunc(func(_ context.Context, q hooks.RemoteRequest) (hooks.RemoteResult, error) {
+			return hooks.RemoteResult{InvocationID: q.InvocationID, Status: hooks.RemoteOK}, nil
+		})
+	}
 	if s.fault == "remote-latency" {
 		r.LatencyEstimate = time.Nanosecond
 	}
@@ -248,4 +254,30 @@ func (d faultDispatcher) Breaker(owner, generation string) (hooks.BreakerSnapsho
 }
 func (d faultDispatcher) ResetBreaker(owner, generation string) error {
 	return d.Dispatcher.(hookstest.RemoteDispatcher).ResetBreaker(owner, generation)
+}
+
+func (d faultDispatcher) RemoteCallbackContext(ctx context.Context, connection, binding string) (context.Context, context.CancelFunc, error) {
+	if d.fault == "remote-ancestry" {
+		plain, cancel := context.WithCancel(ctx)
+		return plain, cancel, nil
+	}
+	return d.Dispatcher.(hookstest.RemoteExecutionDispatcher).RemoteCallbackContext(ctx, connection, binding)
+}
+func (d faultDispatcher) EmitRemoteBatch(ctx context.Context, h hooks.RemoteBatchHandler, items []hookstest.BatchItem) ([]hooks.RemoteBatchOutcome, error) {
+	if d.fault == "remote-batch" {
+		private := append([]hookstest.BatchItem{}, items...)
+		for i, item := range private {
+			if !json.Valid(item.Payload) {
+				private[i].Payload = json.RawMessage(`{}`)
+			}
+		}
+		items = private
+	}
+	return d.Dispatcher.(hookstest.RemoteExecutionDispatcher).EmitRemoteBatch(ctx, h, items)
+}
+func (d faultDispatcher) PrepareAfterCommit(ctx context.Context, name string, payload json.RawMessage, metadata map[string]string) (hookstest.Commit, error) {
+	return d.Dispatcher.(hookstest.RemoteExecutionDispatcher).PrepareAfterCommit(ctx, name, payload, metadata)
+}
+func (d faultDispatcher) PrepareRemoteBatchAfterCommit(ctx context.Context, h hooks.RemoteBatchHandler, items []hookstest.BatchItem) (hookstest.BatchCommit, error) {
+	return d.Dispatcher.(hookstest.RemoteExecutionDispatcher).PrepareRemoteBatchAfterCommit(ctx, h, items)
 }

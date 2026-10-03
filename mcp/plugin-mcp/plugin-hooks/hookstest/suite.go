@@ -54,6 +54,9 @@ var requirements = []requirement{
 	{Requirement{"R16", "remote policy and latency admission"}, (*env).remoteAdmission},
 	{Requirement{"R17", "structured remote results and vetoes"}, (*env).remoteResults},
 	{Requirement{"R18", "remote scope binding and output fences"}, (*env).remoteFences},
+	{Requirement{"R19", "verified remote ancestry depth budget trace and cycles"}, (*env).remoteAncestry},
+	{Requirement{"R20", "bounded observation batches and independent ordered results"}, (*env).remoteBatches},
+	{Requirement{"R21", "opt-in notification receipts rollback and non-success accounting"}, (*env).remoteNotifications},
 	{Requirement{"R22", "remote generation breaker accounting"}, (*env).remoteBreaker},
 }
 

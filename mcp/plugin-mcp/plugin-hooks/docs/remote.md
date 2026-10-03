@@ -15,16 +15,15 @@ declarations use zero/omission. The host chooses a round-trip ceiling and keeps
 streaming/high-frequency declarations `remote_ok=false`; the library does not
 infer frequency from hook names. Every remote filter consumes a round trip.
 
-Two additional catalog policy fields reserve the remaining remote surface:
+Two additional catalog policy fields bound the observation surface:
 
 | Go field | JSON field | Validation |
 | --- | --- | --- |
 | RemoteBatchMax | remote_batch_max | Zero/omitted means the default cap 64; explicit 1..64 only lowers it. Nonzero requires remote observation action (sequential/parallel/async/after_commit), never filter or bail. |
 | RemoteFireAndForget | remote_fire_and_forget | Default false. True requires remote action with async/after_commit mode. |
 
-All three fields require remote_ok when nonzero/true. The single-call seam does
-not implement batching or notifications yet; catalog intent does not advertise
-transport support. Requests with responses remain the only execution path here.
+All three fields require remote_ok when nonzero/true. Catalog intent does not
+advertise negotiated transport support; the host must establish that separately.
 
 `CatalogDocument` has **no independent document-format version**. Its
 `catalog_version` belongs to the publisher's declarations and is independent of
@@ -101,10 +100,40 @@ Fresh registrations get fresh opaque handles; stale handles cannot remove anothe
 scope's replacement. The full accepted filter value still passes schema validation,
 payload byte limits and visible/mutable merge rules; hidden fields remain intact.
 
-Reverse callback binding resolution, shared ancestry budgets and cycle rejection
-are a following implementation. The single-call seam does not provide reverse
-callback authorization. Informational depth/trace in a request grants no permission
-and cannot override the engine's cooperative context guard.
+## Verified callback ancestry
+
+The host implements the small `RemoteBindingResolver` interface in
+`ExecutionConfig.BindingResolver`. During `Handle`, it stores the request's opaque
+`RemoteBinding` in a connection-local table, and removes it when the call ends.
+The binding's fields are private; IDs alone cannot reconstruct one. A resolver
+lookup is not enough: the engine checks its own identity, exact connection/token,
+active invocation and live parent context again.
+
+For an incoming callback the host calls
+`RemoteCallbackContext(incoming, connectionID, bindingID)`, then dispatches with
+that returned context and calls its cancel function afterward. Incoming values,
+including trace identifiers, cannot replace parent values. Incoming cancellation
+or a shorter deadline can narrow the context. Wrong connection, completed,
+expired, unloaded or zero bindings fail with `stale_binding` before scheduling.
+This API is host-only; the host still checks connection identity and capabilities.
+
+The existing context depth guard is the only counter: default depth eight, with
+the ninth dispatch returning `ErrDepthExceeded`. The verified parent determines
+depth, original root/parent invocation IDs, trace and the remaining deadline and
+aggregate budget. Plugin-supplied diagnostic depth/trace/budget fields are never
+resolver arguments. Nested async/post-commit observations detach cancellation but
+retain the inherited deadline; queue and transaction waits consume it.
+
+For a verified callback, a **cycle** is a dispatch whose host-derived ancestry
+already contains an **active invocation of the same owner/generation registration**,
+directly or through intermediate owners. The engine rejects the whole dispatch
+before capacity, once claims, queue admission or transport with `ErrCallbackCycle`
+(`callback_cycle`), independently of depth rejection. Different registrations of
+the same owner are allowed. Completed ancestors no longer trigger the cycle rule.
+Ordinary in-process context nesting retains the existing cooperative depth guard;
+verified callback ancestry additionally activates cycle admission. There is no
+second transport depth counter. A plugin that drops its context is outside this
+cooperative guard; the host's isolation and capability policy remain necessary.
 
 ## Structured per-handler results
 
@@ -140,12 +169,65 @@ operator reset retains stuck permits. A live remote endpoint reporting an ordina
 unavailable/caller-cancelled failure cannot impersonate host cancellation to avoid
 failure accounting.
 
+## Observation batches
+
+`EmitRemoteBatch(ctx, handler, items)` takes a host `RemoteBatchHandler` and
+1..min(64, each declaration's lowered cap) items targeting opaque remote handles
+on **one connection**. The host batch handler maps this to one transport request;
+it is not a JSON-RPC batch. Each item is an observation action, never a filter,
+bail gate or notification. Validate all handles, scope/connection fences, schemas,
+views, declaration policies and payloads before any item is scheduled. A malformed
+envelope schedules none. Inputs are copied before returning or queueing.
+
+Sequential/parallel observations run immediately. An all-async batch uses the
+bounded engine queue and returns ordered queued Futures. An all-after_commit batch
+requires `PrepareRemoteBatchAfterCommit` and its one-shot `Commit`; `Rollback`
+sends nothing. Mixing these delivery classes is rejected atomically. No API
+silently treats preparation as confirmation.
+
+Every admitted item uses its own normal invocation, scope, private payload/metadata,
+view, binding, trace, deadline, budget, once and breaker lease. Results preserve
+input order; one failed item does not suppress successful siblings. Each result
+must echo its own invocation ID and satisfy the ordinary structured result rules.
+Wrong vector length invalidates the sent results; a transport error affects all
+sent items. No retry is performed. Capacity admission is nonblocking so collecting
+a shared request cannot deadlock awaiting a permit already held by that request.
+Unavailable/once/open-breaker items receive independent policy outcomes and are
+not sent. The transport receives only admitted items, in order. Item deadlines
+release their callers while their permits remain held until transport returns;
+manual reset never releases them. The transport context expires at the latest
+sent-item deadline (clipped by the inherited caller), and cancels when all sent
+item contexts are cancelled. Individual deadlines remain authoritative even while
+siblings continue.
+
+## Notifications
+
+A remote action registration supplies either a `Handler` or a `Notifier`, never
+both. A `RemoteNotifier.Notify(ctx, RemoteNotification)` registration requires
+catalog `remote_fire_and_forget=true` and mode async/after_commit. Default is off.
+Normal queue/capacity/once/deadline and connection fences still apply. Rollback
+sends nothing. Writer refusal, panic or timeout is an ordinary policy failure.
+
+A nil `Notify` return means **submitted**, never completed. The initial receipt is
+queued and the Future's eventual submission result is also `queued`, with handler
+class `queued` and no fabricated `ok` result. It does not reset failure counts or
+close a half-open breaker. An open breaker still skips it as unavailable.
+Notifications expose no live binding and cannot authorize reverse callbacks;
+the host must not register a callback capability or wait for a remote reply.
+No retries or durable delivery are provided.
+
+Remote failures are classified by their own validated closed code, rather than
+by an unwrapped local sentinel. Diagnostic text never becomes a telemetry class.
+
 ## Conformance
 
-The stdlib `hookstest` suite appends R16 (policy/latency), R17 (structured results
-and vetoes), R18 (identity/copy/connection/unload fences), and R22 (remote breaker).
-R01-R15 are unchanged; R19-R21 are reserved for callback ancestry, batches and
-notifications in the next change. Tests run against an in-memory fake transport,
-with a broken-adapter proof for each new requirement and zero reference waivers.
-The TS twin validates the same catalog policies and refuses in-process callbacks
-in remote scopes; its remote execution adapter is not implemented here.
+The stdlib `hookstest` suite appends R16–R22 without changing R01–R15. R19 covers
+verified ancestry/depth/budget/trace and both direct/indirect cycles; R20 covers
+observation batches; R21 covers opt-in notification receipts, rollback and
+non-success accounting. The reference has zero waivers; each added requirement
+rejects a deliberately broken adapter. Injected clocks cover breaker transitions;
+in-memory transports cover leases, queueing, copies and stale bindings.
+
+Run `./scripts/check.sh`, including the repeated concurrency/conformance race
+checks. The TS twin's shared catalog rules are unchanged by this execution change;
+its remote execution adapter remains a separate host integration.

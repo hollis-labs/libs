@@ -110,3 +110,59 @@ func (s engineScope) AddRemoteAction(hook, name string, o hooks.Options, r hooks
 func (s engineScope) AddRemoteFilter(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (Handle, error) {
 	return s.scope.AddRemoteFilter(hook, name, o, r)
 }
+
+// BatchItem preserves the host adapter's opaque token representation.
+type BatchItem struct {
+	Handle   Handle
+	Payload  json.RawMessage
+	Metadata map[string]string
+}
+type Commit interface {
+	Commit() (hooks.DispatchResult, error)
+	Rollback()
+}
+type BatchCommit interface {
+	Commit() ([]hooks.RemoteBatchOutcome, error)
+	Rollback()
+}
+
+// RemoteExecutionDispatcher supplies host-only callback/batch/transaction seams.
+type RemoteExecutionDispatcher interface {
+	RemoteDispatcher
+	RemoteCallbackContext(context.Context, string, string) (context.Context, context.CancelFunc, error)
+	EmitRemoteBatch(context.Context, hooks.RemoteBatchHandler, []BatchItem) ([]hooks.RemoteBatchOutcome, error)
+	PrepareAfterCommit(context.Context, string, json.RawMessage, map[string]string) (Commit, error)
+	PrepareRemoteBatchAfterCommit(context.Context, hooks.RemoteBatchHandler, []BatchItem) (BatchCommit, error)
+}
+
+func (a *engineAdapter) RemoteCallbackContext(ctx context.Context, connection, binding string) (context.Context, context.CancelFunc, error) {
+	return a.engine.RemoteCallbackContext(ctx, connection, binding)
+}
+func nativeBatch(items []BatchItem) ([]hooks.RemoteBatchItem, error) {
+	out := make([]hooks.RemoteBatchItem, len(items))
+	for i, item := range items {
+		handle, ok := item.Handle.(hooks.Handle)
+		if !ok {
+			return nil, hooks.ErrInvalidOptions
+		}
+		out[i] = hooks.RemoteBatchItem{Handle: handle, Payload: item.Payload, Metadata: item.Metadata}
+	}
+	return out, nil
+}
+func (a *engineAdapter) EmitRemoteBatch(ctx context.Context, h hooks.RemoteBatchHandler, items []BatchItem) ([]hooks.RemoteBatchOutcome, error) {
+	native, err := nativeBatch(items)
+	if err != nil {
+		return nil, err
+	}
+	return a.engine.EmitRemoteBatch(ctx, h, native)
+}
+func (a *engineAdapter) PrepareAfterCommit(ctx context.Context, name string, payload json.RawMessage, metadata map[string]string) (Commit, error) {
+	return a.engine.PrepareAfterCommit(ctx, name, payload, metadata)
+}
+func (a *engineAdapter) PrepareRemoteBatchAfterCommit(ctx context.Context, h hooks.RemoteBatchHandler, items []BatchItem) (BatchCommit, error) {
+	native, err := nativeBatch(items)
+	if err != nil {
+		return nil, err
+	}
+	return a.engine.PrepareRemoteBatchAfterCommit(ctx, h, native)
+}
