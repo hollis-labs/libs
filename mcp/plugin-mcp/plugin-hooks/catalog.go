@@ -18,7 +18,7 @@ const (
 	Filter Kind = "filter"
 )
 
-// Mode declares execution semantics. Registry-only builds do not execute modes.
+// Mode declares the execution semantics implemented by Engine.
 type Mode string
 
 const (

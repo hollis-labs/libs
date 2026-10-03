@@ -77,6 +77,8 @@ type entry struct {
 	filter           FilterFunc
 	removed, claimed bool
 	active           map[uint64]context.CancelFunc
+	removalContext   context.Context
+	cancelRemoval    context.CancelFunc
 }
 
 // Registry owns immutable declarations and synchronized registration lifecycle.
@@ -88,10 +90,10 @@ type Registry struct {
 	scopes                 map[scopeKey]*scopeState
 	entries                map[uint64]*entry
 	sequence, callSequence uint64
+	engine                 *Engine
 }
 
-// NewRegistry installs a private catalog copy. It does not advertise any dispatch
-// capability: execution modes are a separately implemented layer.
+// NewRegistry installs a private catalog copy. Engine supplies dispatch capability.
 func NewRegistry(c Catalog) (*Registry, error) {
 	if c.Version == "" {
 		return nil, fmt.Errorf("%w: catalog version required", ErrInvalidDefinition)
@@ -110,7 +112,7 @@ func NewRegistry(c Catalog) (*Registry, error) {
 	return r, nil
 }
 
-// Catalog returns declarations, not a claim that dispatch modes are implemented.
+// Catalog returns a detached copy of the host declarations.
 func (r *Registry) Catalog() Catalog {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -224,11 +226,13 @@ func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, ki
 	r.sequence++
 	handle := Handle{r, r.sequence, s.state.key.generation}
 	reg := Registration{handle, s.state.key.owner, s.state.key.generation, hook, name, r.sequence, options}
-	r.entries[handle.id] = &entry{registration: reg, scope: s.state, action: a, filter: f, active: map[uint64]context.CancelFunc{}}
+	removalContext, cancelRemoval := context.WithCancel(context.Background()) //nolint:gosec // Cancellation belongs to removeLocked; it is retained on the registration.
+	r.entries[handle.id] = &entry{removalContext: removalContext, cancelRemoval: cancelRemoval, registration: reg, scope: s.state, action: a, filter: f, active: map[uint64]context.CancelFunc{}}
 	return handle, nil
 }
 
-// Registrations lists this scope's eligible registrations in execution order.
+// Registrations lists eligible registrations by priority and sequence.
+// This order describes execution only within an individual hook.
 func (s *Scope) Registrations() []Registration {
 	r := s.registry
 	r.mu.Lock()
@@ -282,7 +286,7 @@ func (r *Registry) removeLocked(e *entry) []context.CancelFunc {
 	if len(e.active) == 0 {
 		delete(r.entries, e.registration.Handle.id)
 	}
-	var c []context.CancelFunc
+	c := []context.CancelFunc{e.cancelRemoval}
 	for _, cancel := range e.active {
 		c = append(c, cancel)
 	}
