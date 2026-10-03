@@ -1,17 +1,27 @@
-// Package pluginhooks provides a dependency-free, host-owned hook catalog and
-// generation-scoped registration registry. The trusted host constructs Registry
-// and Scope; plugins receive only their scope capability. Scope allowlists,
-// explicit declaration policies, private catalog copies, opaque handles and
-// bounded disposal keep registration authority separate from execution.
+// Package pluginhooks provides a dependency-free, host-owned hook catalog,
+// generation-scoped registration registry and bounded execution engine.
+// Hosts create Registry and Scope; plugins receive only their scope capability.
+// Declarations require explicit modes, schema validators, limits and error policy.
 //
-// AddAction and AddFilter retain context-aware callbacks. This registry-only
-// revision does not expose dispatch or advertise executable modes. The internal
-// lifecycle supports stable priority order, snapshot isolation, atomic once
-// claims, cooperative removal and invalidation of late results after unload.
-// Execution capacity must be acquired before a claim and held until actual
-// handler completion. Plugin code must never run under registry locks.
+// Engine executes sequential actions, parallel observations, bail gates,
+// waterfall filters, bounded async work and one-shot post-commit observations.
+// Every handler receives private JSON bytes and copied metadata. Views project
+// declared JSON Pointer paths; filters can change only visible mutable paths,
+// and merges retain hidden fields. Hosts provide bounded compiled validators.
 //
-// Hosts own schema compilation, identity, authorization, transport and shutdown
-// budgets. This module does not import plugin-sdk or go-hooks, normalize legacy
-// event aliases, migrate consumers or supply implicit policy presets.
+// Invocation timeouts release callers, but execution capacity remains held until
+// the handler actually finishes. Context cancellation cannot kill uncooperative
+// Go code or reverse external effects. Once is claimed atomically after capacity
+// acquisition. Removal and disposal cancel queued/waiting/in-flight work and
+// invalidate late results. No plugin code executes under registry locks.
+//
+// Async receipt means queued, not completed; Future.Await reports eventual results.
+// PrepareAfterCommit produces a host-owned Commit/Rollback capability. Only the
+// host can confirm a transaction, and scheduling is in-memory rather than durable.
+// Nested dispatch carries depth through context, including detached async work.
+// Context propagation is cooperative, not an isolation boundary for hostile code.
+//
+// Identity, authorization, transport, schema compilation, breaker, tracing and
+// durable delivery belong to host integrations or separately scoped work. This
+// module has no dependency on plugin-sdk or go-hooks and provides no legacy aliases.
 package pluginhooks

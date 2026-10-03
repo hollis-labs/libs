@@ -103,6 +103,8 @@ linters:
 
     misspell:
       locale: US
+      ignore-rules:
+        - cancelled # Protocol/status vocabulary from the hooks contract.
 
     revive:
       # Only enable rules that catch real problems. Avoid cosmetic rules that
