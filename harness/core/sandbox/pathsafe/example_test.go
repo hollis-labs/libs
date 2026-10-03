@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hollis-labs/go-safefs/pathsafe"
+	"github.com/hollis-labs/substrate/harness/sandbox/pathsafe"
 )
 
 func ExampleResolveUnder() {
