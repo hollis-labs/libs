@@ -1,4 +1,4 @@
-export { serve, FrameTooLargeError, MAX_INPUT_FRAME_BYTES, ShutdownTimeoutError, DEFAULT_SHUTDOWN_TIMEOUT_MS } from './serve.js';
+export { serve, FrameTooLargeError, MAX_INPUT_FRAME_BYTES, MAX_OUTPUT_FRAME_BYTES, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError, ShutdownTimeoutError, DEFAULT_SHUTDOWN_TIMEOUT_MS } from './serve.js';
 export type { ServeOptions } from './serve.js';
 export { ConfigReader, hasCapability, resolvedDataDir } from './config.js';
 export { createLogger, SecretTracker } from './log.js';

@@ -1,4 +1,6 @@
 import { hookResponseJSON } from './hooks-dispatch.js';
+import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError, encodeBoundedJSON, frameLimit } from './frame-codec.js';
+export { FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError } from './frame-codec.js';
 import { decodeRuntimeParams, PayloadError } from './payload.js';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -7,16 +9,17 @@ import type { Writable } from 'node:stream';
 import { ConfigReader } from './config.js';
 import { Dispatcher, decodeRequest } from './dispatch.js';
 import { EnvelopeFault } from './envelope.js';
-import { errorMessage } from './errors.js';
 import { createLogger, SecretTracker } from './log.js';
 import type { ServerPlugin } from './types.js';
 import type { RPCResponse } from './wire.js';
 
-export const MAX_INPUT_FRAME_BYTES = 8 * 1024 * 1024;
-export class FrameTooLargeError extends Error {
-  constructor() { super('stdin frame exceeds 8 MiB scanner limit'); this.name = 'FrameTooLargeError'; }
-}
+export const MAX_INPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
+export const MAX_OUTPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export interface ServeOptions {
+  inputFrameBytes?: number;
+  outputFrameBytes?: number;
+  /** Maximum time for one complete write, default 5000 ms. */
+  writeTimeoutMs?: number;
   input?: Readable;
   output?: Writable;
   stderr?: Writable;
@@ -26,27 +29,46 @@ export interface ServeOptions {
   /** Default true only when using process stdin. Injectable streams own their signals. */
   handleSignals?: boolean;
 }
-async function* frames(input: Readable, signal: AbortSignal): AsyncGenerator<string> {
+async function* frames(input: Readable, signal: AbortSignal, limit: number): AsyncGenerator<string> {
   let parts: Buffer[] = [];
   let length = 0;
-  for await (const chunk of chunks(input, signal)) {
-    const bytes = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array);
+  for await (const chunk of byteChunks(input, signal)) {
+    const bytes = chunk;
     let offset = 0;
     while (offset < bytes.length) {
       const end = bytes.indexOf(10, offset);
       const part = bytes.subarray(offset, end < 0 ? bytes.length : end);
       length += part.length;
-      if (length >= MAX_INPUT_FRAME_BYTES) throw new FrameTooLargeError();
-      parts.push(part);
+      if (length >= limit) throw new FrameTooLargeError('input', limit);
+      parts.push(Buffer.from(part));
       if (end < 0) break;
       const line = Buffer.concat(parts, length);
-      yield line.subarray(0, line.at(-1) === 13 ? line.length - 1 : line.length).toString('utf8');
+      try { yield new TextDecoder('utf-8', {fatal:true,ignoreBOM:true}).decode(line.subarray(0, line.at(-1) === 13 ? line.length - 1 : line.length)); }
+      catch { throw new FrameUTF8Error(); }
       parts = []; length = 0; offset = end + 1;
     }
   }
-  if (length) {
-    const line = Buffer.concat(parts, length);
-    yield line.subarray(0, line.at(-1) === 13 ? line.length - 1 : line.length).toString('utf8');
+  if (length && !signal.aborted) throw new TruncatedFrameError();
+}
+// Injectable text streams are encoded in bounded segments. Real transports must
+// stay byte streams: a caller decoding bytes first may already erase UTF-8 faults.
+async function* byteChunks(input: Readable, signal: AbortSignal): AsyncGenerator<Buffer> {
+  for await (const chunk of chunks(input, signal)) {
+    if (typeof chunk !== 'string') { yield chunk; continue; }
+    for (let offset = 0; offset < chunk.length;) {
+      let end = Math.min(offset + 4096, chunk.length);
+      const last = chunk.charCodeAt(end - 1);
+      if (last >= 0xd800 && last <= 0xdbff && end < chunk.length) end++;
+      const text = chunk.slice(offset, end);
+      for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        if (c >= 0xd800 && c <= 0xdbff) {
+          const low = text.charCodeAt(++i);
+          if (!(low >= 0xdc00 && low <= 0xdfff)) throw new FrameUTF8Error();
+        } else if (c >= 0xdc00 && c <= 0xdfff) throw new FrameUTF8Error();
+      }
+      yield Buffer.from(text); offset = end;
+    }
   }
 }
 export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000;
@@ -83,6 +105,9 @@ async function* chunks(input: Readable, signal: AbortSignal): AsyncGenerator<Buf
 /** Injected input/output/stderr stay caller-owned; only runtime I/O is interrupted. */
 export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): Promise<void> {
   if (!plugin || typeof plugin.init !== 'function' || typeof plugin.load !== 'function' || typeof plugin.unload !== 'function') throw new Error('serve requires init, load and unload');
+  const inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
+  const writeTimeout = options.writeTimeoutMs ?? 5000;
+  if (!Number.isFinite(writeTimeout) || writeTimeout <= 0 || writeTimeout > 2147483647) throw new Error('writeTimeoutMs must be positive and at most 2147483647');
   const timeout = options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
   if (!Number.isFinite(timeout) || timeout <= 0 || timeout > 2147483647) throw new Error('shutdownTimeoutMs must be positive and at most 2147483647');
   const deno = (globalThis as typeof globalThis & { Deno?: { stdin: { readable: Parameters<typeof Readable.fromWeb>[0] } } }).Deno;
@@ -91,7 +116,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   const controller = new AbortController(), reader = new AbortController();
   const secrets = new SecretTracker();
   const logger = createLogger({secrets,write: line => { (options.stderr ?? process.stderr).write(line); }});
-  const dispatcher = new Dispatcher(plugin, {signal: controller.signal, logger, config: new ConfigReader({},secrets)}, secrets);
+  const dispatcher = new Dispatcher(plugin, {signal: controller.signal, logger, config: new ConfigReader({},secrets)}, secrets, outputLimit);
   const pending = new Set<Promise<void>>();
   let writeTail = Promise.resolve(), barrier = Promise.resolve();
   let transportError: unknown, inputError: unknown;
@@ -111,15 +136,17 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   const write = (response: RPCResponse): Promise<void> => {
     if (closed || transportError) return Promise.resolve();
     let line: string;
-    try { line = (hookResponseJSON(response) ?? JSON.stringify(response, (_key, value: unknown) => {
-      if (typeof value === 'function' || typeof value === 'symbol' || (typeof value === 'number' && !Number.isFinite(value))) throw new Error('unserializable result value');
-      return value;
-    })) + '\n'; }
-    catch (error) { line = JSON.stringify({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:`marshal result: ${errorMessage(error)}`}}) + '\n'; }
+    try { line = (hookResponseJSON(response,outputLimit - 1) ?? encodeBoundedJSON(response, outputLimit - 1)) + '\n'; }
+    catch {
+      try { line = encodeBoundedJSON({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:'outbound response rejected'}}, outputLimit - 1) + '\n'; }
+      catch (error) { transportError ??= error; stop(); return Promise.resolve(); }
+    }
     writeTail = writeTail.then(() => {
       if (closed || transportError) return;
       return new Promise<void>((resolve,reject) => {
-        output.write(line, error => error ? reject(error) : resolve());
+        const timer = setTimeout(() => reject(new WriteTimeoutError()), writeTimeout);
+        try { output.write(line, error => { clearTimeout(timer); error ? reject(error) : resolve(); }); }
+        catch (error) { clearTimeout(timer); reject(error); }
       });
     }).catch(error => { transportError ??= error; stop(); });
     return writeTail;
@@ -131,7 +158,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   let terminal: import('./wire.js').RPCRequest | undefined;
   const pump = (async () => {
     try {
-      for await (const line of frames(input,reader.signal)) {
+      for await (const line of frames(input,reader.signal,inputLimit)) {
         if (reader.signal.aborted) break;
         try {
           const request = decodeRequest(line);

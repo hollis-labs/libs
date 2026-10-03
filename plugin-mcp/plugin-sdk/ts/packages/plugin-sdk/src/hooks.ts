@@ -57,7 +57,7 @@ export function decodeHookErrorData(raw: string): Wire.HookErrorData {
   const f=fields(raw,['contract','code'],['field']);enumValue(f.get('contract')!,'contract',['hooks/1']);enumValue(f.get('code')!,'code',['invalid_params','profile_unavailable','invalid_request','parse_error','method_not_found']);
   if(f.has('field')) text(f.get('field')!,'field');return parseJSONTokens(raw) as Wire.HookErrorData;
 }
-export function encodeHookErrorData(v: Wire.HookErrorData): string {const raw=JSON.stringify(authoredResult('hooks',v));decodeHookErrorData(raw);return raw;}
+export function encodeHookErrorData(v: Wire.HookErrorData): string {const raw=JSON.stringify(authoredResult('hooks',v,MAX_HOOK_DTO_BYTES));decodeHookErrorData(raw);return raw;}
 /** Structural mapping only; never interprets -32003 or -32010 as a veto. */
 export function hookRPCError(code: number, cause: Wire.HookErrorData['code'], field?: string): RPCError {
   if(![-32700,-32600,-32601,-32602].includes(code)) invalid('code','unsupported hooks RPC error code');
@@ -98,11 +98,18 @@ function freezeResult(value: unknown): void {
   if(value && typeof value==='object') {for(const v of Object.values(value)) freezeResult(v);Object.freeze(value);}
 }
 function encode(value: object, result: boolean): string {
-  const v=authoredResult('hooks',value);
-  if(Object.hasOwn(v,'payloadJSON') && Object.hasOwn(v,'payload') && result) invalid('payload','payload and payloadJSON are mutually exclusive');
-  const literal=Object.hasOwn(v,'payloadJSON')?rawJSON(v.payloadJSON as string):result ? resultPayloads.get(value) : undefined;
-  delete v.payloadJSON;
-  const entries = Object.entries(v).filter(([k])=>k!=='payload'||literal===undefined).map(([k,x])=>JSON.stringify(k)+':'+JSON.stringify(x));
+  if(!value || (Object.getPrototypeOf(value)!==Object.prototype && Object.getPrototypeOf(value)!==null) || Object.getOwnPropertySymbols(value).length) invalid('dto','non-JSON object');
+  const descriptors=Object.getOwnPropertyDescriptors(value);
+  for(const d of Object.values(descriptors)) if(!d.enumerable||!Object.hasOwn(d,'value')) invalid('dto','non-JSON property');
+  const rawView=descriptors.payloadJSON?.value as unknown;
+  if(rawView!==undefined && descriptors.payload?.value!==undefined && result) invalid('payload','payload and payloadJSON are mutually exclusive');
+  const literal=rawView!==undefined?rawJSON(rawView as string):result?resultPayloads.get(value):undefined;
+  const source: Record<string,unknown>={};
+  for(const [key,d] of Object.entries(descriptors)) if(key!=='payloadJSON' && (key!=='payload'||literal===undefined)) Object.defineProperty(source,key,{value:d.value,enumerable:true});
+  // RawJSON is validated/spliced rather than quoted during preflight, so a
+  // valid near-limit payload is not charged twice for its author view.
+  const v=authoredResult('hooks',source,MAX_HOOK_DTO_BYTES);
+  const entries=Object.entries(v).map(([k,x])=>JSON.stringify(k)+':'+JSON.stringify(x));
   if(literal!==undefined) entries.push('"payload":'+literal);
   const raw='{'+entries.join(',')+'}';
   if(result) decodeHookHandleResult(raw);else decodeHookHandleParams(raw);return raw;
@@ -117,8 +124,14 @@ function unique(items: Array<{invocation_id: string}>): void {const seen=new Set
 export function decodeHookHandleBatchParams(raw: string): {items: HookRequest[]} {const items=batchItems(raw).map(decodeHookHandleParams);unique(items);return {items};}
 export function decodeHookHandleBatchResult(raw: string): Wire.HookHandleBatchResult {const items=batchItems(raw).map(decodeHookHandleResult);unique(items);return {items};}
 function validateBatchSource(v: object): void {
-  const source=authoredResult('hooks',v);
-  if(Object.keys(source).length!==1||!Array.isArray(source.items)) invalid('items','required closed batch object');
+  if(!v || (Object.getPrototypeOf(v)!==Object.prototype && Object.getPrototypeOf(v)!==null) || Object.getOwnPropertySymbols(v).length) invalid('items','required closed batch object');
+  const props=Object.getOwnPropertyDescriptors(v),d=props.items;
+  if(Object.keys(props).length!==1||!d||!d.enumerable||!Object.hasOwn(d,'value')||!Array.isArray(d.value)) invalid('items','required closed batch object');
+  const items=d.value as unknown[];
+  if(items.length<1||items.length>MAX_HOOK_BATCH_ITEMS||Object.getOwnPropertySymbols(items).length) invalid('items','batch requires 1..64 items');
+  const entries=Object.getOwnPropertyDescriptors(items);
+  if(Object.keys(entries).length!==items.length+1) invalid('items','sparse or extended array');
+  for(let i=0;i<items.length;i++) {const item=entries[String(i)];if(!item||!item.enumerable||!Object.hasOwn(item,'value')) invalid('items','non-JSON array item');}
 }
 export function encodeHookHandleBatchParams(v: {items: Array<Wire.HookHandleParams | HookRequest>}): string {validateBatchSource(v);const raw='{"items":['+v.items.map(encodeHookHandleParams).join(',')+']}';decodeHookHandleBatchParams(raw);return raw;}
 export function encodeHookHandleBatchResult(v: {items: Array<Wire.HookHandleResult | HookResult>}): string {validateBatchSource(v);const raw='{"items":['+v.items.map(encodeHookHandleResult).join(',')+']}';decodeHookHandleBatchResult(raw);return raw;}

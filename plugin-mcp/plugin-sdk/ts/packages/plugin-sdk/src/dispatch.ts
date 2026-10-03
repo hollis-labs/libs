@@ -1,5 +1,6 @@
 import { dispatchHook } from './hooks-dispatch.js';
 import { hooksFixtureEnabled } from './hooks-fixture.js';
+import { encodeBoundedJSON, DEFAULT_FRAME_BYTES, FrameTooLargeError } from './frame-codec.js';
 import { PayloadError, decodeRuntimeParams, rememberParams, authoredResult, validateRuntimeResult } from './payload.js';
 import { inspectEnvelope } from './strict-json.js';
 import { decodeEnvelope } from './envelope.js';
@@ -37,24 +38,25 @@ function envelopes(value: Wire.EnvelopeOut[] | null | undefined): Wire.EnvelopeO
 export class Dispatcher {
   readonly plugin: ServerPlugin;
   private readonly secrets: SecretTracker;
+  private readonly outputLimit: number;
   context: Context;
   get ready(): boolean { return this.initialized; }
   private attempted = false;
   private initialized = false;
   private hookIncarnation?: Wire.RuntimeIdentity;
   private unloadAttempt?: Promise<void>;
-  constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker) { this.plugin = plugin; this.context = context; this.secrets = secrets; }
+  constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker, outputLimit = DEFAULT_FRAME_BYTES) { this.outputLimit = outputLimit; this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown, ctx: Context = this.context): Promise<void> { if (value !== undefined) await this.plugin.identity?.(ctx, value); }
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
     const id = req.id;
     try {
       if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,this.context,req,this.hookIncarnation,hooksFixtureEnabled(this.plugin));
       const result = await this.call(req);
-      if(req.method !== "plugin/init") validateRuntimeResult(req.method,result);
+      if(req.method !== "plugin/init") validateRuntimeResult(req.method,result,this.outputLimit - 1);
       return id === undefined ? undefined : { jsonrpc: '2.0', id, result };
     } catch (error) {
       if (id === undefined) return undefined;
-      const fault = error instanceof InitError ? {code:-32602,message:error.message,data:error.rpcData()} : error instanceof PayloadError ? {code:-32602,message:error.message} : error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
+      const fault = error instanceof FrameTooLargeError ? {code:-32603,message:'outbound response rejected'} : error instanceof InitError ? {code:-32602,message:error.message,data:error.rpcData()} : error instanceof PayloadError ? {code:-32602,message:error.message} : error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
       return {jsonrpc: '2.0', id, error: fault};
     }
   }
@@ -87,6 +89,7 @@ export class Dispatcher {
         } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
         this.context = { ...ctx, forwardContext:input.context, config: new ConfigReader(input.config, this.secrets) };
         const authored = await p.init(this.context, input);
+        encodeBoundedJSON(authored, this.outputLimit - 1);
         const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
         const result = decodeInitResult(encodeInitResult(base));
         validateInitResult(input,result);
@@ -96,27 +99,27 @@ export class Dispatcher {
         return result;
       }
       case 'plugin/load': {
-        const result = authoredResult(req.method,await p.load(ctx)) as unknown as Wire.LoadResult;
+        const result = authoredResult(req.method,await p.load(ctx),this.outputLimit - 1) as unknown as Wire.LoadResult;
         return optionalObject(result, ['skipped_registrations']);
       }
       case 'plugin/unload': await this.shutdown(ctx); return {ok: true};
       case 'plugin/health': {
         if (!p.health) return {ok: true};
-        const result = authoredResult(req.method,await p.health(ctx)) as unknown as Wire.HealthResult;
+        const result = authoredResult(req.method,await p.health(ctx),this.outputLimit - 1) as unknown as Wire.HealthResult;
         return {ok: result.ok ?? false, ...optionalObject(result, ['message'])};
       }
       case 'command/execute': {
         if (!p.command) return notImplemented('CommandHandler');
         const input = decoded as unknown as Wire.CommandExecParams;
         await this.identity(input.identity,ctx);
-        const result = authoredResult(req.method,await p.command(ctx, input)) as unknown as Wire.CommandExecResult;
+        const result = authoredResult(req.method,await p.command(ctx, input),this.outputLimit - 1) as unknown as Wire.CommandExecResult;
         return {action: result.action ?? '',...optionalObject(result, ['content']), ...(envelopes(result.envelopes) ? {envelopes: envelopes(result.envelopes)} : {})};
       }
       case 'event/handle': {
         if (!p.eventHandle) return notImplemented('EventHandler');
         const input = decoded as unknown as Wire.EventHandleParams;
         await this.identity(input.identity,ctx);
-        const result = authoredResult(req.method,await p.eventHandle(ctx, input)) as unknown as Wire.EventHandleResult;
+        const result = authoredResult(req.method,await p.eventHandle(ctx, input),this.outputLimit - 1) as unknown as Wire.EventHandleResult;
         return {...optionalObject(result, ['cancel','reason']), ...(envelopes(result.envelopes) ? {envelopes: envelopes(result.envelopes)} : {})};
       }
       case 'crud/create': case 'crud/read': case 'crud/update': case 'crud/delete': case 'crud/list': {
@@ -132,14 +135,14 @@ export class Dispatcher {
         if (!p.mcpCallTool) return notImplemented('MCPHandler');
         const input = decoded as unknown as Wire.MCPCallRequest;
         await this.identity(input.identity,ctx);
-        const result = authoredResult(req.method,await p.mcpCallTool(ctx, input)) as unknown as Wire.MCPCallResult;
+        const result = authoredResult(req.method,await p.mcpCallTool(ctx, input),this.outputLimit - 1) as unknown as Wire.MCPCallResult;
         return {content: result.content,...optionalObject(result, ['is_error']), ...(envelopes(result.envelopes) ? {envelopes: envelopes(result.envelopes)} : {})};
       }
       case 'http/handle': {
         if (!p.httpHandle) return notImplemented('HTTPHandler');
         const input = decoded as unknown as import('./types.js').HTTPRequest;
         await this.identity(input.identity,ctx);
-        const encoded = authoredResult(req.method,await p.httpHandle(ctx,input));
+        const encoded = authoredResult(req.method,await p.httpHandle(ctx,input),this.outputLimit - 1);
         return {status: encoded.status, ...optionalObject(encoded, ['headers']), ...(encoded.body ? {body: encoded.body} : {})};
       }
       case 'plugin/migrate': {

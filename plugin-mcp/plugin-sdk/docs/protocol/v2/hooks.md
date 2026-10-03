@@ -63,7 +63,7 @@ error containing a known failure code and optional message. Contradictory branch
 unknown statuses/codes or invocation mismatches are invalid output. TS author
 results choose payload OR validated payloadJSON, never both. Host result decoding
 returns an immutable snapshot and retains raw payload via hookPayloadJSON; encode functions reuse that snapshot.
-Go host EncodeHook* functions avoid HTML escaping; hook Serve replies also preserve
+Go host EncodeHook* functions avoid HTML escaping; hook Serve replies use the bounded frame encoders, normalize nonliteral framing whitespace, and preserve
 payload literals. Use the named codecs when exact opaque representation matters;
 a generic serializer may normalize it.
 

@@ -56,6 +56,8 @@ type server struct {
 	initialized         bool
 	plugin              Plugin
 	writeFrame          func([]byte)
+	outputLimit         int
+	fence               func(error)
 	unloadOnce          sync.Once
 	unloadDone          chan struct{}
 	unloadErr           error
@@ -342,48 +344,21 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		if err := payloadResultSource(out); err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		data, err := json.Marshal(out)
-		if err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		s.writeResult(req.ID, CRUDResult{Data: data})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
 	case MethodCRUDRead:
 		out, err := s.asCRUD.Read(ctx, params.ResourceType, params.ID)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		if err := payloadResultSource(out); err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		data, err := json.Marshal(out)
-		if err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		s.writeResult(req.ID, CRUDResult{Data: data})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
 	case MethodCRUDUpdate:
 		out, err := s.asCRUD.Update(ctx, params.ResourceType, params.ID, params.Data)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		if err := payloadResultSource(out); err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		data, err := json.Marshal(out)
-		if err != nil {
-			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-			return
-		}
-		s.writeResult(req.ID, CRUDResult{Data: data})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
 	case MethodCRUDDelete:
 		if err := s.asCRUD.Delete(ctx, params.ResourceType, params.ID); err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
@@ -396,26 +371,17 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		raw := make([]json.RawMessage, 0, len(items))
-		for _, it := range items {
-			if err := payloadResultSource(it); err != nil {
-				s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-				return
-			}
-			b, err := json.Marshal(it)
-			if err != nil {
-				s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
-				return
-			}
-			raw = append(raw, b)
+		if items == nil {
+			items = []map[string]interface{}{}
 		}
-		s.writeResult(req.ID, CRUDListResult{Items: raw})
+		s.writeResultShape(req.ID, map[string]any{"items": items}, CRUDListResult{})
 	}
 }
 
 // writeResult encodes and writes a successful JSON-RPC response.
 // Writes are suppressed for notifications (absent ID).
-func (s *server) writeResult(id RPCID, result any) {
+func (s *server) writeResult(id RPCID, result any) { s.writeResultShape(id, result, result) }
+func (s *server) writeResultShape(id RPCID, result, shape any) {
 	if id == (RPCID{}) {
 		return
 	}
@@ -423,12 +389,12 @@ func (s *server) writeResult(id RPCID, result any) {
 		s.writeError(id, ErrCodeInternal, "marshal result: invalid JSON value")
 		return
 	}
-	payload, err := json.Marshal(result)
+	payload, err := marshalBounded(result, s.frameOutputLimit()-1)
 	if err == nil {
-		err = validateRuntimeResult(result, payload)
+		err = validateRuntimeResult(shape, payload)
 	}
 	if err != nil {
-		s.writeError(id, ErrCodeInternal, fmt.Sprintf("marshal result: %v", err))
+		s.writeError(id, ErrCodeInternal, "outbound response rejected")
 		return
 	}
 	resp := RPCResponse{JSONRPC: "2.0", ID: id, Result: payload}
@@ -491,21 +457,26 @@ func (s *server) writeErrorFromPluginErr(id RPCID, err error) {
 // writeMessage serializes a response and writes it followed by a
 // newline. The runtime writer serializes frames from concurrent handlers.
 func (s *server) writeMessage(resp RPCResponse) {
-	data, err := json.Marshal(resp)
+	data, err := s.encodeFrame(resp)
 	if err != nil {
-		// Last-resort: write a minimal internal-error frame. We cannot
-		// recurse into writeError because json.Marshal already failed.
-		id, idErr := json.Marshal(resp.ID)
-		if idErr != nil {
-			id = []byte("null")
+		fallback := RPCResponse{JSONRPC: "2.0", ID: resp.ID, Error: &RPCError{Code: ErrCodeInternal, Message: "outbound response rejected"}}
+		data, err = s.encodeFrame(fallback)
+		if err != nil {
+			if s.fence != nil {
+				s.fence(err)
+			}
+			return
 		}
-		fallback := fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"error":{"code":%d,"message":"marshal failed"}}`+"\n", id, ErrCodeInternal)
-		s.emit([]byte(fallback))
-		return
 	}
-	data = append(data, '\n')
 	s.emit(data)
 }
+func (s *server) frameOutputLimit() int {
+	if s.outputLimit == 0 {
+		return DefaultFrameBytes
+	}
+	return s.outputLimit
+}
+
 func (s *server) emit(data []byte) { s.writeFrame(data) }
 
 // decodeParams unmarshals req.Params (which is typed any from the

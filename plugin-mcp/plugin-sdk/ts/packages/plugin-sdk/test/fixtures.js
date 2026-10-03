@@ -35,6 +35,7 @@ export function fixturePlugin(profile) {
     return {...base,unload(){effects.unload_attempts++;},health(){effects.health_calls++;return {ok:true};},effects(){return {...effects};}};
   }
   if (profile === 'base') return base;
+  if (profile === 'frame-output') return {...base,health(){return {ok:true,message:'x'.repeat(8*1024*1024)};}};
   if (profile === 'lifecycle-error') return { ...base, init() { throw errNotFound('missing'); }, load() { throw ErrCancelled; } };
   if (profile === 'health-error') return { ...base, health() { throw new Error('unhealthy'); } };
   if (profile !== 'full') throw new Error(`unknown fixture profile ${profile}`);

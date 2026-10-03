@@ -99,3 +99,14 @@ for(const name of (await readdir(directory)).filter(n=>n.startsWith('hooks-')&&n
     assert.deepEqual(await exited,{code:0,signal:null},stderr);
   });
 }
+
+test('raw hook responses respect narrowed frame limits',async()=>{
+  const d=await dispatcher(fixturePlugin('hooks-fixture'));
+  const p={...JSON.parse(base.raw),payload:'x'.repeat(1024)};
+  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:7,method:'hook/handle',params:p})));
+  assert.throws(()=>hookResponseJSON(r,511),sdk.FrameTooLargeError);
+  assert.ok(hookResponseJSON(r,4095).includes('x'.repeat(1024)));
+  const raw=sdk.rawJSON(JSON.stringify('x'.repeat(800000)));
+  const authored={invocation_id:'call-1',status:'ok',payloadJSON:raw};
+  assert.ok(sdk.encodeHookHandleResult(authored).includes(raw));
+});

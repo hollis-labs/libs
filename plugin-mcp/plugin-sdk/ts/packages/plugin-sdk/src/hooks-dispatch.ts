@@ -1,3 +1,4 @@
+import { preserveFrameJSON,encodeBoundedJSON,DEFAULT_FRAME_BYTES } from './frame-codec.js';
 import { parseJSONTokens } from './strict-json.js';
 import { requestParamsJSON } from './payload.js';
 import { decodeHookHandleParams, decodeHookHandleBatchParams, decodeHookHandleResult, encodeHookHandleResult, encodeHookHandleBatchResult, validateHookRequest, validateHookBatchRequest, validateHookResultFor, hookRPCError, HookValidationError } from './hooks.js';
@@ -7,7 +8,9 @@ import type { Context, ServerPlugin } from './types.js';
 import type { RPCRequest, RPCResponse, RuntimeIdentity } from './wire.js';
 const rawResponses = new WeakMap<object,string>();
 /** Internal transport encoder, preserving opaque result literals. */
-export function hookResponseJSON(response: RPCResponse): string | undefined { return rawResponses.get(response); }
+export function hookResponseJSON(response: RPCResponse,limit=DEFAULT_FRAME_BYTES-1): string | undefined {
+ const raw=rawResponses.get(response);return raw===undefined?undefined:encodeBoundedJSON({...response,result:preserveFrameJSON(raw)},limit);
+}
 function failure(p: HookRequest,code: HookFailureCode,status: 'failed'|'unavailable' = 'failed'): HookResult { return {invocation_id:p.invocation_id,status,error:{code}}; }
 function lease(ctx: Context,p: HookRequest,started: number): {ctx: Context; close:()=>void; expired:()=>boolean} {
   const controller=new AbortController();
@@ -74,6 +77,6 @@ export async function dispatchHook(plugin: ServerPlugin,ctx: Context,request: RP
   if(notification) return undefined;
   const raw=request.method==='hook/handle'?encodeHookHandleResult(results[0]!):encodeHookHandleBatchResult({items:results});
   const response: RPCResponse={jsonrpc:'2.0',id:request.id!,result:parseJSONTokens(raw)};
-  rawResponses.set(response,'{"jsonrpc":"2.0","id":'+JSON.stringify(request.id)+',"result":'+raw+'}');
+  rawResponses.set(response,raw);
   return response;
 }

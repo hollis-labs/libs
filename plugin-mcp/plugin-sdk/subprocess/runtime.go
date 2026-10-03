@@ -32,6 +32,8 @@ type ServeOptions struct {
 	Output          io.Writer
 	Context         context.Context
 	ShutdownTimeout time.Duration
+	FrameLimits     FrameLimits
+	WriteTimeout    time.Duration
 }
 
 // ServeWithOptions shares one shutdown path for unload, EOF and cancellation.
@@ -40,12 +42,23 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 	if p == nil {
 		return errors.New("subprocess: Serve called with nil plugin")
 	}
+	limits, err := frameLimits(options.FrameLimits)
+	if err != nil {
+		return err
+	}
 	timeout := options.ShutdownTimeout
 	if timeout == 0 {
 		timeout = DefaultShutdownTimeout
 	}
 	if timeout < 0 {
 		return errors.New("subprocess: shutdown timeout must be positive")
+	}
+	writeTimeout := options.WriteTimeout
+	if writeTimeout == 0 {
+		writeTimeout = DefaultWriteTimeout
+	}
+	if writeTimeout < 0 {
+		return errors.New("subprocess: write timeout must be positive")
 	}
 	parent := options.Context
 	if parent == nil {
@@ -76,10 +89,18 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 	secrets := newSecretTracker()
 	logger := newStderrLogger(secrets)
 	setPackageLogger(logger)
-	srv := &server{plugin: p, logger: logger, secrets: secrets, unloadDone: make(chan struct{})}
+	srv := &server{plugin: p, logger: logger, secrets: secrets, unloadDone: make(chan struct{}), outputLimit: limits.OutputBytes}
 	srv.detectCapabilities()
 	if hookFixtureSetup != nil {
 		hookFixtureSetup(srv)
+	}
+	fatal := make(chan error, 1)
+	srv.fence = func(err error) {
+		select {
+		case fatal <- err:
+		default:
+		}
+		cancel()
 	}
 
 	// A single writer owns the transport. Producers stop enqueueing after Serve
@@ -104,12 +125,28 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 				if !ok {
 					return
 				}
-				n, err := out.Write(data)
-				if err == nil && n != len(data) {
-					err = io.ErrShortWrite
+				result := make(chan error, 1)
+				go func() {
+					n, err := out.Write(data)
+					if err == nil && n != len(data) {
+						err = io.ErrShortWrite
+					}
+					result <- err
+				}()
+				timer := time.NewTimer(writeTimeout)
+				var err error
+				select {
+				case err = <-result:
+				case <-timer.C:
+					err = ErrWriteTimeout
+					if ownOutput {
+						_ = os.Stdout.Close()
+					}
 				}
+				timer.Stop()
 				if err != nil {
 					writerErr = fmt.Errorf("stdout: %w", err)
+					cancel()
 					return
 				}
 			}
@@ -136,18 +173,20 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 	var readerErr error
 	go func() {
 		defer close(readerDone)
-		scanner := bufio.NewScanner(in)
-		scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
-		for scanner.Scan() {
-			line := append([]byte{}, scanner.Bytes()...)
+		reader := bufio.NewReaderSize(in, 64*1024)
+		for {
+			line, err := readFrame(reader, limits.InputBytes)
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					readerErr = err
+				}
+				return
+			}
 			select {
 			case events <- line:
 			case <-stopRead:
 				return
 			}
-		}
-		if err := scanner.Err(); err != nil {
-			readerErr = fmt.Errorf("stdin scanner: %w", err)
 		}
 	}()
 	var pending sync.WaitGroup
@@ -180,6 +219,13 @@ loop:
 		}
 		select {
 		case <-ctx.Done():
+			select {
+			case inputErr = <-fatal:
+			default:
+			}
+			break loop
+		case failure := <-fatal:
+			inputErr = failure
 			break loop
 		case <-writerDone:
 			break loop
@@ -291,6 +337,13 @@ loop:
 	}
 	if srv.unloadErr != nil && terminal == nil {
 		return srv.unloadErr
+	}
+	select {
+	case failure := <-fatal:
+		if inputErr == nil {
+			inputErr = failure
+		}
+	default:
 	}
 	return inputErr
 }

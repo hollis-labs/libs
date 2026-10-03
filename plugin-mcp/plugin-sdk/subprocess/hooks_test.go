@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -298,5 +299,31 @@ func TestHookBatchAtomicAdmissionAndExpiredQueue(t *testing.T) {
 	r := hookAwait(ctx, plugin, p)
 	if plugin.calls != 0 || r.Error.Code != "deadline_exceeded" {
 		t.Fatalf("expired queue %+v calls=%d", r, plugin.calls)
+	}
+}
+
+func TestHookRepliesRespectFrameLimits(t *testing.T) {
+	p := hookTestParams(t)
+	p.Payload = json.RawMessage(`"` + strings.Repeat("x", 1024) + `"`)
+	for _, limit := range []int{512, 32} {
+		t.Run(strconv.Itoa(limit), func(t *testing.T) {
+			var frames [][]byte
+			var fenced error
+			s := &server{plugin: &hookTranscriptPlugin{}, hooksFixtureEnabled: true, hooksIncarnation: p.Scope.Incarnation, logger: newStderrLogger(newSecretTracker()), outputLimit: limit, fence: func(err error) { fenced = err }, writeFrame: func(b []byte) { frames = append(frames, b) }}
+			s.dispatchHook(context.Background(), RPCRequest{ID: NumberID(7), Method: MethodHookHandle, Params: p})
+			if limit == 32 {
+				if fenced == nil || len(frames) != 0 {
+					t.Fatalf("unbounded fallback frames=%d fenced=%v", len(frames), fenced)
+				}
+				return
+			}
+			if fenced != nil || len(frames) != 1 || len(frames[0]) > limit {
+				t.Fatalf("frames=%d fenced=%v", len(frames), fenced)
+			}
+			var r RPCResponse
+			if json.Unmarshal(frames[0], &r) != nil || r.Error == nil || r.Error.Code != -32603 || len(r.Result) != 0 {
+				t.Fatalf("partial success %s", frames[0])
+			}
+		})
 	}
 }

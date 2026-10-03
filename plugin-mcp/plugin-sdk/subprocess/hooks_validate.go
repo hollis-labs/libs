@@ -17,19 +17,16 @@ func hookMarshal(v any) ([]byte, error) {
 	if err := payloadResultSource(v); err != nil {
 		return nil, err
 	}
-	var b bytes.Buffer
-	e := json.NewEncoder(&b)
-	e.SetEscapeHTML(false)
-	if err := e.Encode(v); err != nil {
-		return nil, err
-	}
-	return bytes.TrimSuffix(b.Bytes(), []byte{'\n'}), nil
+	return marshalBounded(v, MaxHookDTOBytes)
 }
 
 // The standard encoder compacts RawMessage, even from MarshalJSON. Named hook
 // codecs splice the validated payload token so its internal whitespace, escaped
 // keys, number spelling and HTML characters survive exactly.
 func hookPreservePayload(v any, payload json.RawMessage) ([]byte, error) {
+	if len(payload) > MaxHookDTOBytes {
+		return nil, hookInvalid("payload", "oversized payload")
+	}
 	raw, err := hookMarshal(v)
 	if err != nil {
 		return nil, err

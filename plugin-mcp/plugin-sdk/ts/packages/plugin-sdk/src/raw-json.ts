@@ -1,9 +1,11 @@
+import { Buffer } from 'node:buffer';
 import { validateJSON, parseJSONTokens } from './strict-json.js';
 const brand: unique symbol = Symbol('RawJSON');
 /** Validated opaque JSON literal. This string is spliced, never re-encoded. */
 export type RawJSON = string & { readonly [brand]: true };
 export function rawJSON(text: string): RawJSON {
   if (typeof text !== 'string') throw new TypeError('RawJSON requires JSON text');
+  if(Buffer.byteLength(text)>(1<<20)) throw new TypeError('oversized RawJSON');
   validateJSON(text);
   const check = (value: unknown): void => {
     if (typeof value === 'number' && !Number.isFinite(value)) throw new TypeError('nonfinite JSON number');

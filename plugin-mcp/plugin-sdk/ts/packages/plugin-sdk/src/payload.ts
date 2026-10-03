@@ -1,3 +1,4 @@
+import { encodeBoundedJSON, DEFAULT_FRAME_BYTES } from './frame-codec.js';
 import { Buffer } from 'node:buffer';
 import { decodeJSONObject, inspectEnvelope, parseJSONTokens, validateJSON } from './strict-json.js';
 import { decodeForwardContext } from './host-rpc.js';
@@ -165,15 +166,16 @@ const results: Record<string, Rule> = {
             fail(); }, headers: strings, body: base64 }, ['status']),
     'plugin/migrate': closed({ notes: array(string()) }, []),
 };
-export function validateRuntimeResult(method: string, value: unknown): void { inspectAuthored(value); try {
+export function validateRuntimeResult(method: string, value: unknown, limit = DEFAULT_FRAME_BYTES - 1): void { const raw = encodeBoundedJSON(value, limit); inspectAuthored(value); try {
     results[method]?.(value);
-    validateJSON(JSON.stringify(value));
+    validateJSON(raw);
 }
 catch {
     throw new Error('invalid runtime result');
 } }
 // Optional top-level undefined means omitted; nested values are never erased.
-export function authoredResult(method: string, value: unknown): Record<string, unknown> {
+export function authoredResult(method: string, value: unknown, limit = DEFAULT_FRAME_BYTES - 1): Record<string, unknown> {
+    encodeBoundedJSON(value, limit, method === 'http/handle');
     if (!record(value))
         throw new Error('expected result object');
     const result: Record<string, unknown> = {};
@@ -190,6 +192,6 @@ export function authoredResult(method: string, value: unknown): Record<string, u
             throw new Error('expected byte body');
         Object.defineProperty(result, 'body', { value: Buffer.from(result.body).toString('base64'), enumerable: true });
     }
-    validateRuntimeResult(method, result);
+    validateRuntimeResult(method, result, limit);
     return result;
 }

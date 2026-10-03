@@ -152,12 +152,7 @@ func (s *server) dispatchHook(ctx context.Context, req RPCRequest) {
 		s.writeError(req.ID, ErrCodeInternal, "invalid hook output")
 		return
 	}
-	id, _ := req.ID.MarshalJSON()
-	frame := append([]byte(`{"jsonrpc":"2.0","id":`), id...)
-	frame = append(frame, []byte(`,"result":`)...)
-	frame = append(frame, payload...)
-	frame = append(frame, '}', '\n')
-	s.writeFrame(frame)
+	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: req.ID, Result: payload})
 }
 func itemsResultJSON(v any) ([]byte, error) {
 	switch r := v.(type) {
