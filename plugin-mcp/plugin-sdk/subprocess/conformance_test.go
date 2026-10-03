@@ -243,7 +243,19 @@ func fixtureError(name string) error {
 	}
 	return nil
 }
-func (*transcriptFull) Command(_ context.Context, r CommandRequest) (CommandResult, error) {
+func (*transcriptFull) Command(ctx context.Context, r CommandRequest) (CommandResult, error) {
+	if r.Name == "echo-context" {
+		c, ok := ForwardContextFromContext(ctx)
+		content := "absent"
+		if ok {
+			var b BindingID
+			if c.BindingID != nil {
+				b = *c.BindingID
+			}
+			content = fmt.Sprintf("%s:%d", b, c.TimeoutMS)
+		}
+		return CommandResult{Action: "message", Content: content}, nil
+	}
 	if err := fixtureError(r.Name); err != nil {
 		return CommandResult{}, err
 	}

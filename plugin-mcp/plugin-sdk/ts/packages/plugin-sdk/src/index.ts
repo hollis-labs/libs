@@ -11,3 +11,5 @@ export type { RPCID, RPCRequest, RPCResponse, RPCError, InitParams, InitResult, 
 export { InitError, encodeGrant, encodeInitParams, encodeInitResult, decodeGrant, decodeGrantSet, decodeRuntimeIdentity, decodeInitParams, decodeInitResult, validateInitResult } from './init-contract.js';
 export type { InitFailureCode } from './init-contract.js';
 export type { Grant, GrantSet, RuntimeIdentity, HostServices, HostServiceLimits, HooksProfile } from './wire.js';
+
+export type { ForwardContext } from './host-rpc.js';

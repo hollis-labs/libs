@@ -45,7 +45,10 @@
         "jsonrpc": "2.0",
         "method": "event/handle",
         "params": {
-          "type": "cancelled"
+          "type": "cancelled",
+          "source": "host",
+          "data": {},
+          "pre_hook": false
         }
       }
     },
@@ -55,7 +58,9 @@
         "id": 0,
         "method": "command/execute",
         "params": {
-          "name": "internal"
+          "name": "internal",
+          "session_id": "",
+          "args": ""
         }
       },
       "level": "normative",

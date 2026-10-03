@@ -46,7 +46,9 @@
         "id": 1,
         "method": "command/execute",
         "params": {
-          "name": "not-found"
+          "name": "not-found",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -64,7 +66,9 @@
         "id": 2,
         "method": "command/execute",
         "params": {
-          "name": "conflict"
+          "name": "conflict",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -82,7 +86,9 @@
         "id": 3,
         "method": "command/execute",
         "params": {
-          "name": "validation"
+          "name": "validation",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -100,7 +106,9 @@
         "id": 4,
         "method": "command/execute",
         "params": {
-          "name": "cancelled"
+          "name": "cancelled",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -118,7 +126,9 @@
         "id": 5,
         "method": "command/execute",
         "params": {
-          "name": "internal"
+          "name": "internal",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -136,7 +146,9 @@
         "id": 6,
         "method": "command/execute",
         "params": {
-          "name": "other-status"
+          "name": "other-status",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -154,7 +166,9 @@
         "id": 7,
         "method": "command/execute",
         "params": {
-          "name": "panic"
+          "name": "panic",
+          "session_id": "",
+          "args": ""
         }
       },
       "expect": {
@@ -173,7 +187,9 @@
         "method": "event/handle",
         "params": {
           "type": "cancelled",
-          "pre_hook": true
+          "pre_hook": true,
+          "source": "host",
+          "data": {}
         }
       },
       "expect": {
@@ -191,7 +207,8 @@
         "id": 9,
         "method": "crud/read",
         "params": {
-          "id": "not-found"
+          "id": "not-found",
+          "resource_type": "notes"
         }
       },
       "expect": {
@@ -209,7 +226,8 @@
         "id": 10,
         "method": "mcp/call_tool",
         "params": {
-          "tool_name": "validation"
+          "tool_name": "validation",
+          "arguments": {}
         }
       },
       "expect": {
@@ -227,7 +245,8 @@
         "id": 11,
         "method": "http/handle",
         "params": {
-          "path": "conflict"
+          "path": "conflict",
+          "method": "GET"
         }
       },
       "expect": {
@@ -245,7 +264,9 @@
         "id": 12,
         "method": "plugin/migrate",
         "params": {
-          "from_version": "not-found"
+          "from_version": "not-found",
+          "data_dir": "/fixture/data",
+          "to_version": "2.0"
         }
       },
       "expect": {

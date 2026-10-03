@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { decodeJSONObject, validatePortableJSON } from './strict-json.js';
+import { decodeJSONObject, validatePortableJSON, rawJSONItems as rawItems, parseJSONTokens as parseTokens } from './strict-json.js';
 // Structure only: hosts own authority, opaque resource schemas and live leases.
 export const MAX_HOST_RPC_DTO_BYTES = 1 << 20;
 export type BindingID = string;
@@ -259,53 +259,6 @@ const nullable = (rule: Rule): Rule => (raw, field) => { if (raw.trim() !== 'nul
     rule(raw, field); };
 const reference = (name: string): Rule => (raw, field) => { shapes[name]!(raw, field); };
 // Split a scanner-validated container without parsing away numeric tokens.
-function rawItems(raw: string): string[] {
-    const text = raw.trim();
-    const parts: string[] = [];
-    let start = 1, depth = 0, quoted = false, escaped = false;
-    for (let i = 1; i < text.length - 1; i++) {
-        const c = text[i];
-        if (quoted) {
-            if (escaped)
-                escaped = false;
-            else if (c === '\\')
-                escaped = true;
-            else if (c === '"')
-                quoted = false;
-        }
-        else if (c === '"')
-            quoted = true;
-        else if (c === '{' || c === '[')
-            depth++;
-        else if (c === '}' || c === ']')
-            depth--;
-        else if (c === ',' && depth === 0) {
-            parts.push(text.slice(start, i).trim());
-            start = i + 1;
-        }
-    }
-    const last = text.slice(start, -1).trim();
-    if (last)
-        parts.push(last);
-    return parts;
-}
-// Build objects from individual scanner-validated tokens. V8 can reuse an
-// incorrect escaped object key across same-shaped JSON.parse calls. Parsing
-// keys as strings avoids that cache and preserves host-owned opaque keys.
-function parseTokens(raw: string): unknown {
-    const text = raw.trim();
-    if (text.startsWith('['))
-        return rawItems(text).map(parseTokens);
-    if (!text.startsWith('{'))
-        return JSON.parse(text) as unknown;
-    const result: Record<string, unknown> = {};
-    for (const member of rawItems(text)) {
-        const match = /^("(?:[^"\\]|\\.)*")\s*:/.exec(member)!;
-        const key = JSON.parse(match[1]!) as string;
-        Object.defineProperty(result, key, { value: parseTokens(member.slice(match[0].length)), enumerable: true, writable: true, configurable: true });
-    }
-    return result;
-}
 function fields(raw: string, spec: Record<string, Rule>, optional: readonly string[], nulls: readonly string[], field: string): Map<string, string> {
     try {
         const required = Object.keys(spec).filter(k => !optional.includes(k));

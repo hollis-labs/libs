@@ -163,10 +163,11 @@
       "expect": {
         "jsonrpc": "2.0",
         "id": 42,
-        "result": {
-          "ok": true
+        "error": {
+          "code": -32602
         }
-      }
+      },
+      "message_prefix": "decode params:"
     },
     {
       "raw": "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"plugin/health\"}",

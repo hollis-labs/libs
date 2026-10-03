@@ -1,4 +1,5 @@
-import { decodeJSONObject, validateJSON, validatePortableJSON } from './strict-json.js';
+import { decodeForwardContext } from './host-rpc.js';
+import { decodeJSONObject, validateJSON, validatePortableJSON, parseJSONTokens } from './strict-json.js';
 import type { Grant, RuntimeIdentity, InitParams, InitResult, HostServices } from './wire.js';
 export type InitFailureCode = 'invalid_init' | 'protocol_mismatch' | 'capability_contract_mismatch' | 'profile_mismatch';
 export class InitError extends Error {
@@ -18,12 +19,12 @@ function version(raw: string, field: string, code: InitFailureCode, expected: nu
   const received = integer(raw,field); if (received !== expected) throw new InitError(code,field,expected,received); return received;
 }
 function string(raw: string, field: string, nonblank = true): string {
-  const value: unknown = JSON.parse(raw); if (typeof value !== 'string' || (nonblank && !value.trim())) invalid(field); return value;
+  const value: unknown = parseJSONTokens(raw); if (typeof value !== 'string' || (nonblank && !value.trim())) invalid(field); return value;
 }
 function object(raw: string, field: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(raw); if (value === null || typeof value !== 'object' || Array.isArray(value)) invalid(field); return value as Record<string,unknown>;
+  const value: unknown = parseJSONTokens(raw); if (value === null || typeof value !== 'object' || Array.isArray(value)) invalid(field); return value as Record<string,unknown>;
 }
-function array(raw: string, field: string): unknown[] { const value: unknown = JSON.parse(raw); if (!Array.isArray(value)) invalid(field); return value; }
+function array(raw: string, field: string): unknown[] { const value: unknown = parseJSONTokens(raw); if (!Array.isArray(value)) invalid(field); return value; }
 export function decodeRuntimeIdentity(raw: string): RuntimeIdentity {
   const f = fields(raw,'incarnation',['host_instance','owner_id','owner_generation']);
   const generation = integer(f.get('owner_generation')!,'owner_generation',Number.MAX_SAFE_INTEGER); if (!generation) invalid('owner_generation');
@@ -44,7 +45,7 @@ export function decodeGrant(raw: string): Grant {
   if (!integer(f.get('owner_generation')!,'owner_generation',Number.MAX_SAFE_INTEGER)) invalid('owner_generation');
   if (timestamp(f.get('expires_at')!,'expires_at') <= timestamp(f.get('issued_at')!,'issued_at')) invalid('expires_at');
   try { validatePortableJSON(f.get('scope')!); } catch { invalid('scope'); }
-  return JSON.parse(raw) as Grant;
+  return parseJSONTokens(raw) as Grant;
 }
 // Parse each array element from its original tokens before JSON.parse can round it.
 function rawArray(raw: string, field: string): string[] {
@@ -70,10 +71,11 @@ function hostServices(raw: string, incarnation: RuntimeIdentity): HostServices {
   const timeoutFields=fields(limits.get('method_timeout_ms')!,'method_timeout_ms',Object.keys(timeouts));
   if(Object.keys(timeouts).length!==offered.length || new Set(offered).size!==offered.length) invalid('host_services.methods');
   for(const m of offered) if(typeof m!=='string' || !methods.has(m) || !timeoutFields.has(m) || !integer(timeoutFields.get(m)!,'method_timeout_ms')) invalid('host_services.methods');
-  return JSON.parse(raw) as HostServices;
+  return parseJSONTokens(raw) as HostServices;
 }
 export function decodeInitParams(raw: string): InitParams {
-  const f=fields(raw,'params',['plugin_dir','data_dir','cache_dir','config','log_level','host_info','capability_contract','incarnation','grants'],['identity','host_services','hooks_profile']);
+  const f=fields(raw,'params',['plugin_dir','data_dir','cache_dir','config','log_level','host_info','capability_contract','incarnation','grants'],['identity','host_services','hooks_profile','context']);
+  if(f.has('context')) {try { decodeForwardContext(f.get('context')!); } catch { invalid('context'); }}
   const host=fields(f.get('host_info')!,'host_info',['version','protocol']); version(host.get('protocol')!,'host_info.protocol','protocol_mismatch',2); string(host.get('version')!,'host_info.version');
   version(f.get('capability_contract')!,'capability_contract','capability_contract_mismatch',1);
   for(const key of ['plugin_dir','data_dir','cache_dir']) string(f.get(key)!,key);
@@ -82,14 +84,14 @@ export function decodeInitParams(raw: string): InitParams {
   const incarnation=decodeRuntimeIdentity(f.get('incarnation')!); decodeGrantSet(f.get('grants')!,incarnation);
   if(f.has('host_services')) hostServices(f.get('host_services')!,incarnation);
   if(f.has('hooks_profile')) {const h=fields(f.get('hooks_profile')!,'hooks_profile',['hooks_profile_version']); version(h.get('hooks_profile_version')!,'hooks_profile.hooks_profile_version','profile_mismatch',1);}
-  return JSON.parse(raw) as InitParams;
+  return parseJSONTokens(raw) as InitParams;
 }
 export function decodeInitResult(raw: string): InitResult {
   const f=fields(raw,'result',['id','name','version','description','protocol','capability_contract'],['reverse_rpc_version','hooks_profile_version']);
   for(const key of ['id','name','version']) string(f.get(key)!,key); string(f.get('description')!,'description',false);
   version(f.get('protocol')!,'protocol','protocol_mismatch',2); version(f.get('capability_contract')!,'capability_contract','capability_contract_mismatch',1);
   for(const key of ['reverse_rpc_version','hooks_profile_version']) if(f.has(key)) version(f.get(key)!,key,'profile_mismatch',1);
-  return JSON.parse(raw) as InitResult;
+  return parseJSONTokens(raw) as InitResult;
 }
 export function validateInitResult(input: InitParams, result: InitResult): void {
   encodeInitParams(input); encodeInitResult(result);
@@ -103,7 +105,7 @@ function encode(value: unknown, field: string): string {
   try {
     return JSON.stringify(value, function(this: unknown, key, item: unknown) {
       if (typeof item === 'number' && !Number.isFinite(item) || typeof item === 'function' || typeof item === 'symbol' || typeof item === 'bigint') invalid(field);
-      const optional = field === 'params' ? ['identity','host_services','hooks_profile'] : field === 'result' ? ['reverse_rpc_version','hooks_profile_version'] : [];
+      const optional = field === 'params' ? ['identity','host_services','hooks_profile','context'] : field === 'result' ? ['reverse_rpc_version','hooks_profile_version'] : [];
       if (item === undefined && !(this === value && optional.includes(key))) invalid(field);
       return item;
     });

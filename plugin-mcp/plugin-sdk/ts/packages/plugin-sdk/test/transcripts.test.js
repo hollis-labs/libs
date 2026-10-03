@@ -1,3 +1,4 @@
+import { parseJSONTokens } from '../dist/strict-json.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
@@ -10,7 +11,7 @@ const directory = new URL('../../../../docs/protocol/v2/transcripts/', import.me
 const names = (await readdir(directory)).filter(name => name.endsWith('.json')).sort();
 assert.ok(names.length, 'missing shared protocol corpus');
 for (const name of names) {
-  const fixture = JSON.parse(await readFile(new URL(name, directory), 'utf8'));
+  const fixture = parseJSONTokens(await readFile(new URL(name, directory), 'utf8'));
   // Status gates availability; level gates obligation. This v1 regression
   // runner still asserts quirks, explicitly recording why it passes them.
   assert.ok(['observed', 'proposed'].includes(fixture.status ?? 'observed'));
@@ -41,7 +42,7 @@ for (const name of names) {
       if (step.expect === undefined) continue;
       const reply = await replies.next();
       assert.equal(reply.done, false, 'stdout closed before expected reply');
-      const actual = JSON.parse(reply.value);
+      const actual = parseJSONTokens(reply.value);
       if (step.message_prefix) {
         assert.ok(actual.error.message.startsWith(step.message_prefix), actual.error.message);
         delete actual.error.message;

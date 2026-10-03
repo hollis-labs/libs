@@ -41,6 +41,7 @@ func (p *InitParams) ResolvedCacheDir() (string, error) {
 
 // InitParams is sent by the host during plugin/init.
 type InitParams struct {
+	Context            *ForwardContext            `json:"context,omitempty"`
 	PluginDir          string                     `json:"plugin_dir"`
 	DataDir            string                     `json:"data_dir"`
 	CacheDir           string                     `json:"cache_dir"`
@@ -103,7 +104,9 @@ type HostServiceLimits struct {
 // --- Load registration manifest ---
 
 // LoadParams is sent by the host during plugin/load (currently empty, reserved).
-type LoadParams struct{}
+type LoadParams struct {
+	Context *ForwardContext `json:"context,omitempty"`
+}
 
 // LoadResult is the plugin's acknowledgement of plugin/load. As of
 // v0.2.0, declarative registrations (commands, slots, components,
@@ -139,9 +142,10 @@ type SkippedRegistration struct {
 
 // CommandExecParams is sent to the plugin for command/execute.
 type CommandExecParams struct {
-	Name      string `json:"name"`
-	SessionID string `json:"session_id"`
-	Args      string `json:"args"`
+	Context   *ForwardContext `json:"context,omitempty"`
+	Name      string          `json:"name"`
+	SessionID string          `json:"session_id"`
+	Args      string          `json:"args"`
 	// Identity is an opaque, host-verified identity value for this
 	// call. See InitParams.Identity.
 	Identity json.RawMessage `json:"identity,omitempty"`
@@ -156,6 +160,7 @@ type CommandExecResult struct {
 
 // EventHandleParams is sent to the plugin for event/handle.
 type EventHandleParams struct {
+	Context   *ForwardContext        `json:"context,omitempty"`
 	Type      string                 `json:"type"`
 	Source    string                 `json:"source"`
 	Data      map[string]interface{} `json:"data"`
@@ -175,6 +180,7 @@ type EventHandleResult struct {
 
 // CRUDParams is sent for all crud/* methods.
 type CRUDParams struct {
+	Context      *ForwardContext        `json:"context,omitempty"`
 	ResourceType string                 `json:"resource_type"`
 	ID           string                 `json:"id,omitempty"`      // for read/update/delete
 	Data         map[string]interface{} `json:"data,omitempty"`    // for create/update
@@ -202,6 +208,7 @@ type HealthResult struct {
 // MCPCallRequest is sent to the plugin for mcp/call_tool when a tool
 // provided by the plugin is invoked.
 type MCPCallRequest struct {
+	Context   *ForwardContext        `json:"context,omitempty"`
 	ToolName  string                 `json:"tool_name"`
 	Arguments map[string]interface{} `json:"arguments"`
 	SessionID string                 `json:"session_id,omitempty"`
@@ -227,8 +234,9 @@ type MCPCallResult struct {
 // plugin route is hit. Streaming is not supported on this path; use SSE
 // envelopes via EventHandleResult instead.
 type HTTPRequest struct {
-	Method string `json:"method"`
-	Path   string `json:"path"`
+	Context *ForwardContext `json:"context,omitempty"`
+	Method  string          `json:"method"`
+	Path    string          `json:"path"`
 	// RawPath preserves optional escaped separators from URL.RawPath.
 	RawPath string `json:"raw_path,omitempty"`
 	// RawQuery preserves the encoded query, including repeated and empty values.
@@ -259,9 +267,10 @@ type HTTPResponse struct {
 // MigrateParams is sent to the plugin for plugin/migrate when the
 // installed manifest version differs from the declared version.
 type MigrateParams struct {
-	FromVersion string `json:"from_version"` // installed manifest version
-	ToVersion   string `json:"to_version"`   // target manifest version
-	DataDir     string `json:"data_dir"`     // convenience — same value passed via InitParams
+	Context     *ForwardContext `json:"context,omitempty"`
+	FromVersion string          `json:"from_version"` // installed manifest version
+	ToVersion   string          `json:"to_version"`   // target manifest version
+	DataDir     string          `json:"data_dir"`     // convenience — same value passed via InitParams
 }
 
 // MigrateResult is returned by the plugin for plugin/migrate. An empty

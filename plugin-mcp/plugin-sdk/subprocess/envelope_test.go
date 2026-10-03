@@ -128,11 +128,7 @@ func TestEnvelopeLeavesPayloadPolicyToMethod(t *testing.T) {
 	if fault != nil || req == nil {
 		t.Fatalf("envelope rejected payload: %+v", fault)
 	}
-	var params HTTPRequest
-	if err := decodeParams(req.Params, &params); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(params.Body, []byte{1, 2}) {
-		t.Fatalf("existing byte-array payload normalization changed: %v", params.Body)
+	if _, err := validateRuntimeParams(req.Method, req.Params); err == nil {
+		t.Fatal("method validator accepted byte-array body")
 	}
 }

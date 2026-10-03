@@ -140,3 +140,50 @@ export function inspectEnvelope(text: string): {fields: Map<string, string> | un
   }
   return {fields, duplicates, invalidKeys};
 }
+
+export function rawJSONItems(raw: string): string[] {
+    const text = raw.trim();
+    const parts: string[] = [];
+    let start = 1, depth = 0, quoted = false, escaped = false;
+    for (let i = 1; i < text.length - 1; i++) {
+        const c = text[i];
+        if (quoted) {
+            if (escaped)
+                escaped = false;
+            else if (c === '\\')
+                escaped = true;
+            else if (c === '"')
+                quoted = false;
+        }
+        else if (c === '"')
+            quoted = true;
+        else if (c === '{' || c === '[')
+            depth++;
+        else if (c === '}' || c === ']')
+            depth--;
+        else if (c === ',' && depth === 0) {
+            parts.push(text.slice(start, i).trim());
+            start = i + 1;
+        }
+    }
+    const last = text.slice(start, -1).trim();
+    if (last)
+        parts.push(last);
+    return parts;
+}
+// Build objects from individual scanner-validated tokens. V8 can reuse an
+// incorrect escaped object key across same-shaped JSON.parse calls. Parsing
+// keys as strings avoids that cache and preserves host-owned opaque keys.
+export function parseJSONTokens(raw: string): unknown {
+    const text = raw.trim();
+    if (text.startsWith('['))
+        return rawJSONItems(text).map(parseJSONTokens);
+    if (!text.startsWith('{')) return JSON.parse(text) as unknown;
+    const result: Record<string, unknown> = {};
+    for (const member of rawJSONItems(text)) {
+        const match = /^("(?:[^"\\]|\\.)*")\s*:/.exec(member)!;
+        const key = JSON.parse(match[1]!) as string;
+        Object.defineProperty(result, key, { value: parseJSONTokens(member.slice(match[0].length)), enumerable: true, writable: true, configurable: true });
+    }
+    return result;
+}
