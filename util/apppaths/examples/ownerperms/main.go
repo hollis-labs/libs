@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/go-apppaths/paths"
+	paths "github.com/hollis-labs/libs/util/apppaths"
 )
 
 func main() {

@@ -3,7 +3,7 @@ package paths_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-apppaths/paths"
+	paths "github.com/hollis-labs/libs/util/apppaths"
 )
 
 // Every directory go-apppaths creates or owns is forced owner-only, including

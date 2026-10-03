@@ -7,19 +7,19 @@ its files — the data, state, cache, and config roots, the main database path,
 and the active workspace. Resolve once at startup, inject the result downward.
 It is the path layer every per-app migration builds on.
 
-Module path: `github.com/hollis-labs/go-apppaths`
-Library package: `github.com/hollis-labs/go-apppaths/paths`
+Module path: `github.com/hollis-labs/libs/util/apppaths`
+Library package: `github.com/hollis-labs/libs/util/apppaths`
 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-apppaths/paths
+go get github.com/hollis-labs/libs/util/apppaths
 ```
 
 ## Usage
 
 ```go
-import "github.com/hollis-labs/go-apppaths/paths"
+import paths "github.com/hollis-labs/libs/util/apppaths"
 
 layout, err := paths.Resolve("torque")
 if err != nil {
