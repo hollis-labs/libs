@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { PassThrough, Writable, Readable } from 'node:stream';
 import { createInterface } from 'node:readline';
-import { serve, ErrCancelled, PluginError, MAX_INPUT_FRAME_BYTES } from '../dist/index.js';
+import { serve, ErrCancelled, PluginError, MAX_INPUT_FRAME_BYTES, TruncatedFrameError } from '../dist/index.js';
 import { fixturePlugin, initParams } from './fixtures.js';
 
 function deferred() {
@@ -90,11 +90,11 @@ test('required params precede invocation; unsupported capability precedes valida
   assert.equal(calls,1);r.input.end(); await r.done;
 });
 
-test('CRLF and final frame without LF decode across arbitrary byte chunks', {timeout:5000}, async () => {
+test('CRLF decodes but final frame without LF is truncated across arbitrary byte chunks', {timeout:5000}, async () => {
   const bytes = Buffer.from('{"jsonrpc":"2.0","id":1,"method":"plugin/health"}\r\n{"jsonrpc":"2.0","id":2,"method":"plugin/health"}');
   let text = ''; const output = new Writable({write(b,_e,cb){text += b.toString();cb();}});
-  await serve(fixturePlugin('base'),{input:Readable.from([...bytes].map(byte=>Buffer.from([byte]))),output});
-  assert.deepEqual(text.trim().split('\n').map(JSON.parse).map(r=>r.id).sort(),[1,2]);
+  await assert.rejects(serve(fixturePlugin('base'),{input:Readable.from([...bytes].map(byte=>Buffer.from([byte]))),output}),TruncatedFrameError);
+  assert.deepEqual(text.trim().split('\n').map(JSON.parse).map(r=>r.id),[1]);
 });
 
 test('frame cap counts UTF-8 bytes rather than JS characters', {timeout:5000}, async () => {

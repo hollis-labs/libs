@@ -135,11 +135,38 @@ failure. Only runtime-owned pipes may be closed to wake blocked operations.
 `lifecycle-shutdown.json` are normative. The shared shutdown recipe checks one
 observed Unload attempt and zero post-fence Health callbacks. Runtime tests cover
 cancellation/drain barriers, cleanup throw/panic, EOF/unload races and deadline
-exhaustion. Payload validation, full frame budgets and reverse profiles retain
-separate implementation gates.
+exhaustion. Reverse profiles retain separate implementation gates.
 
 Runtime method params and results follow the [required/default matrix](payloads.md).
 Every forward params DTO permits optional closed ForwardContext metadata.
 `payload-validation.json` is normative, including scanner-based escaped-key
-preservation and invalid-unload recovery. Framing policies retain their existing
-levels until the framing slice.
+preservation and invalid-unload recovery. Both directions use the bounded framing policy below.
+
+Both stdio directions default to an 8 MiB frame limit, including the terminating
+LF. Input accepts one optional CR immediately before LF and counts it against
+the limit; output emits LF only. Frames must contain valid UTF-8. EOF with bytes
+remaining before LF is a truncated transport, never an implicit final frame.
+Oversized input fails the connection without draining the rest of the line.
+
+Go `ServeOptions.FrameLimits` (`InputBytes`, `OutputBytes`) and TypeScript
+`ServeOptions.inputFrameBytes` / `outputFrameBytes` may narrow these ceilings
+before Init. Go zero values use the defaults; TS omitted options use defaults.
+These local options do not activate reverse RPC or hooks profiles.
+`FrameTooLargeError` exposes only direction and limit, never frame contents.
+
+Output JSON is staged within the configured byte budget before publication;
+string escaping and base64 expansion count. An oversized result produces a
+bounded correlated internal error when that error fits. If even the error does
+not fit, the connection is fenced without emitting the rejected frame. A write
+failure or partial write fences the connection and never appends a replacement
+response to potentially partial JSON. Go `WriteTimeout` and TS `writeTimeoutMs`
+bound a single transport write (default five seconds), independently of EOF and
+the shutdown budget. Injected streams remain caller-owned after timeout: the
+caller must release any already-started operation before reusing the stream.
+The SDK cannot bound allocation or blocking inside plugin-authored serializers,
+getters or callback code.
+
+`frame-accepted.json`, `frame-limit.json`, `frame-output.json` and
+`framing-crlf.json` are normative shared runtime transcripts. Focused runtime
+tests cover malformed UTF-8, truncated EOF, blocked writes, partial writes,
+base64 expansion and an error that cannot fit the output budget.

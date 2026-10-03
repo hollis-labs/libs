@@ -29,6 +29,7 @@ type transcript struct {
 	Termination string           `json:"termination,omitempty"`
 }
 type transcriptStep struct {
+	CRLF          bool            `json:"crlf,omitempty"`
 	PadBytes      int             `json:"pad_bytes,omitempty"`
 	Send          json.RawMessage `json:"send,omitempty"`
 	Raw           string          `json:"raw,omitempty"`
@@ -68,6 +69,8 @@ func TestProtocolTranscripts(t *testing.T) {
 			switch fixture.Profile {
 			case "lifecycle-shutdown":
 				p = &transcriptShutdown{}
+			case "frame-output":
+				p = &transcriptFrameOutput{}
 			case "base":
 				p = &transcriptBase{}
 			case "full":
@@ -126,7 +129,11 @@ func TestProtocolTranscripts(t *testing.T) {
 				}
 				// An over-limit frame can cause the server to close input mid-write.
 				written := make(chan error, 1)
-				go func() { _, err := io.WriteString(inW, frame+"\n"); written <- err }()
+				ending := "\n"
+				if step.CRLF {
+					ending = "\r\n"
+				}
+				go func() { _, err := io.WriteString(inW, frame+ending); written <- err }()
 				select {
 				case err := <-written:
 					if err != nil && fixture.Termination == "" {
@@ -176,7 +183,7 @@ func TestProtocolTranscripts(t *testing.T) {
 				if fixture.Termination == "" && err != nil {
 					t.Fatal(err)
 				}
-				if fixture.Termination != "" && (err == nil || !strings.Contains(err.Error(), "stdin scanner: bufio.Scanner: token too long")) {
+				if fixture.Termination != "" && (err == nil || !isInputFrameLimit(err)) {
 					t.Fatalf("Serve error = %v, want %q", err, fixture.Termination)
 				}
 			case <-time.After(5 * time.Second):
@@ -331,4 +338,15 @@ func (p *transcriptShutdown) Health(context.Context) (HealthStatus, error) {
 }
 func (p *transcriptShutdown) Effects() map[string]int {
 	return map[string]int{"unload_attempts": p.unloadAttempts, "health_calls": p.healthCalls}
+}
+
+func isInputFrameLimit(err error) bool {
+	var frame *FrameTooLargeError
+	return errors.As(err, &frame) && frame.Direction == "input"
+}
+
+type transcriptFrameOutput struct{ transcriptBase }
+
+func (*transcriptFrameOutput) Health(context.Context) (HealthStatus, error) {
+	return HealthStatus{OK: true, Message: strings.Repeat("x", DefaultFrameBytes)}, nil
 }

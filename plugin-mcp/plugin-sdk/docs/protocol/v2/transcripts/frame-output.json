@@ -1,6 +1,6 @@
 {
   "level": "normative",
-  "profile": "base",
+  "profile": "frame-output",
   "steps": [
     {
       "level": "normative",
@@ -41,9 +41,19 @@
       }
     },
     {
-      "raw": "x",
-      "repeat": 8388608
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32603,
+          "message": "outbound response rejected"
+        }
+      }
     }
-  ],
-  "termination": "frame-too-large"
+  ]
 }
