@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
 )
 
 func main() {

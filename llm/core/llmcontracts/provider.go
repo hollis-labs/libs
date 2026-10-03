@@ -3,7 +3,7 @@ package llmcontracts
 import (
 	"context"
 
-	"github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // Provider is the interface for LLM provider adapters.

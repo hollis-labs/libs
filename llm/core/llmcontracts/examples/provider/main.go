@@ -8,8 +8,8 @@ import (
 	"context"
 	"fmt"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // stubProvider is a minimal Provider implementation. A real adapter would

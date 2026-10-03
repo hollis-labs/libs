@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // rateLimitedProvider augments a basic Provider with a calibrated input

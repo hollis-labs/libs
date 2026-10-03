@@ -3,7 +3,7 @@ package llmcontracts
 import (
 	"context"
 
-	"github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // ProviderWithUsage is an optional extension interface for providers that can

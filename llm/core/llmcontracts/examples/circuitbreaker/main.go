@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
 )
 
 var errProvider = errors.New("simulated provider failure")

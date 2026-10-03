@@ -1,6 +1,6 @@
 package llmcontracts
 
-import "github.com/hollis-labs/go-llm-types"
+import "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
 // CacheHint aliases llmtypes.CacheHint so callers that already import this
 // package keep working. Authoritative definition lives in go-llm-types

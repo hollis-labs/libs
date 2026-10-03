@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
-	"github.com/hollis-labs/go-llm-contracts/contracttest"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
+	"github.com/hollis-labs/substrate/llm-core/llmcontracts/contracttest"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // fakeProvider is a deterministic double: it streams one delta and one done.
