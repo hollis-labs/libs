@@ -2,11 +2,15 @@ package host
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	cap "github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/plugin-sdk/capability"
 )
+
+// Actor identifies a host-verified audit subject, including plugins.
+type Actor struct{ Kind, ID string }
 
 // AuditEvent carries only authorization metadata. There is intentionally no
 // arguments, content, arbitrary details, error message or bearer token field.
@@ -14,14 +18,15 @@ import (
 type AuditEvent struct {
 	Timestamp                           time.Time
 	TraceID, RequestID                  string
-	Actor                               Subject
-	InitiatingCaller                    *Subject
-	Owner                               cap.RuntimeIdentity
+	Actor                               Actor
+	InitiatingCaller                    *Actor
+	Owner                               capability.RuntimeIdentity
 	Capability, GrantID, PolicyRevision string
 	Target, Server, Tool                string
-	Effect                              cap.Effect
-	Outcome                             cap.Code // Empty means success.
-	EffectState                         cap.EffectState
+	Effect                              capability.Effect
+	Outcome                             capability.Code // Empty means success.
+	Reason                              capability.FailureDetail
+	EffectState                         capability.EffectState
 	Duration                            time.Duration
 }
 
@@ -37,11 +42,22 @@ type AuditSink interface {
 type Auditor struct {
 	sink     AuditSink
 	failures atomic.Uint64
+	denials  sync.Map
 }
 
 func NewAuditor(sink AuditSink) *Auditor { return &Auditor{sink: sink} }
 func (a *Auditor) Record(ctx context.Context, event AuditEvent) (ok bool) {
-	if a == nil || a.sink == nil {
+	if a == nil {
+		return true
+	}
+	if event.Outcome != "" {
+		key := denialKey(event.Outcome, event.Reason)
+		event.Outcome = key.Code
+		event.Reason = key.Reason
+		counter, _ := a.denials.LoadOrStore(key, new(atomic.Uint64))
+		counter.(*atomic.Uint64).Add(1)
+	}
+	if a.sink == nil {
 		return true
 	}
 	if event.InitiatingCaller != nil {
@@ -65,4 +81,35 @@ func (a *Auditor) Failures() uint64 {
 		return 0
 	}
 	return a.failures.Load()
+}
+
+// DenialKey has a bounded vocabulary so malformed telemetry cannot allocate
+// counters per arbitrary user-supplied string.
+type DenialKey struct {
+	Code   capability.Code
+	Reason capability.FailureDetail
+}
+
+func denialKey(code capability.Code, reason capability.FailureDetail) DenialKey {
+	switch code {
+	case capability.InvalidRequest, capability.Unauthenticated, capability.CapabilityDenied, capability.ScopeDenied, capability.UnsupportedCapability, capability.TargetUnavailable, capability.BudgetExceeded, capability.RateLimited, capability.Cancelled, capability.DeadlineExceeded, capability.UnknownOutcome, capability.InternalError, capability.Conflict:
+	default:
+		code = capability.InternalError
+	}
+	switch reason {
+	case "", capability.StaleBinding, capability.CallbackCycle, capability.DepthExceeded:
+	default:
+		reason = ""
+	}
+	return DenialKey{code, reason}
+}
+
+// Denials returns a copy of per-code/reason counts, independent of sink success.
+func (a *Auditor) Denials() map[DenialKey]uint64 {
+	out := map[DenialKey]uint64{}
+	if a == nil {
+		return out
+	}
+	a.denials.Range(func(key, value any) bool { out[key.(DenialKey)] = value.(*atomic.Uint64).Load(); return true })
+	return out
 }

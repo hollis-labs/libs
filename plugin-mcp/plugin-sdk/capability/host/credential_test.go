@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	cap "github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/plugin-sdk/capability"
 )
 
 type fakeTimer struct {
@@ -68,7 +68,7 @@ func credentialFixture(t *testing.T) (*CredentialStore, *fakeClock, CredentialCl
 	if err != nil {
 		t.Fatal(err)
 	}
-	claims := CredentialClaims{Subject: Subject{SessionClient, "session"}, Owner: cap.RuntimeIdentity{HostInstance: "epoch", OwnerID: "owner", OwnerGeneration: 1}, Audience: "bridge", GrantIDs: []string{"grant"}, CapabilityNames: map[string]string{"grant": cap.ReadonlyQuery}, Scopes: map[string]cap.Scope{"grant": {Allowlists: map[string][]string{"targets": {"one"}}, Limits: map[string]int64{"bytes": 100}}}}
+	claims := CredentialClaims{Subject: Subject{SessionClient, "session"}, Owner: capability.RuntimeIdentity{HostInstance: "epoch", OwnerID: "owner", OwnerGeneration: 1}, Audience: "bridge", GrantIDs: []string{"grant"}, CapabilityNames: map[string]string{"grant": capability.ReadonlyQuery}, GrantExpiresAt: map[string]time.Time{"grant": clock.Now().Add(20 * time.Minute)}, Scopes: map[string]capability.Scope{"grant": {Allowlists: map[string][]string{"targets": {"one"}}, Limits: map[string]int64{"bytes": 100}}}}
 	if err := store.ActivateOwner(claims.Owner); err != nil {
 		t.Fatal(err)
 	}
@@ -80,14 +80,14 @@ func verifyClaims(store *CredentialStore, token string, c CredentialClaims) (Cre
 }
 func unauthenticated(t *testing.T, err error) {
 	t.Helper()
-	var failure *cap.Error
-	if !errors.As(err, &failure) || failure.Code != cap.Unauthenticated {
+	var failure *capability.Error
+	if !errors.As(err, &failure) || failure.Code != capability.Unauthenticated {
 		t.Fatalf("expected unauthenticated, got %v", err)
 	}
 }
 func TestCredentialIssuanceAndHashOnlyStorage(t *testing.T) {
 	store, clock, claims := credentialFixture(t)
-	issued, err := store.Issue(claims, 0)
+	issued, err := issueForTest(t, store, claims, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestCredentialIssuanceAndHashOnlyStorage(t *testing.T) {
 		t.Fatal("not SHA-256 indexed")
 	}
 	for _, format := range []string{"%v", "%+v", "%#v", "%s", "%q"} {
-		if strings.Contains(fmt.Sprintf(format, issued), issued.Token) {
+		if strings.Contains(fmt.Sprintf(format, issued.Credential), issued.Token) {
 			t.Fatal("formatted token leak")
 		}
 	}
@@ -120,7 +120,7 @@ func TestCredentialIssuanceAndHashOnlyStorage(t *testing.T) {
 }
 func TestWrongCredentialIdentityAndPluginRefusal(t *testing.T) {
 	store, _, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	for _, mutate := range []func(*CredentialClaims){
 		func(c *CredentialClaims) { c.Subject.ID = "forged" },
 		func(c *CredentialClaims) { c.Subject.Kind = MCPProxyClient },
@@ -134,7 +134,7 @@ func TestWrongCredentialIdentityAndPluginRefusal(t *testing.T) {
 		unauthenticated(t, err)
 	}
 	claims.Subject.Kind = "plugin"
-	_, err := store.Issue(claims, 0)
+	_, err := issueForTest(t, store, claims, 0)
 	unauthenticated(t, err)
 	for _, token := range []string{"", issued.Token + "=", strings.Repeat("!", 43), strings.Repeat("A", 43)} {
 		_, err := verifyClaims(store, token, claims)
@@ -143,7 +143,7 @@ func TestWrongCredentialIdentityAndPluginRefusal(t *testing.T) {
 }
 func TestExpiryAndGenerationReplacementCancelLeases(t *testing.T) {
 	store, clock, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, time.Second)
+	issued, _ := issueForTest(t, store, claims, time.Second)
 	lease, _ := verifyClaims(store, issued.Token, claims)
 	clock.Advance(time.Second)
 	if context.Cause(lease.Context) == nil {
@@ -151,7 +151,7 @@ func TestExpiryAndGenerationReplacementCancelLeases(t *testing.T) {
 	}
 	_, err := verifyClaims(store, issued.Token, claims)
 	unauthenticated(t, err)
-	issued, _ = store.Issue(claims, 0)
+	issued, _ = issueForTest(t, store, claims, 0)
 	lease, _ = verifyClaims(store, issued.Token, claims)
 	replacement := claims.Owner
 	replacement.OwnerGeneration++
@@ -168,7 +168,7 @@ func TestExpiryAndGenerationReplacementCancelLeases(t *testing.T) {
 	}
 	nextClaims := cloneClaims(claims)
 	nextClaims.Owner = replacement
-	next, _ := store.Issue(nextClaims, 0)
+	next, _ := issueForTest(t, store, nextClaims, 0)
 	store.RevokeOwner(claims.Owner)
 	if _, err := verifyClaims(store, next.Token, nextClaims); err != nil {
 		t.Fatal("stale cleanup fenced replacement")
@@ -182,28 +182,29 @@ func TestExpiryAndGenerationReplacementCancelLeases(t *testing.T) {
 }
 func TestCredentialRenewalOnlyNarrowsAndRotates(t *testing.T) {
 	store, _, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	lease, _ := verifyClaims(store, issued.Token, claims)
 	for _, mutate := range []func(*CredentialClaims){
 		func(c *CredentialClaims) { c.Scopes["grant"].Limits["bytes"] = 101 },
 		func(c *CredentialClaims) { c.Scopes["grant"].Allowlists["targets"] = []string{"other"} },
 		func(c *CredentialClaims) {
 			c.GrantIDs = append(c.GrantIDs, "another")
-			c.Scopes["another"] = cap.Scope{}
-			c.CapabilityNames["another"] = cap.StorageRead
+			c.Scopes["another"] = capability.Scope{}
+			c.CapabilityNames["another"] = capability.StorageRead
+			c.GrantExpiresAt["another"] = c.GrantExpiresAt["grant"]
 		},
 	} {
 		candidate := cloneClaims(claims)
 		mutate(&candidate)
-		_, err := store.Renew(issued.Token, candidate, 0)
-		var e *cap.Error
-		if !errors.As(err, &e) || e.Code != cap.ScopeDenied {
+		_, err := renewForTest(t, store, issued.Token, candidate, 0)
+		var e *capability.Error
+		if !errors.As(err, &e) || e.Code != capability.ScopeDenied {
 			t.Fatalf("widening accepted: %v", err)
 		}
 	}
 	next := cloneClaims(claims)
 	next.Scopes["grant"].Limits["bytes"] = 50
-	renewed, err := store.Renew(issued.Token, next, 0)
+	renewed, err := renewForTest(t, store, issued.Token, next, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,28 +223,28 @@ func TestCredentialRenewalOnlyNarrowsAndRotates(t *testing.T) {
 func TestRevocationShutdownAndLeaseBounds(t *testing.T) {
 	store, _, claims := credentialFixture(t)
 	for _, lease := range []time.Duration{-1, DefaultCredentialLease + 1} {
-		if _, err := store.Issue(claims, lease); err == nil {
+		if _, err := issueForTest(t, store, claims, lease); err == nil {
 			t.Fatal("invalid lease accepted")
 		}
 	}
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	lease, _ := verifyClaims(store, issued.Token, claims)
 	store.Revoke(issued.Token)
 	if context.Cause(lease.Context) == nil {
 		t.Fatal("revocation did not cancel")
 	}
-	issued, _ = store.Issue(claims, 0)
+	issued, _ = issueForTest(t, store, claims, 0)
 	lease, _ = verifyClaims(store, issued.Token, claims)
 	store.Close()
 	if context.Cause(lease.Context) == nil {
 		t.Fatal("shutdown did not cancel")
 	}
-	_, err := store.Issue(claims, 0)
+	_, err := issueForTest(t, store, claims, 0)
 	unauthenticated(t, err)
 }
 func TestConcurrentCredentialFencing(t *testing.T) {
 	store, _, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	var wg sync.WaitGroup
 	for range 16 {
 		wg.Go(func() {
@@ -260,12 +261,17 @@ func TestConcurrentCredentialFencing(t *testing.T) {
 
 func TestIssueClaimsAndRenewalIdentityAreClosed(t *testing.T) {
 	store, _, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	for _, mutate := range []func(*CredentialClaims){
 		func(c *CredentialClaims) { c.Audience = "other" },
 		func(c *CredentialClaims) { c.Owner.HostInstance = "other" },
 		func(c *CredentialClaims) { c.Owner.OwnerGeneration = 2 },
-		func(c *CredentialClaims) { c.GrantIDs = nil; c.Scopes = nil; c.CapabilityNames = nil },
+		func(c *CredentialClaims) {
+			c.GrantIDs = nil
+			c.Scopes = nil
+			c.CapabilityNames = nil
+			c.GrantExpiresAt = nil
+		},
 		func(c *CredentialClaims) { delete(c.Scopes, "grant") },
 		func(c *CredentialClaims) { delete(c.CapabilityNames, "grant") },
 		func(c *CredentialClaims) { c.GrantIDs = append(c.GrantIDs, "grant") },
@@ -273,23 +279,23 @@ func TestIssueClaimsAndRenewalIdentityAreClosed(t *testing.T) {
 	} {
 		candidate := cloneClaims(claims)
 		mutate(&candidate)
-		if _, err := store.Issue(candidate, 0); err == nil {
+		if _, err := issueForTest(t, store, candidate, 0); err == nil {
 			t.Fatal("invalid claims issued")
 		}
 	}
 	changed := cloneClaims(claims)
 	changed.Subject.ID = "other"
-	if _, err := store.Renew(issued.Token, changed, 0); err == nil {
+	if _, err := renewForTest(t, store, issued.Token, changed, 0); err == nil {
 		t.Fatal("subject changed on renewal")
 	}
 	changed = cloneClaims(claims)
-	changed.CapabilityNames["grant"] = cap.StorageRead
-	if _, err := store.Renew(issued.Token, changed, 0); err == nil {
+	changed.CapabilityNames["grant"] = capability.StorageRead
+	if _, err := renewForTest(t, store, issued.Token, changed, 0); err == nil {
 		t.Fatal("capability changed on renewal")
 	}
 	changed = cloneClaims(claims)
 	changed.Scopes["grant"].Limits["bytes"] = 999
-	if _, err := store.Renew(issued.Token, changed, 0); err == nil {
+	if _, err := renewForTest(t, store, issued.Token, changed, 0); err == nil {
 		t.Fatal("widening accepted")
 	}
 	if _, err := verifyClaims(store, issued.Token, claims); err != nil {
@@ -298,7 +304,7 @@ func TestIssueClaimsAndRenewalIdentityAreClosed(t *testing.T) {
 }
 func TestVerificationExpiryWithoutTimerCallback(t *testing.T) {
 	store, clock, claims := credentialFixture(t)
-	issued, _ := store.Issue(claims, 0)
+	issued, _ := issueForTest(t, store, claims, 0)
 	lease, _ := verifyClaims(store, issued.Token, claims)
 	clock.mu.Lock()
 	clock.now = issued.ExpiresAt
@@ -318,11 +324,39 @@ func TestLeaseMaximumIsConfigurable(t *testing.T) {
 	defer store.Close()
 	_, _, claims := credentialFixture(t)
 	store.ActivateOwner(claims.Owner)
-	issued, err := store.Issue(claims, 0)
+	issued, err := issueForTest(t, store, claims, 0)
 	if err != nil || !issued.ExpiresAt.Equal(clock.Now().Add(time.Second)) {
 		t.Fatal("default exceeds configured maximum")
 	}
-	if _, err := store.Issue(claims, 2*time.Second); err == nil {
+	if _, err := issueForTest(t, store, claims, 2*time.Second); err == nil {
 		t.Fatal("maximum ignored")
 	}
+}
+
+type testCredential struct {
+	Credential     IssuedCredential
+	Token, LeaseID string
+	ExpiresAt      time.Time
+}
+
+func captureCredential(t *testing.T, c IssuedCredential, err error) (testCredential, error) {
+	t.Helper()
+	if err != nil {
+		return testCredential{}, err
+	}
+	token, revealErr := c.Reveal()
+	if revealErr != nil {
+		t.Fatal(revealErr)
+	}
+	return testCredential{c, token, c.LeaseID, c.ExpiresAt}, nil
+}
+func issueForTest(t *testing.T, store *CredentialStore, claims CredentialClaims, lease time.Duration) (testCredential, error) {
+	t.Helper()
+	c, err := store.Issue(claims, lease)
+	return captureCredential(t, c, err)
+}
+func renewForTest(t *testing.T, store *CredentialStore, token string, claims CredentialClaims, lease time.Duration) (testCredential, error) {
+	t.Helper()
+	c, err := store.Renew(token, claims, lease)
+	return captureCredential(t, c, err)
 }

@@ -7,11 +7,12 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
-	cap "github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/plugin-sdk/capability"
 )
 
 // SubjectKind excludes plugins: plugins use their authenticated stdio binding.
@@ -37,11 +38,12 @@ func (s Subject) valid() bool {
 // must first resolve scopes under reviewed grants and current caller policy.
 type CredentialClaims struct {
 	Subject         Subject
-	Owner           cap.RuntimeIdentity
+	Owner           capability.RuntimeIdentity
 	Audience        string
 	GrantIDs        []string
-	Scopes          map[string]cap.Scope
+	Scopes          map[string]capability.Scope
 	CapabilityNames map[string]string
+	GrantExpiresAt  map[string]time.Time
 }
 
 // Timer and Clock permit deterministic expiry tests without changing wall time.
@@ -54,26 +56,31 @@ type Clock interface {
 }
 type wallClock struct{}
 
-func (wallClock) Now() time.Time                            { return time.Now() }
+func (wallClock) Now() time.Time                            { return time.Now().Round(0) }
 func (wallClock) AfterFunc(d time.Duration, f func()) Timer { return time.AfterFunc(d, f) }
 
 const DefaultCredentialLease = 5 * time.Minute
+const DefaultCredentialLifetime = time.Hour
 
 // CredentialConfig pins one process epoch and audience. MaxLease is a ceiling;
-// zero chooses five minutes. Clock defaults to the system clock.
+// zero chooses five minutes. MaxLifetime bounds the entire renewal chain and
+// defaults to one hour. Clock defaults to wall time without monotonic readings.
 type CredentialConfig struct {
 	HostInstance, Audience string
 	MaxLease               time.Duration
+	MaxLifetime            time.Duration
 	Clock                  Clock
 }
 
 type credentialEntry struct {
-	hash    [32]byte
-	claims  CredentialClaims
-	expires time.Time
-	ctx     context.Context
-	cancel  context.CancelCauseFunc
-	timer   Timer
+	hash        [32]byte
+	leaseID     string
+	lifetimeEnd time.Time
+	claims      CredentialClaims
+	expires     time.Time
+	ctx         context.Context
+	cancel      context.CancelCauseFunc
+	timer       Timer
 }
 
 // CredentialStore retains only token hashes and authority metadata. It must be
@@ -82,6 +89,8 @@ type CredentialStore struct {
 	mu             sync.Mutex
 	host, audience string
 	maxLease       time.Duration
+	maxLifetime    time.Duration
+	leases         map[string][32]byte
 	clock          Clock
 	entries        map[[32]byte]*credentialEntry
 	generations    map[string]uint64
@@ -90,32 +99,35 @@ type CredentialStore struct {
 }
 
 func NewCredentialStore(cfg CredentialConfig) (*CredentialStore, error) {
-	if cfg.HostInstance == "" || cfg.Audience == "" || cfg.MaxLease < 0 {
-		return nil, refusal(cap.InvalidRequest, "")
+	if cfg.HostInstance == "" || cfg.Audience == "" || cfg.MaxLease < 0 || cfg.MaxLifetime < 0 {
+		return nil, refusal(capability.InvalidRequest, "")
 	}
 	if cfg.MaxLease == 0 {
 		cfg.MaxLease = DefaultCredentialLease
 	}
+	if cfg.MaxLifetime == 0 {
+		cfg.MaxLifetime = DefaultCredentialLifetime
+	}
 	if cfg.Clock == nil {
 		cfg.Clock = wallClock{}
 	}
-	return &CredentialStore{host: cfg.HostInstance, audience: cfg.Audience, maxLease: cfg.MaxLease, clock: cfg.Clock, entries: map[[32]byte]*credentialEntry{}, generations: map[string]uint64{}, active: map[string]uint64{}}, nil
+	return &CredentialStore{host: cfg.HostInstance, audience: cfg.Audience, maxLease: cfg.MaxLease, maxLifetime: cfg.MaxLifetime, leases: map[string][32]byte{}, clock: cfg.Clock, entries: map[[32]byte]*credentialEntry{}, generations: map[string]uint64{}, active: map[string]uint64{}}, nil
 }
 
 // ActivateOwner installs a host-issued incarnation and cancels all earlier
 // leases for that owner. Repeating the current activation is idempotent; a
 // fenced generation cannot be resurrected or a counter reset within an epoch.
-func (s *CredentialStore) ActivateOwner(tuple cap.RuntimeIdentity) error {
+func (s *CredentialStore) ActivateOwner(tuple capability.RuntimeIdentity) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || tuple.Validate() != nil || tuple.HostInstance != s.host {
-		return refusal(cap.Unauthenticated, "")
+		return refusal(capability.Unauthenticated, "")
 	}
 	if s.active[tuple.OwnerID] == tuple.OwnerGeneration {
 		return nil
 	}
 	if tuple.OwnerGeneration <= s.generations[tuple.OwnerID] {
-		return refusal(cap.Unauthenticated, "")
+		return refusal(capability.Unauthenticated, "")
 	}
 	s.revokeOwnerLocked(tuple.OwnerID)
 	s.generations[tuple.OwnerID] = tuple.OwnerGeneration
@@ -123,18 +135,40 @@ func (s *CredentialStore) ActivateOwner(tuple cap.RuntimeIdentity) error {
 	return nil
 }
 
-// IssuedCredential exposes the raw token once, to a private control channel.
-// Formatting redacts it; adapters must still exclude it from JSON/log payloads.
+// IssuedCredential carries a non-secret lease handle and an opaque one-shot
+// secret. Even copies share the same Reveal state. Secret-bearing JSON/text,
+// slog and nested formatting paths are redacted; Reveal is the only access.
 type IssuedCredential struct {
-	Token     string
+	secret    *credentialSecret
+	LeaseID   string
 	ExpiresAt time.Time
 }
+type credentialSecret struct {
+	mu    sync.Mutex
+	token string
+}
 
+func (c IssuedCredential) Reveal() (string, error) {
+	if c.secret == nil {
+		return "", refusal(capability.InvalidRequest, "")
+	}
+	c.secret.mu.Lock()
+	defer c.secret.mu.Unlock()
+	if c.secret.token == "" {
+		return "", refusal(capability.InvalidRequest, "")
+	}
+	token := c.secret.token
+	c.secret.token = ""
+	return token, nil
+}
 func (IssuedCredential) String() string   { return "[credential redacted]" }
 func (IssuedCredential) GoString() string { return "[credential redacted]" }
 func (IssuedCredential) Format(state fmt.State, verb rune) {
 	fmt.Fprint(state, "[credential redacted]")
 }
+func (IssuedCredential) MarshalJSON() ([]byte, error) { return []byte(`"[credential redacted]"`), nil }
+func (IssuedCredential) MarshalText() ([]byte, error) { return []byte("[credential redacted]"), nil }
+func (IssuedCredential) LogValue() slog.Value         { return slog.StringValue("[credential redacted]") }
 
 // Issue accepts claims from a trusted issuer after host authentication/approval.
 // The library cannot authenticate a control channel or infer reviewed policy.
@@ -144,19 +178,22 @@ func (s *CredentialStore) Issue(claims CredentialClaims, lease time.Duration) (I
 	if err := s.checkClaimsLocked(claims); err != nil {
 		return IssuedCredential{}, err
 	}
-	return s.issueLocked(claims, lease)
+	return s.issueLocked(claims, lease, "", time.Time{})
 }
 func (s *CredentialStore) checkClaimsLocked(c CredentialClaims) error {
 	if s.closed || !c.Subject.valid() || c.Owner.Validate() != nil || c.Owner.HostInstance != s.host || c.Audience != s.audience || s.active[c.Owner.OwnerID] != c.Owner.OwnerGeneration {
-		return refusal(cap.Unauthenticated, "")
+		return refusal(capability.Unauthenticated, "")
 	}
-	if len(c.GrantIDs) == 0 || !validNames(c.GrantIDs) || len(c.Scopes) != len(c.GrantIDs) || len(c.CapabilityNames) != len(c.GrantIDs) {
-		return refusal(cap.InvalidRequest, "")
+	if len(c.GrantIDs) == 0 || !validNames(c.GrantIDs) || len(c.Scopes) != len(c.GrantIDs) || len(c.CapabilityNames) != len(c.GrantIDs) || len(c.GrantExpiresAt) != len(c.GrantIDs) {
+		return refusal(capability.InvalidRequest, "")
 	}
 	for _, id := range c.GrantIDs {
 		scope, ok := c.Scopes[id]
-		if !ok || c.CapabilityNames[id] == "" {
-			return refusal(cap.InvalidRequest, "")
+		if !ok || !capabilityName(c.CapabilityNames[id]) {
+			return refusal(capability.InvalidRequest, "")
+		}
+		if !c.GrantExpiresAt[id].Round(0).After(s.clock.Now().Round(0)) {
+			return refusal(capability.CapabilityDenied, c.CapabilityNames[id])
 		}
 		if err := scope.Validate(c.CapabilityNames[id]); err != nil {
 			return err
@@ -164,34 +201,56 @@ func (s *CredentialStore) checkClaimsLocked(c CredentialClaims) error {
 	}
 	return nil
 }
-func (s *CredentialStore) issueLocked(claims CredentialClaims, lease time.Duration) (IssuedCredential, error) {
+func (s *CredentialStore) issueLocked(claims CredentialClaims, lease time.Duration, leaseID string, lifetimeEnd time.Time) (IssuedCredential, error) {
 	if lease == 0 {
 		lease = min(DefaultCredentialLease, s.maxLease)
 	}
 	if lease <= 0 || lease > s.maxLease {
-		return IssuedCredential{}, refusal(cap.InvalidRequest, "")
+		return IssuedCredential{}, refusal(capability.InvalidRequest, "")
 	}
 	var secret [32]byte
 	if _, err := rand.Read(secret[:]); err != nil {
-		return IssuedCredential{}, refusal(cap.InternalError, "")
+		return IssuedCredential{}, refusal(capability.InternalError, "")
 	}
 	hash := sha256.Sum256(secret[:])
 	if _, exists := s.entries[hash]; exists {
-		return IssuedCredential{}, refusal(cap.InternalError, "")
+		return IssuedCredential{}, refusal(capability.InternalError, "")
 	}
-	expiry := s.clock.Now().Add(lease)
+	now := s.clock.Now().Round(0)
+	if lifetimeEnd.IsZero() {
+		lifetimeEnd = now.Add(s.maxLifetime)
+	}
+	expiry := minTime(now.Add(lease), lifetimeEnd)
+	for _, grantExpiry := range claims.GrantExpiresAt {
+		expiry = minTime(expiry, grantExpiry.Round(0))
+	}
+	if !expiry.After(now) {
+		return IssuedCredential{}, refusal(capability.Unauthenticated, "")
+	}
+	if leaseID == "" {
+		var handle [16]byte
+		if _, err := rand.Read(handle[:]); err != nil {
+			return IssuedCredential{}, refusal(capability.InternalError, "")
+		}
+		leaseID = base64.RawURLEncoding.EncodeToString(handle[:])
+		if _, exists := s.leases[leaseID]; exists {
+			return IssuedCredential{}, refusal(capability.InternalError, "")
+		}
+	}
+
 	ctx, cancel := context.WithCancelCause(context.Background())
-	entry := &credentialEntry{hash: hash, claims: cloneClaims(claims), expires: expiry, ctx: ctx, cancel: cancel}
+	entry := &credentialEntry{hash: hash, leaseID: leaseID, lifetimeEnd: lifetimeEnd, claims: cloneClaims(claims), expires: expiry, ctx: ctx, cancel: cancel}
 	s.entries[hash] = entry
-	entry.timer = s.clock.AfterFunc(lease, func() { s.expire(hash, entry) })
-	return IssuedCredential{base64.RawURLEncoding.EncodeToString(secret[:]), expiry}, nil
+	s.leases[leaseID] = hash
+	entry.timer = s.clock.AfterFunc(expiry.Sub(now), func() { s.expire(hash, entry) })
+	return IssuedCredential{secret: &credentialSecret{token: base64.RawURLEncoding.EncodeToString(secret[:])}, LeaseID: leaseID, ExpiresAt: expiry}, nil
 }
 func (s *CredentialStore) expire(hash [32]byte, entry *credentialEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.entries[hash] == entry {
 		// A clock implementation must schedule callbacks no earlier than requested.
-		s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
+		s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
 	}
 }
 func tokenHash(token string) ([32]byte, bool) {
@@ -207,12 +266,14 @@ func tokenHash(token string) ([32]byte, bool) {
 func (s *CredentialStore) findLocked(token string) ([32]byte, *credentialEntry, error) {
 	hash, ok := tokenHash(token)
 	entry := s.entries[hash]
+	// The hash comparison and active-generation check are defense in depth:
+	// exact indexing and eager generation revocation already enforce them.
 	if !ok || entry == nil || subtle.ConstantTimeCompare(hash[:], entry.hash[:]) != 1 {
-		return hash, nil, refusal(cap.Unauthenticated, "")
+		return hash, nil, refusal(capability.Unauthenticated, "")
 	}
-	if s.closed || !s.clock.Now().Before(entry.expires) || s.active[entry.claims.Owner.OwnerID] != entry.claims.Owner.OwnerGeneration {
-		s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
-		return hash, nil, refusal(cap.Unauthenticated, "")
+	if s.closed || !s.clock.Now().Round(0).Before(entry.expires) || s.active[entry.claims.Owner.OwnerID] != entry.claims.Owner.OwnerGeneration {
+		s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
+		return hash, nil, refusal(capability.Unauthenticated, "")
 	}
 	return hash, entry, nil
 }
@@ -224,9 +285,10 @@ type CredentialLease struct {
 	Claims    CredentialClaims
 	ExpiresAt time.Time
 	Context   context.Context
+	LeaseID   string
 }
 
-func (s *CredentialStore) Verify(token string, subject Subject, owner cap.RuntimeIdentity, audience string) (CredentialLease, error) {
+func (s *CredentialStore) Verify(token string, subject Subject, owner capability.RuntimeIdentity, audience string) (CredentialLease, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, entry, err := s.findLocked(token)
@@ -234,9 +296,9 @@ func (s *CredentialStore) Verify(token string, subject Subject, owner cap.Runtim
 		return CredentialLease{}, err
 	}
 	if entry.claims.Subject != subject || entry.claims.Owner != owner || entry.claims.Audience != audience {
-		return CredentialLease{}, refusal(cap.Unauthenticated, "")
+		return CredentialLease{}, refusal(capability.Unauthenticated, "")
 	}
-	return CredentialLease{cloneClaims(entry.claims), entry.expires, entry.ctx}, nil
+	return CredentialLease{Claims: cloneClaims(entry.claims), ExpiresAt: entry.expires, Context: entry.ctx, LeaseID: entry.leaseID}, nil
 }
 
 // Renew rotates the credential on an authenticated live owner/control channel.
@@ -254,29 +316,34 @@ func (s *CredentialStore) Renew(token string, next CredentialClaims, lease time.
 		return IssuedCredential{}, err
 	}
 	if old.claims.Subject != next.Subject || old.claims.Owner != next.Owner || old.claims.Audience != next.Audience {
-		return IssuedCredential{}, refusal(cap.Unauthenticated, "")
+		return IssuedCredential{}, refusal(capability.Unauthenticated, "")
 	}
 	for _, id := range next.GrantIDs {
+		// Subset validation is defense in depth: capability-name equality also
+		// rejects an ID missing from the original claim map.
 		if !slices.Contains(old.claims.GrantIDs, id) {
-			return IssuedCredential{}, refusal(cap.ScopeDenied, next.CapabilityNames[id])
+			return IssuedCredential{}, refusal(capability.ScopeDenied, next.CapabilityNames[id])
 		}
 		if next.CapabilityNames[id] != old.claims.CapabilityNames[id] {
-			return IssuedCredential{}, refusal(cap.ScopeDenied, next.CapabilityNames[id])
+			return IssuedCredential{}, refusal(capability.ScopeDenied, next.CapabilityNames[id])
 		}
-		if err := cap.CheckNarrowing(old.claims.CapabilityNames[id], old.claims.Scopes[id], next.Scopes[id]); err != nil {
+		if err := capability.CheckNarrowing(old.claims.CapabilityNames[id], old.claims.Scopes[id], next.Scopes[id]); err != nil {
 			return IssuedCredential{}, err
 		}
 	}
-	replacement, err := s.issueLocked(next, lease)
+	replacement, err := s.issueLocked(next, lease, old.leaseID, old.lifetimeEnd)
 	if err != nil {
 		return IssuedCredential{}, err
 	}
-	s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
+	s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
 	return replacement, nil
 }
 func (s *CredentialStore) removeLocked(hash [32]byte, cause error) {
 	if entry := s.entries[hash]; entry != nil {
 		delete(s.entries, hash)
+		if s.leases[entry.leaseID] == hash {
+			delete(s.leases, entry.leaseID)
+		}
 		if entry.timer != nil {
 			entry.timer.Stop()
 		}
@@ -287,25 +354,62 @@ func (s *CredentialStore) revokeOwnerLocked(ownerID string) {
 	delete(s.active, ownerID)
 	for hash, entry := range s.entries {
 		if entry.claims.Owner.OwnerID == ownerID {
-			s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
+			s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
 		}
 	}
 }
 
 // RevokeOwner fences exactly one incarnation; stale cleanup cannot revoke its
-// replacement. Call on stop/disable/unload/disconnect/policy withdrawal.
-func (s *CredentialStore) RevokeOwner(tuple cap.RuntimeIdentity) {
+// replacement. Use this for lifecycle stop/disable/unload; client or grant
+// withdrawal uses the selective revocation methods below.
+func (s *CredentialStore) RevokeOwner(tuple capability.RuntimeIdentity) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if tuple.HostInstance == s.host && s.active[tuple.OwnerID] == tuple.OwnerGeneration {
+	if tuple.Validate() != nil || tuple.HostInstance != s.host {
+		return
+	}
+	// Stop can win a race with activation; retain the fence even when inactive.
+	s.generations[tuple.OwnerID] = max(s.generations[tuple.OwnerID], tuple.OwnerGeneration)
+	if s.active[tuple.OwnerID] == tuple.OwnerGeneration {
 		s.revokeOwnerLocked(tuple.OwnerID)
+	}
+}
+
+// RevokeLease withdraws the current token in a renewal chain by non-secret ID.
+func (s *CredentialStore) RevokeLease(leaseID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if hash, ok := s.leases[leaseID]; ok {
+		s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
+	}
+}
+
+// RevokeSubject withdraws one verified client without fencing the incarnation.
+func (s *CredentialStore) RevokeSubject(owner capability.RuntimeIdentity, subject Subject) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for hash, entry := range s.entries {
+		if entry.claims.Owner == owner && entry.claims.Subject == subject {
+			s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
+		}
+	}
+}
+
+// RevokeGrant withdraws credentials referencing a specific grant in one tuple.
+func (s *CredentialStore) RevokeGrant(owner capability.RuntimeIdentity, grantID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for hash, entry := range s.entries {
+		if entry.claims.Owner == owner && slices.Contains(entry.claims.GrantIDs, grantID) {
+			s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
+		}
 	}
 }
 func (s *CredentialStore) Revoke(token string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if hash, ok := tokenHash(token); ok {
-		s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
+		s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
 	}
 }
 func (s *CredentialStore) Close() {
@@ -313,12 +417,13 @@ func (s *CredentialStore) Close() {
 	defer s.mu.Unlock()
 	s.closed = true
 	for hash := range s.entries {
-		s.removeLocked(hash, refusal(cap.Unauthenticated, ""))
+		s.removeLocked(hash, refusal(capability.Unauthenticated, ""))
 	}
+	// Clear is defense in depth: closed already refuses every operation.
 	clear(s.active)
 }
-func cloneScope(s cap.Scope) cap.Scope {
-	out := cap.Scope{Allowlists: map[string][]string{}, Limits: map[string]int64{}}
+func cloneScope(s capability.Scope) capability.Scope {
+	out := capability.Scope{Allowlists: map[string][]string{}, Limits: map[string]int64{}}
 	for k, v := range s.Allowlists {
 		out.Allowlists[k] = slices.Clone(v)
 	}
@@ -329,7 +434,7 @@ func cloneScope(s cap.Scope) cap.Scope {
 }
 func cloneClaims(c CredentialClaims) CredentialClaims {
 	c.GrantIDs = slices.Clone(c.GrantIDs)
-	scopes := map[string]cap.Scope{}
+	scopes := map[string]capability.Scope{}
 	for k, v := range c.Scopes {
 		scopes[k] = cloneScope(v)
 	}
@@ -339,5 +444,17 @@ func cloneClaims(c CredentialClaims) CredentialClaims {
 		names[id] = name
 	}
 	c.CapabilityNames = names
+	expires := map[string]time.Time{}
+	for id, expiry := range c.GrantExpiresAt {
+		expires[id] = expiry.Round(0)
+	}
+	c.GrantExpiresAt = expires
 	return c
+}
+
+func minTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
 }

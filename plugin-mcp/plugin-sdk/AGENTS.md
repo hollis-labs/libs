@@ -40,6 +40,10 @@ all; React is an optional peer behind a subpath.
   version gates and artifact verification. New execution declarations require
   protocol 2; Serve validates the protocol-2 Init contract.
   `docs/manifest.md` defines layout, digest and host enforcement boundaries.
+- `capability/` is the shared stdlib-only DTO/catalog/scope/error leaf.
+- `capability/host/` owns host credentials, selective revocation and audit; it
+  never enters the subprocess transport dependency graph. Hosts authenticate
+  control channels and own policy and application enforcement boundaries.
 - `registry/registry.go` owns the registry wire contract's Go view and
   `RegistryVersion`.
 - `ts/packages/plugin-registry/src/types.ts` owns the same contract's
