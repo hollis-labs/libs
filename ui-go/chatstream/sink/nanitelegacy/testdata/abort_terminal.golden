@@ -1,0 +1,4 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=4 event=delta {"content":"partial","event_id":4,"type":"delta"}
+id=6 event=status {"content":"run aborted: user canceled","event_id":6,"type":"status"}
+id=6 event=stream_end {"message_id":"run-1","type":"stream_end","usage":{"input_tokens":0,"output_tokens":0,"stop_reason":"cancelled"}}

@@ -1,0 +1,122 @@
+{
+  "name": "function-call-no-delta-events",
+  "description": "A function_call item whose arguments arrive only in output_item.done, plus a second call with invalid JSON arguments.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "type": "function_call",
+          "id": "fc_a",
+          "call_id": "call_a",
+          "name": "one",
+          "arguments": ""
+        }
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 3,
+        "output_index": 0,
+        "item": {
+          "type": "function_call",
+          "id": "fc_a",
+          "call_id": "call_a",
+          "name": "one",
+          "arguments": "{\"k\":1}"
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 4,
+        "output_index": 1,
+        "item": {
+          "type": "function_call",
+          "id": "fc_b",
+          "call_id": "call_b",
+          "name": "two",
+          "arguments": ""
+        }
+      }
+    },
+    {
+      "event": "response.function_call_arguments.delta",
+      "data": {
+        "type": "response.function_call_arguments.delta",
+        "sequence_number": 5,
+        "item_id": "fc_b",
+        "output_index": 1,
+        "delta": "{\"broken\":"
+      }
+    },
+    {
+      "event": "response.function_call_arguments.done",
+      "data": {
+        "type": "response.function_call_arguments.done",
+        "sequence_number": 6,
+        "item_id": "fc_b",
+        "output_index": 1,
+        "arguments": "{\"broken\":"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 7,
+        "output_index": 1,
+        "item": {
+          "type": "function_call",
+          "id": "fc_b",
+          "call_id": "call_b",
+          "name": "two",
+          "arguments": "{\"broken\":"
+        }
+      }
+    },
+    {
+      "event": "response.completed",
+      "data": {
+        "type": "response.completed",
+        "sequence_number": 8,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+ "name": "turn-failed",
+ "description": "The turn fails after a command is declined.",
+ "frames": [
+  {
+   "data": {
+    "type": "thread.started",
+    "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"
+   }
+  },
+  {
+   "data": {
+    "type": "turn.started"
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "c1",
+     "type": "command_execution",
+     "command": "rm -rf /",
+     "aggregated_output": "",
+     "exit_code": null,
+     "status": "declined"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "turn.failed",
+    "error": {
+     "message": "model refused the follow-up"
+    }
+   }
+  }
+ ]
+}

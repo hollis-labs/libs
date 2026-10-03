@@ -1,0 +1,7 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"dynamic":true,"input":{"cmd":"ls"},"toolCallId":"approval-ap-9","toolName":"bash","type":"tool-input-available"}
+{"approvalDescriptor":{"tool":"bash","input":{"cmd":"ls"}},"approvalId":"ap-9","reason":"runs a shell command","toolCallId":"approval-ap-9","type":"tool-approval-request"}
+{"type":"finish-step"}
+{"finishReason":"tool-calls","type":"finish"}
+[DONE]

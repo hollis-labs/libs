@@ -1,0 +1,6 @@
+{"choices":[{"delta":{"content":"","role":"assistant"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"content":"line one\nline two\r\nquote \" backslash \\ \u2028 tab\t"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"content":"data: not a frame\n\nevent: nope"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"content":"héllo 世界 🌍 <script>&"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+[DONE]

@@ -1,0 +1,5 @@
+{"choices":[{"delta":{"content":"","role":"assistant"},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"","name":"bash"},"id":"c1","index":0,"type":"function"}]},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"{\"cmd\":\"ls\"}"},"index":0}]},"finish_reason":null,"index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+{"choices":[{"delta":{},"finish_reason":"tool_calls","index":0}],"created":1767323045,"id":"chatcmpl-run-1","model":"claude-x","object":"chat.completion.chunk"}
+[DONE]

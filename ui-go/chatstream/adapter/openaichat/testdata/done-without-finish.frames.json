@@ -1,0 +1,29 @@
+{
+  "name": "done-without-finish",
+  "description": "Text and [DONE] but no finish_reason: the upstream terminal signal is present, so run.finish with reason other.",
+  "frames": [
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "role": "assistant",
+              "content": "x"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data_text": "[DONE]"
+    }
+  ]
+}

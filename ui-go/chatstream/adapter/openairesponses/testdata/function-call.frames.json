@@ -1,0 +1,131 @@
+{
+  "name": "function-call",
+  "description": "A function call (from the function-calling guide) with streamed arguments; completed output lists a function_call, so the finish reason is tool_calls.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "type": "function_call",
+          "id": "fc_1234xyz",
+          "call_id": "call_1234xyz",
+          "name": "get_weather",
+          "arguments": ""
+        }
+      }
+    },
+    {
+      "event": "response.function_call_arguments.delta",
+      "data": {
+        "type": "response.function_call_arguments.delta",
+        "sequence_number": 3,
+        "item_id": "fc_1234xyz",
+        "output_index": 0,
+        "delta": "{\""
+      }
+    },
+    {
+      "event": "response.function_call_arguments.delta",
+      "data": {
+        "type": "response.function_call_arguments.delta",
+        "sequence_number": 4,
+        "item_id": "fc_1234xyz",
+        "output_index": 0,
+        "delta": "location"
+      }
+    },
+    {
+      "event": "response.function_call_arguments.delta",
+      "data": {
+        "type": "response.function_call_arguments.delta",
+        "sequence_number": 5,
+        "item_id": "fc_1234xyz",
+        "output_index": 0,
+        "delta": "\":\"Paris, France\"}"
+      }
+    },
+    {
+      "event": "response.function_call_arguments.done",
+      "data": {
+        "type": "response.function_call_arguments.done",
+        "sequence_number": 6,
+        "item_id": "fc_1234xyz",
+        "output_index": 0,
+        "arguments": "{\"location\":\"Paris, France\"}"
+      }
+    },
+    {
+      "event": "response.output_item.done",
+      "data": {
+        "type": "response.output_item.done",
+        "sequence_number": 7,
+        "output_index": 0,
+        "item": {
+          "type": "function_call",
+          "id": "fc_1234xyz",
+          "call_id": "call_1234xyz",
+          "name": "get_weather",
+          "arguments": "{\"location\":\"Paris, France\"}"
+        }
+      }
+    },
+    {
+      "event": "response.completed",
+      "data": {
+        "type": "response.completed",
+        "sequence_number": 8,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [
+            {
+              "type": "function_call",
+              "id": "fc_1234xyz",
+              "call_id": "call_1234xyz",
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Paris, France\"}"
+            }
+          ],
+          "usage": {
+            "input_tokens": 50,
+            "input_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "output_tokens": 20,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 70
+          }
+        }
+      }
+    }
+  ]
+}

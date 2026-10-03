@@ -1,0 +1,181 @@
+{
+ "name": "whole_messages",
+ "description": "no partial messages: each content block arrives whole in an assistant line; tool_result in a user line",
+ "frames": [
+  {
+   "data": {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "sess-1",
+    "model": "claude-opus-5",
+    "cwd": "/work",
+    "tools": [
+     "Bash",
+     "Read"
+    ],
+    "mcp_servers": [],
+    "permissionMode": "default"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_A",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "thinking",
+       "thinking": "plan it",
+       "signature": "sig123"
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_A",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "Running ls."
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_A",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "toolu_01",
+       "name": "Bash",
+       "input": {
+        "command": "ls"
+       }
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "toolu_01",
+       "content": "file.txt\n"
+      }
+     ]
+    },
+    "parent_tool_use_id": null,
+    "uuid": "ur1",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_B",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "toolu_02",
+       "name": "TodoRead",
+       "input": {}
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "toolu_02",
+       "content": "boom",
+       "is_error": true
+      }
+     ]
+    },
+    "parent_tool_use_id": null,
+    "uuid": "ur2",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_C",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "All done."
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 1234,
+    "num_turns": 3,
+    "result": "ok",
+    "stop_reason": "end_turn",
+    "total_cost_usd": 0.0123,
+    "usage": {
+     "input_tokens": 10,
+     "output_tokens": 42,
+     "cache_creation_input_tokens": 100,
+     "cache_read_input_tokens": 900
+    },
+    "permission_denials": [],
+    "terminal_reason": "completed",
+    "session_id": "sess-1"
+   }
+  }
+ ]
+}

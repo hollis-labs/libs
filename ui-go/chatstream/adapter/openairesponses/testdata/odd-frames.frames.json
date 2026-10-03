@@ -1,0 +1,154 @@
+{
+  "name": "odd-frames",
+  "description": "No response.created (starts at an item), a text delta with no content_part.added, malformed JSON, a non-object, an unknown event type, a [DONE] sentinel, a second response.created, an in_progress frame and an empty-delta.",
+  "frames": [
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 1,
+        "output_index": 0,
+        "item": {
+          "id": "msg_o",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      }
+    },
+    {
+      "event": "response.output_text.delta",
+      "data": {
+        "type": "response.output_text.delta",
+        "sequence_number": 2,
+        "item_id": "msg_o",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "A",
+        "logprobs": []
+      }
+    },
+    {
+      "data_text": "not json at all"
+    },
+    {
+      "data_text": "[1,2]"
+    },
+    {
+      "event": "response.future.new_event",
+      "data": {
+        "type": "response.future.new_event",
+        "sequence_number": 3,
+        "foo": "bar"
+      }
+    },
+    {
+      "data_text": "[DONE]"
+    },
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 4,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.in_progress",
+      "data": {
+        "type": "response.in_progress",
+        "sequence_number": 5,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_text.delta",
+      "data": {
+        "type": "response.output_text.delta",
+        "sequence_number": 6,
+        "item_id": "msg_o",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "",
+        "logprobs": []
+      }
+    },
+    {
+      "event": "response.output_text.delta",
+      "data": {
+        "type": "response.output_text.delta",
+        "sequence_number": 7,
+        "item_id": "msg_o",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "B",
+        "logprobs": []
+      }
+    },
+    {
+      "event": "response.queued",
+      "data": {
+        "type": "response.queued",
+        "sequence_number": 8,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "queued",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.audio.delta",
+      "data": {
+        "type": "response.audio.delta",
+        "sequence_number": 9,
+        "delta": "AAAA"
+      }
+    },
+    {
+      "event": "response.completed",
+      "data": {
+        "type": "response.completed",
+        "sequence_number": 10,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

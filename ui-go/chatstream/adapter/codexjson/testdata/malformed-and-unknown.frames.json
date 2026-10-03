@@ -1,0 +1,57 @@
+{
+ "name": "malformed-and-unknown",
+ "description": "A malformed line, an unknown event and an unknown item type are raw and not terminal; a duplicate thread.started is raw.",
+ "frames": [
+  {
+   "data_text": "{\"type\":\"thread.sta"
+  },
+  {
+   "data": {
+    "type": "thread.started",
+    "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"
+   }
+  },
+  {
+   "data": {
+    "type": "thread.started",
+    "thread_id": "other"
+   }
+  },
+  {
+   "data": {
+    "type": "turn.started"
+   }
+  },
+  {
+   "data": {
+    "type": "future.event",
+    "x": 1
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "z",
+     "type": "hologram",
+     "x": 1
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "a1",
+     "type": "agent_message",
+     "text": "done"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "turn.completed"
+   }
+  }
+ ]
+}

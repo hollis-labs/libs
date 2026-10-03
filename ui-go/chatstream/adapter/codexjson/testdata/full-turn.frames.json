@@ -1,0 +1,164 @@
+{
+ "name": "full-turn",
+ "description": "Reasoning, a command that succeeds, an MCP call that fails, a file change (completed only), a todo list, a non-fatal error item, the message, and usage with cache write and reasoning tokens.",
+ "frames": [
+  {
+   "data": {
+    "type": "thread.started",
+    "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"
+   }
+  },
+  {
+   "data": {
+    "type": "turn.started"
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "r1",
+     "type": "reasoning",
+     "text": "Plan: list files, then patch."
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.started",
+    "item": {
+     "id": "c1",
+     "type": "command_execution",
+     "command": "ls",
+     "aggregated_output": "",
+     "exit_code": null,
+     "status": "in_progress"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "c1",
+     "type": "command_execution",
+     "command": "ls",
+     "aggregated_output": "a.go\nb.go\n",
+     "exit_code": 0,
+     "status": "completed"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.started",
+    "item": {
+     "id": "m1",
+     "type": "mcp_tool_call",
+     "server": "docs",
+     "tool": "search",
+     "arguments": {
+      "q": "x"
+     },
+     "status": "in_progress"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "m1",
+     "type": "mcp_tool_call",
+     "server": "docs",
+     "tool": "search",
+     "arguments": {
+      "q": "x"
+     },
+     "error": {
+      "message": "timeout"
+     },
+     "status": "failed"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "f1",
+     "type": "file_change",
+     "changes": [
+      {
+       "path": "a.go",
+       "kind": "update"
+      }
+     ],
+     "status": "completed"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.started",
+    "item": {
+     "id": "t1",
+     "type": "todo_list",
+     "items": [
+      {
+       "text": "patch",
+       "completed": false
+      }
+     ]
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.updated",
+    "item": {
+     "id": "t1",
+     "type": "todo_list",
+     "items": [
+      {
+       "text": "patch",
+       "completed": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "e1",
+     "type": "error",
+     "message": "could not read .env"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.completed",
+    "item": {
+     "id": "a1",
+     "type": "agent_message",
+     "text": "Patched a.go."
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "turn.completed",
+    "usage": {
+     "input_tokens": 1000,
+     "cached_input_tokens": 600,
+     "cache_write_input_tokens": 100,
+     "output_tokens": 300,
+     "reasoning_output_tokens": 120
+    }
+   }
+  }
+ ]
+}

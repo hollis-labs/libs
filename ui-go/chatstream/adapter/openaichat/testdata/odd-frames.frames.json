@@ -1,0 +1,112 @@
+{
+  "name": "odd-frames",
+  "description": "Malformed JSON, a non-object, unknown top-level/choice/delta keys, a moderation chunk, a second choice (n=2) and an SSE frame with empty data: preserved as raw events or ignored, never terminal.",
+  "frames": [
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "role": "assistant",
+              "content": "A"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data_text": "this is not json"
+    },
+    {
+      "data": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": "B",
+              "x_delta": 1
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ],
+        "x_top": {
+          "k": true
+        },
+        "obfuscation": "r4N7vQ2m"
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "choices": [],
+        "moderation": {
+          "output": {
+            "type": "moderation_results",
+            "results": []
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "choices": [
+          {
+            "index": 1,
+            "delta": {
+              "content": "second"
+            },
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {},
+            "logprobs": null,
+            "finish_reason": "content_filter"
+          }
+        ]
+      }
+    },
+    {
+      "data_text": "[DONE]"
+    }
+  ]
+}

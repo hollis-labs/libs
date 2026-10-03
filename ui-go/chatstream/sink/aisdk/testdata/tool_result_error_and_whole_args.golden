@@ -1,0 +1,8 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"dynamic":true,"toolCallId":"c1","toolName":"bash","type":"tool-input-start"}
+{"dynamic":true,"input":{"cmd":"false"},"toolCallId":"c1","toolName":"bash","type":"tool-input-available"}
+{"dynamic":true,"errorText":"exit status 1","toolCallId":"c1","type":"tool-output-error"}
+{"type":"finish-step"}
+{"finishReason":"tool-calls","type":"finish"}
+[DONE]

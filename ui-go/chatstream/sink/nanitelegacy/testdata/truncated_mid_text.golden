@@ -1,0 +1,3 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=4 event=delta {"content":"half a sen","event_id":4,"type":"delta"}
+id=4 event=error {"error":"the stream ended before the run finished: connection reset by peer","structured_error":{"code":"stream_lost","message":"the stream ended before the run finished: connection reset by peer"},"type":"error"}

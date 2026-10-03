@@ -1,0 +1,113 @@
+{
+ "name": "errors_are_not_terminal",
+ "description": "api_retry, an assistant error, a rate-limit event, a tool error and a malformed line are all non-terminal; only result ends the run",
+ "frames": [
+  {
+   "data": {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "sess-1",
+    "model": "claude-opus-5",
+    "cwd": "/work",
+    "tools": [
+     "Bash",
+     "Read"
+    ],
+    "mcp_servers": [],
+    "permissionMode": "default"
+   }
+  },
+  {
+   "data": {
+    "type": "system",
+    "subtype": "api_retry",
+    "attempt": 1,
+    "max_retries": 5,
+    "retry_delay_ms": 500,
+    "error_status": 529,
+    "error": "overloaded",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_A",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": ""
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1",
+    "error": "rate_limit"
+   }
+  },
+  {
+   "data": {
+    "type": "rate_limit_event",
+    "rate_limit_info": {
+     "status": "allowed_warning"
+    },
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data_text": "{ this is not json"
+  },
+  {
+   "data": {
+    "type": "tool_progress",
+    "tool_use_id": "toolu_01",
+    "tool_name": "Bash",
+    "elapsed_time_seconds": 3
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_B",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "Recovered."
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 1234,
+    "num_turns": 2,
+    "result": "ok",
+    "stop_reason": "end_turn",
+    "total_cost_usd": 0.0123,
+    "usage": {
+     "input_tokens": 10,
+     "output_tokens": 42,
+     "cache_creation_input_tokens": 100,
+     "cache_read_input_tokens": 900
+    },
+    "permission_denials": [],
+    "terminal_reason": "completed",
+    "session_id": "sess-1"
+   }
+  }
+ ]
+}

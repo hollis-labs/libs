@@ -1,0 +1,14 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"data":{"dialect":"nanite","payload":{"type":"slot_changed","content":"slot 2"},"type":"slot_changed"},"transient":true,"type":"data-raw"}
+{"data":{"dialect":"anthropic","payload":{"type":"ping"},"type":"ping"},"transient":true,"type":"data-raw"}
+{"data":{"kind":"nanite.status","value":{"text":"compacting"}},"transient":true,"type":"data-activity"}
+{"data":{"kind":"nanite.status","patch":[{"op":"replace","path":"/text","value":"done"}]},"transient":true,"type":"data-activity"}
+{"data":{"kind":"chatstream.state.snapshot","value":{"todo":[1,2]}},"transient":true,"type":"data-activity"}
+{"type":"reset-step"}
+{"id":"text-1","type":"text-start"}
+{"delta":"replaced","id":"text-1","type":"text-delta"}
+{"id":"text-1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"stop","type":"finish"}
+[DONE]

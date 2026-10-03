@@ -1,0 +1,12 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"r1","type":"reasoning-start"}
+{"delta":"let me think ","id":"r1","type":"reasoning-delta"}
+{"delta":"about it","id":"r1","type":"reasoning-delta"}
+{"id":"r1","providerMetadata":{"chatstream":{"final":"sig-abc"}},"type":"reasoning-end"}
+{"id":"t1","type":"text-start"}
+{"delta":"Answer.","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"stop","messageMetadata":{"rawFinishReason":"stop"},"type":"finish"}
+[DONE]

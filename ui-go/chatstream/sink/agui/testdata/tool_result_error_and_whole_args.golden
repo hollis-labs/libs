@@ -1,0 +1,6 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"timestamp":1767323045000,"toolCallId":"c1","toolCallName":"bash","type":"TOOL_CALL_START"}
+id=4 {"delta":"{\"cmd\":\"false\"}","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_ARGS"}
+id=4 {"timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_END"}
+id=7 {"content":"exit status 1","messageId":"res1","role":"tool","timestamp":1767323045000,"toolCallId":"c1","type":"TOOL_CALL_RESULT"}
+id=9 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

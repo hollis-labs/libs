@@ -1,0 +1,5 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"messageId":"t1","role":"assistant","timestamp":1767323045000,"type":"TEXT_MESSAGE_START"}
+id=4 {"delta":"half a sen","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=4 {"messageId":"t1","type":"TEXT_MESSAGE_END"}
+id=4 {"code":"stream_lost","message":"the stream ended before the run finished: connection reset by peer","type":"RUN_ERROR"}

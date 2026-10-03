@@ -1,0 +1,59 @@
+{
+ "name": "orphan_result",
+ "description": "a tool_result for a call the stream never showed becomes a data part; an approval for an unseen call has no call_id",
+ "frames": [
+  {
+   "data": {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "sess-1",
+    "model": "claude-opus-5"
+   }
+  },
+  {
+   "data": {
+    "type": "control_request",
+    "request_id": "req_x",
+    "request": {
+     "subtype": "can_use_tool",
+     "tool_name": "Bash",
+     "tool_use_id": "toolu_unseen",
+     "input": {
+      "command": "ls"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "toolu_unseen",
+       "content": "a.txt"
+      }
+     ]
+    },
+    "uuid": "ur9",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "terminal_reason": "completed",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 1,
+     "output_tokens": 1
+    },
+    "session_id": "sess-1"
+   }
+  }
+ ]
+}

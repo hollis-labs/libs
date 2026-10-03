@@ -1,0 +1,112 @@
+{
+ "name": "late-arguments-and-failure",
+ "description": "A tool call whose rawInput arrives in an update, then fails; plus non-text content and an unknown update kind.",
+ "frames": [
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "tool_call",
+      "toolCallId": "c1",
+      "title": "Edit",
+      "kind": "edit",
+      "status": "pending"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "c1",
+      "status": "in_progress",
+      "rawInput": {
+       "path": "a.go",
+       "patch": "x"
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "tool_call_update",
+      "toolCallId": "c1",
+      "status": "failed",
+      "rawOutput": {
+       "error": "conflict"
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "image",
+       "data": "AAAA",
+       "mimeType": "image/png"
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "Failed."
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "future_thing",
+      "x": 1
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+     "stopReason": "max_tokens"
+    }
+   }
+  }
+ ]
+}
