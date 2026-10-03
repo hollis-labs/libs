@@ -109,7 +109,7 @@ using `json.RawMessage`), or change only paths declared mutable and visible.
 
 ## Current boundary
 
-All six declared modes execute. Breaker, tracing, remote wire, schema compiler,
+All six declared modes execute. Remote wire, schema compiler,
 TS parity, durable delivery and consumer adoption are unavailable. There are no
 compatibility aliases or release tags yet.
 
@@ -211,3 +211,20 @@ Schemas deliberately illustrate only the envelope and value category; a host mus
 refine nested data schemas and supply compiled validators before installation.
 The sample cannot be installed as-is and makes no remote transport claim. It does
 not migrate Nanite, whose existing hooks and schemas stay unchanged.
+
+
+## Observability and circuit breakers
+
+`ExecutionConfig.Sink` accepts a dependency-free value-record interface for
+completed dispatches, terminal handler attempts and generation breaker events.
+Configure `Clock` and `Breaker` for deterministic cooldown testing or tuned
+thresholds. Defaults are five consecutive failures and a 30-second cooldown;
+one half-open probe runs per owner generation. Unavailable attempts follow the
+existing error policy. Inspect/reset through `Engine.Breaker`, `Breakers` and
+`ResetBreaker`; disposal is terminal and reset never releases stuck permits.
+
+See [observability and breaker semantics](docs/observability.md) for exclusions,
+trace context, timestamps, metrics aggregation, operator state and a host-side
+OpenTelemetry blueprint. The [JSON sink example](examples/observability/main.go)
+is standard-library-only. Records include no payloads, arbitrary metadata or
+handler error text. No tracing backend, operator endpoint or app is adopted.

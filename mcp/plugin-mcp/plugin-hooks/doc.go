@@ -21,7 +21,9 @@
 // Nested dispatch carries depth through context, including detached async work.
 // Context propagation is cooperative, not an isolation boundary for hostile code.
 //
-// Identity, authorization, transport, schema compilation, breaker, tracing and
-// durable delivery belong to host integrations or separately scoped work. This
+// Engine adds generation-scoped breakers and value-only telemetry seams. Host
+// sinks receive sanitized outcomes and transitions outside core locks. Identity,
+// authorization, transport, schema compilation, telemetry export and durable
+// delivery belong to host integrations or separately scoped work. This
 // module has no dependency on plugin-sdk or go-hooks and provides no legacy aliases.
 package pluginhooks

@@ -350,7 +350,7 @@ func TestUnloadDiscardsLateFilterResult(t *testing.T) {
 	done := make(chan callResult, 1)
 	go func() {
 		r, err := e.ApplyFilters(context.Background(), d.Name, json.RawMessage(`{"visible":1}`), nil)
-		done <- callResult{r.Value, err}
+		done <- callResult{payload: r.Value, err: err}
 	}()
 	<-started
 	ctx, cancel := context.WithCancel(context.Background())
