@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Opt-in Cairn seed capture. Not called by tests or normal gates.
+"""Private Cairn seed renderer, called only by scripts/update-goldens.
 
-Run with --repo <local-cairn-repo> --mode preview, review the diff, then
---mode accept. Builds the pinned source in a private detached worktree;
-never runs capture.sh, connects to a service, or reads a real provider home.
-Requires cached Go dependencies (GOPROXY=off) and TMPDIR on private disk.
+Builds the pinned source in a detached worktree with cached Go dependencies;
+never runs capture.sh or reads a real provider home. Writes only to private
+staging beneath TMPDIR; the repository script scans, diffs and publishes.
 """
 import argparse
 import base64
-import difflib
 import json
 import os
 from pathlib import Path
@@ -21,17 +19,13 @@ COMMIT = "f08641f056911927bb01b1f0de1472de2290cfb2"
 CORPUS = Path(__file__).resolve().parent.parent / "testdata/goldens/seeds/cairn"
 
 
+DESTINATION = None
+
 def write_diff(path, value, mode):
-    text = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
-    old = path.read_text() if path.exists() else ""
-    if old == text:
-        return
-    print("".join(difflib.unified_diff(old.splitlines(True), text.splitlines(True),
-                                    fromfile=str(path.relative_to(CORPUS)),
-                                    tofile=str(path.relative_to(CORPUS)) + " (actual)")))
-    if mode == "accept":
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+    destination = DESTINATION / path.relative_to(CORPUS)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+    destination.chmod(0o600)
 
 
 def snapshot(root, normalize):
@@ -136,10 +130,14 @@ def capture(binary, scratch, mode):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", required=True)
-    parser.add_argument("--mode", required=True, choices=["preview", "accept"])
+    parser.add_argument("--output", required=True)
     args = parser.parse_args()
     if not os.environ.get("TMPDIR"):
         parser.error("private TMPDIR is required")
+    global DESTINATION
+    DESTINATION = Path(args.output).resolve()
+    if not DESTINATION.is_relative_to(Path(os.environ["TMPDIR"]).resolve()):
+        parser.error("output must be beneath private TMPDIR")
     with tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"]) as temporary:
         scratch = Path(temporary)
         source = scratch / "source"
@@ -149,7 +147,7 @@ def main():
             binary = scratch / "cairn"
             env = dict(os.environ, GOFLAGS="-p=2", GOPROXY="off", GOSUMDB="off", GOWORK="off", GOTMPDIR=temporary)
             subprocess.run(["go", "build", "-o", str(binary), "./cmd/cairn"], cwd=source, env=env, check=True)
-            capture(binary, scratch, args.mode)
+            capture(binary, scratch, "stage")
         finally:
             subprocess.run(["git", "-C", args.repo, "worktree", "remove", str(source)], check=True)
 

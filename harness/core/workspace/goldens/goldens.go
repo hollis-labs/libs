@@ -7,15 +7,14 @@
 // (bindings, diagnostics and non-secret ownership/provenance). UTF-8 file bytes
 // are readable JSON strings; arbitrary binary bytes use base64.
 //
-// To review a change, build the current tests and render to private scratch:
-//
-//	go test -v ./workspace/goldens ./adapters/agentsessions ./agentlaunch/contexthook -run Golden -args -goldens=preview
-//
-// Then explicitly accept the shown diffs with -goldens=accept. Neither command
-// launches a model CLI. Ordinary verification only reads the expectations.
-// Scratch lives beneath TMPDIR with isolated HOME and provider homes. Only
-// execution roots, session identifiers and timestamps may be normalized.
-// Paths, modes, argv order, diagnostics and ownership are never normalized.
+// Regenerate only through scripts/update-goldens at the repository root.
+// It builds current consumers, renders into private scratch with fixture homes,
+// scrubs execution roots, rejects residual private paths, scans every staged
+// fixture, and shows the diff before --accept replaces expectations. The
+// internal go-test stage flag writes only beneath TMPDIR, never to the corpus.
+// Normal verification reads expectations and never invokes the updater.
+// Only execution roots, session identifiers and timestamps are normalized;
+// paths, permissions, argv order, diagnostics and ownership are preserved.
 // Provider-specific posture and turn bindings live in providerplant cases;
 // provider-neutral writers have no posture/bare launch API. agentsessions
 // allocates a fresh disposable root and has no owned-refresh API. The context
@@ -25,20 +24,11 @@
 // dependency. They include boot and installed create/refresh, owned-key
 // preservation, and the OpenCode installed-layer refusal. Re-capture explicitly:
 //
-//	python3 workspace/goldens/cairn_seeds.py --repo <cairn-repo> --mode preview
+//	scripts/update-goldens --cairn-repo <cairn-repo>
 //
-// Review before --mode accept. No old profile banners are frozen. The script
-// creates and removes a detached worktree, builds with network-disabled Go
-// module resolution, and captures with an empty HOME and fixture provider homes.
-//
-// The legacy writers intentionally disagree: wrapper planting forces native
-// settings and MCP to 0600 and hooks to 0700; providerplant honors projection
-// modes (including an empty Codex auth placeholder); agentsessions ignores
-// explicit per-file modes and gives only MCP/settings files 0600; bootdir's
-// AtomicWrite hook precedes a second engine write. Cairn uses .agents/skills
-// for Codex, AGENTS.md for OpenCode without opencode.json, a Claude @AGENTS.md
-// pointer, and its own installed subagents/commands. Engine-created roots are
-// 0700; precreated roots and legacy parents retain their distinct modes.
+// Seed capture is also staged through scripts/update-goldens --cairn-repo.
+// The script creates and removes a detached worktree, builds offline, and
+// captures with an empty HOME and fixture provider homes before scanning.
 package goldens
 
 import (
@@ -57,7 +47,8 @@ import (
 	"unicode/utf8"
 )
 
-var update = flag.String("goldens", "", "golden update: preview or accept (never set in ordinary gates)")
+var update = flag.String("goldens", "", "internal golden render mode: stage (use scripts/update-goldens)")
+var output = flag.String("goldens-output", "", "private staging directory beneath TMPDIR")
 
 type Entry struct {
 	Path    string `json:"path"`
@@ -216,11 +207,34 @@ func compare(t *testing.T, path string, v any, normalize func([]byte) []byte) {
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	if bytes.Equal(want, b) {
+	if *update != "" {
+		if *update != "stage" {
+			t.Fatal("regenerate through scripts/update-goldens")
+		}
+		temp := os.Getenv("TMPDIR")
+		rel, e := filepath.Rel(temp, *output)
+		if temp == "" || e != nil || !filepath.IsAbs(*output) || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			t.Fatal("golden output must be a private directory beneath TMPDIR")
+		}
+		abs, e := filepath.Abs(path)
+		if e != nil {
+			t.Fatal(e)
+		}
+		parts := strings.SplitN(filepath.ToSlash(abs), "/testdata/goldens/", 2)
+		if len(parts) != 2 {
+			t.Fatal("golden path is outside corpus")
+		}
+		destination := filepath.Join(*output, filepath.FromSlash(parts[1]))
+		if e := os.MkdirAll(filepath.Dir(destination), 0700); e != nil {
+			t.Fatal(e)
+		}
+		if e := os.WriteFile(destination, b, 0600); e != nil {
+			t.Fatal(e)
+		}
 		return
 	}
-	if *update != "" && *update != "preview" && *update != "accept" {
-		t.Fatal("invalid -goldens mode")
+	if bytes.Equal(want, b) {
+		return
 	}
 	diffRoot := t.TempDir()
 	old := filepath.Join(diffRoot, "before")
@@ -239,15 +253,6 @@ func compare(t *testing.T, path string, v any, normalize func([]byte) []byte) {
 		}
 	}
 	fmt.Printf("%s\n%s", filepath.ToSlash(path), diff)
-	if *update == "accept" {
-		if err := os.WriteFile(path, b, 0644); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	if *update == "preview" {
-		return
-	}
 	t.Errorf("golden differs: %s", filepath.ToSlash(path))
 }
 

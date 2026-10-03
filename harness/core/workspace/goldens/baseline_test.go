@@ -160,6 +160,17 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 	if err != nil {
 		return ev, err
 	}
+	if in.Scenario == "credential-clobber" {
+		// Dummy sentinel only: pin the legacy bug, never read ambient credentials.
+		if err := os.WriteFile(filepath.Join(root, "auth.json"), []byte("DUMMY-CREDENTIAL-SENTINEL"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		ex, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+		if err != nil {
+			return ev, err
+		}
+		ev.Diagnostics = append(ev.Diagnostics, "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior belongs to S4.")
+	}
 	if in.Scenario == "refresh" {
 		unrelated(t, root)
 		prepared.BootPrompt = "Refreshed instructions.\n"
