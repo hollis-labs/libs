@@ -1,20 +1,24 @@
 package host
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
 )
 
-const PluginActor SubjectKind = "plugin"
+const (
+	PluginActor SubjectKind = "plugin"
+	UserActor   SubjectKind = "user"
+)
+
+func callerValid(s Subject) bool { return s.valid() || (s.Kind == UserActor && identifier(s.ID)) }
 
 // Call contains host-normalized operation demands, never raw RPC arguments.
 // Dimensions and Usage must cover every descriptor dimension/limit; adapters
@@ -32,6 +36,7 @@ type Call struct {
 // calls require a connection-bound narrow scope, never a bearer credential.
 // LeaseContext is cancelled by lifecycle, grant or binding withdrawal.
 type Authority struct {
+	Background              bool
 	Authenticated           bool
 	Actor                   Subject
 	InitiatingCaller        *Subject
@@ -48,27 +53,51 @@ type Authority struct {
 }
 
 // AuthorityResolver authenticates the actual connection/client, validates its
-// binding and obtains the current live grant, tuple, policy and target state.
-// Request fields/headers cannot stand in for those host-verified facts.
+// binding and returns a consistent immutable snapshot of current grant, tuple,
+// policy and target state. It must be safe for concurrent calls.
+// Request fields/headers cannot stand in for those host-verified facts. Resolve
+// must honor ctx and return promptly; the library cannot stop an uncooperative
+// host callback without leaving its work running.
 type AuthorityResolver interface {
 	Resolve(context.Context, Call) (Authority, error)
 }
 
 // Budget reserves cumulative/rate/concurrency budgets before effects. It must
 // be atomic across calls, return a nonnil release function and not block without
-// observing ctx. Missing budget adapters fail closed even for byte-only limits.
+// observing ctx. Reserve must roll back partial work if it panics before
+// returning a release handle. Release must return promptly. Missing adapters
+// fail closed even for byte-only limits.
 type Budget interface {
 	Reserve(context.Context, Authority, Call) (release func(), err error)
 }
 
+// EnforcerConfig fixes the host epoch and audience independently of resolver output.
+type EnforcerConfig struct {
+	HostInstance, Audience string
+	Catalog                *capability.Catalog
+	Resolver               AuthorityResolver
+	Budget                 Budget
+	Audit                  *Auditor
+	Clock                  Clock
+}
+
+func NewEnforcer(cfg EnforcerConfig) (*Enforcer, error) {
+	if !identifier(cfg.HostInstance) || !identifier(cfg.Audience) || cfg.Catalog == nil || cfg.Resolver == nil || cfg.Budget == nil {
+		return nil, refusal(capability.InvalidRequest, "")
+	}
+	return &Enforcer{host: cfg.HostInstance, audience: cfg.Audience, Catalog: cfg.Catalog, Resolver: cfg.Resolver, Budget: cfg.Budget, Audit: cfg.Audit, Clock: cfg.Clock}, nil
+}
+
 type Enforcer struct {
-	Catalog  *capability.Catalog
-	Resolver AuthorityResolver
-	Budget   Budget
-	Audit    *Auditor
-	Clock    Clock
-	allowed  atomic.Uint64
-	denied   atomic.Uint64
+	host, audience  string
+	cleanupFailures atomic.Uint64
+	Catalog         *capability.Catalog
+	Resolver        AuthorityResolver
+	Budget          Budget
+	Audit           *Auditor
+	Clock           Clock
+	allowed         atomic.Uint64
+	denied          atomic.Uint64
 }
 
 func (e *Enforcer) clock() Clock {
@@ -80,22 +109,25 @@ func (e *Enforcer) clock() Clock {
 
 func decodeScope(name string, raw json.RawMessage) (capability.Scope, error) {
 	var scope capability.Scope
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&scope); err != nil {
-		return capability.Scope{}, refusal(capability.ScopeDenied, name)
+	fields, err := strictjson.ObjectFields(raw, nil, []string{"allowlists", "limits"})
+	if err != nil {
+		return scope, refusal(capability.ScopeDenied, name)
 	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return capability.Scope{}, refusal(capability.ScopeDenied, name)
+	if raw, ok := fields["allowlists"]; ok {
+		if json.Unmarshal(raw, &scope.Allowlists) != nil {
+			return capability.Scope{}, refusal(capability.ScopeDenied, name)
+		}
+	}
+	if raw, ok := fields["limits"]; ok {
+		if json.Unmarshal(raw, &scope.Limits) != nil {
+			return capability.Scope{}, refusal(capability.ScopeDenied, name)
+		}
 	}
 	return scope, nil
 }
 func contextFailure(ctx context.Context, name string) error {
-	var cause *capability.Error
-	if errors.As(context.Cause(ctx), &cause) && cause != nil {
-		copy := *cause
-		copy.Capability = name
-		return &copy
+	if ctx == nil {
+		return refusal(capability.InvalidRequest, name)
 	}
 	if ctx.Err() == context.DeadlineExceeded {
 		return refusal(capability.DeadlineExceeded, name)
@@ -104,6 +136,19 @@ func contextFailure(ctx context.Context, name string) error {
 		return refusal(capability.Cancelled, name)
 	}
 	return nil
+}
+func staleBinding(name string) *capability.Error {
+	return &capability.Error{Code: capability.TargetUnavailable, Capability: name, EffectState: capability.NotStarted, Detail: capability.StaleBinding}
+}
+
+// Admission failures are classified by our state, never by a caller's asserted outcome.
+func admissionFailure(err error, name, requestID string) *capability.Error {
+	failure := safeFailure(err, name, requestID)
+	if failure.Code == capability.UnknownOutcome {
+		failure.Code = capability.InternalError
+	}
+	failure.EffectState = capability.NotStarted
+	return failure
 }
 func safeFailure(err error, name, requestID string) *capability.Error {
 	var failure *capability.Error
@@ -118,28 +163,43 @@ func safeFailure(err error, name, requestID string) *capability.Error {
 	}
 	return &capability.Error{Code: capability.InternalError, Capability: name, RequestID: requestID, EffectState: capability.NotStarted}
 }
-func (e *Enforcer) check(ctx context.Context, call Call) (Authority, time.Time, error) {
+func (e *Enforcer) check(ctx context.Context, call Call) (auth Authority, expiry time.Time, err error) {
+	defer func() {
+		if recover() != nil {
+			err = refusal(capability.InternalError, call.Capability)
+		}
+	}()
 	if err := contextFailure(ctx, call.Capability); err != nil {
 		return Authority{}, time.Time{}, err
 	}
-	if e == nil || e.Resolver == nil || e.Catalog == nil {
+	if e == nil || e.Resolver == nil || e.Catalog == nil || e.host == "" || e.audience == "" {
 		return Authority{}, time.Time{}, refusal(capability.InternalError, call.Capability)
 	}
 	if call.Capability == "" || call.GrantID == "" || call.Operation == "" || call.Target == "" || call.RequestID == "" {
 		return Authority{}, time.Time{}, refusal(capability.InvalidRequest, call.Capability)
 	}
-	auth, err := e.Resolver.Resolve(ctx, call)
+	auth, err = e.Resolver.Resolve(ctx, cloneCall(call))
 	auth = cloneAuthority(auth)
 	if err != nil {
 		return auth, time.Time{}, err
 	}
-	if !auth.Authenticated || !identifier(auth.Actor.ID) || (!auth.Actor.valid() && auth.Actor.Kind != PluginActor) || auth.Owner.Validate() != nil || auth.Audience == "" {
+	if !auth.Authenticated || !identifier(auth.Actor.ID) || (!callerValid(auth.Actor) && auth.Actor.Kind != PluginActor) || auth.Owner.Validate() != nil || auth.Audience == "" {
 		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
 	}
 	if auth.Actor.Kind == PluginActor && auth.Actor.ID != auth.Owner.OwnerID {
 		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
 	}
-	if auth.InitiatingCaller != nil && (!auth.InitiatingCaller.valid() || auth.CallerPolicy == nil) {
+	if auth.Owner.HostInstance != e.host {
+		return auth, time.Time{}, staleBinding(call.Capability)
+	}
+	if auth.Audience != e.audience {
+		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
+	}
+	if auth.Background {
+		if auth.InitiatingCaller != nil || auth.CallerPolicy != nil {
+			return auth, time.Time{}, refusal(capability.InvalidRequest, call.Capability)
+		}
+	} else if auth.InitiatingCaller == nil || !callerValid(*auth.InitiatingCaller) || auth.CallerPolicy == nil {
 		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
 	}
 	if (!auth.Active && !(auth.ProvisionalLogging && call.Capability == capability.LogWrite && call.Operation == "host/log")) || !auth.TargetAvailable {
@@ -152,7 +212,10 @@ func (e *Enforcer) check(ctx context.Context, call Call) (Authority, time.Time, 
 	if grant.Validate() != nil || grant.GrantID != call.GrantID || grant.Name != call.Capability {
 		return auth, time.Time{}, refusal(capability.CapabilityDenied, call.Capability)
 	}
-	if grant.HostInstance != auth.Owner.HostInstance || grant.OwnerID != auth.Owner.OwnerID || grant.OwnerGeneration != auth.Owner.OwnerGeneration || grant.Audience != auth.Audience {
+	if grant.HostInstance != auth.Owner.HostInstance || grant.OwnerID != auth.Owner.OwnerID || grant.OwnerGeneration != auth.Owner.OwnerGeneration {
+		return auth, time.Time{}, staleBinding(call.Capability)
+	}
+	if grant.Audience != e.audience {
 		return auth, time.Time{}, refusal(capability.Unauthenticated, call.Capability)
 	}
 	now := e.clock().Now()
@@ -174,6 +237,9 @@ func (e *Enforcer) check(ctx context.Context, call Call) (Authority, time.Time, 
 	descriptor, err := e.Catalog.Lookup(grant.Name, int(grant.SchemaVersion))
 	if err != nil {
 		return auth, time.Time{}, err
+	}
+	if !slices.Contains(descriptor.Operations, call.Operation) {
+		return auth, time.Time{}, refusal(capability.ScopeDenied, call.Capability)
 	}
 	scope, err := decodeScope(grant.Name, grant.Scope)
 	if err != nil {
@@ -243,45 +309,165 @@ func (e *Enforcer) check(ctx context.Context, call Call) (Authority, time.Time, 
 
 // Permit owns a reserved call and observes request/authority/expiry cancellation.
 // Recheck after waiting and under the host's commit/admission guard. Close must
-// be called on every path; it releases budget reservations exactly once.
+// be called on every path; it attempts each cleanup callback once, isolates
+// panic and reports cleanup failures separately. Close during Commit cancels
+// work but retains its reservation until the callback actually returns.
 type Permit struct {
-	Context       context.Context
-	e             *Enforcer
-	call          Call
-	authority     Authority
-	cancel        context.CancelCauseFunc
-	stopAuthority func() bool
-	timer         Timer
-	release       func()
-	once          sync.Once
-	deadline      time.Time
-	deadlineCode  capability.Code
+	Context        context.Context
+	requestContext context.Context
+	e              *Enforcer
+	call           Call
+	authority      Authority
+	cancel         context.CancelCauseFunc
+	stopAuthority  func() bool
+	timer          Timer
+	release        func()
+	once           sync.Once
+	releaseOnce    sync.Once
+	stateMu        sync.Mutex
+	running        bool
+	consumed       atomic.Bool
+	closed         atomic.Bool
+	deadline       time.Time
+	deadlineCode   capability.Code
 }
 
+func (p *Permit) cleanup(fn func()) {
+	defer func() {
+		if recover() != nil && p.e != nil {
+			p.e.cleanupFailures.Add(1)
+		}
+	}()
+	fn()
+}
 func (p *Permit) Close() {
 	if p == nil {
 		return
 	}
 	p.once.Do(func() {
-		p.cancel(refusal(capability.Cancelled, p.call.Capability))
-		p.stopAuthority()
-		p.timer.Stop()
-		p.release()
+		p.closed.Store(true)
+		if p.cancel != nil {
+			p.cleanup(func() { p.cancel(refusal(capability.Cancelled, p.call.Capability)) })
+		}
+		if p.stopAuthority != nil {
+			p.cleanup(func() { p.stopAuthority() })
+		}
+		if p.timer != nil {
+			p.cleanup(func() { p.timer.Stop() })
+		}
+		p.stateMu.Lock()
+		running := p.running
+		p.stateMu.Unlock()
+		if !running {
+			p.releaseBudget()
+		}
 	})
 }
-func (p *Permit) Recheck() error {
+func (p *Permit) releaseBudget() {
+	p.releaseOnce.Do(func() {
+		if p.release != nil {
+			p.cleanup(p.release)
+		}
+	})
+}
+func (p *Permit) finishCommit() {
+	p.stateMu.Lock()
+	p.running = false
+	closed := p.closed.Load()
+	p.stateMu.Unlock()
+	if closed {
+		p.releaseBudget()
+	}
+}
+func (p *Permit) Recheck() (err error) {
+	defer func() {
+		if recover() != nil {
+			if p != nil {
+				p.Close()
+			}
+			err = refusal(capability.InternalError, "")
+			if p != nil {
+				err = admissionFailure(err, p.call.Capability, p.call.RequestID)
+			}
+		}
+		if p != nil && err != nil {
+			err = admissionFailure(err, p.call.Capability, p.call.RequestID)
+		}
+	}()
+	if p == nil || p.e == nil || p.Context == nil || p.requestContext == nil {
+		return refusal(capability.InvalidRequest, "")
+	}
+	if p.closed.Load() {
+		return refusal(capability.Cancelled, p.call.Capability)
+	}
 	if !p.e.clock().Now().Before(p.deadline) {
 		return refusal(p.deadlineCode, p.call.Capability)
+	}
+	if err := contextFailure(p.requestContext, p.call.Capability); err != nil {
+		return err
+	}
+	current, _, err := p.e.check(p.requestContext, p.call)
+	if err != nil {
+		return admissionFailure(err, p.call.Capability, p.call.RequestID)
+	}
+	if current.Owner != p.authority.Owner {
+		return staleBinding(p.call.Capability)
+	}
+	if current.Actor != p.authority.Actor || current.Audience != p.authority.Audience || current.PolicyRevision != p.authority.PolicyRevision || current.Background != p.authority.Background || !sameCaller(current.InitiatingCaller, p.authority.InitiatingCaller) {
+		return refusal(capability.Unauthenticated, p.call.Capability)
+	}
+	if p.authority.LeaseContext.Err() != nil {
+		return refusal(capability.CapabilityDenied, p.call.Capability)
 	}
 	if err := contextFailure(p.Context, p.call.Capability); err != nil {
 		return err
 	}
-	current, _, err := p.e.check(p.Context, p.call)
-	if err != nil {
-		return err
+	return nil
+}
+
+// Commit consumes this permit once, rechecks current authority and releases on
+// every path. Call it under the host's commit guard after any wait. A failed
+// attempt cannot be retried through this permit.
+func (p *Permit) Commit(fn func(context.Context) error) (err error) {
+	if p == nil || p.e == nil || p.Context == nil {
+		return refusal(capability.InvalidRequest, "")
 	}
-	if current.Actor != p.authority.Actor || current.Owner != p.authority.Owner || current.Audience != p.authority.Audience || current.PolicyRevision != p.authority.PolicyRevision || !sameCaller(current.InitiatingCaller, p.authority.InitiatingCaller) {
-		return refusal(capability.Unauthenticated, p.call.Capability)
+	defer func() {
+		if err != nil {
+			err = safeFailure(err, p.call.Capability, p.call.RequestID)
+		}
+	}()
+	if !p.consumed.CompareAndSwap(false, true) {
+		return refusal(capability.Conflict, p.call.Capability)
+	}
+	p.stateMu.Lock()
+	if p.closed.Load() {
+		p.stateMu.Unlock()
+		return refusal(capability.Cancelled, p.call.Capability)
+	}
+	p.running = true
+	p.stateMu.Unlock()
+	defer p.finishCommit()
+	defer p.Close()
+	executing := false
+	defer func() {
+		if recover() != nil {
+			if executing {
+				err = callbackFailure(errors.New("callback panic"), p.call)
+			} else {
+				err = refusal(capability.InternalError, p.call.Capability)
+			}
+		}
+	}()
+	if fn == nil {
+		return refusal(capability.InvalidRequest, p.call.Capability)
+	}
+	if err := p.Recheck(); err != nil {
+		return admissionFailure(err, p.call.Capability, p.call.RequestID)
+	}
+	executing = true
+	if err := fn(p.Context); err != nil {
+		return callbackFailure(err, p.call)
 	}
 	return nil
 }
@@ -321,7 +507,22 @@ func cloneCall(c Call) Call {
 	c.Usage = usage
 	return c
 }
+func (e *Enforcer) auditTime() (now time.Time) {
+	now = time.Now()
+	defer func() {
+		if recover() != nil && e.Audit != nil {
+			e.Audit.failures.Add(1)
+		}
+	}()
+	now = e.clock().Now()
+	return now
+}
 func (e *Enforcer) record(ctx context.Context, call Call, auth Authority, start time.Time, err error, successState capability.EffectState) {
+	defer func() {
+		if recover() != nil && e != nil && e.Audit != nil {
+			e.Audit.failures.Add(1)
+		}
+	}()
 	if e == nil {
 		return
 	}
@@ -329,7 +530,8 @@ func (e *Enforcer) record(ctx context.Context, call Call, auth Authority, start 
 		auth.Actor = Subject{}
 		auth.InitiatingCaller = nil
 	}
-	event := AuditEvent{Timestamp: e.clock().Now(), TraceID: call.TraceID, RequestID: call.RequestID, Actor: Actor{Kind: string(auth.Actor.Kind), ID: auth.Actor.ID}, InitiatingCaller: auditActor(auth.InitiatingCaller), Owner: auth.Owner, Capability: call.Capability, GrantID: call.GrantID, PolicyRevision: auth.PolicyRevision, Target: call.Target, Server: call.Server, Tool: call.Tool, Effect: call.Effect, EffectState: successState, Duration: e.clock().Now().Sub(start)}
+	now := e.auditTime()
+	event := AuditEvent{Timestamp: now, TraceID: call.TraceID, RequestID: call.RequestID, Actor: Actor{Kind: string(auth.Actor.Kind), ID: auth.Actor.ID}, InitiatingCaller: auditActor(auth.InitiatingCaller), Owner: auth.Owner, Capability: call.Capability, GrantID: call.GrantID, PolicyRevision: auth.PolicyRevision, Target: call.Target, Server: call.Server, Tool: call.Tool, Effect: call.Effect, EffectState: successState, Duration: max(time.Duration(0), now.Sub(start))}
 	if err != nil {
 		failure := safeFailure(err, call.Capability, call.RequestID)
 		event.Outcome = failure.Code
@@ -341,66 +543,82 @@ func (e *Enforcer) record(ctx context.Context, call Call, auth Authority, start 
 	} else {
 		e.denied.Add(1)
 	}
-	e.Audit.Record(ctx, event)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	e.Audit.Record(context.WithoutCancel(ctx), sanitizeAudit(event))
 }
 
 // RequireCapability performs call-time checks and budget reservation before any
 // application side effect. Use Run for automatic release and success/denial audit.
-func (e *Enforcer) RequireCapability(ctx context.Context, call Call) (*Permit, error) {
+func (e *Enforcer) RequireCapability(ctx context.Context, call Call) (permit *Permit, err error) {
 	start := time.Now()
+	var auth Authority
+	defer func() {
+		if recover() != nil {
+			if permit != nil {
+				permit.Close()
+				permit = nil
+			}
+			err = refusal(capability.InternalError, call.Capability)
+		}
+		if err != nil {
+			err = admissionFailure(err, call.Capability, call.RequestID)
+		}
+		e.record(ctx, call, auth, start, err, capability.NotStarted)
+	}()
 	if e != nil {
 		start = e.clock().Now()
 	}
-	permit, auth, err := e.require(ctx, call)
-	if err != nil {
-		err = safeFailure(err, call.Capability, call.RequestID)
-	}
-	e.record(ctx, call, auth, start, err, capability.NotStarted)
+	permit, auth, err = e.require(ctx, call)
 	return permit, err
 }
-func (e *Enforcer) require(ctx context.Context, call Call) (*Permit, Authority, error) {
+func (e *Enforcer) require(ctx context.Context, call Call) (permit *Permit, auth Authority, err error) {
+	var pending *Permit
+	defer func() {
+		if recover() != nil {
+			err = refusal(capability.InternalError, call.Capability)
+		}
+		if err != nil {
+			if pending != nil {
+				pending.Close()
+			}
+			permit = nil
+			err = admissionFailure(err, call.Capability, call.RequestID)
+		}
+	}()
 	call = cloneCall(call)
 	auth, expires, err := e.check(ctx, call)
 	if err != nil {
-		return nil, auth, safeFailure(err, call.Capability, call.RequestID)
+		return nil, auth, err
 	}
 	if e.Budget == nil {
 		return nil, auth, refusal(capability.BudgetExceeded, call.Capability)
 	}
-	merged, cancel := context.WithCancelCause(ctx)
-	stop := context.AfterFunc(auth.LeaseContext, func() { cancel(refusal(capability.CapabilityDenied, call.Capability)) })
-	deadline := expires
-	expiryCode := capability.CapabilityDenied
+	pending = &Permit{e: e, requestContext: ctx, call: call, authority: auth, deadline: expires, deadlineCode: capability.CapabilityDenied}
+	pending.Context, pending.cancel = context.WithCancelCause(ctx)
+	pending.stopAuthority = context.AfterFunc(auth.LeaseContext, func() { pending.cancel(refusal(capability.CapabilityDenied, call.Capability)) })
 	if millis, ok := call.Usage["deadline_ms"]; ok {
-		maxMillis := int64((time.Duration(1<<63 - 1)) / time.Millisecond)
-		callDeadline := e.clock().Now().Add(time.Duration(min(millis, maxMillis)) * time.Millisecond)
-		if callDeadline.Before(deadline) {
-			deadline = callDeadline
-			expiryCode = capability.DeadlineExceeded
+		maxMillis := int64(time.Duration(1<<63-1) / time.Millisecond)
+		deadline := e.clock().Now().Add(time.Duration(min(millis, maxMillis)) * time.Millisecond)
+		if deadline.Before(pending.deadline) {
+			pending.deadline = deadline
+			pending.deadlineCode = capability.DeadlineExceeded
 		}
 	}
-	timer := e.clock().AfterFunc(deadline.Sub(e.clock().Now()), func() { cancel(refusal(expiryCode, call.Capability)) })
-	release, err := e.Budget.Reserve(merged, auth, call)
-	if err != nil || release == nil {
-		cancel(refusal(capability.BudgetExceeded, call.Capability))
-		stop()
-		timer.Stop()
-		if release != nil {
-			release()
-		}
-		if err == nil {
-			err = refusal(capability.BudgetExceeded, call.Capability)
-		}
-		return nil, auth, safeFailure(err, call.Capability, call.RequestID)
+	pending.timer = e.clock().AfterFunc(pending.deadline.Sub(e.clock().Now()), func() { pending.cancel(refusal(pending.deadlineCode, call.Capability)) })
+	pending.release, err = e.Budget.Reserve(pending.Context, cloneAuthority(auth), cloneCall(call))
+	if err != nil {
+		return nil, auth, err
 	}
-	permit := &Permit{Context: merged, e: e, call: call, authority: auth, cancel: cancel, stopAuthority: stop, timer: timer, release: release, deadline: deadline, deadlineCode: expiryCode}
-	if err := permit.Recheck(); err != nil {
-		permit.Close()
-		return nil, auth, safeFailure(err, call.Capability, call.RequestID)
+	if pending.release == nil {
+		return nil, auth, refusal(capability.BudgetExceeded, call.Capability)
 	}
-	return permit, auth, nil
+	if err := pending.Recheck(); err != nil {
+		return nil, auth, err
+	}
+	return pending, auth, nil
 }
-
 func callbackFailure(err error, call Call) *capability.Error {
 	var typed *capability.Error
 	if errors.As(err, &typed) && typed != nil {
@@ -425,51 +643,43 @@ func callbackFailure(err error, call Call) *capability.Error {
 // callback failures become safe internal errors with an unknown effect state.
 func (e *Enforcer) Run(ctx context.Context, call Call, fn func(context.Context, *Permit) error) (err error) {
 	start := time.Now()
-	if e != nil {
-		start = e.clock().Now()
-	}
-	var authority Authority
-	executing := false
+	var auth Authority
+	var permit *Permit
 	defer func() {
 		if recover() != nil {
-			if executing {
-				err = callbackFailure(errors.New("callback panic"), call)
-			} else {
-				err = refusal(capability.InternalError, call.Capability)
-			}
+			err = refusal(capability.InternalError, call.Capability)
+		}
+		if permit != nil {
+			permit.Close()
 		}
 		if err != nil {
 			err = safeFailure(err, call.Capability, call.RequestID)
 		}
-		e.record(ctx, call, authority, start, err, capability.Committed)
+		e.record(ctx, call, auth, start, err, capability.Committed)
 	}()
+	if e != nil {
+		start = e.clock().Now()
+	}
 	if fn == nil {
 		return refusal(capability.InvalidRequest, call.Capability)
 	}
-	permit, auth, err := e.require(ctx, call)
-	authority = auth
+	permit, auth, err = e.require(ctx, call)
 	if err != nil {
 		return err
 	}
-	defer permit.Close()
-	authority = permit.authority
-	executing = true
-	if err := fn(permit.Context, permit); err != nil {
-		return callbackFailure(err, call)
-	}
-	return nil
+	return permit.Commit(func(ctx context.Context) error { return fn(ctx, permit) })
 }
 
 // Counters remain available even when telemetry persistence/presentation fails.
 // Enforcer must not be copied after use. Counts reflect helper admission/outcome
 // events, not downstream application records or a host's complete registry.
-type Counters struct{ Allowed, Denied, AuditFailures uint64 }
+type Counters struct{ Allowed, Denied, AuditFailures, CleanupFailures uint64 }
 
 func (e *Enforcer) Counters() Counters {
 	if e == nil {
 		return Counters{}
 	}
-	return Counters{e.allowed.Load(), e.denied.Load(), e.Audit.Failures()}
+	return Counters{Allowed: e.allowed.Load(), Denied: e.denied.Load(), AuditFailures: e.Audit.Failures(), CleanupFailures: e.cleanupFailures.Load()}
 }
 
 func auditActor(s *Subject) *Actor {

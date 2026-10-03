@@ -17,23 +17,34 @@ The result is the shared `GrantSet` ready for that DTO; no parallel wire grant
 is created here.
 
 Every scope is validated against the selected descriptor/version and authority
-is intersected without widening. Optional refusal produces a named `Denial`;
+is intersected without widening. Optional refusal produces a named
+`PlanNotice` with a code;
 required refusal aborts the complete plan rather than returning partial grants.
 Cancellation or implementation failure aborts even an optional request. Empty
-plans encode as `[]`. Repeated capability names with different grant IDs retain
+plans encode as `[]`. An admitted scope that narrows a request also returns a
+`PlanNotice{Narrowed:true}` identifying its grant, including required requests.
+A broken scope callback or grant ID generator aborts the plan. Repeated
+capability names with different grant IDs retain
 separate operation/target/key pairs. Hosts still review digest/runtime/OS
 permissions and use their own lifecycle controller before spawn/activation.
 
 ## Call-time adapter
 
-Construct an `Enforcer` with the selected catalog, a trusted `AuthorityResolver`,
-an atomic `Budget`, an optional `Auditor` and an injectable clock. The resolver
+Construct an `Enforcer` through `NewEnforcer` with a fixed expected host epoch
+and audience, the selected catalog, a trusted `AuthorityResolver`,
+an atomic `Budget`, an optional `Auditor` and an injectable clock. Configure
+callbacks before use; do not mutate configuration concurrently. The resolver
 must authenticate the actual connection/client, verify its narrow binding,
 resolve the current grant, initiating caller and current policy, and supply the
-same lifecycle-issued tuple. Never derive these facts from caller-selected
+same lifecycle-issued tuple in a consistent, immutable snapshot. Resolver and
+budget adapters must be safe for concurrent calls. Never derive facts from caller-selected
 headers, plugin session/agent IDs or Init's connection-level identity. A plugin
-actor ID must match its owner. An initiating caller needs a separate verified
-caller policy; background calls have only explicitly approved policy scope.
+actor ID must match its owner. Each authority must select either a verified
+initiating caller with a separate caller policy, or explicit `Background:true`
+with only approved background policy scope. Missing mode, both modes or a
+caller policy without a caller fails closed. Verified callers may be users
+(`UserActor`), agents, sessions or MCP proxies. User callers do not receive
+bearer credentials from this library.
 
 `Call` contains host-normalized demands, not raw arguments. Supply capability,
 grant, exact operation/target/effect, request/trace IDs, every descriptor-specific
@@ -47,13 +58,17 @@ payloads or count actual response bytes.
 `Authority` must include an authenticated actor, expected tuple/audience,
 structurally valid live grant, active/available target, exact current policy
 revision, policy scopes and a lifecycle/grant/binding cancellation context.
+An epoch or generation mismatch returns target_unavailable/stale_binding.
+The selected descriptor owns the operation; two catalog descriptors cannot
+share an operation name. Scope envelopes use exact key casing and reject
+case variants or duplicate keys before interpreting authority.
 Every actor needs a `TransportScope` that can only narrow the grant. For a
 plugin it comes from its authenticated connection binding; for a non-plugin
 route it comes from the verified scoped credential. Non-plugin routes verify
 that credential separately and resolve its referenced live grant/current policy
 here. Omitting transport scope denies rather than inheriting the full grant.
-The helper checks
-identity, tuple, audience, issue/expiry, descriptor/schema, current policy,
+The helper checks identity, tuple, audience, issue/expiry, descriptor/schema,
+current policy,
 caller intersection, binding, target, operation, effect and all budgets before
 calling any effect handler. Only explicit provisional `log.write`/`host/log`
 authority may operate while inactive; it still needs a live bounded lease and
@@ -61,23 +76,36 @@ all normal grant checks. It creates no other pre-activation service lane.
 
 `Budget.Reserve` must atomically reserve cumulative usage/rate/concurrency across
 requests, observe cancellation and return a nonnil release function. It must
-not perform the application effect. Actual operation implementations enforce
-reserved row/body/output limits, current definition/digest, cycles and target
+not perform the application effect. A callback that panics before returning a
+release handle must roll back its own partial reservation; the library cannot
+release a handle it never received. Resolver and budget callbacks must honor
+the context and return promptly; an uncooperative resolver can block its caller.
+Resolver, reservation, commit, cleanup and policy callback panics are contained
+as safe failures. Actual operation implementations enforce reserved
+row/body/output limits, current definition/digest, cycles and target
 ownership. Missing reservation adapters deny even byte-only operations.
 
 Prefer `Run(ctx, call, handler)`: it checks/reserves, rechecks after reservation,
 invokes the handler, releases reservations and audits the outcome on success,
 error or panic. The handler receives a `Permit` and cancellation context. If it
 waits before mutation, call `Permit.Recheck` after the wait under the host's
-lifecycle admission/commit guard before writing. That guard is the atomic
+lifecycle admission/commit guard before writing. `Run` consumes one commit
+attempt around its handler and does not retry it. That guard is the atomic
 boundary: a cancellation context alone cannot prevent a revoke/commit race.
 Current policy and identity are resolved again; a changed actor, caller,
 audience, tuple or policy revision cannot borrow the admitted permit.
 
 `RequireCapability` is the lower-level helper for adapters needing their own
-execution wrapper. It audits admission, returning a reserved `Permit`. Defer
-`Close` on every path (release is once); audit the application outcome through
-host instrumentation. A permit's admission audit has effect state not_started;
+execution wrapper. It audits admission, returning a reserved `Permit`. After
+any wait, call `Permit.Commit` under the host commit guard; it rechecks, consumes
+one attempt and invokes the effect. A second commit attempt returns conflict,
+even when the first failed. Defer `Close` on every path and audit the application
+outcome through host instrumentation. Cleanup callbacks are attempted once;
+their panics increment `CleanupFailures` and cannot rewrite a definite commit.
+Closing during a commit cancels it but retains its reservation until the
+callback actually finishes. A failed cleanup callback is reported rather than
+claimed to have released the host's resources. A permit's admission audit has
+effect state not_started;
 `Run` reports a definite completed operation as committed. Do not hold permits
 without bounded lifetimes or copy an Enforcer after use.
 
@@ -93,16 +121,20 @@ validated effect states. No automatic retry or fictional rollback occurs.
 
 Outcomes include authenticated actor/initiating caller, tuple, grant/policy,
 request/trace, target/tool/effect and duration, with no arguments, content,
-credentials or raw error messages. Sink errors/panics do not change enforcement;
+credentials or raw error messages. Every audited identifier is limited to
+256 UTF-8 bytes; invalid/control-bearing values become a fixed marker.
+Unauthenticated actor/caller assertions are scrubbed. Audit receives a context
+without request cancellation so a cancelled request cannot erase its outcome;
+the sink must apply its own bounded timeout. Sink errors/panics do not change
+enforcement;
 `Enforcer.Counters` keeps helper success/failure and audit failure counts readable
 independently of telemetry presentation. Counters describe helper events, not
 all operations in an application. Sinks must remain bounded and return promptly.
 
-`ConformanceRequirements` publishes the ten behavioral integration obligations.
 The package tests use synthetic authenticated authority/policy/budget adapters
-and observable effects; they prove helper behavior, not a real host transport,
-OS boundary or registry. Every integrating host must supply positive scoped
-operations and direct bypass attempts for its actual supported descriptor set,
-prove lifecycle/transport and secret-output behavior, and record any explicit
-waivers. No consumer adoption, protocol Serve change, HTTP bridge, workflow
+and observable effects. They prove helper behavior, not a real host transport,
+OS boundary or registry. Behavioral host conformance must exercise the actual
+adapter and demonstrate that deliberately broken adapters fail; that suite is
+a separate delivery. A host declares unsupported descriptors through its catalog
+subset. No consumer adoption, protocol Serve change, HTTP bridge, workflow
 engine or OS sandbox is implemented by these helpers.

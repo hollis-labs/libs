@@ -34,14 +34,17 @@ func enforcementFixture(t *testing.T) (*Enforcer, *Authority, Call, context.Canc
 	t.Cleanup(cancel)
 	tuple := capability.RuntimeIdentity{HostInstance: "epoch", OwnerID: "owner", OwnerGeneration: 1}
 	grant := capability.Grant{GrantID: "grant", Name: capability.StorageWrite, SchemaVersion: 1, Scope: raw, HostInstance: tuple.HostInstance, OwnerID: tuple.OwnerID, OwnerGeneration: tuple.OwnerGeneration, Audience: "stdio", IssuedAt: clock.Now().Format(time.RFC3339Nano), ExpiresAt: clock.Now().Add(time.Minute).Format(time.RFC3339Nano), PolicyRevision: "reviewed"}
-	auth := &Authority{Authenticated: true, Actor: Subject{PluginActor, "owner"}, Owner: tuple, Audience: "stdio", Grant: grant, PolicyRevision: "reviewed", Policy: cloneScope(scope), TransportScope: &scope, LeaseContext: life, Active: true, TargetAvailable: true}
+	auth := &Authority{Background: true, Authenticated: true, Actor: Subject{PluginActor, "owner"}, Owner: tuple, Audience: "stdio", Grant: grant, PolicyRevision: "reviewed", Policy: cloneScope(scope), TransportScope: &scope, LeaseContext: life, Active: true, TargetAvailable: true}
 	catalog, err := capability.NewCatalog([]string{capability.StorageWrite}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	releases := &atomic.Int64{}
 	events := &[]AuditEvent{}
-	enforcer := &Enforcer{Catalog: catalog, Clock: clock, Resolver: authorityFunc(func(context.Context, Call) (Authority, error) { return *auth, nil }), Budget: budgetFunc(func(context.Context, Authority, Call) (func(), error) { return func() { releases.Add(1) }, nil }), Audit: NewAuditor(auditFunc(func(_ context.Context, e AuditEvent) error { *events = append(*events, e); return nil }))}
+	enforcer, err := NewEnforcer(EnforcerConfig{HostInstance: "epoch", Audience: "stdio", Catalog: catalog, Clock: clock, Resolver: authorityFunc(func(context.Context, Call) (Authority, error) { return *auth, nil }), Budget: budgetFunc(func(context.Context, Authority, Call) (func(), error) { return func() { releases.Add(1) }, nil }), Audit: NewAuditor(auditFunc(func(_ context.Context, e AuditEvent) error { *events = append(*events, e); return nil }))})
+	if err != nil {
+		t.Fatal(err)
+	}
 	call := Call{Capability: capability.StorageWrite, GrantID: "grant", Operation: "host/storage/put", Target: "owner", Effect: capability.Write, Dimensions: map[string]string{"keys": "preferences"}, Usage: map[string]int64{"request_bytes": 10}, RequestID: "request", TraceID: "trace"}
 	return enforcer, auth, call, cancel, releases, events
 }
@@ -61,7 +64,7 @@ func TestEnforcementBeforeEffects(t *testing.T) {
 		{"unauthenticated", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.Authenticated = false }},
 		{"forged actor", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.Actor.ID = "other" }},
 		{"wrong kind", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.Actor.Kind = "unverified" }},
-		{"wrong tuple", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.Grant.OwnerGeneration++ }},
+		{"wrong tuple", capability.TargetUnavailable, func(e *Enforcer, a *Authority, c *Call) { a.Grant.OwnerGeneration++ }},
 		{"wrong audience", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.Audience = "other" }},
 		{"inactive", capability.TargetUnavailable, func(e *Enforcer, a *Authority, c *Call) { a.Active = false }},
 		{"unavailable target", capability.TargetUnavailable, func(e *Enforcer, a *Authority, c *Call) { a.TargetAvailable = false }},
@@ -97,8 +100,12 @@ func TestEnforcementBeforeEffects(t *testing.T) {
 		{"budget", capability.BudgetExceeded, func(e *Enforcer, a *Authority, c *Call) { c.Usage["request_bytes"] = 101 }},
 		{"missing budget", capability.InvalidRequest, func(e *Enforcer, a *Authority, c *Call) { delete(c.Usage, "request_bytes") }},
 		{"missing reservation", capability.BudgetExceeded, func(e *Enforcer, a *Authority, c *Call) { e.Budget = nil }},
-		{"caller policy absent", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) { a.InitiatingCaller = &Subject{SessionClient, "caller"} }},
+		{"caller policy absent", capability.Unauthenticated, func(e *Enforcer, a *Authority, c *Call) {
+			a.Background = false
+			a.InitiatingCaller = &Subject{SessionClient, "caller"}
+		}},
 		{"caller policy denies", capability.ScopeDenied, func(e *Enforcer, a *Authority, c *Call) {
+			a.Background = false
 			a.InitiatingCaller = &Subject{SessionClient, "caller"}
 			policy := cloneScope(a.Policy)
 			policy.Allowlists["keys"] = []string{}
@@ -126,6 +133,7 @@ func TestEnforcementBeforeEffects(t *testing.T) {
 }
 func TestDelegatedSuccessAuditAndFailingSink(t *testing.T) {
 	e, a, c, _, releases, events := enforcementFixture(t)
+	a.Background = false
 	a.InitiatingCaller = &Subject{SessionClient, "caller"}
 	policy := cloneScope(a.Policy)
 	a.CallerPolicy = &policy
@@ -352,6 +360,7 @@ func TestEachAuthorityScopeActuallyNarrowsCall(t *testing.T) {
 			case "transport":
 				a.TransportScope = &narrowed
 			case "caller":
+				a.Background = false
 				a.InitiatingCaller = &Subject{SessionClient, "caller"}
 				a.CallerPolicy = &narrowed
 			}
@@ -365,6 +374,7 @@ func TestPermitPinsAuthenticatedPrincipal(t *testing.T) {
 		t.Run(field, func(t *testing.T) {
 			e, a, c, _, _, _ := enforcementFixture(t)
 			a.Actor = Subject{SessionClient, "session"}
+			a.Background = false
 			a.InitiatingCaller = &Subject{AgentClient, "initiator"}
 			policy := cloneScope(a.Policy)
 			a.CallerPolicy = &policy
@@ -388,7 +398,11 @@ func TestPermitPinsAuthenticatedPrincipal(t *testing.T) {
 				a.PolicyRevision = "next"
 				a.Grant.PolicyRevision = "next"
 			}
-			failureCode(t, permit.Recheck(), capability.Unauthenticated)
+			want := capability.Unauthenticated
+			if field == "owner" {
+				want = capability.TargetUnavailable
+			}
+			failureCode(t, permit.Recheck(), want)
 		})
 	}
 }
@@ -437,8 +451,10 @@ func TestScopeAndTupleValidationCoverAllTrustedInputs(t *testing.T) {
 			switch problem {
 			case "host":
 				a.Grant.HostInstance = "another"
+				want = capability.TargetUnavailable
 			case "owner":
 				a.Grant.OwnerID = "another"
+				want = capability.TargetUnavailable
 			case "generation":
 				a.Owner.OwnerGeneration = 0
 			case "policy schema":
@@ -451,6 +467,7 @@ func TestScopeAndTupleValidationCoverAllTrustedInputs(t *testing.T) {
 				policy := cloneScope(a.Policy)
 				policy.Allowlists["unrecognized"] = []string{"one"}
 				a.CallerPolicy = &policy
+				a.Background = false
 				a.InitiatingCaller = &Subject{AgentClient, "caller"}
 				want = capability.ScopeDenied
 			case "extra usage":

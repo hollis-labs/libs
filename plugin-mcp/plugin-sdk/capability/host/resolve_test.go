@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestGrantResolutionUsesSharedDTOAndNarrowing(t *testing.T) {
 		return inputs, nil
 	})
 	grants, denials, err := ResolveGrants(context.Background(), catalog, resolver, []Request{request}, plan)
-	if err != nil || len(grants) != 1 || len(denials) != 0 {
+	if err != nil || len(grants) != 1 || len(denials) != 1 || !denials[0].Narrowed || denials[0].GrantID != grants[0].GrantID {
 		t.Fatalf("resolution: %v", err)
 	}
 	if err := grants.ValidateForRuntime(plan.Runtime); err != nil {
@@ -111,7 +112,7 @@ func TestPlanningUnknownScopeVersionAndZeroAuthority(t *testing.T) {
 	plan.NewGrantID = func() string { return "duplicate" }
 	request.Optional = false
 	_, _, err = ResolveGrants(context.Background(), catalog, scopeFunc(approvedScopes), []Request{request, request}, plan)
-	failureCode(t, err, capability.InvalidRequest)
+	failureCode(t, err, capability.InternalError)
 }
 func TestPlanningRepeatedNamesKeepOperationTargetPairsSeparate(t *testing.T) {
 	catalog, one, plan := planningFixture(t)
@@ -175,4 +176,57 @@ func TestCancelledEmptyPlanDoesNotProceed(t *testing.T) {
 	cancel()
 	_, _, err := ResolveGrants(ctx, catalog, scopeFunc(approvedScopes), nil, plan)
 	failureCode(t, err, capability.Cancelled)
+}
+
+func TestPlanningCallbackPanicAndGeneratorFailureAbortOptional(t *testing.T) {
+	for _, problem := range []string{"scope panic", "generator panic", "blank ID", "invalid UTF-8 ID"} {
+		t.Run(problem, func(t *testing.T) {
+			catalog, request, plan := planningFixture(t)
+			request.Optional = true
+			resolver := scopeFunc(approvedScopes)
+			switch problem {
+			case "scope panic":
+				resolver = scopeFunc(func(context.Context, Request) (ScopeInputs, error) { panic("policy") })
+			case "generator panic":
+				plan.NewGrantID = func() string { panic("ID") }
+			case "blank ID":
+				plan.NewGrantID = func() string { return "" }
+			case "invalid UTF-8 ID":
+				plan.NewGrantID = func() string { return string([]byte{0xff}) }
+			}
+			grants, _, err := ResolveGrants(context.Background(), catalog, resolver, []Request{request}, plan)
+			failureCode(t, err, capability.InternalError)
+			if grants != nil {
+				t.Fatal("broken implementation returned plan")
+			}
+		})
+	}
+}
+
+func TestCancellationMidOptionalPlanAborts(t *testing.T) {
+	catalog, request, plan := planningFixture(t)
+	request.Optional = true
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resolver := scopeFunc(func(ctx context.Context, r Request) (ScopeInputs, error) { cancel(); return approvedScopes(ctx, r) })
+	grants, notices, err := ResolveGrants(ctx, catalog, resolver, []Request{request}, plan)
+	failureCode(t, err, capability.Cancelled)
+	if grants != nil || len(notices) != 0 {
+		t.Fatal("cancelled planning became optional denial")
+	}
+}
+
+func TestPlanningBadOperationRefusedByName(t *testing.T) {
+	catalog, request, plan := planningFixture(t)
+	supported := cloneScope(request.Scope)
+	request.Scope.Allowlists["operations"] = []string{"host/storage/get", "host/storage/delete"}
+	resolver := scopeFunc(func(context.Context, Request) (ScopeInputs, error) {
+		return ScopeInputs{cloneScope(supported), cloneScope(supported), cloneScope(supported)}, nil
+	})
+	grants, _, err := ResolveGrants(context.Background(), catalog, resolver, []Request{request}, plan)
+	failureCode(t, err, capability.ScopeDenied)
+	var failure *capability.Error
+	if !errors.As(err, &failure) || failure.Capability != request.Name || grants != nil {
+		t.Fatal("bad operation was silently clipped")
+	}
 }

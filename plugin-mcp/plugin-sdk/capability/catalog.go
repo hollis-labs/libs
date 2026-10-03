@@ -134,6 +134,8 @@ func NewCatalog(supported []string, extensions []Descriptor) (*Catalog, error) {
 		shared[d.Name] = d
 	}
 	c := &Catalog{descriptors: map[string]Descriptor{}}
+	operations := map[string]string{}
+
 	for _, name := range supported {
 		d, ok := shared[name]
 		if !ok {
@@ -141,6 +143,12 @@ func NewCatalog(supported []string, extensions []Descriptor) (*Catalog, error) {
 		}
 		if _, ok := c.descriptors[name]; ok {
 			return nil, refusal(InvalidRequest, name)
+		}
+		for _, op := range d.Operations {
+			if _, exists := operations[op]; exists {
+				return nil, refusal(InvalidRequest, name)
+			}
+			operations[op] = name
 		}
 		c.descriptors[name] = d
 	}
@@ -156,6 +164,12 @@ func NewCatalog(supported []string, extensions []Descriptor) (*Catalog, error) {
 		}
 		if !validExtensionOperations(d.Operations) || !validNames(d.ScopeSchema.Allowlists) || !validNames(d.ScopeSchema.Limits) || !slices.Contains(d.ScopeSchema.Allowlists, "operations") || !slices.Contains(d.ScopeSchema.Allowlists, "targets") || !slices.Contains(d.ScopeSchema.Allowlists, "effects") {
 			return nil, refusal(InvalidRequest, d.Name)
+		}
+		for _, op := range d.Operations {
+			if _, exists := operations[op]; exists {
+				return nil, refusal(InvalidRequest, d.Name)
+			}
+			operations[op] = d.Name
 		}
 		c.descriptors[d.Name] = cloneDescriptor(d)
 	}
