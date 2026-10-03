@@ -29,8 +29,11 @@ jobs:
       - name: one-way dependency rule
         run: scripts/check-one-way
 
+      # Scoped to the revision under test (the pull request's merge commit, or the pushed
+      # branch tip): the checkout fetches every branch, and a scan of all refs would charge
+      # this change with the history of every other open branch.
       - name: public hygiene (secrets, hosts, private paths; tree and history)
-        run: scripts/scan-public
+        run: scripts/scan-public --ref HEAD
 
       - name: scripts parse (shellcheck, python syntax)
         run: |
