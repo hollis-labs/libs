@@ -134,3 +134,39 @@ func TestCRUDSuppliedEmptyDataIsNotOmitted(t *testing.T) {
 		t.Fatalf("empty data lost: %s: %v", b, err)
 	}
 }
+
+func TestRequiredObjectHostEncoding(t *testing.T) {
+	for _, value := range []map[string]interface{}{nil, {}, {"MixedCase": "value"}} {
+		event := EventHandleParams{Type: "post", Source: "host", Data: value, Identity: json.RawMessage(`{"subject":"caller"}`)}
+		mcp := MCPCallRequest{ToolName: "echo", Arguments: value, Identity: json.RawMessage(`{"subject":"caller"}`)}
+		for _, tc := range []struct {
+			method, field string
+			params        any
+		}{{MethodEventHandle, "data", event}, {MethodMCPCallTool, "arguments", mcp}} {
+			b, err := json.Marshal(tc.params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := validateRuntimeParams(tc.method, json.RawMessage(b)); err != nil {
+				t.Fatalf("host DTO rejected by plugin validator: %s: %v", b, err)
+			}
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(b, &fields); err != nil {
+				t.Fatal(err)
+			}
+			want := `{}`
+			if value != nil && len(value) > 0 {
+				want = `{"MixedCase":"value"}`
+			}
+			if string(fields[tc.field]) != want {
+				t.Fatalf("%s encoded %s, want %s", tc.field, fields[tc.field], want)
+			}
+			if string(fields["identity"]) != `{"subject":"caller"}` {
+				t.Fatalf("other fields changed: %s", b)
+			}
+		}
+		if value == nil && (event.Data != nil || mcp.Arguments != nil) {
+			t.Fatal("encoding mutated caller's nil map")
+		}
+	}
+}
