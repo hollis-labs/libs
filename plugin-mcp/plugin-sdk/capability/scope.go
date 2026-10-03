@@ -3,6 +3,8 @@ package capability
 import (
 	"slices"
 	"sort"
+	"strings"
+	"unicode"
 )
 
 // Scope is a normalized authority envelope, not a wire grant. Each allowlist
@@ -53,7 +55,7 @@ func (s Scope) Validate(name string) error {
 			return refusal(InvalidRequest, name)
 		}
 		for _, v := range vs {
-			if v == "" || v == "*" {
+			if v == "" || v == "*" || strings.TrimSpace(v) != v || strings.ContainsFunc(v, unicode.IsControl) {
 				return refusal(InvalidRequest, name)
 			}
 		}
@@ -98,5 +100,5 @@ func (s Scope) Allows(dimension, value string) bool {
 // Within checks a nonnegative amount against an explicitly present ceiling.
 func (s Scope) Within(dimension string, amount int64) bool {
 	limit, ok := s.Limits[dimension]
-	return ok && amount >= 0 && amount <= limit
+	return ok && limit > 0 && amount >= 0 && amount <= limit
 }

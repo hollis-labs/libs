@@ -69,7 +69,11 @@ func TestDescriptorScopeChecks(t *testing.T) {
 }
 func TestWireFailureNeverRetries(t *testing.T) {
 	e := &Error{Code: UnknownOutcome, RequestID: "request", EffectState: Unknown}
-	b, err := json.Marshal(e.RPCData())
+	payload, err := e.RPCData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
 	}

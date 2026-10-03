@@ -16,6 +16,7 @@ const (
 	DeadlineExceeded      Code = "deadline_exceeded"
 	UnknownOutcome        Code = "unknown_outcome"
 	InternalError         Code = "internal_error"
+	Conflict              Code = "conflict"
 )
 
 // EffectState distinguishes authorization refusal from an ambiguous mutation.
@@ -31,10 +32,11 @@ const (
 // Error contains only safe classification metadata. Adapters must not copy
 // internal error messages, arguments or credentials into wire errors.
 type Error struct {
-	Code        Code        `json:"code"`
-	Capability  string      `json:"capability,omitempty"`
-	RequestID   string      `json:"request_id,omitempty"`
-	EffectState EffectState `json:"effect_state"`
+	Code        Code          `json:"code"`
+	Capability  string        `json:"capability,omitempty"`
+	RequestID   string        `json:"request_id,omitempty"`
+	EffectState EffectState   `json:"effect_state"`
+	Detail      FailureDetail `json:"detail,omitempty"`
 }
 
 func (e *Error) Error() string { return string(e.Code) + ": " + e.Capability }
@@ -42,18 +44,57 @@ func (e *Error) Error() string { return string(e.Code) + ": " + e.Capability }
 // RPCErrorData is the protocol-2 host application error payload. All errors
 // prohibit automatic retry, including unknown outcomes and idempotent hints.
 type RPCErrorData struct {
-	Contract    string      `json:"contract"`
-	Code        Code        `json:"code"`
-	RequestID   string      `json:"request_id"`
-	EffectState EffectState `json:"effect_state"`
-	Retryable   bool        `json:"retryable"`
+	Contract    string        `json:"contract"`
+	Code        Code          `json:"code"`
+	RequestID   string        `json:"request_id"`
+	EffectState EffectState   `json:"effect_state"`
+	Retryable   bool          `json:"retryable"`
+	Detail      FailureDetail `json:"detail,omitempty"`
 }
 
 const HostRPCErrorCode = -32010
 
-func (e *Error) RPCData() RPCErrorData {
-	return RPCErrorData{"host-rpc/1", e.Code, e.RequestID, e.EffectState, false}
+// FailureDetail is a closed machine-readable refinement, never raw diagnostics.
+type FailureDetail string
+
+const (
+	StaleBinding  FailureDetail = "stale_binding"
+	CallbackCycle FailureDetail = "callback_cycle"
+	DepthExceeded FailureDetail = "depth_exceeded"
+)
+
+// RPCData validates application codes and effect state before serialization.
+// Missing state is conservatively unknown; inconsistent unknown-outcome or
+// unrecognized metadata is refused instead of emitting a malformed wire error.
+func (e *Error) RPCData() (RPCErrorData, error) {
+	if e == nil {
+		return RPCErrorData{}, refusal(InvalidRequest, "")
+	}
+	state := e.EffectState
+	if state == "" {
+		state = Unknown
+	}
+	switch state {
+	case NotStarted, NotCommitted, Committed, Unknown:
+	default:
+		return RPCErrorData{}, refusal(InvalidRequest, e.Capability)
+	}
+	switch e.Code {
+	case InvalidRequest, Unauthenticated, CapabilityDenied, ScopeDenied, UnsupportedCapability, TargetUnavailable, BudgetExceeded, RateLimited, Cancelled, DeadlineExceeded, UnknownOutcome, InternalError, Conflict:
+	default:
+		return RPCErrorData{}, refusal(InvalidRequest, e.Capability)
+	}
+	if e.Code == UnknownOutcome && state != Unknown {
+		return RPCErrorData{}, refusal(InvalidRequest, e.Capability)
+	}
+	switch e.Detail {
+	case "", StaleBinding, CallbackCycle, DepthExceeded:
+	default:
+		return RPCErrorData{}, refusal(InvalidRequest, e.Capability)
+	}
+	return RPCErrorData{Contract: "host-rpc/1", Code: e.Code, RequestID: e.RequestID, EffectState: state, Retryable: false, Detail: e.Detail}, nil
 }
+
 func refusal(code Code, name string) *Error {
 	return &Error{Code: code, Capability: name, EffectState: NotStarted}
 }

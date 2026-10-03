@@ -3,6 +3,7 @@ package capability
 import (
 	"slices"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -113,11 +114,11 @@ func SharedDescriptors() []Descriptor {
 		descriptor(ContextSource, "Declared context sources with ownership and retrieval budgets.", Read, false, []string{"register", "retrieve"}, []string{"agents", "sessions", "sources", "mounts"}, []string{"response_bytes"}),
 		descriptor(DurableAgentWake, "Wake approved agents; no provisioning, commands or scheduler access.", Write, false, []string{"wake"}, []string{"agents"}, []string{"request_bytes", "rate_per_minute"}),
 		descriptor(ReflexSeed, "Install exact declared seeds on approved agents.", Write, false, []string{"install"}, []string{"agents", "seeds"}, []string{"request_bytes"}),
-		descriptor(MCPReach, "Discover/call/cancel reviewed tools with pinned definitions and no delegation cycles.", Destructive, false, []string{"host/mcp/list_tools", "host/mcp/call_tool", "host/mcp/cancel_call"}, []string{"server_tools", "definition_revisions", "sessions"}, []string{"request_bytes", "response_bytes", "deadline_ms", "concurrency", "rate_per_minute", "call_depth"}),
+		descriptor(MCPReach, "Discover/call/cancel reviewed tools with pinned definitions and no delegation cycles.", Destructive, false, []string{"host/mcp/list_tools", "host/mcp/call_tool", "host/mcp/cancel_call"}, []string{"server_tools", "sessions"}, []string{"request_bytes", "response_bytes", "deadline_ms", "concurrency", "rate_per_minute", "call_depth"}),
 		descriptor(StorageRead, "Owner-private logical KV keys.", Read, true, []string{"host/storage/get"}, []string{"keys"}, []string{"response_bytes"}),
 		descriptor(StorageWrite, "Owner-private KV mutations with expected revision and operation key.", Destructive, true, []string{"host/storage/put", "host/storage/delete"}, []string{"keys"}, []string{"request_bytes"}),
 		descriptor(SecretsRead, "Exact broker secret references; external custody and redaction.", Read, true, []string{"host/secrets/get"}, []string{"secret_refs"}, []string{"lifetime_ms", "response_bytes"}),
-		descriptor(EgressRequest, "Reviewed HTTPS destinations/methods; host checks DNS, redirects and proxies.", Destructive, true, []string{"host/egress/request"}, []string{"destinations", "methods"}, []string{"request_bytes", "response_bytes", "deadline_ms"}),
+		descriptor(EgressRequest, "Reviewed HTTPS destinations/methods; host checks DNS, redirects and proxies.", Destructive, true, []string{"host/egress/request"}, []string{"destinations"}, []string{"request_bytes", "response_bytes", "deadline_ms"}),
 		descriptor(EventsPublish, "Owner-namespaced declared schemas; no core/gate impersonation.", Write, true, []string{"host/events/publish"}, []string{"event_schemas"}, []string{"request_bytes", "rate_per_minute"}),
 		descriptor(LogWrite, "Bounded redacted logging to the host sink.", Write, true, []string{"host/log"}, []string{"levels"}, []string{"request_bytes", "rate_per_minute"}),
 	}
@@ -153,7 +154,7 @@ func NewCatalog(supported []string, extensions []Descriptor) (*Catalog, error) {
 		if _, ok := c.descriptors[d.Name]; ok {
 			return nil, refusal(InvalidRequest, d.Name)
 		}
-		if !validNames(d.Operations) || !validNames(d.ScopeSchema.Allowlists) || !validNames(d.ScopeSchema.Limits) || !slices.Contains(d.ScopeSchema.Allowlists, "operations") || !slices.Contains(d.ScopeSchema.Allowlists, "targets") || !slices.Contains(d.ScopeSchema.Allowlists, "effects") {
+		if !validExtensionOperations(d.Operations) || !validNames(d.ScopeSchema.Allowlists) || !validNames(d.ScopeSchema.Limits) || !slices.Contains(d.ScopeSchema.Allowlists, "operations") || !slices.Contains(d.ScopeSchema.Allowlists, "targets") || !slices.Contains(d.ScopeSchema.Allowlists, "effects") {
 			return nil, refusal(InvalidRequest, d.Name)
 		}
 		c.descriptors[d.Name] = cloneDescriptor(d)
@@ -202,4 +203,23 @@ func (c *Catalog) Lookup(name string, version int) (Descriptor, error) {
 		return Descriptor{}, refusal(UnsupportedCapability, name)
 	}
 	return cloneDescriptor(d), nil
+}
+
+// Extension methods use a separately reviewed closed table. The complete shared
+// host/* operation namespace stays reserved, including future shared methods.
+func validExtensionOperations(operations []string) bool {
+	if !validNames(operations) {
+		return false
+	}
+	for _, op := range operations {
+		if strings.HasPrefix(op, "host/") || strings.ContainsAny(op, "*?[]") || strings.TrimSpace(op) != op || strings.ContainsFunc(op, unicode.IsControl) {
+			return false
+		}
+		for _, shared := range SharedDescriptors() {
+			if slices.Contains(shared.Operations, op) {
+				return false
+			}
+		}
+	}
+	return true
 }
