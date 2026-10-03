@@ -44,34 +44,24 @@ contract. Archives and checksums belong to distribution catalogs.
 
 ## Tool annotations
 
-`annotations` is an optional object with optional boolean fields `readOnly`,
-`destructive`, `idempotent` and `openWorld`. Explicit `false` survives encoding;
-omitted fields acquire no defaults. Omitting the object leaves existing manifest
-behavior and output unchanged. The SDK carries hints; hosts map them to MCP
-annotations when registering tools. This change does not implement host mapping.
-Hints never authorize execution or lower policy: `effect` stays authoritative.
+`annotations` is an optional object using the MCP field names: optional string
+`title` and optional booleans `readOnlyHint`, `destructiveHint`, `idempotentHint`
+and `openWorldHint`. Projection of this object to MCP uses the same keys and
+values. Explicit `false` survives encoding; omitted fields acquire no defaults.
+Omitting the object leaves existing manifest behavior and output unchanged.
+This change does not implement host registration. Hints never authorize
+execution or lower policy: `effect` stays authoritative.
 
-For the conventional effects, any supplied hint must follow this matrix:
-
-| Effect | readOnly | destructive | idempotent | openWorld |
-|---|---|---|---|---|
-| read | true | false | false | either |
-| write | false | false | either | either |
-| destructive | false | true | false | either |
-
-Every field may be omitted. `idempotent: true` is meaningful only for `write`;
-false is neutral. `destructive: true` cannot accompany `readOnly: true`.
-The SDK refuses inconsistencies with the tool name and offending hint in the
-error. An empty annotation object is valid. Effects remain an open host
-vocabulary: custom effects are accepted without semantic hints or with only
-`openWorld`, but supplied `readOnly`, `destructive` or `idempotent` hints are
-refused because the SDK cannot establish consistency for a custom effect.
-MCP `title` is outside this four-field object.
+The only cross-field rule is that `readOnlyHint: true` cannot accompany
+`destructiveHint: true`. The SDK refuses that conflict with the tool name and
+hints in the error. All other combinations are accepted, including idempotent
+read or destructive tools. Effects remain an open host vocabulary and are not
+compared with hints. An empty annotation object is valid.
 
 For example, a repeatable write can declare:
 
 ```json
-{"name":"notes_save","description":"Save notes","input_schema":{"type":"object"},"effect":"write","annotations":{"readOnly":false,"destructive":false,"idempotent":true,"openWorld":false}}
+{"name":"notes_save","description":"Save notes","input_schema":{"type":"object"},"effect":"write","annotations":{"title":"Save notes","readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}}
 ```
 
 ### Compatibility with older strict hosts
@@ -81,12 +71,33 @@ The new decoder reads existing manifests unchanged. A manifest that **uses**
 refuse it by name with `manifest: unknown field "annotations"`; they do not
 silently ignore it. This is not forward compatible with those hosts. No release
 number is assigned here, and neither schema version 2 nor subprocess protocol 1
-changes. Host releases must disclose support before plugin authors emit hints.
+changes. The rollout order is: SDK release carrying annotations, then the Nanite SDK
+bump, then updated nanite-plugins manifests. Phase A therefore requires SDK,
+host and plugin updates; it is not host-only. Each host adopts on its own
+schedule, with no lockstep release.
 
 Compatibility fixtures live in `manifest/testdata/annotations/`: manifests with
 and without hints, plus `older-strict-host-error.txt`, the frozen diagnostic
 observed from the pre-change decoder. That diagnostic is documentation of
 version skew, not a test that builds or simulates old SDK code.
+
+### Historical tool definitions
+
+`manifest/testdata/annotations/nanite-pre-cutover.json` freezes the exact
+`context_pin`, `context_unpin` and `reminder_set` names, descriptions, input
+schemas and annotations. Source: Nanite
+`2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe`, the commit built into the
+pre-cutover binary with SHA256 prefix `ef20f9be` (a binary hash, not a Git
+revision). Definitions come from `internal/selftools/self_tools.go`; the four
+boolean hints come from `internal/mcpserver/annotations.go` and are applied
+unchanged by `buildTool` in `internal/mcpserver/server.go`. The source has no
+title for these tools. Zero-value false hints are preserved explicitly.
+
+The golden test decodes these definitions and validates them through a manifest
+roundtrip, preserving the MCP annotation keys and values. Historical MCP
+definitions have no `effect` field; the test supplies an opaque host-defined
+effect rather than inferring historical metadata. No Nanite checkout or binary
+is required to run the test.
 
 ## Validation and enforcement
 

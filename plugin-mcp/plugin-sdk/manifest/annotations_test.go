@@ -3,6 +3,7 @@ package manifest_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -36,7 +37,7 @@ func TestAnnotationFixtures(t *testing.T) {
 				}
 			} else {
 				a := m.Tools[1].Annotations
-				if a == nil || a.ReadOnly == nil || *a.ReadOnly || a.Destructive == nil || *a.Destructive || a.Idempotent == nil || !*a.Idempotent || a.OpenWorld == nil || *a.OpenWorld {
+				if a == nil || a.Title != "Save notes" || a.ReadOnlyHint == nil || *a.ReadOnlyHint || a.DestructiveHint == nil || *a.DestructiveHint || a.IdempotentHint == nil || !*a.IdempotentHint || a.OpenWorldHint == nil || *a.OpenWorldHint {
 					t.Fatalf("explicit hints lost: %#v", a)
 				}
 			}
@@ -45,53 +46,52 @@ func TestAnnotationFixtures(t *testing.T) {
 }
 
 func TestAnnotationConsistency(t *testing.T) {
-	// Each row specifies the allowed explicit boolean values. Omission is
-	// always valid, including for custom host-defined effects.
-	rows := []struct {
-		effect  string
-		allowed map[string][]bool
-	}{
-		{"read", map[string][]bool{"readOnly": {true}, "destructive": {false}, "idempotent": {false}, "openWorld": {false, true}}},
-		{"write", map[string][]bool{"readOnly": {false}, "destructive": {false}, "idempotent": {false, true}, "openWorld": {false, true}}},
-		{"destructive", map[string][]bool{"readOnly": {false}, "destructive": {true}, "idempotent": {false}, "openWorld": {false, true}}},
-		{"custom_host.effect", map[string][]bool{"openWorld": {false, true}}},
-	}
-	for _, row := range rows {
-		for _, field := range []string{"readOnly", "destructive", "idempotent", "openWorld"} {
-			for _, value := range []string{"omitted", "false", "true"} {
-				t.Run(row.effect+"/"+field+"/"+value, func(t *testing.T) {
-					m := example()
-					m.Tools[0].Effect = row.effect
-					m.Tools[0].Annotations = &manifest.ToolAnnotations{}
-					valid := value == "omitted"
-					if !valid {
-						if err := json.Unmarshal([]byte(`{"`+field+`":`+value+`}`), m.Tools[0].Annotations); err != nil {
-							t.Fatal(err)
-						}
-						for _, allowed := range row.allowed[field] {
-							valid = valid || allowed == (value == "true")
-						}
+	// Effects are an open host vocabulary. Every combination of omitted,
+	// false and true hints is valid except read-only plus destructive.
+	values := []*bool{nil, new(false), new(true)}
+	for _, effect := range []string{"read", "write", "destructive", "custom_host.effect"} {
+		for ri, readOnly := range values {
+			for di, destructive := range values {
+				for ii, idempotent := range values {
+					for oi, openWorld := range values {
+						t.Run(fmt.Sprintf("%s/%d%d%d%d", effect, ri, di, ii, oi), func(t *testing.T) {
+							m := example()
+							m.Tools[0].Effect = effect
+							m.Tools[0].Annotations = &manifest.ToolAnnotations{
+								ReadOnlyHint: readOnly, DestructiveHint: destructive,
+								IdempotentHint: idempotent, OpenWorldHint: openWorld,
+							}
+							var out bytes.Buffer
+							err := manifest.Encode(&out, m)
+							if ri == 2 && di == 2 {
+								if err == nil || !strings.Contains(err.Error(), m.Tools[0].Name+").annotations.readOnlyHint=true cannot accompany destructiveHint=true") || out.Len() != 0 {
+									t.Fatalf("expected named refusal without output, got %v", err)
+								}
+								return
+							}
+							if err != nil {
+								t.Fatal(err)
+							}
+							got, err := manifest.Decode(&out)
+							if err != nil || !reflect.DeepEqual(got.Tools[0].Annotations, m.Tools[0].Annotations) {
+								t.Fatalf("annotation roundtrip: %v", err)
+							}
+						})
 					}
-					var out bytes.Buffer
-					err := manifest.Encode(&out, m)
-					if valid {
-						if err != nil {
-							t.Fatal(err)
-						}
-						if _, err := manifest.Decode(&out); err != nil {
-							t.Fatal(err)
-						}
-					} else if err == nil || !strings.Contains(err.Error(), m.Tools[0].Name+").annotations."+field) || out.Len() != 0 {
-						t.Fatalf("expected named refusal without output, got %v", err)
-					}
-				})
+				}
 			}
 		}
 	}
 }
 
 func TestAnnotationDecodeRefusesMalformedHints(t *testing.T) {
-	for _, annotations := range []string{`{"readOnly":"true"}`, `{"openWorld":1}`, `{"title":"Notes"}`, `{"ReadOnly":true}`, `{"readOnly":true,"readOnly":false}`, `[]`, `{"readOnly":false}`, `{"destructive":true}`, `{"idempotent":true}`, `{"readOnly":true,"destructive":true}`} {
+	for _, annotations := range []string{
+		`{"readOnlyHint":"true"}`, `{"openWorldHint":1}`, `{"title":true}`,
+		`{"ReadOnlyHint":true}`, `{"readOnlyHint":true,"readOnlyHint":false}`,
+		`{"title":"a","title":"b"}`, `[]`,
+		`{"readOnly":true}`, `{"destructive":false}`, `{"idempotent":true}`, `{"openWorld":false}`,
+		`{"readOnlyHint":true,"destructiveHint":true}`,
+	} {
 		t.Run(annotations, func(t *testing.T) {
 			var out bytes.Buffer
 			if err := manifest.Encode(&out, example()); err != nil {
@@ -102,5 +102,85 @@ func TestAnnotationDecodeRefusesMalformedHints(t *testing.T) {
 				t.Fatalf("expected atomic refusal, got %#v, %v", got, err)
 			}
 		})
+	}
+}
+
+// The source revision is immutable. This test validates its tool definitions
+// through the SDK without requiring a Nanite checkout or executing a binary.
+func TestNanitePreCutoverGoldenDefinitions(t *testing.T) {
+	raw, err := os.ReadFile("testdata/annotations/nanite-pre-cutover.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		SourceCommit       string `json:"source_commit"`
+		BinarySHA256Prefix string `json:"binary_sha256_prefix"`
+		Tools              []struct {
+			Name        string          `json:"name"`
+			Description string          `json:"description"`
+			InputSchema json.RawMessage `json:"inputSchema"`
+			Annotations json.RawMessage `json:"annotations"`
+		} `json:"tools"`
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&fixture); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.SourceCommit != "2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe" || fixture.BinarySHA256Prefix != "ef20f9be" {
+		t.Fatal("golden source provenance changed")
+	}
+	names := []string{}
+	for _, tool := range fixture.Tools {
+		names = append(names, tool.Name)
+		t.Run(tool.Name, func(t *testing.T) {
+			var annotations manifest.ToolAnnotations
+			if err := json.Unmarshal(tool.Annotations, &annotations); err != nil {
+				t.Fatal(err)
+			}
+			m := example()
+			m.Tools = []manifest.Tool{{
+				Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema,
+				// The old MCP definition has no effect field. This test uses an opaque
+				// host vocabulary value rather than inventing historical metadata.
+				Effect: "golden.host-defined", Annotations: &annotations,
+			}}
+			var out bytes.Buffer
+			if err := manifest.Encode(&out, m); err != nil {
+				t.Fatal(err)
+			}
+			got, err := manifest.Decode(&out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := got.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if got.Tools[0].Name != tool.Name || got.Tools[0].Description != tool.Description {
+				t.Fatal("golden name or description changed")
+			}
+			assertJSONEqual := func(want, got []byte) {
+				t.Helper()
+				var w, g any
+				if err := json.Unmarshal(want, &w); err != nil {
+					t.Fatal(err)
+				}
+				if err := json.Unmarshal(got, &g); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(w, g) {
+					t.Fatalf("golden projection differs: want %s, got %s", want, got)
+				}
+			}
+			assertJSONEqual(tool.InputSchema, got.Tools[0].InputSchema)
+			projected, err := json.Marshal(got.Tools[0].Annotations)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertJSONEqual(tool.Annotations, projected)
+		})
+	}
+	if !reflect.DeepEqual(names, []string{"reminder_set", "context_pin", "context_unpin"}) {
+		t.Fatalf("unexpected golden tools: %v", names)
 	}
 }

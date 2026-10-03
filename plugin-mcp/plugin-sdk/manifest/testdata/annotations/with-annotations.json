@@ -22,9 +22,9 @@
       },
       "effect": "read",
       "annotations": {
-        "readOnly": true,
-        "destructive": false,
-        "openWorld": false
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
       }
     },
     {
@@ -35,10 +35,11 @@
       },
       "effect": "write",
       "annotations": {
-        "readOnly": false,
-        "destructive": false,
-        "idempotent": true,
-        "openWorld": false
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "title": "Save notes"
       }
     },
     {
@@ -49,9 +50,9 @@
       },
       "effect": "destructive",
       "annotations": {
-        "readOnly": false,
-        "destructive": true,
-        "openWorld": true
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
       }
     }
   ]
