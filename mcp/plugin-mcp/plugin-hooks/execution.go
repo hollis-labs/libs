@@ -64,6 +64,7 @@ type ExecutionConfig struct {
 	Breaker                                                        BreakerConfig
 	Clock                                                          Clock
 	Sink                                                           Sink
+	BindingResolver                                                RemoteBindingResolver
 }
 
 // Engine is the sole execution layer for its Registry. Call Shutdown to release
@@ -88,18 +89,21 @@ type Engine struct {
 }
 type depthKey struct{}
 type dispatch struct {
-	ctx        context.Context
-	trace      TraceRecord
-	beganAt    time.Time
-	cancel     context.CancelFunc
-	stop       func() bool
-	definition Definition
-	entries    []*entry
-	payload    json.RawMessage
-	metadata   map[string]string
-	id         string
-	future     *Future
-	permits    chan struct{}
+	ctx            context.Context
+	trace          TraceRecord
+	beganAt        time.Time
+	cancel         context.CancelFunc
+	stop           func() bool
+	definition     Definition
+	entries        []*entry
+	payload        json.RawMessage
+	metadata       map[string]string
+	id             string
+	future         *Future
+	permits        chan struct{}
+	remoteOverride RemoteHandler
+	batchWork      func()
+	batch          bool
 }
 
 // NewEngine uses provisional defaults: 64 active calls, 8 per owner generation,
@@ -147,6 +151,10 @@ func NewEngine(r *Registry, c ExecutionConfig) (*Engine, error) {
 	for range c.Workers {
 		e.workers.Go(func() {
 			for d := range e.queue {
+				if d.batchWork != nil {
+					d.batchWork()
+					continue
+				}
 				result, err := e.execute(d)
 				d.future.complete(result, err)
 				d.cleanup()
@@ -185,7 +193,7 @@ func cloneMetadata(v map[string]string) map[string]string {
 	return out
 }
 func (d *dispatch) cleanup() { d.stop(); d.cancel() }
-func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessage, metadata map[string]string, kind Kind, detached bool) (prepared *dispatch, prepareErr error) {
+func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessage, metadata map[string]string, kind Kind, detached bool, targets ...*entry) (prepared *dispatch, prepareErr error) {
 	trace := e.dispatchRecord(ctx, hook)
 	beganAt := trace.StartedAt
 	defer func() {
@@ -211,11 +219,20 @@ func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessa
 	if depth >= e.config.MaxDepth {
 		return nil, ErrDepthExceeded
 	}
+	inheritedDeadline, hasInheritedDeadline := ctx.Deadline()
 	if detached {
+		verified, _ := ctx.Value(verifiedCallbackKey{}).(bool)
+		if !verified {
+			hasInheritedDeadline = false
+		}
 		ctx = context.WithoutCancel(ctx)
 	}
 	ctx = context.WithValue(ctx, depthKey{}, depth+1)
-	ctx, cancel := context.WithTimeout(ctx, d.Budget)
+	deadline := time.Now().Add(d.Budget)
+	if hasInheritedDeadline && inheritedDeadline.Before(deadline) {
+		deadline = inheritedDeadline
+	}
+	ctx, cancel := context.WithDeadline(ctx, deadline)
 	stop := context.AfterFunc(e.lifetime, cancel)
 	e.mu.Lock()
 	closed := e.closed
@@ -236,7 +253,19 @@ func (e *Engine) prepare(ctx context.Context, hook string, payload json.RawMessa
 		cancel()
 		return nil, err
 	}
-	return &dispatch{trace: trace, beganAt: beganAt, ctx: ctx, cancel: cancel, stop: stop, definition: d, entries: e.registry.snapshot(hook), payload: private, metadata: cloneMetadata(metadata), id: trace.InvocationID, permits: make(chan struct{}, d.MaxParallelism)}, nil
+	entries := e.registry.snapshot(hook)
+	if len(targets) > 0 {
+		entries = targets
+	}
+	if cycleErr := rejectCycle(ctx, entries); cycleErr != nil {
+		stop()
+		cancel()
+		return nil, cycleErr
+	}
+	if _, ok := ctx.Value(rootInvocationKey{}).(string); !ok {
+		ctx = context.WithValue(ctx, rootInvocationKey{}, trace.InvocationID)
+	}
+	return &dispatch{trace: trace, beganAt: beganAt, ctx: ctx, cancel: cancel, stop: stop, definition: d, entries: entries, payload: private, metadata: cloneMetadata(metadata), id: trace.InvocationID, permits: make(chan struct{}, d.MaxParallelism)}, nil
 }
 
 func dispatchFailure(err error) DispatchResult {
@@ -393,7 +422,15 @@ type callResult struct {
 }
 
 func classify(err error) string {
+	var remote *RemoteFailure
+	if errors.As(err, &remote) && validRemoteCode(remote.Code) {
+		return string(remote.Code)
+	}
 	switch {
+	case errors.Is(err, errNotificationSubmitted):
+		return "queued"
+	case errors.Is(err, ErrCallbackCycle):
+		return "callback_cycle"
 	case err == nil:
 		return "success"
 	case errors.Is(err, ErrCancelled):
@@ -473,13 +510,27 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 	}
 	stopRemoval := context.AfterFunc(entry.removalContext, cancelDeadline)
 	cancel := func() { stopRemoval(); stopConnection(); cancelDeadline() }
-	select {
-	case d.permits <- struct{}{}:
-	case <-ctx.Done():
-		cancel()
-		return nil, fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
+	if d.batch {
+		select {
+		case d.permits <- struct{}{}:
+		default:
+			cancel()
+			return nil, &RemoteFailure{Code: CapacityExhausted, admission: true}
+		}
+	} else {
+		select {
+		case d.permits <- struct{}{}:
+		case <-ctx.Done():
+			cancel()
+			return nil, fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
+		}
 	}
-	releaseCapacity, err := e.capacity(ctx, entry.scope.key)
+	var releaseCapacity func()
+	if d.batch {
+		releaseCapacity, err = e.tryCapacity(entry.scope.key)
+	} else {
+		releaseCapacity, err = e.capacity(ctx, entry.scope.key)
+	}
 	release := func() { releaseCapacity(); <-d.permits }
 	if err != nil {
 		<-d.permits
@@ -506,10 +557,12 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 	call.record.Started = true
 	call.record.QueueMS = elapsed(e.config.Clock.Now(), call.beganAt)
 	handlerCtx := context.WithValue(l.ctx, traceContextKey{}, TraceContext{TraceID: call.record.TraceID, SpanID: call.record.SpanID})
+	handlerCtx, active := withActiveInvocation(handlerCtx, entry)
 	result := make(chan callResult, 1)
 	input := bytes.Clone(payload)
 	metadata := cloneMetadata(d.metadata)
 	go func() {
+		defer active.active.Store(false)
 		out := callResult{}
 		func() {
 			defer func() {
@@ -521,15 +574,18 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 			if entry.remote != nil {
 				out.payload, out.err = e.invokeRemote(handlerCtx, d, entry, input, metadata)
 			} else if entry.action != nil {
-				out.err = entry.action(handlerCtx, v)
+				localCtx := context.WithValue(handlerCtx, parentInvocationKey{}, d.id)
+				out.err = entry.action(localCtx, v)
 			} else {
-				out.payload, out.err = entry.filter(handlerCtx, v)
+				localCtx := context.WithValue(handlerCtx, parentInvocationKey{}, d.id)
+				out.payload, out.err = entry.filter(localCtx, v)
 				out.payload = bytes.Clone(out.payload)
 			}
 			if validate != nil && out.err == nil {
 				out.payload, out.err = validate(out.payload)
 			}
 		}()
+		active.active.Store(false)
 		if ctx.Err() != nil {
 			out.payload = nil
 			out.err = ctx.Err()
@@ -631,6 +687,13 @@ func (e *Engine) execute(d *dispatch) (result DispatchResult, executeErr error) 
 		if err := d.ctx.Err(); err != nil {
 			result.Status = CallerCancelled
 			return result, err
+		}
+		if errors.Is(out.err, errNotificationSubmitted) {
+			if result.Status == Success {
+				result.Status = Queued
+			}
+			result.Outcomes[len(result.Outcomes)-1].Error = nil
+			continue
 		}
 		if out.err != nil {
 			if def.Mode == Bail && errors.Is(out.err, ErrCancelled) {

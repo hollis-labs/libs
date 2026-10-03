@@ -100,7 +100,8 @@ and harness runs. During development use `go test ./hookstest` and `go vet ./...
 
 ## Remote seam requirements
 
-Factories implementing `RemoteScope` and `RemoteDispatcher` also run these
+Factories implementing `RemoteScope`, `RemoteDispatcher`, and
+`RemoteExecutionDispatcher` also run these
 requirements against an in-memory fake `RemoteHandler` transport. The reference
 passes with zero waivers. A factory lacking the remote extension must explicitly
 waive the affected IDs with a reason; no implicit waiver is provided.
@@ -110,9 +111,11 @@ waive the affected IDs with a reason; no implicit waiver is provided.
 | R16 | Remote-only scopes, remote_ok, latency ceiling and remaining-budget admission |
 | R17 | Structured result branches, deliberate bail vetoes and no text/sentinel heuristics |
 | R18 | Correlation/digest/context snapshots, field views, connection/unload and generation fences |
+| R19 | Verified parent bindings, one shared depth guard, inherited deadline/budget/trace, direct and indirect active-registration cycles |
+| R20 | Observation batch caps, whole-envelope validation, ordered independent outcomes and private item leases |
+| R21 | Default-off notifications, queued receipts, rollback without sends, and no breaker success |
 | R22 | Transport failure accounting, open skip and half-open recovery under existing policy |
 
-R01-R15 retain their existing identities. R19-R21 are reserved for the following
-callback/batch/notification surface and are not published runnable requirements
-yet. Separate broken-adapter probes prove that every new requirement rejects a
+R01-R15 retain their existing identities. Separate broken-adapter probes prove
+that every new requirement rejects a
 specific bad integration. Run the same `./scripts/check.sh` gate.

@@ -61,20 +61,24 @@ func remoteToken() (string, error) {
 }
 
 // RemoteRegistration is supplied only by the host, after profile negotiation.
-// LatencyEstimate is the host's positive round-trip estimate, not plugin data.
+// LatencyEstimate is the host's positive call/submission estimate, not plugin data.
 // It must fit the declaration's ceiling; every send also checks remaining time.
 type RemoteRegistration struct {
 	Handler         RemoteHandler
 	Connection      *RemoteConnection
 	LatencyEstimate time.Duration
+	Notifier        RemoteNotifier
 }
 
 func validateRemoteRegistration(d Definition, r RemoteRegistration) error {
 	if !*d.RemoteOK {
 		return &RemoteFailure{Code: RemoteNotAllowed}
 	}
-	if r.Handler == nil || r.Connection == nil || r.Connection.ctx == nil || r.LatencyEstimate <= 0 {
+	if (r.Handler == nil && r.Notifier == nil) || (r.Handler != nil && r.Notifier != nil) || r.Connection == nil || r.Connection.ctx == nil || r.LatencyEstimate <= 0 {
 		return ErrInvalidOptions
+	}
+	if r.Notifier != nil && (!d.RemoteFireAndForget || d.Kind != Action || (d.Mode != Async && d.Mode != AfterCommit)) {
+		return &RemoteFailure{Code: RemoteNotAllowed, admission: true}
 	}
 	if !r.Connection.live() {
 		return &RemoteFailure{Code: StaleBinding}
@@ -98,8 +102,8 @@ func (s *Scope) AddRemoteFilter(hook, name string, o Options, r RemoteRegistrati
 // host-verified incarnation representation without inferring authority from it.
 type RemoteScope struct{ HostInstance, Owner, Generation, RegistrationID string }
 
-// RemoteContext carries host-established diagnostic values. Part A single-call
-// transport does not expose reverse-callback authorization or a depth override.
+// RemoteContext carries host-established diagnostic values. These fields do
+// not authorize reverse callbacks or a plugin-supplied depth override.
 // Deadlines remain host-monotonic context deadlines; do not assume clock sync.
 type RemoteContext struct {
 	BindingID, ConnectionID, RootInvocationID, ParentInvocationID string
@@ -116,6 +120,7 @@ type RemoteRequest struct {
 	Context                                          RemoteContext
 	Payload                                          json.RawMessage
 	Metadata                                         map[string]string
+	Binding                                          RemoteBinding
 }
 type RemoteStatus string
 
@@ -162,8 +167,10 @@ func (f *RemoteFailure) Unwrap() error {
 	switch f.Code {
 	case RemoteNotAllowed:
 		return ErrUnauthorized
-	case LatencyBudgetExceeded, StaleScope, StaleBinding, CapacityExhausted, ProfileUnavailable, CallbackCycle:
+	case LatencyBudgetExceeded, StaleScope, StaleBinding, CapacityExhausted, ProfileUnavailable:
 		return ErrUnavailable
+	case CallbackCycle:
+		return ErrCallbackCycle
 	case DeadlineExceeded:
 		return context.DeadlineExceeded
 	case CallerCancellation:
@@ -257,6 +264,8 @@ func (e *Engine) invokeRemote(ctx context.Context, d *dispatch, entry *entry, pa
 	reg := entry.registration
 	deadline, _ := ctx.Deadline()
 	rootDeadline, _ := d.ctx.Deadline()
+	rootID, _ := ctx.Value(rootInvocationKey{}).(string)
+	parentID, _ := ctx.Value(parentInvocationKey{}).(string)
 	trace, _ := TraceContextFrom(ctx)
 	now := time.Now()
 	remaining := deadline.Sub(now)
@@ -270,14 +279,33 @@ func (e *Engine) invokeRemote(ctx context.Context, d *dispatch, entry *entry, pa
 	id := fmt.Sprintf("%s:%s:%d", e.registry.hostInstance, d.id, reg.Handle.id)
 	request := RemoteRequest{InvocationID: id, CatalogVersion: e.registry.catalogVersion, Hook: reg.Hook, SchemaDigest: d.definition.SchemaDigest, Kind: d.definition.Kind, Mode: d.definition.Mode,
 		Scope:   RemoteScope{HostInstance: e.registry.hostInstance, Owner: reg.Owner, Generation: reg.Generation, RegistrationID: fmt.Sprintf("%s:%d", e.registry.hostInstance, reg.Handle.id)},
-		Context: RemoteContext{BindingID: binding, ConnectionID: entry.remote.Connection.ID(), RootInvocationID: d.id, Deadline: deadline, Timeout: remaining, AggregateBudget: rootDeadline.Sub(now), Depth: d.trace.Depth, Trace: trace}, Payload: bytes.Clone(payload), Metadata: privateMetadata}
+		Context: RemoteContext{BindingID: binding, ConnectionID: entry.remote.Connection.ID(), RootInvocationID: rootID, ParentInvocationID: parentID, Deadline: deadline, Timeout: remaining, AggregateBudget: rootDeadline.Sub(now), Depth: d.trace.Depth, Trace: trace}, Payload: bytes.Clone(payload), Metadata: privateMetadata}
 	// The trusted adapter must preserve the host's tuple when mapping its wire DTO;
 	// the expected id/deadline are retained separately from the mutable request copy.
-	result, callErr := entry.remote.Handler.Handle(ctx, request)
+	if entry.remote.Notifier != nil {
+		request.Context.BindingID = ""
+		err := entry.remote.Notifier.Notify(ctx, RemoteNotification{Request: request})
+		if err != nil {
+			return nil, fmt.Errorf("%w: remote notification refused", ErrTransport)
+		}
+		return nil, errNotificationSubmitted
+	}
+	ancestry, _ := ctx.Value(ancestryKey{}).([]*activeInvocation)
+	bindingContext := context.WithValue(ctx, parentInvocationKey{}, id)
+	request.Binding = RemoteBinding{state: &remoteBindingState{engine: e, connection: entry.remote.Connection, id: binding, ctx: bindingContext, active: ancestry[len(ancestry)-1]}}
+	handler := entry.remote.Handler
+	if d.remoteOverride != nil {
+		handler = d.remoteOverride
+	}
+	result, callErr := handler.Handle(ctx, request)
 	if !entry.remote.Connection.live() {
 		return nil, &RemoteFailure{Code: StaleBinding}
 	}
 	if callErr != nil {
+		var refusal *RemoteFailure
+		if d.remoteOverride != nil && errors.As(callErr, &refusal) && refusal.admission {
+			return nil, callErr
+		}
 		// A transport error is never a veto, even when its text/sentinel claims one.
 		return nil, fmt.Errorf("%w: remote request failed", ErrTransport)
 	}

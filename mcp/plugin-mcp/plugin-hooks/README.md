@@ -254,4 +254,6 @@ Hosts can attach `RemoteHandler` implementations with `AddRemoteAction` /
 `remote_latency_budget_ms` is required for remote-enabled declarations.
 The [remote seam contract](docs/remote.md) explains structured results, latency,
 connection fences, breaker accounting and the introspection format change.
-No SDK or wire dependency, batching, notification transport or app adoption is added.
+Hosts also have verified callback bindings, bounded observation batches and
+opt-in notification receipts. No SDK or concrete transport dependency, publication
+or app adoption is added.

@@ -109,7 +109,7 @@ func excludedBreakerError(err error) bool {
 	if errors.As(err, &remote) {
 		return remote.admission
 	}
-	return errors.Is(err, ErrCancelled) || errors.Is(err, ErrApprovalRequired) || errors.Is(err, ErrDepthExceeded)
+	return errors.Is(err, ErrCancelled) || errors.Is(err, ErrApprovalRequired) || errors.Is(err, ErrDepthExceeded) || errors.Is(err, ErrCallbackCycle) || errors.Is(err, errNotificationSubmitted)
 }
 func (e *Engine) completeBreaker(ticket breakerTicket, err error, excluded bool, class string) BreakerSnapshot {
 	now := e.config.Clock.Now()
@@ -261,7 +261,8 @@ func (call *observedCall) finish(err error) string {
 		class := classify(err)
 		// Canceled/unavailable sentinels returned by a running handler with live
 		// contexts are ordinary handler failures, not synthetic admission/caller failures.
-		if !excluded && (class == "caller_cancelled" || class == "unavailable") {
+		var remoteFailure *RemoteFailure
+		if !excluded && !errors.As(err, &remoteFailure) && (class == "caller_cancelled" || class == "unavailable") {
 			class = "handler_error"
 		}
 		call.class = class
