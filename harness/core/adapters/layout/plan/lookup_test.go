@@ -359,3 +359,35 @@ func TestRuntimePermissionBindings(t *testing.T) {
 		code(t, err, "unresolved_runtime_binding")
 	}
 }
+func TestCredentialDestinationsNeverWrite(t *testing.T) {
+	for _, r := range Table() {
+		if r.Field == Credentials || r.Path == "auth.json" || r.Path == ".credentials.json" || r.Path == "oauth_creds.json" {
+			if r.Form != Link || r.CredentialPolicy != LinkOnlyNeverWrite {
+				t.Fatalf("credential can become a managed file: %+v", r)
+			}
+		}
+	}
+	for _, mode := range []runtimes.Mode{runtimes.ModeSubprocessPerTurn, runtimes.ModeJSONRPCStdio} {
+		k := key(runtimes.Codex, Credentials)
+		k.Mode = mode
+		res, err := Resolve(Request{Key: k, Required: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Row.Path != "" || res.Row.Renderer != "" {
+			t.Fatal("credential returned as managed row")
+		}
+		found := false
+		for _, effect := range res.Effects {
+			if effect.Path == "auth.json" && effect.Form == Link && effect.CredentialPolicy == LinkOnlyNeverWrite {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("missing link-only preserve-on-replant effect")
+		}
+	}
+	row, _ := Find(key(runtimes.Codex, Credentials))
+	row.CredentialPolicy = ""
+	code(t, Validate([]Row{row}), "invalid_layout")
+}

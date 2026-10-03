@@ -106,25 +106,34 @@ type Evidence struct {
 	Observations []string `json:"observations,omitempty"`
 	Note         string   `json:"note,omitempty"`
 }
+
+// CredentialPolicy excludes credential destinations from managed file writes.
+// Replant preserves existing credentials; fresh link provisioning belongs to
+// the authorized workspace effect handler, which must refuse overwrite.
+type CredentialPolicy string
+
+const LinkOnlyNeverWrite CredentialPolicy = "link-only-never-write"
+
 type Row struct {
-	Posture      *PostureReference `json:"posture,omitempty"`
-	Provider     runtimes.ID       `json:"provider"`
-	Layer        Layer             `json:"layer"`
-	Mode         runtimes.Mode     `json:"mode,omitempty"`
-	Variant      layout.Variant    `json:"variant,omitempty"`
-	Field        Field             `json:"field"`
-	Concern      string            `json:"concern"`
-	Root         layout.Root       `json:"root"`
-	Path         string            `json:"path,omitempty"`
-	Form         Form              `json:"form"`
-	ModeBits     uint32            `json:"mode_bits"`
-	Renderer     string            `json:"renderer,omitempty"`
-	DocumentSlot string            `json:"document_slot,omitempty"`
-	Locator      Locator           `json:"locator"`
-	Capability   Capability        `json:"capability"`
-	ExclusiveMCP Capability        `json:"exclusive_mcp,omitempty"`
-	Evidence     Evidence          `json:"evidence"`
-	Reason       string            `json:"reason,omitempty"`
+	CredentialPolicy CredentialPolicy  `json:"credential_policy,omitempty"`
+	Posture          *PostureReference `json:"posture,omitempty"`
+	Provider         runtimes.ID       `json:"provider"`
+	Layer            Layer             `json:"layer"`
+	Mode             runtimes.Mode     `json:"mode,omitempty"`
+	Variant          layout.Variant    `json:"variant,omitempty"`
+	Field            Field             `json:"field"`
+	Concern          string            `json:"concern"`
+	Root             layout.Root       `json:"root"`
+	Path             string            `json:"path,omitempty"`
+	Form             Form              `json:"form"`
+	ModeBits         uint32            `json:"mode_bits"`
+	Renderer         string            `json:"renderer,omitempty"`
+	DocumentSlot     string            `json:"document_slot,omitempty"`
+	Locator          Locator           `json:"locator"`
+	Capability       Capability        `json:"capability"`
+	ExclusiveMCP     Capability        `json:"exclusive_mcp,omitempty"`
+	Evidence         Evidence          `json:"evidence"`
+	Reason           string            `json:"reason,omitempty"`
 }
 
 func (r Row) clone() Row {

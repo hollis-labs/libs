@@ -147,6 +147,8 @@ type Request struct {
 	Components    map[string]string
 }
 type Resolution struct {
+	// Effects are never managed-file entries. Credential effects are preserve-only on replant.
+	Effects  []Row
 	Row      Row
 	Omission *Diagnostic
 }
@@ -190,6 +192,9 @@ func Resolve(req Request) (Resolution, error) {
 		return Resolution{}, diagnostic(req.Key, "invalid_component", err.Error())
 	}
 	r.Path = resolved
+	if r.Form == Link {
+		return Resolution{Effects: []Row{r}}, nil
+	}
 	return Resolution{Row: r}, nil
 }
 func unavailable(req Request, reason string) (Resolution, error) {
@@ -311,7 +316,7 @@ func Validate(table []Row) error {
 		if (r.Field == MCP || r.Field == Credentials || r.Concern == "native-config" && r.Field != PlantingPlugin) && r.ModeBits != 0600 {
 			return diagnostic(k, "invalid_layout", "config carrying MCP or credentials requires 0600")
 		}
-		if r.Field == Credentials && r.Form != Link {
+		if r.Field == Credentials && (r.Form != Link || r.CredentialPolicy != LinkOnlyNeverWrite) {
 			return diagnostic(k, "invalid_layout", "credentials must be link effects")
 		}
 		if r.Locator.CWD != "" && !validRoot(r.Locator.CWD) {
@@ -324,6 +329,9 @@ func Validate(table []Row) error {
 		}
 		if r.Locator.RPCProject != "" && len(r.Locator.Argv) > 0 && r.Provider == runtimes.Codex {
 			return diagnostic(k, "invalid_layout", "RPC project must not become spawn argv")
+		}
+		if r.Form == Link && r.CredentialPolicy != LinkOnlyNeverWrite {
+			return diagnostic(k, "invalid_layout", "credential destinations are link-only / never-write")
 		}
 		for _, arg := range r.Locator.Argv {
 			if !validToken(arg) {

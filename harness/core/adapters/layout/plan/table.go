@@ -143,6 +143,9 @@ func buildTable() []Row {
 		}
 	}
 	for i := range out {
+		if out[i].Form == Link {
+			out[i].CredentialPolicy = LinkOnlyNeverWrite
+		}
 		if out[i].Provider == agy && out[i].Field != Permissions {
 			out[i].Evidence.Reference = "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl"
 		}
