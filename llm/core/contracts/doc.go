@@ -1,7 +1,6 @@
 // Package agentcontracts holds the shared contract types for launching an
 // agent: what to launch and under what limits ([Assignment]), how it runs
-// ([RunPolicy]), the lifecycle vocabulary of a running instance
-// ([InstanceStatus]), and the auditable record of what was actually granted
+// ([RunPolicy]), and the auditable record of what was actually granted
 // ([LaunchRecord]).
 //
 // It is pure data. There are no interfaces to satisfy, no I/O and no

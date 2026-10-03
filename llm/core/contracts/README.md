@@ -1,6 +1,6 @@
 # agent-contracts-leaf
 
-Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus, and the capabilities and runtime vocabularies.
+Zero-dependency agent contracts: Assignment, RunPolicy, LaunchRecord, and the capabilities and runtime vocabularies.
 
 ## Status
 

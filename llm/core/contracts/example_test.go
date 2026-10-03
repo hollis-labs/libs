@@ -28,12 +28,3 @@ func ExampleEffectiveTrust() {
 	fmt.Println(agentcontracts.EffectiveTrust(agentcontracts.TrustTrusted, agentcontracts.TrustNormal))
 	// Output: normal
 }
-
-func ExampleInstanceStatus_ToA2A() {
-	stopped := agentcontracts.StoppedDetail{Reason: agentcontracts.ReasonCompleted}
-	fmt.Println(agentcontracts.StatusStopped.ToA2A("", stopped))
-	fmt.Println(agentcontracts.StatusWaiting.ToA2A(agentcontracts.WaitingAuth, agentcontracts.StoppedDetail{}))
-	// Output:
-	// completed
-	// auth-required
-}
