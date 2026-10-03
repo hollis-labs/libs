@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	localdaemon "github.com/hollis-labs/go-localdaemon"
+	localdaemon "github.com/hollis-labs/libs/util/localdaemon"
 )
 
 func main() {

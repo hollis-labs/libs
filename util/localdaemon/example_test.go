@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	localdaemon "github.com/hollis-labs/go-localdaemon"
+	localdaemon "github.com/hollis-labs/libs/util/localdaemon"
 )
 
 func tempDir() string {

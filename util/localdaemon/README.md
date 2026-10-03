@@ -13,7 +13,7 @@ The design goal is that **the lock, not the PID file, decides who the single ins
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-localdaemon
+go get github.com/hollis-labs/libs/util/localdaemon
 ```
 
 Requires Go 1.26.6 or newer. No dependencies outside the standard library.
@@ -30,7 +30,7 @@ import (
 	"os"
 	"path/filepath"
 
-	localdaemon "github.com/hollis-labs/go-localdaemon"
+	localdaemon "github.com/hollis-labs/libs/util/localdaemon"
 )
 
 func main() {
