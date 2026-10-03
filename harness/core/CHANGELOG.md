@@ -35,6 +35,7 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ### Fixed
 
+- `sandbox`: the Linux loopback helper no longer fails with `operation not permitted` when bwrap has already brought `lo` up. With `--unshare-net`, bwrap 0.9.0 raises `lo` and then drops every capability from the sandboxed process, and the helper asked for the same change again, which needs `CAP_NET_ADMIN` even when nothing changes. It now writes the interface flags only when `lo` is down; the payload gets no new capability. The Linux sandbox tests had not run in CI before the CI workflow installed bubblewrap; five loopback tests failed for this reason.
 - Pull replay beyond bounded client queues without dropping healthy readers;
   keep ACK watermarks outside the stream to avoid event feedback.
 - Bound pipe draining after leader exit, preserve signal evidence, and fence
