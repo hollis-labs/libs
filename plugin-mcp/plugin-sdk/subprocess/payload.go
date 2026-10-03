@@ -354,3 +354,22 @@ func (p CRUDParams) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(fields)
 }
+
+// MarshalJSON emits the required event data object even when the host supplied
+// a nil map. The receiver is copied; the caller's map is not changed.
+func (p EventHandleParams) MarshalJSON() ([]byte, error) {
+	type plain EventHandleParams
+	if p.Data == nil {
+		p.Data = map[string]interface{}{}
+	}
+	return json.Marshal(plain(p))
+}
+
+// MarshalJSON emits the required tool arguments object for a nil map.
+func (p MCPCallRequest) MarshalJSON() ([]byte, error) {
+	type plain MCPCallRequest
+	if p.Arguments == nil {
+		p.Arguments = map[string]interface{}{}
+	}
+	return json.Marshal(plain(p))
+}
