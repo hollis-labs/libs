@@ -1,8 +1,18 @@
-// Package llmcore is the root package of the llm-core module.
+// Package llmcore is the root package of the llm-core module. It holds no code:
+// the module's API lives in its packages.
 //
-// It will hold the LLM core: shared model, provider and routing contracts and types.
+//   - llmtypes: transport-agnostic request, response, tool and stream-event types.
+//   - llmcontracts (and contracttest): the provider interface, its optional
+//     extensions and rate-budget helpers.
+//   - embedcontracts: text-embedding interfaces and data shapes.
+//   - usageledger: the disjoint LLM token-usage record.
+//   - modelsdev: a cached client for the models.dev model catalog.
+//   - costcalc: prices a usageledger Usage with modelsdev Pricing.
+//   - contracts (with capabilities and runtimes): the shared contract types for
+//     launching an agent.
 //
-// The module is a skeleton: packages arrive through history-preserving
-// imports (see scripts/import-repo in the repository root) and are released
-// with module-prefixed tags of the form llm-core/vX.Y.Z.
+// Each package directory carries its own README.md, AGENTS.md and CHANGELOG.md from
+// the repository it was imported from, and a MIGRATION.md with the old and new
+// import paths. The module is released with module-prefixed tags of the form
+// llm-core/vX.Y.Z.
 package llmcore
