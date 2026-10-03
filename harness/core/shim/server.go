@@ -31,18 +31,21 @@ type Hello struct {
 }
 
 type connection struct {
-	host       *Host
-	socket     *net.UnixConn
-	role       string
-	epoch      uint64
-	send       chan Frame
-	done       chan struct{}
-	once       sync.Once
-	replayStop chan struct{}
-	replayDone chan struct{}
-	delivered  string
-	ack        string
-	mu         sync.Mutex
+	served         chan struct{}
+	host           *Host
+	socket         *net.UnixConn
+	role           string
+	epoch          uint64
+	send           chan Frame
+	done           chan struct{}
+	once           sync.Once
+	replayStop     chan struct{}
+	replayDone     chan struct{}
+	delivered      string
+	ack            string
+	mu             sync.Mutex
+	pending        []Frame
+	deferResponses bool
 }
 
 func (c *connection) close() { c.once.Do(func() { close(c.done); c.socket.Close() }) }
@@ -63,10 +66,22 @@ func (c *connection) enqueue(f Frame) bool {
 func (c *connection) frame(kind, reply string, v any) Frame {
 	return Frame{Major: ProtocolMajor, Minor: ProtocolMinor, Type: kind, ReplyTo: reply, Session: c.host.launch.Session, Epoch: fmt.Sprint(c.epoch), Body: body(v)}
 }
-func (c *connection) result(f Frame, v any) { c.enqueue(c.frame("result", f.RequestID, v)) }
-func (c *connection) error(f Frame, err error) {
-	c.enqueue(c.frame("error", f.RequestID, map[string]any{"code": codeOf(err), "message": err.Error(), "retryable": false}))
+func (c *connection) respond(f Frame) {
+	if c.deferResponses {
+		c.pending = append(c.pending, f)
+		return
+	}
+	c.enqueueWait(f, nil)
 }
+func (c *connection) result(f Frame, v any) { c.respond(c.frame("result", f.RequestID, v)) }
+func (c *connection) error(f Frame, err error) {
+	details := map[string]any{"code": codeOf(err), "message": err.Error(), "retryable": false}
+	if codeOf(err) == "unsupported_protocol" {
+		details["supported_versions"] = []map[string]int{{"major": ProtocolMajor, "minor_min": 0, "minor_max": ProtocolMinor}}
+	}
+	c.respond(c.frame("error", f.RequestID, details))
+}
+
 func (h *Host) accept() {
 	defer h.wg.Done()
 	for {
@@ -104,7 +119,11 @@ func (h *Host) serve(socket *net.UnixConn) {
 	}
 	var hello Hello
 	reject := func(code string) {
-		WriteFrame(socket, Frame{Major: ProtocolMajor, Type: "error", ReplyTo: f.RequestID, Session: h.launch.Session, Body: body(map[string]string{"code": code})})
+		details := map[string]any{"code": code, "message": "hello refused: " + code, "retryable": false}
+		if code == "unsupported_protocol" {
+			details["supported_versions"] = []map[string]int{{"major": ProtocolMajor, "minor_min": 0, "minor_max": ProtocolMinor}}
+		}
+		WriteFrame(socket, Frame{Major: ProtocolMajor, Minor: ProtocolMinor, Type: "error", ReplyTo: f.RequestID, Session: h.launch.Session, Body: body(details)})
 	}
 	if f.Type == "auth" {
 		reject("attached_mode_not_supported")
@@ -122,10 +141,6 @@ func (h *Host) serve(socket *net.UnixConn) {
 		reject("unsupported_protocol")
 		return
 	}
-	if f.Session != h.launch.Session || hello.Instance != h.launch.Instance || hello.Generation != fmt.Sprint(h.launch.Generation) || (hello.Journal != "" && hello.Journal != h.journal.identity.ID) {
-		reject("identity_mismatch")
-		return
-	}
 	if hello.Role != "controller" && hello.Role != "observer" {
 		reject("invalid_request")
 		return
@@ -134,7 +149,12 @@ func (h *Host) serve(socket *net.UnixConn) {
 		reject("unauthorized")
 		return
 	}
-	c := &connection{host: h, socket: socket, role: hello.Role, send: make(chan Frame, h.launch.ClientQueue), done: make(chan struct{})}
+	if f.Session != h.launch.Session || hello.Instance != h.launch.Instance || hello.Generation != fmt.Sprint(h.launch.Generation) || (hello.Journal != "" && hello.Journal != h.journal.identity.ID) {
+		reject("identity_mismatch")
+		return
+	}
+	c := &connection{host: h, socket: socket, role: hello.Role, send: make(chan Frame, h.launch.ClientQueue), done: make(chan struct{}), served: make(chan struct{})}
+	defer close(c.served)
 	h.op.Lock()
 	h.mu.Lock()
 	select {
@@ -156,6 +176,14 @@ func (h *Host) serve(socket *net.UnixConn) {
 			}
 		}
 		c.epoch = h.epoch
+		h.mu.Unlock()
+		if _, err = h.record("shim.attached", map[string]string{"role": "observer", "epoch": fmt.Sprint(c.epoch)}, false); err != nil {
+			h.op.Unlock()
+			reject(codeOf(err))
+			h.failJournal(err)
+			return
+		}
+		h.mu.Lock()
 		h.observer = c
 	} else {
 		if h.controller != nil {
@@ -173,7 +201,7 @@ func (h *Host) serve(socket *net.UnixConn) {
 		nextEpoch := h.epoch + 1
 		h.mu.Unlock()
 		// The takeover event is durable before any new epoch is published.
-		if _, err = h.record("shim.controller", map[string]string{"epoch": fmt.Sprint(nextEpoch)}, false); err != nil {
+		if _, err = h.record("shim.attached", map[string]string{"role": "controller", "epoch": fmt.Sprint(nextEpoch)}, false); err != nil {
 			h.op.Unlock()
 			reject("journal_unavailable")
 			h.failJournal(err)
@@ -189,7 +217,12 @@ func (h *Host) serve(socket *net.UnixConn) {
 	}
 	h.mu.Unlock()
 	h.op.Unlock()
-	defer c.close()
+	defer func() {
+		c.close()
+		if _, err := h.record("shim.detached", map[string]string{"role": c.role, "epoch": fmt.Sprint(c.epoch)}, false); err != nil {
+			h.failJournal(err)
+		}
+	}()
 	socket.SetDeadline(time.Time{})
 	info := map[string]any{"protocol_major": ProtocolMajor, "protocol_minor": ProtocolMinor, "journal": h.journal.identity.ID, "generation": fmt.Sprint(h.launch.Generation), "instance": h.launch.Instance, "controller_epoch": fmt.Sprint(c.epoch), "max_frame": MaxFrame, "pin_adopted": true, "pin_key": h.launch.PinKey, "boot_generation": h.launch.BootGeneration, "reservation": h.launch.Reservation, "capabilities": map[string]any{"inject": []string{"input/immediate", "signal/immediate"}, "control": []string{"kill", "signal"}, "driver": "stdio", "process_boundary": "process_group", "mandatory_child_isolation": false, "peer_uid": runtime.GOOS == "linux", "limits": []string{"wall_time", "journal_bytes"}, "attached": false}}
 	if err = WriteFrame(socket, c.frame("hello", f.RequestID, info)); err != nil {
@@ -207,7 +240,7 @@ func (h *Host) serve(socket *net.UnixConn) {
 			case <-c.done:
 				return
 			case <-timer.C:
-				c.enqueue(c.frame("health", "", map[string]any{"ping": newID(), "status": h.health()}))
+				c.enqueueWait(c.frame("health", "", map[string]any{"ping": newID(), "status": h.health()}), nil)
 			}
 		}
 	}()
@@ -217,6 +250,11 @@ func (h *Host) serve(socket *net.UnixConn) {
 		f, err = ReadFrame(socket)
 		if err != nil {
 			return
+		}
+		if len(f.RequestID) > 256 {
+			f.RequestID = ""
+			c.error(f, fault("invalid_request", "request identifier too large"))
+			continue
 		}
 		if f.Session != h.launch.Session || f.Major != ProtocolMajor || f.Minor < 0 || f.Minor > ProtocolMinor {
 			c.error(f, fault("unsupported_protocol", "session or protocol mismatch"))
@@ -247,26 +285,11 @@ func (h *Host) serve(socket *net.UnixConn) {
 			c.journalRefusal(f, fault("read_only", "observer cannot execute commands"))
 			continue
 		}
-		h.op.Lock()
-		h.mu.Lock()
-		valid := h.controller == c && h.epoch == c.epoch
-		h.mu.Unlock()
-		if !valid || f.Epoch != fmt.Sprint(c.epoch) {
-			c.journalRefusal(f, fault("stale_controller", "controller epoch displaced"))
-			h.op.Unlock()
-			continue
+		for _, reply := range c.dispatch(f) {
+			if !c.enqueueWait(reply, nil) {
+				return
+			}
 		}
-		switch f.Type {
-		case "ack":
-			c.acknowledge(f)
-		case "inject":
-			c.inject(f)
-		case "control":
-			c.control(f)
-		default:
-			c.error(f, fault("unsupported_message", "unknown command"))
-		}
-		h.op.Unlock()
 	}
 }
 func (c *connection) writeLoop() {
@@ -275,26 +298,19 @@ func (c *connection) writeLoop() {
 		case <-c.done:
 			return
 		case f := <-c.send:
-			// Hold delivery accounting across the socket write: a fast peer's
-			// ack must not race the writer's publication of that same cursor.
-			if f.Type == "event" {
-				c.mu.Lock()
-			}
-			c.socket.SetWriteDeadline(time.Now().Add(3 * c.host.launch.Heartbeat))
-			if err := WriteFrame(c.socket, f); err != nil {
-				if f.Type == "event" {
-					c.mu.Unlock()
-				}
-				c.close()
-				return
-			}
 			if f.Type == "event" {
 				var b struct {
 					Event mesh.Event `json:"event"`
 				}
 				json.Unmarshal(f.Body, &b)
+				c.mu.Lock()
 				c.delivered = b.Event.Cursor
 				c.mu.Unlock()
+			}
+			c.socket.SetWriteDeadline(time.Now().Add(3 * c.host.launch.Heartbeat))
+			if err := WriteFrame(c.socket, f); err != nil {
+				c.close()
+				return
 			}
 		}
 	}
@@ -306,6 +322,21 @@ func (c *connection) stopReplay() {
 		c.replayStop = nil
 	}
 }
+func (c *connection) enqueueWait(f Frame, stop <-chan struct{}) bool {
+	timer := time.NewTimer(3 * c.host.launch.Heartbeat)
+	defer timer.Stop()
+	select {
+	case <-c.done:
+		return false
+	case <-stop:
+		return false
+	case c.send <- f:
+		return true
+	case <-timer.C:
+		c.close()
+		return false
+	}
+}
 func (c *connection) replay(f Frame) {
 	var req struct {
 		After string `json:"after_cursor"`
@@ -315,16 +346,11 @@ func (c *connection) replay(f Frame) {
 		return
 	}
 	c.stopReplay()
-	events, sub, err := c.host.journal.Subscribe(req.After, c.host.launch.ClientQueue)
+	next, high, sub, err := c.host.journal.subscribe(req.After)
 	if err != nil {
 		c.error(f, err)
 		return
 	}
-	high := req.After
-	if len(events) > 0 {
-		high = events[len(events)-1].Cursor
-	}
-	c.result(f, map[string]string{"high_water": high})
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	c.replayStop = stop
@@ -332,37 +358,29 @@ func (c *connection) replay(f Frame) {
 	go func() {
 		defer close(done)
 		defer c.host.journal.unsubscribe(sub)
-		deliver := func(e mesh.Event, replay bool) bool {
-			select {
-			case <-stop:
-				return false
-			case <-c.done:
-				return false
-			case <-sub.done:
-				c.close()
-				return false
-			default:
-			}
-			return c.enqueue(c.frame("event", "", map[string]any{"event": e, "replay": replay}))
-		}
-		for _, e := range events {
-			if !deliver(e, true) {
-				return
-			}
+		if !c.enqueueWait(c.frame("result", f.RequestID, map[string]string{"high_water": c.host.journal.cursor(high)}), stop) {
+			return
 		}
 		for {
+			batch := c.host.journal.readAfter(next, 32)
+			for _, e := range batch {
+				if !c.enqueueWait(c.frame("event", "", map[string]any{"event": e, "replay": next < high}), stop) {
+					return
+				}
+				next++
+			}
+			if len(batch) > 0 {
+				continue
+			}
 			select {
 			case <-stop:
 				return
 			case <-c.done:
 				return
 			case <-sub.done:
-				c.close()
 				return
-			case e := <-sub.queue:
-				if !deliver(e, false) {
-					return
-				}
+			case <-sub.notify:
+				continue
 			}
 		}
 	}()
@@ -390,13 +408,8 @@ func (c *connection) acknowledge(f Frame) {
 		c.error(f, fault("cursor_invalid", "ack must advance within delivered history"))
 		return
 	}
-	// The controller asserts contiguous local persistence; the shim can prove
-	// bounds and monotonicity, but cannot inspect the controller's own store.
-	if _, err := c.host.record("shim.ack", map[string]string{"cursor": req.Cursor}, false); err != nil {
-		c.error(f, err)
-		c.host.failJournal(err)
-		return
-	}
+	// Ack is a local watermark, not an event. Streaming acknowledgments
+	// would create an unbounded feedback loop for a conforming consumer.
 	c.mu.Lock()
 	c.ack = req.Cursor
 	c.mu.Unlock()
@@ -436,14 +449,13 @@ func (c *connection) inject(f Frame) {
 	if req.Delivery == "" {
 		req.Delivery = "at_idle"
 	}
-	// Validate provenance before executing; malformed claims are recorded under
-	// the launch actor with a rejection code, never as trusted actor identity.
-	if req.Actor.Validate() != nil || req.Subject.Validate() != nil || req.Key == "" || len(req.Key) > 256 {
-		c.journalRefusal(f, fault("invalid_request", "missing or invalid provenance/key"))
+	// Bound provenance before constructing durable events or fingerprints.
+	if req.Actor.Validate() != nil || req.Subject.Validate() != nil || len(req.Actor.URN) > 1024 || len(req.Subject) > 1024 || len(req.OnBehalfOf) > 64 || req.Key == "" || len(req.Key) > 256 {
+		c.journalRefusal(f, fault("invalid_request", "invalid or oversized provenance/key"))
 		return
 	}
 	for _, u := range req.OnBehalfOf {
-		if u.Validate() != nil {
+		if u.Validate() != nil || len(u) > 1024 {
 			c.journalRefusal(f, fault("invalid_request", "invalid delegated actor"))
 			return
 		}
@@ -521,9 +533,11 @@ func (c *connection) inject(f Frame) {
 				}
 			}
 		} else if executeErr == nil {
-			if !allowedSignal(req.Signal) {
+			if req.Signal == 0 {
+				executeErr = fault("invalid_request", "signal zero is not an execution signal")
+			} else if !allowedSignal(req.Signal) {
 				executeErr = fault("unsupported_mode", "signal unsupported")
-			} else if e := h.driver.SendSignal(syscall.Signal(req.Signal)); e != nil {
+			} else if e := h.sendSignal(syscall.Signal(req.Signal)); e != nil {
 				executeErr = fault("outcome_unknown", "signal result uncertain")
 			} else {
 				receipt.Code = "signal_sent"
@@ -599,7 +613,7 @@ func (c *connection) control(f Frame) {
 	if req.Action == "kill" {
 		c.host.stop("controller_kill")
 	} else {
-		err = c.host.driver.SendSignal(syscall.Signal(req.Signal))
+		err = c.host.sendSignal(syscall.Signal(req.Signal))
 	}
 	if err != nil {
 		c.error(f, fault("outcome_unknown", "control effect uncertain"))
@@ -612,4 +626,30 @@ func (c *connection) control(f Frame) {
 		return
 	}
 	c.result(f, map[string]string{"code": "submitted", "cursor": outcome.Cursor})
+}
+
+func (c *connection) dispatch(f Frame) []Frame {
+	h := c.host
+	h.op.Lock()
+	defer h.op.Unlock()
+	c.deferResponses = true
+	defer func() { c.deferResponses = false; c.pending = nil }()
+	h.mu.Lock()
+	valid := h.controller == c && h.epoch == c.epoch
+	h.mu.Unlock()
+	if !valid || f.Epoch != fmt.Sprint(c.epoch) {
+		c.journalRefusal(f, fault("stale_controller", "controller epoch displaced"))
+		return append([]Frame(nil), c.pending...)
+	}
+	switch f.Type {
+	case "ack":
+		c.acknowledge(f)
+	case "inject":
+		c.inject(f)
+	case "control":
+		c.control(f)
+	default:
+		c.error(f, fault("unsupported_message", "unknown command"))
+	}
+	return append([]Frame(nil), c.pending...)
 }

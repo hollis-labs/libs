@@ -43,6 +43,7 @@ type Launch struct {
 }
 
 type Exit struct {
+	Signal int    `json:"signal,omitempty"`
 	Status int    `json:"status"`
 	Cause  string `json:"cause"`
 }
@@ -61,6 +62,8 @@ type Host struct {
 	once            sync.Once
 	wg              sync.WaitGroup
 	mu              sync.Mutex
+	processMu       sync.Mutex
+	reaped          bool
 	exit            Exit
 	running         bool
 	cause           string
@@ -76,7 +79,7 @@ func Start(spec Launch) (*Host, error) {
 	if len(filepath.Join(spec.ControlDir, "control.sock")) >= 104 {
 		return nil, fault("invalid_request", "control socket path exceeds portable Unix limit")
 	}
-	if spec.Session == "" || spec.Instance == "" || spec.Generation == 0 || len(spec.Argv) == 0 || spec.Argv[0] == "" || len(spec.Secret) < 32 || spec.PinKey == "" || spec.BootGeneration == "" || spec.Reservation == "" {
+	if spec.Session == "" || spec.Instance == "" || spec.Generation == 0 || len(spec.Argv) == 0 || spec.Argv[0] == "" || len(spec.Secret) < 32 || len(spec.Session) > 1024 || len(spec.Instance) > 1024 || len(spec.Actor.URN) > 1024 || len(spec.Subject) > 1024 || spec.PinKey == "" || spec.BootGeneration == "" || spec.Reservation == "" {
 		return nil, fault("invalid_request", "incomplete launch identity, capability or pin")
 	}
 	if err := spec.Actor.Validate(); err != nil {
@@ -195,7 +198,7 @@ func Start(spec Launch) (*Host, error) {
 		outR.Close()
 		errR.Close()
 		h.stdin.Close()
-		h.record("shim.exit", Exit{-1, "spawn_failed"}, true)
+		h.record("shim.exit", Exit{Status: -1, Cause: "spawn_failed"}, true)
 		cleanup()
 		return nil, fault("spawn_failed", "could not start child")
 	}
@@ -206,7 +209,7 @@ func Start(spec Launch) (*Host, error) {
 		gap := h.event("shim.output_gap", map[string]string{"code": codeOf(err)})
 		gap.Truncated = true
 		h.journal.Append(gap, true)
-		signalGroup(h.cmd.Process.Pid, syscall.SIGKILL)
+		h.sendSignal(syscall.SIGKILL)
 	}
 	var readers sync.WaitGroup
 	readers.Add(2)
@@ -221,23 +224,58 @@ func Start(spec Launch) (*Host, error) {
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
+		noticeErr := waitLeaderExit(h.cmd.Process.Pid)
+		if noticeErr != nil {
+			h.sendSignal(syscall.SIGKILL)
+		}
+		h.processMu.Lock()
+		if noticeErr == nil {
+			signalGroup(h.cmd.Process.Pid, syscall.SIGKILL)
+		}
 		waitErr := h.cmd.Wait()
+		h.reaped = true
+		h.processMu.Unlock()
+		h.mu.Lock()
+		h.running = false
+		h.mu.Unlock()
 		h.stdin.Close()
-		signalGroup(h.cmd.Process.Pid, syscall.SIGKILL)
-		readers.Wait()
+		drained := make(chan struct{})
+		go func() { readers.Wait(); close(drained) }()
+		drainTimer := time.NewTimer(150 * time.Millisecond)
+		drainGap := false
+		select {
+		case <-drained:
+		case <-drainTimer.C:
+			drainGap = true
+			outR.Close()
+			errR.Close()
+			<-drained
+		}
+		drainTimer.Stop()
+		if drainGap {
+			gap := h.event("shim.output_gap", map[string]string{"code": "descendant_holds_pipe"})
+			gap.Truncated = true
+			h.journal.Append(gap, true)
+		}
 		status := h.cmd.ProcessState.ExitCode()
 		cause := "exit"
 		if waitErr != nil {
 			cause = "child_failed"
 		}
+		if drainGap {
+			cause = "descendant_holds_pipe"
+		}
 		h.mu.Lock()
 		if h.cause != "" {
 			cause = h.cause
 		}
-		h.exit = Exit{status, cause}
+		h.exit = Exit{Status: status, Cause: cause}
+		if ws, ok := h.cmd.ProcessState.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+			h.exit.Signal = int(ws.Signal())
+		}
 		h.running = false
 		h.mu.Unlock()
-		h.record("shim.exit", Exit{status, cause}, true)
+		h.record("shim.exit", h.exit, true)
 		h.pin.Close()
 		close(h.done)
 	}()
@@ -275,13 +313,18 @@ func (h *Host) capture(name string, r io.Reader) {
 		}
 		if err != nil {
 			if err != io.EOF {
-				h.record("shim.output_gap", map[string]string{"stream": name}, true)
+				gap := h.event("shim.output_gap", map[string]string{"stream": name})
+				gap.Truncated = true
+				h.journal.Append(gap, true)
 			}
 			return
 		}
 	}
 }
 func (h *Host) failJournal(err error) {
+	if codeOf(err) != "journal_unavailable" && codeOf(err) != "journal_full" {
+		return
+	}
 	e := h.event("shim.output_gap", map[string]string{"code": codeOf(err)})
 	e.Truncated = true
 	h.journal.Append(e, true)
@@ -294,16 +337,19 @@ func (h *Host) stop(cause string) {
 		h.cause = cause
 	}
 	h.mu.Unlock()
-	if !running {
+	h.processMu.Lock()
+	reaped := h.reaped
+	h.processMu.Unlock()
+	if !running || reaped {
 		return
 	}
-	signalGroup(h.cmd.Process.Pid, syscall.SIGTERM)
+	h.sendSignal(syscall.SIGTERM)
 	timer := time.NewTimer(h.launch.StopGrace)
 	defer timer.Stop()
 	select {
 	case <-h.done:
 	case <-timer.C:
-		signalGroup(h.cmd.Process.Pid, syscall.SIGKILL)
+		h.sendSignal(syscall.SIGKILL)
 	}
 }
 func (h *Host) Done() <-chan struct{} { return h.done }
@@ -357,4 +403,13 @@ func ReadLaunch(path string) (Launch, error) {
 	defer f.Close()
 	err = json.NewDecoder(io.LimitReader(f, MaxFrame+1)).Decode(&launch)
 	return launch, err
+}
+
+func (h *Host) sendSignal(s syscall.Signal) error {
+	h.processMu.Lock()
+	defer h.processMu.Unlock()
+	if h.reaped {
+		return fault("target_offline", "child reaped")
+	}
+	return h.driver.SendSignal(s)
 }

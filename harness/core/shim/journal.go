@@ -20,6 +20,7 @@ import (
 
 const segmentLimit = 1 << 20
 const terminalReserve = 16 << 10
+const maxRecord = MaxFrame - 4096
 
 var segmentHeader = []byte("SHIMLOG1\n")
 
@@ -50,8 +51,8 @@ type Journal struct {
 }
 
 type subscription struct {
-	queue chan mesh.Event
-	done  chan struct{}
+	notify chan struct{}
+	done   chan struct{}
 }
 
 func privateDir(path string) error {
@@ -106,22 +107,7 @@ func OpenJournal(dir, session string, generation uint64, capacity int64) (*Journ
 	}
 	if os.IsNotExist(err) {
 		j.identity = journalIdentity{newID(), session, generation}
-		f, e := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if e != nil {
-			return nil, e
-		}
-		_, e = f.Write(body(j.identity))
-		if e == nil {
-			e = f.Sync()
-		}
-		ce := f.Close()
-		if e != nil {
-			return nil, e
-		}
-		if ce != nil {
-			return nil, ce
-		}
-		if e = syncDir(dir); e != nil {
+		if e := publishIdentity(dir, j.identity); e != nil {
 			return nil, e
 		}
 	} else if err != nil {
@@ -134,21 +120,28 @@ func OpenJournal(dir, session string, generation uint64, capacity int64) (*Journ
 			return nil, fault("identity_mismatch", "journal identity mismatch")
 		}
 	}
-	files, err := filepath.Glob(filepath.Join(dir, "*.seg"))
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	quarantines, _ := filepath.Glob(filepath.Join(dir, "*.torn-*"))
-	for _, p := range quarantines {
-		info, e := os.Lstat(p)
-		if e != nil {
-			return nil, e
+	var files []string
+	for _, entry := range entries {
+		p := filepath.Join(dir, entry.Name())
+		if strings.HasSuffix(entry.Name(), ".seg") {
+			files = append(files, p)
 		}
-		if !info.Mode().IsRegular() {
-			return nil, fault("unsafe_path", "invalid quarantine file")
+		if strings.Contains(entry.Name(), ".torn-") {
+			info, e := entry.Info()
+			if e != nil {
+				return nil, e
+			}
+			if !info.Mode().IsRegular() {
+				return nil, fault("unsafe_path", "invalid quarantine file")
+			}
+			j.size += info.Size()
 		}
-		j.size += info.Size()
 	}
+
 	sort.Strings(files)
 	for index, p := range files {
 		ordinal, e := strconv.Atoi(strings.TrimSuffix(filepath.Base(p), ".seg"))
@@ -182,7 +175,24 @@ func (j *Journal) recover(path string, final bool) error {
 		return fault("journal_full", "retained journal exceeds capacity")
 	}
 	header := make([]byte, len(segmentHeader))
-	if _, err = io.ReadFull(f, header); err != nil || !bytes.Equal(header, segmentHeader) {
+	n, err := io.ReadFull(f, header)
+	if err != nil || !bytes.Equal(header, segmentHeader) {
+		if final && info.Size() < int64(len(segmentHeader)) && bytes.Equal(header[:n], segmentHeader[:n]) {
+			if err = j.quarantine(f, path, 0); err != nil {
+				return err
+			}
+			if _, err = f.Seek(0, io.SeekStart); err != nil {
+				return err
+			}
+			if _, err = f.Write(segmentHeader); err != nil {
+				return err
+			}
+			if err = f.Sync(); err != nil {
+				return err
+			}
+			j.size += int64(len(segmentHeader))
+			return syncDir(j.dir)
+		}
 		return fault("journal_corrupt", "invalid segment header")
 	}
 	offset := int64(len(header))
@@ -213,37 +223,7 @@ func (j *Journal) recover(path string, final bool) error {
 			if !final {
 				return fault("journal_corrupt", "incomplete non-final segment")
 			}
-			if _, err = f.Seek(start, io.SeekStart); err != nil {
-				return err
-			}
-			tail, err := io.ReadAll(f)
-			if err != nil {
-				return err
-			}
-			q := path + ".torn-" + newID()
-			out, err := os.OpenFile(q, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-			if err != nil {
-				return err
-			}
-			_, err = out.Write(tail)
-			if err == nil {
-				err = out.Sync()
-			}
-			ce := out.Close()
-			if err != nil {
-				return err
-			}
-			if ce != nil {
-				return ce
-			}
-			// Quarantined evidence counts toward the cap, even after truncation.
-			if err = f.Truncate(start); err != nil {
-				return err
-			}
-			if err = f.Sync(); err != nil {
-				return err
-			}
-			return syncDir(j.dir)
+			return j.quarantine(f, path, start)
 		}
 		if crc32.ChecksumIEEE(payload) != binary.BigEndian.Uint32(checksum[:]) {
 			return fault("journal_corrupt", "record checksum mismatch")
@@ -317,13 +297,13 @@ func (j *Journal) Append(event mesh.Event, terminal bool) (mesh.Event, error) {
 	event.Cursor = j.cursor(seq)
 	event.SourceSequence = seq
 	if err := event.Validate(); err != nil {
-		return mesh.Event{}, err
+		return mesh.Event{}, fault("invalid_request", "invalid event envelope")
 	}
 	b, err := json.Marshal(event)
 	if err != nil {
 		return mesh.Event{}, err
 	}
-	if len(b) > MaxFrame {
+	if len(b) > maxRecord {
 		return mesh.Event{}, fault("invalid_request", "journal record too large")
 	}
 	needed := int64(len(b) + 8)
@@ -336,6 +316,9 @@ func (j *Journal) Append(event mesh.Event, terminal bool) (mesh.Event, error) {
 	}
 	if j.segmentSize+needed > segmentLimit {
 		if err = j.newSegment(); err != nil {
+			if codeOf(err) != "journal_full" {
+				err = fault("journal_unavailable", "segment creation failed")
+			}
 			j.failure = err
 			return mesh.Event{}, err
 		}
@@ -359,28 +342,34 @@ func (j *Journal) Append(event mesh.Event, terminal bool) (mesh.Event, error) {
 	j.events = append(j.events, event)
 	for sub := range j.subscribers {
 		select {
-		case sub.queue <- event:
+		case sub.notify <- struct{}{}:
 		default:
-			close(sub.done)
-			delete(j.subscribers, sub)
 		}
 	}
 	return event, nil
 }
 
-// Subscribe takes the high-water snapshot and installs the tail queue under
-// the append lock. A slow subscriber is closed rather than blocking appends.
-func (j *Journal) Subscribe(after string, queueSize int) ([]mesh.Event, *subscription, error) {
+// subscribe captures a high-water and registers a coalescing notification
+// under the append lock. Events stay in the retained journal, not client queues.
+func (j *Journal) subscribe(after string) (uint64, uint64, *subscription, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	seq, err := j.parse(after)
 	if err != nil {
-		return nil, nil, err
+		return 0, 0, nil, err
 	}
-	s := &subscription{make(chan mesh.Event, queueSize), make(chan struct{})}
+	s := &subscription{notify: make(chan struct{}, 1), done: make(chan struct{})}
 	j.subscribers[s] = struct{}{}
-	snapshot := append([]mesh.Event(nil), j.events[seq:]...)
-	return snapshot, s, nil
+	return seq, uint64(len(j.events)), s, nil
+}
+func (j *Journal) readAfter(seq uint64, limit int) []mesh.Event {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	end := seq + uint64(limit)
+	if end > uint64(len(j.events)) {
+		end = uint64(len(j.events))
+	}
+	return append([]mesh.Event(nil), j.events[seq:end]...)
 }
 func (j *Journal) unsubscribe(s *subscription) {
 	j.mu.Lock()
@@ -423,4 +412,68 @@ func (j *Journal) Close() error {
 		j.lock = nil
 	}
 	return err
+}
+
+// The owner lock serializes identity publication. A crash before rename leaves
+// only the staging file; the next open discards it and publishes a new identity.
+func publishIdentity(dir string, identity journalIdentity) error {
+	pending := filepath.Join(dir, "identity.pending")
+	if err := os.Remove(pending); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	f, err := os.OpenFile(pending, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(pending)
+	_, err = f.Write(body(identity))
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err = os.Rename(pending, filepath.Join(dir, "identity.json")); err != nil {
+		return err
+	}
+	return syncDir(dir)
+}
+func (j *Journal) quarantine(f *os.File, path string, start int64) error {
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return err
+	}
+	tail, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	out, err := os.OpenFile(path+".torn-"+newID(), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(tail)
+	if err == nil {
+		err = out.Sync()
+	}
+	closeErr := out.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	// Persist the evidence's directory entry before truncating the original.
+	if err = syncDir(j.dir); err != nil {
+		return err
+	}
+	if err = f.Truncate(start); err != nil {
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		return err
+	}
+	return syncDir(j.dir)
 }

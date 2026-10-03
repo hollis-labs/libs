@@ -25,7 +25,11 @@ func main() {
 	}
 	host, err := shim.Start(launch)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "shim launch failed")
+		code := "internal_error"
+		if typed, ok := err.(*shim.Error); ok {
+			code = typed.Code
+		}
+		fmt.Fprintln(os.Stderr, "shim launch failed: "+code)
 		os.Exit(1)
 	}
 	defer host.Close()

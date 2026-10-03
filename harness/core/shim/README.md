@@ -33,13 +33,15 @@ here. The launcher holds a shared lock on the stable pin inode before launch.
 The shim opens that same existing file, obtains its own shared lock before
 spawn, and exposes `pin_adopted`, key, boot generation and reservation in hello.
 Only after verifying that receipt may the launcher release its shared hold.
-The shim closes its noninherited pin descriptor on child exit. Mutators use a
+The shim closes its noninherited pin descriptor on child exit. The descriptor
+metadata is supplied by the host; the pin file does not authenticate its key or
+boot generation. Mutators use a
 separate ordered mutation lock and an exclusive nonblocking pin probe. Never
 replace or unlink the pin inode while its identity is active. Kernel lock
 release alone is not proof that all descendants exited.
 
 The generic child boundary is a POSIX process group. Exit and kill clean up
-that group; a child that deliberately escapes it requires an external host
+that group while its leader PID is still reserved, before reaping; a child that deliberately escapes it requires an external host
 sandbox/service-manager boundary. Required aggregate CPU/memory/task limits
 and mandatory child isolation are unsupported in this cut. Same-UID directory
 permissions do not isolate a malicious unsandboxed child: the host must hide
@@ -75,7 +77,10 @@ the durable controller epoch. Replacing a live controller requires explicit
 carry the current epoch and target generation. Takeover serializes with
 intent/effect/outcome execution. Observers can replay and request health, and
 cannot inject, control or acknowledge. Pending connections and per-client queues
-are bounded; a slow client disconnects without blocking journal appends.
+are bounded. Catch-up waits for bounded queue space; retained events are pulled
+in bounded batches using coalesced journal notifications, so a backlog larger
+than the queue does not itself disconnect a reader. A stalled socket write
+disconnects at its deadline without blocking journal appends or takeover.
 
 `Client` provides the handshake, serialized writes, heartbeat responses and a
 bounded `Frames` stream. After reconnect, the controller does the following:
@@ -87,11 +92,14 @@ bounded `Frames` stream. After reconnect, the controller does the following:
 3. Persist each envelope transactionally, de-duplicate by event ID, and then
    `Ack(session, cursor)` for the highest contiguous locally persisted cursor.
 
-Replay installs its tail subscription under the append lock at the same instant
-as the snapshot, so concurrent output cannot fall between the two. Cursors are
+Replay registers its notification and snapshot high-water under the append lock,
+then pulls retained records by position, so concurrent output cannot fall
+between catch-up and the tail. Cursors are
 journal-ID-qualified decimal positions. Foreign/ahead cursors and acknowledgments
-outside delivered history return `cursor_invalid`; the controller asserts its
-own local durability and contiguity. v0 does not evict history, so there is no
+outside dispatched history return `cursor_invalid`; the controller asserts its
+own local durability and contiguity. ACK watermarks stay in memory outside the event stream, so persisting and
+acking every event cannot feed back into more events. No retention depends on
+ACK durability in this cut. v0 does not evict history, so there is no
 expired-history case. A new downstream event store assigns its own cursor and
 retains the source cursor as provenance rather than comparing unrelated stores.
 
@@ -104,7 +112,9 @@ client helper does not silently reconnect or resend effects for its caller.
 
 `inject` accepts the `Inject` body: idempotency key, actor, delegated actor URNs,
 subject, mode, delivery, expected generation, optional deadline, and either
-base64 `data` or `signal`. Input is at most 64 KiB and `input/immediate` writes
+base64 `data` or `signal`. Provenance URNs are limited to 1024 bytes, delegated
+actors to 64 entries, and request IDs/idempotency keys to 256 bytes. Signal zero
+is `invalid_request`. Input is at most 64 KiB and `input/immediate` writes
 those exact bytes, with a bounded 2-second pipe-write deadline. A partial or
 uncertain write returns `outcome_unknown` and the actual byte count. Supported
 signals are SIGINT, SIGTERM, SIGHUP and SIGKILL. A signal targets the process
@@ -121,17 +131,23 @@ An accepted effect has fsynced intent before it touches the child, then a
 fsynced outcome. Exact retries return the same receipt; a changed fingerprint
 with the same key returns `idempotency_conflict`. An uncertain effect is never
 implicitly retried. `control` supports `kill` and `signal` with expected
-generation; kill sends SIGTERM then SIGKILL after the launch grace. Pause,
+generation; kill sends SIGTERM then SIGKILL after the launch grace. Exit evidence preserves signal deaths. If an escaped
+descendant keeps a pipe open, drain stops after 150 milliseconds and records a
+truncated gap with `descendant_holds_pipe`; `Done` and shutdown stay bounded.
+No signals are sent after reaping the leader. Pause,
 resume, resize and dynamic resource changes return `unsupported_control`.
 
 ## Durability and limits
 
 Journal segments have a `SHIMLOG1` header and ordered segment filenames; each
-record is `length | full mesh.Event JSON | CRC32`. One lock serializes append
+record is `length | full mesh.Event JSON | CRC32`, capped below the wire-frame
+limit to leave room for the replay envelope. One lock serializes append
 and fsync. Observations become streamable only after fsync. Recovery validates
 envelopes, cursor order and checksums. An incomplete final fragment is fsynced
 into a quarantine file before truncation and a new segment; complete checksum
-failures or incomplete non-final segments are `journal_corrupt`.
+failures or incomplete non-final segments are `journal_corrupt`. A final
+empty/partial header is also quarantined and repaired; identity is staged,
+fsynced, renamed and directory-synced before it becomes authoritative.
 
 Raw output is base64 in private payloads, in chunks of at most 64 KiB. No launch
 environment or capability material is logged by the host. Process output can
@@ -144,7 +160,8 @@ cap. No automatic compaction or receipt eviction occurs. The resident replay
 index and deduplication map are bounded by that cap as well. Quarantined tail
 evidence counts toward it. Ordinary appends reserve 16 KiB for terminal/gap
 records; exhaustion stops effects and terminates the child, with a truncated
-gap event where storage still works. I/O failure stops the child even if the
+gap event where storage still works. Only physical journal I/O failure or capacity exhaustion stops the child;
+request/envelope validation errors do not. I/O failure stops the child even if the
 failed disk cannot persist its final diagnostic. Offline cleanup/archival is
 explicit host work after proving the process no longer uses the generation.
 

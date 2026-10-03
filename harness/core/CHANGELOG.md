@@ -15,3 +15,13 @@ All notable changes to the `harness` module are documented here. The format foll
   immediate input/signals, generation-use pins and launch-time limits.
 - Fake-child acceptance tests for detach/reconnect, framing, durability,
   idempotency, controller fencing and process-group cleanup.
+
+### Fixed
+
+- Pull replay beyond bounded client queues without dropping healthy readers;
+  keep ACK watermarks outside the stream to avoid event feedback.
+- Bound pipe draining after leader exit, preserve signal evidence, and fence
+  group signalling after reaping. Recover interrupted journal header/identity
+  creation and reject oversized provenance without stopping a healthy child.
+- Journal connection attach/detach and publish protocol negotiation details;
+  keep slow response writes outside the controller operation lock.

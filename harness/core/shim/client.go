@@ -93,8 +93,6 @@ func (c *Client) read(session string) {
 		case c.frames <- f:
 		case <-c.done:
 			return
-		default:
-			return
 		}
 	}
 }

@@ -28,6 +28,10 @@ func TestFakeProvider(t *testing.T) {
 		return
 	}
 	switch mode {
+	case "escape":
+		escapedChild()
+	case "escaped-sleep":
+		time.Sleep(900 * time.Millisecond)
 	case "echo":
 		fmt.Fprintln(os.Stdout, "ready")
 		io.Copy(os.Stdout, os.Stdin)
@@ -36,9 +40,15 @@ func TestFakeProvider(t *testing.T) {
 		for i := 0; i < 80; i++ {
 			os.Stdout.Write(b)
 		}
-	case "tree":
+	case "tree", "tree-stubborn":
 		child := exec.Command(os.Args[0], "-test.run=^TestFakeProvider$")
-		child.Env = []string{"SHIM_TEST_CHILD=sleep", "HOME=" + os.Getenv("HOME")}
+		childMode := "sleep"
+		if mode == "tree-stubborn" {
+			childMode = "stubborn"
+			child.Stdout = os.Stdout
+			child.Stderr = os.Stderr
+		}
+		child.Env = []string{"SHIM_TEST_CHILD=" + childMode, "HOME=" + os.Getenv("HOME"), "GORACE=atexit_sleep_ms=0"}
 		if child.Start() != nil {
 			os.Exit(3)
 		}
@@ -72,7 +82,7 @@ func launchTest(t *testing.T, mode string) Launch {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Launch{Session: "urn:session:test", Instance: "urn:instance:test", Generation: 1, Actor: mesh.Actor{URN: "msg://service/shim/test", Kind: mesh.ActorService}, Subject: "urn:session:test", Argv: []string{exe, "-test.run=^TestFakeProvider$"}, Env: []string{"SHIM_TEST_CHILD=" + mode, "HOME=" + root}, Cwd: root, ControlDir: filepath.Join(root, "c"), JournalDir: filepath.Join(root, "j"), Secret: strings.Repeat("s", 32), PinPath: filepath.Join(root, "test.pin"), PinKey: "test", BootGeneration: "boot-1", Reservation: "reserve-1", StopGrace: 50 * time.Millisecond, Heartbeat: time.Second, JournalBytes: 16 << 20, ClientQueue: 256}
+	return Launch{Session: "urn:session:test", Instance: "urn:instance:test", Generation: 1, Actor: mesh.Actor{URN: "msg://service/shim/test", Kind: mesh.ActorService}, Subject: "urn:session:test", Argv: []string{exe, "-test.run=^TestFakeProvider$"}, Env: []string{"SHIM_TEST_CHILD=" + mode, "HOME=" + root, "GORACE=atexit_sleep_ms=0"}, Cwd: root, ControlDir: filepath.Join(root, "c"), JournalDir: filepath.Join(root, "j"), Secret: strings.Repeat("s", 32), PinPath: filepath.Join(root, "test.pin"), PinKey: "test", BootGeneration: "boot-1", Reservation: "reserve-1", StopGrace: 50 * time.Millisecond, Heartbeat: time.Second, JournalBytes: 16 << 20, ClientQueue: 256}
 }
 func hostTest(t *testing.T, mode string) (*Host, Launch) {
 	t.Helper()
@@ -454,14 +464,14 @@ func TestJournalRecoveryAndCorruption(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestJournalFsyncAndSlowSubscriber(t *testing.T) {
+func TestJournalFsyncAndCoalescedNotifications(t *testing.T) {
 	spec := launchTest(t, "echo")
 	j, err := OpenJournal(spec.JournalDir, spec.Session, 1, 4<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer j.Close()
-	_, sub, err := j.Subscribe("", 1)
+	_, _, sub, err := j.subscribe("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,9 +479,12 @@ func TestJournalFsyncAndSlowSubscriber(t *testing.T) {
 	j.Append(event, false)
 	j.Append(event, false)
 	select {
-	case <-sub.done:
+	case <-sub.notify:
 	default:
-		t.Fatal("slow subscriber not disconnected")
+		t.Fatal("missing journal notification")
+	}
+	if len(j.readAfter(0, 32)) != 2 {
+		t.Fatal("coalescing lost retained records")
 	}
 	before := j.HighWater()
 	j.syncFile = func(*os.File) error { return errors.New("simulated sync failure") }
