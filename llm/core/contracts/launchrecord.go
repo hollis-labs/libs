@@ -3,7 +3,7 @@ package agentcontracts
 import (
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/capabilities"
+	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
 )
 
 // Digests are the four content hashes a launch record pins: the definition, the

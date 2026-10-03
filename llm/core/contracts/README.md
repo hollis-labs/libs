@@ -9,7 +9,7 @@ Zero-dependency agent contracts: Assignment, RunPolicy, InstanceStatus, and the 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/agent-contracts-leaf
+go get github.com/hollis-labs/substrate/llm-core/contracts
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 
-	agentcontracts "github.com/hollis-labs/agent-contracts-leaf"
+	agentcontracts "github.com/hollis-labs/substrate/llm-core/contracts"
 )
 
 func main() {

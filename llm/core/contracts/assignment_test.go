@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/capabilities"
+	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
 )
 
 func validAssignment() Assignment {

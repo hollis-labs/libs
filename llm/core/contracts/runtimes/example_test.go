@@ -3,7 +3,7 @@ package runtimes_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 func ExampleMode_Valid() {
