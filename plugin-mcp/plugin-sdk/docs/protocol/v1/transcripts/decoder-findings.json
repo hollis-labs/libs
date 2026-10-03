@@ -1,0 +1,78 @@
+{
+  "profile": "base",
+  "steps": [
+    {
+      "raw": "{",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "string-id",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "send": [],
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "send": {
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/init",
+        "params": {
+          "host_info": {
+            "protocol": 999
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 1
+        }
+      }
+    }
+  ]
+}

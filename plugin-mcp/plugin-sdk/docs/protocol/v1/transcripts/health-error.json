@@ -1,0 +1,20 @@
+{
+  "profile": "health-error",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "ok": false,
+          "message": "unhealthy"
+        }
+      }
+    }
+  ]
+}

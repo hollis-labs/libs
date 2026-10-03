@@ -1,0 +1,27 @@
+{
+  "status": "proposed",
+  "finding": "F1: no reverse RPC dispatcher in either Go Serve or plugin-host Conn; hypothetical host adapter required",
+  "profile": "duplex",
+  "steps": [
+    {
+      "direction": "plugin-to-host",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "host/storage/get",
+        "params": {
+          "key": "fixture"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "value": {
+            "text": "hello"
+          }
+        }
+      }
+    }
+  ]
+}

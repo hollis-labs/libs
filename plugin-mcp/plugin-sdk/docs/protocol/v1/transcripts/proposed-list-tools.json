@@ -1,0 +1,21 @@
+{
+  "status": "proposed",
+  "finding": "F2: method constant exists without dispatcher; registrations are manifest-authoritative",
+  "profile": "full",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "mcp/list_tools"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "tools": []
+        }
+      }
+    }
+  ]
+}

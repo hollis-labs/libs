@@ -1,0 +1,35 @@
+{
+  "profile": "base",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "pad_bytes": 65536,
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/health"
+      },
+      "pad_bytes": 8388607,
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}
