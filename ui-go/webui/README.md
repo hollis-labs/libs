@@ -20,7 +20,7 @@ releases. See [`CHANGELOG.md`](CHANGELOG.md) and pin a version in your
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-webui
+go get github.com/hollis-labs/libs/ui-go/webui
 ```
 
 ## Usage
@@ -36,7 +36,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	webui "github.com/hollis-labs/go-webui"
+	webui "github.com/hollis-labs/libs/ui-go/webui"
 )
 
 //go:embed all:dist

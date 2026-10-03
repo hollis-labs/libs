@@ -8,7 +8,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	webui "github.com/hollis-labs/go-webui"
+	webui "github.com/hollis-labs/libs/ui-go/webui"
 )
 
 // builtFS is a minimal built SPA: an index.html and one hashed asset.

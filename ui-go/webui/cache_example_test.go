@@ -3,7 +3,7 @@ package webui_test
 import (
 	"fmt"
 
-	webui "github.com/hollis-labs/go-webui"
+	webui "github.com/hollis-labs/libs/ui-go/webui"
 )
 
 func ExampleCachePolicyFor() {

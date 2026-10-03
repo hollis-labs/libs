@@ -15,7 +15,7 @@ import (
 	"log"
 	"net/http"
 
-	webui "github.com/hollis-labs/go-webui"
+	webui "github.com/hollis-labs/libs/ui-go/webui"
 )
 
 //go:embed all:dist
