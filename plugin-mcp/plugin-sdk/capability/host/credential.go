@@ -30,7 +30,7 @@ type Subject struct {
 }
 
 func (s Subject) valid() bool {
-	return s.ID != "" && (s.Kind == AgentClient || s.Kind == SessionClient || s.Kind == MCPProxyClient)
+	return identifier(s.ID) && (s.Kind == AgentClient || s.Kind == SessionClient || s.Kind == MCPProxyClient)
 }
 
 // CredentialClaims are host-authenticated metadata, not a signed wire token.
@@ -135,31 +135,34 @@ func (s *CredentialStore) ActivateOwner(tuple capability.RuntimeIdentity) error 
 	return nil
 }
 
-// IssuedCredential carries a non-secret lease handle and an opaque one-shot
-// secret. Even copies share the same Reveal state. Secret-bearing JSON/text,
-// slog and nested formatting paths are redacted; Reveal is the only access.
+// IssuedCredential carries a non-secret lease handle and a one-shot closure.
+// Copies share Reveal state. Encoding and logging redact the credential; nested
+// private-field formatting can print the closure address but cannot print its
+// captured secret. Reveal is the only supported access to the token.
 type IssuedCredential struct {
-	secret    *credentialSecret
+	secret    func() string
 	LeaseID   string
 	ExpiresAt time.Time
 }
-type credentialSecret struct {
-	mu    sync.Mutex
-	token string
+
+func oneShotSecret(token string) func() string {
+	var mu sync.Mutex
+	return func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		result := token
+		token = ""
+		return result
+	}
 }
 
 func (c IssuedCredential) Reveal() (string, error) {
-	if c.secret == nil {
-		return "", refusal(capability.InvalidRequest, "")
+	if c.secret != nil {
+		if token := c.secret(); token != "" {
+			return token, nil
+		}
 	}
-	c.secret.mu.Lock()
-	defer c.secret.mu.Unlock()
-	if c.secret.token == "" {
-		return "", refusal(capability.InvalidRequest, "")
-	}
-	token := c.secret.token
-	c.secret.token = ""
-	return token, nil
+	return "", refusal(capability.InvalidRequest, "")
 }
 func (IssuedCredential) String() string   { return "[credential redacted]" }
 func (IssuedCredential) GoString() string { return "[credential redacted]" }
@@ -243,7 +246,7 @@ func (s *CredentialStore) issueLocked(claims CredentialClaims, lease time.Durati
 	s.entries[hash] = entry
 	s.leases[leaseID] = hash
 	entry.timer = s.clock.AfterFunc(expiry.Sub(now), func() { s.expire(hash, entry) })
-	return IssuedCredential{secret: &credentialSecret{token: base64.RawURLEncoding.EncodeToString(secret[:])}, LeaseID: leaseID, ExpiresAt: expiry}, nil
+	return IssuedCredential{secret: oneShotSecret(base64.RawURLEncoding.EncodeToString(secret[:])), LeaseID: leaseID, ExpiresAt: expiry}, nil
 }
 func (s *CredentialStore) expire(hash [32]byte, entry *credentialEntry) {
 	s.mu.Lock()
@@ -324,7 +327,7 @@ func (s *CredentialStore) Renew(token string, next CredentialClaims, lease time.
 		if !slices.Contains(old.claims.GrantIDs, id) {
 			return IssuedCredential{}, refusal(capability.ScopeDenied, next.CapabilityNames[id])
 		}
-		if next.CapabilityNames[id] != old.claims.CapabilityNames[id] {
+		if next.CapabilityNames[id] != old.claims.CapabilityNames[id] || next.GrantExpiresAt[id].Round(0).After(old.claims.GrantExpiresAt[id]) {
 			return IssuedCredential{}, refusal(capability.ScopeDenied, next.CapabilityNames[id])
 		}
 		if err := capability.CheckNarrowing(old.claims.CapabilityNames[id], old.claims.Scopes[id], next.Scopes[id]); err != nil {

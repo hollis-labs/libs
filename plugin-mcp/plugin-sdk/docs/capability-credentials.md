@@ -22,16 +22,18 @@ The returned token has 32 cryptographically random bytes, encoded as unpadded
 base64url. Server state keeps only SHA-256 hashes and authority metadata. Send
 the raw token once through a private channel. Never send it via command-line
 arguments, URLs, logs, registry documents, browser bundles or shared files. The
-secret lives behind an opaque pointer; call `Reveal` exactly once at issuance,
+secret lives in a one-shot closure; call `Reveal` exactly once at issuance,
 then send it privately. Copies share that one-shot state. Formatting, JSON/text
-encoding and slog redact the credential, including nested private fields. A
+encoding and slog redact the credential. Nested private-field formatting may
+print the closure address, but cannot traverse its captured token. A
 revealed string is still secret-bearing and must never be logged.
 
 The default lease is five minutes. Configuration supplies an explicit maximum;
 requested leases cannot exceed it. Expiry is also capped at the earliest grant
 expiry and the renewal chain's absolute lifetime (`MaxLifetime`, default one
 hour). A fresh authenticated issuance is required after that bound; renewal
-cannot extend it even when the host supplies refreshed grant expiry metadata.
+cannot extend it. Renewal also refuses any later expiry for an existing grant;
+refreshed grants require a fresh authenticated issuance.
 `Verify` checks the exact verified subject, audience, runtime identity, expiry
 and active owner. It returns copied claims and a context cancelled on expiry,
 revocation, renewal, generation replacement or shutdown. Expiry verification
@@ -74,7 +76,7 @@ and duration. It has no argument, content, token or raw error field. Supply only
 verified safe identifiers. The host sink owns bounded telemetry buffering,
 retention and presentation, and must return promptly and honor cancellation.
 `Auditor.Record` isolates sink errors and panics, returning failure separately
-and incrementing a thread-safe failure counter. Per-code/ reason denial counters
+and incrementing a thread-safe failure counter. Per-code/reason denial counters
 (`Denials`) are bounded to the error vocabulary, copied on read and updated even
 when persistence or presentation fails. A sink failure never changes the
 authorization decision. A missing sink is an explicit host configuration choice,
