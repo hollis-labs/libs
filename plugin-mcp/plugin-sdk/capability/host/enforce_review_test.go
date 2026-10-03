@@ -168,7 +168,6 @@ func TestAuditedIdentifiersAreBoundedAndUnauthenticatedActorScrubbed(t *testing.
 	c.Server = bad
 	c.Tool = bad
 	c.TraceID = bad
-	c.RequestID = bad
 	c.GrantID = bad
 	c.Capability = bad
 	a.Actor.ID = bad
@@ -184,7 +183,7 @@ func TestAuditedIdentifiersAreBoundedAndUnauthenticatedActorScrubbed(t *testing.
 	if event.Actor != (Actor{}) || event.InitiatingCaller != nil {
 		t.Fatal("unverified identity leaked")
 	}
-	for _, id := range []string{event.Target, event.Server, event.Tool, event.TraceID, event.RequestID, event.GrantID, event.Capability, event.Owner.HostInstance, event.Owner.OwnerID, event.PolicyRevision} {
+	for _, id := range []string{event.Target, event.Server, event.Tool, event.TraceID, event.GrantID, event.Capability, event.Owner.HostInstance, event.Owner.OwnerID, event.PolicyRevision} {
 		if id != invalidAuditIdentifier {
 			t.Fatal("unbounded audit identifier")
 		}

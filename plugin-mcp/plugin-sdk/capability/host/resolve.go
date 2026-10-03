@@ -54,7 +54,7 @@ func ResolveGrants(ctx context.Context, catalog *capability.Catalog, resolver Sc
 		}
 	}()
 	if err := contextFailure(ctx, ""); err != nil {
-		return nil, nil, admissionFailure(err, "", "")
+		return nil, nil, admissionFailure(err, "", 0)
 	}
 	if catalog == nil || resolver == nil || plan.NewGrantID == nil || plan.Runtime.Validate() != nil {
 		return nil, nil, refusal(capability.InvalidRequest, "")
@@ -65,7 +65,7 @@ func ResolveGrants(ctx context.Context, catalog *capability.Catalog, resolver Sc
 	for _, request := range requests {
 		grant, err := resolveGrant(ctx, catalog, resolver, request, plan)
 		if err != nil {
-			failure := admissionFailure(err, request.Name, "")
+			failure := admissionFailure(err, request.Name, 0)
 			// Cancellation and implementation failures must not be hidden as optional
 			// feature denial. The host cannot proceed with an incomplete plan.
 			if !request.Optional || failure.Code == capability.Cancelled || failure.Code == capability.DeadlineExceeded || failure.Code == capability.InternalError {

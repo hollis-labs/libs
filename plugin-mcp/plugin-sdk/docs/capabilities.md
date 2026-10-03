@@ -82,11 +82,19 @@ effective, err := capability.Intersect(descriptor.Name, requested,
 `Error` carries a symbolic `Code`, capability name, request ID and effect state,
 without an internal cause or arbitrary diagnostic text. `RPCData` validates and
 returns the `host-rpc/1` payload for application failures at JSON-RPC code
-`-32010`. Every payload has `retryable: false`. Missing effect state defaults to
+`-32010`. `RequestID` is a decimal integer in `1..9007199254740991`,
+encoded as a JSON number; strings, fractions, exponents, zero and unsafe values
+are refused. Internal planning errors may omit correlation; `Error.Validate`
+checks their classification, while `RPCData` requires a valid ID. The adapter
+must copy the enclosing integer request ID and enforce equality with it.
+Every payload has `retryable: false`. Missing effect state defaults to
 unknown; invalid states/codes/details and inconsistent unknown-outcome states
 are refused. The `conflict` code covers expected-revision/operation-key
-conflicts. Optional `detail` is restricted to stale_binding, callback_cycle or
-depth_exceeded. Standard JSON-RPC parsing/invalid-method failures remain
+conflicts. Optional `detail` is restricted to stale_binding, callback_cycle,
+depth_exceeded, parent_invalid or parent_terminal. Unknown/wrong-owner/
+wrong-binding parent refusals share parent_invalid; only a terminal parent
+verified to belong to the same binding may disclose parent_terminal. The host
+ledger owns that decision; the leaf validates the closed vocabulary. Standard JSON-RPC parsing/invalid-method failures remain
 distinct. Effect states are `not_started`, `not_committed`, `committed` and
 `unknown`; an ambiguous submitted mutation uses `unknown_outcome`, never an
 automatically retried timeout or claimed rollback. Adapters must not copy
