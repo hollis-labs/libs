@@ -1,6 +1,6 @@
 # go-embed-contracts
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-embed-contracts.svg)](https://pkg.go.dev/github.com/hollis-labs/go-embed-contracts)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/llm-core/embedcontracts.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/llm-core/embedcontracts)
 
 Shared text-embedding interface for Go. Contracts only — no provider
 implementations, no runtime dependencies beyond the Go standard library.
@@ -15,7 +15,7 @@ other's transitive dependencies.
 ## Install
 
 ```
-go get github.com/hollis-labs/go-embed-contracts
+go get github.com/hollis-labs/substrate/llm-core/embedcontracts
 ```
 
 ## Quickstart
@@ -28,7 +28,7 @@ package mine
 import (
     "context"
 
-    embedcontracts "github.com/hollis-labs/go-embed-contracts"
+    embedcontracts "github.com/hollis-labs/substrate/llm-core/embedcontracts"
 )
 
 type MyEmbedder struct{ /* client, config, etc. */ }
@@ -61,7 +61,7 @@ See the godoc for the contractual guarantees implementers commit to.
 ## Companion module
 
 Chat-model contracts and rate-budget primitives live in
-[`github.com/hollis-labs/go-llm-contracts`](https://github.com/hollis-labs/go-llm-contracts).
+[`github.com/hollis-labs/substrate/llm-core/llmcontracts`](https://github.com/hollis-labs/go-llm-contracts).
 
 ## Contributing
 

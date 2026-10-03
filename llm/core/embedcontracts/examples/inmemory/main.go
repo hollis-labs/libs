@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	embedcontracts "github.com/hollis-labs/go-embed-contracts"
+	embedcontracts "github.com/hollis-labs/substrate/llm-core/embedcontracts"
 )
 
 // dims is the vector width this stub embedder produces.
