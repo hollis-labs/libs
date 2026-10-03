@@ -312,7 +312,7 @@ func (e *Engine) enqueueRemoteBatch(handler RemoteBatchHandler, ds []*dispatch, 
 		receipts[i].Result = DispatchResult{InvocationID: d.id, Status: Queued, Future: d.future}
 	}
 	ds[0].batchWork = func() {
-		results := e.runRemoteBatch(ds[0].ctx, handler, ds, entries)
+		results := e.runRemoteBatch(context.WithoutCancel(ds[0].ctx), handler, ds, entries)
 		for i, d := range ds {
 			d.future.complete(results[i].Result, results[i].Error)
 		}

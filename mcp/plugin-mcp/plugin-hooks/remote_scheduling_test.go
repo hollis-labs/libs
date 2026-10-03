@@ -439,3 +439,92 @@ func TestRemoteCompletedAncestorIsNotCycle(t *testing.T) {
 		t.Fatalf("completed ancestor rejected %v calls=%d", err, count.Load())
 	}
 }
+
+func TestRemoteBatchIndependentQueuedDeadlines(t *testing.T) {
+	for _, mode := range []Mode{Async, AfterCommit} {
+		t.Run(string(mode), func(t *testing.T) {
+			first := definition("batch.short", Action)
+			first.Mode = mode
+			*first.RemoteOK = true
+			first.Budget = 300 * time.Millisecond
+			first.HandlerTimeout = 300 * time.Millisecond
+			first.RemoteLatencyBudget = 200 * time.Millisecond
+			second := first
+			second.Name = "batch.long"
+			second.Budget = time.Second
+			second.HandlerTimeout = time.Second
+			second.RemoteLatencyBudget = 800 * time.Millisecond
+			registry, err := NewRegistry(Catalog{Version: "test", Definitions: []Definition{first, second}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			e, err := NewEngine(registry, ExecutionConfig{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				if closeErr := e.Shutdown(ctx); closeErr != nil {
+					t.Error(closeErr)
+				}
+			})
+			s, err := registry.NewScope(ScopeConfig{Owner: "owner", Generation: "one", Remote: true, Hooks: []string{first.Name, second.Name}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			connection, _ := NewRemoteConnection()
+			t.Cleanup(connection.Close)
+			items := make([]RemoteBatchItem, 2)
+			for i, d := range []Definition{first, second} {
+				handle, addErr := s.AddRemoteAction(d.Name, d.Name, Options{}, RemoteRegistration{Connection: connection, LatencyEstimate: time.Millisecond, Handler: RemoteHandlerFunc(func(context.Context, RemoteRequest) (RemoteResult, error) {
+					t.Error("single-call fallback")
+					return RemoteResult{}, nil
+				})})
+				if addErr != nil {
+					t.Fatal(addErr)
+				}
+				items[i] = RemoteBatchItem{Handle: handle, Payload: json.RawMessage(`{}`)}
+			}
+			handler := RemoteBatchHandlerFunc(func(ctx context.Context, qs []RemoteRequest) ([]RemoteResult, error) {
+				if len(qs) != 2 {
+					t.Errorf("batch omitted live item: %d", len(qs))
+				}
+				var latest time.Time
+				out := make([]RemoteResult, len(qs))
+				for i, q := range qs {
+					if q.Context.Deadline.After(latest) {
+						latest = q.Context.Deadline
+					}
+					out[i] = RemoteResult{InvocationID: q.InvocationID, Status: RemoteOK}
+				}
+				actual, _ := ctx.Deadline()
+				if !actual.Equal(latest) {
+					t.Errorf("first item clipped sibling: transport %s latest item %s", actual, latest)
+				}
+				return out, nil
+			})
+			var receipts []RemoteBatchOutcome
+			if mode == AfterCommit {
+				pending, prepareErr := e.PrepareRemoteBatchAfterCommit(context.Background(), handler, items)
+				if prepareErr != nil {
+					t.Fatal(prepareErr)
+				}
+				receipts, err = pending.Commit()
+			} else {
+				receipts, err = e.EmitRemoteBatch(context.Background(), handler, items)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, receipt := range receipts {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				final, awaitErr := receipt.Result.Future.Await(ctx)
+				cancel()
+				if awaitErr != nil || final.Status != Success {
+					t.Fatalf("independent deadline outcome %+v %v", final, awaitErr)
+				}
+			}
+		})
+	}
+}
