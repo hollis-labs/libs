@@ -139,17 +139,8 @@ func (m Manifest) Validate() error {
 		add(strings.TrimSpace(tool.Description) != "", prefix+".description is required")
 		add(strings.TrimSpace(tool.Effect) != "", prefix+".effect is required (host-defined vocabulary)")
 		if a := tool.Annotations; a != nil {
-			known := tool.Effect == "read" || tool.Effect == "write" || tool.Effect == "destructive"
-			annotationPrefix := prefix + " (" + tool.Name + ").annotations"
-			if a.ReadOnly != nil {
-				add(known && *a.ReadOnly == (tool.Effect == "read"), annotationPrefix+".readOnly is inconsistent with effect "+tool.Effect)
-			}
-			if a.Destructive != nil {
-				add(known && *a.Destructive == (tool.Effect == "destructive"), annotationPrefix+".destructive is inconsistent with effect "+tool.Effect)
-			}
-			if a.Idempotent != nil {
-				add(known && (!*a.Idempotent || tool.Effect == "write"), annotationPrefix+".idempotent is inconsistent with effect "+tool.Effect)
-			}
+			add(!(a.ReadOnlyHint != nil && *a.ReadOnlyHint && a.DestructiveHint != nil && *a.DestructiveHint),
+				prefix+" ("+tool.Name+").annotations.readOnlyHint=true cannot accompany destructiveHint=true")
 		}
 		var schema map[string]json.RawMessage
 		var schemaType string

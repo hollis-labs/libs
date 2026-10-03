@@ -98,10 +98,12 @@ type Tool struct {
 
 // ToolAnnotations carries optional MCP hints, never authorization. Effect stays
 // authoritative. Pointers distinguish an omitted hint from an explicit false;
-// no defaults are inferred. See docs/manifest.md for the consistency matrix.
+// no defaults are inferred. Only readOnlyHint=true with destructiveHint=true
+// is inconsistent.
 type ToolAnnotations struct {
-	ReadOnly    *bool `json:"readOnly,omitempty"`
-	Destructive *bool `json:"destructive,omitempty"`
-	Idempotent  *bool `json:"idempotent,omitempty"`
-	OpenWorld   *bool `json:"openWorld,omitempty"`
+	Title           string `json:"title,omitempty"`
+	ReadOnlyHint    *bool  `json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool  `json:"destructiveHint,omitempty"`
+	IdempotentHint  *bool  `json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`
 }
