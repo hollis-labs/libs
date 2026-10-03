@@ -1,5 +1,5 @@
-# The gate: two jobs, one per half of the repo (the Go module at the root, the
-# npm workspace under ts/). Gate only — nothing here publishes; the release
+# The gate covers Go and the npm workspace, with additional Node 22 and Deno
+# runtime legs. Gate only — nothing here publishes; the release
 # steps are a runbook in AGENTS.md ("Releasing the TS package").
 #
 # govulncheck is pinned (v1.8.0), not @latest: an unpinned scanner changes its
@@ -90,3 +90,67 @@ jobs:
       # human runs `npm publish`, not after.
       - name: pack (dry run)
         run: npm pack --dry-run --workspaces
+
+  ts-node22:
+    name: ts · Node 22 · typecheck · build · test · pack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: install
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: build
+        run: npm run build
+
+      - name: test
+        run: npm test
+
+      - name: pack (dry run)
+        run: npm pack --dry-run --workspaces
+
+  ts-deno:
+    name: deno · stdio acceptance · transcript replay
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      # Node installs/builds the workspace and drives the real Deno child.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 'v2.x'
+
+      - name: install
+        run: npm ci
+
+      - name: build
+        run: npm run build
+
+      # Only local modules and Node built-ins: no Deno network permission or
+      # dependency downloads. npm ci owns dependency installation above.
+      - name: real stdio acceptance (Deno child)
+        run: node packages/plugin-sdk/test/stdio-acceptance.js deno run --cached-only --no-npm --no-check --allow-env
+
+      - name: shared transcript replay (Deno)
+        run: deno test --cached-only --no-npm --no-check --allow-read --allow-env packages/plugin-sdk/test/transcripts.test.js
