@@ -25,7 +25,8 @@ export function fixturePlugin(profile) {
   if (profile !== 'full') throw new Error(`unknown fixture profile ${profile}`);
   return {
     ...base,
-    command(_ctx, r) {
+    command(ctx, r) {
+      if(r.name === "echo-context") return {action:"message",content:ctx.forwardContext ? `${ctx.forwardContext.binding_id ?? ""}:${ctx.forwardContext.timeout_ms}` : "absent"};
       fail(r.name);
       return { action: 'message', content: r.args, envelopes: [{ type: 'fixture.echo', data: { name: r.name, identity: r.identity ?? null }, session_id: r.session_id }] };
     },

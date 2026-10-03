@@ -198,6 +198,10 @@ loop:
 			ready, attempted := srv.initialized, srv.initAttempted
 			srv.initMu.Unlock()
 			if req.Method == MethodUnload {
+				if _, err := validateRuntimeParams(req.Method, req.Params); err != nil {
+					run(func() { srv.writeError(req.ID, ErrCodeInvalidParams, err.Error()) })
+					continue
+				}
 				terminal, terminalReady = req, ready
 				break loop
 			}
@@ -245,6 +249,10 @@ loop:
 	case <-drained:
 	case <-shutdownCtx.Done():
 		return fail()
+	}
+	if terminal != nil && terminalReady {
+		forward, _ := validateRuntimeParams(terminal.Method, terminal.Params)
+		shutdownCtx = withForwardContext(shutdownCtx, forward)
 	}
 	cleanup := srv.beginUnload(shutdownCtx)
 	select {

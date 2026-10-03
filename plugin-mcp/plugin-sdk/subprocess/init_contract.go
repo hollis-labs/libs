@@ -114,6 +114,9 @@ func (p InitParams) Validate() error {
 	if len(p.Identity) > 0 && (strictjson.Validate(p.Identity) != nil || bytes.Equal(bytes.TrimSpace(p.Identity), []byte("null"))) {
 		return initInvalid("identity")
 	}
+	if p.Context != nil && p.Context.Validate() != nil {
+		return initInvalid("context")
+	}
 	if p.HostServices != nil {
 		if err := p.HostServices.Validate(); err != nil {
 			return err
@@ -135,7 +138,7 @@ func (p InitParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(plain(p))
 }
 func (p *InitParams) UnmarshalJSON(data []byte) error {
-	f, err := initFields(data, "params", []string{"plugin_dir", "data_dir", "cache_dir", "config", "log_level", "host_info", "capability_contract", "incarnation", "grants"}, []string{"identity", "host_services", "hooks_profile"})
+	f, err := initFields(data, "params", []string{"plugin_dir", "data_dir", "cache_dir", "config", "log_level", "host_info", "capability_contract", "incarnation", "grants"}, []string{"identity", "host_services", "hooks_profile", "context"})
 	if err != nil {
 		return err
 	}
@@ -159,6 +162,9 @@ func (p *InitParams) UnmarshalJSON(data []byte) error {
 	}
 	if err := initStrings(f["config"], "config"); err != nil {
 		return err
+	}
+	if v, ok := f["context"]; ok && ValidateHostRPCDTO("ForwardContext", v) != nil {
+		return initInvalid("context")
 	}
 	type plain InitParams
 	var next plain

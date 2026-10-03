@@ -1,3 +1,4 @@
+import { decodeRuntimeParams, PayloadError } from './payload.js';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import { Readable } from 'node:stream';
@@ -134,7 +135,15 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
         try {
           const request = decodeRequest(line);
           if (!request) continue;
-          if (request.method === 'plugin/unload') { terminal = request; break; }
+          if (request.method === 'plugin/unload') {
+            try { decodeRuntimeParams(request); }
+            catch(error) {
+              if(!(error instanceof PayloadError)) throw error;
+              if(request.id!==undefined) void write({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});
+              continue;
+            }
+            terminal = request; break;
+          }
           // Keep Init admission ordered without blocking reader EOF/cancellation.
           const task = barrier.then(() => dispatcher.dispatch(request)).then(response => { if (response) void write(response); });
           track(task);
@@ -160,7 +169,8 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
     const shutdown = (async () => {
       await Promise.all([...pending]);
       if (closed) throw new ShutdownTimeoutError();
-      const cleanupContext = {...dispatcher.context,signal:cleanupController.signal};
+      const forwardContext = terminal && dispatcher.ready ? decodeRuntimeParams<{context?: import('./host-rpc.js').ForwardContext}>(terminal).context : undefined;
+      const cleanupContext = {...dispatcher.context,forwardContext,signal:cleanupController.signal};
       let cleanupError: unknown, cleanupFailed = false;
       try { await dispatcher.shutdown(cleanupContext); } catch (error) { cleanupError = error; cleanupFailed = true; }
       if (closed) throw new ShutdownTimeoutError();

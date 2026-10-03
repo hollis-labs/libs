@@ -192,7 +192,7 @@ func TestShutdownCancelsDrainsThenCleansOnce(t *testing.T) {
 			var out bytes.Buffer
 			done := make(chan error, 1)
 			go func() { done <- ServeWithOptions(p, ServeOptions{Input: inR, Output: &out, Context: parent}) }()
-			io.WriteString(inW, initLine(t, 1)+`{"jsonrpc":"2.0","id":2,"method":"command/execute"}`+"\n")
+			io.WriteString(inW, initLine(t, 1)+`{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}`+"\n")
 			<-started
 			if explicit {
 				io.WriteString(inW, `{"jsonrpc":"2.0","id":3,"method":"plugin/unload"}`+"\n")
@@ -266,7 +266,7 @@ func TestShutdownTimeoutDoesNotClaimCleanup(t *testing.T) {
 	var out bytes.Buffer
 	var mu sync.Mutex
 	writer := &syncWriter{buf: &out, mu: &mu}
-	err := ServeWithOptions(p, ServeOptions{Input: strings.NewReader(initLine(t, 1) + `{"jsonrpc":"2.0","id":2,"method":"command/execute"}` + "\n"), Output: writer, ShutdownTimeout: 20 * time.Millisecond})
+	err := ServeWithOptions(p, ServeOptions{Input: strings.NewReader(initLine(t, 1) + `{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}` + "\n"), Output: writer, ShutdownTimeout: 20 * time.Millisecond})
 	if !errors.Is(err, ErrShutdownTimeout) || attempts.Load() != 0 {
 		t.Fatalf("error=%v attempts=%d", err, attempts.Load())
 	}

@@ -84,8 +84,8 @@ omits `id` for notifications; there is no bigint or rounded numeric ID support.
 
 `transcripts/decoder-findings.json`, `notifications.json` and `envelope-ids.json`
 assert normative envelopes in Go and TS. Other transcripts retain their existing
-normative/observed-quirk levels for payloads and framing; those policies
-have separate conformance work. The unchanged [v1 corpus](../v1/README.md) records
+normative/observed-quirk levels for framing; runtime payload validation is
+normative as described in the payload matrix. The unchanged [v1 corpus](../v1/README.md) records
 historical protocol-1 behavior and is no longer replayed against current Serve.
 Optional profiles require their own conformance gate.
 
@@ -137,3 +137,9 @@ observed Unload attempt and zero post-fence Health callbacks. Runtime tests cove
 cancellation/drain barriers, cleanup throw/panic, EOF/unload races and deadline
 exhaustion. Payload validation, full frame budgets and reverse profiles retain
 separate implementation gates.
+
+Runtime method params and results follow the [required/default matrix](payloads.md).
+Every forward params DTO permits optional closed ForwardContext metadata.
+`payload-validation.json` is normative, including scanner-based escaped-key
+preservation and invalid-unload recovery. Framing policies retain their existing
+levels until the framing slice.

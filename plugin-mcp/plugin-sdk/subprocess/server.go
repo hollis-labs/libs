@@ -120,6 +120,14 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			return
 		}
 	}
+	if req.Method != MethodInit && s.supportsMethod(req.Method) {
+		forward, err := validateRuntimeParams(req.Method, req.Params)
+		if err != nil {
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			return
+		}
+		ctx = withForwardContext(ctx, forward)
+	}
 	switch req.Method {
 	case MethodInit:
 		if !req.ID.positiveInteger() {
@@ -143,6 +151,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeInitError(req.ID, err)
 			return
 		}
+		ctx = withForwardContext(ctx, params.Context)
 		res, err := s.plugin.Init(ctx, params)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
@@ -317,6 +326,9 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 		s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
 		return
 	}
+	if req.Method == MethodCRUDList && params.Filters == nil {
+		params.Filters = map[string]interface{}{}
+	}
 	switch req.Method {
 	case MethodCRUDCreate:
 		out, err := s.asCRUD.Create(ctx, params.ResourceType, params.Data)
@@ -324,7 +336,15 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		data, _ := json.Marshal(out)
+		if err := payloadResultSource(out); err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
+		data, err := json.Marshal(out)
+		if err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
 		s.writeResult(req.ID, CRUDResult{Data: data})
 	case MethodCRUDRead:
 		out, err := s.asCRUD.Read(ctx, params.ResourceType, params.ID)
@@ -332,7 +352,15 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		data, _ := json.Marshal(out)
+		if err := payloadResultSource(out); err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
+		data, err := json.Marshal(out)
+		if err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
 		s.writeResult(req.ID, CRUDResult{Data: data})
 	case MethodCRUDUpdate:
 		out, err := s.asCRUD.Update(ctx, params.ResourceType, params.ID, params.Data)
@@ -340,7 +368,15 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		data, _ := json.Marshal(out)
+		if err := payloadResultSource(out); err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
+		data, err := json.Marshal(out)
+		if err != nil {
+			s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+			return
+		}
 		s.writeResult(req.ID, CRUDResult{Data: data})
 	case MethodCRUDDelete:
 		if err := s.asCRUD.Delete(ctx, params.ResourceType, params.ID); err != nil {
@@ -356,7 +392,15 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 		}
 		raw := make([]json.RawMessage, 0, len(items))
 		for _, it := range items {
-			b, _ := json.Marshal(it)
+			if err := payloadResultSource(it); err != nil {
+				s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+				return
+			}
+			b, err := json.Marshal(it)
+			if err != nil {
+				s.writeError(req.ID, ErrCodeInternal, "marshal result failed")
+				return
+			}
 			raw = append(raw, b)
 		}
 		s.writeResult(req.ID, CRUDListResult{Items: raw})
@@ -369,7 +413,14 @@ func (s *server) writeResult(id RPCID, result any) {
 	if id == (RPCID{}) {
 		return
 	}
+	if err := payloadResultSource(result); err != nil {
+		s.writeError(id, ErrCodeInternal, "marshal result: invalid JSON value")
+		return
+	}
 	payload, err := json.Marshal(result)
+	if err == nil {
+		err = validateRuntimeResult(result, payload)
+	}
 	if err != nil {
 		s.writeError(id, ErrCodeInternal, fmt.Sprintf("marshal result: %v", err))
 		return
@@ -458,18 +509,7 @@ func decodeParams(raw any, dst any) error {
 	if raw == nil {
 		return nil
 	}
-	// Keep the existing non-init payload normalization in this envelope slice.
-	// Init alone requires raw tokens for its already strict contract decoder.
-	if _, init := dst.(*InitParams); !init {
-		if wire, ok := raw.(json.RawMessage); ok {
-			var value any
-			if err := json.Unmarshal(wire, &value); err != nil {
-				return fmt.Errorf("decode params: %w", err)
-			}
-			raw = value
-		}
-	}
-	b, err := json.Marshal(raw)
+	b, err := paramsJSON(raw)
 	if err != nil {
 		return fmt.Errorf("marshal params: %w", err)
 	}
@@ -499,4 +539,24 @@ func NewConfigReader(values map[string]string) ConfigReader {
 		secrets = newSecretTracker()
 	}
 	return newConfigReader(values, secrets)
+}
+
+func (s *server) supportsMethod(method string) bool {
+	switch method {
+	case MethodLoad, MethodUnload, MethodHealth:
+		return true
+	case MethodCommandExecute:
+		return s.asCommand != nil
+	case MethodEventHandle:
+		return s.asEvent != nil
+	case MethodCRUDCreate, MethodCRUDRead, MethodCRUDUpdate, MethodCRUDDelete, MethodCRUDList:
+		return s.asCRUD != nil
+	case MethodMCPCallTool:
+		return s.asMCP != nil
+	case MethodHTTPHandle:
+		return s.asHTTP != nil
+	case MethodMigrate:
+		return s.asMigrate != nil
+	}
+	return false
 }

@@ -184,3 +184,5 @@ and `incarnation` replace the old name-only grant option; default grants are
 empty and the harness supplies a test incarnation. Results acknowledge both
 `protocol:2` and `capability_contract:1`. Optional reverse/hook offers are
 validated and declined by the current runtime; their transports are not implemented.
+
+Runtime params require the fields in the protocol-2 [payload matrix](../../../docs/protocol/v2/payloads.md). Optional `context` reuses the closed `ForwardContext` DTO; callbacks read `context.forwardContext`. It carries metadata only; this runtime does not authorize bindings or enforce its timeout. Invalid params return -32602 before invocation, and unrepresentable or malformed results return -32603.

@@ -241,7 +241,7 @@ func TestServe_EventEnvelopesPropagate(t *testing.T) {
 	p := &envelopeEventPlugin{basePlugin: basePlugin{id: "env-evt"}}
 	resps := drive(t, p, []RPCRequest{
 		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle,
-			Params: EventHandleParams{Type: "message.sent"}},
+			Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "message.sent"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -266,7 +266,7 @@ func (p *envelopeEventPlugin) EventHandle(ctx context.Context, req EventRequest)
 func TestServe_EventHandlerCancel(t *testing.T) {
 	p := &eventPlugin{basePlugin: basePlugin{id: "evt"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle, Params: EventHandleParams{Type: "veto", PreHook: true}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle, Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "veto", PreHook: true}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -434,7 +434,7 @@ func (p *migratePlugin) Migrate(ctx context.Context, from, to string) error {
 func TestServe_Migrator(t *testing.T) {
 	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/tmp"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/fixture/data"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -450,7 +450,7 @@ func TestServe_Migrator(t *testing.T) {
 func TestServe_MigrateError(t *testing.T) {
 	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "bad"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{DataDir: "/fixture/data", FromVersion: "0.1.0", ToVersion: "bad"}},
 	})
 	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeInternal {
 		t.Errorf("expected internal error, got %+v", resps)
@@ -460,7 +460,7 @@ func TestServe_MigrateError(t *testing.T) {
 func TestServe_MigrateMethodNotFound(t *testing.T) {
 	p := &basePlugin{id: "none"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{DataDir: "/fixture/data", FromVersion: "0.1.0", ToVersion: "0.2.0"}},
 	})
 	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
 		t.Errorf("expected method-not-found, got %+v", resps)
@@ -576,8 +576,8 @@ func TestServe_IdentityAwareDispatchMethods(t *testing.T) {
 
 	resps := drive(t, p, []RPCRequest{
 		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x", Identity: idA}},
-		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodEventHandle, Params: EventHandleParams{Type: "y", Identity: idB}},
-		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "z", Identity: idC}},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodEventHandle, Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "y", Identity: idB}},
+		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodMCPCallTool, Params: MCPCallRequest{Arguments: map[string]interface{}{}, ToolName: "z", Identity: idC}},
 		{JSONRPC: "2.0", ID: NumberID(4), Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x", Identity: idD}},
 	})
 	for _, r := range resps {

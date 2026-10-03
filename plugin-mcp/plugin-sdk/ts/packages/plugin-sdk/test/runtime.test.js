@@ -30,8 +30,8 @@ test('in-flight calls complete out of order; EOF drains before final unload', {t
     return {action:'message',content:r.name};
   },unload(){unloaded.resolve();}};
   const r = await rig(t,p);
-  r.send(1,'command/execute',{name:'slow'}); await slowStarted.promise;
-  r.send(2,'command/execute',{name:'fast'});
+  r.send(1,'command/execute',{name:'slow',args:'',session_id:''}); await slowStarted.promise;
+  r.send(2,'command/execute',{name:'fast',args:'',session_id:''});
   assert.deepEqual(await r.reply(),{jsonrpc:'2.0',id:2,result:{action:'message',content:'fast'}});
   const inputEnded = once(r.input,'end');
   r.input.end();
@@ -54,9 +54,9 @@ test('sync throw, async rejection and cyclic results are isolated; next call sur
   }};
   const r = await rig(t,p);
   for(const [id,name] of [[1,'throw'],[2,'reject'],[3,'cycle']]) {
-    r.send(id,'command/execute',{name}); assert.equal((await r.reply()).error.code,-32603);
+    r.send(id,'command/execute',{name,args:'',session_id:''}); assert.equal((await r.reply()).error.code,-32603);
   }
-  r.send(4,'command/execute',{name:'ok'}); assert.equal((await r.reply()).result.content,'alive');
+  r.send(4,'command/execute',{name:'ok',args:'',session_id:''}); assert.equal((await r.reply()).result.content,'alive');
   r.input.end(); await r.done;
 });
 
@@ -66,26 +66,28 @@ test('AbortSignal wakes stdin, cancels pending handler, unload gets fresh signal
     started.resolve(); await once(ctx.signal,'abort'); throw ErrCancelled;
   },unload(ctx) { assert.equal(ctx.signal.aborted,false); }};
   const r = await rig(t,p,{signal:controller.signal});
-  r.send(1,'command/execute',{name:'wait'}); await started.promise;
+  r.send(1,'command/execute',{name:'wait',args:'',session_id:''}); await started.promise;
   controller.abort(); assert.equal((await r.reply()).error.code,-32003); await r.done;
   assert.equal(r.input.destroyed,false);assert.equal(r.input.listenerCount('readable'),0);
 });
 
-test('identity is opaque, per call; null is present and omitted is not delivered', {timeout:5000}, async t => {
+test('identity remains opaque but structural null is invalid', {timeout:5000}, async t => {
   const received = []; const p = {...fixturePlugin('full'),identity(_ctx,v){received.push(v);}};
   const r = await rig(t,p,{initParams:{identity:{subject:'one'}}});
-  r.send(2,'command/execute',{name:'echo',identity:null}); await r.reply();
-  r.send(3,'command/execute',{name:'echo'}); await r.reply();
-  assert.deepEqual(received,[{subject:'one'},null]); r.input.end(); await r.done;
+  r.send(2,'command/execute',{name:'echo',args:'',session_id:'',identity:null}); assert.equal((await r.reply()).error.code,-32602);
+  r.send(3,'command/execute',{name:'echo',args:'',session_id:'',identity:{MixedCase:1}}); await r.reply();
+  assert.deepEqual(received,[{subject:'one'},{MixedCase:1}]); r.input.end(); await r.done;
 });
 
-test('omitted/null fields get Go zero values; unsupported capability precedes params validation', {timeout:5000}, async t => {
-  const p = {...fixturePlugin('base'),command(_ctx,req){assert.equal(req.name,'');assert.equal(req.args,'');return {action:'noop'};}};
+test('required params precede invocation; unsupported capability precedes validation', {timeout:5000}, async t => {
+  let calls=0;
+  const p = {...fixturePlugin('base'),command(_ctx,req){calls++;assert.equal(req.args,'');return {action:'noop'};}};
   const r = await rig(t,p);
-  r.send(1,'command/execute',null); assert.equal((await r.reply()).result.action,'noop');
+  r.send(1,'command/execute',null); assert.equal((await r.reply()).error.code,-32602);
   r.send(2,'http/handle',[]); assert.equal((await r.reply()).error.code,-32601);
   r.send(3,'command/execute',{name:42}); assert.equal((await r.reply()).error.code,-32602);
-  r.input.end(); await r.done;
+  r.send(4,'command/execute',{name:'echo',session_id:'',args:''}); assert.equal((await r.reply()).result.action,'noop');
+  assert.equal(calls,1);r.input.end(); await r.done;
 });
 
 test('CRLF and final frame without LF decode across arbitrary byte chunks', {timeout:5000}, async () => {
@@ -120,7 +122,7 @@ test('explicit unload fences new work, acknowledges once and ends without host E
 test('wrapped typed error and cancellation precedence follow Go', {timeout:5000}, async t => {
   const cause = new PluginError(404,'underlying'); cause.cause = ErrCancelled;
   const r = await rig(t,{...fixturePlugin('base'),command(){throw new Error('outer',{cause});}});
-  r.send(1,'command/execute'); assert.deepEqual((await r.reply()).error,{code:-32003,message:'outer'});
+  r.send(1,'command/execute',{name:'test',args:'',session_id:''}); assert.deepEqual((await r.reply()).error,{code:-32003,message:'outer'});
   r.input.end(); await r.done;
 });
 
@@ -151,8 +153,8 @@ test('exception stringification and cause getters cannot escape handler isolatio
     if(req.name === 'cause') { const error = new Error('outer'); Object.defineProperty(error,'cause',{get(){throw new Error('getter');}}); throw error; }
     throw {toString(){throw new Error('stringifier');}};
   }});
-  r.send(1,'command/execute',{name:'cause'}); assert.equal((await r.reply()).error.code,-32603);
-  r.send(2,'command/execute',{name:'unprintable'}); assert.equal((await r.reply()).error.message,'unprintable handler error');
+  r.send(1,'command/execute',{name:'cause',args:'',session_id:''}); assert.equal((await r.reply()).error.code,-32603);
+  r.send(2,'command/execute',{name:'unprintable',args:'',session_id:''}); assert.equal((await r.reply()).error.message,'unprintable handler error');
   r.send(3,'plugin/health'); assert.equal((await r.reply()).result.ok,true);
   r.input.end(); await r.done;
 });
@@ -230,7 +232,7 @@ test('cleanup throw and panic are not retried, including EOF failure', {timeout:
 test('shutdown times out an uncooperative handler without late cleanup or success', {timeout:5000}, async t => {
   const started = deferred(),release = deferred();t.after(()=>release.resolve());let attempts = 0;
   const r = await rig(t,{...fixturePlugin('base'),async command(){started.resolve();await release.promise;return {action:'noop'};},unload(){attempts++;}},{shutdownTimeoutMs:20});
-  r.send(1,'command/execute');await started.promise;
+  r.send(1,'command/execute',{name:'test',args:'',session_id:''});await started.promise;
   const result = assert.rejects(r.done,{name:'ShutdownTimeoutError'});r.input.end();await result;
   let late = '';r.output.on('data',chunk=>{late+=chunk;});
   release.resolve();await nextTurn();
@@ -260,4 +262,27 @@ test('unload before successful Init is a terminal refusal with one final cleanup
   r.input.write('{"jsonrpc":"2.0","id":1,"method":"plugin/unload"}\n{"jsonrpc":"2.0","id":2,"method":"plugin/health"}\n');
   assert.equal((await r.reply()).error.code,-32600);await r.done;
   assert.deepEqual(plugin.effects(),{unload_attempts:1,health_calls:0});
+});
+
+test('forward metadata is per invocation, including Init and terminal cleanup', {timeout:5000}, async t => {
+  const seen=[];
+  const p={...fixturePlugin('base'),init(ctx){seen.push(ctx.forwardContext);return fixturePlugin('base').init();},load(ctx){seen.push(ctx.forwardContext);return {};},command(ctx){seen.push(ctx.forwardContext);return {action:'noop'};},unload(ctx){seen.push(ctx.forwardContext);}};
+  const r=await rig(t,p,{initParams:{context:{timeout_ms:20}}});
+  r.send(1,'command/execute',{name:'echo',args:'',session_id:'',context:{timeout_ms:10}});await r.reply();
+  r.send(2,'command/execute',{name:'echo',args:'',session_id:''});await r.reply();
+  r.send(3,'command/execute',{name:'echo',args:'',session_id:'',context:{timeout_ms:1,parent_call:{}}});assert.equal((await r.reply()).error.code,-32602);
+  r.send(4,'plugin/load',{context:{timeout_ms:3}});await r.reply();
+  r.send(5,'plugin/unload',null);assert.equal((await r.reply()).error.code,-32602);
+  r.send(6,'plugin/unload',{context:{timeout_ms:4}});assert.equal((await r.reply()).result.ok,true);await r.done;
+  assert.deepEqual(seen,[{timeout_ms:20},{timeout_ms:10},undefined,{timeout_ms:3},{timeout_ms:4}]);
+});
+
+test('required result fields and non-JSON nested values fail without poisoning later calls', {timeout:5000}, async t => {
+ const sparse=[];sparse.length=1;
+ const values=[{}, {ok:null}, {ok:1}, {ok:true,message:null}, {ok:true,extra:1}];
+ const p={...fixturePlugin('full'),health(){return values.shift() ?? {ok:true};},create(){return {nested:undefined};},read(){return {nested:NaN};},update(){return {nested:()=>{}};},list(){return [{nested:sparse}];}};
+ const r=await rig(t,p);
+ for(let i=0;i<5;i++){r.send(i+1,'plugin/health');assert.equal((await r.reply()).error.code,-32603);}
+ for(const method of ['crud/create','crud/read','crud/update','crud/list']){r.send(10,method,{resource_type:'notes',id:'a',data:{},filters:{}});assert.equal((await r.reply()).error.code,-32603);}
+ r.send(11,'plugin/health');assert.equal((await r.reply()).result.ok,true);r.input.end();await r.done;
 });

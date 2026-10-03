@@ -22,12 +22,12 @@ async function run(signalStop) {
     send(1,'plugin/init',initParams({config:{token:'fixture-secret'}})); assert.equal((await reply()).result.protocol,2);
     send(2,'plugin/load'); assert.equal((await reply()).result.skipped_registrations[0].id,'optional');
     if(signalStop) {
-      send(3,'command/execute',{name:'wait-for-abort'}); await waiting; child.kill('SIGTERM');
+      send(3,'command/execute',{name:'wait-for-abort',args:'',session_id:''}); await waiting; child.kill('SIGTERM');
       assert.equal((await reply()).result.action,'noop');
     } else {
-      send(3,'command/execute',{name:'panic'}); assert.equal((await reply()).error.code,-32603);
+      send(3,'command/execute',{name:'panic',args:'',session_id:''}); assert.equal((await reply()).error.code,-32603);
       send(4,'plugin/health'); assert.deepEqual((await reply()).result,{ok:true});
-      send(undefined,'event/handle',{type:'cancelled'}); child.stdin.end();
+      send(undefined,'event/handle',{type:'cancelled',source:'host',data:{},pre_hook:false}); child.stdin.end();
     }
     assert.equal((await next.next()).done,true,'unexpected late stdout');
     assert.deepEqual(await exit,[0,null]);
