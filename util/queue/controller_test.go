@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
-	"github.com/hollis-labs/go-queue/driver/memory"
-	"github.com/hollis-labs/go-queue/driver/noop"
-	qsqlite "github.com/hollis-labs/go-queue/driver/sqlite"
+	queue "github.com/hollis-labs/libs/util/queue"
+	"github.com/hollis-labs/libs/util/queue/driver/memory"
+	"github.com/hollis-labs/libs/util/queue/driver/noop"
+	qsqlite "github.com/hollis-labs/libs/util/queue/driver/sqlite"
 )
 
 func controllerDriver(t *testing.T, backend string) queue.Queue {

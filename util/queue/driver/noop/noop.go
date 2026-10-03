@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
+	queue "github.com/hollis-labs/libs/util/queue"
 )
 
 // Driver is a no-op Queue implementation. Push accepts and drops every

@@ -6,12 +6,12 @@ A lightweight, driver-based job queue for Go. `go-queue` defines a small `Queue`
 
 Pre-1.0 (`v0.2.x`). The public API is stable in shape — `Queue`, `Worker`, `WorkerOpts`, the driver packages — but minor breaks may still happen between `v0.x` releases. See [`CHANGELOG.md`](CHANGELOG.md) for per-release detail and pin a version in your `go.mod`.
 
-Documentation: [pkg.go.dev/github.com/hollis-labs/go-queue](https://pkg.go.dev/github.com/hollis-labs/go-queue).
+Documentation: [pkg.go.dev/github.com/hollis-labs/libs/util/queue](https://pkg.go.dev/github.com/hollis-labs/libs/util/queue).
 
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-queue
+go get github.com/hollis-labs/libs/util/queue
 ```
 
 ## Usage
@@ -26,8 +26,8 @@ import (
     "fmt"
     "time"
 
-    queue "github.com/hollis-labs/go-queue"
-    "github.com/hollis-labs/go-queue/driver/memory"
+    queue "github.com/hollis-labs/libs/util/queue"
+    "github.com/hollis-labs/libs/util/queue/driver/memory"
 )
 
 func main() {
@@ -63,7 +63,7 @@ For a persistent backend, construct the SQLite driver with an open `*sql.DB`:
 import (
     "database/sql"
 
-    qsqlite "github.com/hollis-labs/go-queue/driver/sqlite"
+    qsqlite "github.com/hollis-labs/libs/util/queue/driver/sqlite"
     _ "modernc.org/sqlite"
 )
 
@@ -84,7 +84,7 @@ q.Push(ctx, "email", payload,
 
 ## API Overview
 
-Root package (`github.com/hollis-labs/go-queue`):
+Root package (`github.com/hollis-labs/libs/util/queue`):
 
 - `Queue` — interface every driver implements: `Push`, `Pop`, `Delete`, `Release`, `Size`, `Failed`.
 - `QueuedJob` — struct returned by `Pop`, carrying `ID`, `Type`, `Queue`, `Payload`, `Attempts`, `MaxTries`, and timestamps.

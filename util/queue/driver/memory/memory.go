@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
+	queue "github.com/hollis-labs/libs/util/queue"
 )
 
 type entry struct {

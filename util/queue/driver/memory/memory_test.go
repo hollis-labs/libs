@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
-	"github.com/hollis-labs/go-queue/driver/memory"
+	queue "github.com/hollis-labs/libs/util/queue"
+	"github.com/hollis-labs/libs/util/queue/driver/memory"
 )
 
 // Compile-time assertion: Driver implements queue.Queue.

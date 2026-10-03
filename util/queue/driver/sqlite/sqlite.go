@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
+	queue "github.com/hollis-labs/libs/util/queue"
 	_ "modernc.org/sqlite"
 )
 

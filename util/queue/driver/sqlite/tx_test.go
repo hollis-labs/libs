@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
+	queue "github.com/hollis-labs/libs/util/queue"
 )
 
 func openFile(t *testing.T, busyMS int, conns int) *sql.DB {

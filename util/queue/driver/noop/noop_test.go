@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	queue "github.com/hollis-labs/go-queue"
-	"github.com/hollis-labs/go-queue/driver/noop"
+	queue "github.com/hollis-labs/libs/util/queue"
+	"github.com/hollis-labs/libs/util/queue/driver/noop"
 )
 
 var _ queue.Queue = (*noop.Driver)(nil)

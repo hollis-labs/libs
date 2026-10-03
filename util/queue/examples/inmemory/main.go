@@ -20,8 +20,8 @@ import (
 	"log"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
-	"github.com/hollis-labs/go-queue/driver/memory"
+	queue "github.com/hollis-labs/libs/util/queue"
+	"github.com/hollis-labs/libs/util/queue/driver/memory"
 )
 
 func main() {

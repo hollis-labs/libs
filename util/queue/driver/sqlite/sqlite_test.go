@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	queue "github.com/hollis-labs/go-queue"
-	qsqlite "github.com/hollis-labs/go-queue/driver/sqlite"
+	queue "github.com/hollis-labs/libs/util/queue"
+	qsqlite "github.com/hollis-labs/libs/util/queue/driver/sqlite"
 	_ "modernc.org/sqlite"
 )
 
