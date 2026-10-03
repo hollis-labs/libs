@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 func newTestHub(t *testing.T, o ...streamhub.Option) *streamhub.Hub {

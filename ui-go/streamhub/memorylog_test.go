@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 func collect(t *testing.T, l streamhub.Log, stream string, after streamhub.Seq) ([]streamhub.Record, error) {

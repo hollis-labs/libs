@@ -13,7 +13,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // AssignsMonotonicEventIDs: the hub stamps 1, 2, 3, ... in publish order.

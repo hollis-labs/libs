@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/go-streamhub/hubtest"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
+	"github.com/hollis-labs/libs/ui-go/streamhub/hubtest"
 )
 
 // The concurrency suite: run it with `go test -race -count=20 -run Concurrency`.

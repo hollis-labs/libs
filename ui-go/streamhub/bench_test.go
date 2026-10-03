@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // BenchmarkPublishFanout measures Publish latency with 100 fast subscribers

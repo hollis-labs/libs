@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // The grace timers are time.AfterFunc timers created inside the Hub; inside a

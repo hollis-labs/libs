@@ -9,8 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/go-streamhub/hubtest"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
+	"github.com/hollis-labs/libs/ui-go/streamhub/hubtest"
 )
 
 // A slow-consumer close that lands while replay is still running must leave a

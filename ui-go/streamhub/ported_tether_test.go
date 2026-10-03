@@ -14,7 +14,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 const bus = "events"

@@ -9,7 +9,7 @@ Payload-opaque, stdlib-only replayable fan-out hub: per-stream cursor, gap signa
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-streamhub
+go get github.com/hollis-labs/libs/ui-go/streamhub
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ import (
 	"context"
 	"fmt"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 func main() {

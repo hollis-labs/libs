@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/go-streamhub/hubtest"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
+	"github.com/hollis-labs/libs/ui-go/streamhub/hubtest"
 )
 
 // simpleLog is a second, deliberately different Log: it keeps its data in a

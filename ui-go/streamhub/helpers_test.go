@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // mustNext reads one item. The timeout is a failure net only; tests that

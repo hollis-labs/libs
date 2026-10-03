@@ -3,8 +3,8 @@ package streamhub_test
 import (
 	"testing"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/go-streamhub/hubtest"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
+	"github.com/hollis-labs/libs/ui-go/streamhub/hubtest"
 )
 
 func memoryFactory(pageSize int) hubtest.Factory {

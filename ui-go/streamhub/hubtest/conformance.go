@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	streamhub "github.com/hollis-labs/go-streamhub"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 // Factory builds the backend under test.
