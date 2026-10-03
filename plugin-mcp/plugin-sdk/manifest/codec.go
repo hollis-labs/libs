@@ -131,6 +131,9 @@ func jsonValue(d *json.Decoder, depth int) error {
 // those aliases so a declaration cannot override a reviewed field through an
 // alternate spelling. Raw host extensions and schema objects stay opaque.
 func exactFields(raw []byte, typ reflect.Type) error {
+	if typ != reflect.TypeFor[json.RawMessage]() && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return fmt.Errorf("manifest: null is not valid for a declared field")
+	}
 	if typ.Kind() == reflect.Pointer {
 		return exactFields(raw, typ.Elem())
 	}

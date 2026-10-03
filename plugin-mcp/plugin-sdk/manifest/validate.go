@@ -4,14 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
-
-	"github.com/hollis-labs/plugin-sdk/subprocess"
 )
 
 var (
@@ -56,9 +52,9 @@ func (m Manifest) Validate() error {
 	add(ValidID(m.ID), "id must contain lowercase alphanumeric segments separated by dots or dashes")
 	add(strings.TrimSpace(m.Name) != "", "name is required")
 	add(ValidVersion(m.Version), "version must be SemVer without a leading v")
-	add(m.Protocol == subprocess.ProtocolVersion, fmt.Sprintf("protocol must be %d", subprocess.ProtocolVersion))
+	add(m.Protocol == RequiredProtocol, fmt.Sprintf("protocol must be %d", RequiredProtocol))
 	add(m.Runtime == Runtime, `runtime must be "subprocess"`)
-	if err := m.Entrypoint.Validate(); err != nil {
+	if err := m.validateV2(); err != nil {
 		problems = append(problems, err.Error())
 	}
 	for _, u := range []struct{ name, value string }{{"homepage", m.Homepage}, {"repository", m.Repository}} {
@@ -76,6 +72,9 @@ func (m Manifest) Validate() error {
 		add(r.Min != "" || r.Max != "", "hosts."+host+" must declare min or max")
 		add(r.Min == "" || ValidVersion(r.Min), "hosts."+host+".min must be SemVer")
 		add(r.Max == "" || ValidVersion(r.Max), "hosts."+host+".max must be SemVer")
+		if err := r.Validate(); err != nil {
+			problems = append(problems, "hosts."+host+": "+err.Error())
+		}
 	}
 	for _, ext := range []struct {
 		name string
@@ -150,28 +149,6 @@ func (m Manifest) Validate() error {
 	}
 	if len(problems) > 0 {
 		return fmt.Errorf("manifest %q: %s", m.ID, strings.Join(problems, "; "))
-	}
-	return nil
-}
-
-// Validate rejects absolute paths, traversal, shell strings, Windows drive/UNC
-// paths and control characters, independently of the machine doing validation.
-func (e Entrypoint) Validate() error {
-	if e.Command == "" || strings.ContainsAny(e.Command, " \\:\t\n\r;&|`$<>'\"*?(){}[]!~") || strings.ContainsFunc(e.Command, unicode.IsControl) || strings.HasPrefix(e.Command, "/") {
-		return fmt.Errorf("entrypoint.command must be a relative executable path, not a shell command")
-	}
-	if path.Clean(e.Command) == "." {
-		return fmt.Errorf("entrypoint.command must name an executable")
-	}
-	for _, part := range strings.Split(e.Command, "/") {
-		if part == ".." {
-			return fmt.Errorf("entrypoint.command must stay inside the bundle")
-		}
-	}
-	for _, arg := range e.Args {
-		if strings.ContainsFunc(arg, unicode.IsControl) {
-			return fmt.Errorf("entrypoint.args cannot contain control characters")
-		}
 	}
 	return nil
 }

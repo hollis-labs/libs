@@ -10,6 +10,14 @@
 
 ### Changed
 
+- **Breaking:** manifest-v2 execution now requires protocol 2, `server`
+  (`runtime`, inclusive `engines`, bundled `entry`) and an exact SHA-256 artifact
+  inventory. Removed `entrypoint` and its Go type; protocol-1 manifests fail.
+  Host/runtime compatibility uses numeric SemVer including prereleases, with no
+  local/0.x bypass. Go/TS Serve remains protocol 1 pending its separate update.
+  See [manifest layout, digest and enforcement](docs/manifest.md).
+
+
 - **Breaking:** browser contribution registry v2 replaces the legacy registry protocol-1 shape.
   Entries carry owner generation and representation-specific data, component,
   or public handler references; hosts explicitly opt into kind/region schemas.
@@ -19,6 +27,14 @@
 - Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
 
 ### Added
+
+- Manifest UI isolation preferences and catalog-shaped hook declarations,
+  `TreeDigest` with a specified path/hash/executable-byte algorithm,
+  `CheckCompatibility` with fail-closed runtime/host bounds, and `VerifyBundle`
+  for immutable staged trees. Verification rejects links, special files,
+  inventory/content/mode mismatches and a changed reviewed manifest. Hosts own
+  trust, runtime permission flags, snapshot publication and execution policy.
+
 
 - `registry.Catalog` publishes atomic, epoch-bound revisions and refuses owner
   replacement or withdrawal before explicit revocation. `registry.Scope` fences
@@ -36,7 +52,8 @@
   remain host-defined. Hints never grant authority. Historical golden
   definitions for context_pin, context_unpin and reminder_set are pinned to
   Nanite source commit `2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe`.
-  Existing manifests decode unchanged, but manifests using annotations require
+  The historical annotations addition preserved existing execution envelopes;
+  the new execution contract above now replaces them. Manifests using annotations require
   the SDK release carrying this field: older strict hosts refuse them with
   `manifest: unknown field "annotations"` (documented fixture in
   `manifest/testdata/annotations/older-strict-host-error.txt`). Rollout order:
@@ -45,7 +62,7 @@
   registration is separate.
 
 - `manifest`: shared schema version 2 declarations with dotted IDs, subprocess
-  entrypoints, host ranges and opaque host extensions, config fields and
+  server entries, host/engine ranges and opaque host extensions, config fields and
   host-resolved secrets, capability requests and manifest-authoritative tools.
   Includes validation and a dependency-free JSON codec (valid YAML). Legacy
   host dialects, builtin runtimes and release signature fields are refused.
