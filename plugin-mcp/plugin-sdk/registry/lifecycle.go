@@ -113,8 +113,22 @@ func (c *Catalog) Revoke(owner, generation string) error {
 	c.mu.Lock()
 	p, exists := c.response.Plugins[owner]
 	if !exists {
+		refusals := removeRefusals(c.response.Refusals, owner, generation)
+		changed := len(refusals) != len(c.response.Refusals)
+		if changed && c.response.Revision == MaxRevision {
+			c.mu.Unlock()
+			return ErrStale
+		}
 		c.revoked[owner+"\x00"+generation] = true
-		c.mu.Unlock()
+		if changed {
+			c.response.Refusals = refusals
+			c.response.Revision++
+			callbacks := c.callbacks()
+			c.mu.Unlock()
+			notify(callbacks)
+		} else {
+			c.mu.Unlock()
+		}
 		return nil
 	}
 	if p.OwnerGeneration != generation {
@@ -137,18 +151,22 @@ func (c *Catalog) Revoke(owner, generation string) error {
 			delete(c.response.Contributions, kind)
 		}
 	}
-	refusals := make([]Refusal, 0, len(c.response.Refusals))
-	for _, refusal := range c.response.Refusals {
-		if refusal.OwnerID != owner || refusal.OwnerGeneration != generation {
-			refusals = append(refusals, refusal)
-		}
-	}
-	c.response.Refusals = refusals
+	c.response.Refusals = removeRefusals(c.response.Refusals, owner, generation)
 	c.response.Revision++
 	callbacks := c.callbacks()
 	c.mu.Unlock()
 	notify(callbacks)
 	return nil
+}
+
+func removeRefusals(entries []Refusal, owner, generation string) []Refusal {
+	out := make([]Refusal, 0, len(entries))
+	for _, refusal := range entries {
+		if refusal.OwnerID != owner || refusal.OwnerGeneration != generation {
+			out = append(out, refusal)
+		}
+	}
+	return out
 }
 
 // Scope fences admission before reverse-order cleanup. Callbacks must cooperate

@@ -419,3 +419,27 @@ func TestKnownWireFieldsRequireExactCase(t *testing.T) {
 		})
 	}
 }
+
+func TestRevokeRefusalOnlyOwnerPublishesAbsence(t *testing.T) {
+	r := NewResponse("epoch", 2)
+	r.Refusals = []Refusal{{OwnerID: "pending", OwnerGeneration: "1", Kind: "unknown", LocalKey: "a", Reason: "unsupported-kind"}}
+	catalog := NewCatalog("epoch")
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	notifications := 0
+	catalog.Subscribe(func() { notifications++; _ = catalog.Snapshot() })
+	if err := catalog.Revoke("pending", "1"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := catalog.Snapshot()
+	if len(snapshot.Refusals) != 0 || snapshot.Revision != 3 || notifications != 1 {
+		t.Fatalf("refusal-only owner survived: %+v, notifications=%d", snapshot, notifications)
+	}
+	if err := catalog.Revoke("pending", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if notifications != 1 || catalog.Snapshot().Revision != 3 {
+		t.Fatal("idempotent revoke republished unchanged catalog")
+	}
+}
