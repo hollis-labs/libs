@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	svcerr "github.com/hollis-labs/go-svcerr"
+	svcerr "github.com/hollis-labs/libs/util/svcerr"
 )
 
 func TestAssertSameOutcome(t *testing.T) {

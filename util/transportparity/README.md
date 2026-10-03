@@ -11,7 +11,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-transportparity
+go get github.com/hollis-labs/libs/util/transportparity
 ```
 
 This is a test-helper library: import it from `_test.go` files, not from production code. It depends on [go-svcerr](https://github.com/hollis-labs/go-svcerr) to derive an error's category.
@@ -26,8 +26,8 @@ package main
 import (
 	"fmt"
 
-	svcerr "github.com/hollis-labs/go-svcerr"
-	tp "github.com/hollis-labs/go-transportparity"
+	svcerr "github.com/hollis-labs/libs/util/svcerr"
+	tp "github.com/hollis-labs/libs/util/transportparity"
 )
 
 // printT lets this program show what a failing assertion would say; in a real

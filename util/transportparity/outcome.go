@@ -3,7 +3,7 @@ package transportparity
 import (
 	"fmt"
 
-	svcerr "github.com/hollis-labs/go-svcerr"
+	svcerr "github.com/hollis-labs/libs/util/svcerr"
 )
 
 // T is the part of *testing.T (or testing.TB) the assertions use. It is a small

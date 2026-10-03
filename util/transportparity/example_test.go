@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	svcerr "github.com/hollis-labs/go-svcerr"
-	tp "github.com/hollis-labs/go-transportparity"
+	svcerr "github.com/hollis-labs/libs/util/svcerr"
+	tp "github.com/hollis-labs/libs/util/transportparity"
 )
 
 // printT lets an Example show what a failing assertion would say.
