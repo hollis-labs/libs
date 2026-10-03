@@ -11,7 +11,7 @@ Three functions and nothing else. `Backup` snapshots a live database with `VACUU
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-sqlite-backup
+go get github.com/hollis-labs/libs/util/sqlitebackup
 ```
 
 Requires Go 1.26.6 or newer. It depends on [`go-sqlite`](https://github.com/hollis-labs/go-sqlite) (`sqlitekit`) for the read-only opener and imports no SQLite driver itself: register one in your program (`modernc.org/sqlite`, driver name `sqlite`, is the default) or pass `WithDriverName`.
@@ -29,7 +29,7 @@ import (
 	"os"
 	"path/filepath"
 
-	sqlitebackup "github.com/hollis-labs/go-sqlite-backup"
+	sqlitebackup "github.com/hollis-labs/libs/util/sqlitebackup"
 	_ "modernc.org/sqlite"
 )
 

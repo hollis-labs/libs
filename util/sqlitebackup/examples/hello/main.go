@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	sqlitebackup "github.com/hollis-labs/go-sqlite-backup"
+	sqlitebackup "github.com/hollis-labs/libs/util/sqlitebackup"
 	_ "modernc.org/sqlite"
 )
 

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-sqlite/sqlitekit"
+	"github.com/hollis-labs/libs/util/sqlite/sqlitekit"
 )
 
 func TestBackupOnlineProducesVerifiedCopy(t *testing.T) {

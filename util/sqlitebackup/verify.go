@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hollis-labs/go-sqlite/sqlitekit"
+	"github.com/hollis-labs/libs/util/sqlite/sqlitekit"
 )
 
 var sqliteMagic = []byte("SQLite format 3\x00")

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-sqlite/sqlitekit"
+	"github.com/hollis-labs/libs/util/sqlite/sqlitekit"
 )
 
 // existingTarget writes a distinct small database at a fresh path.
