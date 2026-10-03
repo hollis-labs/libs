@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hollis-labs/agentkit/broker"
+	"github.com/hollis-labs/substrate/harness/broker"
 )
 
 func main() {

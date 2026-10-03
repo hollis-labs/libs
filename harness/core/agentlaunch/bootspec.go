@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // RuntimeBinding is the frozen hot-path-readable runtime contract the

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // S4.3 — Materialization.

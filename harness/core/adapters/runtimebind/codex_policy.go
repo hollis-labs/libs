@@ -3,7 +3,7 @@ package runtimebind
 import (
 	"fmt"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 type CodexPolicyRequest struct {

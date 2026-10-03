@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 )
 
 // codexMCPToolCallElicitation is the params block codex-cli 0.154.0 sent for

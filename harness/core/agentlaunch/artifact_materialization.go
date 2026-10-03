@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // ArtifactMaterializationRequest is the shared bridge from launch-facing

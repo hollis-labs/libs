@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // CW-20261001-0198. OpenCode streams its compaction summary as ordinary

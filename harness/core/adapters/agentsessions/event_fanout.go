@@ -1,7 +1,7 @@
 package agentsessions
 
 import (
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // tryEventFanout mirrors ev to the caller-supplied typed fanout without

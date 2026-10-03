@@ -3,7 +3,7 @@ package skills
 import (
 	"strings"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // Skill is the provider-neutral on-disk skill model. It captures the

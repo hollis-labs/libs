@@ -33,11 +33,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/agentkit/agentlaunch/launcher"
-	"github.com/hollis-labs/agentkit/agentlaunch/providerplant"
-	"github.com/hollis-labs/agentkit/agentlaunch/sessionshim"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/sessionshim"
+	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 func main() {

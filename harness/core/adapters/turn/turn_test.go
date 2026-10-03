@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	agentsessions "github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/go-providers/provider"
+	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 func TestClaudeStreamingUserFrame(t *testing.T) {

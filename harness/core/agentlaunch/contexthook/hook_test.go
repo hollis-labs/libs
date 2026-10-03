@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentcontext"
-	"github.com/hollis-labs/agentkit/agentcontext/resolvers"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext/resolvers"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/agentkit/agentlaunch/contexthook"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/contexthook"
 )
 
 // newCompiled builds a minimal CompiledLaunch suitable for driving the

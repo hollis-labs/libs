@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 // SessionLostError is the error a resume turn fails with when the provider

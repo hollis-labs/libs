@@ -1,6 +1,6 @@
 package agentcontext
 
-import "github.com/hollis-labs/go-materialize/artifact"
+import "github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 
 // AuthoredRecipe is the app-neutral composition input for callers that want
 // shared base/parts/slot/document assembly. Apps supply definitions and policy;

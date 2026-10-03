@@ -4,9 +4,9 @@ import (
 	"context"
 	"path"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // SharedPrepareOptions configure ResolvePreparation.

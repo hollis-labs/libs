@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // validPlan returns a LaunchPlan that passes Validate, used as the

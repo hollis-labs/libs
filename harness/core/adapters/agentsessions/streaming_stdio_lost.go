@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 // A streaming-stdio child that is started to resume a provider session the

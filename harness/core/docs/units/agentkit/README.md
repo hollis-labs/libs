@@ -18,13 +18,13 @@ excluded (see the migration map).
 
 ## Packages
 
-- `github.com/hollis-labs/agentkit/agentcontext`
+- `github.com/hollis-labs/substrate/harness/agentcontext`
   - Slot-source resolver framework (static_file, static_dir, inline, cmd,
     http_text, http_json, role_summary, skill_index). Deterministic
     boot-prompt assembly with byte/token budgets and per-slot provenance.
     Recipe composition (`AuthoredRecipe` → `ResolvedComposition`).
   - Subpackages: `agentcontext/resolvers`, `agentcontext/skills`.
-- `github.com/hollis-labs/agentkit/agentlaunch`
+- `github.com/hollis-labs/substrate/harness/agentlaunch`
   - LaunchPlan → CompiledLaunch → PreparedLaunch pipeline
     (`launcher.Compile` / `launcher.Prepare`), and the `PreparedExecution`
     handoff `providerplant.PrepareExecution` builds for session runtimes.
@@ -35,7 +35,7 @@ excluded (see the migration map).
     `Replant`). Tether-compatible catalog schema.
   - Subpackages: `catalog`, `contexthook`, `launcher`, `matrix`,
     `parity`, `providerplant`, `sessionshim`.
-- `github.com/hollis-labs/agentkit/agentsessions`
+- `github.com/hollis-labs/substrate/harness/adapters/agentsessions`
   - Session lifecycle over go-providers adapters: subprocess-per-turn
     (default), PTY, streaming-stdio, JSON-RPC stdio and serve-http
     (`http-sse`) runtimes, plus HTTP API providers. Optional turn interrupt
@@ -48,7 +48,7 @@ excluded (see the migration map).
     (thread binding, notification parsers, `CodexApprovalResponder`).
     Runtime ids, modes and per-runtime facts come from agent-contracts-leaf
     `runtimes` and the go-providers `registry`.
-- `github.com/hollis-labs/agentkit/broker`
+- `github.com/hollis-labs/substrate/harness/broker`
   - Envelope/messaging harness used by agent runtimes for inter-component
     coordination.
 

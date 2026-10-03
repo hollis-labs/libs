@@ -1,9 +1,9 @@
 package contexthook
 
 import (
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
 )
 
 // Config tunes the contexthook adapter. The zero value is a no-op hook:

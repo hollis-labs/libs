@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // DefaultStaticDirMaxFiles caps the number of files a single

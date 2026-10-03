@@ -1,10 +1,10 @@
 package agentlaunch
 
 import (
-	"github.com/hollis-labs/go-providers/layout"
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 
-	"github.com/hollis-labs/go-materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // ProviderProjectionFromProvider translates go-providers' provider-owned pure

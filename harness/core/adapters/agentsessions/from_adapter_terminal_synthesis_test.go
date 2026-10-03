@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // Regression coverage for: "a real OpenCode chat turn spawns, runs, and

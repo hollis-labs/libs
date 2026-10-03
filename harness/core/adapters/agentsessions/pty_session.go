@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	pevents "github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // ptyRuntime is the agentsessions.Runtime backed by a long-lived PTY-spawned

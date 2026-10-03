@@ -3,7 +3,7 @@ package agentlaunch
 import (
 	"errors"
 
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 // Sentinel errors returned by the Validate methods on LaunchPlan,

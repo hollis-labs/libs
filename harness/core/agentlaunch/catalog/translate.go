@@ -3,8 +3,8 @@ package catalog
 import (
 	"fmt"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // Resolve looks up a launch profile by ID inside g, resolves the

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // StaticFileResolver implements agentcontext.Resolver for

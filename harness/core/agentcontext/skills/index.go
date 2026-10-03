@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // Index is the deterministic catalog of skills produced by Discover.

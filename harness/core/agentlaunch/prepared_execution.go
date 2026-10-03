@@ -3,11 +3,11 @@ package agentlaunch
 import (
 	"errors"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/agentkit/agentcontext"
-	"github.com/hollis-labs/go-materialize/artifact"
-	"github.com/hollis-labs/go-materialize/materialize"
-	permission "github.com/hollis-labs/go-permission"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 var (

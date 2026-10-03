@@ -2,8 +2,8 @@
 package sessionkit
 
 import (
-	"github.com/hollis-labs/agentkit/agentruntime/turn"
-	agentsessions "github.com/hollis-labs/agentkit/agentsessions"
+	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/turn"
 )
 
 type FirstTurnMode string

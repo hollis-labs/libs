@@ -3,9 +3,9 @@ package providerplant
 import (
 	"sort"
 
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
 )
 
 // PlantContextFor translates a PreparedLaunch into the

@@ -3,9 +3,9 @@ package agentsessions
 import (
 	"encoding/json"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
 )
 
 // ClaudeStreamingUserFrame is the NDJSON object Claude Code's streaming stdio

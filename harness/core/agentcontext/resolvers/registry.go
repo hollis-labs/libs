@@ -1,7 +1,7 @@
 package resolvers
 
 import (
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // Default returns a map populated with the seven app-neutral

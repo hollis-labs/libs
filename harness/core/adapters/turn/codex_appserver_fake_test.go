@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	agentsessions "github.com/hollis-labs/agentkit/agentsessions"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	permission "github.com/hollis-labs/go-permission"
-	"github.com/hollis-labs/go-providers/provider"
+	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // The fake Codex app-server is this test binary re-executed with

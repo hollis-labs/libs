@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	agentlaunch "github.com/hollis-labs/agentkit/agentlaunch"
+	agentlaunch "github.com/hollis-labs/substrate/harness/agentlaunch"
 )
 
 func TestBuildInjectionRejectsUnsafePaths(t *testing.T) {

@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"slices"
 
-	"github.com/hollis-labs/go-providers/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 // adapterArgs is an adapter's argv for one turn with extra added. An adapter

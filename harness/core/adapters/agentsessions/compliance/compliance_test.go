@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agentkit/agentsessions"
-	"github.com/hollis-labs/agentkit/agentsessions/compliance"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions/compliance"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // echoAdapter mirrors the test fixture in the agentsessions package — a

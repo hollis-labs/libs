@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hollis-labs/agentkit/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 )
 
 // DefaultRoleSummaryMaxBytes caps the body size of a role-summary

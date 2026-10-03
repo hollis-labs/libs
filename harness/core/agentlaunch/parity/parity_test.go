@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/hollis-labs/agentkit/agentlaunch/catalog"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/catalog"
 )
 
 // repoRoot walks up from this test file to the go-agent-launch module

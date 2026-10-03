@@ -3,8 +3,8 @@ package providerplant
 import (
 	"context"
 
-	"github.com/hollis-labs/agentkit/agentlaunch"
-	"github.com/hollis-labs/agentkit/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
 )
 
 // prepareAndPlantConfig collects the two option families PrepareAndPlant

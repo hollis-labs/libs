@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	pevents "github.com/hollis-labs/go-providers/provider/events"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // ptyEchoAdapter is a CLIAdapter for a long-lived shell that loops: read
