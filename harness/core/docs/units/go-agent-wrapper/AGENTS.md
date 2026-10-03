@@ -1,0 +1,90 @@
+# go-agent-wrapper
+
+The shared harness for launching, observing and governing CLI-agent
+subprocesses. It composes `agentkit` plus `go-runner`, `go-providers` and
+`go-sandbox` into one standardized execution boundary, and translates provider
+output into `runtimeevents`. It deliberately prescribes no prompt design, no
+workflow logic, no turn semantics and no agent cognition — it runs the child
+and reports what happened.
+
+## Start Here
+
+- `README.md` is the current status and the full event vocabulary.
+- `ROADMAP.md` records what is deferred and why.
+- `wrapper/` owns `Config`, `New` and `Run`: runtime dispatch, session drive,
+  event translation, permission posture, prepared launches, protected paths,
+  `CancelTurn`/`Stop`.
+- `launch/` is `Select`: a runtime by go-providers registry id and
+  agent-contracts-leaf mode in, its native or ACP adapter out, from a closed
+  factory table that `Supported` lists. `adapters/` holds the adapters
+  themselves.
+- `acp/` owns ACP v1 negotiation, create-or-resume, session MCP servers,
+  cancellation and close; `Manager`/`Session` are the authoritative registry
+  and lifecycle.
+- `activity/` binds the wrapper to the `go-runtime-events` sink.
+- `policy/` defines the advisory observer surface; `classifybridge/` feeds it
+  from a `go-harness-filters` classifier.
+- `filters/` adapts `go-harness-filters` rules onto agent text and tool
+  envelopes.
+- `turnoutput/` reduces a session's events to one `Output` per completed turn
+  (final text, kind, stop reason, confidence). Its `doc.go` is the contract: how
+  the text is chosen, when it is empty and how the kind is decided. It reads the
+  payload conventions in the `runtimeevents` package doc, so a producer that
+  changes one changes what the reducer sees.
+- `plant/` owns pre-spawn materialization. `sandbox/` is the post-start PID
+  applier; pre-spawn confinement is `Config.SandboxPolicy`/`SandboxProfile`/
+  `ProtectedPaths`.
+- `snapshot/` is the filesystem capture/diff/restore primitive;
+  `sidebyside/` holds the live native-vs-ACP Claude comparison.
+- `internal/testgate/` owns the live-provider opt-in gate.
+
+## Commands
+
+```bash
+gofmt -l .
+go vet ./...
+golangci-lint run
+go test -race -count=1 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+```
+
+CI runs all five, with golangci-lint pinned at v2.11.4. `.golangci.yml` is the
+portfolio go-baseline config, and the whole tree is clean against it, so a new
+finding fails CI; there is no ratchet. A genuine exception takes a one-line
+`//nolint:<linter> // <rule>: <why>` at the site. Live provider tests are skipped unless
+`GO_AGENT_WRAPPER_LIVE_PROVIDER_TESTS=1`, so a default run exercises no real
+CLI.
+
+This module tracks published `agentkit` and `go-sandbox` releases through
+ordinary `go.mod` pins. Never add a local `replace` directive to pick up
+unreleased work; use a temporary `go.work` kept outside the repository
+instead.
+
+## Boundaries
+
+Policy here is advisory and must stay that way. A `PolicyObserver`
+recommendation emits a correlated `policy.nudge` / `rewrite` / `block` /
+`approval_requested` event; it never changes, delays or prevents child
+execution. Wiring an observer into the execution path would turn an
+observability surface into an enforcement one, which is a different product.
+
+A failed advertised ACP resume is returned as an error, never downgraded into
+silently starting a fresh session — a caller that asked to resume and got a new
+session would lose history without being told.
+
+Runtimes, modes and defaults are the go-providers registry's; the wrapper keeps
+no runtime list and no runtime or mode enum of its own (D-73). Every registry
+(runtime, mode) has a launch factory or a recorded reason it is not driven
+(`TestFactoriesFollowTheRegistry`), and every registry runtime launches through
+`launch.Select` + `New` + `Run` against a providertest fake
+(`TestLaunchEveryRegistryRuntimeThroughSelect`).
+
+Every live-provider test must go through `internal/testgate.RequireLiveProvider`,
+and `TestEveryInstalledProviderTestUsesTheSharedGate` fails the build if one
+does not. The gate accepts the exact value `1` and nothing else, so a stray
+truthy string cannot switch real CLIs on in CI.
+
+`Config.Environment` materializes an explicit child environment for every spawn
+— inherit/merge/replace mode, allowlist, ordered overrides, final unset list.
+That explicitness is the point: secret egress and precedence stay inspectable
+without wrapping the child in `env -i`.

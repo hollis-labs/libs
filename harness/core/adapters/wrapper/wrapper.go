@@ -1,0 +1,1289 @@
+package wrapper
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/hollis-labs/agentkit/agentlaunch"
+	"github.com/hollis-labs/agentkit/agentruntime/turn"
+	"github.com/hollis-labs/agentkit/agentsessions"
+	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/go-materialize/materialize"
+	permission "github.com/hollis-labs/go-permission"
+	pevents "github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/go-providers/registry"
+	sandboxprofile "github.com/hollis-labs/go-sandbox/sandbox"
+
+	"github.com/hollis-labs/go-agent-wrapper/acp"
+	"github.com/hollis-labs/go-agent-wrapper/activity"
+	"github.com/hollis-labs/go-agent-wrapper/adapters"
+	"github.com/hollis-labs/go-agent-wrapper/filters"
+	"github.com/hollis-labs/go-agent-wrapper/plant"
+	"github.com/hollis-labs/go-agent-wrapper/policy"
+	"github.com/hollis-labs/go-agent-wrapper/sandbox"
+	runtimeevents "github.com/hollis-labs/go-runtime-events/runtimeevents"
+)
+
+// Config describes a single wrapped-process invocation. Build a Config,
+// pass it to [New], then call [Wrapper.Run] (which drives the full
+// start-wait-emit-exit lifecycle) or [Wrapper.SendInput] / [Wrapper.Stop]
+// for finer control alongside a concurrent [Wrapper.Run].
+//
+// Required fields: App, Adapter, Activity, Workdir.
+//
+// Everything else is optional — zero values mean "no planting", "no
+// sandbox profile", "no policy observer", "no filter pipeline". The wrapper
+// degrades cleanly into a pure passthrough when no subsystems are configured.
+//
+// Non-ACP Adapter values must implement [adapters.RuntimeAdapter]. ACP
+// adapters must implement [acp.ClientAdapter], allowing Wrapper to own their
+// protocol session through [acp.Manager].
+type Config struct {
+	// App identifies the calling application ("nanite", "torque",
+	// "tachyon", ...). Propagated into every emitted Event.
+	App string
+
+	// Adapter is the provider integration (Claude, Codex, OpenCode, ...).
+	// Required. Must implement [adapters.RuntimeAdapter] for native runtimes or
+	// [acp.ClientAdapter] when Describe reports [adapters.ProtocolACP].
+	Adapter adapters.Adapter
+
+	// Activity is the runtime-event emitter the wrapper uses to surface
+	// lifecycle, IO, agent, policy, plant, and sandbox events.
+	// Required.
+	Activity *activity.Bridge
+
+	// Workdir is the absolute path used as the spawned process's
+	// working directory and as the workspace argument to
+	// [sandbox.Applier.Apply]. Required by the agentkit streaming-stdio
+	// runtime.
+	Workdir string
+
+	// Environment defines exactly how the child process environment is
+	// derived. The zero value preserves the historical behavior (inherit the
+	// wrapper process environment). Use EnvironmentReplace with a composed,
+	// allowlisted Set for strict isolation; use EnvironmentMerge only when
+	// intentionally retaining ambient variables. The materialized environment
+	// is passed to native and ACP subprocesses without shell construction.
+	Environment ChildEnvironment
+
+	// BootDir, when non-empty, overrides the per-session boot directory
+	// the [Planter] writes into. Empty defaults to
+	// <Workdir>/.wrapper-boot/<SessionID>/. Ignored when Planter is
+	// nil. The wrapper does NOT clean up the boot dir on Run exit —
+	// the caller owns retention.
+	BootDir string
+
+	// SessionID overrides the wrapper-session identity used in emitted
+	// events. Empty allocates a fresh ID via
+	// [runtimeevents.NewSessionID].
+	SessionID string
+
+	// Planter, when set, runs before exec to lay down per-session boot
+	// files (MCP config, provider settings, hooks/plugins, recovery
+	// prompts). [Wrapper.Run] emits plant.started before the call and
+	// plant.completed after it (including on error). Plant errors abort
+	// Run before the agentkit runtime is constructed.
+	//
+	// The wrapper's planting is complementary to agentkit's own
+	// [agentsessions.StartOptions.AutoPlantBootDir] — both can run for
+	// the same session, with adapter-specific semantics deciding which
+	// files the spawned process actually consumes.
+	//
+	// When PreparedExecution carries a materialized handle, wrapper planting is
+	// rejected instead of running a competing writer.
+	Planter plant.Planter
+
+	// PlantSpec describes what Planter should lay down. Ignored when
+	// Planter is nil.
+	PlantSpec plant.Spec
+
+	// PreparedExecution is an already resolved/materialized agentkit handoff.
+	// Native and ACP wrapper runtimes consume its exact argv/env/cwd and
+	// access policy without resolving provider projection or planting again.
+	PreparedExecution *agentlaunch.PreparedExecution
+
+	// PrepareRequest is the convenience path for callers that want the wrapper
+	// to invoke agentkit.ResolvePreparation before launch. It is mutually
+	// exclusive with PreparedExecution. Empty ProjectRoot/CWD/BootRoot fields
+	// default from Config.Workdir and the wrapper boot dir.
+	PrepareRequest *agentlaunch.PrepareRequest
+
+	// MaterializationEngine optionally overrides the shared engine used for
+	// PrepareRequest. Nil uses agentkit's default engine.
+	MaterializationEngine materialize.Engine
+
+	// SandboxPolicy is the resolved go-sandbox policy for pre-start
+	// enforcement. It is forwarded to agentsessions.StartOptions.SandboxPolicy
+	// and is mutually exclusive with SandboxProfile.
+	SandboxPolicy *sandboxprofile.ResolvedAccessPolicy
+
+	// Sandbox, when set, runs [sandbox.Applier.Apply] against the
+	// session's child PID after [Runtime.Start] returns and emits a
+	// sandbox.applied event with the result. Apply errors abort Run
+	// (the session is stopped and the error surfaced).
+	//
+	// Note: for the adapter runtime (subprocess-per-turn) the PID is
+	// zero between turns — the Applier's pre-spawn enforcement story
+	// belongs in [agentsessions.StartOptions.Profile] for that path.
+	// The wrapper's Sandbox is the right hook for runtimes where a
+	// long-lived child has a stable PID (PTY, streaming-stdio,
+	// jsonrpc-stdio).
+	Sandbox sandbox.Applier
+
+	// SandboxProfile is forwarded to agentsessions.StartOptions.Profile so
+	// runtimes that support pre-spawn go-sandbox wrapping can constrain the
+	// child before exec. The zero-value profile (empty ID) disables this path.
+	SandboxProfile sandboxprofile.Profile
+
+	// ProtectedPaths lists control-plane directories the agent must never
+	// write: the host's state, database, config, catalog or allow-lists,
+	// which an agent running as the operator's uid could otherwise rewrite
+	// to grant itself authority (CW-20260930-0237). Each must be absolute.
+	//
+	// On the native and prepared runtime paths they are forwarded to
+	// agentkit's StartOptions.ProtectedPaths, which folds them into the one
+	// sandbox that wraps the child: SandboxPolicy or SandboxProfile when
+	// set, otherwise a minimal host-filesystem profile whose only effect is
+	// the protection. Where the platform cannot enforce it, the launch fails
+	// rather than run with the control plane writable.
+	//
+	// On the ACP path they are merged into the resolved SandboxPolicy (or
+	// the prepared access policy). Without one, or with an explicitly
+	// disabled one, the ACP child runs under acp.ProtectOnlyProfileID, the
+	// same minimal host-filesystem profile (CW-20261001-0162). An ACP
+	// endpoint the wrapper does not spawn cannot be protected and is
+	// refused. Where the backend cannot write-protect paths, an ACP launch
+	// fails with ErrProtectedPathsUnsupported.
+	//
+	// go-sandbox's rules apply: directories only, real paths, existing
+	// before launch, no write grant inside one. Protection stops direct
+	// writes; under the minimal host-filesystem profile it is not a boundary
+	// against writes delegated to same-uid services (go-sandbox README).
+	ProtectedPaths []string
+
+	// WorkspaceDir is the per-session persistent root forwarded to
+	// agentsessions.StartOptions.WorkspaceDir — distinct from Workdir
+	// (the spawned process's cwd). Every one of agentkit's
+	// streaming-stdio, jsonrpc-stdio, and serve-http runtime kinds
+	// (i.e. every real shipped adapter — Claude, Codex, OpenCode) hard-
+	// errors before spawning anything when both WorkspaceDir and LogPath
+	// are empty. When both are left empty here, [Wrapper.Run]
+	// synthesizes <Workdir>/.wrapper-workspace/<SessionID> — the same
+	// "degrade cleanly on a zero value" contract this Config already
+	// gives BootDir (above), rather than trading it for a required-field
+	// error a caller has to know about agentkit internals to avoid.
+	WorkspaceDir string
+
+	// LogPath overrides the per-session log file path forwarded to
+	// agentsessions.StartOptions.LogPath. Empty defers to WorkspaceDir
+	// (agentkit derives <WorkspaceDir>/logs/session.log). See
+	// WorkspaceDir above for the synthesized default when both are
+	// empty.
+	LogPath string
+
+	// SessionIDPreset, when non-empty, is forwarded to
+	// agentsessions.StartOptions.SessionIDPreset — the provider-side
+	// session id an adapter should resume from on its very first turn
+	// (e.g. Claude streaming-stdio's `--resume <id>`). Adapters that
+	// don't understand resume ignore it silently.
+	SessionIDPreset string
+
+	// PermissionPosture is the session's permission posture, as
+	// go-permission's Mode (default / accept-edits / plan / yolo). On the
+	// native Codex app-server runtime it decides how the wrapper answers
+	// Codex's server-initiated approval requests, through agentkit's
+	// [turn.CodexApprovalResponder]: default approves the MCP tool calls the
+	// launch planted and declines sandbox escalations (commands, file changes
+	// outside the writable roots); accept-edits also approves file changes;
+	// plan declines all of them; yolo approves all of them. A request the
+	// responder cannot decide for a human is answered with a JSON-RPC error
+	// in every mode. Each request still emits agent.permission_requested and
+	// agent.permission_resolved.
+	//
+	// Set on a native launch that is not prepared, it is also the launch's
+	// posture: the go-providers registry maps it onto the runtime's own
+	// flags and environment (Claude's --permission-mode, Codex's
+	// sandbox_mode and approval_policy, OpenCode's OPENCODE_PERMISSION,
+	// agy's --mode), at the adapter's extra-argument slot, before "--". That
+	// needs a go-providers adapter. On a prepared launch the flags are the
+	// plan's (Provider.Permission); the responder then answers from the
+	// prepared execution's posture when this is empty, and Run returns
+	// ErrPostureConflict when both are set and differ.
+	//
+	// The zero value sets no launch flags, and the responder answers as
+	// [permission.ModeDefault]. [New] rejects an unknown mode. ACP sessions
+	// use ACPBestEffortPermissionRequestResponder instead.
+	PermissionPosture permission.Mode
+
+	// MCPAllow narrows which MCP tool calls the default and accept-edits
+	// postures approve on the native Codex app-server runtime
+	// ([turn.CodexApprovalResponder.MCPAllow]). Each entry is "server" or
+	// "server/tool", each half a path.Match pattern, e.g. "mux/torque_*".
+	// With entries, a call matching none is declined and its
+	// agent.permission_resolved says why; plan and yolo ignore the list.
+	// Empty keeps the posture's own answer: every MCP tool call the launch
+	// planted is approved. [New] rejects a malformed entry.
+	MCPAllow []string
+
+	// SystemPrompt is prepended to the first prompt of an ACP session. It is
+	// currently ignored by non-ACP runtime paths.
+	SystemPrompt string
+
+	// ACPManager, when set, is the authoritative registry for ACP sessions
+	// launched by this Wrapper. Sharing one Manager across Wrappers gives a
+	// host lookup, liveness, cancel, close and shutdown without a duplicate
+	// host-side registry. A nil value creates a manager owned by this Wrapper.
+	ACPManager *acp.Manager
+
+	// ACPAuthMethodID selects an agent-managed authentication method returned
+	// by initialize. Empty uses the ACP agent's existing authenticated state.
+	ACPAuthMethodID string
+
+	// ACPMCPServers are the MCP servers an ACP session connects to, stdio or
+	// HTTP (with headers), sent as session/new and session/load
+	// "mcpServers". An agent that does not advertise mcpCapabilities.http is
+	// not sent the HTTP ones, and OnACPDiagnostic names them. Native runtimes
+	// take MCP servers from the launch plan's MCPSpec through agentkit's
+	// prepared plant instead. Pi (pi-acp) does not wire session MCP servers
+	// at all, so they do not reach Pi.
+	ACPMCPServers []acp.MCPServer
+
+	// ACPSessionModeID and ACPSessionConfig are applied after session/new or
+	// session/load and before the first prompt.
+	ACPSessionModeID string
+	ACPSessionConfig map[string]any
+
+	// OnACPDiagnostic receives bounded, redacted protocol diagnostics. Raw
+	// stderr/protocol bytes are never placed on the ordinary event stream.
+	OnACPDiagnostic func(acp.Diagnostic)
+
+	// ACPBestEffortPermissionRequestResponder answers ACP
+	// session/request_permission calls when the selected agent chooses to ask.
+	// Nil retains the selected client's established non-blocking decline (see
+	// [acp.LaunchParams]). The seam is
+	// deliberately best-effort and does not replace authoritative host gates:
+	// providers may execute operation classes without requesting permission.
+	ACPBestEffortPermissionRequestResponder acp.BestEffortPermissionRequestResponder
+
+	// OnSessionID, when non-nil, is invoked the first time the running
+	// session observes a provider-assigned session id — in addition to,
+	// not instead of, [Wrapper.Run]'s own unconditional
+	// Process.ProviderSessionID rebind (see Run's doc comment). This
+	// field exists because not every agentkit runtime's session-id
+	// delivery reaches EventFanout: the serve-http runtime's initial
+	// session-creation call (agentkit's serveHTTPSession.createSession —
+	// OpenCode's primary, first-session delivery point) invokes
+	// StartOptions.OnSessionID directly and never pushes a matching
+	// EventFanout frame, so a caller that only observes the
+	// activity.Bridge's Sink would never see that particular session id
+	// without this field. (Claude's streaming-stdio and OpenCode's
+	// secondary SSE session.created path fire OnSessionID and
+	// EventFanout together from the same observed event, so for those
+	// two the Sink-observed rebind alone would have sufficed — this
+	// field closes the one path where it doesn't.) Called from the
+	// adapter's own read goroutine — callers must not block inside it.
+	OnSessionID func(id string)
+
+	// AutoFireFirstTurn, when true, is forwarded to
+	// agentsessions.StartOptions.AutoFireFirstTurn together with
+	// FirstTurnPayload (as bytes) — the runtime delivers FirstTurnPayload
+	// as the first SendInput automatically once Start succeeds, closing
+	// the Launch/SendInput race a caller-driven first turn is otherwise
+	// exposed to. Needed by every ModeOneShot/ModeSubagent/ModeBackground
+	// boot, which relies on the runtime auto-delivering the kickoff
+	// payload as the first turn rather than a caller racing its own
+	// SendInput against Start's return.
+	AutoFireFirstTurn bool
+
+	// FirstTurnPayload is the kickoff string sent on the auto-fired
+	// first turn when AutoFireFirstTurn is true. Ignored when
+	// AutoFireFirstTurn is false.
+	FirstTurnPayload string
+
+	// PolicyObserver, when set, is consulted by the wrapper's translator
+	// goroutine after every observed [runtimeevents.KindAgentToolUse] event.
+	// [Wrapper.Run] builds a [policy.Observation] from the tool use and emits
+	// the matching legacy policy.nudge / policy.rewrite / policy.block /
+	// policy.approval_requested runtime event, correlated via ParentID.
+	// [policy.RecommendationNone] emits no derived event.
+	//
+	// Findings are observation metadata only. Even a
+	// [policy.RecommendationBlock] or [policy.RecommendationRewrite] does not
+	// change, delay, or prevent the child operation; the event is emitted
+	// after agent.tool_use. Enforceable host gates must run before execution.
+	//
+	// Observers must be cheap and synchronous on the hot path. See
+	// [policy.Observer] for the contract and host/ACP boundary.
+	PolicyObserver policy.Observer
+
+	// Filters, when set, runs the harness filter pipeline against agent
+	// text, tool output, command output, and envelopes. Nil means no
+	// filtering. Repairs replace the wrapper-emitted event payload; raw
+	// child execution is unchanged.
+	Filters filters.Pipeline
+
+	// HeartbeatInterval, when positive, emits session.heartbeat events at
+	// this cadence while Run is active. Zero disables wrapper-synthesized
+	// heartbeats; adapter-provided heartbeat events may still be surfaced.
+	HeartbeatInterval time.Duration
+}
+
+// Wrapper owns the launch boundary for one wrapped subprocess. A
+// Wrapper is single-use: build via [New], run, observe the
+// [activity.Bridge] event stream, dispose. To wrap a new process,
+// build a new Wrapper.
+type Wrapper struct {
+	cfg       Config
+	sessionID string
+
+	inputMu      sync.Mutex
+	inputWG      sync.WaitGroup
+	inputsClosed bool
+
+	// turns tracks the open turn and the one CancelTurn interrupted.
+	turns turnMarks
+
+	sessMu     sync.RWMutex
+	session    agentsessions.Session
+	acpSession *acp.Session
+	acpManager *acp.Manager
+	// acpProviderSessionID is retained for postmortem readback after the
+	// live acpSession control reference has been cleared.
+	acpProviderSessionID string
+	typedSource          runtimeevents.Source // set in Run; used by SendInput/Stop for derived events
+	rawSource            runtimeevents.Source // set in Run; used for stdin.write events
+}
+
+// New validates cfg and returns a Wrapper ready for [Wrapper.Run].
+func New(cfg Config) (*Wrapper, error) {
+	if cfg.App == "" {
+		return nil, errors.New("wrapper: Config.App is required")
+	}
+	if cfg.Adapter == nil {
+		return nil, errors.New("wrapper: Config.Adapter is required")
+	}
+	if cfg.Activity == nil {
+		return nil, errors.New("wrapper: Config.Activity is required")
+	}
+	if err := (turn.CodexApprovalResponder{Mode: cfg.PermissionPosture}).Validate(); err != nil {
+		return nil, fmt.Errorf("wrapper: Config.PermissionPosture: %w", err)
+	}
+	if err := (turn.CodexApprovalResponder{MCPAllow: cfg.MCPAllow}).Validate(); err != nil {
+		return nil, fmt.Errorf("wrapper: Config.MCPAllow: %w", err)
+	}
+	for _, path := range cfg.ProtectedPaths {
+		if !filepath.IsAbs(path) {
+			return nil, fmt.Errorf("wrapper: Config.ProtectedPaths entry %q must be absolute", path)
+		}
+	}
+	if _, _, err := cfg.Environment.resolve(nil); err != nil {
+		return nil, err
+	}
+	cfg.Environment.Allowlist = cloneStringSlice(cfg.Environment.Allowlist)
+	cfg.Environment.Set = cloneStringSlice(cfg.Environment.Set)
+	cfg.Environment.Unset = cloneStringSlice(cfg.Environment.Unset)
+	sessionID := cfg.SessionID
+	if sessionID == "" {
+		sessionID = runtimeevents.NewSessionID()
+	}
+	return &Wrapper{cfg: cfg, sessionID: sessionID}, nil
+}
+
+// SessionID returns the wrapper-session identity propagated into every
+// emitted [runtimeevents.Event]. Stable for the lifetime of the
+// Wrapper.
+func (w *Wrapper) SessionID() string { return w.sessionID }
+
+// Run drives the full session lifecycle:
+//
+//  1. Routes ACP adapters through [acp.Manager]; other adapters through their
+//     [adapters.RuntimeAdapter].
+//  2. For non-ACP adapters, maps [adapters.Descriptor.Protocol] + [adapters.Descriptor.Transport]
+//     to agentkit [agentsessions.Capabilities].
+//  3. Constructs an [agentsessions.Runtime] via NewFromAdapter,
+//     calls Prepare, and Start.
+//  4. Fans [llmtypes.StreamEvent]s through [translateStreamEvent]
+//     and emits the resulting [runtimeevents.Event]s via the
+//     [activity.Bridge].
+//  5. Blocks on Session.Wait. Cancellation of ctx triggers
+//     Session.Stop.
+//
+// Emits these envelope kinds: session.ready, process.started,
+// process.exited, plus per-stream-event translations (agent.delta,
+// agent.tool_use, turn.completed, turn.failed). Provider session_id
+// frames re-bind the [activity.Bridge] Process.ProviderSessionID
+// rather than producing an event; so does [Config.OnSessionID] firing
+// (see its doc comment for why both paths exist).
+//
+// When Config.WorkspaceDir and Config.LogPath are both empty, Run
+// synthesizes <Workdir>/.wrapper-workspace/<SessionID> as the
+// WorkspaceDir forwarded to agentsessions.StartOptions — every real
+// shipped adapter's runtime kind (streaming-stdio, jsonrpc-stdio,
+// serve-http) requires one of the two to be set before it will spawn
+// anything.
+//
+// ACP sessions normalize unexpected disconnect, malformed stream, child exit,
+// and cancellation outcomes through [acp.LifecycleError]. Returns the
+// underlying wait error if any; ctx.Err() is preserved when cancellation
+// stopped the wrapper.
+func (w *Wrapper) Run(ctx context.Context) error {
+	baseEnv, environmentExplicit, err := w.cfg.Environment.resolve(os.Environ())
+	if err != nil {
+		return err
+	}
+	desc := w.cfg.Adapter.Describe()
+	if desc.Protocol == adapters.ProtocolACP {
+		return w.runACP(ctx, desc, baseEnv, environmentExplicit)
+	}
+	ra, ok := w.cfg.Adapter.(adapters.RuntimeAdapter)
+	if !ok {
+		return fmt.Errorf("%w: adapter %q", ErrAdapterNotRuntime, w.cfg.Adapter.Name())
+	}
+	if w.cfg.Workdir == "" {
+		return errors.New("wrapper: Config.Workdir is required")
+	}
+
+	caps, err := runtimeCaps(desc.Protocol, desc.Transport)
+	if err != nil {
+		return err
+	}
+	if w.cfg.SandboxPolicy != nil && w.cfg.SandboxProfile.ID != "" {
+		return fmt.Errorf("%w: Config.SandboxPolicy and Config.SandboxProfile are mutually exclusive", ErrPreparedExecutionConflict)
+	}
+
+	w.cfg.Activity.Bind(w.cfg.App, w.sessionID, runtimeevents.Process{
+		Provider: desc.Provider,
+		Runtime:  legacyRuntimeToken(desc.Protocol, desc.Transport),
+	})
+	source := runtimeevents.Source{
+		Channel:    runtimeSourceChannel(desc.Protocol, desc.Transport),
+		Confidence: runtimeevents.ConfidenceExact,
+	}
+	rawSource := runtimeevents.Source{
+		Channel:    rawSourceChannel(desc.Transport),
+		Confidence: runtimeevents.ConfidenceExact,
+	}
+	w.sessMu.Lock()
+	w.typedSource = source
+	w.rawSource = rawSource
+	w.sessMu.Unlock()
+
+	bootDir := w.defaultBootDir()
+	prepared, err := w.resolvePreparedExecution(ctx, bootDir)
+	if err != nil {
+		return err
+	}
+	if prepared != nil && w.cfg.SandboxPolicy != nil {
+		return fmt.Errorf("%w: Config.PreparedExecution/PrepareRequest and Config.SandboxPolicy are mutually exclusive", ErrPreparedExecutionConflict)
+	}
+	if prepared != nil && prepared.Materialization != nil && w.cfg.Planter != nil {
+		return ErrPreparedPlantConflict
+	}
+
+	childEnv := baseEnv
+	if prepared == nil {
+		// Resolve the wrapper-level Spec to validate the adapter's exec-shape
+		// contract and surface PTY/no-PTY mismatches early. The agentkit runtime
+		// constructs its own binary and argv via CLIAdapter, while Spec.Env is an
+		// honored final replacement for the Config-derived base environment.
+		spec, resolveErr := w.cfg.Adapter.Resolve(adapters.ResolveContext{
+			BootDir: bootDir,
+			Cwd:     w.cfg.Workdir,
+			Env:     baseEnv,
+			PTY:     caps.PTY,
+		})
+		if resolveErr != nil {
+			return fmt.Errorf("wrapper: adapter Resolve: %w", resolveErr)
+		}
+		var adapterEnvironmentExplicit bool
+		childEnv, adapterEnvironmentExplicit, err = resolvedSpecEnvironment(baseEnv, spec.Env)
+		if err != nil {
+			return fmt.Errorf("wrapper: adapter Resolve environment: %w", err)
+		}
+		if len(childEnv) == 0 && (environmentExplicit || adapterEnvironmentExplicit) && capsUsesLongLivedProcess(caps) {
+			childEnv = []string{nonInheritingEmptyEnvironment}
+		}
+	}
+	// A native launch's posture: an explicit PermissionPosture's flags and
+	// environment, from the registry. A prepared launch's are the plan's,
+	// already in its bindings.
+	var posture registry.PostureLaunch
+	if prepared == nil {
+		posture, err = nativePosture(w.cfg.Adapter, desc, w.cfg.PermissionPosture)
+		if err != nil {
+			return fmt.Errorf("wrapper: Config.PermissionPosture: %w", err)
+		}
+		childEnv = withPostureEnv(childEnv, posture.Env)
+	}
+
+	if prepared != nil && prepared.Materialization != nil {
+		emitPreparedMaterialization(ctx, w.cfg.Activity, source, prepared.Materialization)
+	} else if err = w.runPlanter(ctx, source); err != nil {
+		return err
+	}
+
+	cliAdapter, err := withPostureArgs(ra.CLIAdapter(), posture.Args)
+	if err != nil {
+		return err
+	}
+	cliAdapter, err = preparedCLIAdapter(cliAdapter, prepared)
+	if err != nil {
+		return fmt.Errorf("wrapper: prepared adapter: %w", err)
+	}
+
+	runtime, err := agentsessions.NewFromAdapter(agentsessions.AdapterRuntimeConfig{
+		ID:      "wrapper-" + w.cfg.Adapter.Name(),
+		Kind:    "cli",
+		Adapter: cliAdapter,
+		Caps:    caps,
+	})
+	if err != nil {
+		return fmt.Errorf("wrapper: agentsessions.NewFromAdapter: %w", err)
+	}
+	if err = runtime.Prepare(ctx); err != nil {
+		return fmt.Errorf("wrapper: runtime.Prepare: %w", err)
+	}
+
+	fanout := make(chan llmtypes.StreamEvent, 128)
+	// typed carries the typed events of the session in the order the stream
+	// events arrive in; see typedQueue.
+	typed := &typedQueue{fanout: fanout}
+	closeFanout := typed.closeFanout
+
+	stdoutStream := newStreamWriter(ctx, w.cfg.Activity, rawSource,
+		runtimeevents.KindStdoutRaw, runtimeevents.KindStdoutLine, w.cfg.Filters)
+	stderrStream := newStreamWriter(ctx, w.cfg.Activity, rawSource,
+		runtimeevents.KindStderrRaw, runtimeevents.KindStderrLine, w.cfg.Filters)
+
+	var turnMu sync.Mutex
+	var currentTurnID string
+	// turnUsage accumulates the usage reported during the open turn. Usage
+	// is not a turn boundary: adapters report it just before their terminal
+	// event, or once per step, so it rides on the turn's one terminal event
+	// instead of closing the turn itself.
+	var turnUsage *llmtypes.Usage
+	addTurnUsage := func(u *llmtypes.Usage) {
+		turnMu.Lock()
+		defer turnMu.Unlock()
+		turnUsage = mergeTurnUsage(turnUsage, u)
+	}
+	emitObserved := func(kind runtimeevents.EventKind, payload any, ev llmtypes.StreamEvent) {
+		payload = w.filterPayload(ctx, kind, payload)
+		turnMu.Lock()
+		defer turnMu.Unlock()
+
+		terminal := isTurnTerminal(kind)
+		// A terminal event with no open turn still closes a turn: the
+		// provider reported one, even if nothing in it reached the wrapper
+		// first. Opening it here keeps the one-terminal-per-turn shape.
+		if currentTurnID == "" && (isTurnInternal(kind) || terminal) {
+			currentTurnID = runtimeevents.NewTurnID()
+			w.turns.opened(currentTurnID)
+			_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindTurnStarted, source, nil,
+				runtimeevents.WithTurnID(currentTurnID))
+			_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionProcessing, source,
+				map[string]any{"turn_id": currentTurnID},
+				runtimeevents.WithTurnID(currentTurnID))
+		}
+		if terminal {
+			payload = withTurnUsage(payload, turnUsage)
+			payload = withStopReason(payload, turnUsage)
+			turnUsage = nil
+			if kind == runtimeevents.KindTurnFailed && w.turns.isInterrupted(currentTurnID) {
+				payload = withInterruptedReason(payload)
+			}
+		}
+
+		eventID := runtimeevents.NewEventID()
+		opts := []runtimeevents.EmitOption{runtimeevents.WithID(eventID)}
+		if currentTurnID != "" && isTurnScoped(kind) {
+			opts = append(opts, runtimeevents.WithTurnID(currentTurnID))
+		}
+		_ = w.cfg.Activity.Emit(ctx, kind, source, payload, opts...)
+
+		if kind == runtimeevents.KindAgentToolUse {
+			w.observeToolUsePolicy(ctx, source, ev, eventID, currentTurnID)
+		}
+
+		if terminal {
+			closedTurnID := currentTurnID
+			currentTurnID = ""
+			w.turns.closed(closedTurnID)
+			_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionIdle, source,
+				map[string]any{"turn_id": closedTurnID},
+				runtimeevents.WithTurnID(closedTurnID))
+		}
+	}
+	// flushOpenTurn ends a turn the child never finished: the process exited
+	// with a turn open and no terminal event for it. The turn fails, carrying
+	// its id and any usage it reported, and the session goes idle, so every
+	// turn.started still gets exactly one terminal event before
+	// process.exited.
+	flushOpenTurn := func(exitCode int, waitErr error) {
+		turnMu.Lock()
+		defer turnMu.Unlock()
+		if currentTurnID == "" {
+			turnUsage = nil
+			return
+		}
+		payload := map[string]any{
+			"error":       "wrapper: process exited before the turn completed",
+			"reason":      "process_exited",
+			"stop_reason": llmtypes.StopReasonError,
+			"exit_code":   exitCode,
+		}
+		if waitErr != nil {
+			payload["wait_error"] = waitErr.Error()
+		}
+		closedTurnID := currentTurnID
+		currentTurnID = ""
+		w.turns.closed(closedTurnID)
+		_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindTurnFailed, source,
+			withTurnUsage(payload, turnUsage), runtimeevents.WithTurnID(closedTurnID))
+		turnUsage = nil
+		_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionIdle, source,
+			map[string]any{"turn_id": closedTurnID},
+			runtimeevents.WithTurnID(closedTurnID))
+	}
+	emitProviderObserved := func(kind runtimeevents.EventKind, payload any) {
+		payload = w.filterPayload(ctx, kind, payload)
+		turnMu.Lock()
+		defer turnMu.Unlock()
+
+		if currentTurnID == "" && isTurnInternal(kind) {
+			currentTurnID = runtimeevents.NewTurnID()
+			w.turns.opened(currentTurnID)
+			_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindTurnStarted, source, nil,
+				runtimeevents.WithTurnID(currentTurnID))
+			_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionProcessing, source,
+				map[string]any{"turn_id": currentTurnID},
+				runtimeevents.WithTurnID(currentTurnID))
+		}
+
+		opts := []runtimeevents.EmitOption{}
+		if currentTurnID != "" && isTurnScoped(kind) {
+			opts = append(opts, runtimeevents.WithTurnID(currentTurnID))
+		}
+		_ = w.cfg.Activity.Emit(ctx, kind, source, payload, opts...)
+	}
+
+	heartbeatStop := make(chan struct{})
+	if w.cfg.HeartbeatInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(w.cfg.HeartbeatInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionHeartbeat, source,
+						map[string]any{"last_activity_at": time.Now().UTC()})
+				case <-heartbeatStop:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	defer close(heartbeatStop)
+
+	workspaceDir, logPath := resolveWorkspaceLogPath(w.cfg.Workdir, w.sessionID, w.cfg.WorkspaceDir, w.cfg.LogPath)
+
+	approvalPosture, err := sessionPosture(w.cfg.PermissionPosture, prepared)
+	if err != nil {
+		return err
+	}
+	approvals := turn.CodexApprovalResponder{Mode: approvalPosture, MCPAllow: w.cfg.MCPAllow}
+
+	session, err := runtime.Start(ctx, agentsessions.StartOptions{
+		Workdir:           w.cfg.Workdir,
+		WorkspaceDir:      workspaceDir,
+		LogPath:           logPath,
+		Env:               childEnv,
+		EventFanout:       fanout,
+		Fanout:            stdoutStream,
+		Stderr:            stderrStream,
+		PreparedExecution: prepared,
+		SandboxPolicy:     w.cfg.SandboxPolicy,
+		Profile:           w.cfg.SandboxProfile,
+		ProtectedPaths:    w.cfg.ProtectedPaths,
+		SessionIDPreset:   w.cfg.SessionIDPreset,
+		AutoFireFirstTurn: w.cfg.AutoFireFirstTurn,
+		FirstTurnPayload:  []byte(w.cfg.FirstTurnPayload),
+		OnSessionID: func(id string) {
+			if id == "" {
+				return
+			}
+			// Unconditional rebind: keeps the Sink-observed
+			// Process.ProviderSessionID path (below, in the fanout
+			// consumer loop) correct even for runtimes/paths — e.g.
+			// serve-http's createSession — that call OnSessionID
+			// without also pushing an EventFanout frame. See Config.
+			// OnSessionID's doc comment.
+			w.cfg.Activity.Emitter().SetProviderSessionID(id)
+			if w.cfg.OnSessionID != nil {
+				w.cfg.OnSessionID(id)
+			}
+		},
+		SandboxOutcomeCallback: func(out agentsessions.SandboxOutcome) {
+			emitSandboxOutcome(ctx, w.cfg.Activity, source, out)
+		},
+		TypedEventCallback: func(ev pevents.Event) {
+			kind, payload, mapped := translateProviderEvent(ev)
+			if !mapped {
+				return
+			}
+			// The stream events of the same output reach the translator below
+			// through the fanout channel, a goroutine behind the parser; emitting
+			// a typed event here would let it overtake the tool call, text and
+			// terminal event it belongs with. So it goes in line behind them.
+			emit := func() { emitProviderObserved(kind, payload) }
+			if !typed.enqueue(emit) {
+				emit()
+			}
+		},
+		JsonRpcRequestHook: func(method string, params json.RawMessage) (any, *agentsessions.JsonRpcError) {
+			requestID := runtimeevents.NewEventID()
+			payload := map[string]any{"method": method, "params": params}
+			outcome := approvals.Decide(method, params)
+			resolved := map[string]any{
+				"method":  method,
+				"allowed": outcome.Allowed,
+				"posture": string(approvalPosture),
+				"reason":  outcome.Reason,
+			}
+			if outcome.Kind != "" {
+				resolved["kind"] = string(outcome.Kind)
+			}
+			if outcome.MCPServer != "" {
+				resolved["mcp_server"] = outcome.MCPServer
+			}
+			if outcome.MCPTool != "" {
+				resolved["mcp_tool"] = outcome.MCPTool
+			}
+			if outcome.MCPAllowEntry != "" {
+				resolved["mcp_allow_entry"] = outcome.MCPAllowEntry
+			}
+			if outcome.Err != nil {
+				resolved["error"] = outcome.Err.Message
+			}
+			// The request and its resolution are emitted in their place in the
+			// stream, like the typed events: the hook runs on the reader goroutine
+			// while the tool call, text and turn events of the same turn are still
+			// in the fanout channel, and emitting here let a refused request reach
+			// the sink before the tool call it belongs to. The decision is made
+			// now, because the hook returns it; only the events wait their turn.
+			emit := func() {
+				turnMu.Lock()
+				if currentTurnID == "" {
+					currentTurnID = runtimeevents.NewTurnID()
+					w.turns.opened(currentTurnID)
+					_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindTurnStarted, source, nil,
+						runtimeevents.WithTurnID(currentTurnID))
+					_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionProcessing, source,
+						map[string]any{"turn_id": currentTurnID},
+						runtimeevents.WithTurnID(currentTurnID))
+				}
+				turnID := currentTurnID
+				turnMu.Unlock()
+				_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindAgentPermissionRequested, source, payload,
+					runtimeevents.WithID(requestID), runtimeevents.WithTurnID(turnID))
+				_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindAgentPermissionResolved, source, resolved,
+					runtimeevents.WithParentID(requestID), runtimeevents.WithTurnID(turnID))
+			}
+			if !typed.enqueue(emit) {
+				emit()
+			}
+			return outcome.Response()
+		},
+	})
+	if err != nil {
+		emitRuntimeStartSandboxError(ctx, w.cfg.Activity, source, err)
+		return fmt.Errorf("wrapper: runtime.Start: %w", err)
+	}
+	w.sessMu.Lock()
+	w.session = session
+	w.sessMu.Unlock()
+
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSessionReady, source, nil)
+	if pid := session.Health().PID; pid != 0 {
+		_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindProcessStarted, source,
+			map[string]any{"pid": pid})
+	}
+
+	translatorDone := make(chan struct{})
+	go func() {
+		defer close(translatorDone)
+		for ev := range fanout {
+			if ev.Type == typedMarker {
+				if emit, ok := typed.dequeue(); ok {
+					emit()
+				}
+				continue
+			}
+			if ev.Type == llmtypes.EventSessionID && ev.SessionID != "" {
+				// Provider-side session ID: rebind the Process so
+				// subsequent emissions carry it. Use the locked
+				// setter — stream writers may concurrently emit
+				// events that read Process.
+				w.cfg.Activity.Emitter().SetProviderSessionID(ev.SessionID)
+				continue
+			}
+			if ev.Type == llmtypes.EventUsage {
+				addTurnUsage(ev.Usage)
+				continue
+			}
+			ev = w.filterStreamEvent(ctx, ev)
+			kind, payload, mapped := translateStreamEvent(ev)
+			if !mapped {
+				continue
+			}
+			emitObserved(kind, payload, ev)
+		}
+	}()
+
+	if err := w.runSandbox(ctx, source, session); err != nil {
+		// Close admission before stopping, then wait for the logical session
+		// and every already-accepted input to unwind before closing fanout.
+		// This is the same ownership ordering as the normal exit path.
+		w.closeInputAdmission()
+		_ = session.Stop(context.Background())
+		exitCode, waitErr := session.Wait()
+		w.inputWG.Wait()
+		closeFanout()
+		<-translatorDone
+		flushOpenTurn(exitCode, waitErr)
+		exitPayload := map[string]any{"exit_code": exitCode, "error": err.Error()}
+		if waitErr != nil {
+			exitPayload["wait_error"] = waitErr.Error()
+		}
+		_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindProcessExited, source, exitPayload)
+		return err
+	}
+
+	// Watch ctx for cancellation so a stuck session unblocks. The
+	// watcher emits the interrupt event pair around session.Stop so
+	// downstream consumers can see why the session ended.
+	stopWatcher := make(chan struct{})
+	go func() { //nolint:gosec // G118: this runs because ctx was canceled, so the interrupt needs a context that is not
+		select {
+		case <-ctx.Done():
+			_ = w.requestInterrupt(context.Background(), source, session, "ctx_cancel")
+		case <-stopWatcher:
+		}
+	}()
+
+	exitCode, waitErr := session.Wait()
+	close(stopWatcher)
+	w.closeInputAdmission()
+	w.inputWG.Wait()
+	closeFanout()
+	<-translatorDone
+	flushOpenTurn(exitCode, waitErr)
+
+	exitPayload := map[string]any{"exit_code": exitCode}
+	if waitErr != nil {
+		exitPayload["error"] = waitErr.Error()
+	}
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindProcessExited, source, exitPayload)
+
+	if waitErr != nil {
+		return fmt.Errorf("wrapper: session exited with error: %w", waitErr)
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	return nil
+}
+
+// SendInput pushes input bytes into the running session. Emits a
+// stdin.write event with the bytes (before forwarding to the
+// session) so audit and replay capture caller-issued input.
+// Returns [ErrSessionNotStarted] if [Wrapper.Run] has not started a
+// session yet.
+func (w *Wrapper) SendInput(ctx context.Context, data []byte) error {
+	w.inputMu.Lock()
+	if w.inputsClosed {
+		w.inputMu.Unlock()
+		return ErrSessionNotStarted
+	}
+	w.sessMu.RLock()
+	session := w.session
+	acpSession := w.acpSession
+	rawSource := w.rawSource
+	w.sessMu.RUnlock()
+	if session == nil && acpSession == nil {
+		w.inputMu.Unlock()
+		return ErrSessionNotStarted
+	}
+	w.inputWG.Add(1)
+	w.inputMu.Unlock()
+	defer w.inputWG.Done()
+	// Emit before forwarding so the event sequence reflects intent
+	// even when SendInput errors (the input was attempted regardless).
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindStdinWrite, rawSource,
+		map[string]any{
+			"bytes": string(data),
+		})
+	if acpSession != nil {
+		return acpSession.Prompt(ctx, string(data))
+	}
+	return session.SendInput(ctx, data)
+}
+
+func (w *Wrapper) closeInputAdmission() {
+	w.inputMu.Lock()
+	w.inputsClosed = true
+	w.inputMu.Unlock()
+}
+
+// Stop requests termination of the running session and emits the
+// interrupt.requested → interrupt.acknowledged event pair around the
+// underlying session.Stop call. The two events are correlated via
+// ParentID. Returns nil if no session is running (e.g., Run already
+// returned).
+func (w *Wrapper) Stop(ctx context.Context) error {
+	w.sessMu.RLock()
+	session := w.session
+	acpSession := w.acpSession
+	source := w.typedSource
+	w.sessMu.RUnlock()
+	if session == nil && acpSession == nil {
+		return nil
+	}
+	if acpSession != nil {
+		return w.requestACPInterrupt(ctx, source, acpSession, "user_stop", true)
+	}
+	return w.requestInterrupt(ctx, source, session, "user_stop")
+}
+
+// CancelTurn ends the turn in flight without closing the session. ACP
+// sessions send session/cancel. A native session whose runtime can interrupt
+// a turn (agentsessions.TurnInterrupter) keeps its process:
+//   - streaming-stdio Claude: Claude's stream-json interrupt. The turn ends
+//     with turn.failed, reason "interrupted".
+//   - Codex app-server: turn/interrupt for the open turn. The wrapper does
+//     not model Codex turns (the host drives the thread protocol), so the
+//     host sees the turn end as Codex reports it: turn/completed with status
+//     "interrupted".
+//   - OpenCode serve: POST /session/{id}/abort. The turn ends with
+//     turn.failed, reason "interrupted".
+//
+// The next SendInput starts a turn on the same process. Any other session
+// returns ErrTurnCancelUnsupported; Stop ends it instead. It returns once
+// the agent has acknowledged the interrupt. The adapter's
+// Describe().Delivery advertises adapters.DeliveryCapabilityCancelTurn
+// exactly where this works.
+func (w *Wrapper) CancelTurn(ctx context.Context) error {
+	w.sessMu.RLock()
+	acpSession := w.acpSession
+	session := w.session
+	source := w.typedSource
+	w.sessMu.RUnlock()
+	if acpSession != nil {
+		return w.requestACPInterrupt(ctx, source, acpSession, "turn_cancel", false)
+	}
+	if interrupter, ok := session.(agentsessions.TurnInterrupter); ok {
+		return w.requestTurnInterrupt(ctx, source, interrupter)
+	}
+	return ErrTurnCancelUnsupported
+}
+
+// ProviderSessionID returns the current provider-assigned ACP session id, or
+// the most recently completed ACP session id for postmortem correlation.
+func (w *Wrapper) ProviderSessionID() string {
+	w.sessMu.RLock()
+	session := w.acpSession
+	retained := w.acpProviderSessionID
+	w.sessMu.RUnlock()
+	if session == nil {
+		return retained
+	}
+	return session.ProviderSessionID()
+}
+
+// ACPSnapshot returns authoritative managed liveness for an ACP session.
+func (w *Wrapper) ACPSnapshot() (acp.Snapshot, bool) {
+	w.sessMu.RLock()
+	session := w.acpSession
+	w.sessMu.RUnlock()
+	if session == nil {
+		return acp.Snapshot{}, false
+	}
+	return session.Snapshot(), true
+}
+
+// ACPManager returns the manager selected for this Wrapper after Run begins.
+func (w *Wrapper) ACPManager() *acp.Manager {
+	w.sessMu.RLock()
+	defer w.sessMu.RUnlock()
+	return w.acpManager
+}
+
+// requestInterrupt is the shared interrupt path used by both
+// [Wrapper.Stop] (reason="user_stop") and the ctx-watcher goroutine
+// in Run (reason="ctx_cancel"). It emits an interrupt.requested
+// event, calls session.Stop, then emits interrupt.acknowledged with
+// ParentID correlating to the request event.
+func (w *Wrapper) requestInterrupt(
+	ctx context.Context,
+	source runtimeevents.Source,
+	session agentsessions.Session,
+	reason string,
+) error {
+	requestID := runtimeevents.NewEventID()
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindInterruptRequested, source,
+		map[string]any{"reason": reason},
+		runtimeevents.WithID(requestID))
+
+	stopErr := session.Stop(ctx)
+
+	ackPayload := map[string]any{"reason": reason}
+	if stopErr != nil {
+		ackPayload["error"] = stopErr.Error()
+	}
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindInterruptAcknowledged, source,
+		ackPayload, runtimeevents.WithParentID(requestID))
+
+	return stopErr
+}
+
+// isTurnInternal reports whether a runtime event kind is part of an
+// agent turn's body. These trigger turn.started allocation if no
+// turn is currently active.
+func isTurnInternal(kind runtimeevents.EventKind) bool {
+	switch kind {
+	case runtimeevents.KindAgentDelta,
+		runtimeevents.KindAgentToolUse,
+		runtimeevents.KindAgentToolResult,
+		runtimeevents.KindAgentSubagentSpawn,
+		runtimeevents.KindAgentPermissionRequested,
+		runtimeevents.KindAgentPermissionResolved,
+		runtimeevents.KindAgentPermissionDenied:
+		return true
+	default:
+		return false
+	}
+}
+
+// isTurnScoped reports whether a runtime event kind should carry the
+// current TurnID when one is active. Includes the turn-internal kinds
+// plus the turn-ending kinds (turn.completed / turn.failed) so the
+// terminal events also reference the turn they close.
+func isTurnScoped(kind runtimeevents.EventKind) bool {
+	// session.lost is reported inside the turn that discovered it, but it
+	// does not open one.
+	return isTurnInternal(kind) || isTurnTerminal(kind) || kind == runtimeevents.KindSessionLost
+}
+
+// isTurnTerminal reports whether a runtime event kind ends a turn. A native
+// turn has exactly one: turn.completed or turn.failed.
+func isTurnTerminal(kind runtimeevents.EventKind) bool {
+	return kind == runtimeevents.KindTurnCompleted || kind == runtimeevents.KindTurnFailed
+}
+
+// mergeTurnUsage adds one usage report to the turn's running total. Token
+// counts are summed, because an adapter that reports more than once per turn
+// reports per step (OpenCode's step_finish), and the latest non-empty stop
+// reason wins. The result never aliases u.
+func mergeTurnUsage(total, u *llmtypes.Usage) *llmtypes.Usage {
+	if u == nil {
+		return total
+	}
+	if total == nil {
+		c := *u
+		return &c
+	}
+	total.InputTokens += u.InputTokens
+	total.OutputTokens += u.OutputTokens
+	total.CacheCreationTokens += u.CacheCreationTokens
+	total.CacheReadTokens += u.CacheReadTokens
+	// CostUSD is a per-event delta (go-llm-types), so summing it is the
+	// turn's cost.
+	total.CostUSD += u.CostUSD
+	if u.StopReason != "" {
+		total.StopReason = u.StopReason
+	}
+	return total
+}
+
+// withTurnUsage attaches a turn's accumulated usage to its terminal event's
+// payload under "usage", the key turn.completed carried it under before usage
+// stopped being a turn boundary. A nil usage leaves the payload unchanged.
+func withTurnUsage(payload any, usage *llmtypes.Usage) any {
+	if usage == nil {
+		return payload
+	}
+	out := map[string]any{}
+	switch p := payload.(type) {
+	case nil:
+	case map[string]any:
+		for k, v := range p {
+			out[k] = v
+		}
+	default:
+		// Not a map: keep it whole rather than drop it.
+		out["payload"] = p
+	}
+	out["usage"] = usage
+	return out
+}
+
+// withStopReason sets a terminal payload's normalised stop_reason from the
+// turn's usage, unless the payload already names one (turn.failed carries
+// "error"). A turn that reported no reason gets none.
+func withStopReason(payload any, usage *llmtypes.Usage) any {
+	if usage == nil || usage.StopReason == "" {
+		return payload
+	}
+	out := map[string]any{}
+	switch p := payload.(type) {
+	case nil:
+	case map[string]any:
+		if _, set := p["stop_reason"]; set {
+			return payload
+		}
+		for k, v := range p {
+			out[k] = v
+		}
+	default:
+		out["payload"] = p
+	}
+	out["stop_reason"] = llmtypes.NormalizeStopReason(usage.StopReason)
+	return out
+}
+
+// resolveWorkspaceLogPath applies Config.WorkspaceDir/LogPath's
+// documented default: both forward verbatim when the caller set
+// either one, and when both are empty a WorkspaceDir is synthesized
+// under workdir so [Wrapper.Run] doesn't hand agentkit's
+// streaming-stdio/jsonrpc-stdio/serve-http runtimes an empty pair —
+// every one of them returns a hard error from Start before spawning
+// anything in that case. Pulled out of Run as a pure function so the
+// default-synthesis decision is independently unit-testable without
+// spawning a process.
+func resolveWorkspaceLogPath(workdir, sessionID, workspaceDir, logPath string) (resolvedWorkspaceDir, resolvedLogPath string) {
+	if workspaceDir == "" && logPath == "" {
+		workspaceDir = filepath.Join(workdir, ".wrapper-workspace", sessionID)
+	}
+	return workspaceDir, logPath
+}
+
+// runPlanter resolves the boot directory, emits plant.started, calls
+// the configured Planter, and emits plant.completed (including on
+// error). Returns the planter's error so Run can abort before
+// constructing the agentkit runtime.
+//
+// No-op when Config.Planter is nil.
+func (w *Wrapper) runPlanter(ctx context.Context, source runtimeevents.Source) error {
+	if w.cfg.Planter == nil {
+		return nil
+	}
+	bootDir := w.defaultBootDir()
+	ensureDir := bootDir
+	if w.cfg.PlantSpec.Operation == materialize.OperationCreate {
+		ensureDir = filepath.Dir(bootDir)
+	}
+	if err := os.MkdirAll(ensureDir, 0o750); err != nil {
+		return fmt.Errorf("wrapper: ensure boot dir %q: %w", bootDir, err)
+	}
+
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindPlantStarted, source, map[string]any{
+		"boot_dir":            bootDir,
+		"files_planned":       countSpecFiles(w.cfg.PlantSpec),
+		"hooks_planned":       len(w.cfg.PlantSpec.Hooks),
+		"providers_planned":   len(w.cfg.PlantSpec.ProviderSettings),
+		"has_mcp":             w.cfg.PlantSpec.MCPConfig != nil,
+		"has_recovery_prompt": w.cfg.PlantSpec.RecoveryPrompt != "",
+	})
+
+	result, plantErr := w.cfg.Planter.Plant(ctx, bootDir, w.cfg.PlantSpec)
+
+	donePayload := map[string]any{
+		"boot_dir":        bootDir,
+		"planted_files":   result.PlantedFiles,
+		"planned_files":   result.PlannedFiles,
+		"written_files":   result.WrittenFiles,
+		"unchanged_files": result.UnchangedFiles,
+		"conflict_files":  result.ConflictFiles,
+		"operation":       string(result.Operation),
+		"complete":        result.Complete,
+	}
+	if plantErr != nil {
+		donePayload["error"] = plantErr.Error()
+	}
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindPlantCompleted, source, donePayload)
+
+	if plantErr != nil {
+		return fmt.Errorf("wrapper: plant: %w", plantErr)
+	}
+	return nil
+}
+
+// runSandbox calls the configured sandbox.Applier with the session's
+// current PID and emits sandbox.applied with the result. Returns the
+// applier's error so Run can stop the session and abort.
+//
+// No-op when Config.Sandbox is nil.
+func (w *Wrapper) runSandbox(ctx context.Context, source runtimeevents.Source, session agentsessions.Session) error {
+	if w.cfg.Sandbox == nil {
+		return nil
+	}
+	pid := session.Health().PID
+	result, applyErr := w.cfg.Sandbox.Apply(ctx, pid)
+
+	payload := map[string]any{
+		"profile": result.Profile,
+		"applied": result.Applied,
+		"notes":   result.Notes,
+		"pid":     pid,
+	}
+	if applyErr != nil {
+		payload["error"] = applyErr.Error()
+	}
+	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindSandboxApplied, source, payload)
+
+	if applyErr != nil {
+		return fmt.Errorf("wrapper: sandbox.Apply: %w", applyErr)
+	}
+	return nil
+}
+
+// countSpecFiles tallies the discrete file slots in a plant.Spec for
+// the plant.started event's "files_planned" payload. Counts entries in
+// Files plus MCPConfig (if present); ProviderSettings and Hooks are
+// reported separately.
+func countSpecFiles(spec plant.Spec) int {
+	n := len(spec.Files)
+	if spec.MCPConfig != nil {
+		n++
+	}
+	return n
+}
+
+// ErrAdapterNotRuntime is returned by [Wrapper.Run] when the
+// configured [adapters.Adapter] does not also implement
+// [adapters.RuntimeAdapter]. The agentkit/agentsessions integration
+// path requires a [provider.CLIAdapter] which only [RuntimeAdapter]
+// implementations expose. Use [errors.Is] to detect.
+var ErrAdapterNotRuntime = errors.New("wrapper: adapter does not implement adapters.RuntimeAdapter")
+
+// ErrSessionNotStarted is returned by [Wrapper.SendInput] when called
+// before [Wrapper.Run] has started a session. Use [errors.Is] to
+// detect.
+var ErrSessionNotStarted = errors.New("wrapper: session not started")
+
+// ErrTurnCancelUnsupported is returned by CancelTurn for a session that can
+// neither cancel an ACP turn nor interrupt a native one.
+var ErrTurnCancelUnsupported = errors.New("wrapper: runtime does not expose turn-scoped cancellation")
+
+// ErrAdapterNotACPClient is returned when an adapter declares ProtocolACP but
+// cannot construct the real ACP client lifecycle.
+var ErrAdapterNotACPClient = errors.New("wrapper: ACP adapter does not implement acp.ClientAdapter")
