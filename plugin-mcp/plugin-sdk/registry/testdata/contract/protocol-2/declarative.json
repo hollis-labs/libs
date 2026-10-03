@@ -1,0 +1,61 @@
+{
+  "description": "declarative",
+  "response": {
+    "protocol": 2,
+    "host_instance": "host-epoch",
+    "revision": 3,
+    "plugins": {
+      "p": {
+        "owner_generation": "2"
+      }
+    },
+    "kinds": {
+      "nav.item": {
+        "schema_version": 1,
+        "metadata_schema": {},
+        "representations": [
+          "declarative"
+        ],
+        "regions": [],
+        "required_capabilities": []
+      }
+    },
+    "regions": {},
+    "contributions": {
+      "nav.item": {
+        "p/nav": {
+          "owner_id": "p",
+          "owner_generation": "2",
+          "local_key": "nav",
+          "kind": "nav.item",
+          "schema_version": 1,
+          "required": false,
+          "representation": "declarative",
+          "metadata": {
+            "nested": [
+              1,
+              null,
+              {
+                "unicode": "caf\u00e9"
+              }
+            ]
+          },
+          "declarative": {
+            "label": "Notes",
+            "action": {
+              "type": "navigate",
+              "route": "notes"
+            }
+          }
+        }
+      }
+    },
+    "refusals": []
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "validate": "ok"
+  }
+}

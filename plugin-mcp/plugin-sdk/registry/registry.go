@@ -1,209 +1,363 @@
-// Package registry defines the plugin registry wire contract: what a host
-// publishes so a browser can find, load and resolve the UI a plugin ships.
-//
-// The contract has two views of one definition — this Go view, and the
-// TypeScript view in ts/packages/plugin-registry. They live in the same
-// repository so the wire format is authored once. Neither generates the
-// other; both pin [Protocol] and both round-trip their own types, so a host
-// and a loader at genuinely different versions disagree about the protocol
-// number rather than about a field.
-//
-// The model this serves is host-manifest-authoritative. The host publishes
-// what registered; the browser resolves it. A plugin does not declare at
-// runtime what it registers, and a loader never learns a registration from a
-// bundle it imported.
-//
-// What this package deliberately does not know:
-//
-//   - What a contribution kind means. Kind is an open string chosen by the
-//     host. One host's "envelope", "widget" and "slot" are three values of
-//     that string, not three things this package has types for. Note in
-//     particular that the SDK's existing [plugin.UIComponentType] enum is one
-//     host's taxonomy that already lives in this module; the registry
-//     contract does not build on it, and unifying the two would move a
-//     host's vocabulary into the shared contract.
-//   - Any host's trust, capability or isolation model.
-//   - Where bundles are served from, under what CSP, and how a bundle obtains
-//     shared runtime dependencies such as a React copy. Those are host
-//     concerns with host answers.
-//
-// A host builds a [Response] from whatever it knows and serves it; this
-// package supplies the types, the protocol constant and [Response.Validate].
-// It deliberately contains no HTTP handler and no caching — a host owns its
-// own endpoint, and the registry version counter that invalidates it is
-// host state.
+// Package registry defines the protocol-2 host-authoritative contribution catalog.
+// Wire structure is shared with @hollis-labs/plugin-registry. Admission and
+// execution authority belong to the host; this package never grants capabilities.
 package registry
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
+	"strings"
 )
 
-// Protocol is the registry wire version. A host and a loader must agree on it
-// exactly: a loader that meets a protocol it does not know refuses the whole
-// response rather than guessing at fields, because an unreadable registry is
-// not evidence that a host's plugins went away.
-//
-// Pinned by TestProtocolLockedAt1 here and by the matching pin on the
-// TypeScript side. Bumping it is a deliberate, coordinated act.
-const Protocol = 1
+const Protocol = 2
+const MaxRevision = uint64(1<<53 - 1)
 
-// Response is the whole registry document a host serves.
-//
-// Both maps are always present in the serialized form — a loader may treat
-// them as stable dictionaries. Use [NewResponse] to get them initialized.
+type Representation string
+
+const (
+	Declarative Representation = "declarative"
+	Component   Representation = "component"
+	Handler     Representation = "handler"
+)
+
 type Response struct {
-	Protocol int `json:"protocol"`
-
-	// Plugins describes each plugin the browser may need to load, keyed by
-	// plugin id. A plugin with no bundle still belongs here; its
-	// contributions are then declared-but-unresolvable, which is a state the
-	// loader reports rather than hides.
-	Plugins map[string]Plugin `json:"plugins"`
-
-	// Contributions is kind -> contribution key -> contribution. The kind is
-	// host-defined and opaque here. The key is unique within its kind and is
-	// the name the host looks a contribution up by.
-	//
-	// One contribution per (kind, key). Where a host groups contributions —
-	// an ordered toolbar, a priority-sorted rail — the group name and the
-	// ordering belong in Meta, because grouping and order are host taxonomy
-	// and no loader reads them.
+	Protocol      int                                `json:"protocol"`
+	HostInstance  string                             `json:"host_instance"`
+	Revision      uint64                             `json:"revision"`
+	Plugins       map[string]Plugin                  `json:"plugins"`
+	Kinds         map[string]KindDescriptor          `json:"kinds"`
+	Regions       map[string]RegionDescriptor        `json:"regions"`
 	Contributions map[string]map[string]Contribution `json:"contributions"`
+	Refusals      []Refusal                          `json:"refusals"`
 }
 
-// Plugin is what the browser needs in order to load one plugin's UI.
 type Plugin struct {
-	// BundleURL is the ES module the browser dynamic-imports. Empty means
-	// this plugin ships no browser code.
-	BundleURL string `json:"bundle_url,omitempty"`
-
-	// StylesheetURL is an optional stylesheet loaded alongside the bundle.
-	StylesheetURL string `json:"stylesheet_url,omitempty"`
-
-	// BundleVersion is an opaque cache-bust token appended to the import URL.
-	//
-	// It is NOT an integrity hash and nothing verifies it. The name says
-	// "version" rather than "hash" on purpose: a host may legitimately derive
-	// it from a modification time, and a field named hash invites a reader to
-	// treat it as a content check it was never able to be.
-	//
-	// The host has exactly one obligation: the token must change whenever the
-	// bytes at BundleURL change. URL-keyed ES module caches never re-import
-	// the same URL, so a reinstall at the same path with an unchanged token
-	// is invisible to the browser.
-	BundleVersion string `json:"bundle_version,omitempty"`
-
-	// Runtime declares the shared runtime a bundle expects the host to
-	// provide, e.g. {"react", "^19.0.0"}. It is carried and surfaced; this
-	// package and the loader do not enforce it. Recorded as a declaration so
-	// a host that wants to refuse an incompatible bundle has the information,
-	// and so the next reader does not mistake a carried field for a check.
-	Runtime *Runtime `json:"runtime,omitempty"`
+	OwnerGeneration string `json:"owner_generation"`
+	BundleURL       string `json:"bundle_url,omitempty"`
+	// BundleVersion identifies the exact bytes, not an arbitrary cache token.
+	BundleVersion string    `json:"bundle_version,omitempty"`
+	StylesheetURL string    `json:"stylesheet_url,omitempty"`
+	Runtime       []Runtime `json:"runtime,omitempty"`
 }
 
-// Runtime names a shared runtime dependency and the range a bundle expects.
+// Runtime has inclusive bounds; missing one side is unbounded. Both missing is invalid.
 type Runtime struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	Name string `json:"name"`
+	Min  string `json:"min,omitempty"`
+	Max  string `json:"max,omitempty"`
 }
 
-// Contribution is one named export a plugin offers under one kind.
-type Contribution struct {
-	// PluginID names the plugin that owns this contribution and must appear
-	// in Response.Plugins.
-	PluginID string `json:"plugin_id"`
+type KindDescriptor struct {
+	SchemaVersion        uint64           `json:"schema_version"`
+	MetadataSchema       json.RawMessage  `json:"metadata_schema"`
+	Representations      []Representation `json:"representations"`
+	Regions              []string         `json:"regions"`
+	RequiredCapabilities []string         `json:"required_capabilities"`
+}
 
-	// Export is the named export to pull from the plugin's module. It is
-	// required and explicit: a loader that infers an export name from an
-	// identifier is guessing, and a host that has a display name where an
-	// export name belongs has a defect the wire should not carry.
+type RegionDescriptor struct {
+	Kinds           []string         `json:"kinds"`
+	Representations []Representation `json:"representations"`
+	ContextSchema   json.RawMessage  `json:"context_schema"`
+	// Ordering is host policy; default is priority 10, ascending, then manifest order.
+	Ordering string `json:"ordering"`
+}
+
+type ComponentRef struct {
 	Export string `json:"export"`
-
-	// Meta is host-defined and opaque. It carries everything about a
-	// contribution that only the host understands — a kind version, a schema
-	// URL, a slot name, a priority, a label, props — and no loader reads it.
-	// Keeping it raw is what stops one host's taxonomy reaching the other's.
-	Meta json.RawMessage `json:"meta,omitempty"`
+	Region string `json:"region"`
 }
 
-// NewResponse returns a Response at the current protocol with both maps
-// initialized, so a host can populate it without nil-map checks and a loader
-// always receives the two top-level keys.
-func NewResponse() Response {
-	return Response{
-		Protocol:      Protocol,
-		Plugins:       make(map[string]Plugin),
-		Contributions: make(map[string]map[string]Contribution),
-	}
+// HandlerRef is a public reviewed binding, not a token or internal execution handle.
+type HandlerRef struct {
+	ID string `json:"id"`
 }
 
-// Set records one contribution, creating the kind's map on first use.
-func (r Response) Set(kind, key string, c Contribution) {
-	byKey, ok := r.Contributions[kind]
-	if !ok {
-		byKey = make(map[string]Contribution)
-		r.Contributions[kind] = byKey
-	}
-	byKey[key] = c
+type Contribution struct {
+	OwnerID         string          `json:"owner_id"`
+	OwnerGeneration string          `json:"owner_generation"`
+	LocalKey        string          `json:"local_key"`
+	Kind            string          `json:"kind"`
+	SchemaVersion   uint64          `json:"schema_version"`
+	Required        bool            `json:"required"`
+	Representation  Representation  `json:"representation"`
+	Metadata        json.RawMessage `json:"metadata"`
+	Component       *ComponentRef   `json:"component,omitempty"`
+	Declarative     json.RawMessage `json:"declarative,omitempty"`
+	Handler         *HandlerRef     `json:"handler,omitempty"`
+	PublicBinding   string          `json:"public_binding,omitempty"`
 }
 
-// Meta marshals a host's contribution metadata for [Contribution.Meta].
-func Meta(v any) (json.RawMessage, error) {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return nil, fmt.Errorf("registry: marshal contribution meta: %w", err)
-	}
-	return json.RawMessage(raw), nil
+type Refusal struct {
+	OwnerID         string `json:"owner_id"`
+	OwnerGeneration string `json:"owner_generation"`
+	Kind            string `json:"kind"`
+	LocalKey        string `json:"local_key"`
+	Reason          string `json:"reason"`
+	Required        bool   `json:"required"`
 }
 
-// Validation failures. Each names a response a loader cannot act on.
 var (
-	// ErrProtocol reports a response at a protocol this build does not speak.
-	ErrProtocol = errors.New("registry: protocol mismatch")
-	// ErrInvalidContribution reports a structurally unusable contribution.
+	ErrProtocol            = errors.New("registry: protocol mismatch")
 	ErrInvalidContribution = errors.New("registry: invalid contribution")
-	// ErrUnknownPlugin reports a contribution naming a plugin the response
-	// does not describe.
-	ErrUnknownPlugin = errors.New("registry: contribution names an unknown plugin")
+	ErrUnknownPlugin       = errors.New("registry: unknown owner")
+	ErrCollision           = errors.New("registry: collision")
+	ErrRequired            = errors.New("registry: required contribution refused")
+	ErrIntegrity           = errors.New("registry: bundle integrity mismatch")
+	ErrRuntime             = errors.New("registry: runtime incompatibility")
 )
+var name = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+var digest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
-// Validate reports whether a response is one a loader can act on.
-//
-// It checks structure — the protocol, that every contribution names a plugin
-// and an export, that metadata is valid JSON — and one referential rule: a
-// contribution must name a plugin the response describes. That last check is
-// here rather than left to the loader because a dangling plugin id is
-// unresolvable by construction, and the loader's only honest response to one
-// is to drop the contribution. A host finding out at serve time is better
-// than a browser silently rendering less than the manifest declared.
-//
-// A plugin with no BundleURL is valid: a host may describe a plugin whose
-// browser half is absent, and its contributions are then attributable but
-// unresolved.
+func NewResponse(hostInstance string, revision uint64) Response {
+	return Response{Protocol: Protocol, HostInstance: hostInstance, Revision: revision,
+		Plugins: map[string]Plugin{}, Kinds: map[string]KindDescriptor{}, Regions: map[string]RegionDescriptor{},
+		Contributions: map[string]map[string]Contribution{}, Refusals: []Refusal{}}
+}
+func QualifiedKey(ownerID, localKey string) string { return ownerID + "/" + localKey }
+func (c Contribution) Key() string                 { return QualifiedKey(c.OwnerID, c.LocalKey) }
+
+// Set refuses duplicates without replacing the first declaration.
+func (r Response) Set(c Contribution) error {
+	if r.Contributions == nil || !name.MatchString(c.OwnerID) || !name.MatchString(c.LocalKey) || c.Kind == "" {
+		return ErrInvalidContribution
+	}
+	byKey := r.Contributions[c.Kind]
+	if byKey == nil {
+		byKey = map[string]Contribution{}
+		r.Contributions[c.Kind] = byKey
+	}
+	if _, exists := byKey[c.Key()]; exists {
+		return fmt.Errorf("%w: %s/%s", ErrCollision, c.Kind, c.Key())
+	}
+	byKey[c.Key()] = c
+	return nil
+}
+func Meta(v any) (json.RawMessage, error) { return json.Marshal(v) }
+func validJSON(raw json.RawMessage) bool  { return len(raw) > 0 && json.Valid(raw) }
+func validReps(reps []Representation) bool {
+	if len(reps) == 0 {
+		return false
+	}
+	seen := map[Representation]bool{}
+	for _, r := range reps {
+		if seen[r] || (r != Declarative && r != Component && r != Handler) {
+			return false
+		}
+		seen[r] = true
+	}
+	return true
+}
+
+// Validate checks shape/references only. Unknown optional kinds are admission refusals.
 func (r Response) Validate() error {
 	if r.Protocol != Protocol {
-		return fmt.Errorf("%w: response is protocol %d, this build speaks %d", ErrProtocol, r.Protocol, Protocol)
+		return ErrProtocol
 	}
+	if r.HostInstance == "" || r.Revision == 0 || r.Revision > MaxRevision || r.Plugins == nil || r.Kinds == nil || r.Regions == nil || r.Contributions == nil || r.Refusals == nil {
+		return ErrInvalidContribution
+	}
+	for id, p := range r.Plugins {
+		if !name.MatchString(id) || p.OwnerGeneration == "" {
+			return ErrInvalidContribution
+		}
+		if (p.BundleURL == "") != (p.BundleVersion == "") || (p.BundleVersion != "" && !digest.MatchString(p.BundleVersion)) {
+			return ErrIntegrity
+		}
+		seen := map[string]bool{}
+		for _, rt := range p.Runtime {
+			if seen[rt.Name] || rt.Name == "" || !validBounds(rt.Min, rt.Max) {
+				return ErrRuntime
+			}
+			seen[rt.Name] = true
+		}
+	}
+	for kind, d := range r.Kinds {
+		if kind == "" || d.SchemaVersion == 0 || d.SchemaVersion > MaxRevision || !validJSON(d.MetadataSchema) || !validReps(d.Representations) || d.Regions == nil || d.RequiredCapabilities == nil {
+			return ErrInvalidContribution
+		}
+	}
+	for region, d := range r.Regions {
+		if region == "" || d.Kinds == nil || !validReps(d.Representations) || !validJSON(d.ContextSchema) || (d.Ordering != "priority-ascending" && d.Ordering != "priority-descending" && d.Ordering != "manifest") {
+			return ErrInvalidContribution
+		}
+	}
+	bindings := map[string]bool{}
 	for kind, byKey := range r.Contributions {
-		if kind == "" {
-			return fmt.Errorf("%w: empty contribution kind", ErrInvalidContribution)
+		if kind == "" || byKey == nil {
+			return ErrInvalidContribution
 		}
 		for key, c := range byKey {
+			if c.Kind != kind || !name.MatchString(c.OwnerID) || !name.MatchString(c.LocalKey) || c.Key() != key || c.OwnerGeneration == "" || c.SchemaVersion == 0 || c.SchemaVersion > MaxRevision || !validJSON(c.Metadata) {
+				return ErrInvalidContribution
+			}
+			p, ok := r.Plugins[c.OwnerID]
+			if !ok {
+				return ErrUnknownPlugin
+			}
+			if p.OwnerGeneration != c.OwnerGeneration {
+				return ErrInvalidContribution
+			}
+			switch c.Representation {
+			case Component:
+				if c.Component == nil || c.Component.Export == "" || c.Component.Region == "" || len(c.Declarative) != 0 || c.Handler != nil || p.BundleURL == "" {
+					return ErrInvalidContribution
+				}
+			case Declarative:
+				if !validJSON(c.Declarative) || c.Component != nil || c.Handler != nil {
+					return ErrInvalidContribution
+				}
+			case Handler:
+				if c.Handler == nil || c.Handler.ID == "" || c.Component != nil || len(c.Declarative) != 0 {
+					return ErrInvalidContribution
+				}
+			default:
+				return ErrInvalidContribution
+			}
+			if c.PublicBinding != "" {
+				binding := kind + "\x00" + c.PublicBinding
+				if bindings[binding] {
+					return ErrCollision
+				}
+				bindings[binding] = true
+			}
+		}
+	}
+	for _, f := range r.Refusals {
+		if f.OwnerID == "" || f.OwnerGeneration == "" || f.Kind == "" || f.LocalKey == "" || f.Reason == "" {
+			return ErrInvalidContribution
+		}
+	}
+	return nil
+}
+
+type AdmissionPolicy struct {
+	Kinds    map[string]KindDescriptor
+	Regions  map[string]RegionDescriptor
+	Reserved func(kind, key string) bool
+	// Hosts supply their schema engine. A nonempty schema cannot be silently ignored.
+	ValidateMetadata func(schema, metadata json.RawMessage) error
+}
+type Plan struct {
+	Accepted []Contribution
+	Refusals []Refusal
+}
+
+func includes[T comparable](values []T, value T) bool {
+	for _, v := range values {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+func schemaEmpty(raw json.RawMessage) bool {
+	var v map[string]json.RawMessage
+	return json.Unmarshal(raw, &v) == nil && v != nil && len(v) == 0
+}
+
+// Plan validates all declarations before any activation and emits named refusals.
+func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
+	if err := r.Validate(); err != nil {
+		return Plan{}, err
+	}
+	plan := Plan{Accepted: []Contribution{}, Refusals: append([]Refusal{}, r.Refusals...)}
+	kinds := make([]string, 0, len(r.Contributions))
+	for k := range r.Contributions {
+		kinds = append(kinds, k)
+	}
+	sort.Strings(kinds)
+	required := false
+	for _, f := range plan.Refusals {
+		required = required || f.Required
+	}
+	for _, kind := range kinds {
+		keys := make([]string, 0, len(r.Contributions[kind]))
+		for k := range r.Contributions[kind] {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			c := r.Contributions[kind][key]
+			reason := ""
+			d, ok := policy.Kinds[kind]
+			published, pubOK := r.Kinds[kind]
 			switch {
-			case key == "":
-				return fmt.Errorf("%w: empty contribution key under kind %q", ErrInvalidContribution, kind)
-			case c.PluginID == "":
-				return fmt.Errorf("%w: %s/%s has no plugin_id", ErrInvalidContribution, kind, key)
-			case c.Export == "":
-				return fmt.Errorf("%w: %s/%s has no export", ErrInvalidContribution, kind, key)
+			case c.OwnerID == "core" || (policy.Reserved != nil && policy.Reserved(kind, key)):
+				reason = "reserved"
+			case strings.HasPrefix(kind, "plugin.") && !strings.HasPrefix(kind, "plugin."+c.OwnerID+"."):
+				reason = "reserved"
+			case !ok || !pubOK:
+				reason = "unsupported-kind"
+			case d.SchemaVersion != c.SchemaVersion || published.SchemaVersion != c.SchemaVersion:
+				reason = "unsupported-schema"
+			case !includes(d.Representations, c.Representation) || !includes(published.Representations, c.Representation):
+				reason = "unsupported-representation"
 			}
-			if len(c.Meta) > 0 && !json.Valid(c.Meta) {
-				return fmt.Errorf("%w: %s/%s has malformed meta", ErrInvalidContribution, kind, key)
+			if reason == "" && c.Representation == Component {
+				region := c.Component.Region
+				rd, exists := policy.Regions[region]
+				wire, wireOK := r.Regions[region]
+				if !exists || !wireOK || !includes(d.Regions, region) || !includes(published.Regions, region) || !includes(rd.Kinds, kind) || !includes(wire.Kinds, kind) || !includes(rd.Representations, Component) || !includes(wire.Representations, Component) {
+					reason = "unsupported-region"
+				}
 			}
-			if _, ok := r.Plugins[c.PluginID]; !ok {
-				return fmt.Errorf("%w: %s/%s names plugin %q", ErrUnknownPlugin, kind, key, c.PluginID)
+			if reason == "" {
+				if policy.ValidateMetadata != nil {
+					if err := policy.ValidateMetadata(d.MetadataSchema, c.Metadata); err != nil {
+						reason = "invalid-metadata"
+					}
+				} else if !schemaEmpty(d.MetadataSchema) {
+					reason = "unsupported-metadata-schema"
+				}
+			}
+			if reason != "" {
+				plan.Refusals = append(plan.Refusals, Refusal{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, reason, c.Required})
+				required = required || c.Required
+			} else {
+				plan.Accepted = append(plan.Accepted, c)
+			}
+		}
+	}
+	if required {
+		return plan, ErrRequired
+	}
+	return plan, nil
+}
+
+func BundleDigest(bytes []byte) string {
+	sum := sha256.Sum256(bytes)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// VerifyBundle must run before executing the exact immutable bytes supplied here.
+func VerifyBundle(p Plugin, bytes []byte, runtimes map[string]string, allowPrerelease bool) error {
+	if !digest.MatchString(p.BundleVersion) || BundleDigest(bytes) != p.BundleVersion {
+		return ErrIntegrity
+	}
+	return CheckRuntimes(p.Runtime, runtimes, allowPrerelease)
+}
+func CheckRuntimes(requirements []Runtime, versions map[string]string, allowPrerelease bool) error {
+	for _, r := range requirements {
+		version, ok := parseVersion(versions[r.Name])
+		if !ok || !validBounds(r.Min, r.Max) || (!allowPrerelease && len(version.pre) > 0) {
+			return ErrRuntime
+		}
+		if r.Min != "" {
+			min, _ := parseVersion(r.Min)
+			if compare(version, min) < 0 {
+				return ErrRuntime
+			}
+		}
+		if r.Max != "" {
+			max, _ := parseVersion(r.Max)
+			if compare(version, max) > 0 {
+				return ErrRuntime
 			}
 		}
 	}
