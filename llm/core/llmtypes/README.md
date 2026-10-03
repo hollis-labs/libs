@@ -13,7 +13,7 @@ Pre-1.0 (`v0.x`). The API may evolve; breaking changes will be called out in
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-llm-types
+go get github.com/hollis-labs/substrate/llm-core/llmtypes
 ```
 
 ## Quickstart
@@ -24,7 +24,7 @@ package main
 import (
 	"fmt"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func main() {
@@ -46,7 +46,7 @@ See [`examples/`](./examples) for runnable demos covering `ChatRequest`,
 
 ## Documentation
 
-Full API reference: [pkg.go.dev/github.com/hollis-labs/go-llm-types](https://pkg.go.dev/github.com/hollis-labs/go-llm-types).
+Full API reference: [pkg.go.dev/github.com/hollis-labs/substrate/llm-core/llmtypes](https://pkg.go.dev/github.com/hollis-labs/substrate/llm-core/llmtypes).
 
 ## What's Here
 
@@ -64,7 +64,7 @@ companion modules and provider-specific adapters.
 
 ## Companion Modules
 
-- `github.com/hollis-labs/go-llm-contracts` — provider interfaces and shared
+- `github.com/hollis-labs/substrate/llm-core/llmcontracts` — provider interfaces and shared
   rate-budget primitives
 - `github.com/hollis-labs/go-providers` — PTY / CLI / subprocess provider
   adapters
