@@ -133,7 +133,9 @@ with the same key returns `idempotency_conflict`. An uncertain effect is never
 implicitly retried. `control` supports `kill` and `signal` with expected
 generation; kill sends SIGTERM then SIGKILL after the launch grace. Exit evidence preserves signal deaths. If an escaped
 descendant keeps a pipe open, drain stops after 150 milliseconds and records a
-truncated gap with `descendant_holds_pipe`; `Done` and shutdown stay bounded.
+truncated gap with `descendant_holds_pipe`. The pipe drain interval and signal
+escalation grace are bounded; complete shutdown also waits for journal I/O and
+connection teardown, so it has no unconditional time bound.
 No signals are sent after reaping the leader. Pause,
 resume, resize and dynamic resource changes return `unsupported_control`.
 

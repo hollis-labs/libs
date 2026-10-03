@@ -589,6 +589,27 @@ func TestMalformedClientAndNegotiation(t *testing.T) {
 		}
 		c.Close()
 	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		h.mu.Lock()
+		previous := h.controller
+		h.mu.Unlock()
+		released := previous == nil
+		if previous != nil {
+			select {
+			case <-previous.done:
+				released = true
+			default:
+			}
+		}
+		if released {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("previous controller disconnect was not processed")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	c := clientTest(t, h, spec, "controller")
 	c.Send(spec.Session, "health", map[string]string{"ping": "probe"})
 	receive(t, c, "result")

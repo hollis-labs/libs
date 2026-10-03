@@ -31,8 +31,8 @@ type journalIdentity struct {
 }
 
 // Journal serializes append, fsync, replay snapshots and subscriptions under
-// one lock. Retention never evicts unacknowledged evidence. v0 retains all
-// records to preserve idempotency receipts, then fails closed at its disk cap.
+// one lock. v0 retains every record; ACK watermarks do not affect retention.
+// Records preserve idempotency receipts, then the host fails closed at its disk cap.
 // The resident index is bounded by that same cap. Close only after producers stop.
 type Journal struct {
 	mu          sync.Mutex

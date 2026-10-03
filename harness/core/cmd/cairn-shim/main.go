@@ -29,7 +29,7 @@ func main() {
 		if typed, ok := err.(*shim.Error); ok {
 			code = typed.Code
 		}
-		fmt.Fprintln(os.Stderr, "shim launch failed: "+code)
+		fmt.Fprintf(os.Stderr, "shim launch failed: %s: %v\n", code, err)
 		os.Exit(1)
 	}
 	defer host.Close()

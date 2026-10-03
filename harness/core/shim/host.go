@@ -307,7 +307,9 @@ func (h *Host) capture(name string, r io.Reader) {
 		if n > 0 {
 			_, e := h.record("shim.output", map[string]string{"stream": name, "encoding": "base64", "data": base64.StdEncoding.EncodeToString(b[:n])}, false)
 			if e != nil {
-				h.failJournal(e)
+				// Output cannot continue without durable capture, even if a future
+				// envelope bug reports a normally nonfatal request-validation error.
+				h.failJournal(fault("journal_unavailable", "output append failed: "+codeOf(e)))
 				return
 			}
 		}

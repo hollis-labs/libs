@@ -184,6 +184,14 @@ func (h *Host) serve(socket *net.UnixConn) {
 			return
 		}
 		h.mu.Lock()
+		select {
+		case <-h.closing:
+			c.close()
+			h.mu.Unlock()
+			h.op.Unlock()
+			return
+		default:
+		}
 		h.observer = c
 	} else {
 		if h.controller != nil {
@@ -208,6 +216,14 @@ func (h *Host) serve(socket *net.UnixConn) {
 			return
 		}
 		h.mu.Lock()
+		select {
+		case <-h.closing:
+			c.close()
+			h.mu.Unlock()
+			h.op.Unlock()
+			return
+		default:
+		}
 		if h.controller != nil {
 			h.controller.close()
 		}
@@ -564,7 +580,12 @@ func (c *connection) inject(f Frame) {
 	c.result(f, receipt)
 }
 func (c *connection) journalRefusal(f Frame, err error) {
-	_, e := c.host.record("shim.refused", map[string]string{"request_id": f.RequestID, "type": f.Type, "code": codeOf(err)}, false)
+	kind, cutType := boundedLogString(f.Type, 128)
+	requestID, cutID := boundedLogString(f.RequestID, 256)
+	code, cutCode := boundedLogString(codeOf(err), 64)
+	event := c.host.event("shim.refused", map[string]string{"request_id": requestID, "type": kind, "code": code})
+	event.Truncated = cutType || cutID || cutCode
+	_, e := c.host.journal.Append(event, false)
 	if e != nil {
 		c.error(f, e)
 		c.host.failJournal(e)
@@ -652,4 +673,11 @@ func (c *connection) dispatch(f Frame) []Frame {
 		c.error(f, fault("unsupported_message", "unknown command"))
 	}
 	return append([]Frame(nil), c.pending...)
+}
+
+func boundedLogString(value string, limit int) (string, bool) {
+	if len(value) > limit {
+		return value[:limit], true
+	}
+	return value, false
 }

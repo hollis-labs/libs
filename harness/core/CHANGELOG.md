@@ -25,3 +25,7 @@ All notable changes to the `harness` module are documented here. The format foll
   creation and reject oversized provenance without stopping a healthy child.
 - Journal connection attach/detach and publish protocol negotiation details;
   keep slow response writes outside the controller operation lock.
+- Recheck shutdown after durable attach before registering either connection
+  role, and bound untrusted refusal metadata with truncation evidence.
+- Include underlying launch errors on stderr; describe bounded drain/grace
+  intervals accurately and wait for disconnect processing in negotiation tests.
