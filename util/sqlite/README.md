@@ -10,12 +10,12 @@ The module ships small, focused sub-packages: `sqlitekit` (DSN + opener defaults
 
 Pre-1.0 (`v0.1.x`). The public API is stable in shape — `sqlitekit.Options`, `sqlitekit.OpenOptions`, `DSN`, and the four named openers — but minor breaks may still happen between `v0.x` releases. See [`CHANGELOG.md`](CHANGELOG.md) for per-release detail and pin a version in your `go.mod`.
 
-Documentation: [pkg.go.dev/github.com/hollis-labs/go-sqlite](https://pkg.go.dev/github.com/hollis-labs/go-sqlite).
+Documentation: [pkg.go.dev/github.com/hollis-labs/libs/util/sqlite](https://pkg.go.dev/github.com/hollis-labs/libs/util/sqlite).
 
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-sqlite
+go get github.com/hollis-labs/libs/util/sqlite
 ```
 
 The package only depends on [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), a pure-Go driver. No CGO toolchain is required.
@@ -38,7 +38,7 @@ For apps that intentionally serialize all DB access through one handle:
 import (
     "context"
 
-    "github.com/hollis-labs/go-sqlite/sqlitekit"
+    "github.com/hollis-labs/libs/util/sqlite/sqlitekit"
     _ "modernc.org/sqlite"
 )
 
@@ -200,8 +200,8 @@ import (
     "log"
     "time"
 
-    "github.com/hollis-labs/go-sqlite/serialwrite"
-    "github.com/hollis-labs/go-sqlite/sqlitekit"
+    "github.com/hollis-labs/libs/util/sqlite/serialwrite"
+    "github.com/hollis-labs/libs/util/sqlite/sqlitekit"
 )
 
 ctx, cancel := context.WithCancel(context.Background())
@@ -251,7 +251,7 @@ For tests and apps that want the `Writer` interface without managing a goroutine
 
 ## API Overview
 
-Package `sqlitekit` (`github.com/hollis-labs/go-sqlite/sqlitekit`):
+Package `sqlitekit` (`github.com/hollis-labs/libs/util/sqlite/sqlitekit`):
 
 - `Options` — per-connection pragmas and DSN parameters (`BusyTimeout`, `WAL`, `ForeignKeys`, `Synchronous`, `TempStore`, `MMapSize`, `JournalSizeLimit`, `CacheKiB`, `TxLock`, `ReadOnly`, `Mode`).
 - `DefaultOptions()` — sensible defaults for typical app DBs.
@@ -266,7 +266,7 @@ Package `sqlitekit` (`github.com/hollis-labs/go-sqlite/sqlitekit`):
 - Sentinels: `ErrReadOnlyMissingFile`.
 - Constants: `DefaultBusyTimeout`, `DefaultReadMaxOpenConns`, `DefaultDriverName`.
 
-Package `txutil` (`github.com/hollis-labs/go-sqlite/txutil`):
+Package `txutil` (`github.com/hollis-labs/libs/util/sqlite/txutil`):
 
 - `BeginImmediate(ctx, db)` — open a transaction that begins with writer-lock acquisition. Contract marker for the `_txlock=immediate` DSN dependency.
 - `WithImmediate(ctx, db, fn)` — closure form. Commits on `nil`, rolls back on error/panic. Commit failures also trigger rollback to release the connection.
@@ -276,7 +276,7 @@ Package `txutil` (`github.com/hollis-labs/go-sqlite/txutil`):
 - `SavepointName(prefix)` / `WithSavepoint(ctx, tx, name, fn)` — savepoint helpers. Cleanup runs under `context.WithoutCancel(ctx)` so a mid-`fn` cancellation does not leave an orphan savepoint.
 - Sentinels: `ErrInvalidSavepointName`.
 
-Package `serialwrite` (`github.com/hollis-labs/go-sqlite/serialwrite`):
+Package `serialwrite` (`github.com/hollis-labs/libs/util/sqlite/serialwrite`):
 
 - `Op` — `func(ctx context.Context, tx *sql.Tx) error`. Runs inside a SAVEPOINT on the worker's BEGIN IMMEDIATE transaction.
 - `Writer` — interface implemented by both `Queue` and `Direct`. Methods: `Submit(ctx, name, fn) error`, `Stats() Stats`.
@@ -331,8 +331,8 @@ Apps that keep a separate SQLite database for queued background work (telemetry,
 
 ```go
 import (
-    "github.com/hollis-labs/go-sqlite/sqlitekit"
-    qsqlite "github.com/hollis-labs/go-queue/driver/sqlite"
+    "github.com/hollis-labs/libs/util/sqlite/sqlitekit"
+    qsqlite "github.com/hollis-labs/libs/util/queue/driver/sqlite"
     _ "modernc.org/sqlite"
 )
 

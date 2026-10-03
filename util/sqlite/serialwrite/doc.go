@@ -15,7 +15,7 @@
 //
 // Both modes call [Submit] and block until the op has committed or failed.
 //
-// Use this package when [github.com/hollis-labs/go-sqlite/sqlitekit.OpenSingle]
+// Use this package when [github.com/hollis-labs/libs/util/sqlite/sqlitekit.OpenSingle]
 // is not enough — typically when:
 //
 //   - the app keeps a separate read pool open and needs all writes to flow
@@ -31,7 +31,7 @@
 //
 //   - durable background work, queued retries across process restarts, or
 //     cron-style scheduling — those need a persistent queue (see
-//     github.com/hollis-labs/go-queue);
+//     github.com/hollis-labs/libs/util/queue);
 //
 //   - cross-process serialization. serialwrite serializes within one Go
 //     process. Two processes opening the same SQLite file each get their own
@@ -39,5 +39,5 @@
 //     coordinating them. busy_timeout helps; serialwrite does not.
 //
 // The package depends on the stdlib and the sibling
-// [github.com/hollis-labs/go-sqlite/txutil] package only.
+// [github.com/hollis-labs/libs/util/sqlite/txutil] package only.
 package serialwrite

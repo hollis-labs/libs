@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/go-sqlite/txutil"
+	"github.com/hollis-labs/libs/util/sqlite/txutil"
 )
 
 func TestSavepointName_SanitizesAndIsUnique(t *testing.T) {

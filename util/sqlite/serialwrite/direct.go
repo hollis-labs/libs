@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/hollis-labs/go-sqlite/txutil"
+	"github.com/hollis-labs/libs/util/sqlite/txutil"
 )
 
 // Direct is a non-batching, synchronous [Writer]. Each Submit runs the op

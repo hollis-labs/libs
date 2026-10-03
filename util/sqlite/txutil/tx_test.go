@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-sqlite/sqlitekit"
-	"github.com/hollis-labs/go-sqlite/txutil"
+	"github.com/hollis-labs/libs/util/sqlite/sqlitekit"
+	"github.com/hollis-labs/libs/util/sqlite/txutil"
 )
 
 // openWriter opens a single-connection writer pool via sqlitekit so the DSN

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-sqlite/serialwrite"
-	"github.com/hollis-labs/go-sqlite/sqlitekit"
+	"github.com/hollis-labs/libs/util/sqlite/serialwrite"
+	"github.com/hollis-labs/libs/util/sqlite/sqlitekit"
 )
 
 func openWriter(t *testing.T, name string) *sql.DB {

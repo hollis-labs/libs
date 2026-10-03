@@ -63,7 +63,7 @@ same thing) and increases the API surface to maintain across `v0.x` releases.
 The optional second helper would have wrapped `go-queue/driver/sqlite.New`:
 
 ```go
-import qsqlite "github.com/hollis-labs/go-queue/driver/sqlite"
+import qsqlite "github.com/hollis-labs/libs/util/queue/driver/sqlite"
 
 func NewSQLiteDriver(db *sql.DB, opts qsqlite.Opts) (queue.Queue, error)
 ```
@@ -140,6 +140,6 @@ None of these are active concerns as of this ADR.
 - Decision PR: [#4](https://github.com/hollis-labs/go-sqlite/pull/4) — full
   rationale and review thread.
 - `go-queue` SQLite driver:
-  [`github.com/hollis-labs/go-queue/driver/sqlite`](https://github.com/hollis-labs/go-queue/tree/main/driver/sqlite).
+  [`github.com/hollis-labs/libs/util/queue/driver/sqlite`](https://github.com/hollis-labs/go-queue/tree/main/driver/sqlite).
 - Relevant `go-sqlite` packages: `sqlitekit.OpenSingle`, `sqlitekit.OpenOptions`
   ([`sqlitekit/open.go`](../../sqlitekit/open.go)).

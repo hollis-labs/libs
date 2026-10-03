@@ -1,4 +1,4 @@
-// Package gosqlite is the module root for github.com/hollis-labs/go-sqlite.
+// Package gosqlite is the module root for github.com/hollis-labs/libs/util/sqlite.
 //
 // The module ships small, focused sub-packages that solve the recurring
 // "WAL is enabled but Go writers still hit SQLITE_BUSY" failure mode:

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hollis-labs/go-sqlite/txutil"
+	"github.com/hollis-labs/libs/util/sqlite/txutil"
 )
 
 // Op is the function signature for a unit of work submitted to a [Writer].

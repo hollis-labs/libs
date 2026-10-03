@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/go-sqlite/txutil"
+	"github.com/hollis-labs/libs/util/sqlite/txutil"
 )
 
 // Queue is a batching in-process write serializer. Call [Queue.Run] in a
