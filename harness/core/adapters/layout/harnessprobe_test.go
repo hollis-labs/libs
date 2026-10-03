@@ -22,7 +22,7 @@ func TestHarnessProbe(t *testing.T) {
 			t.Skipf("%s not on PATH: %v", bin, err)
 		}
 	}
-	script, err := filepath.Abs(filepath.Join("..", "hack", "probe-harness-layout.sh"))
+	script, err := filepath.Abs(filepath.Join("..", "provider", "hack", "probe-harness-layout.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
