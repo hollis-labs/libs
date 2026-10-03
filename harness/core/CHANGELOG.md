@@ -10,4 +10,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ### Added
 
-- Empty module skeleton: `go.mod` and a package doc. No API yet.
+- Stdio process shim library and separate `cairn-shim` executable with a private
+  authenticated Unix controller, durable shared event journal, replay, bounded
+  immediate input/signals, generation-use pins and launch-time limits.
+- Fake-child acceptance tests for detach/reconnect, framing, durability,
+  idempotency, controller fencing and process-group cleanup.
