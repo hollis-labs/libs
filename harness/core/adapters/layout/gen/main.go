@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	docPath  = "docs/LAYOUT.md"
-	jsonPath = "layout/layout.json"
+	docPath  = "adapters/layout/docs/LAYOUT.md"
+	jsonPath = "adapters/layout/layout.json"
 )
 
 func main() {
