@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	directives "github.com/hollis-labs/go-directives"
+	directives "github.com/hollis-labs/libs/ui-go/directives"
 )
 
 func main() {

@@ -1,6 +1,6 @@
 # go-directives
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-directives.svg)](https://pkg.go.dev/github.com/hollis-labs/go-directives)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/ui-go/directives.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/ui-go/directives)
 
 A pure-Go parser for **chat directives** — inline `::` commands embedded in
 conversation text. The library lexes directives, maintains a context-scope
@@ -21,7 +21,7 @@ but breaking changes — if any — will be called out in
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-directives
+go get github.com/hollis-labs/libs/ui-go/directives
 ```
 
 ## Quickstart
@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"os"
 
-	directives "github.com/hollis-labs/go-directives"
+	directives "github.com/hollis-labs/libs/ui-go/directives"
 )
 
 func main() {
@@ -69,7 +69,7 @@ go run ./examples/parse
 
 Full API docs on godoc:
 
-- <https://pkg.go.dev/github.com/hollis-labs/go-directives>
+- <https://pkg.go.dev/github.com/hollis-labs/libs/ui-go/directives>
 
 The package surface is small and is summarised below; see godoc for the
 authoritative reference.
@@ -123,7 +123,7 @@ passed through verbatim to the caller.
 ## Dependencies
 
 No non-stdlib Go dependencies. `go.mod` declares only the module path
-`github.com/hollis-labs/go-directives` and the current Go directive.
+`github.com/hollis-labs/libs/ui-go/directives` and the current Go directive.
 
 ## Testing
 
