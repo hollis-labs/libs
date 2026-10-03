@@ -4,11 +4,7 @@ import { readFileSync } from 'node:fs';
 import { decodeHostRPCDTO, encodeHostRPCDTO, HostRPCValidationError, MAX_HOST_RPC_DTO_BYTES } from '../dist/host-rpc.js';
 const corpus = JSON.parse(readFileSync(new URL('../../../../protocol/v2/fixtures/host-rpc.json', import.meta.url), 'utf8'));
 for (const vector of corpus.structural) {
-    test('host RPC structural: ' + vector.name, t => {
-        if (['ApplicationErrorResponse', 'HostRPCErrorData'].includes(vector.schema)) {
-            t.skip('application errors await the capability leaf update');
-            return;
-        }
+    test('host RPC structural: ' + vector.name, () => {
         if (!vector.valid) {
             assert.throws(() => decodeHostRPCDTO(vector.schema, vector.raw), HostRPCValidationError);
             return;
@@ -97,4 +93,25 @@ test('log field names are unique exact-case keys', () => {
     assert.throws(() => encodeHostRPCDTO('LogParams', value), HostRPCValidationError);
     value.fields[1].name = 'Key';
     assert.doesNotThrow(() => encodeHostRPCDTO('LogParams', value));
+});
+test('application errors retain closed leaf metadata and positive correlation',()=>{
+ const base='{"contract":"host-rpc/1","code":"target_unavailable","request_id":1,"effect_state":"not_started","retryable":false,"detail":"parent_invalid"}';
+ for(const [before,after] of [
+  ['"request_id":1','"request_id":null'],['"request_id":1','"request_id":0'],
+  ['"request_id":1','"request_id":1e0'],['"request_id":1','"request_id":1.0'],
+  ['"request_id":1','"request_id":9007199254740992'],['"request_id":1','"Request_id":1'],
+  ['"request_id":1','"request_id":1,"request_id":1'],['"retryable":false','"retryable":true'],
+  ['"retryable":false','"retryable":null'],['"parent_invalid"','"parent_unknown"'],['"parent_invalid"','""'],
+  ['"target_unavailable"','"unknown_code"'],['"not_started"','"unknown_state"'],
+  ['"target_unavailable"','"unknown_outcome"'],['"contract":"host-rpc/1"','"contract":"host-rpc/2"'],
+ ])assert.throws(()=>decodeHostRPCDTO('HostRPCErrorData',base.replace(before,after)),HostRPCValidationError);
+ assert.doesNotThrow(()=>decodeHostRPCDTO('HostRPCErrorData',base.replace('target_unavailable','unknown_outcome').replace('not_started','unknown')));
+ for(const detail of ['stale_binding','callback_cycle','depth_exceeded','parent_invalid','parent_terminal']){
+  const data=decodeHostRPCDTO('HostRPCErrorData',base.replace('parent_invalid',detail));
+  const response={jsonrpc:'2.0',id:1,error:{code:-32010,message:'safe',data}};
+  assert.deepEqual(decodeHostRPCDTO('ApplicationErrorResponse',encodeHostRPCDTO('ApplicationErrorResponse',response)),response);
+  response.id=2;assert.throws(()=>encodeHostRPCDTO('ApplicationErrorResponse',response),HostRPCValidationError);
+  response.id=1;response.error.message='😀'.repeat(257);assert.throws(()=>encodeHostRPCDTO('ApplicationErrorResponse',response),HostRPCValidationError);
+  response.error.message='😀'.repeat(256);assert.doesNotThrow(()=>encodeHostRPCDTO('ApplicationErrorResponse',response));
+ }
 });
