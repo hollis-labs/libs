@@ -10,3 +10,8 @@
 - Bound handler capacity, deadlines, queue admission and nested dispatch depth.
 - Contain panics, isolate JSON payloads and merge visible mutable filter changes.
 - Return ordered outcomes, veto/approval statuses and async completion receipts.
+- Add catalog JSON introspection and generated Markdown with inline schemas.
+- Validate custom declaration namespaces and preflight manifest registrations.
+- Retain structured deprecation warnings without redirects; name removal failures.
+- Add one provider-based discovery endpoint for independently versioned catalogs.
+- Document explicit lifecycle adapter mappings and proposed filter declarations.

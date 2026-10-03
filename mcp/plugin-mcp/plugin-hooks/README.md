@@ -121,3 +121,93 @@ Run fast checks with `GOWORK=off go test .`, `GOWORK=off go vet ./...` and
 `go test -race -count=1 ./...`, matches CI checks and repeats concurrency-heavy
 lifecycle tests with race instrumentation. Install local hooks with `lefthook install`
 if desired; the tracked configuration alone installs nothing.
+
+## Catalog introspection and registration preflight
+
+`json.Marshal(registry.Catalog())` produces a sorted `catalog_version` document
+with inline JSON Schema objects, mutation/view rules, version/deprecation data,
+explicit remote policy, resource limits and schema digests. Validator functions
+are excluded. `Catalog.Document()` returns detached `CatalogDocument` data;
+`Definition` also marshals to this form. Millisecond fields preserve fractional
+limits. This is introspection, not an executable catalog: hosts still compile
+validators and validate declarations when installing a registry. Catalog version,
+Go module version, and subprocess protocol version are independent.
+
+Custom declarations require exactly `plugin.<owner_namespace>.<subject>.<event>`.
+The trusted publisher supplies `Definition.OwnerNamespace`, which must match the
+name's namespace segment. Every declaration still requires schemas, validators,
+limits and explicit policy. The namespace grants no authority: the host assigns
+scope allowlists, including any subscriptions to another namespace's declarations.
+There is no plugin-controlled catalog extension API or lossy plugin-ID conversion.
+
+A host can call `scope.ValidateRegistration(hook, registrationName, kind, options)`
+for each manifest hook/filter before attaching handlers. It applies the same kind,
+allowlist, digest, view and resolved-options policy as `AddAction`/`AddFilter`.
+It returns `RegistrationValidation` with resolved options and structured warnings.
+It reserves neither names nor capacity; adding handlers rechecks policy and
+atomically enforces duplicate names and handler limits. Manifest parsing, identity,
+authorization and remote transport remain host responsibilities.
+
+Deprecation requires since, reason and planned removal; replacement is optional
+and must be a distinct canonical name. Preflight returns `RegistrationWarning`
+data, and successful registrations retain the same warnings in `Registrations()`
+for the host to surface. No warning callback or plugin code runs under locks.
+Deprecation never redirects a registration. At the removal release the publisher
+omits the entry from its supported catalog; both scope creation and registration
+then fail with `ErrUnknownHook` naming the removed hook. The library does not guess
+whether a host release has reached an arbitrary removal-version string.
+
+`AgentLifecycleMappings()` returns the explicit eleven-event adapter table for
+native go-hooks names. It does not install aliases, translate payloads, execute
+commands or change permission behavior. The registry rejects native names such as
+`Stop` and `PreToolUse`. Hosts must implement and validate the adapter separately;
+`Stop` maps to `turn.stopping`, and `PreCompact` remains a non-veto observation.
+
+## One discovery endpoint
+
+Mount `NewDiscoveryHandler` once behind the host's authentication, request budget
+and permitted-subset policy. Hosts adapt the hooks, contributions and capabilities
+catalogs with the standard-library-only `Provider` interface; this module imports
+neither of the other catalog modules. For example, with host-provided
+`contributionProvider` and `capabilityProvider`:
+
+```go
+handler, err := pluginhooks.NewDiscoveryHandler(map[string]pluginhooks.Provider{
+    "hooks": registry,
+    "contributions": contributionProvider,
+    "capabilities": capabilityProvider,
+})
+if err != nil {
+    return err
+}
+mux.Handle("/api/plugins/catalogs", authenticated(handler))
+```
+
+The GET/HEAD document has `discovery_version: 1` and a `catalogs` object with named,
+independently versioned sections. Providers return JSON objects and must honor
+request contexts and be concurrency-safe. Every request reads fresh sections;
+there is no cross-module atomic snapshot. A missing section means unsupported.
+Any section failure fails the entire response with a generic error, without
+partial data or provider error text. Responses use `Cache-Control: no-store`.
+Discovery is data, never a registration grant; no app adopts this endpoint here.
+
+## Generated documentation sample
+
+`Catalog.WriteMarkdown(io.Writer)` generates sorted reference documentation from
+the same catalog document as discovery, including schemas and all policy fields.
+The proposed [sample catalog](docs/catalog-sample.md) is generated with:
+
+```sh
+go run ./examples/catalog > docs/catalog-sample.md
+```
+
+The sample draws on the nine existing Nanite filter declarations in
+`internal/plugin/filter.go` at source revision
+`66ca11f4b12208df1f02dfa09d3187065fde9cb0`: `context_window`,
+`assistant_response`, `envelope_data`, `system_prompt`, `user_message`,
+`tool_result`, `tool_selection`, `reflex_state` and `reflex_action`.
+Its dotted names and `value` envelopes are proposals, not aliases or an adapter.
+Schemas deliberately illustrate only the envelope and value category; a host must
+refine nested data schemas and supply compiled validators before installation.
+The sample cannot be installed as-is and makes no remote transport claim. It does
+not migrate Nanite, whose existing hooks and schemas stay unchanged.
