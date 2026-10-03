@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/hollis-labs/go-envelopes/admin"
+	"github.com/hollis-labs/libs/ui-go/envelopes/admin"
 )
 
 // Resource names the requested operation before any resource lookup. The host

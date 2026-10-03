@@ -13,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
 )
 
 // RunContract exercises a Registry against the v1 invariants. It assumes

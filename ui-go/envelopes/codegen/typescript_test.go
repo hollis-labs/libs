@@ -9,8 +9,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
-	"github.com/hollis-labs/go-envelopes/codegen"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
+	"github.com/hollis-labs/libs/ui-go/envelopes/codegen"
 )
 
 func TestTypeScript_generatesDataTypesAndImportMetadata(t *testing.T) {

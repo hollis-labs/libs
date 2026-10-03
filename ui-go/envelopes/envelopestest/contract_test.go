@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
-	"github.com/hollis-labs/go-envelopes/envelopestest"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
+	"github.com/hollis-labs/libs/ui-go/envelopes/envelopestest"
 )
 
 // TestContract_selfCheck runs the contract against the package's own

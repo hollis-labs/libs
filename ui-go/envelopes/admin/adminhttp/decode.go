@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/go-envelopes/admin"
+	"github.com/hollis-labs/libs/ui-go/envelopes/admin"
 )
 
 // object rejects duplicate members rather than accepting last-key-wins JSON.

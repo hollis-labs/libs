@@ -30,10 +30,10 @@ the CHANGELOG for breaking changes. The wire-format major version
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-envelopes
+go get github.com/hollis-labs/libs/ui-go/envelopes
 ```
 
-Godoc: <https://pkg.go.dev/github.com/hollis-labs/go-envelopes>
+Godoc: <https://pkg.go.dev/github.com/hollis-labs/libs/ui-go/envelopes>
 
 ## Quickstart
 
@@ -44,7 +44,7 @@ import (
 	"context"
 	"log"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
 )
 
 func main() {
@@ -83,10 +83,10 @@ Pin this module in the consuming application's `go.mod`, then run the command
 from that application:
 
 ```sh
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export \
   -format catalog -output envelope-catalog.json
 
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export \
   -format typescript -output envelope-types.generated.ts
 ```
 

@@ -6,15 +6,15 @@ to its own checkout, or maintain another JSON-Schema-to-TypeScript walker.
 
 ## Command
 
-Add a normal `require` for `github.com/hollis-labs/go-envelopes` to the
+Add a normal `require` for `github.com/hollis-labs/libs/ui-go/envelopes` to the
 consumer's `go.mod`. These commands then run the generator from the version
 selected by Minimal Version Selection:
 
 ```sh
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export \
   -format catalog -output build/envelope-catalog.json
 
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export \
   -format typescript -output ui/src/generated/envelope-types.ts
 ```
 
@@ -34,7 +34,7 @@ For a hermetic tool invocation independent of a consumer `go.mod`, suffix the
 package with an exact released version:
 
 ```sh
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export@vX.Y.Z \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export@vX.Y.Z \
   -format catalog
 ```
 
@@ -131,7 +131,7 @@ node scripts/generate-types.mjs --schema-dir ../../libs/go-envelopes/manifest/sc
 After:
 
 ```sh
-go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+go run github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export \
   -format typescript -output ui/src/generated/envelope-types.ts
 ```
 

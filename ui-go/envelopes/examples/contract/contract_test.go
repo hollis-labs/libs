@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
-	"github.com/hollis-labs/go-envelopes/envelopestest"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
+	"github.com/hollis-labs/libs/ui-go/envelopes/envelopestest"
 )
 
 // TestEnvelopesContract pins the public envelope-protocol contract.

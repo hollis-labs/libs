@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"log"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
 )
 
 // pluginManifest is what a plugin-SDK consumer would normally embed

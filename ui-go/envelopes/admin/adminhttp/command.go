@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/hollis-labs/go-envelopes/admin"
+	"github.com/hollis-labs/libs/ui-go/envelopes/admin"
 )
 
 func (h *handler) command(w http.ResponseWriter, r *http.Request, g admin.Group, revision, operation string) {

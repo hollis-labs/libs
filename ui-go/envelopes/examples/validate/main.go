@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"log"
 
-	envelopes "github.com/hollis-labs/go-envelopes"
+	envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
 )
 
 func main() {

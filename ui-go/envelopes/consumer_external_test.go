@@ -34,9 +34,9 @@ func TestExternalConsumer(t *testing.T) {
 
 go 1.26.1
 
-require github.com/hollis-labs/go-envelopes v0.0.0
+require github.com/hollis-labs/libs/ui-go/envelopes v0.0.0
 
-replace github.com/hollis-labs/go-envelopes => %s
+replace github.com/hollis-labs/libs/ui-go/envelopes => %s
 `, repositoryRoot)
 	pluginManifest := "type: demo.notice\nui:\n  component: cards/Notice\n  export: Notice\n"
 	pluginSchema := `{"type":"object","properties":{"message":{"type":"string"}},"required":["message"],"x-plugin-help":"notice"}`
@@ -49,8 +49,8 @@ import (
     "fmt"
     "strings"
 
-    envelopes "github.com/hollis-labs/go-envelopes"
-    "github.com/hollis-labs/go-envelopes/codegen"
+    envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
+    "github.com/hollis-labs/libs/ui-go/envelopes/codegen"
 )
 
 func main() {
@@ -133,7 +133,7 @@ func main() {
 	if err := json.Unmarshal(output, &summary); err != nil {
 		t.Fatalf("decode consumer output: %v\n%s", err, output)
 	}
-	if summary.Module != "github.com/hollis-labs/go-envelopes" || summary.ModuleVersion != "(devel; local replacement)" {
+	if summary.Module != "github.com/hollis-labs/libs/ui-go/envelopes" || summary.ModuleVersion != "(devel; local replacement)" {
 		t.Fatalf("consumer source identity = %q@%q", summary.Module, summary.ModuleVersion)
 	}
 	if !strings.HasPrefix(summary.ManifestDigest, "sha256:") || summary.Types < 2 || summary.Schemas < 2 {
@@ -145,7 +145,7 @@ func main() {
 	}
 
 	command = exec.Command("go", "run", "-mod=mod",
-		"github.com/hollis-labs/go-envelopes/cmd/envelopes-export",
+		"github.com/hollis-labs/libs/ui-go/envelopes/cmd/envelopes-export",
 		"-format", "typescript")
 	command.Dir = consumerDir
 	command.Env = commandEnvironment(map[string]string{"GOWORK": "off"})
@@ -172,7 +172,7 @@ func TestExternalConsumerOrdinarySelectedModuleIdentity(t *testing.T) {
 
 go 1.26.1
 
-require github.com/hollis-labs/go-envelopes %s
+require github.com/hollis-labs/libs/ui-go/envelopes %s
 `, version)
 	program := `package main
 
@@ -181,7 +181,7 @@ import (
     "encoding/json"
     "fmt"
 
-    envelopes "github.com/hollis-labs/go-envelopes"
+    envelopes "github.com/hollis-labs/libs/ui-go/envelopes"
 )
 
 func main() {
@@ -228,7 +228,7 @@ func main() {
 	if err := json.Unmarshal(output[jsonStart:], &source); err != nil {
 		t.Fatalf("decode source identity: %v\n%s", err, output)
 	}
-	if source.Module != "github.com/hollis-labs/go-envelopes" || source.ModuleVersion != version {
+	if source.Module != "github.com/hollis-labs/libs/ui-go/envelopes" || source.ModuleVersion != version {
 		t.Fatalf("ordinary selected module identity = %#v", source)
 	}
 }
@@ -240,7 +240,7 @@ type moduleFile struct {
 
 func writeModuleProxy(t *testing.T, repositoryRoot string) (string, string) {
 	t.Helper()
-	const modulePath = "github.com/hollis-labs/go-envelopes"
+	const modulePath = "github.com/hollis-labs/libs/ui-go/envelopes"
 	files := make([]moduleFile, 0)
 	digest := sha256.New()
 	err := filepath.Walk(repositoryRoot, func(path string, info os.FileInfo, walkErr error) error {
