@@ -15,8 +15,8 @@
 - **Module.** The code is now part of the `github.com/hollis-labs/substrate/harness` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.1.1 v0.1.2 v0.2.0 v0.2.1 v0.2.2) were not carried over; no `harness/vX.Y.Z` tag exists yet.
 - **Placement.** Each package is at the home ADR 0055 gives it. No package clause was renamed, so no importer needs an alias for the move. Examples and fixtures sit next to the package they exercise. The old repository's own files (README, AGENTS.md, CHANGELOG.md, LICENSE, ROADMAP and docs) are in this directory.
 - **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages, the history in `CHANGELOG.md` and prose that still describes the standalone repository are left as written.
-- **Layout.** The old module's root held no Go package; the package lived in its `runtimeevents/` directory and is now `harness/adapters/runtimeevents/` itself. Splitting the canonical event envelope into the mesh root package is the restructure task (CW-20261003-0135), not part of this move.
+- **Layout.** The old module's root held no Go package; the package lived in its `runtimeevents/` directory and is now `harness/adapters/runtimeevents/` itself. Splitting the canonical event envelope into the mesh root package is the restructure task, not part of this move.
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** Everything this unit required is at the same version it had before (it required nothing outside the standard library).
 - **Files not carried to the new location** (git history still has them): `.github`, `.folio.yaml`, `.gitignore`, `go.mod`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.
