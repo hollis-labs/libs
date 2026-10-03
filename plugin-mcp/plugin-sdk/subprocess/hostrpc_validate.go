@@ -396,6 +396,16 @@ func hostRPCCancelResult(base hostRPCRule) hostRPCRule {
 	}
 }
 func parseHostRPCURL(s string) (bool, error) {
+	// url.Parse checks path escapes but leaves malformed query escapes intact.
+	// Validate the complete wire string, matching the TypeScript URL validator.
+	hex := func(b byte) bool {
+		return b >= '0' && b <= '9' || b >= 'a' && b <= 'f' || b >= 'A' && b <= 'F'
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && (i+2 >= len(s) || !hex(s[i+1]) || !hex(s[i+2])) {
+			return false, nil
+		}
+	}
 	u, err := url.Parse(s)
 	if err != nil {
 		return false, err

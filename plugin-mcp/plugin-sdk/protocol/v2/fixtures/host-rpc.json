@@ -447,6 +447,42 @@
       "error": {
         "code": -32602
       }
+    },
+    {
+      "name": "egress malformed path percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/%zz\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": false
+    },
+    {
+      "name": "egress malformed query percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/?x=%zz\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": false
+    },
+    {
+      "name": "egress incomplete path percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/%2\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": false
+    },
+    {
+      "name": "egress incomplete query percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/?x=%\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": false
+    },
+    {
+      "name": "egress valid path percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/%2F\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": true
+    },
+    {
+      "name": "egress valid query percent escape",
+      "schema": "EgressRequestParams",
+      "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/?x=%2F\",\"headers\":[],\"body_base64\":\"e30=\"}",
+      "valid": true
     }
   ],
   "policy": [
