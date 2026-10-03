@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	hooks "github.com/hollis-labs/plugin-hooks"
 	"github.com/hollis-labs/plugin-hooks/hookstest"
@@ -29,6 +30,7 @@ func TestRejectsBrokenAdapters(t *testing.T) {
 		{"panic-siblings", "R07"}, {"once", "R08"}, {"stale-handle", "R09"},
 		{"unload-no-sweep", "R10"}, {"unload-late-output", "R10"}, {"depth", "R11"},
 		{"capacity", "R12"}, {"payload", "R13"}, {"view", "R14"}, {"catalog", "R15"},
+		{"remote-latency", "R16"}, {"remote-veto", "R17"}, {"remote-fence", "R18"}, {"remote-breaker", "R22"},
 	} {
 		t.Run(probe.fault, func(t *testing.T) {
 			// #nosec G204 -- The executable is this test binary; arguments are fixed suite requirement IDs.
@@ -145,6 +147,9 @@ func (s faultScope) AddAction(hook, name string, o hooks.Options, fn hooks.Actio
 	return s.Scope.AddAction(hook, name, o, fn)
 }
 func (d faultDispatcher) ApplyFilters(ctx context.Context, hook string, payload json.RawMessage, meta map[string]string) (hooks.DispatchResult, error) {
+	if d.fault == "remote-breaker" {
+		_ = d.ResetBreaker("owner", "one")
+	}
 	r, err := d.Dispatcher.ApplyFilters(ctx, hook, payload, meta)
 	if d.fault == "unload-late-output" && err != nil {
 		r.Status, r.Value = hooks.Success, json.RawMessage(`{"n":999}`)
@@ -206,4 +211,41 @@ func TestFaultProbe(t *testing.T) {
 		return
 	}
 	hookstest.Run(t, factory)
+}
+
+func (s faultScope) AddRemoteAction(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (hookstest.Handle, error) {
+	remote := s.Scope.(hookstest.RemoteScope)
+	if s.fault == "remote-latency" {
+		r.LatencyEstimate = time.Nanosecond
+	}
+	if s.fault == "remote-veto" {
+		original := r.Handler
+		r.Handler = hooks.RemoteHandlerFunc(func(ctx context.Context, q hooks.RemoteRequest) (hooks.RemoteResult, error) {
+			result, err := original.Handle(ctx, q)
+			if result.Status == hooks.RemoteCancelled || result.Status == hooks.RemoteApprovalRequired {
+				result.Status = hooks.RemoteFailed
+				result.Reason = ""
+				result.Failure = &hooks.RemoteFailure{Code: hooks.HandlerError}
+			}
+			return result, err
+		})
+	}
+	return remote.AddRemoteAction(hook, name, o, r)
+}
+func (s faultScope) AddRemoteFilter(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (hookstest.Handle, error) {
+	if s.fault == "remote-fence" {
+		original := r.Handler
+		r.Handler = hooks.RemoteHandlerFunc(func(ctx context.Context, q hooks.RemoteRequest) (hooks.RemoteResult, error) {
+			result, err := original.Handle(ctx, q)
+			result.InvocationID = q.InvocationID
+			return result, err
+		})
+	}
+	return s.Scope.(hookstest.RemoteScope).AddRemoteFilter(hook, name, o, r)
+}
+func (d faultDispatcher) Breaker(owner, generation string) (hooks.BreakerSnapshot, error) {
+	return d.Dispatcher.(hookstest.RemoteDispatcher).Breaker(owner, generation)
+}
+func (d faultDispatcher) ResetBreaker(owner, generation string) error {
+	return d.Dispatcher.(hookstest.RemoteDispatcher).ResetBreaker(owner, generation)
 }

@@ -75,6 +75,9 @@ type Definition struct {
 	Since                                        string
 	Deprecated                                   *Deprecation
 	RemoteOK                                     *bool
+	RemoteLatencyBudget                          time.Duration
+	RemoteBatchMax                               int
+	RemoteFireAndForget                          bool
 	Budget, HandlerTimeout                       time.Duration
 	OnErrorDefault                               ErrorPolicy
 	AllowedOnError                               []ErrorPolicy
@@ -124,6 +127,20 @@ func validateDefinition(d Definition) error {
 	}
 	if d.RemoteOK == nil || d.Budget <= 0 || d.HandlerTimeout <= 0 || d.HandlerTimeout > d.Budget || d.MaxPayloadBytes <= 0 || d.MaxHandlers <= 0 || d.MaxParallelism <= 0 {
 		return bad("explicit finite policy limits required")
+	}
+	if *d.RemoteOK {
+		if d.RemoteLatencyBudget <= 0 || d.RemoteLatencyBudget > d.HandlerTimeout {
+			return bad("remote latency budget required within handler timeout")
+		}
+	} else if d.RemoteLatencyBudget != 0 || d.RemoteBatchMax != 0 || d.RemoteFireAndForget {
+		return bad("remote policy requires remote_ok")
+	}
+	observation := d.Kind == Action && (d.Mode == Sequential || d.Mode == Parallel || d.Mode == Async || d.Mode == AfterCommit)
+	if d.RemoteBatchMax < 0 || d.RemoteBatchMax > 64 || (d.RemoteBatchMax != 0 && !observation) {
+		return bad("remote batch cap must be 1..64 for observation actions, or zero for default")
+	}
+	if d.RemoteFireAndForget && (d.Kind != Action || (d.Mode != Async && d.Mode != AfterCommit)) {
+		return bad("remote fire-and-forget requires async or after_commit action")
 	}
 	validSchema := func(s json.RawMessage) bool {
 		var v map[string]json.RawMessage

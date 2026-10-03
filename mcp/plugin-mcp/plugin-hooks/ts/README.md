@@ -189,3 +189,16 @@ The pack check is dry-run only. No npm publication workflow is installed.
 
 Breaker/telemetry seams, remote wire, schema compilation, UI adoption and durable
 execution are future integrations. The twin does not include the Go breaker/sink.
+
+## Remote catalog policy
+
+The Go catalog now accepts optional `remote_latency_budget_ms`, `remote_batch_max`
+and `remote_fire_and_forget` fields. Remote-enabled declarations require a positive
+latency ceiling within handler timeout. Batch cap zero/omitted means 64, with only
+1..64 overrides for remote observation actions; notification opt-in defaults off
+and requires remote async/after_commit actions. The reader validates these fields
+in lockstep with Go. There is no independent catalog document-format version.
+Existing remote-enabled documents must add the latency field. Local zero/default
+fields may remain omitted. Remote scopes refuse in-process callbacks; the twin
+implements catalog/preflight policy but does not implement the Go remote transport
+seam. See the repository's [single-call contract](../docs/remote.md).

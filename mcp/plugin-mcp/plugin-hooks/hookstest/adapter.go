@@ -82,3 +82,31 @@ func (s engineScope) Remove(token Handle) {
 	}
 }
 func (s engineScope) Dispose(ctx context.Context) error { return s.scope.Dispose(ctx) }
+
+// RemoteScope extends the scope capability for a host's transport adapter.
+// A factory used with Run must implement it to meet the remote requirements.
+type RemoteScope interface {
+	Scope
+	AddRemoteAction(string, string, hooks.Options, hooks.RemoteRegistration) (Handle, error)
+	AddRemoteFilter(string, string, hooks.Options, hooks.RemoteRegistration) (Handle, error)
+}
+
+// RemoteDispatcher exposes operator state for remote failure-accounting probes.
+type RemoteDispatcher interface {
+	Dispatcher
+	Breaker(string, string) (hooks.BreakerSnapshot, error)
+	ResetBreaker(string, string) error
+}
+
+func (a *engineAdapter) Breaker(owner, generation string) (hooks.BreakerSnapshot, error) {
+	return a.engine.Breaker(owner, generation)
+}
+func (a *engineAdapter) ResetBreaker(owner, generation string) error {
+	return a.engine.ResetBreaker(owner, generation)
+}
+func (s engineScope) AddRemoteAction(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (Handle, error) {
+	return s.scope.AddRemoteAction(hook, name, o, r)
+}
+func (s engineScope) AddRemoteFilter(hook, name string, o hooks.Options, r hooks.RemoteRegistration) (Handle, error) {
+	return s.scope.AddRemoteFilter(hook, name, o, r)
+}

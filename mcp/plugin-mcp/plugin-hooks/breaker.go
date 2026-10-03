@@ -105,6 +105,10 @@ func (e *Engine) admitBreaker(key scopeKey) (breakerTicket, error) {
 	return ticket, err
 }
 func excludedBreakerError(err error) bool {
+	var remote *RemoteFailure
+	if errors.As(err, &remote) {
+		return remote.admission
+	}
 	return errors.Is(err, ErrCancelled) || errors.Is(err, ErrApprovalRequired) || errors.Is(err, ErrDepthExceeded)
 }
 func (e *Engine) completeBreaker(ticket breakerTicket, err error, excluded bool, class string) BreakerSnapshot {
@@ -251,7 +255,7 @@ func (call *observedCall) finish(err error) string {
 	call.once.Do(func() {
 		e := call.engine
 		e.registry.mu.Lock()
-		removed := call.entry.removed || call.entry.scope.disposed
+		removed := call.entry.removed || call.entry.scope.disposed || remoteEntryUnavailable(call.entry)
 		e.registry.mu.Unlock()
 		excluded := !call.started || removed || call.dispatch.ctx.Err() != nil
 		class := classify(err)

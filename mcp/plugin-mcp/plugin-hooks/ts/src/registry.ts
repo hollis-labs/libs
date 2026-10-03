@@ -78,6 +78,7 @@ export interface State {
   key: string;
   allowed: Set<string>;
   disposed: boolean;
+  remote: boolean;
   active: Set<Promise<unknown>>;
 }
 // Internal storage is module-private; plugin scope objects expose no registry reference.
@@ -170,6 +171,7 @@ export class Registry {
       key,
       allowed,
       disposed: false,
+      remote: config.remote ?? false,
       active: new Set(),
     };
     d.states.set(key, state);
@@ -291,6 +293,7 @@ export class Scope {
     const policy = this.validateRegistration(hook, name, kind, options);
     if (typeof handler !== "function") fail("invalid_options");
     const { registry, state } = scopeData(this);
+    if (state.remote) fail("unauthorized");
     const d = data(registry);
     const entries = [...d.entries.values()];
     if (

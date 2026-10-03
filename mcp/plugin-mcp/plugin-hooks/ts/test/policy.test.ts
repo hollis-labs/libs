@@ -53,9 +53,13 @@ describe("shared registration policy", () => {
           tc.kind ?? "action",
           tc.options ?? {},
         );
-        if (tc.operation === "duplicate") {
+        if (
+          tc.operation === "duplicate" ||
+          tc.operation === "inprocess_registration"
+        ) {
           s.addAction(hook, name, tc.options ?? {}, () => {});
-          s.addAction(hook, name, tc.options ?? {}, () => {});
+          if (tc.operation === "duplicate")
+            s.addAction(hook, name, tc.options ?? {}, () => {});
         }
       }).toThrowError(expect.objectContaining({ code: tc.error }));
     });

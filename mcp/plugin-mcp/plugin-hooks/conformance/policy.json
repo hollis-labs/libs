@@ -208,5 +208,96 @@
     "patch": {
       "input_schema": null
     }
+  },
+  {
+    "name": "remote-without-latency",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true
+    }
+  },
+  {
+    "name": "local-with-latency",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_latency_budget_ms": 10
+    }
+  },
+  {
+    "name": "remote-latency-above-handler",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": 101
+    }
+  },
+  {
+    "name": "remote-batch-too-large",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": 50,
+      "remote_batch_max": 65
+    }
+  },
+  {
+    "name": "remote-gate-cannot-batch",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": 50,
+      "remote_batch_max": 1,
+      "mode": "bail"
+    }
+  },
+  {
+    "name": "remote-sequential-cannot-notify",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": 50,
+      "remote_fire_and_forget": true
+    }
+  },
+  {
+    "name": "remote-negative-latency",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": -1
+    }
+  },
+  {
+    "name": "local-batch-forbidden",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_batch_max": 2
+    }
+  },
+  {
+    "name": "local-notification-forbidden",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "remote_fire_and_forget": true
+    }
+  },
+  {
+    "name": "remote-scope-cannot-register-local-handler",
+    "operation": "inprocess_registration",
+    "error": "unauthorized",
+    "remote": true,
+    "patch": {
+      "remote_ok": true,
+      "remote_latency_budget_ms": 50
+    }
   }
 ]

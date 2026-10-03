@@ -21,26 +21,29 @@ type CatalogDocument struct {
 // DefinitionDocument carries inline schemas and explicit policy, without Go
 // functions. Durations are milliseconds (fractional for sub-millisecond limits).
 type DefinitionDocument struct {
-	Name             string              `json:"name"`
-	OwnerNamespace   string              `json:"owner_namespace,omitempty"`
-	Kind             Kind                `json:"kind"`
-	Mode             Mode                `json:"mode"`
-	InputSchema      json.RawMessage     `json:"input_schema"`
-	OutputSchema     json.RawMessage     `json:"output_schema,omitempty"`
-	MutablePaths     []string            `json:"mutable_paths"`
-	Since            string              `json:"since"`
-	Deprecated       *Deprecation        `json:"deprecated,omitempty"`
-	RemoteOK         *bool               `json:"remote_ok"`
-	BudgetMS         float64             `json:"budget_ms"`
-	HandlerTimeoutMS float64             `json:"handler_timeout_ms"`
-	OnErrorDefault   ErrorPolicy         `json:"on_error_default"`
-	AllowedOnError   []ErrorPolicy       `json:"allowed_on_error"`
-	MaxPayloadBytes  int                 `json:"max_payload_bytes"`
-	MaxHandlers      int                 `json:"max_handlers"`
-	MaxParallelism   int                 `json:"max_parallelism"`
-	Views            map[string][]string `json:"views"`
-	RequiredView     string              `json:"required_view,omitempty"`
-	SchemaDigest     string              `json:"schema_digest"`
+	Name                  string              `json:"name"`
+	OwnerNamespace        string              `json:"owner_namespace,omitempty"`
+	Kind                  Kind                `json:"kind"`
+	Mode                  Mode                `json:"mode"`
+	InputSchema           json.RawMessage     `json:"input_schema"`
+	OutputSchema          json.RawMessage     `json:"output_schema,omitempty"`
+	MutablePaths          []string            `json:"mutable_paths"`
+	Since                 string              `json:"since"`
+	Deprecated            *Deprecation        `json:"deprecated,omitempty"`
+	RemoteOK              *bool               `json:"remote_ok"`
+	RemoteLatencyBudgetMS float64             `json:"remote_latency_budget_ms,omitempty"`
+	RemoteBatchMax        int                 `json:"remote_batch_max,omitempty"`
+	RemoteFireAndForget   bool                `json:"remote_fire_and_forget,omitempty"`
+	BudgetMS              float64             `json:"budget_ms"`
+	HandlerTimeoutMS      float64             `json:"handler_timeout_ms"`
+	OnErrorDefault        ErrorPolicy         `json:"on_error_default"`
+	AllowedOnError        []ErrorPolicy       `json:"allowed_on_error"`
+	MaxPayloadBytes       int                 `json:"max_payload_bytes"`
+	MaxHandlers           int                 `json:"max_handlers"`
+	MaxParallelism        int                 `json:"max_parallelism"`
+	Views                 map[string][]string `json:"views"`
+	RequiredView          string              `json:"required_view,omitempty"`
+	SchemaDigest          string              `json:"schema_digest"`
 }
 
 func definitionDocument(d Definition) DefinitionDocument {
@@ -55,6 +58,7 @@ func definitionDocument(d Definition) DefinitionDocument {
 		Name: d.Name, OwnerNamespace: d.OwnerNamespace, Kind: d.Kind, Mode: d.Mode,
 		InputSchema: d.InputSchema, OutputSchema: d.OutputSchema, MutablePaths: d.MutablePaths,
 		Since: d.Since, Deprecated: d.Deprecated, RemoteOK: d.RemoteOK,
+		RemoteLatencyBudgetMS: float64(d.RemoteLatencyBudget) / float64(time.Millisecond), RemoteBatchMax: d.RemoteBatchMax, RemoteFireAndForget: d.RemoteFireAndForget,
 		BudgetMS:         float64(d.Budget) / float64(time.Millisecond),
 		HandlerTimeoutMS: float64(d.HandlerTimeout) / float64(time.Millisecond),
 		OnErrorDefault:   d.OnErrorDefault, AllowedOnError: d.AllowedOnError,

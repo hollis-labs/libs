@@ -55,7 +55,7 @@ func corpusValidator(raw json.RawMessage) error {
 func corpusCatalog(doc CatalogDocument) Catalog {
 	c := Catalog{Version: doc.CatalogVersion}
 	for _, d := range doc.Definitions {
-		v := Definition{Name: d.Name, OwnerNamespace: d.OwnerNamespace, Kind: d.Kind, Mode: d.Mode, InputSchema: d.InputSchema, OutputSchema: d.OutputSchema, MutablePaths: d.MutablePaths, Since: d.Since, Deprecated: d.Deprecated, RemoteOK: d.RemoteOK, Budget: time.Duration(d.BudgetMS * float64(time.Millisecond)), HandlerTimeout: time.Duration(d.HandlerTimeoutMS * float64(time.Millisecond)), OnErrorDefault: d.OnErrorDefault, AllowedOnError: d.AllowedOnError, MaxPayloadBytes: d.MaxPayloadBytes, MaxHandlers: d.MaxHandlers, MaxParallelism: d.MaxParallelism, Views: d.Views, RequiredView: d.RequiredView, SchemaDigest: d.SchemaDigest, ValidateInput: corpusValidator}
+		v := Definition{Name: d.Name, OwnerNamespace: d.OwnerNamespace, Kind: d.Kind, Mode: d.Mode, InputSchema: d.InputSchema, OutputSchema: d.OutputSchema, MutablePaths: d.MutablePaths, Since: d.Since, Deprecated: d.Deprecated, RemoteOK: d.RemoteOK, RemoteLatencyBudget: time.Duration(d.RemoteLatencyBudgetMS * float64(time.Millisecond)), RemoteBatchMax: d.RemoteBatchMax, RemoteFireAndForget: d.RemoteFireAndForget, Budget: time.Duration(d.BudgetMS * float64(time.Millisecond)), HandlerTimeout: time.Duration(d.HandlerTimeoutMS * float64(time.Millisecond)), OnErrorDefault: d.OnErrorDefault, AllowedOnError: d.AllowedOnError, MaxPayloadBytes: d.MaxPayloadBytes, MaxHandlers: d.MaxHandlers, MaxParallelism: d.MaxParallelism, Views: d.Views, RequiredView: d.RequiredView, SchemaDigest: d.SchemaDigest, ValidateInput: corpusValidator}
 		if v.Kind == Filter {
 			v.ValidateOutput = corpusValidator
 		}
@@ -332,9 +332,9 @@ func TestSharedPolicyConformance(t *testing.T) {
 							options.Timeout = &v
 						}
 						_, got = scope.ValidateRegistration(hook, name, kind, options)
-						if got == nil && tc.Operation == "duplicate" {
+						if got == nil && (tc.Operation == "duplicate" || tc.Operation == "inprocess_registration") {
 							_, got = scope.AddAction(hook, name, options, func(context.Context, Invocation) error { return nil })
-							if got == nil {
+							if got == nil && tc.Operation == "duplicate" {
 								_, got = scope.AddAction(hook, name, options, func(context.Context, Invocation) error { return nil })
 							}
 						}
