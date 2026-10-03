@@ -374,3 +374,48 @@ func TestPublicBindingCollisionAndNestedDuplicateJSON(t *testing.T) {
 		t.Fatal("nested duplicate key accepted")
 	}
 }
+
+func TestRevokeRemovesOnlyMatchingGenerationRefusals(t *testing.T) {
+	r := validResponse()
+	r.Refusals = []Refusal{
+		{OwnerID: "notes", OwnerGeneration: "1", Kind: "future", LocalKey: "a", Reason: "unsupported-kind"},
+		{OwnerID: "notes", OwnerGeneration: "older", Kind: "future", LocalKey: "b", Reason: "unsupported-kind"},
+		{OwnerID: "other", OwnerGeneration: "1", Kind: "future", LocalKey: "c", Reason: "unsupported-kind"},
+	}
+	catalog := NewCatalog(r.HostInstance)
+	if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+		t.Fatal(err)
+	}
+	if err := catalog.Revoke("notes", "1"); err != nil {
+		t.Fatal(err)
+	}
+	want := r.Refusals[1:]
+	if !reflect.DeepEqual(catalog.Snapshot().Refusals, want) {
+		t.Fatal("matching refusals survived or unrelated refusal removed")
+	}
+}
+
+func TestKnownWireFieldsRequireExactCase(t *testing.T) {
+	cases := []struct {
+		name   string
+		target any
+		raw    string
+	}{
+		{"response", new(Response), `{"Revision":1}`},
+		{"plugin", new(Plugin), `{"Owner_generation":"1"}`},
+		{"runtime", new(Runtime), `{"Name":"react"}`},
+		{"contribution", new(Contribution), `{"Required":false}`},
+		{"refusal", new(Refusal), `{"Required":false}`},
+		{"kind", new(KindDescriptor), `{"Schema_version":1}`},
+		{"region", new(RegionDescriptor), `{"Ordering":"manifest"}`},
+		{"component", new(ComponentRef), `{"Export":"Panel"}`},
+		{"handler", new(HandlerRef), `{"Id":"handle"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !errors.Is(json.Unmarshal([]byte(tc.raw), tc.target), ErrInvalidContribution) {
+				t.Fatal("mis-cased known field accepted")
+			}
+		})
+	}
+}
