@@ -38,12 +38,24 @@
           "protocol": 2,
           "capability_contract": 1
         }
-      }
+      },
+      "crlf": true
     },
     {
-      "raw": "x",
-      "repeat": 8388608
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "pad_bytes": 8388606,
+      "crlf": true,
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "ok": true
+        }
+      }
     }
-  ],
-  "termination": "frame-too-large"
+  ]
 }

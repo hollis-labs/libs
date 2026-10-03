@@ -38,7 +38,7 @@ for (const name of names) {
       if (step.pad_bytes) frame += ' '.repeat(step.pad_bytes - Buffer.byteLength(frame));
       if (step.repeat) frame = frame.repeat(step.repeat);
       // The reader may terminate while accepting an oversized frame.
-      input.write(frame + '\n');
+      input.write(frame + (step.crlf ? '\r\n' : '\n'));
       if (step.expect === undefined) continue;
       const reply = await replies.next();
       assert.equal(reply.done, false, 'stdout closed before expected reply');
