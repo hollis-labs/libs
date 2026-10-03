@@ -14,6 +14,7 @@ All notable changes to the `harness` module are documented here. The format foll
 - Requirement: `gopkg.in/yaml.v3` v3.0.1 (from `go-permission`).
 - The packages of three more former modules, moved in with their git history at their final homes: `sandbox` (from `go-sandbox`), `adapters/provider` with `provider/events`, `adapters/providertest`, `adapters/registry` and `adapters/layout` with `gen` and `layouttest` (from `go-providers`), and `runner` with `internal/stubcli` (from `go-runner`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/` with a `MIGRATION.md`; the layout documents are in `adapters/layout/docs/`.
 - Requirements: `github.com/creack/pty` v1.1.24 (from `go-providers` and `go-runner`) and `github.com/hollis-labs/substrate/llm-core` v0.1.0, which replaces the old `go-llm-types`, `go-llm-contracts` and `agent-contracts-leaf` requirements.
+- The packages of `agentkit`, moved in with their git history: `adapters/agentsessions` (with `compliance`), `adapters/{checkpoint,loopback,runtimebind,sessionkit,turn}`, `agentlaunch` (with `launcher`, `matrix`, `parity`, `catalog`, `contexthook` and `sessionshim`), `workspace/{bootdir,providerplant}`, `agentcontext` (with `resolvers` and `skills`) and `broker`. `agentcontext`, `contexthook`, `catalog`, `sessionshim` and `broker` stay in this module for now. The umbrella root, the `agentruntime` facade and `agentruntime/smoke` are not carried. No package clause or symbol was renamed. Its README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/agentkit/` with a `MIGRATION.md`.
 - Stdio process shim library and separate `cairn-shim` executable with a private
   authenticated Unix controller, durable shared event journal, replay, bounded
   immediate input/signals, generation-use pins and launch-time limits.
@@ -24,6 +25,7 @@ All notable changes to the `harness` module are documented here. The format foll
 
 - `adapters/layout/gen` writes `adapters/layout/layout.json` and `adapters/layout/docs/LAYOUT.md`, the files' new locations relative to the module root (the generator's two path constants; it would otherwise have written `layout/layout.json` and `docs/LAYOUT.md` next to the module root).
 - Code that pinned a sibling at a tag now builds against the sibling's source at its old repository's `main`: `runner` (was `go-providers` v0.26.0, `go-sandbox` v0.3.0, `go-llm-types` v0.3.0), `adapters/provider` (was `go-llm-contracts` v0.1.0, `go-permission` v0.1.0) and `sandbox` (was `go-safefs` v0.1.0).
+- `agentkit`'s code, which pinned `go-materialize` v0.1.0, `go-permission` v0.1.0, `go-providers` v0.46.0, `go-runner` v0.8.2, `go-sandbox` v0.6.0 and `go-safefs` v0.1.0 at tags, builds against their packages in this module, and its llm-core requirements are `llm-core` v0.1.0.
 
 ### Fixed
 

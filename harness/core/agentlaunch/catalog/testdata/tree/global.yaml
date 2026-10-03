@@ -1,0 +1,20 @@
+version: 0.1.0
+catalog:
+  roots:
+    projects: projects
+    agents: agents
+    providers: providers
+    launches: launches
+    boot: boot
+  defaults:
+    workspace_root: ~/.tether/workspaces
+    state_db: ~/.tether/state/tether.db
+    temp_root: ~/.tether/tmp
+# daemon controls the muxd long-lived process (see ADR 0002). Omitting the
+# block takes the documented defaults: unix socket + pid file under
+# ~/.tether/run/, 10-second shutdown timeout. Uncomment + override to
+# point at a different transport (e.g., tcp:127.0.0.1:7180 for debugging).
+# daemon:
+#   listen_addr: unix:~/.tether/run/muxd.sock
+#   pid_file: ~/.tether/run/muxd.pid
+#   shutdown_timeout: 10s
