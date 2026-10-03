@@ -10,15 +10,18 @@
  * renders React components — is at `@hollis-labs/plugin-registry/react` and
  * takes React as an optional peer.
  */
-export { PROTOCOL } from './types.js'
+export { PROTOCOL } from "./types.js";
 export type {
   PluginRegistryResponse,
   RegistryContribution,
   RegistryPlugin,
   RegistryRuntime,
-} from './types.js'
+  KindDescriptor,
+  RegionDescriptor,
+  Representation,
+} from "./types.js";
 
-export { createPluginRegistry } from './loader.js'
+export { createPluginRegistry } from "./loader.js";
 export type {
   AdoptedContribution,
   DeclaredContribution,
@@ -26,15 +29,28 @@ export type {
   PluginLoadError,
   PluginRegistry,
   PluginRegistryOptions,
+  VerifiedBundle,
   PluginRegistrySnapshot,
   Refusal,
   ResolvedContribution,
   SyncResult,
-} from './loader.js'
+} from "./loader.js";
 
 export {
   createLinkStylesheetSink,
   createNullStylesheetSink,
   defaultStylesheetSink,
-} from './stylesheets.js'
-export type { DocumentLike, LinkElementLike, StylesheetSink } from './stylesheets.js'
+} from "./stylesheets.js";
+export type {
+  DocumentLike,
+  LinkElementLike,
+  StylesheetSink,
+} from "./stylesheets.js";
+
+export { qualifiedKey } from "./types.js";
+export { bundleDigest } from "./loader.js";
+export { validateResponse, planResponse } from "./validation.js";
+export type { AdmissionPolicy, Plan } from "./validation.js";
+export { checkRuntimes } from "./version.js";
+
+export { parseRegistryResponse, RegistryError } from "./parse.js";

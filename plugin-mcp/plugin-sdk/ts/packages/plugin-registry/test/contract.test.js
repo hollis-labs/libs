@@ -1,62 +1,163 @@
-/**
- * The wire contract's own invariants.
- *
- * The Go view of this contract lives in `libs/plugin-sdk/registry/` and pins
- * the same protocol number in `TestProtocolLockedAt1`. Neither side generates
- * the other. Each side pins the version and round-trips its own types, so a
- * host and a loader built at different versions disagree about the protocol
- * number — which a loader reports at runtime — rather than about a field,
- * which nothing would notice. `contract-fixtures.test.js` adds fixtures frozen
- * per released protocol, shared with the Go half.
- */
-import { test } from 'node:test'
-import assert from 'node:assert/strict'
-import { PROTOCOL } from '../dist/index.js'
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  PROTOCOL,
+  parseRegistryResponse,
+  RegistryError,
+  validateResponse,
+  checkRuntimes,
+} from "../dist/index.js";
+import { response } from "./helpers.js";
 
-test('protocol is locked at 1', () => {
-  assert.equal(
-    PROTOCOL,
-    1,
-    'bump registry.Protocol in the Go half in the same change, or a host and a loader stop agreeing',
-  )
-})
-
-test('a full response survives a JSON round trip unchanged', () => {
-  const response = {
-    protocol: PROTOCOL,
-    plugins: {
-      'acme.widgets': {
-        bundle_url: '/api/plugins/acme.widgets/ui/index.js',
-        stylesheet_url: '/api/plugins/acme.widgets/ui/index.css',
-        bundle_version: '1757600000000',
-        runtime: { name: 'react', version: '^19.0.0' },
-      },
+test("protocol is locked at 2; protocol 1 has no fallback", () => {
+  assert.equal(PROTOCOL, 2);
+  assert.equal(validateResponse({ ...response(), protocol: 1 }), "ErrProtocol");
+});
+test("raw parser rejects exact, escaped and case-variant duplicate keys at every depth", () => {
+  for (const raw of [
+    '{"revision":1,"revision":2}',
+    '{"required":true,"REQUIRED":false}',
+    '{"x":{"a":1,"\\u0061":2}}',
+    '{"metadata":{"key":1,"KEY":2}}',
+  ])
+    assert.throws(
+      () => parseRegistryResponse(raw),
+      (err) => err instanceof RegistryError && err.code === "ErrCollision",
+    );
+});
+test("raw parser preserves escaped strings and nested arrays", () => {
+  const c = response();
+  c.contributions.panel["p/main"].metadata = {
+    value: 'quote: " and escape \\',
+    array: [null, { nested: "a" }],
+  };
+  assert.deepEqual(parseRegistryResponse(JSON.stringify(c)), c);
+});
+test("raw parser fails invalid JSON and malformed input with typed errors", () => {
+  for (const raw of ["{", '{"a":1,}', "true", "{}", '{"a":1} garbage'])
+    assert.throws(() => parseRegistryResponse(raw), RegistryError);
+});
+test("mis-cased known fields are rejected rather than treated as unknown extensions", () => {
+  for (const mutate of [
+    (r) => {
+      r.Revision = r.revision;
+      delete r.revision;
     },
-    contributions: {
-      envelope: {
-        'acme.report': { plugin_id: 'acme.widgets', export: 'ReportView', meta: { version: 2 } },
-      },
-      slot: {
-        'acme.nav': {
-          plugin_id: 'acme.widgets',
-          export: 'AcmeNavPage',
-          meta: { slot: 'nav-rail', priority: 10, label: 'Acme', props: {} },
-        },
-      },
+    (r) => {
+      r.plugins.p.Bundle_URL = r.plugins.p.bundle_url;
+      delete r.plugins.p.bundle_url;
     },
+    (r) => {
+      r.contributions.panel["p/main"].Required = true;
+      delete r.contributions.panel["p/main"].required;
+    },
+  ]) {
+    const c = response();
+    mutate(c);
+    assert.equal(validateResponse(c), "ErrInvalidContribution");
   }
-
-  assert.deepEqual(JSON.parse(JSON.stringify(response)), response)
-})
-
-test('contribution meta is opaque — arbitrary host shapes survive', () => {
-  const meta = { nested: { deep: [1, 2, { x: null }] }, unicode: 'café' }
-  const round = JSON.parse(
-    JSON.stringify({
-      protocol: PROTOCOL,
-      plugins: { p: { bundle_url: '/p.js' } },
-      contributions: { whatever: { k: { plugin_id: 'p', export: 'E', meta } } },
+});
+test("missing/null mandatory booleans and forbidden null representation fields fail", () => {
+  for (const mutate of [
+    (r) => delete r.contributions.panel["p/main"].required,
+    (r) => (r.contributions.panel["p/main"].required = null),
+    (r) => (r.contributions.panel["p/main"].declarative = null),
+    (r) =>
+      r.refusals.push({
+        owner_id: "p",
+        owner_generation: "1",
+        kind: "panel",
+        local_key: "x",
+        reason: "unsupported-kind",
+      }),
+  ]) {
+    const c = response();
+    mutate(c);
+    assert.equal(validateResponse(c), "ErrInvalidContribution");
+  }
+});
+test("structural validation refuses inherited and non-JSON values", () => {
+  const inherited = Object.create(response());
+  assert.equal(validateResponse(inherited), "ErrProtocol");
+  const c = response();
+  c.plugins = Object.create(c.plugins);
+  assert.equal(validateResponse(c), "ErrInvalidContribution");
+  for (const value of [undefined, Infinity, new Date(), () => null]) {
+    const c = response();
+    c.contributions.panel["p/main"].metadata = value;
+    assert.equal(validateResponse(c), "ErrInvalidContribution");
+  }
+  const cycle = {};
+  cycle.self = cycle;
+  const cyc = response();
+  cyc.contributions.panel["p/main"].metadata = cycle;
+  assert.equal(validateResponse(cyc), "ErrInvalidContribution");
+});
+test("inherited owner records do not satisfy an explicit declaration", () => {
+  const c = response();
+  delete c.plugins.p;
+  c.contributions.panel = {
+    "constructor/main": {
+      ...c.contributions.panel["p/main"],
+      owner_id: "constructor",
+    },
+  };
+  assert.equal(validateResponse(c), "ErrUnknownPlugin");
+});
+test("unsafe revisions, non-digests and public binding collisions fail", () => {
+  for (const revision of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])
+    assert.equal(
+      validateResponse({ ...response(), revision }),
+      "ErrInvalidContribution",
+    );
+  const c = response();
+  c.plugins.p.bundle_version = "mtime";
+  assert.equal(validateResponse(c), "ErrIntegrity");
+  const dupe = response();
+  dupe.contributions.panel["p/main"].public_binding = "same";
+  dupe.contributions.panel["p/other"] = {
+    ...dupe.contributions.panel["p/main"],
+    local_key: "other",
+  };
+  assert.equal(validateResponse(dupe), "ErrCollision");
+});
+test("normalized runtime bounds use inclusive numeric semantic ordering", () => {
+  assert.equal(
+    checkRuntimes([{ name: "react", min: "19.2.0", max: "19.10.0" }], {
+      react: "19.10.0",
     }),
-  )
-  assert.deepEqual(round.contributions.whatever.k.meta, meta)
-})
+    true,
+  );
+  assert.equal(
+    checkRuntimes([{ name: "react", min: "19.10.0" }], { react: "19.2.0" }),
+    false,
+  );
+  for (const versions of [{}, { react: "^19.0.0" }, { react: "19.0.0-beta.1" }])
+    assert.equal(
+      checkRuntimes([{ name: "react", min: "19.0.0" }], versions),
+      false,
+    );
+  assert.equal(
+    checkRuntimes(
+      [{ name: "react", min: "19.0.0-beta.1", max: "19.0.0" }],
+      { react: "19.0.0-beta.2" },
+      true,
+    ),
+    true,
+  );
+  assert.equal(
+    checkRuntimes(
+      [{ name: "react", min: "19.0.0-beta.2" }],
+      { react: "19.0.0-beta.10" },
+      true,
+    ),
+    true,
+  );
+  assert.equal(
+    checkRuntimes(
+      [{ name: "react", min: "19.0.0" }],
+      Object.create({ react: "19.0.0" }),
+    ),
+    false,
+  );
+});
