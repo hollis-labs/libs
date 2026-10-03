@@ -1,0 +1,284 @@
+# go-envelopes
+
+`go-envelopes` is the shared Go primitive library for the **Envelope UI
+Protocol** — a small wire format for typed, host-rendered payloads that
+agents send to host applications. The package ships a manifest-driven
+type registry, JSON-Schema validator, and plugin extension API for
+runtime registration of additional envelope types. The same module also owns
+the build-time catalog and TypeScript generator, so consumers do not need a
+sibling checkout of this repository.
+
+The root envelope packages are transport-agnostic; MCP/SSE and envelope
+storage remain host concerns. The module also owns the independent admin
+contract in [`admin`](admin/README.md): app declarations, scalar settings
+validation and redacted snapshots. The optional
+[`admin/adminhttp`](admin/adminhttp/README.md) binding serves caller-specific
+declarations and guarded commands on a host-mounted handler. It is the only
+package permitted to import `net/http` and starts no server or lifecycle action.
+Root envelope packages must not import
+`admin`. Admin declarations are not entries in the envelope type catalog.
+Storage, authentication/authorization, resolution and lifecycle remain
+host-owned. `admin.ContractVersion` is independent of the module version
+and `Envelope.V`.
+
+## Status
+
+`v0.5.x` — pre-1.0. Public API may shift between minor versions; see
+the CHANGELOG for breaking changes. The wire-format major version
+(`Envelope.V`) is independent of the library version.
+
+## Install
+
+```sh
+go get github.com/hollis-labs/go-envelopes
+```
+
+Godoc: <https://pkg.go.dev/github.com/hollis-labs/go-envelopes>
+
+## Quickstart
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	envelopes "github.com/hollis-labs/go-envelopes"
+)
+
+func main() {
+	reg, err := envelopes.LoadCore(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	env := &envelopes.Envelope{
+		V:    envelopes.ProtocolVersion,
+		ID:   "env_demo_1",
+		Type: "info-card",
+		Data: map[string]any{
+			"title": "Hello",
+			"body":  "world",
+		},
+	}
+	if err := reg.ValidateEnvelope(env); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+More runnable examples live under [`examples/`](examples/):
+
+- `examples/validate` — load the core registry and validate a known-good
+  envelope. Run with `go run ./examples/validate`.
+- `examples/plugin` — register a plugin-owned envelope type at runtime.
+  Run with `go run ./examples/plugin`.
+- `examples/contract` — wire `envelopestest.RunContract` into a host's
+  test suite. Run with `go test ./examples/contract`.
+
+## Build-time generation
+
+Pin this module in the consuming application's `go.mod`, then run the command
+from that application:
+
+```sh
+go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+  -format catalog -output envelope-catalog.json
+
+go run github.com/hollis-labs/go-envelopes/cmd/envelopes-export \
+  -format typescript -output envelope-types.generated.ts
+```
+
+Both outputs state the selected module version, protocol version, and manifest
+digest. The catalog contains the embedded YAML manifest, manifest schema,
+per-type JSON Schemas, annotations, and any plugin-supplied component import
+metadata. The TypeScript data types are host-neutral: they derive from the JSON
+Schemas alone and prescribe no React, loader, or presentation wording. Core
+envelope types carry no component binding at all — the manifest asserts wire
+identity only, so `ENVELOPE_IMPORT_METADATA` is empty for a core-only catalog.
+
+Go-based generators and plugin hosts can use the same surface directly:
+
+```go
+catalog, err := registry.ExportCatalog()
+if err != nil {
+    return err
+}
+source, err := codegen.TypeScript(catalog, codegen.TypeScriptOptions{})
+```
+
+See [`docs/generation.md`](docs/generation.md) for migration and plugin examples.
+
+## Structured validation
+
+Schema failures remain compatible with `errors.Is(err,
+envelopes.ErrSchemaValidation)` and now expose bounded structured details:
+
+```go
+var validationErr *envelopes.ValidationError
+if errors.As(err, &validationErr) {
+    for _, failure := range validationErr.Details() {
+        log.Printf("instance=%s schema=%s keyword=%s expected=%v actual=%v",
+            failure.InstancePath, failure.SchemaPath, failure.Keyword,
+            failure.Expected, failure.Actual)
+    }
+}
+```
+
+`TypeSpec.DataSchemaDocument` exposes parsed `SchemaMetadata`, including custom
+annotation keywords, without requiring consumers to reopen embedded files.
+Hosts decide how those facts are worded or presented to users.
+
+`ValidationError.Error()` and `Details()` are safe bounded diagnostic surfaces.
+The raw validator error remains available through `errors.As` for compatibility,
+but may contain rejected payload values and should not be logged.
+
+## Declaring which types you support
+
+A host that adopts the core catalog wholesale imports every type in it,
+including types it has no business handling. `TypeSupport` lets a consumer
+state its own answer, by name, and be told when that answer has gone stale:
+
+```go
+err := registry.CheckSupport(envelopes.TypeSupport{
+    Supports: hostRenderedTypes,
+    Excludes: map[string]string{
+        "subagent-spawn-approval": "ADR 0005 — not a session manager",
+        "chat-loop-terminated":    "ADR 0005 — not an agent launcher",
+    },
+})
+```
+
+Every registered type must be **claimed** — supported, or excluded with a
+reason. A type that is neither is reported as unclaimed, and `CheckSupport`
+returns a `*SupportGap` naming it.
+
+That requirement is the point. Excluding a type by leaving it out of a list is
+indistinguishable from never having heard of it, so a type someone deliberately
+rejected comes back silently the next time a consumer regenerates against a
+newer catalog. A named exclusion carrying a reason survives that regeneration,
+and makes adopting a new type a decision somebody has to write down. Run it from
+a test and a library upgrade that adds an envelope type becomes a failing build
+rather than a silent import.
+
+`SupportedTypes` returns the accounted-for set, filtered to what is actually
+registered — build a host dispatch table from that rather than from `All()`.
+
+**This library does not partition the catalog for you.** There is no wire-kind
+versus composition split to take half of: no core schema references another
+type's schema, and types that look composition-only (`list-card`,
+`confirmation-card`) are emitted standalone as whole interactions. The
+distinction that does exist is *emission authority* — whether an agent, a host
+decision flow, or the runtime may emit a type — and that is host policy rather
+than wire, so it belongs in the host that decides it.
+
+## Responses: typed channels and the conflict contract
+
+An interactive envelope can return up to three different things, and `Response`
+keeps them apart instead of collapsing them into one untyped blob:
+
+| Field | Carries |
+|---|---|
+| `Payload` | freeform data for the envelope type |
+| `Answers` | replies to questions — `questionId`, `value`, optional `acceptedSuggestion` and `note` |
+| `Decisions` | dispositions of items — `itemId`, `action`, optional `note` and `meta` |
+
+`Answer.AcceptedSuggestion` is a pointer so an explicit rejection is
+distinguishable from an envelope that offered no suggestion. `Decision.Action`
+is an open string: the set of dispositions belongs to the interaction, not to
+the wire format.
+
+### What a second submission means
+
+`ResponseStatus.IsTerminal()` is the contract. It is the one piece of response
+semantics hosts were previously each reinventing, and getting it wrong in one
+specific way makes a protocol unreachable:
+
+| Status | Terminal | A later submission should |
+|---|---|---|
+| `submitted`, `canceled`, `error` | yes | be refused as a conflict **carrying the response already recorded** — the caller usually wants to reflect the resolved state, not retry |
+| `partial` | no | be accepted, **replacing** the previous draft |
+
+```go
+if response.Status.IsTerminal() {
+    // record immutably; a second submission is a conflict
+} else {
+    // a resumable draft; the next submission replaces it
+}
+```
+
+**A host that claims an envelope on a `partial` submission breaks its own
+protocol.** The interaction can then never be completed, because the completing
+submission collides with the draft that preceded it — `partial` becomes a state
+you can enter and never leave. If a host has one "record the response" path, it
+needs to branch on `IsTerminal` before taking it.
+
+An unrecognized status is not terminal: an unknown state is not a resolution,
+and treating it as one discards a response. Internal lifecycle markers a host
+uses while dispatching (a "handling" claim, a "failed" outcome) belong on the
+host's own instance record, not in the response status.
+
+### The transport is not part of the contract
+
+This library specifies the payload, the status semantics and the conflict
+semantics. It does not specify a route, an auth scheme or a storage model. A
+card that hardcodes `POST /api/envelopes/{id}/respond` has made the same
+category of mistake as a manifest that names a component path: it has put a
+host's local arrangement inside a shared contract. Keep the schema and the
+validation portable; keep the fetch client in the host.
+
+## Cancellation vocabulary
+
+The canonical wire spelling is US English: `"canceled"` for response and
+`session-task` statuses, and `"user-canceled"` for the protocol error code.
+Use `ResponseStatusCanceled` and `ErrorCodeUserCanceled` for new output.
+
+v0.5.x retains read compatibility for the v0.2-era
+`"cancelled"` status and `"user-cancelled"` error code. The deprecated
+`ResponseStatusCancelled` and `ErrorCodeUserCancelled` constants keep their
+historical values so existing emitters do not silently change wire behavior on
+upgrade. Normalize stored input before re-emitting it:
+
+```go
+response.Status = response.Status.Canonical()
+if response.Error != nil {
+    response.Error.Code = envelopes.CanonicalErrorCode(response.Error.Code)
+}
+```
+
+The compatibility spellings and deprecated Go names are retained in v0.5.x.
+Removal is not scheduled and will be announced first. New output must use the
+canonical US spellings.
+
+## Layout
+
+- `manifest/` — canonical YAML manifest + per-type JSON Schemas (single source of truth, language-agnostic).
+- `*.go` (root package `envelopes`) — registry, validator, plugin extension API.
+- `envelopestest/` — contract test helper for downstream consumers.
+- `docs/` — manifest spec, extension API guide.
+- `cmd/envelopes-export/`, `codegen/` — module-resolved catalog and TypeScript generation.
+- `examples/` — runnable demonstrations of the public API.
+
+## Docs
+
+- [`docs/manifest-spec.md`](docs/manifest-spec.md) — manifest format.
+- [`docs/extension-api.md`](docs/extension-api.md) — plugin extension API.
+- [`docs/generation.md`](docs/generation.md) — catalog/codegen API and migration guide.
+
+## Related libraries
+
+`go-envelopes` is part of the Hollis Labs `go-*` portfolio. This module owns
+both the Go registry/catalog API and the TypeScript data-type generator.
+Go and TypeScript hosts therefore consume the same embedded YAML manifest and
+JSON Schemas from the module version selected by the host's `go.mod`; there is
+no separate TypeScript companion package to install or synchronize.
+
+## Contributing
+
+Issues and PRs welcome. Please run `make test` (which runs
+`go test -race -count=1 ./...`) before opening a PR.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

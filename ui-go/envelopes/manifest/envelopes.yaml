@@ -1,0 +1,122 @@
+# Envelope type manifest — single source of truth for both Go and TypeScript.
+#
+# This file is consumed by:
+#   - go-envelopes (this repo): loaded via go:embed at runtime to seed the
+#     core type registry. See registry.go (LoadCore) and types.go.
+#   - codegen.TypeScript / cmd/envelopes-export: build-time consumers use the
+#     embedded catalog to emit host-neutral TypeScript data types.
+#
+# Adding a new core envelope type:
+#   1. Add an entry here (`type`, plus an optional `description`).
+#   2. Drop a JSON Schema at manifest/schemas/<type>.schema.json validating
+#      the envelope's `data` payload (optional — entries without a schema
+#      register without one, and validation passes on type-name alone).
+#   3. Add tests covering known-good and known-bad payloads.
+#   4. Tag a minor release. Module-owned generation reads this manifest.
+#
+# THIS MANIFEST DECLARES WIRE IDENTITY ONLY. It does not say how a type is
+# rendered, by what component, or with which props. It carried `component`,
+# `export` and `props` through v0.4.x; all three named paths and symbols
+# inside one specific host's source tree, which is an appearance claim this
+# library has no authority to make. They were removed in v0.5.0 and the
+# manifest metaschema now rejects them BY NAME rather than by omission, so a
+# regenerating sweep cannot quietly reintroduce them. The mapping they held
+# is recorded in the CW-20260910-0113 handoff table. Which component renders
+# a type is a BINDING concern and belongs outside this library — putting it
+# back here creates a second appearance authority.
+#
+# Runtime envelope instance fields (not manifest fields — they live on the
+# Envelope struct in types.go):
+#   - Presentation: rendering hint (inline/modal/drawer/sidecar/fullscreen).
+#   - Trace: observability metadata (agentId, sessionId, etc.).
+# Host-specific routing fields (e.g. a host's `target` / `render_target`
+# panel-routing hints) are NOT modeled by go-envelopes; they belong on each
+# host's own wrapper struct. See docs/manifest-spec.md for the full schema
+# spec.
+
+core:
+  # Generic primitives
+  - type: document-viewer
+
+  - type: report-card
+
+  - type: error-report
+
+  - type: approval-card
+
+  - type: proposal-card
+
+  # Work system (todo/plan)
+  #
+  # `todo-list` was retired as a standalone type (Phase 6,
+  # TASKS/phase-6/01-rebuild-todo-list-as-composition.md) — it is now a
+  # `list-card` composition: `list-card`'s schema grew a `data_source`
+  # pointer (`{kind: "todos", scope, scope_id}`) plus a per-item `status`
+  # field, and the emitter (internal/selftools/self_tools_transport.go's
+  # callTodoList) produces `type: "list-card"` instead of its own type.
+  # See manifest/schemas/list-card.schema.json.
+  #
+  # `plan-review` was retired as a standalone type (Phase 6,
+  # TASKS/phase-6/02-rebuild-plan-review-as-composition.md) — it is now a
+  # `list-card` + `confirmation-card` composition: `list-card`'s schema grew
+  # an optional `plan_id` (live step list + toggle via useTogglePlanStep)
+  # and `confirmation-card`'s schema grew the same optional `plan_id` (live
+  # approve/reject/request-changes via useApprovePlan/useRejectPlan). The
+  # emitter (internal/selftools/self_tools.go's plan_create tool
+  # description) now instructs the agent to emit both envelope blocks
+  # instead of a single `plan-review` block. See
+  # manifest/schemas/list-card.schema.json and
+  # manifest/schemas/confirmation-card.schema.json.
+  #
+  # NOTE for anyone splitting this catalog: the types below are reusable
+  # card vocabulary, NOT types that are only ever composed inside another
+  # envelope. `list-card` and `confirmation-card` are emitted standalone as
+  # whole interactions — that is exactly what the retirements above did, and
+  # what their `data_source` pointers exist to support.
+
+  # Reusable primitives (Phase 7)
+  - type: info-card
+
+  - type: list-card
+
+  - type: metric-card
+
+  - type: progress-card
+
+  - type: confirmation-card
+
+  - type: table-card
+
+  - type: timeline-card
+
+  - type: diff-card
+
+  # Compact downloadable-artifact card surfaced in a host's chat drawer.
+  # Default render-target = bottom_chat_drawer (set in the schema).
+  - type: artifact-mini
+
+  # Backend-only: no host has ever rendered this one.
+  - type: session-task
+
+  # Subagent spawn approval. Shares a renderer with `approval-card` in at
+  # least one host (TASKS/phase-6/03), discriminated by envelope.type;
+  # that sharing is the host's business, not this manifest's. Subagent-
+  # specific fields (run_id/role/prompt/mode/...) ride in `data` alongside
+  # the same risk_level convention approval-card uses. Wire type stays
+  # `subagent-spawn-approval` unchanged: the real emitter
+  # (internal/subagent/service.go), the registered response handler
+  # (internal/chat/envelope_response_subagent.go), and the recovery-
+  # rehydration gate (internal/api/sessions.go) all key off this literal
+  # string. See docs/engineering/architecture/08-cards.md.
+  - type: subagent-spawn-approval
+
+  # Chat-loop terminal pause envelope. Emitted when the loop exits
+  # abnormally (max turns, hard ceiling, idle timeout, runaway failures)
+  # so the user sees a termination card instead of silence.
+  - type: chat-loop-terminated
+
+  # MCP elicitation/create mid-tool user prompt. Carries boolean
+  # (accept/decline) or string (text input) input depending on
+  # schema_type. User response routes back via the protocol's response
+  # envelope.
+  - type: elicitation-prompt
