@@ -31,7 +31,7 @@ Each has a `MIGRATION.md` with the old and the new import paths.
 
 Below this line is the changelog of the standalone `go-workflow` module, kept as written. Its version numbers belong to that module (`github.com/hollis-labs/go-workflow`), not to this one.
 
-## v0.1.0 — 2026-09-04
+## go-workflow v0.1.0 — 2026-09-04 (standalone module)
 
 The first standalone release of `github.com/hollis-labs/go-workflow` extracts
 Hadron's reusable workflow engine at source checkpoint
