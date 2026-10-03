@@ -1,0 +1,89 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T18:55:37.296394-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - TODO(author): what a competent agent will get wrong here — invariants, the test that guards each by name, what must never happen.
+  agents_start_here: |-
+    - `streamhub` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: 'Payload-opaque, stdlib-only replayable fan-out hub: per-stream cursor, gap signal, replay ring and slow-consumer policies.'
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: streamhub
+  repo_name: go-streamhub
+  stability: pre-1.0
+computed:
+  import_line: streamhub "github.com/hollis-labs/go-streamhub"
+  import_path: github.com/hollis-labs/go-streamhub
+  module_path: github.com/hollis-labs/go-streamhub
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:a689f80f44897200a18e68ef93a5be394dd20d98cfe2ab0844459e5a5bdd7fe1
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:eb592d0f2832582838e855c0c1fc5efdc52146022c76ae7f8250bd66bd028e0e
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:96e32a6ed60771771d2950b626461ddf9407826c55921591737d1b7a189b8782
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:3ac8e9c38f4f9c2b814277ba93addf6bfce56f9931153218794b7e70a4a5c591
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:5c8f5dc34ba3ac49223cbbe6a1113821fac731030fbdc4a78e5931f532d333df
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:7c7160b9a7562e33a637164cbf8cea24bbdcc828747b643bf70b02402f9436cb
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:501752f7a54082c2fd87f534a71b8c26b32c26d8f8ccf6055b0a5fee6e570725
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  streamhub.go:
+    preset: go-lib
+    digest_at_gen: sha256:2823c9eed27ff5fcfa929f3d6925b7a1bd5e71162f9e40894fa050ec9562ac27
+  streamhub_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:f2467bea3a8117066174d9522d64f5bf1fc59a6afe5c4249e530b6d72aabe73b
+sync_history:
+  - at: 2026-09-29T18:55:37.296394-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
