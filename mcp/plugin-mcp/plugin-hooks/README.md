@@ -110,8 +110,10 @@ using `json.RawMessage`), or change only paths declared mutable and visible.
 ## Current boundary
 
 All six declared modes execute. Remote wire, schema compiler,
-TS parity, durable delivery and consumer adoption are unavailable. There are no
-compatibility aliases or release tags yet.
+durable delivery and consumer adoption are unavailable. The private
+[TypeScript twin](ts/README.md) implements the execution/lifecycle contract and
+shares JSON conformance fixtures with Go; breaker/telemetry parity is deferred.
+There are no compatibility aliases or release tags yet.
 
 ## Checks
 
@@ -228,3 +230,11 @@ trace context, timestamps, metrics aggregation, operator state and a host-side
 OpenTelemetry blueprint. The [JSON sink example](examples/observability/main.go)
 is standard-library-only. Records include no payloads, arbitrary metadata or
 handler error text. No tracing backend, operator endpoint or app is adopted.
+
+## TypeScript twin
+
+The private browser/Node ESM package lives entirely under [ts/](ts/README.md).
+Run `npm ci --ignore-scripts` and `npm run check` from that directory.
+Go and vitest consume the same execution and registration-policy JSON fixtures
+in `conformance/`; Go production code remains dependency-free. No npm publication
+workflow or release tag is added.

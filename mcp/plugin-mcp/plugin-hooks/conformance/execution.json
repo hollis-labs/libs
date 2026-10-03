@@ -1,0 +1,1239 @@
+{
+  "catalog": {
+    "catalog_version": "conformance-1",
+    "definitions": [
+      {
+        "name": "event.observe",
+        "kind": "action",
+        "mode": "sequential",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "gate.check",
+        "kind": "action",
+        "mode": "bail",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "event.parallel",
+        "kind": "action",
+        "mode": "parallel",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "event.async",
+        "kind": "action",
+        "mode": "async",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "event.committed",
+        "kind": "action",
+        "mode": "after_commit",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "value.change",
+        "kind": "filter",
+        "mode": "waterfall",
+        "input_schema": {},
+        "mutable_paths": [
+          "/value"
+        ],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {
+          "masked": [
+            "/value"
+          ]
+        },
+        "schema_digest": "test",
+        "output_schema": {}
+      },
+      {
+        "name": "array.change",
+        "kind": "filter",
+        "mode": "waterfall",
+        "input_schema": {},
+        "mutable_paths": [
+          "/items/1/name"
+        ],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {
+          "masked": [
+            "/items/1/name"
+          ]
+        },
+        "schema_digest": "test",
+        "output_schema": {}
+      },
+      {
+        "name": "number.change",
+        "kind": "filter",
+        "mode": "waterfall",
+        "input_schema": {},
+        "mutable_paths": [
+          "/value"
+        ],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "output_schema": {}
+      },
+      {
+        "name": "root.change",
+        "kind": "filter",
+        "mode": "waterfall",
+        "input_schema": {},
+        "mutable_paths": [
+          ""
+        ],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "output_schema": {}
+      },
+      {
+        "name": "plugin.example.subject.changed",
+        "kind": "action",
+        "mode": "sequential",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "owner_namespace": "example"
+      },
+      {
+        "name": "old.event",
+        "kind": "action",
+        "mode": "sequential",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "deprecated": {
+          "since": "2",
+          "replacement": "event.observe",
+          "reason": "renamed",
+          "removal": "3"
+        }
+      },
+      {
+        "name": "event.serial_parallel",
+        "kind": "action",
+        "mode": "parallel",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 1,
+        "views": {},
+        "schema_digest": "test"
+      },
+      {
+        "name": "text.change",
+        "kind": "filter",
+        "mode": "waterfall",
+        "input_schema": {},
+        "mutable_paths": [
+          ""
+        ],
+        "since": "1",
+        "remote_ok": false,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 40,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "output_schema": {}
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "priority-zero-and-stable-ties",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "default"
+        },
+        {
+          "name": "zero",
+          "options": {
+            "priority": 0
+          }
+        },
+        {
+          "name": "tie"
+        },
+        {
+          "name": "first",
+          "options": {
+            "priority": -2
+          }
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "first",
+            "zero",
+            "default",
+            "tie"
+          ],
+          "classes": [
+            "success",
+            "success",
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "once-retired-after-attempt",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "once",
+          "options": {
+            "once": true
+          }
+        },
+        {
+          "name": "other"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "once",
+            "other"
+          ],
+          "classes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "status": "success",
+          "order": [
+            "other"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "open-handler-error-isolated",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "bad",
+          "behavior": "error"
+        },
+        {
+          "name": "next"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad",
+            "next"
+          ],
+          "classes": [
+            "handler_error",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "panic-isolated",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "bad",
+          "behavior": "panic"
+        },
+        {
+          "name": "next"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad",
+            "next"
+          ],
+          "classes": [
+            "panic",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "closed-stops-sequential",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "bad",
+          "behavior": "error",
+          "options": {
+            "onError": "closed"
+          }
+        },
+        {
+          "name": "never"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "failed_closed",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "handler_error"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bail-cancel-even-open",
+      "hook": "gate.check",
+      "registrations": [
+        {
+          "name": "veto",
+          "behavior": "cancel"
+        },
+        {
+          "name": "never"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "cancelled",
+          "order": [
+            "veto"
+          ],
+          "classes": [
+            "cancelled"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bail-approval-even-open",
+      "hook": "gate.check",
+      "registrations": [
+        {
+          "name": "approval",
+          "behavior": "approval"
+        },
+        {
+          "name": "never"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "approval_required",
+          "order": [
+            "approval"
+          ],
+          "classes": [
+            "approval_required"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "non-bail-cancel-follows-open",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "cancel",
+          "behavior": "cancel"
+        },
+        {
+          "name": "next"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "cancel",
+            "next"
+          ],
+          "classes": [
+            "cancelled",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "parallel-closed-does-not-stop-admitted",
+      "hook": "event.parallel",
+      "registrations": [
+        {
+          "name": "bad",
+          "behavior": "error",
+          "options": {
+            "onError": "closed"
+          }
+        },
+        {
+          "name": "next"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "failed_closed",
+          "order": [
+            "bad",
+            "next"
+          ],
+          "classes": [
+            "handler_error",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "event.async",
+      "hook": "event.async",
+      "registrations": [
+        {
+          "name": "handler"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "handler"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ],
+      "receipt": "queued"
+    },
+    {
+      "name": "event.committed",
+      "hook": "event.committed",
+      "registrations": [
+        {
+          "name": "handler"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "handler"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ],
+      "receipt": "queued"
+    },
+    {
+      "name": "filter-waterfall",
+      "hook": "value.change",
+      "registrations": [
+        {
+          "name": "first",
+          "output": "{\"value\":2,\"hidden\":true}"
+        },
+        {
+          "name": "second",
+          "output": "{\"value\":3,\"hidden\":true}"
+        }
+      ],
+      "payload": "{\"value\":1,\"hidden\":true}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "first",
+            "second"
+          ],
+          "classes": [
+            "success",
+            "success"
+          ],
+          "value": "{\"value\":3,\"hidden\":true}"
+        }
+      ]
+    },
+    {
+      "name": "filter-open-preserves-prior",
+      "hook": "value.change",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{\"value\":2,\"hidden\":false}"
+        },
+        {
+          "name": "next",
+          "output": "{\"value\":3,\"hidden\":true}"
+        }
+      ],
+      "payload": "{\"value\":1,\"hidden\":true}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad",
+            "next"
+          ],
+          "classes": [
+            "invalid_output",
+            "success"
+          ],
+          "value": "{\"value\":3,\"hidden\":true}"
+        }
+      ]
+    },
+    {
+      "name": "filter-closed-no-value",
+      "hook": "value.change",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{\"value\":2,\"hidden\":false}",
+          "options": {
+            "onError": "closed"
+          }
+        }
+      ],
+      "payload": "{\"value\":1,\"hidden\":true}",
+      "expected": [
+        {
+          "status": "failed_closed",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mask-preserves-hidden",
+      "hook": "value.change",
+      "registrations": [
+        {
+          "name": "masked",
+          "options": {
+            "view": "masked"
+          },
+          "output": "{\"value\":2}"
+        }
+      ],
+      "payload": "{\"value\":1,\"hidden\":{\"secret\":\"retained\"}}",
+      "seen": [
+        "{\"value\":1}"
+      ],
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "masked"
+          ],
+          "classes": [
+            "success"
+          ],
+          "value": "{\"value\":2,\"hidden\":{\"secret\":\"retained\"}}"
+        }
+      ]
+    },
+    {
+      "name": "mask-cannot-insert-hidden",
+      "hook": "value.change",
+      "registrations": [
+        {
+          "name": "bad",
+          "options": {
+            "view": "masked"
+          },
+          "output": "{\"value\":2,\"hidden\":\"injected\"}"
+        }
+      ],
+      "payload": "{\"value\":1,\"hidden\":\"kept\"}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{\"value\":1,\"hidden\":\"kept\"}"
+        }
+      ]
+    },
+    {
+      "name": "array-positions-and-hidden",
+      "hook": "array.change",
+      "registrations": [
+        {
+          "name": "masked",
+          "options": {
+            "view": "masked"
+          },
+          "output": "{\"items\":[null,{\"name\":\"new\"},null]}"
+        }
+      ],
+      "payload": "{\"items\":[{\"name\":\"a\"},{\"name\":\"b\",\"secret\":true},{\"name\":\"c\"}],\"secret\":false}",
+      "seen": [
+        "{\"items\":[null,{\"name\":\"b\"},null]}"
+      ],
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "masked"
+          ],
+          "classes": [
+            "success"
+          ],
+          "value": "{\"items\":[{\"name\":\"a\"},{\"name\":\"new\",\"secret\":true},{\"name\":\"c\"}],\"secret\":false}"
+        }
+      ]
+    },
+    {
+      "name": "array-resize-requires-container",
+      "hook": "array.change",
+      "registrations": [
+        {
+          "name": "bad",
+          "options": {
+            "view": "masked"
+          },
+          "output": "{\"items\":[null,{\"name\":\"b\"}]}"
+        }
+      ],
+      "payload": "{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"},{}]}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"},{}]}"
+        }
+      ]
+    },
+    {
+      "name": "large-integer-is-exact",
+      "hook": "number.change",
+      "registrations": [
+        {
+          "name": "exact",
+          "output": "{\"value\":2,\"big\":9007199254740993,\"literal\":1.50}"
+        }
+      ],
+      "payload": "{\"value\":1,\"big\":9007199254740993,\"literal\":1.50}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "exact"
+          ],
+          "classes": [
+            "success"
+          ],
+          "value": "{\"value\":2,\"big\":9007199254740993,\"literal\":1.50}"
+        }
+      ]
+    },
+    {
+      "name": "numeric-literal-change-immutable",
+      "hook": "number.change",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{\"value\":2,\"literal\":1.5}"
+        }
+      ],
+      "payload": "{\"value\":1,\"literal\":1.50}",
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{\"value\":1,\"literal\":1.50}"
+        }
+      ]
+    },
+    {
+      "name": "root-replacement",
+      "hook": "root.change",
+      "registrations": [
+        {
+          "name": "replace",
+          "output": "[1,true,null]"
+        }
+      ],
+      "payload": "{\"value\":1}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "replace"
+          ],
+          "classes": [
+            "success"
+          ],
+          "value": "[1,true,null]"
+        }
+      ]
+    },
+    {
+      "name": "duplicate-payload-key-go-last-wins",
+      "hook": "root.change",
+      "registrations": [
+        {
+          "name": "echo",
+          "behavior": "echo"
+        }
+      ],
+      "payload": "{\"value\":1,\"value\":2}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "echo"
+          ],
+          "classes": [
+            "success"
+          ],
+          "value": "{\"value\":2}"
+        }
+      ]
+    },
+    {
+      "name": "custom-name-declared-not-permission",
+      "hook": "plugin.example.subject.changed",
+      "registrations": [
+        {
+          "name": "custom"
+        }
+      ],
+      "payload": "{}",
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "custom"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deprecated-name-never-redirects",
+      "hook": "old.event",
+      "registrations": [
+        {
+          "name": "old"
+        }
+      ],
+      "payload": "{}",
+      "warnings": 1,
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "old"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "removed-before-snapshot",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "removed"
+        },
+        {
+          "name": "kept"
+        }
+      ],
+      "payload": "{}",
+      "remove": [
+        "removed"
+      ],
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "kept"
+          ],
+          "classes": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "disposed-generation-does-not-run",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "removed"
+        }
+      ],
+      "payload": "{}",
+      "dispose": true,
+      "expected": [
+        {
+          "status": "success",
+          "order": [],
+          "classes": []
+        }
+      ]
+    },
+    {
+      "name": "invalid-json",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "never"
+        }
+      ],
+      "payload": "{",
+      "error": "invalid_payload"
+    },
+    {
+      "name": "input-validator-rejects",
+      "hook": "event.observe",
+      "registrations": [
+        {
+          "name": "never"
+        }
+      ],
+      "payload": "{\"reject\":true}",
+      "error": "invalid_payload"
+    },
+    {
+      "name": "timeout-open",
+      "hook": "event.observe",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "slow",
+          "behavior": "timeout",
+          "options": {
+            "timeoutMs": 10,
+            "onError": "open"
+          }
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "slow"
+          ],
+          "classes": [
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "timeout-closed",
+      "hook": "event.observe",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "slow",
+          "behavior": "timeout",
+          "options": {
+            "timeoutMs": 10,
+            "onError": "closed"
+          }
+        }
+      ],
+      "expected": [
+        {
+          "status": "failed_closed",
+          "order": [
+            "slow"
+          ],
+          "classes": [
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "depth-guard",
+      "hook": "event.observe",
+      "payload": "{}",
+      "config": {
+        "maxDepth": 1
+      },
+      "registrations": [
+        {
+          "name": "nested",
+          "behavior": "nested"
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "nested"
+          ],
+          "classes": [
+            "depth_rejected"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "invalid-output-json",
+      "hook": "root.change",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{"
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{}"
+        }
+      ]
+    },
+    {
+      "name": "output-validator-rejects",
+      "hook": "root.change",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{\"reject\":true}"
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{}"
+        }
+      ]
+    },
+    {
+      "name": "once-failure-is-still-retired",
+      "hook": "event.observe",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "once",
+          "behavior": "error",
+          "options": {
+            "once": true
+          }
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "once"
+          ],
+          "classes": [
+            "handler_error"
+          ]
+        },
+        {
+          "status": "success",
+          "order": [],
+          "classes": []
+        }
+      ]
+    },
+    {
+      "name": "parallel-admission-timeout-starts-at-admission",
+      "hook": "event.serial_parallel",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "0",
+          "behavior": "work",
+          "options": {
+            "timeoutMs": 50
+          }
+        },
+        {
+          "name": "1",
+          "behavior": "work",
+          "options": {
+            "timeoutMs": 50
+          }
+        },
+        {
+          "name": "2",
+          "behavior": "work",
+          "options": {
+            "timeoutMs": 50
+          }
+        }
+      ],
+      "expected": [
+        {
+          "status": "success",
+          "order": [
+            "0",
+            "1",
+            "2"
+          ],
+          "classes": [
+            "success",
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "merged-byte-limit-includes-json-escaping",
+      "hook": "text.change",
+      "payload": "{}",
+      "registrations": [
+        {
+          "name": "bad",
+          "output": "{\"value\":\"<<<<<<<<<\"}"
+        }
+      ],
+      "expected": [
+        {
+          "status": "completed_with_open_errors",
+          "order": [
+            "bad"
+          ],
+          "classes": [
+            "invalid_output"
+          ],
+          "value": "{}"
+        }
+      ]
+    }
+  ]
+}

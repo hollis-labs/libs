@@ -1,0 +1,212 @@
+[
+  {
+    "name": "vendor-name-not-alias",
+    "operation": "scope",
+    "error": "unknown_hook",
+    "hooks": [
+      "Stop"
+    ]
+  },
+  {
+    "name": "case-not-normalized",
+    "operation": "scope",
+    "error": "unknown_hook",
+    "hooks": [
+      "Event.observe"
+    ]
+  },
+  {
+    "name": "undeclared-custom-name",
+    "operation": "scope",
+    "error": "unknown_hook",
+    "hooks": [
+      "plugin.example.subject.unknown"
+    ]
+  },
+  {
+    "name": "empty-owner",
+    "operation": "scope",
+    "error": "unauthorized",
+    "owner": ""
+  },
+  {
+    "name": "empty-generation",
+    "operation": "scope",
+    "error": "unauthorized",
+    "generation": ""
+  },
+  {
+    "name": "remote-denied",
+    "operation": "scope",
+    "error": "unauthorized",
+    "remote": true
+  },
+  {
+    "name": "allowlist-denies-even-own-namespace",
+    "operation": "registration",
+    "error": "unauthorized",
+    "hooks": [],
+    "hook": "plugin.example.subject.changed"
+  },
+  {
+    "name": "empty-registration-name",
+    "operation": "registration",
+    "error": "invalid_options",
+    "registration": ""
+  },
+  {
+    "name": "kind-mismatch",
+    "operation": "registration",
+    "error": "invalid_options",
+    "kind": "filter"
+  },
+  {
+    "name": "zero-timeout-no-default",
+    "operation": "registration",
+    "error": "invalid_options",
+    "options": {
+      "timeoutMs": 0
+    }
+  },
+  {
+    "name": "excessive-timeout",
+    "operation": "registration",
+    "error": "invalid_options",
+    "options": {
+      "timeoutMs": 101
+    }
+  },
+  {
+    "name": "bad-view",
+    "operation": "registration",
+    "error": "invalid_options",
+    "options": {
+      "view": "unknown"
+    }
+  },
+  {
+    "name": "digest-mismatch",
+    "operation": "registration",
+    "error": "invalid_options",
+    "options": {
+      "schemaDigest": "bad"
+    }
+  },
+  {
+    "name": "unknown-error-policy",
+    "operation": "registration",
+    "error": "invalid_options",
+    "options": {
+      "onError": "other"
+    }
+  },
+  {
+    "name": "duplicate-name",
+    "operation": "duplicate",
+    "error": "duplicate"
+  },
+  {
+    "name": "generation-reserved",
+    "operation": "generation",
+    "error": "duplicate"
+  },
+  {
+    "name": "required-view",
+    "operation": "definition_registration",
+    "error": "unauthorized",
+    "patch": {
+      "views": {
+        "public": [
+          "/value"
+        ]
+      },
+      "required_view": "public"
+    }
+  },
+  {
+    "name": "custom-namespace-mismatch",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "name": "plugin.other.subject.event",
+      "owner_namespace": "example"
+    }
+  },
+  {
+    "name": "custom-three-segments",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "name": "plugin.example.event",
+      "owner_namespace": "example"
+    }
+  },
+  {
+    "name": "core-with-namespace",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "owner_namespace": "example"
+    }
+  },
+  {
+    "name": "zero-budget",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "budget_ms": 0
+    }
+  },
+  {
+    "name": "negative-limit",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "max_handlers": -1
+    }
+  },
+  {
+    "name": "timeout-exceeds-budget",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "handler_timeout_ms": 1001
+    }
+  },
+  {
+    "name": "bad-pointer",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "views": {
+        "v": [
+          "/bad~2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "bad-mode",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "mode": "waterfall"
+    }
+  },
+  {
+    "name": "missing-policy",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "on_error_default": ""
+    }
+  },
+  {
+    "name": "missing-schema",
+    "operation": "definition",
+    "error": "invalid_definition",
+    "patch": {
+      "input_schema": null
+    }
+  }
+]
