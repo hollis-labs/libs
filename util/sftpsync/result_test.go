@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 )
 
 // TestResultStringIsOperatorReadable pins the one-liner, because it is what

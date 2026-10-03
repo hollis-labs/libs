@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 )
 
 // acceptanceTree is the shape the README promises round-trips: nested

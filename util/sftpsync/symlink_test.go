@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 )
 
 func TestUploadRefusesSymlinkEscape(t *testing.T) {

@@ -36,7 +36,7 @@ import (
 	"os"
 	"path/filepath"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 	"github.com/pkg/sftp"
 )
 

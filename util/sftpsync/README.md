@@ -14,12 +14,12 @@ report of what happened rather than a bare `error`. It takes a live `*sftp.Clien
 and never dials, authenticates, or reads `~/.ssh/config`: the connection is the caller's, and so
 are the decisions that made it trustworthy.
 
-Documentation: [pkg.go.dev/github.com/hollis-labs/go-sftpsync](https://pkg.go.dev/github.com/hollis-labs/go-sftpsync).
+Documentation: [pkg.go.dev/github.com/hollis-labs/libs/util/sftpsync](https://pkg.go.dev/github.com/hollis-labs/libs/util/sftpsync).
 
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-sftpsync
+go get github.com/hollis-labs/libs/util/sftpsync
 ```
 
 ## Usage
@@ -32,7 +32,7 @@ import (
 	"fmt"
 	"log"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 	"golang.org/x/crypto/ssh"
 )
 

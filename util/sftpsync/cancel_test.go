@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 )
 
 // waitFor polls until cond is true, so a test can cancel a transfer at a known

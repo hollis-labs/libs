@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"testing"
 
-	sftpsync "github.com/hollis-labs/go-sftpsync"
+	sftpsync "github.com/hollis-labs/libs/util/sftpsync"
 )
 
 // TestIrregularFilesAreSkippedNotRecreated covers the default branch of the
