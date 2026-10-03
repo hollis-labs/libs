@@ -78,6 +78,99 @@ func (c *Contribution) UnmarshalJSON(raw []byte) error {
 	if required, ok := fields["required"]; !ok || string(required) == "null" {
 		return ErrInvalidContribution
 	}
+	switch value.Representation {
+	case Component:
+		if _, ok := fields["declarative"]; ok {
+			return ErrInvalidContribution
+		}
+		if _, ok := fields["handler"]; ok {
+			return ErrInvalidContribution
+		}
+	case Declarative:
+		if _, ok := fields["component"]; ok {
+			return ErrInvalidContribution
+		}
+		if _, ok := fields["handler"]; ok {
+			return ErrInvalidContribution
+		}
+	case Handler:
+		if _, ok := fields["component"]; ok {
+			return ErrInvalidContribution
+		}
+		if _, ok := fields["declarative"]; ok {
+			return ErrInvalidContribution
+		}
+	}
+	if err := optionalStrings(fields, "public_binding"); err != nil {
+		return err
+	}
 	*c = Contribution(value)
+	return nil
+}
+
+// Present optional strings must be nonempty strings, rather than JSON null.
+func optionalStrings(fields map[string]json.RawMessage, names ...string) error {
+	for _, name := range names {
+		if raw, present := fields[name]; present {
+			var value string
+			if json.Unmarshal(raw, &value) != nil || value == "" {
+				return ErrInvalidContribution
+			}
+		}
+	}
+	return nil
+}
+func (p *Plugin) UnmarshalJSON(raw []byte) error {
+	type wire Plugin
+	var value wire
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	if err := optionalStrings(fields, "bundle_url", "stylesheet_url"); err != nil {
+		return err
+	}
+	if _, present := fields["bundle_version"]; present && !digest.MatchString(value.BundleVersion) {
+		return ErrIntegrity
+	}
+	if rt, present := fields["runtime"]; present && string(rt) == "null" {
+		return ErrRuntime
+	}
+	*p = Plugin(value)
+	return nil
+}
+func (r *Runtime) UnmarshalJSON(raw []byte) error {
+	type wire Runtime
+	var value wire
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ErrRuntime
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return ErrRuntime
+	}
+	if err := optionalStrings(fields, "min", "max"); err != nil {
+		return ErrRuntime
+	}
+	*r = Runtime(value)
+	return nil
+}
+func (f *Refusal) UnmarshalJSON(raw []byte) error {
+	type wire Refusal
+	var value wire
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	if required, ok := fields["required"]; !ok || string(required) == "null" {
+		return ErrInvalidContribution
+	}
+	*f = Refusal(value)
 	return nil
 }

@@ -28,10 +28,19 @@ func NewCatalog(hostInstance string) *Catalog {
 	return &Catalog{response: NewResponse(hostInstance, 1), listeners: map[uint64]func(){}, revoked: map[string]bool{}}
 }
 func clone(r Response) Response {
-	raw, _ := json.Marshal(r)
-	var out Response
-	_ = json.Unmarshal(raw, &out)
+	out, _ := cloneChecked(r)
 	return out
+}
+func cloneChecked(r Response) (Response, error) {
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return Response{}, ErrInvalidContribution
+	}
+	var out Response
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return Response{}, err
+	}
+	return out, nil
 }
 func (c *Catalog) Snapshot() Response { c.mu.RLock(); defer c.mu.RUnlock(); return clone(c.response) }
 func (c *Catalog) Subscribe(fn func()) func() {
@@ -55,7 +64,10 @@ func notify(callbacks []func()) {
 	}
 }
 func (c *Catalog) Activate(response Response, policy AdmissionPolicy) (Plan, error) {
-	candidate := clone(response)
+	candidate, err := cloneChecked(response)
+	if err != nil {
+		return Plan{}, err
+	}
 	plan, err := candidate.Plan(policy)
 	if err != nil {
 		return plan, err
@@ -69,6 +81,12 @@ func (c *Catalog) Activate(response Response, policy AdmissionPolicy) (Plan, err
 	if candidate.HostInstance != c.response.HostInstance || candidate.Revision <= c.response.Revision {
 		c.mu.Unlock()
 		return plan, ErrStale
+	}
+	for id := range c.response.Plugins {
+		if _, exists := candidate.Plugins[id]; !exists {
+			c.mu.Unlock()
+			return plan, ErrNeedsRevocation
+		}
 	}
 	for id, p := range candidate.Plugins {
 		if c.revoked[id+"\x00"+p.OwnerGeneration] {
@@ -89,9 +107,13 @@ func (c *Catalog) Activate(response Response, policy AdmissionPolicy) (Plan, err
 
 // Revoke affects only the named generation and publishes its absence immediately.
 func (c *Catalog) Revoke(owner, generation string) error {
+	if !name.MatchString(owner) || generation == "" {
+		return ErrInvalidContribution
+	}
 	c.mu.Lock()
 	p, exists := c.response.Plugins[owner]
 	if !exists {
+		c.revoked[owner+"\x00"+generation] = true
 		c.mu.Unlock()
 		return nil
 	}
