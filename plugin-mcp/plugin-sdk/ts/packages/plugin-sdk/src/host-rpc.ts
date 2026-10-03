@@ -320,8 +320,8 @@ function array(rule: Rule, max: number): Rule {
         invalid(field, 'array exceeds limit'); for (const p of parts)
         rule(p, field); };
 }
-const timestamp: Rule = (raw, field) => {
-    const value: unknown = JSON.parse(raw);
+/** Validate a UTC RFC3339 timestamp with at most nine fractional digits. */
+export function validateTimestamp(value: unknown, field = 'timestamp'): asserts value is string {
     if (typeof value !== 'string')
         invalid(field, 'invalid UTC timestamp');
     const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/.exec(value);
@@ -333,7 +333,8 @@ const timestamp: Rule = (raw, field) => {
     date.setUTCHours(h!, min!, sec!, 0);
     if (date.getUTCFullYear() !== y || date.getUTCMonth() + 1 !== m || date.getUTCDate() !== d || date.getUTCHours() !== h || date.getUTCMinutes() !== min || date.getUTCSeconds() !== sec)
         invalid(field, 'invalid UTC timestamp');
-};
+}
+const timestamp: Rule = (raw, field) => validateTimestamp(JSON.parse(raw), field);
 const base64: Rule = (raw, field) => {
     const value: unknown = JSON.parse(raw);
     if (typeof value !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) || Buffer.from(value, 'base64').toString('base64') !== value)

@@ -483,6 +483,114 @@
       "schema": "EgressRequestParams",
       "raw": "{\"grant_id\":\"g-egress\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"method\":\"GET\",\"url\":\"https://example.com/?x=%2F\",\"headers\":[],\"body_base64\":\"e30=\"}",
       "valid": true
+    },
+    {
+      "name": "timestamp whole seconds",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp one fractional digit",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00.1Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp nine fractional digits",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00.123456789Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp ten fractional digits",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00.1234567890Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp empty fraction",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00.Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp leap day",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2000-02-29T23:59:59Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp non-leap century",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"1900-02-29T00:00:00Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp year zero",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"0000-01-01T00:00:00Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp two-digit year value",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"0099-01-01T00:00:00Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp last four-digit year",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"9999-12-31T23:59:59.999999999Z\"}",
+      "valid": true
+    },
+    {
+      "name": "timestamp five-digit year",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"10000-01-01T00:00:00Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp UTC offset",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00+00:00\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp lowercase z",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:00z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp leap second",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T00:00:60Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp hour rollover",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-01T24:00:00Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp month zero",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-00-01T00:00:00Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp day zero",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":\"2030-01-00T00:00:00Z\"}",
+      "valid": false
+    },
+    {
+      "name": "timestamp non-string",
+      "schema": "SecretsGetResult",
+      "raw": "{\"value_base64\":\"\",\"expires_at\":2030}",
+      "valid": false
     }
   ],
   "policy": [
