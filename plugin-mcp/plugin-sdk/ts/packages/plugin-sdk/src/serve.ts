@@ -1,3 +1,4 @@
+import { hookResponseJSON } from './hooks-dispatch.js';
 import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError, encodeBoundedJSON, frameLimit } from './frame-codec.js';
 export { FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError } from './frame-codec.js';
 import { decodeRuntimeParams, PayloadError } from './payload.js';
@@ -135,7 +136,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   const write = (response: RPCResponse): Promise<void> => {
     if (closed || transportError) return Promise.resolve();
     let line: string;
-    try { line = encodeBoundedJSON(response, outputLimit - 1) + '\n'; }
+    try { line = (hookResponseJSON(response,outputLimit - 1) ?? encodeBoundedJSON(response, outputLimit - 1)) + '\n'; }
     catch {
       try { line = encodeBoundedJSON({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:'outbound response rejected'}}, outputLimit - 1) + '\n'; }
       catch (error) { transportError ??= error; stop(); return Promise.resolve(); }

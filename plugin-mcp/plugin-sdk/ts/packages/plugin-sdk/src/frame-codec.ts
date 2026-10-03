@@ -1,3 +1,4 @@
+import { validateJSON } from './strict-json.js';
 import { Buffer } from 'node:buffer';
 export const DEFAULT_FRAME_BYTES = 8 * 1024 * 1024;
 export class FrameTooLargeError extends Error {
@@ -21,6 +22,14 @@ export function frameLimit(value: number | undefined): number {
   const limit = value ?? DEFAULT_FRAME_BYTES;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > DEFAULT_FRAME_BYTES) throw new Error('frame limits must be positive and may only narrow defaults');
   return limit;
+}
+// Internal raw-token seam for profile codecs; not a package export. Validation
+// happens before a token can bypass ordinary value encoding. Physical CR/LF
+// outside strings are removed to keep exactly one frame per line.
+const rawFrames = new WeakMap<object,string>();
+export function preserveFrameJSON(raw: string): object {
+  validateJSON(raw);
+  const marker=Object.freeze({});rawFrames.set(marker,raw.replace(/[\r\n]/g,''));return marker;
 }
 /** Stage bounded JSON without first making an unbounded serialized copy. */
 export function encodeBoundedJSON(value: unknown, limit: number, byteBodies = false): string {
@@ -52,6 +61,7 @@ export function encodeBoundedJSON(value: unknown, limit: number, byteBodies = fa
   const active = new Set<object>();
   const visit = (v: unknown, depth: number): void => {
     if (depth > 128) throw new Error('JSON depth exceeded');
+    if(v && typeof v==='object' && rawFrames.has(v)){put(rawFrames.get(v)!);return;}
     if (v === null) { put('null'); return; }
     if (typeof v === 'string') { quote(v); return; }
     if (typeof v === 'boolean') { put(String(v)); return; }

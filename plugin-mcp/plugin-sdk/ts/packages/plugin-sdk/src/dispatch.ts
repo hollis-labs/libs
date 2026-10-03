@@ -1,3 +1,5 @@
+import { dispatchHook } from './hooks-dispatch.js';
+import { hooksFixtureEnabled } from './hooks-fixture.js';
 import { encodeBoundedJSON, DEFAULT_FRAME_BYTES, FrameTooLargeError } from './frame-codec.js';
 import { PayloadError, decodeRuntimeParams, rememberParams, authoredResult, validateRuntimeResult } from './payload.js';
 import { inspectEnvelope } from './strict-json.js';
@@ -41,12 +43,14 @@ export class Dispatcher {
   get ready(): boolean { return this.initialized; }
   private attempted = false;
   private initialized = false;
+  private hookIncarnation?: Wire.RuntimeIdentity;
   private unloadAttempt?: Promise<void>;
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker, outputLimit = DEFAULT_FRAME_BYTES) { this.outputLimit = outputLimit; this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown, ctx: Context = this.context): Promise<void> { if (value !== undefined) await this.plugin.identity?.(ctx, value); }
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
     const id = req.id;
     try {
+      if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,this.context,req,this.hookIncarnation,hooksFixtureEnabled(this.plugin));
       const result = await this.call(req);
       if(req.method !== "plugin/init") validateRuntimeResult(req.method,result,this.outputLimit - 1);
       return id === undefined ? undefined : { jsonrpc: '2.0', id, result };
@@ -90,6 +94,7 @@ export class Dispatcher {
         const result = decodeInitResult(encodeInitResult(base));
         validateInitResult(input,result);
         await this.identity(input.identity,this.context);
+        this.hookIncarnation = input.incarnation;
         this.initialized = true;
         return result;
       }

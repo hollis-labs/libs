@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hooks.schema.json",
+  "description": "hooks/1 reserved data-only DTOs. Strict runtime validators additionally enforce branches, tuples, nonzero trace IDs, integer tokens, request/notification context and correlated outputs.",
+  "$defs": {
+    "HookFailureCode": {
+      "type": "string",
+      "enum": [
+        "remote_not_allowed",
+        "latency_budget_exceeded",
+        "schema_mismatch",
+        "profile_unavailable",
+        "stale_scope",
+        "stale_binding",
+        "capacity_exhausted",
+        "deadline_exceeded",
+        "caller_cancelled",
+        "depth_exceeded",
+        "callback_cycle",
+        "transport_failure",
+        "handler_panic",
+        "invalid_output",
+        "handler_error"
+      ]
+    },
+    "HookKind": {
+      "type": "string",
+      "enum": [
+        "action",
+        "filter"
+      ]
+    },
+    "HookMode": {
+      "type": "string",
+      "enum": [
+        "sequential",
+        "parallel",
+        "bail",
+        "waterfall",
+        "async",
+        "after_commit"
+      ]
+    },
+    "HookStatus": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "cancelled",
+        "approval_required",
+        "failed",
+        "unavailable"
+      ]
+    },
+    "HookScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "incarnation": {
+          "$ref": "init.schema.json#/$defs/RuntimeIdentity"
+        },
+        "registration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "incarnation",
+        "registration_id"
+      ]
+    },
+    "HookTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "span_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "parent_span_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id"
+      ]
+    },
+    "HookFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/HookFailureCode"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 16384
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "HookErrorData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "const": "hooks/1"
+        },
+        "code": {
+          "enum": [
+            "invalid_params",
+            "profile_unavailable",
+            "invalid_request",
+            "parse_error",
+            "method_not_found"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "contract",
+        "code"
+      ]
+    },
+    "HookHandleParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "hook": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "schema_digest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "$ref": "#/$defs/HookKind"
+        },
+        "mode": {
+          "$ref": "#/$defs/HookMode"
+        },
+        "scope": {
+          "$ref": "#/$defs/HookScope"
+        },
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        },
+        "payload": {
+          "x-raw-preserve": true
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "aggregate_budget_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "trace": {
+          "$ref": "#/$defs/HookTrace"
+        },
+        "root_invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "parent_invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "invocation_id",
+        "catalog_version",
+        "hook",
+        "schema_digest",
+        "kind",
+        "mode",
+        "scope",
+        "context",
+        "payload",
+        "metadata",
+        "deadline",
+        "aggregate_budget_ms",
+        "depth",
+        "trace",
+        "root_invocation_id"
+      ]
+    },
+    "HookHandleResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "invocation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "status": {
+          "$ref": "#/$defs/HookStatus"
+        },
+        "payload": {
+          "x-raw-preserve": true
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "error": {
+          "$ref": "#/$defs/HookFailure"
+        }
+      },
+      "required": [
+        "invocation_id",
+        "status"
+      ]
+    },
+    "HookHandleBatchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/HookHandleParams"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "HookHandleBatchResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/HookHandleResult"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    }
+  }
+}

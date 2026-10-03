@@ -42,6 +42,7 @@ for (const name of names) {
       if (step.expect === undefined) continue;
       const reply = await replies.next();
       assert.equal(reply.done, false, 'stdout closed before expected reply');
+      if(step.expect_contains) assert.ok(reply.value.includes(step.expect_contains),reply.value);
       const actual = parseJSONTokens(reply.value);
       if (step.message_prefix) {
         assert.ok(actual.error.message.startsWith(step.message_prefix), actual.error.message);

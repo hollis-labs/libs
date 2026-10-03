@@ -14,6 +14,7 @@ export interface Plugin {
   load(context: Context): Awaitable<Wire.LoadResult>;
   unload(context: Context): Awaitable<void>;
 }
+export interface HookHandler { hookHandle(context: Context, params: import('./hooks.js').HookRequest): Awaitable<import('./hooks.js').HookResult>; }
 export interface CommandHandler { command(context: Context, params: Wire.CommandExecParams): Awaitable<Wire.CommandExecResult>; }
 export interface EventHandler { eventHandle(context: Context, params: Wire.EventHandleParams): Awaitable<Wire.EventHandleResult>; }
 export interface HealthChecker { health(context: Context): Awaitable<Wire.HealthResult>; }
@@ -30,4 +31,4 @@ export interface HTTPResponse extends Omit<Wire.HTTPResponse, 'body'> { body?: U
 export interface HTTPHandler { httpHandle(context: Context, params: HTTPRequest): Awaitable<HTTPResponse>; }
 export interface Migrator { migrate(context: Context, fromVersion: string, toVersion: string): Awaitable<void>; }
 export interface IdentityAware { identity(context: Context, value: unknown): Awaitable<void>; }
-export type ServerPlugin = Plugin & Partial<CommandHandler & EventHandler & HealthChecker & CRUDHandler & MCPHandler & HTTPHandler & Migrator & IdentityAware>;
+export type ServerPlugin = Plugin & Partial<HookHandler & CommandHandler & EventHandler & HealthChecker & CRUDHandler & MCPHandler & HTTPHandler & Migrator & IdentityAware>;

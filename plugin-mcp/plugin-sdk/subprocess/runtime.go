@@ -91,6 +91,9 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 	setPackageLogger(logger)
 	srv := &server{plugin: p, logger: logger, secrets: secrets, unloadDone: make(chan struct{}), outputLimit: limits.OutputBytes}
 	srv.detectCapabilities()
+	if hookFixtureSetup != nil {
+		hookFixtureSetup(srv)
+	}
 	fatal := make(chan error, 1)
 	srv.fence = func(err error) {
 		select {

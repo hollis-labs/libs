@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
+	"github.com/hollis-labs/plugin-sdk/capability"
 )
 
 // Serve runs the JSON-RPC server loop against a plugin, reading
@@ -48,18 +49,20 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 
 // server holds the per-invocation state for one Serve call.
 type server struct {
-	initMu        sync.Mutex
-	initAttempted bool
-	initialized   bool
-	plugin        Plugin
-	writeFrame    func([]byte)
-	outputLimit   int
-	fence         func(error)
-	unloadOnce    sync.Once
-	unloadDone    chan struct{}
-	unloadErr     error
-	logger        plugin.Logger
-	secrets       *secretTracker
+	hooksFixtureEnabled bool
+	hooksIncarnation    capability.RuntimeIdentity
+	initMu              sync.Mutex
+	initAttempted       bool
+	initialized         bool
+	plugin              Plugin
+	writeFrame          func([]byte)
+	outputLimit         int
+	fence               func(error)
+	unloadOnce          sync.Once
+	unloadDone          chan struct{}
+	unloadErr           error
+	logger              plugin.Logger
+	secrets             *secretTracker
 
 	// Capability flags — populated by detectCapabilities.
 	asCommand  CommandHandler
@@ -131,6 +134,8 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		ctx = withForwardContext(ctx, forward)
 	}
 	switch req.Method {
+	case MethodHookHandle, MethodHookHandleBatch:
+		s.dispatchHook(ctx, req)
 	case MethodInit:
 		if !req.ID.positiveInteger() {
 			s.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID")
@@ -168,6 +173,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		}
 		s.notifyIdentity(ctx, params.Identity)
 		s.initMu.Lock()
+		s.hooksIncarnation = params.Incarnation
 		s.initialized = true
 		s.initMu.Unlock()
 		s.writeResult(req.ID, res)

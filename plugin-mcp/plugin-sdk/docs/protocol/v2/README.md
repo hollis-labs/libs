@@ -170,3 +170,5 @@ getters or callback code.
 `framing-crlf.json` are normative shared runtime transcripts. Focused runtime
 tests cover malformed UTF-8, truncated EOF, blocked writes, partial writes,
 base64 expansion and an error that cannot fit the output budget.
+
+[Reserved hooks/1 wire and host codecs](hooks.md) describe the independently gated hook methods and shared hook conformance fixtures.

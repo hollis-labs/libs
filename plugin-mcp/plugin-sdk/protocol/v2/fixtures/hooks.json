@@ -1,0 +1,1249 @@
+[
+  {
+    "name": "filter request",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "payload null",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "lossless payload",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"n\":1.50,\"huge\":9007199254740993,\"k\\u005b\":\"<x>&\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "missing invocation_id",
+    "dto": "HookHandleParams",
+    "raw": "{\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing catalog_version",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing hook",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing schema_digest",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing kind",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing mode",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing scope",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing context",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing payload",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing metadata",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing deadline",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing aggregate_budget_ms",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing depth",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing trace",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "missing root_invocation_id",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"}}",
+    "valid": false
+  },
+  {
+    "name": "null invocation_id",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":null,\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null catalog_version",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":null,\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null hook",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":null,\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null schema_digest",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":null,\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null kind",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":null,\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null mode",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":null,\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null scope",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":null,\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null context",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":null,\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null metadata",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":null,\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null deadline",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":null,\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null aggregate_budget_ms",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":null,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null depth",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":null,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null trace",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":null,\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "null root_invocation_id",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":null}",
+    "valid": false
+  },
+  {
+    "name": "unknown key",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\",\"unknown\":true}",
+    "valid": false
+  },
+  {
+    "name": "case alias",
+    "dto": "HookHandleParams",
+    "raw": "{\"Invocation_ID\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "duplicate nested",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\",\"title\":\"new\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "timeout_ms 1.0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1.0},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "timeout_ms 1e0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1e0},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "timeout_ms 0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":0},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "timeout_ms -1",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":-1},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "timeout_ms 9007199254740992",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":9007199254740992},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "aggregate_budget_ms 1.0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1.0,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "aggregate_budget_ms 1e0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1e0,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "aggregate_budget_ms 0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":0,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "aggregate_budget_ms -1",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":-1,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "aggregate_budget_ms 9007199254740992",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":9007199254740992,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "depth 1.0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1.0,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "depth 1e0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1e0,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "depth 0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":0,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "depth -1",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":-1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "depth 9007199254740992",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":9007199254740992,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "owner_generation 1.0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1.0},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "owner_generation 1e0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1e0},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "owner_generation 0",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":0},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "owner_generation -1",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":-1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "owner_generation 9007199254740992",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":9007199254740992},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid deadline 2026-02-30T12:00:00Z",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2026-02-30T12:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid deadline 2030-01-01T00:00:00+00:00",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00+00:00\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid kind unknown",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"unknown\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid mode unknown",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"unknown\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid mode sequential",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "invalid hook BadHook",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"BadHook\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "forward parent_call forbidden",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":1}},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "request missing binding",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": false
+  },
+  {
+    "name": "action sequential",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "notify sequential",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "notify no binding sequential",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "batch sequential",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch notify sequential",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "action parallel",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"parallel\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "notify parallel",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"parallel\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "notify no binding parallel",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"parallel\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "batch parallel",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"parallel\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch notify parallel",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"parallel\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "action bail",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"bail\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "notify bail",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"bail\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "notify no binding bail",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"bail\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "batch bail",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"bail\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": false
+  },
+  {
+    "name": "batch notify bail",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"bail\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "action async",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"async\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "notify async",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"async\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "notify no binding async",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"async\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "batch async",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"async\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch notify async",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"async\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "action after_commit",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"after_commit\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "notify after_commit",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"after_commit\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "notify no binding after_commit",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"after_commit\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "batch after_commit",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"after_commit\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch notify after_commit",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"after_commit\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": true
+  },
+  {
+    "name": "filter notification",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false,
+    "notification": true
+  },
+  {
+    "name": "batch filter forbidden",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": false
+  },
+  {
+    "name": "batch length 0",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[]}",
+    "valid": false,
+    "notification": false
+  },
+  {
+    "name": "batch length 1",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-0\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch length 64",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-0\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-2\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-3\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-4\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-5\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-6\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-7\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-8\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-9\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-10\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-11\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-12\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-13\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-14\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-15\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-16\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-17\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-18\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-19\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-20\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-21\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-22\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-23\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-24\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-25\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-26\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-27\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-28\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-29\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-30\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-31\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-32\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-33\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-34\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-35\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-36\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-37\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-38\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-39\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-40\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-41\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-42\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-43\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-44\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-45\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-46\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-47\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-48\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-49\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-50\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-51\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-52\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-53\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-54\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-55\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-56\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-57\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-58\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-59\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-60\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-61\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-62\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-63\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "batch length 65",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-0\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-2\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-3\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-4\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-5\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-6\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-7\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-8\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-9\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-10\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-11\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-12\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-13\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-14\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-15\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-16\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-17\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-18\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-19\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-20\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-21\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-22\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-23\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-24\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-25\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-26\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-27\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-28\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-29\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-30\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-31\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-32\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-33\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-34\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-35\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-36\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-37\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-38\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-39\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-40\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-41\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-42\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-43\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-44\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-45\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-46\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-47\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-48\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-49\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-50\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-51\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-52\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-53\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-54\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-55\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-56\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-57\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-58\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-59\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-60\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-61\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-62\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-63\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-64\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false,
+    "notification": false
+  },
+  {
+    "name": "duplicate invocations",
+    "dto": "HookHandleBatchParams",
+    "raw": "{\"items\":[{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"},{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"action\",\"mode\":\"sequential\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":null,\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}]}",
+    "valid": false
+  },
+  {
+    "name": "result ok",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\",\"payload\":null}",
+    "valid": true
+  },
+  {
+    "name": "contradictory ok",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\",\"payload\":null,\"reason\":\"veto\"}",
+    "valid": false
+  },
+  {
+    "name": "result cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"cancelled\"}",
+    "valid": true
+  },
+  {
+    "name": "contradictory cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"cancelled\",\"error\":{\"code\":\"handler_error\"}}",
+    "valid": false
+  },
+  {
+    "name": "result approval_required",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"approval_required\"}",
+    "valid": true
+  },
+  {
+    "name": "contradictory approval_required",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"approval_required\",\"error\":{\"code\":\"handler_error\"}}",
+    "valid": false
+  },
+  {
+    "name": "result failed",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"handler_error\"}}",
+    "valid": true
+  },
+  {
+    "name": "contradictory failed",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"handler_error\"},\"reason\":\"veto\"}",
+    "valid": false
+  },
+  {
+    "name": "result unavailable",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"unavailable\",\"error\":{\"code\":\"handler_error\"}}",
+    "valid": true
+  },
+  {
+    "name": "contradictory unavailable",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"unavailable\",\"error\":{\"code\":\"handler_error\"},\"reason\":\"veto\"}",
+    "valid": false
+  },
+  {
+    "name": "result unknown",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"unknown\"}",
+    "valid": false
+  },
+  {
+    "name": "missing error failed",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\"}",
+    "valid": false
+  },
+  {
+    "name": "missing error unavailable",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"unavailable\"}",
+    "valid": false
+  },
+  {
+    "name": "failure remote_not_allowed",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"remote_not_allowed\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure latency_budget_exceeded",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"latency_budget_exceeded\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure schema_mismatch",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"schema_mismatch\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure profile_unavailable",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"profile_unavailable\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure stale_scope",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"stale_scope\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure stale_binding",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"stale_binding\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure capacity_exhausted",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"capacity_exhausted\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure deadline_exceeded",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"deadline_exceeded\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure caller_cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"caller_cancelled\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure depth_exceeded",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"depth_exceeded\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure callback_cycle",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"callback_cycle\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure transport_failure",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"transport_failure\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure handler_panic",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"handler_panic\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure invalid_output",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"invalid_output\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure handler_error",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"handler_error\"}}",
+    "valid": true
+  },
+  {
+    "name": "failure other",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"failed\",\"error\":{\"code\":\"other\"}}",
+    "valid": false
+  },
+  {
+    "name": "correlated action sequential ok",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\"}",
+    "valid": true,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "sequential",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated action sequential cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"cancelled\"}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "sequential",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated action sequential approval_required",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"approval_required\"}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "sequential",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated action bail ok",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\"}",
+    "valid": true,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "bail",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated action bail cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"cancelled\"}",
+    "valid": true,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "bail",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated action bail approval_required",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"approval_required\"}",
+    "valid": true,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "bail",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated filter waterfall ok",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\",\"payload\":null}",
+    "valid": true,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "filter",
+      "mode": "waterfall",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated filter waterfall cancelled",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"cancelled\"}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "filter",
+      "mode": "waterfall",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlated filter waterfall approval_required",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"approval_required\"}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "filter",
+      "mode": "waterfall",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "correlation mismatch",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-other\",\"status\":\"ok\",\"payload\":{}}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "filter",
+      "mode": "waterfall",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "filter requires output",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\"}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "filter",
+      "mode": "waterfall",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": {
+        "title": "old"
+      },
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "action forbids output",
+    "dto": "HookHandleResult",
+    "raw": "{\"invocation_id\":\"call-1\",\"status\":\"ok\",\"payload\":null}",
+    "valid": false,
+    "request": {
+      "invocation_id": "call-1",
+      "catalog_version": "1",
+      "hook": "example.record.before_save",
+      "schema_digest": "decl-v1",
+      "kind": "action",
+      "mode": "sequential",
+      "scope": {
+        "incarnation": {
+          "host_instance": "fixture-host",
+          "owner_id": "fixture",
+          "owner_generation": 1
+        },
+        "registration_id": "reg-1"
+      },
+      "context": {
+        "binding_id": "binding-1",
+        "timeout_ms": 1000
+      },
+      "payload": null,
+      "metadata": {},
+      "deadline": "2030-01-01T00:00:00Z",
+      "aggregate_budget_ms": 1000,
+      "depth": 1,
+      "trace": {
+        "trace_id": "0123456789abcdef0123456789abcdef",
+        "span_id": "0123456789abcdef"
+      },
+      "root_invocation_id": "root-1"
+    }
+  },
+  {
+    "name": "escaped x\\u005b",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"x\\u005b\":1.50},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  },
+  {
+    "name": "escaped x\\u005d",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"x\\u005d\":1.50},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true,
+    "notification": false
+  }
+]
