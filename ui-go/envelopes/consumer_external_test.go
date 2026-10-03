@@ -16,7 +16,7 @@ import (
 )
 
 // TestExternalConsumer runs a separate Go module from a temp directory. Its
-// working directory has no sibling go-envelopes checkout, so all runtime and
+// working directory has no sibling checkout of the ui-go module, so all runtime and
 // generation assets must come through the imported module API.
 func TestExternalConsumer(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
@@ -26,7 +26,7 @@ func TestExternalConsumer(t *testing.T) {
 	// This package lives in envelopes/ of the ui-go module; the module root is its parent.
 	repositoryRoot := filepath.Dir(filepath.Dir(filename))
 	consumerDir := t.TempDir()
-	resolvedSibling := filepath.Clean(filepath.Join(consumerDir, "..", "..", "libs", "go-envelopes"))
+	resolvedSibling := filepath.Clean(filepath.Join(consumerDir, "..", "..", "libs", "ui-go"))
 	if _, err := os.Stat(resolvedSibling); !os.IsNotExist(err) {
 		t.Fatalf("consumer independence precondition failed: %s exists or stat returned %v", resolvedSibling, err)
 	}
