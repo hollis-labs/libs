@@ -334,8 +334,26 @@ export function planResponse(
   };
   for (const kind of Object.keys(r.contributions).sort())
     for (const key of Object.keys(r.contributions[kind]).sort()) {
-      const c = r.contributions[kind][key],
-        d = own(policy.kinds, kind),
+      const original = r.contributions[kind][key];
+      const unknownStatus = ![
+        "accepted",
+        "declared_not_selected",
+        "refused",
+        "unavailable",
+      ].includes(original.status);
+      const c = unknownStatus
+        ? { ...original, status: "unavailable" }
+        : original;
+      if (unknownStatus)
+        plan.statusDiagnostics.push({
+          owner_id: c.owner_id,
+          owner_generation: c.owner_generation,
+          kind,
+          local_key: c.local_key,
+          required: c.required,
+          reason: "unknown-status",
+        });
+      const d = own(policy.kinds, kind),
         wire = own(r.kinds, kind);
       if (c.status === "refused") {
         plan.listed.push(c);
@@ -399,15 +417,6 @@ export function planResponse(
       } else {
         plan.listed.push(c);
         if (c.status === "accepted") plan.accepted.push(c);
-        else if (!["declared_not_selected", "unavailable"].includes(c.status))
-          plan.statusDiagnostics.push({
-            owner_id: c.owner_id,
-            owner_generation: c.owner_generation,
-            kind,
-            local_key: c.local_key,
-            required: c.required,
-            reason: "unknown-status",
-          });
       }
     }
   return plan;

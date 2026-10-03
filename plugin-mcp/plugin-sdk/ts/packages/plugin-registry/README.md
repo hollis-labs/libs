@@ -121,8 +121,9 @@ listed declarations, including unresolved exports. `snapshot` exposes declared
 entries, resolution state and owner generations; `refusals` and `errors` expose
 named admission and lifecycle failures. Entries carry host-declared `status` and
 optional `status_reason`. Only `accepted` entries resolve. `declared_not_selected`,
-`unavailable`, and unknown statuses remain listed and inactive; unknown values
-emit `status-diagnostic` with reason `unknown-status`. A retained `refused` entry
+`unavailable`, and unknown statuses remain listed and inactive. Unknown values
+project as `unavailable` and emit `status-diagnostic` with reason `unknown-status`,
+without echoing the raw status; `status_reason` stays as supplied. A retained `refused` entry
 must match the authoritative top-level refusal. Status never bypasses admission
 checks or adds SDK selection logic. `subscribe` and `version` support
 external-store integrations. Hosts define the meaning of kinds, ordering,

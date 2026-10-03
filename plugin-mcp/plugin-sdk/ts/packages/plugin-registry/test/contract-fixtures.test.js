@@ -9,6 +9,7 @@ import {
   validateResponse,
   RegistryError,
   planResponse,
+  createPluginRegistry,
 } from "../dist/index.js";
 
 // Shared fixtures stay frozen per released registry version; both authored views use
@@ -60,4 +61,41 @@ test("unknown optional shared fixture degrades visibly at admission", () => {
   assert.equal(plan.requiredFailed, false);
   assert.equal(plan.accepted.length, 0);
   assert.equal(plan.refusals[0].reason, "unsupported-kind");
+});
+
+test("shared unknown-status projection normalizes plan and published snapshot", async () => {
+  const fixture = JSON.parse(
+    readFileSync(join(dir, "unknown-status.json"), "utf8"),
+  );
+  const response = fixture.response,
+    expected = fixture.projection;
+  const policy = { kinds: response.kinds, regions: response.regions };
+  const plan = planResponse(response, policy);
+  assert.equal(plan.listed[0].status, expected.status);
+  assert.equal(plan.listed[0].status_reason, expected.status_reason);
+  assert.equal(plan.accepted.length, expected.accepted);
+  assert.deepEqual(
+    plan.statusDiagnostics.map((d) => d.reason),
+    expected.diagnostics,
+  );
+  const events = [];
+  const registry = createPluginRegistry({
+    ...policy,
+    runtimes: { react: "19.1.0" },
+    stylesheets: false,
+    fetchBundle: async () => assert.fail("inactive bundle fetched"),
+    importModule: async () => assert.fail("inactive bundle imported"),
+    onDiagnostic: (event) => events.push(event),
+  });
+  assert.equal((await registry.sync(JSON.stringify(response))).accepted, true);
+  const snapshot = registry.snapshot();
+  assert.equal(snapshot.contributions[0].status, expected.status);
+  assert.equal(snapshot.contributions[0].status_reason, expected.status_reason);
+  assert.equal(snapshot.contributions[0].resolved, false);
+  assert.deepEqual(
+    events.map((event) => event.diagnostic.reason),
+    expected.diagnostics,
+  );
+  const raw = response.contributions[expected.kind][expected.key].status;
+  assert.equal(JSON.stringify({ plan, snapshot, events }).includes(raw), false);
 });

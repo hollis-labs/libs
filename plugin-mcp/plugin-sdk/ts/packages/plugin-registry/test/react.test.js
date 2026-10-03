@@ -107,7 +107,10 @@ test("React never resolves inactive statuses and fences a newly unselected captu
     c.contributions.panel["p/main"].status = status;
     assert.equal((await registry.sync(c)).accepted, true);
     assert.equal(registry.get("panel", "p/main"), undefined);
-    assert.equal(registry.snapshot().contributions[0].status, status);
+    assert.equal(
+      registry.snapshot().contributions[0].status,
+      status === "future_status" ? "unavailable" : status,
+    );
   }
   const registry = createReactPluginRegistry(options);
   await registry.sync(response());

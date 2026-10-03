@@ -8,7 +8,9 @@
   name; there is no v1 fallback.
 - Require per-entry `status` and carry optional `status_reason`. Only `accepted`
   entries activate. Inactive entries stay listed without import or mounting;
-  unknown statuses produce diagnostics. Top-level refusals remain authoritative.
+  unknown nonempty statuses project as `unavailable`, preserve `status_reason`
+  and produce `unknown-status` diagnostics without echoing the raw status.
+  Empty/missing status remains invalid. Top-level refusals remain authoritative.
 - Revoke before replacement import, dispose in reverse order, quarantine failed
   cleanup and reject stale completions. React components retain generation gates;
   unchanged data retains identity and one disposer.

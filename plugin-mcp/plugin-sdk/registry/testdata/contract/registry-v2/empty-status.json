@@ -1,5 +1,5 @@
 {
-  "description": "Unknown nonempty status projects as unavailable, preserves reason, and emits unknown-status without echoing the raw status.",
+  "description": "An empty status remains invalid.",
   "response": {
     "host_instance": "host-epoch",
     "revision": 2,
@@ -61,7 +61,7 @@
             "region": "rail"
           },
           "public_binding": "notes-panel",
-          "status": "future_status",
+          "status": "",
           "status_reason": "host-state"
         }
       }
@@ -70,19 +70,9 @@
     "registry_version": 2
   },
   "go": {
-    "validate": "ok"
+    "validate": "ErrInvalidContribution"
   },
   "ts": {
-    "validate": "ok"
-  },
-  "projection": {
-    "kind": "panel",
-    "key": "notes/main",
-    "status": "unavailable",
-    "status_reason": "host-state",
-    "diagnostics": [
-      "unknown-status"
-    ],
-    "accepted": 0
+    "validate": "ErrInvalidContribution"
   }
 }
