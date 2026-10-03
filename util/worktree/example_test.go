@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // exampleRepo creates a throwaway repository with one commit. Examples print

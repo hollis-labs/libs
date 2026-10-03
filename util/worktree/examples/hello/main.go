@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 func main() {

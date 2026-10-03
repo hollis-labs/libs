@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 var ctx = context.Background()

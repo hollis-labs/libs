@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // ErrUnavailable is wrapped when the gh binary cannot be found.

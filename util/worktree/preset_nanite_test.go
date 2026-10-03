@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // Translations of Nanite's internal/worktree/manager_test.go against the

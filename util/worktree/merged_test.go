@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 type fakeSource struct {

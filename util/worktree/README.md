@@ -11,7 +11,7 @@ It manages the `git worktree` lifecycle for tools that give each agent run, work
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-worktree
+go get github.com/hollis-labs/libs/util/worktree
 ```
 
 Requires Go 1.26.6 or newer and a `git` binary on `PATH` at runtime. The root package is standard library only. The `ghmerged` sub-package also needs the GitHub CLI (`gh`) at runtime, and only when you use it.
@@ -28,7 +28,7 @@ import (
 	"os"
 	"os/exec"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 func main() {

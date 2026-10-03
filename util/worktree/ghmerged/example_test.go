@@ -3,7 +3,7 @@ package ghmerged_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-worktree/ghmerged"
+	"github.com/hollis-labs/libs/util/worktree/ghmerged"
 )
 
 // A Source is configured, not called, here: Merged shells out to gh in the

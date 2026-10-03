@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // TestMain isolates every git invocation in this test binary from the

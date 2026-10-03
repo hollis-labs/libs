@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // These tests are translations of Torque's internal/worktree perrun_test.go

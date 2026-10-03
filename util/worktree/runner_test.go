@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 type recorder struct {

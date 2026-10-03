@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // Translations of Tether's internal/workspace/workroot_test.go against the

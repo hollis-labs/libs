@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	worktree "github.com/hollis-labs/go-worktree"
+	worktree "github.com/hollis-labs/libs/util/worktree"
 )
 
 // fakeGH writes a shell script standing in for gh. It records its arguments
