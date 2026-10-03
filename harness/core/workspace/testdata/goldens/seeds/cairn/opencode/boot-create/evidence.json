@@ -1,0 +1,26 @@
+{
+  "writer": "cairn",
+  "source_commit": "f08641f056911927bb01b1f0de1472de2290cfb2",
+  "legacy_bundle_seed_commit": "6da0e3864698c75bf4e00b115b1bc264a614c8d2",
+  "fixture": "neutral miniature bundle (not the legacy bundle)",
+  "bindings": {
+    "cwd_preference": "project_dir",
+    "project_dir_arg": [
+      "{{.ProjectDir}}"
+    ],
+    "env_amendments": [
+      "OPENCODE_CONFIG_DIR={{.BootDir}}"
+    ],
+    "home_resource_paths": null
+  },
+  "exit_code": 0,
+  "diagnostics": [
+    "cairn: the opencode layout has nowhere to plant spec.prompts, which declares \"handoff\", so this boot directory carries none. Everything else it declared rendered, and the boot directory is complete.",
+    "cairn: the opencode layout has nowhere to plant spec.subagents, which declares \"reviewer\", so this boot directory carries none. Everything else it declared rendered, and the boot directory is complete.",
+    "cairn: the opencode layout does not render spec.mcp, which declares \"fixture\", so this boot directory carries none of it (OpenCode keeps both in opencode.json, which cairn renders once the library renderer lands, CW-20260930-0136). Everything else it declared rendered, and the boot directory is complete."
+  ],
+  "ownership": {
+    "boot": "disposable tree",
+    "installed": "Cairn owned-key merge"
+  }
+}

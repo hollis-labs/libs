@@ -1,0 +1,29 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "/fixture/project",
+    "Env": [
+      "OPENCODE_CONFIG_DIR=<boot>"
+    ],
+    "ExtraArgs": [
+      "--dir",
+      "/fixture/project"
+    ],
+    "First": [
+      "serve",
+      "--port",
+      "0",
+      "--hostname",
+      "127.0.0.1"
+    ],
+    "Resumed": [
+      "serve",
+      "--port",
+      "0",
+      "--hostname",
+      "127.0.0.1"
+    ]
+  },
+  "diagnostics": []
+}

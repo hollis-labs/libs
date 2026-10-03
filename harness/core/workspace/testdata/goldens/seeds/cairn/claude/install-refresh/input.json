@@ -1,0 +1,5 @@
+{
+  "provider": "claude",
+  "scenario": "refresh",
+  "operation": "install"
+}

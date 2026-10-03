@@ -2,7 +2,7 @@
   "fixture": "cairn-install",
   "source": {
     "app": "cairn",
-    "checkout": "/Users/chrispian/dev/projects/cairn",
+    "checkout": "/fixture-root/dev/projects/cairn",
     "head": "3735a92",
     "dirty": false,
     "paths": [

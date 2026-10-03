@@ -1,0 +1,127 @@
+{
+  "writer": "agentlaunch",
+  "source": "substrate legacy planting baseline",
+  "bindings": {
+    "operation": "create",
+    "changes": [
+      {
+        "path": "empty",
+        "kind": "create",
+        "entry_id": "fixture:empty",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "",
+          "hex": ""
+        }
+      },
+      {
+        "path": "skills/sample/SKILL.md",
+        "kind": "create",
+        "entry_id": "fixture:skill",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "046c899b2417d0ebc75adb230fd77e6aba2b8ecc59b867339bff6e95284e6fea"
+        }
+      },
+      {
+        "path": "skills/sample/data.bin",
+        "kind": "create",
+        "entry_id": "fixture:data",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
+        }
+      },
+      {
+        "path": "skills/sample/scripts/run.sh",
+        "kind": "create",
+        "entry_id": "fixture:script",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        }
+      }
+    ],
+    "complete": true
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "empty",
+      "kind": "directory",
+      "mode": 488,
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      },
+      "ownership": {
+        "entry_id": "fixture:empty",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "046c899b2417d0ebc75adb230fd77e6aba2b8ecc59b867339bff6e95284e6fea"
+      },
+      "ownership": {
+        "entry_id": "fixture:skill",
+        "group_id": "fixture"
+      },
+      "provenance": {
+        "source": "fixture"
+      }
+    },
+    {
+      "path": "skills/sample/data.bin",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
+      },
+      "ownership": {
+        "entry_id": "fixture:data",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "fixture:script",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    }
+  ]
+}

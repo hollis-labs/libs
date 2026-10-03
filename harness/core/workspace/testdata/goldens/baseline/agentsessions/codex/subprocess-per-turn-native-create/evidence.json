@@ -1,0 +1,32 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "<boot>",
+    "Env": [
+      "CODEX_HOME=<boot>"
+    ],
+    "ExtraArgs": null,
+    "First": [
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "--cd",
+      "/fixture/project",
+      "--",
+      "Fixture turn."
+    ],
+    "Resumed": [
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "--cd",
+      "/fixture/project",
+      "resume",
+      "fixture-session",
+      "--",
+      "Fixture next turn."
+    ]
+  },
+  "diagnostics": []
+}

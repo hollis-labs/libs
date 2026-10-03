@@ -66,7 +66,7 @@ func TestSeedClaudeWorkspaceTrust_PreservesExistingKeys(t *testing.T) {
 		"anonymousId":  "abc-123",
 		"someOtherKey": []any{"a", "b"},
 		"projects": map[string]any{
-			"/Users/me/repoA": map[string]any{
+			"/fixture-root/repoA": map[string]any{
 				"hasTrustDialogAccepted": true,
 				"allowedTools":           []any{"Edit", "Bash"},
 			},
@@ -94,7 +94,7 @@ func TestSeedClaudeWorkspaceTrust_PreservesExistingKeys(t *testing.T) {
 	}
 
 	projects, _ := cfg["projects"].(map[string]any)
-	repoA, _ := projects["/Users/me/repoA"].(map[string]any)
+	repoA, _ := projects["/fixture-root/repoA"].(map[string]any)
 	if repoA == nil {
 		t.Fatalf("existing projects entry dropped: %v", projects)
 	}
@@ -358,7 +358,7 @@ func TestClaudeSettingsDocument_WritesNothing(t *testing.T) {
 	setHomeForTest(t, homeDir)
 
 	a := NewClaudeAdapterDev()
-	a.AdditionalDirectories = []string{"/Users/x/dev"}
+	a.AdditionalDirectories = []string{"/fixture-root/dev"}
 
 	doc, err := a.SettingsDocument()
 	if err != nil {
@@ -402,7 +402,7 @@ func TestClaudeSettingsDocument_WritesNothing(t *testing.T) {
 func TestClaudeSettingsDocument_IgnoresOperatorConfig(t *testing.T) {
 	a := &ClaudeAdapter{
 		PermissionMode:        "acceptEdits",
-		AdditionalDirectories: []string{"/Users/x/dev"},
+		AdditionalDirectories: []string{"/fixture-root/dev"},
 	}
 
 	emptyHome := t.TempDir()

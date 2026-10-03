@@ -1,0 +1,15 @@
+{
+  "writer": "cairn",
+  "source_commit": "f08641f056911927bb01b1f0de1472de2290cfb2",
+  "legacy_bundle_seed_commit": "6da0e3864698c75bf4e00b115b1bc264a614c8d2",
+  "fixture": "neutral miniature bundle (not the legacy bundle)",
+  "bindings": {},
+  "exit_code": 1,
+  "diagnostics": [
+    "cairn: --provider \"opencode\": unsupported provider: the opencode layout covers the boot directory only — cairn has no installed layer for it"
+  ],
+  "ownership": {
+    "boot": "disposable tree",
+    "installed": "Cairn owned-key merge"
+  }
+}

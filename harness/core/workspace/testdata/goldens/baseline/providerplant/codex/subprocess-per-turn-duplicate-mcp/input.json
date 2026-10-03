@@ -1,0 +1,6 @@
+{
+  "provider": "codex",
+  "runtime": "subprocess-per-turn",
+  "variant": "native",
+  "scenario": "duplicate-mcp"
+}
