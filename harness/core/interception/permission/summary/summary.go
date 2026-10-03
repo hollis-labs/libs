@@ -42,7 +42,7 @@ import (
 	"sort"
 	"strings"
 
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 )
 
 // SummaryInput aggregates the data sources the permission summary draws

@@ -3,7 +3,7 @@ package pathgrants_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-permission/pathgrants"
+	"github.com/hollis-labs/substrate/harness/interception/permission/pathgrants"
 )
 
 func ExamplePathGrants_RegisterFromUserMessage() {

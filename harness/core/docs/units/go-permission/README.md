@@ -9,7 +9,7 @@ non-stdlib dependency (`gopkg.in/yaml.v3`).
 
 | Package | What it is |
 |---|---|
-| `github.com/hollis-labs/go-permission` | `Engine`, `RuleSet`/`Rule`, approvals, subagent rule derivation, `Auditor` |
+| `github.com/hollis-labs/substrate/harness/interception/permission` | `Engine`, `RuleSet`/`Rule`, approvals, subagent rule derivation, `Auditor` |
 | `.../pathgrants` | session-scoped path grants from explicit path mentions, with parent-session lineage |
 | `.../summary` | renders effective path access as prompt text |
 
@@ -20,7 +20,7 @@ non-stdlib dependency (`gopkg.in/yaml.v3`).
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-permission
+go get github.com/hollis-labs/substrate/harness/interception/permission
 ```
 
 Requires Go 1.26.6 or newer.
@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"time"
 
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 )
 
 func main() {
