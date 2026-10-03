@@ -1,20 +1,14 @@
 package subprocess
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/signal"
-	"runtime/debug"
 	"sync"
-	"syscall"
 
 	plugin "github.com/hollis-labs/plugin-sdk"
-	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
 )
 
 // Serve runs the JSON-RPC server loop against a plugin, reading
@@ -27,8 +21,9 @@ import (
 //  2. Serve reads newline-delimited JSON requests from stdin. Each
 //     request is dispatched in its own goroutine with panic recovery.
 //  3. Unknown methods return ErrCodeMethodNotFound.
-//  4. Stdin EOF or the shutdown signal ends the loop; Serve calls
-//     Unload on the plugin and returns.
+//  4. Explicit unload, stdin EOF or a shutdown signal fences new work,
+//     cancels/drains admitted work, then calls Unload at most once and returns.
+//     The default shutdown budget is five seconds; see ServeWithOptions.
 //
 // The Plugin must implement the minimum Init/Load/Unload contract.
 // Optional capability interfaces (CommandHandler, EventHandler,
@@ -43,149 +38,12 @@ import (
 //	    }
 //	}
 func Serve(p Plugin) error {
-	return serveWith(p, os.Stdin, os.Stdout)
+	return ServeWithOptions(p, ServeOptions{})
 }
 
-// serveWith is the testable entry point. Production code calls Serve,
-// which wires in os.Stdin/os.Stdout.
+// serveWith preserves the package test entry point; injected streams stay caller-owned.
 func serveWith(p Plugin, in io.Reader, out io.Writer) error {
-	if p == nil {
-		return errors.New("subprocess: Serve called with nil plugin")
-	}
-
-	secrets := newSecretTracker()
-	logger := newStderrLogger(secrets)
-	setPackageLogger(logger)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Signal-triggered shutdown.
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
-	defer signal.Stop(sigs)
-
-	srv := &server{
-		plugin:  p,
-		out:     out,
-		logger:  logger,
-		secrets: secrets,
-	}
-	srv.detectCapabilities()
-
-	go func() {
-		<-sigs
-		logger.Info("subprocess: shutdown signal received")
-		cancel()
-	}()
-
-	scanner := bufio.NewScanner(in)
-	// Accept large JSON payloads (default 64KB is small for CRUD
-	// list responses or bulk event data).
-	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
-
-	// Serialize writes so concurrent goroutines do not interleave.
-	var writeMu sync.Mutex
-	srv.writeMu = &writeMu
-
-	// Track outstanding request goroutines so Serve waits for them
-	// before calling Unload and returning.
-	var wg sync.WaitGroup
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for scanner.Scan() {
-			line := append([]byte{}, scanner.Bytes()...)
-			req, fault := decodeEnvelope(line)
-			if fault != nil {
-				srv.writeMessage(*fault)
-				continue
-			}
-			if req == nil { // No outgoing calls exist yet; unsolicited replies have no waiter.
-				continue
-			}
-			// Reject requests admitted before init, even if their goroutine
-			// would otherwise run after a later successful handshake.
-			if req.Method != MethodInit {
-				srv.initMu.Lock()
-				ready := srv.initialized
-				srv.initMu.Unlock()
-				if !ready {
-					srv.writeError(req.ID, ErrCodeInvalidRequest, "successful init required")
-					continue
-				}
-			}
-			// Preserve raw init params: map decoding loses duplicate keys and
-			// precise integer tokens. The handshake is a reader admission barrier.
-			if req.Method == MethodInit {
-				if !req.ID.positiveInteger() {
-					srv.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID")
-					continue
-				}
-				srv.initMu.Lock()
-				attempted := srv.initAttempted
-				srv.initMu.Unlock()
-				if attempted {
-					srv.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted")
-					continue
-				}
-				if strictjson.Validate(line) != nil {
-					srv.initMu.Lock()
-					srv.initAttempted = true
-					srv.initMu.Unlock()
-					srv.writeInitError(req.ID, initInvalid("request"))
-					continue
-				}
-				if req.JSONRPC != "2.0" {
-					srv.initMu.Lock()
-					srv.initAttempted = true
-					srv.initMu.Unlock()
-					srv.writeError(req.ID, ErrCodeInvalidRequest, "invalid init envelope")
-					continue
-				}
-			}
-			run := func(req RPCRequest) {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("subprocess: panic in handler", "method", req.Method, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
-						srv.writeError(req.ID, ErrCodeInternal, fmt.Sprintf("panic: %v", r))
-					}
-				}()
-				srv.dispatch(ctx, req)
-			}
-			if req.Method == MethodInit {
-				run(*req)
-				continue
-			}
-			wg.Add(1)
-			go func(req RPCRequest) { defer wg.Done(); run(req) }(*req)
-		}
-	}()
-
-	select {
-	case <-done:
-		// stdin closed — normal shutdown. Fall through.
-	case <-ctx.Done():
-		// Signal-triggered shutdown. Close stdin would require a
-		// per-platform trick; instead we just wait for in-flight
-		// requests to complete via ctx cancellation.
-	}
-
-	wg.Wait()
-
-	// Final Unload.
-	unloadCtx, unloadCancel := context.WithCancel(context.Background())
-	defer unloadCancel()
-	if err := p.Unload(unloadCtx); err != nil {
-		logger.Error("subprocess: unload returned error", "err", err.Error())
-		return err
-	}
-
-	if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("stdin scanner: %w", err)
-	}
-	return nil
+	return ServeWithOptions(p, ServeOptions{Input: in, Output: out})
 }
 
 // server holds the per-invocation state for one Serve call.
@@ -194,8 +52,10 @@ type server struct {
 	initAttempted bool
 	initialized   bool
 	plugin        Plugin
-	out           io.Writer
-	writeMu       *sync.Mutex
+	writeFrame    func([]byte)
+	unloadOnce    sync.Once
+	unloadDone    chan struct{}
+	unloadErr     error
 	logger        plugin.Logger
 	secrets       *secretTracker
 
@@ -285,7 +145,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		}
 		res, err := s.plugin.Init(ctx, params)
 		if err != nil {
-			s.writeError(req.ID, ErrCodeInternal, err.Error())
+			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
 		// No reverse/hook profile implementation exists yet; decline both.
@@ -304,14 +164,14 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 	case MethodLoad:
 		res, err := s.plugin.Load(ctx)
 		if err != nil {
-			s.writeError(req.ID, ErrCodeInternal, err.Error())
+			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
 		s.writeResult(req.ID, res)
 
 	case MethodUnload:
-		if err := s.plugin.Unload(ctx); err != nil {
-			s.writeError(req.ID, ErrCodeInternal, err.Error())
+		if err := s.unload(ctx); err != nil {
+			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
 		s.writeResult(req.ID, map[string]bool{"ok": true})
@@ -324,7 +184,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		}
 		status, err := s.asHealth.Health(ctx)
 		if err != nil {
-			s.writeResult(req.ID, HealthResult{OK: false, Message: err.Error()})
+			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
 		s.writeResult(req.ID, HealthResult{OK: status.OK, Message: status.Message})
@@ -572,8 +432,7 @@ func (s *server) writeErrorFromPluginErr(id RPCID, err error) {
 }
 
 // writeMessage serializes a response and writes it followed by a
-// newline. Writes are protected by writeMu so concurrent goroutines do
-// not interleave bytes on stdout.
+// newline. The runtime writer serializes frames from concurrent handlers.
 func (s *server) writeMessage(resp RPCResponse) {
 	data, err := json.Marshal(resp)
 	if err != nil {
@@ -584,16 +443,13 @@ func (s *server) writeMessage(resp RPCResponse) {
 			id = []byte("null")
 		}
 		fallback := fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"error":{"code":%d,"message":"marshal failed"}}`+"\n", id, ErrCodeInternal)
-		s.writeMu.Lock()
-		_, _ = s.out.Write([]byte(fallback))
-		s.writeMu.Unlock()
+		s.emit([]byte(fallback))
 		return
 	}
 	data = append(data, '\n')
-	s.writeMu.Lock()
-	_, _ = s.out.Write(data)
-	s.writeMu.Unlock()
+	s.emit(data)
 }
+func (s *server) emit(data []byte) { s.writeFrame(data) }
 
 // decodeParams unmarshals req.Params (which is typed any from the
 // decoded RPCRequest) into a concrete struct. Params decoded from the wire

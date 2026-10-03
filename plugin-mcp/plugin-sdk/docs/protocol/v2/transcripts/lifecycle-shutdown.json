@@ -1,6 +1,6 @@
 {
   "level": "normative",
-  "profile": "health-error",
+  "profile": "lifecycle-shutdown",
   "steps": [
     {
       "level": "normative",
@@ -41,20 +41,18 @@
       }
     },
     {
-      "send": {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "plugin/health"
-      },
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"stop\",\"method\":\"plugin/unload\"}\n{\"jsonrpc\":\"2.0\",\"id\":\"fenced\",\"method\":\"plugin/health\"}",
       "expect": {
         "jsonrpc": "2.0",
-        "id": 1,
-        "error": {
-          "code": -32603,
-          "message": "unhealthy"
+        "id": "stop",
+        "result": {
+          "ok": true
         }
-      },
-      "level": "normative"
+      }
     }
-  ]
+  ],
+  "effects": {
+    "unload_attempts": 1,
+    "health_calls": 0
+  }
 }

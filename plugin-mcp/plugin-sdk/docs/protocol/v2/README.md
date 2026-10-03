@@ -84,7 +84,56 @@ omits `id` for notifications; there is no bigint or rounded numeric ID support.
 
 `transcripts/decoder-findings.json`, `notifications.json` and `envelope-ids.json`
 assert normative envelopes in Go and TS. Other transcripts retain their existing
-normative/observed-quirk levels for payloads, framing and shutdown; those policies
+normative/observed-quirk levels for payloads and framing; those policies
 have separate conformance work. The unchanged [v1 corpus](../v1/README.md) records
 historical protocol-1 behavior and is no longer replayed against current Serve.
 Optional profiles require their own conformance gate.
+
+## Lifecycle shutdown and errors
+
+A valid `plugin/unload` is terminal. Without successful Init it receives -32600
+while still ending the connection through final cleanup. The reader fences new
+work, cancels admitted handler contexts, drains admitted callbacks, and attempts
+Unload once. The result `{ "ok": true }` or mapped callback error is the sole
+correlated terminal reply, flushed before Serve returns; no host EOF is needed.
+A notification unload terminates without a reply. Frames after the unload fence
+are not dispatched or answered. EOF, SIGINT/SIGTERM, external cancellation and
+transport failure use the same cleanup path. An unload error or panic is recorded
+and never retried automatically. Cleanup uses a fresh context/signal, limited by
+the remaining shutdown budget, rather than the cancelled handler context.
+
+Init, Load, Unload and Health callback errors use the ordinary plugin error
+mapping, including wrapped typed errors and the hook-veto sentinel. Init's
+structural failures retain `plugin-init/2`. A missing Health callback defaults
+to `{ "ok": true }`; an authored unhealthy status remains a successful
+`{ "ok": false, "message": "..." }`. A callback failure or panic produces an RPC
+error. Cancellation of a runtime context is separate from the plugin's hook veto.
+Explicit unload callback failure is reported on the wire; cleanup failure without
+an explicit unload reply is returned/rejected by Serve.
+
+The default total shutdown budget is five seconds for drain, cleanup and output
+flush together. Go exposes `ServeWithOptions(plugin, ServeOptions{Context: ctx,
+ShutdownTimeout: duration, Input: reader, Output: writer})`; omitted streams use
+stdin/stdout, and zero timeout uses `DefaultShutdownTimeout`. TS accepts
+`shutdownTimeoutMs` (default `DEFAULT_SHUTDOWN_TIMEOUT_MS`, 5000) with its existing
+`serve` options (positive finite value, at most 2147483647 ms). Budget exhaustion returns Go `ErrShutdownTimeout` or rejects
+with TS `ShutdownTimeoutError`, reporting incomplete cleanup/transport. There is
+no success acknowledgement for unfinished cleanup. If handlers do not drain,
+Unload is not invoked concurrently with them or scheduled later as a retry.
+Callback code ignoring cancellation may still be running after Serve returns;
+these in-process runtimes cannot kill it. Late callbacks cannot enqueue replies.
+TS requires callback code to yield to the event loop for its deadline to run.
+
+Injected I/O remains caller-owned. TS detaches its input listeners at shutdown
+and does not destroy injected streams. Go cannot interrupt an arbitrary injected
+Reader/Writer: the caller must close or otherwise unblock outstanding I/O after
+Serve returns, and must not reuse that I/O while an old operation is blocked.
+An already-started injected write cannot be retracted; close the transport on
+failure. Only runtime-owned pipes may be closed to wake blocked operations.
+
+`lifecycle.json`, `lifecycle-errors.json`, `health-error.json` and
+`lifecycle-shutdown.json` are normative. The shared shutdown recipe checks one
+observed Unload attempt and zero post-fence Health callbacks. Runtime tests cover
+cancellation/drain barriers, cleanup throw/panic, EOF/unload races and deadline
+exhaustion. Payload validation, full frame budgets and reverse profiles retain
+separate implementation gates.
