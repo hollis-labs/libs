@@ -90,7 +90,7 @@ func TestCompatibilityFailClosed(t *testing.T) {
 func TestV2StructureAndStrictDecode(t *testing.T) {
 	m := nodeExample()
 	m.Hooks = []manifest.Hook{{Name: "context.pre_compact", Priority: new(0), Mode: "bail", Timeout: 1000, OnError: "closed"}}
-	m.UI = &manifest.UI{Bundle: "ui/index.js", Stylesheet: "ui/style.css", Isolation: "iframe"}
+	m.UI = &manifest.UI{Bundle: "ui/index.js", Stylesheet: "ui/style.css", Isolation: "sandboxed-frame"}
 	m.Artifact.Files = append(m.Artifact.Files, manifest.ArtifactFile{Path: m.UI.Bundle, SHA256: strings.Repeat("1", 64)}, manifest.ArtifactFile{Path: m.UI.Stylesheet, SHA256: strings.Repeat("2", 64)})
 	m.Artifact.TreeSHA256, _ = manifest.TreeDigest(m.Artifact.Files)
 	var buf bytes.Buffer
@@ -288,10 +288,10 @@ func TestNodeFloorWithUnboundedMin(t *testing.T) {
 
 func TestAdditionalV2Rejections(t *testing.T) {
 	for _, change := range []func(*manifest.Manifest){
-		func(m *manifest.Manifest) { m.UI = &manifest.UI{Bundle: "ui/index.js", Isolation: "iframe"} },
-		func(m *manifest.Manifest) { m.UI = &manifest.UI{Bundle: "../index.js", Isolation: "iframe"} },
+		func(m *manifest.Manifest) { m.UI = &manifest.UI{Bundle: "ui/index.js", Isolation: "sandboxed-frame"} },
+		func(m *manifest.Manifest) { m.UI = &manifest.UI{Bundle: "../index.js", Isolation: "sandboxed-frame"} },
 		func(m *manifest.Manifest) {
-			m.UI = &manifest.UI{Bundle: "ui/index.js", Stylesheet: "ui/a.js", Isolation: "iframe"}
+			m.UI = &manifest.UI{Bundle: "ui/index.js", Stylesheet: "ui/a.js", Isolation: "sandboxed-frame"}
 		},
 		func(m *manifest.Manifest) {
 			m.Hooks = []manifest.Hook{{Name: "session.end", Mode: "parallel", Timeout: 1, OnError: "open"}, {Name: "session.end", Mode: "parallel", Timeout: 1, OnError: "open"}}
@@ -315,5 +315,64 @@ func TestAdditionalV2Rejections(t *testing.T) {
 	}
 	if m.VerifyBundle(link) == nil {
 		t.Fatal("accepted symlink root")
+	}
+}
+
+func TestHookViewAndOnceDeclarations(t *testing.T) {
+	for _, once := range []*bool{nil, new(false), new(true)} {
+		for _, view := range []*string{nil, new("summary"), new("reasoning_blind"), new("host.summary-v2")} {
+			m := nodeExample()
+			m.Hooks = []manifest.Hook{{Name: "session.end", Mode: "sequential", Timeout: 1000, OnError: "open", Once: once, View: view}}
+			var out bytes.Buffer
+			if err := manifest.Encode(&out, m); err != nil {
+				t.Fatal(err)
+			}
+			got, err := manifest.Decode(&out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := got.Hooks[0]
+			if (h.Once == nil) != (once == nil) || (once != nil && *h.Once != *once) || (h.View == nil) != (view == nil) || (view != nil && *h.View != *view) {
+				t.Fatal("option presence or value lost")
+			}
+		}
+	}
+	m := nodeExample()
+	m.Hooks = []manifest.Hook{{Name: "session.end", Mode: "sequential", Timeout: 1000, OnError: "open"}}
+	raw, _ := json.Marshal(m)
+	for _, option := range []string{`"once":"true"`, `"once":1`, `"once":null`, `"Once":true`, `"once":true,"once":false`, `"view":""`, `"view":" "`, `"view":"bad token"`, `"view":"bad\nview"`, `"view":null`, `"view":1`, `"View":"summary"`, `"view":"a","view":"b"`} {
+		bad := strings.Replace(string(raw), `"on_error":"open"`, `"on_error":"open",`+option, 1)
+		if _, err := manifest.Decode(strings.NewReader(bad)); err == nil {
+			t.Fatal("accepted", option)
+		}
+	}
+	for _, view := range []string{"", " ", "bad token", "bad\nview"} {
+		m.Hooks[0].View = new(view)
+		if err := m.Validate(); err == nil {
+			t.Fatal("accepted view", view)
+		}
+	}
+}
+func TestUIIsolationPreferences(t *testing.T) {
+	m := nodeExample()
+	m.UI = &manifest.UI{Bundle: "ui/index.js"}
+	m.Artifact.Files = append(m.Artifact.Files, manifest.ArtifactFile{Path: "ui/index.js", SHA256: strings.Repeat("1", 64)})
+	m.Artifact.TreeSHA256, _ = manifest.TreeDigest(m.Artifact.Files)
+	for _, isolation := range []string{"sandboxed-frame", "main-origin"} {
+		m.UI.Isolation = isolation
+		var out bytes.Buffer
+		if err := manifest.Encode(&out, m); err != nil {
+			t.Fatal(err)
+		}
+		got, err := manifest.Decode(&out)
+		if err != nil || got.UI.Isolation != isolation {
+			t.Fatal("isolation preference lost", err)
+		}
+	}
+	for _, isolation := range []string{"iframe", "shared", "automatic", ""} {
+		m.UI.Isolation = isolation
+		if err := m.Validate(); err == nil {
+			t.Fatal("accepted isolation", isolation)
+		}
 	}
 }

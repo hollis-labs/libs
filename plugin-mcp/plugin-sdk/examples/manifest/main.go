@@ -18,7 +18,7 @@ func main() {
 		Protocol:    manifest.RequiredProtocol, Runtime: manifest.Runtime,
 		Server:   manifest.Server{Runtime: "node", Entry: "bin/notes.js", Engines: map[string]manifest.HostRange{"node": {Min: "22.0.0"}}},
 		Artifact: exampleArtifact(),
-		Hooks:    []manifest.Hook{{Name: "session.end", Mode: "sequential", Timeout: 1000, OnError: "open"}},
+		Hooks:    []manifest.Hook{{Name: "session.end", Once: new(false), View: new("summary"), Mode: "sequential", Timeout: 1000, OnError: "open"}},
 		Hosts:    map[string]manifest.HostRange{"nanite": {Min: "0.1.0"}},
 		Tools: []manifest.Tool{{
 			Name: "notes_list", Description: "List saved notes", Effect: "read",

@@ -24,16 +24,20 @@ Serve speak protocol 2. Do not use this manifest with that older Serve.
   `server: {runtime, engines, entry}`. See the pinned layout and runtime contract
   below. No command arguments or raw runtime permission flags are accepted.
 - Optional `ui: {bundle, stylesheet, isolation}`: bundle is JavaScript under
-  `ui/`, optional stylesheet is CSS under `ui/`; isolation is `iframe` or
-  `shared`, a preference the host must explicitly accept or refuse.
+  `ui/`, optional stylesheet is CSS under `ui/`; isolation is `sandboxed-frame` (host default) or
+  `main-origin` (per-app override), a preference the host must explicitly accept or refuse.
 - Required `artifact: {files, tree_sha256}`: exact regular-file inventory with
   SHA-256 and executable bits, and the deterministic digest defined below.
 - Optional `hooks`: declarations with canonical dotted `name`, optional integer
-  `priority` (omitted means 10; explicit zero survives), `mode`, positive integer
+  `priority` (omitted means 10; explicit zero survives), optional boolean `once`
+  (omitted means false; explicit false survives), optional `view` token, `mode`, positive integer
   `timeout` in milliseconds, and `on_error: open|closed`. Modes are `sequential`,
   `parallel`, `bail`, `waterfall`, `async`, `after_commit`. Names are lowercase
   dotted segments with optional underscores, e.g. `context.pre_compact`; duplicate
-  names are refused. The host checks catalog kind/mode, name ownership, remote
+  names are refused. A supplied view must be a nonblank token beginning with a
+  letter or underscore, followed by letters, digits, underscores, dots or dashes.
+  The host validates view availability and any required catalog view; the SDK
+  never chooses a view. The host checks catalog kind/mode, name ownership, remote
   eligibility, schema, timeout cap and grants. SDK validation does not register
   callbacks, select a catalog or import plugin-hooks.
 - `capabilities`: existing `subprocess.CapabilityRequest` values. Names and

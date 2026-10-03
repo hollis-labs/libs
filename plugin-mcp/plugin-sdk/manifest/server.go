@@ -21,17 +21,19 @@ type Server struct {
 type UI struct {
 	Bundle     string `json:"bundle"`
 	Stylesheet string `json:"stylesheet,omitempty"`
-	Isolation  string `json:"isolation"` // iframe or shared
+	Isolation  string `json:"isolation"` // sandboxed-frame or main-origin
 }
 
 // Hook is a declaration only. Catalog/admission, limits and grants are host-owned.
 // Priority nil means 10; explicit zero remains zero. Timeout is milliseconds.
 type Hook struct {
-	Name     string `json:"name"`
-	Priority *int   `json:"priority,omitempty"`
-	Mode     string `json:"mode"`
-	Timeout  int    `json:"timeout"`
-	OnError  string `json:"on_error"`
+	Name     string  `json:"name"`
+	Priority *int    `json:"priority,omitempty"`
+	Once     *bool   `json:"once,omitempty"`
+	View     *string `json:"view,omitempty"`
+	Mode     string  `json:"mode"`
+	Timeout  int     `json:"timeout"`
+	OnError  string  `json:"on_error"`
 }
 
 func (h Hook) EffectivePriority() int {
@@ -86,8 +88,8 @@ func (m Manifest) validateV2() error {
 		if m.UI.Stylesheet != "" && (!validBundlePath(m.UI.Stylesheet) || !strings.HasPrefix(m.UI.Stylesheet, "ui/") || path.Ext(m.UI.Stylesheet) != ".css") {
 			return fmt.Errorf("ui.stylesheet must be bundled CSS under ui/")
 		}
-		if m.UI.Isolation != "iframe" && m.UI.Isolation != "shared" {
-			return fmt.Errorf("ui.isolation must be iframe or shared")
+		if m.UI.Isolation != "sandboxed-frame" && m.UI.Isolation != "main-origin" {
+			return fmt.Errorf("ui.isolation must be sandboxed-frame or main-origin")
 		}
 	}
 	seen := map[string]bool{}
@@ -96,6 +98,9 @@ func (m Manifest) validateV2() error {
 			return fmt.Errorf("hooks[%d].name must be canonical and unique", i)
 		}
 		seen[h.Name] = true
+		if h.View != nil && !keyName.MatchString(*h.View) {
+			return fmt.Errorf("hooks[%d].view must be a nonblank token", i)
+		}
 		switch h.Mode {
 		case "sequential", "parallel", "bail", "waterfall", "async", "after_commit":
 		default:
