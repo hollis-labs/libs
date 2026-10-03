@@ -8,6 +8,13 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `agentdef`: strict version-2 definition parsing and validation, namespaced
+  extension negotiation, semantic and artifact digests, and conformance fixtures.
+  Harness permissions reference profile names; content pins are checked for
+  syntax and verified by the host resolver.
+
 ## v0.1.0
 
 ### Added
