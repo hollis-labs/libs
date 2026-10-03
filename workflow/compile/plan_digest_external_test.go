@@ -3,8 +3,8 @@ package compile_test
 import (
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/graph"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/graph"
 )
 
 func TestPlanDigestRecomputesCanonicalRelocationStableIdentity(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/diagnostic"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/values"
-	"github.com/hollis-labs/go-workflow/verification"
-	workflowwait "github.com/hollis-labs/go-workflow/wait"
+	"github.com/hollis-labs/libs/workflow/diagnostic"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/values"
+	"github.com/hollis-labs/libs/workflow/verification"
+	workflowwait "github.com/hollis-labs/libs/workflow/wait"
 )
 
 // RetrySafety describes when the engine may retry an invocation. It is

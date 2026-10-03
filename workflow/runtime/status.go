@@ -1,6 +1,6 @@
 package runtime
 
-import workflowwait "github.com/hollis-labs/go-workflow/wait"
+import workflowwait "github.com/hollis-labs/libs/workflow/wait"
 
 // RunStatus is the persisted state of a workflow run.
 type RunStatus string

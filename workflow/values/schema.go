@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/libs/workflow/graph"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
 

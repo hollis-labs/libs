@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	mcpadapter "github.com/hollis-labs/go-workflow/adapters/mcp"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
-	"github.com/hollis-labs/go-workflow/verification"
+	mcpadapter "github.com/hollis-labs/libs/workflow/adapters/mcp"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
+	"github.com/hollis-labs/libs/workflow/verification"
 )
 
 type fakeClient struct {

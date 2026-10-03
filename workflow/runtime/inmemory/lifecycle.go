@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow/values"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 // TransitionRun atomically validates and persists a run status change and its

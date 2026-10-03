@@ -10,9 +10,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	httpadapter "github.com/hollis-labs/go-workflow/adapters/http"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
+	httpadapter "github.com/hollis-labs/libs/workflow/adapters/http"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
 )
 
 const (

@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	checkpointadapter "github.com/hollis-labs/go-workflow/adapters/checkpoint"
-	gateadapter "github.com/hollis-labs/go-workflow/adapters/gate"
-	workflowgate "github.com/hollis-labs/go-workflow/gate"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
-	workflowwait "github.com/hollis-labs/go-workflow/wait"
+	checkpointadapter "github.com/hollis-labs/libs/workflow/adapters/checkpoint"
+	gateadapter "github.com/hollis-labs/libs/workflow/adapters/gate"
+	workflowgate "github.com/hollis-labs/libs/workflow/gate"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
+	workflowwait "github.com/hollis-labs/libs/workflow/wait"
 )
 
 var checkpointTime = time.Date(2026, time.August, 24, 20, 0, 0, 0, time.UTC)

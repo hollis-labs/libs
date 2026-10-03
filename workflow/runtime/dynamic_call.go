@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func resolveDynamicCallSpec(spec *graph.CallSpec, inputs values.ValueSet) (*graph.CallSpec, error) {

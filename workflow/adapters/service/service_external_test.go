@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	serviceadapter "github.com/hollis-labs/go-workflow/adapters/service"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
+	serviceadapter "github.com/hollis-labs/libs/workflow/adapters/service"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestServiceKindRegistersTruthfulLifecycleAndDefensiveStart(t *testing.T) {

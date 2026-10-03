@@ -1,8 +1,8 @@
 package checkpoint
 
 import (
-	gateadapter "github.com/hollis-labs/go-workflow/adapters/gate"
-	"github.com/hollis-labs/go-workflow/stepkind"
+	gateadapter "github.com/hollis-labs/libs/workflow/adapters/gate"
+	"github.com/hollis-labs/libs/workflow/stepkind"
 )
 
 const (

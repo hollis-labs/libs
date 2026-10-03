@@ -6,7 +6,7 @@
 // second store implementation.
 package runtimetest
 
-import "github.com/hollis-labs/go-workflow/runtime/inmemory"
+import "github.com/hollis-labs/libs/workflow/runtime/inmemory"
 
 // Store is the process-lifetime in-memory runtime store.
 //

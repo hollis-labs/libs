@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	graphschema "github.com/hollis-labs/go-workflow/graph/schema"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	graphschema "github.com/hollis-labs/libs/workflow/graph/schema"
 )
 
 const (

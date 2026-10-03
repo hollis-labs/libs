@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/compile/internal/planschema"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/compile/internal/planschema"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

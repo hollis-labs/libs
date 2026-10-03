@@ -13,13 +13,13 @@ import (
 	"sync"
 	"testing"
 
-	generatedapi "github.com/hollis-labs/go-workflow/adapters/generatedapi"
-	httpadapter "github.com/hollis-labs/go-workflow/adapters/http"
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/diagnostic"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
+	generatedapi "github.com/hollis-labs/libs/workflow/adapters/generatedapi"
+	httpadapter "github.com/hollis-labs/libs/workflow/adapters/http"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/diagnostic"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 type allowPolicy struct {

@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	cmdadapter "github.com/hollis-labs/go-workflow/adapters/cmd"
-	"github.com/hollis-labs/go-workflow/diagnostic"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
+	cmdadapter "github.com/hollis-labs/libs/workflow/adapters/cmd"
+	"github.com/hollis-labs/libs/workflow/diagnostic"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestCmdRegistersWithConservativeMetadataAndDescription(t *testing.T) {

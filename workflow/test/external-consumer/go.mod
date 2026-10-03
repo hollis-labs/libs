@@ -2,7 +2,7 @@ module example.com/go-workflow-external-consumer
 
 go 1.26.6
 
-require github.com/hollis-labs/go-workflow v0.0.0
+require github.com/hollis-labs/libs/workflow v0.0.0
 
 require (
 	github.com/expr-lang/expr v1.17.8 // indirect
@@ -13,4 +13,4 @@ require (
 
 // Pre-release proof only. Release qualification must remove this replacement
 // and resolve the exact immutable module tag through the Go module proxy.
-replace github.com/hollis-labs/go-workflow => ../..
+replace github.com/hollis-labs/libs/workflow => ../..

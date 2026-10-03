@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow/runtime/inmemory"
-	"github.com/hollis-labs/go-workflow/values"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/runtime/inmemory"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestStoreIsConcurrentDefensiveAndProcessLifetimeOnly(t *testing.T) {

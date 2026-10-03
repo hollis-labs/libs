@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	graphschema "github.com/hollis-labs/go-workflow/graph/schema"
+	"github.com/hollis-labs/libs/workflow/graph"
+	graphschema "github.com/hollis-labs/libs/workflow/graph/schema"
 )
 
 // Builder is an immutable authoring view over graph.Graph. Every method returns

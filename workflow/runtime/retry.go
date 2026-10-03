@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	workflowwait "github.com/hollis-labs/go-workflow/wait"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	workflowwait "github.com/hollis-labs/libs/workflow/wait"
 )
 
 const (

@@ -7,7 +7,7 @@ hosts and transport implementations.
 Allowed imports are:
 
 - the Go standard library, including `testing`;
-- other packages under `github.com/hollis-labs/go-workflow`, except `adapters`;
+- other packages under `github.com/hollis-labs/libs/workflow`, except `adapters`;
 - `gopkg.in/yaml.v3` for workflow source parsing;
 - `github.com/santhosh-tekuri/jsonschema/v6` for schema validation; and
 - `github.com/expr-lang/expr` for the expression language selected by ADR 0007.

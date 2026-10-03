@@ -10,7 +10,7 @@ import (
 	"io"
 	"sync"
 
-	calladapter "github.com/hollis-labs/go-workflow/adapters/call"
+	calladapter "github.com/hollis-labs/libs/workflow/adapters/call"
 )
 
 const EventDefinitionResolved = "call.definition_resolved"

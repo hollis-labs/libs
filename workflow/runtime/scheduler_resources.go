@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/libs/workflow/graph"
 )
 
 var (

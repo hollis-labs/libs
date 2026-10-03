@@ -3,7 +3,7 @@ package diagnostic
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-workflow/graph"
+	"github.com/hollis-labs/libs/workflow/graph"
 )
 
 const (

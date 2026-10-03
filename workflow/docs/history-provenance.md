@@ -19,6 +19,6 @@ state/event semantics, or digest algorithms. Hadron release tags were removed
 from this repository because they identify a different Go module.
 
 The first standalone-module commit adds `go.mod`, rewrites Go import paths to
-`github.com/hollis-labs/go-workflow`, and adds standalone release guards and
+`github.com/hollis-labs/libs/workflow`, and adds standalone release guards and
 documentation. Source checkpoint and filtered checkpoint IDs above are the
 review anchors for future forensic comparison.

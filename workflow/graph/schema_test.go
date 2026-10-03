@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/graph/internal/schemagen"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/graph/internal/schemagen"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

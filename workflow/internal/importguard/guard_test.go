@@ -18,7 +18,7 @@ import (
 
 const (
 	hadronImportPath           = "github.com/hollis-labs/hadron"
-	workflowImportPath         = "github.com/hollis-labs/go-workflow"
+	workflowImportPath         = "github.com/hollis-labs/libs/workflow"
 	workflowAdaptersImportPath = workflowImportPath + "/adapters"
 )
 
@@ -107,7 +107,7 @@ func TestForbiddenImportFixture(t *testing.T) {
 	}
 
 	const want = "workflow core import guard failed:\n" +
-		"- forbidden.go:5: github.com/hollis-labs/go-workflow/forbiddenfixture imports " +
+		"- forbidden.go:5: github.com/hollis-labs/libs/workflow/forbiddenfixture imports " +
 		"\"github.com/hollis-labs/hadron/internal/persistence\": " +
 		"Hadron is a downstream host and is not a module dependency"
 	if err.Error() != want {

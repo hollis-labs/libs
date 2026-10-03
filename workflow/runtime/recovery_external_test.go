@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/graph"
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow/runtime/inmemory"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/stepkind/stepkindtest"
-	"github.com/hollis-labs/go-workflow/values"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/graph"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/runtime/inmemory"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/stepkind/stepkindtest"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestRecoveryReconcilesExpiredCrashAndRebuildsControlBeforeReady(t *testing.T) {

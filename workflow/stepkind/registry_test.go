@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/go-workflow/diagnostic"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/stepkind/stepkindtest"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/diagnostic"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/stepkind/stepkindtest"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestRegistryLookupListAndDefensiveCopies(t *testing.T) {

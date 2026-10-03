@@ -1,7 +1,7 @@
 # Embed the workflow engine in a Go host
 
 The reusable engine boundary is the complete public
-`github.com/hollis-labs/go-workflow/...` module. It contains graph and source
+`github.com/hollis-labs/libs/workflow/...` module. It contains graph and source
 contracts, compiler phases, typed values, runtime state machines, waits,
 verification, step-kind SDKs and adapters, offline embedding, and conformance
 fixtures. It has no dependency on `github.com/hollis-labs/hadron/internal/...`.

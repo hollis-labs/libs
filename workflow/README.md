@@ -12,16 +12,16 @@ your host needs, for example:
 
 ```go
 import (
-	"github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/offline"
-	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/offline"
+	"github.com/hollis-labs/libs/workflow/stepkind"
 )
 ```
 
 Install an exact release:
 
 ```sh
-go get github.com/hollis-labs/go-workflow@v0.1.0
+go get github.com/hollis-labs/libs/workflow@v0.1.0
 ```
 
 Never resolve a workflow contract, schema, step kind, verifier, or plan by a

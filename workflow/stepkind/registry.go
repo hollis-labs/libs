@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/hollis-labs/go-workflow/diagnostic"
+	"github.com/hollis-labs/libs/workflow/diagnostic"
 )
 
 var (

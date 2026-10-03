@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/adapters/emit"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/adapters/emit"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 var publishedAt = time.Date(2026, time.August, 24, 20, 0, 0, 0, time.UTC)

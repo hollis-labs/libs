@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	graphschema "github.com/hollis-labs/go-workflow/graph/schema"
+	graphschema "github.com/hollis-labs/libs/workflow/graph/schema"
 )
 
 func TestDocumentIsDefensiveAndValidatesJSON(t *testing.T) {

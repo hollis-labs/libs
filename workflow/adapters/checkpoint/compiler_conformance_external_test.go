@@ -6,13 +6,13 @@ import (
 	"reflect"
 	"testing"
 
-	checkpointadapter "github.com/hollis-labs/go-workflow/adapters/checkpoint"
-	"github.com/hollis-labs/go-workflow/adapters/emit"
-	workflowcompile "github.com/hollis-labs/go-workflow/compile"
-	"github.com/hollis-labs/go-workflow/conformance"
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	workflowwait "github.com/hollis-labs/go-workflow/wait"
+	checkpointadapter "github.com/hollis-labs/libs/workflow/adapters/checkpoint"
+	"github.com/hollis-labs/libs/workflow/adapters/emit"
+	workflowcompile "github.com/hollis-labs/libs/workflow/compile"
+	"github.com/hollis-labs/libs/workflow/conformance"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	workflowwait "github.com/hollis-labs/libs/workflow/wait"
 )
 
 func TestCompilerLowersAndValidatesEmitCheckpointSource(t *testing.T) {

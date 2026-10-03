@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	"github.com/hollis-labs/go-workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/graph"
+	"github.com/hollis-labs/libs/workflow/stepkind"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
 
