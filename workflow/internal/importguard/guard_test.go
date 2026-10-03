@@ -20,6 +20,9 @@ const (
 	hadronImportPath           = "github.com/hollis-labs/hadron"
 	workflowImportPath         = "github.com/hollis-labs/libs/workflow"
 	workflowAdaptersImportPath = workflowImportPath + "/adapters"
+	// workflowHostImportPath is the host layer (formerly the separate go-workflow-host
+	// module): like adapters, it may use concrete drivers, and core must not import it.
+	workflowHostImportPath = workflowImportPath + "/host"
 )
 
 var allowedExternalImports = []string{
@@ -68,7 +71,8 @@ func TestWorkflowCoreDependencyGraph(t *testing.T) {
 	packages := goList(t, root, "-f", "{{.ImportPath}}", "./...")
 	corePackages := packages[:0]
 	for _, packagePath := range packages {
-		if pathWithin(packagePath, workflowImportPath) && !pathWithin(packagePath, workflowAdaptersImportPath) {
+		if pathWithin(packagePath, workflowImportPath) && !pathWithin(packagePath, workflowAdaptersImportPath) &&
+			!pathWithin(packagePath, workflowHostImportPath) {
 			corePackages = append(corePackages, packagePath)
 		}
 	}
@@ -129,6 +133,7 @@ func TestImportPolicy(t *testing.T) {
 			{name: "schema validator", importer: workflowImportPath + "/compile", imported: "github.com/santhosh-tekuri/jsonschema/v6"},
 			{name: "expression engine", importer: workflowImportPath + "/values", imported: "github.com/expr-lang/expr/vm"},
 			{name: "adapter dependency", importer: workflowAdaptersImportPath + "/mcp", imported: "github.com/mark3labs/mcp-go/mcp"},
+			{name: "host dependency", importer: workflowHostImportPath + "/sqlstore", imported: "modernc.org/sqlite"},
 			{name: "non-module importer", importer: hadronImportPath + "/internal/appworkflow", imported: "modernc.org/sqlite"},
 		}
 
@@ -150,6 +155,7 @@ func TestImportPolicy(t *testing.T) {
 			{name: "Hadron internal", imported: hadronImportPath + "/internal/persistence", want: "downstream host"},
 			{name: "Hadron command", imported: hadronImportPath + "/cmd/hadrond", want: "downstream host"},
 			{name: "workflow adapter", imported: workflowAdaptersImportPath + "/http", want: "adapter packages"},
+			{name: "workflow host", imported: workflowHostImportPath + "/sqlstore", want: "host packages"},
 			{name: "Wails", imported: "github.com/wailsapp/wails/v2/pkg/runtime", want: "concrete UI"},
 			{name: "HTTP server", imported: "github.com/labstack/echo/v4", want: "concrete transport"},
 			{name: "MCP server", imported: "github.com/mark3labs/mcp-go/server", want: "concrete MCP"},
@@ -337,7 +343,7 @@ func skipNonCoreDirectory(rel string, entry fs.DirEntry) bool {
 	if entry.Name() == "testdata" || entry.Name() == ".git" {
 		return true
 	}
-	for _, excluded := range []string{"adapters", "docs", "examples", "test"} {
+	for _, excluded := range []string{"adapters", "docs", "examples", "host", "test"} {
 		if rel == excluded || strings.HasPrefix(rel, excluded+"/") {
 			return true
 		}
@@ -346,7 +352,8 @@ func skipNonCoreDirectory(rel string, entry fs.DirEntry) bool {
 }
 
 func forbiddenImportReason(importer, imported string) string {
-	if !pathWithin(importer, workflowImportPath) || pathWithin(importer, workflowAdaptersImportPath) {
+	if !pathWithin(importer, workflowImportPath) || pathWithin(importer, workflowAdaptersImportPath) ||
+		pathWithin(importer, workflowHostImportPath) {
 		return ""
 	}
 	if isStandardLibrary(imported) {
@@ -354,6 +361,9 @@ func forbiddenImportReason(importer, imported string) string {
 	}
 	if pathWithin(imported, workflowAdaptersImportPath) {
 		return "workflow core must not depend on adapter packages"
+	}
+	if pathWithin(imported, workflowHostImportPath) {
+		return "workflow core must not depend on host packages"
 	}
 	if pathWithin(imported, workflowImportPath) {
 		return ""

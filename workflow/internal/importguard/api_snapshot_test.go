@@ -64,8 +64,11 @@ func buildPublicAPISnapshot(workflowRoot string) ([]byte, error) {
 		}
 		if entry.IsDir() {
 			slashRel := filepath.ToSlash(rel)
+			// host/ (formerly the separate go-workflow-host module) is not part of the core
+			// public API this snapshot has always covered; it was never snapshotted.
 			if entry.Name() == ".git" || entry.Name() == "testdata" || strings.Contains("/"+slashRel+"/", "/internal/") ||
-				slashRel == "test" || strings.HasPrefix(slashRel, "test/") {
+				slashRel == "test" || strings.HasPrefix(slashRel, "test/") ||
+				slashRel == "host" || strings.HasPrefix(slashRel, "host/") {
 				return filepath.SkipDir
 			}
 			return nil
