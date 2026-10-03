@@ -1,0 +1,211 @@
+# go-egress-proxy
+
+`go-egress-proxy` is a small, standalone Go library that runs a host-side, domain-allowlisted HTTP proxy intended for sandboxed child processes. It is the network-policy half of the picture deliberately excluded from [`go-sandbox`](https://github.com/hollis-labs/go-sandbox).
+
+The proxy spawns on `127.0.0.1` (random port by default), exposes its address via `(*Proxy).EnvVars` for callers to merge into the child's `HTTP_PROXY` / `HTTPS_PROXY`, and enforces a domain allowlist plus an SSRF deny set on every request before any dial. CONNECT is restricted to TLS ports (443, 8443) by default.
+
+## Status
+
+Pre-1.0 — API may shift before `v1` (see [CHANGELOG.md](./CHANGELOG.md)), but the security-critical
+behaviours (SSRF guard, CONNECT TLS-port allowlist, hijacked-conn drain on
+`Stop`, `Host`-header scrub) are non-optional and covered by tests. See
+[godoc](https://pkg.go.dev/github.com/hollis-labs/substrate/harness/interception/egress)
+for the package reference.
+
+## Install
+
+```bash
+go get github.com/hollis-labs/go-egress-proxy
+```
+
+## Usage
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+    "os/exec"
+
+    "github.com/hollis-labs/substrate/harness/interception/egress"
+    // import "github.com/hollis-labs/go-sandbox/sandbox" — see examples/
+)
+
+func main() {
+    proxy := egress.New(egress.Config{
+        AllowedDomains: []string{
+            "api.anthropic.com",
+            "*.githubusercontent.com",
+        },
+        OnDeny: func(host, reason string) {
+            log.Printf("egress denied %s (%s)", host, reason)
+        },
+    })
+    if err := proxy.Start(); err != nil {
+        log.Fatal(err)
+    }
+    defer proxy.Stop()
+
+    cmd := exec.Command("claude", "--print", "hello")
+    cmd.Stdout = os.Stdout
+
+    // Merge proxy env into the child BEFORE applying the sandbox.
+    env := append([]string(nil), os.Environ()...)
+    for k, v := range proxy.EnvVars() {
+        env = append(env, k+"="+v)
+    }
+    cmd.Env = env
+
+    // sandbox.Apply(cmd, sandbox.Profile{Net: false, ...}, ws) ...
+    if err := cmd.Run(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+A complete working example (with the go-sandbox call site stubbed for cheap CI compilation) lives in `examples/sandbox_integration`.
+
+## Using the SSRF guard without a proxy
+
+If you make your own outbound requests and just want SSRF-safe dialing, skip the `Proxy` and put a `Guard` on your `http.Transport`:
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "net/http"
+
+    "github.com/hollis-labs/substrate/harness/interception/egress"
+)
+
+func main() {
+    g := &egress.Guard{} // zero value: system resolver, 10s dial timeout, loopback denied
+    client := &http.Client{Transport: &http.Transport{DialContext: g.DialContext}}
+
+    _, err := client.Get("http://169.254.169.254/latest/meta-data/")
+    fmt.Println(errors.Is(err, egress.ErrSSRFBlocked)) // true
+
+    // Lower level: validate, then dial the returned literal yourself.
+    ip, err := egress.ResolveAndPin(context.Background(), nil, "example.com", false)
+    _ = ip // dial net.JoinHostPort(ip.String(), port), never "example.com" again
+    _ = err
+}
+```
+
+Rules that keep it safe:
+
+- Dial the IP that `ResolveAndPin` returns. Calling it as a pre-flight check and then dialing the hostname elsewhere reopens the DNS-rebinding window, which is why there is deliberately no check-only `IsSafe(url)` helper.
+- Redirects are re-validated because `http.Client` sends the redirected request through the same `Transport`. Do not build a second `Transport` or call `net.Dial` from a `CheckRedirect` handler.
+- Leave `Transport.Proxy` nil. With a proxy configured, `DialContext` dials the proxy and the origin is never checked. A `Transport` with `DialTLSContext` set also bypasses `DialContext` for HTTPS.
+- `AllowLocalhost` opens loopback only, never RFC1918 or the rest of the deny set.
+- A resolver answer with a nil or wrong-length `net.IP` is refused whole (`ErrSSRFBlocked`), like a denied address.
+- An IPv6 answer that carries an IPv4 is judged by that IPv4: the NAT64 well-known prefix (`64:ff9b::/96`), 6to4 (`2002::/16`), Teredo (`2001::/32`, both the server and the XOR-obfuscated client address) and IPv4-compatible (`::/96`) forms. A denied IPv4 cannot ride an IPv6 answer past the deny set, and DNS64 egress to a public IPv4 works. Embedded loopback is denied even with `AllowLocalhost`, since a translated 127.0.0.1 is not this host. The NAT64 local-use prefix (`64:ff9b:1::/48`) is denied whole, because where its IPv4 sits depends on an operator-chosen prefix length.
+
+## What this library is — and isn't
+
+**This is a lib, not a framework.**
+
+In:
+
+- `Guard{Resolver, Dialer, AllowLocalhost, DialTimeout}` and `(*Guard).DialContext` — the SSRF guard as a drop-in `http.Transport.DialContext`, with no `Proxy`
+- `ResolveAndPin(ctx, resolver, host, allowLocalhost) (net.IP, error)`, `DefaultResolver`, `IsLocalhostName` — the validate-then-pin primitives `Proxy` itself is built on
+
+- `Config{AllowedDomains, AllowLocalhost, ExtraCONNECTPorts, CONNECTDeadline, DialTimeout, HTTPClientTimeout, StopDrainWindow, Resolver, Dialer, OnDeny, Logger, ListenAddr}`
+- `New(cfg) *Proxy`, `(*Proxy).Start() error`, `(*Proxy).Addr() string`, `(*Proxy).Stop() error`, `(*Proxy).EnvVars() map[string]string`
+- Domain allowlist with exact + wildcard semantics (see "Wildcard semantics" below)
+- SSRF deny set: link-local incl. cloud IMDS (169.254/16), RFC1918, CGNAT, IETF protocol assignments (192.0.0/24), 6to4 relay anycast (192.88.99/24), benchmarking (198.18/15), reserved 240/4 incl. 255.255.255.255, IPv6 ULA / link-local / site-local (fec0::/10), NAT64 local-use (`64:ff9b:1::/48`), unspecified, plus the IPv4 embedded in NAT64 well-known, 6to4, Teredo and IPv4-compatible addresses — applied to every resolved IP before any dial
+- DNS-rebinding defense: validate every IP from the resolver, then dial the IP literal so DNS cannot rebind between check and dial
+- `AllowLocalhost` flag for callers that legitimately need to reach loopback services; off by default
+- CONNECT restricted to TLS ports (443, 8443) by default; `ExtraCONNECTPorts` extends for tests
+- Per-CONNECT-tunnel deadline (5min default) and a tracked-conn drain in `Stop` so a stalled upstream cannot wedge shutdown — `http.Server.Shutdown` is documented not to touch hijacked conns; we close them explicitly
+- `Host`-header scrub on the plain-HTTP forward path (audit finding 04c regression test)
+- `OnDeny(host, reason)` callback with reason ∈ `{"domain", "port", "ssrf", "scheme"}` and a pluggable `Logger` interface — caller's choice for observability
+- `EnvVars()` helper returning the `HTTP_PROXY`/`HTTPS_PROXY` pair (both upper- and lower-case) so callers can merge into `*exec.Cmd.Env` before applying a sandbox
+- Stdlib-only — no third-party dependencies (no OTel pull-in)
+
+Out (intentionally):
+
+- **Hot-reload of the allowlist.** v0.1.0 is restart-to-update. Consumers that need per-tenant or per-task allowlists spin a new `Proxy` per child process — that's already the dominant pattern and it keeps `Config` immutable.
+- **Command policy / shell-denylist matching.** Pre-flight checks against shell-command denylists (`rm -rf`, `dd`, `mkfs`, ...) belong in a separate library, not here.
+- **Auth.** No upstream HTTP auth, no client-side proxy auth (`Proxy-Authorization` is stripped). The threat model is "host-side proxy for trusted-but-confined children"; if you need auth, run the proxy behind one.
+- **Caching, response inspection, body size limits.** The proxy is a pass-through. If you need to gate response bodies (say, blocking a 5GB download), wrap your own `Logger` that observes `OnDeny` and `slog` events, or interpose between the child and the proxy with a different abstraction.
+- **Distributed / multi-instance state.** `Proxy` is per-process. Each consumer process runs its own.
+- **Windows and other platforms.** The proxy itself is `GOOS`-agnostic — it's standard `net/http` — but `go-sandbox` is darwin/linux only, so the realistic deployment surface is the same.
+
+## Wildcard semantics
+
+`*.example.com` matches `sub.example.com` and `deep.sub.example.com`. It does **not** match `example.com` itself. To allow both, list both (`example.com`, `*.example.com`). Match is case-insensitive.
+
+## Hardening posture
+
+The SSRF guard, CONNECT port restriction, conn-tracking-on-`Stop`, and `Host`-header scrub each address a concrete attack the proxy must close. Each fix is pinned by a regression test (listed below).
+
+- **DNS-based SSRF.** A resolver returning `169.254.169.254` for an allowlisted hostname could exfiltrate cloud instance metadata. Fix: validate every IP from the resolver against the deny set, fail closed if any private IP is in the result, pin the dial to the validated IP.
+- **CONNECT to non-TLS ports.** `CONNECT allowed.example.com:22` tunneled raw SSH out of the sandbox. Fix: built-in port allowlist `{443, 8443}`; `ExtraCONNECTPorts` is opt-in.
+- **Stalled-upstream Stop wedge.** `http.Server.Shutdown` does not touch hijacked connections. Tunnel goroutines parked in `io.Copy` against a slow upstream blocked Stop forever. Fix: track every hijacked conn; force-close on Stop with a bounded drain window.
+- **Forwarded `Host` header.** A naive proxy forwards the client's `Host` header verbatim to upstream — leaking internal hostnames or confusing vhost-based routing. Fix: scrub `Host` from the outgoing request and set `outReq.Host` to the validated URL host.
+
+These regressions are pinned by tests:
+
+- `TestProxy_CONNECT_BlocksIMDS`
+- `TestProxy_CONNECT_RejectsNonTLSPort`
+- `TestProxy_CONNECT_PinsValidatedIP`
+- `TestProxy_CONNECT_FailsClosedOnMixedIPs`
+- `TestProxy_HTTP_BlocksRFC1918`
+- `TestProxy_HTTP_RejectsLocalhostByName`
+- `TestProxy_HTTP_HostHeaderNotForwarded`
+- `TestProxy_Stop_DrainsStalledCONNECT`
+
+The standalone guard (`Guard`, `ResolveAndPin`) is pinned by:
+
+- `TestResolveAndPin_RejectsAnyDeniedDNSAnswer`
+- `TestResolveAndPin_RejectsDeniedRanges`
+- `TestResolveAndPin_LocalhostOptInDoesNotOpenOtherRanges`
+- `TestResolveAndPin_BlocksIPv4MappedIMDS`
+- `TestResolveAndPin_MalformedIPFailsClosed`
+- `TestGuard_DialContext_MalformedIPNeverDials`
+- `TestResolveAndPin_BlocksNAT64SynthesizedIMDS`
+- `TestGuard_DialContext_BlocksNAT64SynthesizedIMDS`
+- `TestResolveAndPin_JudgesEmbeddedIPv4`
+- `TestResolveAndPin_EmbeddedLoopbackDeniedEvenWithAllowLocalhost`
+- `TestResolveAndPin_SpecialPurposeRanges`
+- `TestGuard_DialContext_BlocksIMDS`
+- `TestGuard_DialContext_PinsValidatedIP`
+- `TestGuard_DialContext_FailsClosedOnMixedIPs`
+- `TestGuard_DialContext_AllowLocalhostDoesNotOpenRFC1918`
+- `TestGuard_HTTPClient_RevalidatesRedirects`
+- `FuzzResolveAndPin`, `FuzzGuardDialContext`, `FuzzGuardMalformedIP`
+
+## Repository layout
+
+```
+go-egress-proxy/
+├── go.mod
+├── LICENSE                            # MIT
+├── README.md
+├── egress/                            # main package
+│   ├── doc.go
+│   ├── proxy.go                       # Proxy, Config, handlers, deny-set data
+│   ├── ssrf.go                        # Guard, ResolveAndPin: standalone SSRF guard
+│   ├── tunnels.go                     # tracked-goroutine coordinator (stdlib)
+│   ├── proxy_test.go                  # full feature + regression suite
+│   ├── ssrf_test.go                   # standalone guard suite + fuzz targets
+│   └── example_test.go                # runnable examples
+└── examples/
+    └── sandbox_integration/           # env-var injection into a sandboxed *exec.Cmd
+        └── main.go
+```
+
+## Contributing
+
+Issues and PRs welcome. Please run `go test -race ./...` before opening a
+PR; the regression tests pinned in [Hardening posture](#hardening-posture)
+must stay green.
+
+## License
+
+MIT — see `LICENSE`.

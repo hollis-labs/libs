@@ -1,0 +1,129 @@
+package runtimeevents
+
+// EventKind identifies the kind of runtime event. Consumers must tolerate
+// unknown kinds (treat them as opaque) rather than rejecting the [Event] —
+// new kinds will be added over time and old consumers must round-trip them
+// cleanly.
+type EventKind string
+
+// Process-lifetime kinds.
+const (
+	KindProcessStarted EventKind = "process.started"
+	KindProcessExited  EventKind = "process.exited"
+)
+
+// Session-lifetime kinds. A session spans multiple turns.
+const (
+	KindSessionReady      EventKind = "session.ready"
+	KindSessionIdle       EventKind = "session.idle"
+	KindSessionProcessing EventKind = "session.processing"
+	KindSessionHeartbeat  EventKind = "session.heartbeat"
+
+	// KindSessionLost reports that a resume did not continue the provider
+	// session it asked for: the provider either started a new session in
+	// its place (non-terminal, the turn runs on) or no longer has it (the
+	// turn fails). Conventional payload: requested_id, actual_id (empty when
+	// the turn failed rather than continuing elsewhere), reason.
+	KindSessionLost EventKind = "session.lost"
+
+	// KindSessionAuthFailed reports that the provider CLI is not signed in
+	// or its credentials were refused, as observed by the producer (for
+	// example a sign-in prompt on stderr). Conventional payload: error.
+	KindSessionAuthFailed EventKind = "session.auth_failed"
+)
+
+// Turn kinds. A turn is one request/response exchange within a session.
+const (
+	KindTurnStarted   EventKind = "turn.started"
+	KindTurnCompleted EventKind = "turn.completed"
+	KindTurnFailed    EventKind = "turn.failed"
+)
+
+// Raw and line-buffered IO kinds. Raw kinds carry exact byte spans; line
+// kinds carry one logical line each. Both may be emitted for the same
+// underlying bytes when the wrapper has both byte-level and line-level
+// observers attached.
+const (
+	KindStdinWrite EventKind = "stdin.write"
+	KindStdoutRaw  EventKind = "stdout.raw"
+	KindStderrRaw  EventKind = "stderr.raw"
+	KindStdoutLine EventKind = "stdout.line"
+	KindStderrLine EventKind = "stderr.line"
+)
+
+// Agent semantic kinds. These require a semantic observation channel
+// (stream-json, JSON-RPC, plugin hook) — PTY-only sessions cannot emit
+// them reliably.
+const (
+	KindAgentDelta               EventKind = "agent.delta"
+	KindAgentToolUse             EventKind = "agent.tool_use"
+	KindAgentToolResult          EventKind = "agent.tool_result"
+	KindAgentSubagentSpawn       EventKind = "agent.subagent_spawn"
+	KindAgentPermissionRequested EventKind = "agent.permission_requested"
+	KindAgentPermissionResolved  EventKind = "agent.permission_resolved"
+
+	// KindAgentPermissionDenied reports a tool action the agent CLI refused
+	// on its own because it needed an approval that could not be asked for
+	// (headless mode). Unlike agent.permission_resolved there was no request
+	// to answer; without this event the refusal is a silent no-op.
+	// Conventional payload: action, display_name.
+	KindAgentPermissionDenied EventKind = "agent.permission_denied"
+)
+
+// Policy observation compatibility kinds. Their action-shaped Go names and
+// wire values are retained for compatibility. They carry observed policy
+// findings or recommendations; by themselves they do not mean a producer
+// nudged, rewrote, blocked, or paused the underlying operation.
+const (
+	KindPolicyNudge             EventKind = "policy.nudge"
+	KindPolicyRewrite           EventKind = "policy.rewrite"
+	KindPolicyBlock             EventKind = "policy.block"
+	KindPolicyApprovalRequested EventKind = "policy.approval_requested"
+)
+
+// Planting kinds. Emitted around boot-dir / hook / plugin / MCP-config
+// planting before and after the wrapped process starts.
+const (
+	KindPlantStarted   EventKind = "plant.started"
+	KindPlantCompleted EventKind = "plant.completed"
+)
+
+// Sandbox kind. Emitted once after the sandbox profile has been applied
+// (or refused) just before exec.
+const KindSandboxApplied EventKind = "sandbox.applied"
+
+// Interrupt kinds. Pair via [Event.ParentID] — the acknowledged event
+// references the requested event's ID.
+const (
+	KindInterruptRequested    EventKind = "interrupt.requested"
+	KindInterruptAcknowledged EventKind = "interrupt.acknowledged"
+)
+
+// SourceChannel identifies the observation transport that produced the
+// event. Open string — adapters may introduce new channels without a
+// schema bump; consumers must tolerate unknown channels.
+type SourceChannel string
+
+const (
+	ChannelClaudeStreamJSON SourceChannel = "claude-stream-json"
+	ChannelOpenCodePlugin   SourceChannel = "opencode-plugin"
+	ChannelJSONRPC          SourceChannel = "jsonrpc"
+	ChannelPTY              SourceChannel = "pty"
+	ChannelStdio            SourceChannel = "stdio"
+	ChannelHook             SourceChannel = "hook"
+	ChannelFilter           SourceChannel = "filter"
+)
+
+// Confidence describes how directly the source observation maps to the
+// event's semantic meaning. "exact" means the channel reports the event
+// natively (e.g., a tool_use JSON message). "derived" means the wrapper
+// reconstructed the event from a structured-but-indirect source.
+// "inferred" means a text classifier or heuristic produced it; never
+// authoritative for policy enforcement on its own.
+type Confidence string
+
+const (
+	ConfidenceExact    Confidence = "exact"
+	ConfidenceDerived  Confidence = "derived"
+	ConfidenceInferred Confidence = "inferred"
+)
