@@ -11,8 +11,11 @@ import (
 )
 
 const (
-	// ModulePath is the canonical Go module that owns this catalog.
-	ModulePath = "github.com/hollis-labs/libs/ui-go/envelopes"
+	// ModulePath is the canonical Go module that owns this catalog. It is the
+	// ui-go module, not this package's import path: it is compared with the
+	// module paths in the running binary's build information, which name
+	// modules, and this package is envelopes/ inside the ui-go module.
+	ModulePath = "github.com/hollis-labs/libs/ui-go"
 
 	// CatalogFormatVersion versions the JSON shape returned by ExportCatalog.
 	CatalogFormatVersion = 1

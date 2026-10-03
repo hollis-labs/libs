@@ -23,7 +23,8 @@ func TestExternalConsumer(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	repositoryRoot := filepath.Dir(filename)
+	// This package lives in envelopes/ of the ui-go module; the module root is its parent.
+	repositoryRoot := filepath.Dir(filepath.Dir(filename))
 	consumerDir := t.TempDir()
 	resolvedSibling := filepath.Clean(filepath.Join(consumerDir, "..", "..", "libs", "go-envelopes"))
 	if _, err := os.Stat(resolvedSibling); !os.IsNotExist(err) {
@@ -34,9 +35,9 @@ func TestExternalConsumer(t *testing.T) {
 
 go 1.26.1
 
-require github.com/hollis-labs/libs/ui-go/envelopes v0.0.0
+require github.com/hollis-labs/libs/ui-go v0.0.0
 
-replace github.com/hollis-labs/libs/ui-go/envelopes => %s
+replace github.com/hollis-labs/libs/ui-go => %s
 `, repositoryRoot)
 	pluginManifest := "type: demo.notice\nui:\n  component: cards/Notice\n  export: Notice\n"
 	pluginSchema := `{"type":"object","properties":{"message":{"type":"string"}},"required":["message"],"x-plugin-help":"notice"}`
@@ -133,7 +134,7 @@ func main() {
 	if err := json.Unmarshal(output, &summary); err != nil {
 		t.Fatalf("decode consumer output: %v\n%s", err, output)
 	}
-	if summary.Module != "github.com/hollis-labs/libs/ui-go/envelopes" || summary.ModuleVersion != "(devel; local replacement)" {
+	if summary.Module != "github.com/hollis-labs/libs/ui-go" || summary.ModuleVersion != "(devel; local replacement)" {
 		t.Fatalf("consumer source identity = %q@%q", summary.Module, summary.ModuleVersion)
 	}
 	if !strings.HasPrefix(summary.ManifestDigest, "sha256:") || summary.Types < 2 || summary.Schemas < 2 {
@@ -154,7 +155,7 @@ func main() {
 		t.Fatalf("external module-owned generator: %v\n%s", err, output)
 	}
 	generated := string(output)
-	if !strings.Contains(generated, "go-envelopes@(devel; local replacement)") ||
+	if !strings.Contains(generated, "libs/ui-go@(devel; local replacement)") ||
 		!strings.Contains(generated, "export interface InfoCardData") || strings.Contains(generated, repositoryRoot) {
 		t.Fatalf("external generator lacked source identity or types:\n%s", generated)
 	}
@@ -165,14 +166,14 @@ func TestExternalConsumerOrdinarySelectedModuleIdentity(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	repositoryRoot := filepath.Dir(filename)
+	repositoryRoot := filepath.Dir(filepath.Dir(filename)) // the ui-go module root
 	proxyURL, version := writeModuleProxy(t, repositoryRoot)
 	consumerDir := t.TempDir()
 	goMod := fmt.Sprintf(`module selected-consumer.test
 
 go 1.26.1
 
-require github.com/hollis-labs/libs/ui-go/envelopes %s
+require github.com/hollis-labs/libs/ui-go %s
 `, version)
 	program := `package main
 
@@ -228,7 +229,7 @@ func main() {
 	if err := json.Unmarshal(output[jsonStart:], &source); err != nil {
 		t.Fatalf("decode source identity: %v\n%s", err, output)
 	}
-	if source.Module != "github.com/hollis-labs/libs/ui-go/envelopes" || source.ModuleVersion != version {
+	if source.Module != "github.com/hollis-labs/libs/ui-go" || source.ModuleVersion != version {
 		t.Fatalf("ordinary selected module identity = %#v", source)
 	}
 }
@@ -240,7 +241,7 @@ type moduleFile struct {
 
 func writeModuleProxy(t *testing.T, repositoryRoot string) (string, string) {
 	t.Helper()
-	const modulePath = "github.com/hollis-labs/libs/ui-go/envelopes"
+	const modulePath = "github.com/hollis-labs/libs/ui-go"
 	files := make([]moduleFile, 0)
 	digest := sha256.New()
 	err := filepath.Walk(repositoryRoot, func(path string, info os.FileInfo, walkErr error) error {
