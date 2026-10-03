@@ -89,8 +89,19 @@ type Secret struct {
 // required string whose vocabulary and enforcement belong to the host. The SDK
 // does not infer an effect from a name or interpret one as granting authority.
 type Tool struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"input_schema"`
-	Effect      string          `json:"effect"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	InputSchema json.RawMessage  `json:"input_schema"`
+	Effect      string           `json:"effect"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// ToolAnnotations carries optional MCP hints, never authorization. Effect stays
+// authoritative. Pointers distinguish an omitted hint from an explicit false;
+// no defaults are inferred. See docs/manifest.md for the consistency matrix.
+type ToolAnnotations struct {
+	ReadOnly    *bool `json:"readOnly,omitempty"`
+	Destructive *bool `json:"destructive,omitempty"`
+	Idempotent  *bool `json:"idempotent,omitempty"`
+	OpenWorld   *bool `json:"openWorld,omitempty"`
 }

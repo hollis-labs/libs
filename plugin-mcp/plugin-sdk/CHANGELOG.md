@@ -14,6 +14,15 @@
 
 ### Added
 
+- Optional manifest tool `annotations` with `readOnly`, `destructive`,
+  `idempotent` and `openWorld` hints, preserving explicit false and validating
+  consistency with the authoritative effect. Hints never grant authority.
+  Existing manifests decode unchanged, but manifests using annotations require
+  the SDK release carrying this field: older strict hosts refuse them with
+  `manifest: unknown field "annotations"` (documented fixture in
+  `manifest/testdata/annotations/older-strict-host-error.txt`). No schema,
+  subprocess protocol or package version changes; host MCP mapping is separate.
+
 - `manifest`: shared schema version 2 declarations with dotted IDs, subprocess
   entrypoints, host ranges and opaque host extensions, config fields and
   host-resolved secrets, capability requests and manifest-authoritative tools.
