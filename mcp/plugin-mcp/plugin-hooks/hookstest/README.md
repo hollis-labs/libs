@@ -33,6 +33,10 @@ prints `WAIVED`, its ID and reason as a skipped subtest. Unknown IDs and empty
 reasons fail the run. Waivers record migration gaps; they do not certify full
 conformance. `Requirements()` returns a detached list for migration reports.
 
+Requirement IDs are stable within this package. New requirements are appended;
+existing IDs are never renumbered or reassigned. Hosts may persist these IDs in
+waivers and migration reports, and `Waive` rejects unknown IDs.
+
 | ID | Requirement |
 | --- | --- |
 | R01 | Action priorities, explicit zero, default priority and stable ties across owners |
