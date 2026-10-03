@@ -26,9 +26,9 @@ import (
 	"os"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-runner/runner"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/runner"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func main() {

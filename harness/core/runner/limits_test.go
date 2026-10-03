@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-runner/runner"
+	"github.com/hollis-labs/substrate/harness/runner"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // TestResourceLimits_RlimitsApplied verifies the runner's argv wrap

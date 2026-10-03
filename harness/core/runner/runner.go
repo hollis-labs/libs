@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/sandbox"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // Config configures a single Run. Provider, Workspace, and OnEvent are

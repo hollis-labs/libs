@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-runner/runner"
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/runner"
+	"github.com/hollis-labs/substrate/harness/sandbox"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // stubAdapter is a minimal CLIAdapter for the e2e test. It parses the

@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/hollis-labs/go-runner/runner"
+	"github.com/hollis-labs/substrate/harness/runner"
 )
 
 // Apply the same resource-limit wrap Run uses to a *exec.Cmd you built

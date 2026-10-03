@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/sandbox"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 type contractAdapter struct{ binPath string }

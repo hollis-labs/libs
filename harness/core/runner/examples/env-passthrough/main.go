@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-runner/runner"
+	"github.com/hollis-labs/substrate/harness/runner"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // echoAdapter is a minimal CLIAdapter for binaries that write

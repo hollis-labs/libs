@@ -5,7 +5,7 @@ Thin Go substrate that composes [`go-providers`](https://github.com/hollis-labs/
 (resolved access policy + legacy Profile enforcement) into a single `Run` entry point. It spawns a CLI binary under optional OS confinement, parses its structured output through a provider adapter, and emits **raw observed events** through a caller-supplied callback.
 
 ```go
-import "github.com/hollis-labs/go-runner/runner"
+import "github.com/hollis-labs/substrate/harness/runner"
 
 resolved, _ := sandbox.ResolveAccessPolicy(policy)
 
