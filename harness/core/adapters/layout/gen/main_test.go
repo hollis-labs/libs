@@ -8,7 +8,8 @@ import (
 )
 
 func TestCheckPassesOnCommittedFiles(t *testing.T) {
-	root := filepath.Join("..", "..")
+	// The module root: this package is adapters/layout/gen, three levels below the harness module root.
+	root := filepath.Join("..", "..", "..")
 	stale, err := run(root, true)
 	if err != nil {
 		t.Fatal(err)
