@@ -10,6 +10,11 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ### Added
 
+- Explicit bounded-spawn capabilities and conformance checks for lifetime child,
+  fanout, depth and budget ceilings, parent records and cascade cancellation.
+- Per-call work history, accepted-delegation result replies queued for the next
+  turn, run-scoped pool identity subsets and children-first termination recovery.
+
 - `agentdef`: strict version-2 definition parsing and validation, namespaced
   extension negotiation, semantic and artifact digests, and conformance fixtures.
   Harness permissions reference profile names; content pins are checked for
@@ -42,6 +47,8 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ### Changed
 
+- Removed the unused MemberProvisioner.Stop method. Release ends stable sessions
+  and their binding leases; Retire also ends ephemeral enrollment.
 - Assign requires a caller-scoped idempotency key; ReportResult requires a
   supported versioned result envelope instead of a body-only result.
 - Task result content is encoded as bytes to preserve the exact digest input

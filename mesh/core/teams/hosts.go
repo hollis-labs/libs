@@ -51,7 +51,7 @@ type MemberProvisioner interface {
 	// same identity/session, including failures after an external side effect.
 	// ErrProvisionFailed explicitly marks an irrecoverable failure; other
 	// errors are retryable and retain quota.
-	// Stop/Release MUST atomically tombstone Member.Intent.IdempotencyKey.
+	// Retire/Release MUST atomically tombstone Member.Intent.IdempotencyKey.
 	// Cleanup touches only resources acquired by Member.Intent.IdempotencyKey,
 	// never an unrelated actor lease. A never-acknowledged stub has no Actor.
 	// Fence racing/future Provision calls, and clean any resource provisioned
@@ -62,10 +62,11 @@ type MemberProvisioner interface {
 	// Pool/durable must return the requested enrolled identity, acquiring one
 	// binding lease per actor so two live sessions never share an identity.
 	Provision(context.Context, ProvisionRequest) (Member, error)
-	Stop(context.Context, string, Member) error    // idempotent; key supplied
-	Release(context.Context, string, Member) error // durable/pool identity retained
-	// Retire stops/fences the session and retires the ephemeral enrollment;
-	// it shares the same atomic intent-tombstone contract as Stop/Release.
+	// Release ends the stable member session and binding lease, retaining its
+	// durable/pool enrollment for a future session.
+	Release(context.Context, string, Member) error
+	// Retire ends the ephemeral member session, binding lease and enrollment;
+	// it shares the same atomic intent-tombstone contract as Release.
 	Retire(context.Context, string, Member) error
 }
 type ProvisionRequest struct {
@@ -90,6 +91,12 @@ type MessageSender interface {
 	// recipient-plan digest. Changed requests return ErrConflict, even when
 	// transport de-duplication remembers only keys.
 	BindMessage(context.Context, string, string) error
+	// SendMessage honors the retained recipient session and delivery policy.
+	// An unavailable session or unsupported queue policy must fail loudly;
+	// never retarget a reply to a new session of the same actor. Success means
+	// acceptance, including durable queuing for DeliveryAtIdle. New delegation
+	// replies must atomically recheck the delegation is non-terminal and both
+	// retained member/session pairs are active before queue acceptance.
 	SendMessage(context.Context, Delivery) error // idempotent delivery key
 }
 type RoutingInstaller interface {

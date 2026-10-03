@@ -49,18 +49,19 @@ func (h *providerHost) Provision(ctx context.Context, req teams.ProvisionRequest
 	h.members[m.ID] = m
 	return m, nil
 }
-func (h *providerHost) Stop(ctx context.Context, key string, m teams.Member) error {
-	_, err := h.provider.Invoke(ctx, mesh.Request{Verb: mesh.Cancel, Actor: h.actor, Target: m.Actor, IdempotencyKey: key})
-	return err
-}
 func (h *providerHost) SendMessage(ctx context.Context, d teams.Delivery) error {
 	body, err := json.Marshal(d.Body)
 	if err != nil {
 		return err
 	}
-	out, err := h.provider.Invoke(ctx, mesh.Request{Verb: mesh.MessageSend, Actor: mesh.Actor{URN: d.From, Kind: mesh.ActorAgent}, Target: d.Recipient.Actor, Body: body, IdempotencyKey: d.IdempotencyKey})
+	verb := d.Verb
+	if verb != mesh.Delegate && verb != mesh.Handoff {
+		verb = mesh.MessageSend
+	}
+	out, err := h.provider.Invoke(ctx, mesh.Request{Verb: verb, History: d.History, Delivery: d.Delivery, InReplyTo: d.InReplyTo, Actor: mesh.Actor{URN: d.From, Kind: mesh.ActorAgent}, Target: d.Recipient.Actor, Body: body, IdempotencyKey: d.IdempotencyKey})
 	if err == nil {
 		h.deliveries = append(h.deliveries, out)
+		err = h.Host.SendMessage(ctx, d)
 	}
 	return err
 }
@@ -98,7 +99,7 @@ func TestTeamsProviderComposition(t *testing.T) {
 	definition := teams.Team{ID: "example", Name: "Example team", Version: 1,
 		Slots:     []teams.Slot{{Name: "owner", Role: "coordinator", Definition: pin, Resolution: teams.Fresh, Activation: teams.Singleton, Min: 1, Max: 1}, {Name: "workers", Role: "engineer", Definition: pin, Resolution: teams.Pool, Pool: "workers", Identities: pool, Activation: teams.Concurrent, Min: 2, Max: 4, Dispatch: teams.IdleFirst}},
 		Phases:    []teams.Phase{{ID: "work", Kind: "flex", ActiveSlots: []string{"owner", "workers"}, OwnerSlot: "owner", ExitTrigger: teams.Trigger{Kind: "event", Spec: map[string]string{"event": "ready"}}}},
-		Authority: teams.Authority{Mode: teams.Strict, Grants: []teams.Grant{{FromSlot: "owner", Verb: teams.MayMessage, ToSlot: "workers"}, {FromSlot: "owner", Verb: teams.MaySpawn, ToSlot: "workers"}}}, Policy: teams.Policy{Spawn: limits}}
+		Authority: teams.Authority{Mode: teams.Strict, Grants: []teams.Grant{{FromSlot: "owner", Verb: teams.MayMessage, ToSlot: "workers"}, {FromSlot: "owner", Verb: teams.MaySpawn, ToSlot: "workers"}, {FromSlot: "owner", Verb: teams.MayDelegate, ToSlot: "workers"}}}, Policy: teams.Policy{Spawn: limits}}
 	h := &providerHost{Host: memory.New(), provider: p, actor: actor, members: map[string]teams.Member{}}
 	h.SpawnCapabilities["owner"] = true
 	for _, identity := range pool {
@@ -192,6 +193,30 @@ func TestTeamsProviderComposition(t *testing.T) {
 		}
 		if !reflect.DeepEqual(before, p.Events()) {
 			t.Fatal("authority-denied send reached provider")
+		}
+	})
+	t.Run("delegate_result_next_turn", func(t *testing.T) {
+		req := teams.AddressRequest{RunID: run.ID, Actor: owner.Actor, Address: "@workers", Verb: mesh.Delegate, Body: "return an answer", History: mesh.HistoryNone}
+		route, err := router.Send(ctx, definition, req, "delegation")
+		if err != nil {
+			t.Fatal(err)
+		}
+		task := h.deliveries[len(h.deliveries)-1].Task
+		if task == nil || task.History != mesh.HistoryNone {
+			t.Fatal("history override did not reach provider")
+		}
+		var original teams.Delivery
+		for _, d := range h.Host.Deliveries() {
+			if d.Verb == mesh.Delegate {
+				original = d
+			}
+		}
+		if err := router.ReplyResult(ctx, definition, run.ID, original.IdempotencyKey, route.Recipients[0].Actor, "answer"); err != nil {
+			t.Fatal(err)
+		}
+		reply := h.deliveries[len(h.deliveries)-1].Message
+		if reply == nil || reply.Recipients[0] != owner.Actor || reply.InReplyTo != original.IdempotencyKey || reply.Delivery != mesh.DeliveryAtIdle {
+			t.Fatal("result queue policy lost at provider seam")
 		}
 	})
 	t.Run("parent_lineage_and_cascade", func(t *testing.T) {

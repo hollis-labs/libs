@@ -128,7 +128,7 @@ func authorizationTarget(m Member) Member {
 	m.Status = "active"
 	return m
 }
-func releaseOrStop(ctx context.Context, p MemberProvisioner, runID string, m Member) error {
+func endMember(ctx context.Context, p MemberProvisioner, runID string, m Member) error {
 	key := stableID(runID, "termination", m.ID)
 	if m.Resolution == Fresh {
 		return p.Retire(ctx, key, m)
@@ -137,7 +137,7 @@ func releaseOrStop(ctx context.Context, p MemberProvisioner, runID string, m Mem
 }
 func finishMembers(ctx context.Context, store RosterStore, p MemberProvisioner, runID string, plan []Member) error {
 	for _, m := range plan {
-		if err := releaseOrStop(ctx, p, runID, m); err != nil {
+		if err := endMember(ctx, p, runID, m); err != nil {
 			return err
 		}
 		err := store.Mutate(ctx, runID, func(r *Roster) error {
@@ -191,8 +191,83 @@ func EndRun(ctx context.Context, runID string, store RosterStore, p MemberProvis
 	if err != nil {
 		return err
 	}
+	plan, err = childrenFirst(plan)
+	if err != nil {
+		return err
+	}
 	if err = finishMembers(ctx, store, p, runID, plan); err != nil {
 		return err
 	}
 	return routing.RemoveRouting(ctx, runID)
+}
+
+// childrenFirst orders a forest, including descendants whose parents have
+// already finished. Cycles fail before any external cleanup call.
+func childrenFirst(members []Member) ([]Member, error) {
+	state := map[string]int{}
+	var out []Member
+	var visit func(Member) error
+	visit = func(m Member) error {
+		if state[m.ID] == 1 {
+			return fmt.Errorf("termination: parent cycle")
+		}
+		if state[m.ID] == 2 {
+			return nil
+		}
+		state[m.ID] = 1
+		for _, child := range members {
+			if child.Parent == m.ID {
+				if err := visit(child); err != nil {
+					return err
+				}
+			}
+		}
+		state[m.ID] = 2
+		out = append(out, m)
+		return nil
+	}
+	for _, m := range members {
+		if err := visit(m); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// reconcileTerminations skips only ancestors of failed descendants, allowing
+// unrelated branches and later provisioning to make progress on every pass.
+func reconcileTerminations(ctx context.Context, store RosterStore, p MemberProvisioner, runID string, plan []Member) []error {
+	state := map[string]int{}
+	recovered := map[string]bool{}
+	var failures []error
+	var visit func(Member) bool
+	visit = func(m Member) bool {
+		if state[m.ID] == 1 {
+			failures = append(failures, fmt.Errorf("termination: parent cycle at %s", m.ID))
+			return false
+		}
+		if state[m.ID] == 2 {
+			return recovered[m.ID]
+		}
+		state[m.ID] = 1
+		ready := true
+		for _, child := range plan {
+			if child.Parent == m.ID && !visit(child) {
+				ready = false
+			}
+		}
+		if ready {
+			if err := finishMembers(ctx, store, p, runID, []Member{m}); err != nil {
+				failures = append(failures, err)
+				ready = false
+			}
+		}
+		state[m.ID] = 2
+		recovered[m.ID] = ready
+		return ready
+	}
+	for _, m := range plan {
+		visit(m)
+	}
+	return failures
 }

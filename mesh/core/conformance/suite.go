@@ -26,6 +26,7 @@ var worker = mesh.Actor{URN: "msg://agent/conformance/worker", Kind: mesh.ActorA
 
 func Run(t *testing.T, newFixture Factory) {
 	t.Helper()
+	t.Run("spawn", func(t *testing.T) { RunSpawn(t, newFixture) })
 	tests := map[string]func(*testing.T, Fixture){
 		"lifecycle": func(t *testing.T, f Fixture) {
 			call := invoker(t, f.Provider)
@@ -136,7 +137,7 @@ func Run(t *testing.T, newFixture Factory) {
 				}
 				result := call(mesh.Request{Verb: mesh.ReportResult, Actor: worker, Target: task.ID, Result: &mesh.VersionedResult{SchemaVersion: mesh.ResultSchemaV1, ContentType: "application/json", Digest: mesh.ContentDigest([]byte(`{"answer":42}`)), Content: json.RawMessage(`{"answer":42}`)}})
 				task = result.Task
-				if result.Message == nil || len(result.Message.Recipients) != 1 || result.Message.Recipients[0] != caller.URN {
+				if result.Message == nil || len(result.Message.Recipients) != 1 || result.Message.Recipients[0] != caller.URN || result.Message.InReplyTo != string(task.ID) || result.Message.Delivery != mesh.DeliveryAtIdle {
 					t.Fatal("result was not pushed back to caller")
 				}
 				if task.State != mesh.TaskCompleted || string(task.Result) != `{"answer":42}` {

@@ -19,7 +19,8 @@ type AddressRequest struct {
 	Address string
 	Body    string
 	Verb    mesh.Verb
-	Kind    mesh.ActorKind // Address filter only.
+	Kind    mesh.ActorKind     // Address filter only.
+	History mesh.HistoryPolicy // May narrow team policy: full > filtered > summary > none.
 }
 type Route struct {
 	TeamID        string
@@ -39,6 +40,8 @@ type Delivery struct {
 	Body           string
 	Verb           mesh.Verb
 	History        mesh.HistoryPolicy
+	InReplyTo      string
+	Delivery       mesh.DeliveryPolicy
 	Route          Route // Message -> rule -> snapshotted member provenance.
 }
 
@@ -79,6 +82,9 @@ func (router *Router) Resolve(ctx context.Context, t Team, req AddressRequest) (
 		return Route{}, fmt.Errorf("routing: incomplete host/request")
 	}
 	if err := Validate(t); err != nil {
+		return Route{}, err
+	}
+	if _, err := effectiveHistory(t, req); err != nil {
 		return Route{}, err
 	}
 	permission, err := permissionFor(req.Verb)
@@ -205,6 +211,10 @@ func (router *Router) Send(ctx context.Context, t Team, req AddressRequest, key 
 // SendResolved retries a host-retained plan without selecting new recipients.
 // The host must retain the original trusted request and plan together.
 func (router *Router) SendResolved(ctx context.Context, t Team, req AddressRequest, route Route, key string) error {
+	history, err := effectiveHistory(t, req)
+	if err != nil {
+		return err
+	}
 	if router.Roster == nil || router.Sender == nil || key == "" || req.Body == "" || req.Actor == "" || route.RunID != req.RunID || route.RosterVersion == 0 || len(route.Recipients) == 0 {
 		return fmt.Errorf("routing: invalid retained delivery")
 	}
@@ -288,7 +298,7 @@ func (router *Router) SendResolved(ctx context.Context, t Team, req AddressReque
 		Request AddressRequest
 		Route   Route
 		History mesh.HistoryPolicy
-	}{req, route, t.Policy.History.Effective()})
+	}{req, route, history})
 	if err != nil {
 		return err
 	}
@@ -297,7 +307,7 @@ func (router *Router) SendResolved(ctx context.Context, t Team, req AddressReque
 	}
 	var failures []error
 	for _, m := range recipients {
-		err := router.Sender.SendMessage(ctx, Delivery{IdempotencyKey: stableID(req.RunID, key, m.ID), From: from.Actor, Recipient: clone(m), Body: req.Body, Verb: req.Verb, History: t.Policy.History.Effective(), Route: clone(route)})
+		err := router.Sender.SendMessage(ctx, Delivery{IdempotencyKey: stableID(req.RunID, key, m.ID), From: from.Actor, Recipient: clone(m), Body: req.Body, Verb: req.Verb, History: history, Route: clone(route)})
 		if err != nil {
 			failures = append(failures, fmt.Errorf("recipient %s: %w", m.ID, err))
 		}
@@ -332,4 +342,20 @@ func routingAddress(t Team, req AddressRequest) (string, string, error) {
 	}
 
 	return address, rule, nil
+}
+
+func effectiveHistory(t Team, req AddressRequest) (mesh.HistoryPolicy, error) {
+	policy := t.Policy.History.Effective()
+	history := policy
+	if req.History != "" {
+		history = req.History
+	}
+	if !policy.Valid() || !history.Valid() {
+		return "", fmt.Errorf("routing: invalid history policy")
+	}
+	rank := map[mesh.HistoryPolicy]int{mesh.HistoryNone: 0, mesh.HistorySummary: 1, mesh.HistoryFiltered: 2, mesh.HistoryFull: 3}
+	if rank[history] > rank[policy] {
+		return "", fmt.Errorf("%w: history widens team policy", ErrDenied)
+	}
+	return history, nil
 }
