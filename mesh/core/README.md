@@ -1,0 +1,48 @@
+# mesh
+
+`github.com/hollis-labs/substrate/mesh` holds the contracts and building blocks that
+agents, hosts and providers use to talk to each other: who an actor is, what it may
+ask of another, how work is assigned and followed, how a team is formed and run, and
+how an agent is defined.
+
+## What is in the module
+
+| Package | Purpose |
+|---|---|
+| `mesh` (root) | The provider contract: actors and URNs, verbs, canonical task, session and instance states with their mapping table, the event envelope, capability descriptors and negotiation, assignment receipts, lookup and authorized replay, versioned results, typed diagnostics, and enrollment, execution and binding records. Standard library only. |
+| `mesh/fake`, `mesh/conformance` | An in-memory provider and the reusable conformance suites. Provider implementations run the suites in their own tests. |
+| `mesh/teams`, `mesh/teams/memory` | The team model behind host interfaces: slots, phases, authority checks, routing, spawning with limits, launch and recovery, and an in-memory host for tests. |
+| `mesh/agentdef` | Parsing, validation and digests for the version-2 agent definition file. |
+| `mesh/messaging`, `mesh/federation`, `mesh/hitl`, `mesh/tetherclient` | Durable messaging, cross-host federation, human-in-the-loop requests and the HTTP client for the Tether daemon. |
+
+Packages under `internal/` are not part of the module's API.
+
+## Versioning and stability
+
+Releases are tagged `mesh/vX.Y.Z`. The first release is `v0.1.0`.
+
+While the major version is `0`:
+
+- There is no compatibility guarantee. A minor release (`v0.1.0` to `v0.2.0`) may contain
+  breaking changes, and every breaking change is listed under "Changed" in the
+  [changelog](CHANGELOG.md).
+- New capabilities ship in a minor release. A patch release only fixes bugs and does not
+  change the exported API.
+- Consumers pin an exact version and adopt a new one on their own schedule. Releases of
+  this module are never coordinated with releases of other modules.
+
+Parts of the surface are expected to change once a provider implements them. In
+particular the `task.lookup` and `event.follow` verbs, the capability identifiers
+`urn:hollis-labs:mesh:dispatch/v1` and `urn:hollis-labs:mesh:spawn/v1`, and the result
+schema `urn:hollis-labs:mesh:result/v1` are provisional.
+
+## Requirements
+
+Go 1.26.6 or newer. The root package imports only the standard library; other packages
+bring the third-party modules listed in `go.mod` (for example the SQLite driver used by
+`messaging/sqlstore`).
+
+## Development
+
+Build, test and release conventions for all modules of this repository are in the
+[repository README](../README.md).
