@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.0
 
 ### Added
 
@@ -28,3 +28,24 @@
 - Add injectable clocks, sanitized tracing/transition sinks and nested trace context.
 - Validate filter output before lifecycle completion and breaker accounting.
 - Add observability wiring examples and concurrent breaker/telemetry checks.
+- Add the private TypeScript twin under `ts/`, with browser and Node execution,
+  scoped lifecycle, field views and async variants; unpublished, with no npm
+  publication workflow.
+- Share execution and catalog-policy JSON conformance fixtures between Go and TS.
+- Add the transport-agnostic `RemoteHandler` seam, `RemoteConnection` fences,
+  structured result/veto validation, latency admission and generation breakers.
+- Add `remote_latency_budget_ms`, `remote_batch_max` and
+  `remote_fire_and_forget` catalog policies to Go introspection and the TS reader.
+  Catalog document change: `remote_ok=true` requires a positive
+  `remote_latency_budget_ms` within handler timeout; there is no independent
+  document-format version.
+- Add verified callback bindings with shared host-derived depth, inherited
+  deadline/aggregate budget and trace, plus direct/indirect active-registration
+  cycle rejection before scheduling.
+- Add bounded observation-action batches with whole-envelope validation,
+  private per-item leases, ordered independent outcomes, queued async execution
+  and one-shot post-commit confirmation.
+- Add opt-in async/post-commit notifications with queued-only submission outcomes,
+  no callback binding, no retries and no fabricated handler/breaker success.
+- Extend `hookstest` with R16-R22 and broken-adapter proofs for remote admission,
+  results, fences, ancestry, batches, notifications and breakers; R01-R15 unchanged.

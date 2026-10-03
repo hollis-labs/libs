@@ -1,4 +1,4 @@
-# Single-call remote hook seam
+# Remote hook execution seams
 
 The core remains standard-library-only and imports no SDK or wire package.
 A trusted host implements `RemoteHandler.Handle(context.Context, RemoteRequest)`
@@ -30,11 +30,10 @@ advertise negotiated transport support; the host must establish that separately.
 module, document shape and transport-profile versions. This change accepts new
 optional policy keys and makes the latency field mandatory for remote-enabled
 declarations. An older closed-key TS reader rejects a document with these new
-fields; this PR updates Go introspection, TS reader and shared fixtures together.
-Existing remote-enabled declarations must supply the latency budget. There are
-no tags or adopters requiring a compatibility path. Local declarations still
-omit all three zero/default fields. Discovery and generated markdown use this
-same updated document.
+fields. Go introspection, the TS reader and shared fixtures use the same shape.
+The v0.1.0 catalog requires remote-enabled declarations to supply the latency
+budget. Local declarations omit all three zero/default fields. Discovery and
+generated markdown use this same document.
 
 ## Host registration
 
@@ -47,8 +46,9 @@ negotiated incarnation and registration/digest against each admitted request.
 
 `AddRemoteAction`/`AddRemoteFilter` require both a remote-enabled declaration and
 `ScopeConfig.Remote=true`. Local scopes can attach in-process handlers only;
-remote scopes can attach `RemoteHandler` registrations only. Registration names,
-allowlists, required views, digests, resource caps and deprecation still use the
+remote scopes can attach remote `Handler` or `Notifier` registrations only.
+Registration names, allowlists, required views, digests, resource caps and
+deprecation still use the
 same registry policy. `ValidateRegistration` is policy preflight, not a transport
 attachment or name reservation.
 
