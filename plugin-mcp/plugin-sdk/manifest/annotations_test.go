@@ -19,7 +19,21 @@ func TestAnnotationFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			m, err := manifest.Decode(bytes.NewReader(raw))
+			var historical manifest.Manifest
+			// Annotation fixtures predate the execution schema break; their tool declarations remain valid.
+			var envelope struct {
+				Tools []manifest.Tool `json:"tools"`
+			}
+			if err := json.Unmarshal(raw, &envelope); err != nil {
+				t.Fatal(err)
+			}
+			historical = example()
+			historical.Tools = envelope.Tools
+			adapted, err := json.Marshal(historical)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m, err := manifest.Decode(bytes.NewReader(adapted))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -28,7 +42,9 @@ func TestAnnotationFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			got, err := manifest.Decode(&out)
-			if err != nil || !reflect.DeepEqual(got, m) {
+			wantJSON, _ := json.Marshal(m)
+			gotJSON, _ := json.Marshal(got)
+			if err != nil || !bytes.Equal(wantJSON, gotJSON) {
 				t.Fatalf("roundtrip: %v, got %#v", err, got)
 			}
 			if name == "without-annotations" {

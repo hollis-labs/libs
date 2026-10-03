@@ -3,8 +3,8 @@
 // hosts validate their extension, resolve secrets, and enforce their own policy.
 //
 // Encode emits JSON, a subset of YAML, suitable for a plugin.yaml file or a
-// --manifest flag. Decode reads that format without a YAML dependency. Hosts
-// accepting other YAML syntax should convert it to JSON before calling Decode.
+// --manifest flag. Decode reads that format without a YAML dependency. Broader
+// YAML syntax is outside the on-disk contract.
 package manifest
 
 import (
@@ -16,8 +16,10 @@ import (
 const (
 	// SchemaVersion is independent of the subprocess wire protocol.
 	SchemaVersion = 2
-	Filename      = "plugin.yaml"
-	Runtime       = "subprocess"
+	// RequiredProtocol is the manifest-v2 target; Serve adopts it separately.
+	RequiredProtocol = 2
+	Filename         = "plugin.yaml"
+	Runtime          = "subprocess"
 )
 
 // Manifest is the common plugin declaration. Host-specific registrations live
@@ -34,7 +36,10 @@ type Manifest struct {
 	Repository    string                         `json:"repository,omitempty"`
 	Protocol      int                            `json:"protocol"`
 	Runtime       string                         `json:"runtime"`
-	Entrypoint    Entrypoint                     `json:"entrypoint"`
+	Server        Server                         `json:"server"`
+	UI            *UI                            `json:"ui,omitempty"`
+	Artifact      Artifact                       `json:"artifact"`
+	Hooks         []Hook                         `json:"hooks,omitempty"`
 	Capabilities  []subprocess.CapabilityRequest `json:"capabilities,omitempty"`
 	Config        Config                         `json:"config,omitzero"`
 	Tools         []Tool                         `json:"tools,omitempty"`
@@ -44,16 +49,9 @@ type Manifest struct {
 	Nanite        json.RawMessage                `json:"nanite,omitempty"`
 }
 
-// Entrypoint names one executable inside the bundle, never a shell command.
-// Hosts must additionally resolve symlinks and verify the executable on disk.
-type Entrypoint struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args,omitempty"`
-}
-
 // HostRange declares inclusive semantic-version bounds on a host contract.
 // Empty Min or Max means unbounded on that side. Hosts enforce compatibility
-// (including ordering of bounds and their own prerelease policy).
+// through CheckCompatibility, with explicit prerelease policy.
 type HostRange struct {
 	Min string `json:"min,omitempty"`
 	Max string `json:"max,omitempty"`

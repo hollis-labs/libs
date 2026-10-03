@@ -54,9 +54,11 @@ go get github.com/hollis-labs/plugin-sdk
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.
 - `manifest` — a shared subprocess declaration with host extension objects,
-  config/secrets, capabilities, tools and per-host contract ranges. Its
-  dependency-free encoder emits JSON (valid YAML) for `plugin.yaml`; its
-  decoder refuses legacy dialects, unknown fields and duplicate keys.
+  config/secrets, capabilities, tools, hooks, server/UI artifacts and inclusive
+  host/engine ranges. It requires protocol 2; Serve's protocol-2 implementation
+  follows separately. Its dependency-free encoder emits JSON for `plugin.yaml`;
+  decoding rejects legacy dialects, unknown fields and duplicate keys. Helpers
+  check semantic version bounds and verify immutable bundle inventories.
   See [the manifest contract](docs/manifest.md).
 - `registry` — the Go view of the plugin registry wire contract: the
   registry-v2 catalog of owner-qualified declarative, component, and handler
