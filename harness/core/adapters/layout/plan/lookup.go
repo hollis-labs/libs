@@ -131,7 +131,8 @@ func validateKey(k Key) error {
 }
 
 // Request distinguishes optional content from hard requirements. Permission
-// enforcement and required MCP exclusivity always refuse, never downgrade.
+// requests refuse an unmapped posture; optional mappings yield a named omission.
+// Required MCP exclusivity always refuses where unsupported, never downgrades.
 // PostureLookup is injected by the compiler (normally registry PostureFor).
 // It checks representability without making this leaf depend on the registry.
 // It must return an error for an unmapped explicit posture, never cast strings.
