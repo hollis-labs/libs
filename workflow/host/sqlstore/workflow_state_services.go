@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/graph"
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow/stepkind"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/graph"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/stepkind"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func (s *Store) LoadService(ctx context.Context, start workflowruntime.NodeInvocationID) (workflowruntime.ServiceSnapshot, error) {

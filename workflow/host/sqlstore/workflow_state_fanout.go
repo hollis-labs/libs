@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow/values"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func (s *Store) LoadFanOut(ctx context.Context, parent workflowruntime.NodeInvocationID) (workflowruntime.FanOutSnapshot, error) {

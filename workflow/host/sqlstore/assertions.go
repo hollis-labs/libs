@@ -1,6 +1,6 @@
 package sqlstore
 
-import workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+import workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
 
 // Compile-time proof that Store implements every go-workflow runtime store
 // interface. A new runtime.*Store method in a go-workflow bump must be

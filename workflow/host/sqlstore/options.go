@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
 )
 
 // RunColumns names the run table and the four columns of it the store reads

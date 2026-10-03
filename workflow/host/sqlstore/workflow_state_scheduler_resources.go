@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
 )
 
 func (s *Store) AdmitNode(ctx context.Context, request workflowruntime.AdmitNodeRequest) (workflowruntime.AdmitNodeResult, error) {

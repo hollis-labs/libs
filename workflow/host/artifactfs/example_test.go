@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/go-workflow-host/artifactfs"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/host/artifactfs"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func Example() {

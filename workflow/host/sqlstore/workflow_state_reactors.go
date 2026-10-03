@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
 )
 
 const workflowReactorSelect = `SELECT snapshot_json,reactor_id,registration_id,registration_generation,correlation,current_generation,current_run_id,continue_after_events,event_count,status,generation,created_at,updated_at FROM workflow_reactors`

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func TestNewRejectsEmptyAndInvalidAuthority(t *testing.T) {

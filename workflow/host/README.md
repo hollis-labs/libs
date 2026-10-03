@@ -18,7 +18,7 @@ Every package is standard library plus go-workflow only.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-workflow-host/sqlstore
+go get github.com/hollis-labs/libs/workflow/host/sqlstore
 ```
 
 ## sqlstore
@@ -38,8 +38,8 @@ import (
 	"database/sql"
 	"log"
 
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
-	"github.com/hollis-labs/go-workflow-host/sqlstore"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/host/sqlstore"
 	_ "modernc.org/sqlite" // any database/sql SQLite driver works
 )
 
@@ -90,7 +90,7 @@ Directories are mode 0700 and files 0600. Depends on the standard library and
 `go-workflow/values` only.
 
 ```sh
-go get github.com/hollis-labs/go-workflow-host/artifactfs
+go get github.com/hollis-labs/libs/workflow/host/artifactfs
 ```
 
 ```go
@@ -105,8 +105,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/go-workflow-host/artifactfs"
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/host/artifactfs"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 func main() {

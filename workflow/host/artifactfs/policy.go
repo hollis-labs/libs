@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 // OwnerClaimAuthorizer returns a strict default ownership policy for a Store

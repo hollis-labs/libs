@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/conformance"
-	workflowruntime "github.com/hollis-labs/go-workflow/runtime"
+	"github.com/hollis-labs/libs/workflow/conformance"
+	workflowruntime "github.com/hollis-labs/libs/workflow/runtime"
 )
 
 // naniteRunColumns is the run-table shape of a host that shares workflow_runs

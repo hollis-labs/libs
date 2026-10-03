@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 // Store is a local, immutable go-workflow artifact store. Each artifact is

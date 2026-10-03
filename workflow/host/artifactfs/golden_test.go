@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-workflow/values"
+	"github.com/hollis-labs/libs/workflow/values"
 )
 
 // The expected ids were computed once from the consuming apps' own
