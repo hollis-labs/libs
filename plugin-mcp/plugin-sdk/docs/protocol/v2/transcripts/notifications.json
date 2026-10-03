@@ -58,8 +58,15 @@
           "name": "internal"
         }
       },
-      "level": "observed-quirk",
-      "preferred": "ID 0 is a valid numeric request ID and must receive a correlated reply; only an absent ID denotes a notification. Explicit null IDs also must not silently become notifications."
+      "level": "normative",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32603,
+          "message": "failed"
+        }
+      }
     },
     {
       "send": {

@@ -82,7 +82,7 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 	t.Helper()
 	autoInit := len(reqs) > 0 && reqs[0].Method != MethodInit
 	if autoInit {
-		reqs = append([]RPCRequest{{JSONRPC: "2.0", ID: 8000, Method: MethodInit, Params: validInitParams()}}, reqs...)
+		reqs = append([]RPCRequest{{JSONRPC: "2.0", ID: NumberID(8000), Method: MethodInit, Params: validInitParams()}}, reqs...)
 	}
 	in, inW := io.Pipe()
 	var out bytes.Buffer
@@ -126,7 +126,7 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 		if err := json.Unmarshal([]byte(l), &r); err != nil {
 			t.Fatalf("bad response line %q: %v", l, err)
 		}
-		if autoInit && r.ID == 8000 {
+		if autoInit && r.ID == NumberID(8000) {
 			if r.Error != nil {
 				t.Fatalf("setup init: %+v", r.Error)
 			}
@@ -136,7 +136,7 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 	}
 	// Responses are produced concurrently — sort by ID so test
 	// assertions on resps[N] are deterministic.
-	sort.Slice(resps, func(i, j int) bool { return resps[i].ID < resps[j].ID })
+	sort.Slice(resps, func(i, j int) bool { return resps[i].ID.number < resps[j].ID.number })
 	return resps
 }
 
@@ -156,16 +156,16 @@ func (w *syncWriter) Write(b []byte) (int, error) {
 func TestServe_InitLoadUnload(t *testing.T) {
 	p := &basePlugin{id: "test", name: "Test", version: "0.0.1"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: validInitParams()},
-		{JSONRPC: "2.0", ID: 2, Method: MethodLoad},
-		{JSONRPC: "2.0", ID: 3, Method: MethodUnload},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: validInitParams()},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodLoad},
+		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodUnload},
 	})
 	if len(resps) != 3 {
 		t.Fatalf("got %d responses, want 3", len(resps))
 	}
 	for _, r := range resps {
 		if r.Error != nil {
-			t.Errorf("id=%d got error: %+v", r.ID, r.Error)
+			t.Errorf("id=%v got error: %+v", r.ID, r.Error)
 		}
 	}
 
@@ -181,7 +181,7 @@ func TestServe_InitLoadUnload(t *testing.T) {
 func TestServe_MethodNotFoundForMissingCapability(t *testing.T) {
 	p := &basePlugin{id: "test"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("want 1 response, got %d", len(resps))
@@ -194,7 +194,7 @@ func TestServe_MethodNotFoundForMissingCapability(t *testing.T) {
 func TestServe_CommandHandler(t *testing.T) {
 	p := &commandPlugin{basePlugin: basePlugin{id: "cmd"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
 			Params: CommandExecParams{Name: "greet", Args: "world"}},
 	})
 	if len(resps) != 1 {
@@ -212,7 +212,7 @@ func TestServe_CommandHandler(t *testing.T) {
 func TestServe_CommandEnvelopesPropagate(t *testing.T) {
 	p := &envelopeCommandPlugin{basePlugin: basePlugin{id: "env"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
 			Params: CommandExecParams{Name: "emit"}},
 	})
 	if len(resps) != 1 {
@@ -240,7 +240,7 @@ func (p *envelopeCommandPlugin) Command(ctx context.Context, req CommandRequest)
 func TestServe_EventEnvelopesPropagate(t *testing.T) {
 	p := &envelopeEventPlugin{basePlugin: basePlugin{id: "env-evt"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodEventHandle,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle,
 			Params: EventHandleParams{Type: "message.sent"}},
 	})
 	if len(resps) != 1 {
@@ -266,7 +266,7 @@ func (p *envelopeEventPlugin) EventHandle(ctx context.Context, req EventRequest)
 func TestServe_EventHandlerCancel(t *testing.T) {
 	p := &eventPlugin{basePlugin: basePlugin{id: "evt"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodEventHandle, Params: EventHandleParams{Type: "veto", PreHook: true}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle, Params: EventHandleParams{Type: "veto", PreHook: true}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -283,8 +283,8 @@ func TestServe_EventHandlerCancel(t *testing.T) {
 func TestServe_CRUDErrorMapping(t *testing.T) {
 	p := &crudPlugin{basePlugin: basePlugin{id: "crud"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "missing"}},
-		{JSONRPC: "2.0", ID: 2, Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "found"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "missing"}},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "found"}},
 	})
 	if len(resps) != 2 {
 		t.Fatalf("got %d", len(resps))
@@ -300,7 +300,7 @@ func TestServe_CRUDErrorMapping(t *testing.T) {
 func TestServe_PanicRecovery(t *testing.T) {
 	p := &panicPlugin{basePlugin: basePlugin{id: "panic"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "boom"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "boom"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -340,7 +340,7 @@ func (p *mcpPlugin) MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCal
 func TestServe_MCPHandler(t *testing.T) {
 	p := &mcpPlugin{basePlugin: basePlugin{id: "mcp"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodMCPCallTool,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMCPCallTool,
 			Params: MCPCallRequest{ToolName: "search", Arguments: map[string]interface{}{"q": "cats"}, SessionID: "s1"}},
 	})
 	if len(resps) != 1 {
@@ -367,7 +367,7 @@ func TestServe_MCPHandler(t *testing.T) {
 func TestServe_MCPMethodNotFound(t *testing.T) {
 	p := &basePlugin{id: "none"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "x"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "x"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -389,7 +389,7 @@ func (p *httpPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPRespo
 func TestServe_HTTPHandler(t *testing.T) {
 	p := &httpPlugin{basePlugin: basePlugin{id: "http"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodHTTPHandle,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodHTTPHandle,
 			Params: HTTPRequest{Method: "GET", Path: "/ping", RawPath: "/p%69ng", RawQuery: "msg=hi&msg=again&empty=", Query: map[string]string{"msg": "hi"}}},
 	})
 	if len(resps) != 1 {
@@ -410,7 +410,7 @@ func TestServe_HTTPHandler(t *testing.T) {
 func TestServe_HTTPMethodNotFound(t *testing.T) {
 	p := &basePlugin{id: "none"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x"}},
 	})
 	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
 		t.Errorf("expected method-not-found, got %+v", resps)
@@ -434,7 +434,7 @@ func (p *migratePlugin) Migrate(ctx context.Context, from, to string) error {
 func TestServe_Migrator(t *testing.T) {
 	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/tmp"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/tmp"}},
 	})
 	if len(resps) != 1 {
 		t.Fatalf("got %d", len(resps))
@@ -450,7 +450,7 @@ func TestServe_Migrator(t *testing.T) {
 func TestServe_MigrateError(t *testing.T) {
 	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "bad"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "bad"}},
 	})
 	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeInternal {
 		t.Errorf("expected internal error, got %+v", resps)
@@ -460,7 +460,7 @@ func TestServe_MigrateError(t *testing.T) {
 func TestServe_MigrateMethodNotFound(t *testing.T) {
 	p := &basePlugin{id: "none"}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0"}},
 	})
 	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
 		t.Errorf("expected method-not-found, got %+v", resps)
@@ -557,7 +557,7 @@ func TestServe_IdentityAwareInit(t *testing.T) {
 	params := validInitParams()
 	params.Identity = json.RawMessage(`{"user_id":"u1"}`)
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodInit, Params: params},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: params},
 	})
 	if len(resps) != 1 || resps[0].Error != nil {
 		t.Fatalf("resps = %+v", resps)
@@ -575,14 +575,14 @@ func TestServe_IdentityAwareDispatchMethods(t *testing.T) {
 	idD := json.RawMessage(`{"user_id":"http"}`)
 
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "x", Identity: idA}},
-		{JSONRPC: "2.0", ID: 2, Method: MethodEventHandle, Params: EventHandleParams{Type: "y", Identity: idB}},
-		{JSONRPC: "2.0", ID: 3, Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "z", Identity: idC}},
-		{JSONRPC: "2.0", ID: 4, Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x", Identity: idD}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x", Identity: idA}},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodEventHandle, Params: EventHandleParams{Type: "y", Identity: idB}},
+		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "z", Identity: idC}},
+		{JSONRPC: "2.0", ID: NumberID(4), Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x", Identity: idD}},
 	})
 	for _, r := range resps {
 		if r.Error != nil {
-			t.Errorf("id=%d error: %+v", r.ID, r.Error)
+			t.Errorf("id=%v error: %+v", r.ID, r.Error)
 		}
 	}
 
@@ -622,7 +622,7 @@ func TestServe_IdentityAwareDispatchMethods(t *testing.T) {
 func TestServe_IdentityNotCalledWhenAbsent(t *testing.T) {
 	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
 	})
 	if len(resps) != 1 || resps[0].Error != nil {
 		t.Fatalf("resps = %+v", resps)
@@ -639,7 +639,7 @@ func TestServe_IdentityNotCalledWhenAbsent(t *testing.T) {
 func TestServe_IdentityIgnoredWithoutIdentityAware(t *testing.T) {
 	p := &commandPlugin{basePlugin: basePlugin{id: "cmd"}}
 	resps := drive(t, p, []RPCRequest{
-		{JSONRPC: "2.0", ID: 1, Method: MethodCommandExecute,
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
 			Params: CommandExecParams{Name: "greet", Args: "world", Identity: json.RawMessage(`{"user_id":"u1"}`)}},
 	})
 	if len(resps) != 1 {

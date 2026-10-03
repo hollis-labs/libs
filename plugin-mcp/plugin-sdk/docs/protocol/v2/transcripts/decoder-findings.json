@@ -1,5 +1,5 @@
 {
-  "level": "observed-quirk",
+  "level": "normative",
   "profile": "base",
   "steps": [
     {
@@ -44,13 +44,13 @@
       "raw": "{",
       "expect": {
         "jsonrpc": "2.0",
-        "id": 0,
+        "id": null,
         "error": {
           "code": -32700
         }
       },
-      "message_prefix": "parse error:",
-      "preferred": "Invalid JSON must return -32700 with id:null, then continue reading."
+      "level": "normative",
+      "message_prefix": "parse error:"
     },
     {
       "send": {
@@ -60,25 +60,24 @@
       },
       "expect": {
         "jsonrpc": "2.0",
-        "id": 0,
-        "error": {
-          "code": -32700
+        "id": "string-id",
+        "result": {
+          "ok": true
         }
       },
-      "message_prefix": "parse error:",
-      "preferred": "Accept string IDs and echo the exact string in the response; a valid string ID is not a parse error."
+      "level": "normative"
     },
     {
       "send": [],
       "expect": {
         "jsonrpc": "2.0",
-        "id": 0,
+        "id": null,
         "error": {
-          "code": -32700
+          "code": -32600,
+          "message": "invalid request"
         }
       },
-      "message_prefix": "parse error:",
-      "preferred": "An empty batch must return -32600 with id:null. Nonempty JSON-RPC batches should receive per-request replies; valid JSON arrays are not parse errors."
+      "level": "normative"
     },
     {
       "send": {
@@ -88,11 +87,12 @@
       "expect": {
         "jsonrpc": "2.0",
         "id": 1,
-        "result": {
-          "ok": true
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
         }
       },
-      "preferred": "Require jsonrpc exactly \"2.0\"; missing/wrong versions are invalid requests (-32600), not dispatched calls."
+      "level": "normative"
     },
     {
       "send": {
@@ -124,11 +124,12 @@
       "expect": {
         "jsonrpc": "2.0",
         "id": 3,
-        "result": {
-          "ok": true
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
         }
       },
-      "preferred": "Reject a version other than \"2.0\" with -32600 instead of dispatching."
+      "level": "normative"
     },
     {
       "send": {
@@ -139,11 +140,11 @@
         "jsonrpc": "2.0",
         "id": 4,
         "error": {
-          "code": -32601,
-          "message": "unknown method \"\""
+          "code": -32600,
+          "message": "invalid request"
         }
       },
-      "preferred": "Require a string method; missing method is -32600, not unknown-method -32601."
+      "level": "normative"
     },
     {
       "send": {
@@ -153,14 +154,13 @@
       },
       "expect": {
         "jsonrpc": "2.0",
-        "id": 0,
+        "id": 5,
         "error": {
-          "code": -32700
+          "code": -32600,
+          "message": "invalid request"
         }
       },
-      "preferred": "A non-string method is an invalid request (-32600), not invalid JSON (-32700).",
-      "message_prefix": "parse error:"
+      "level": "normative"
     }
-  ],
-  "preferred": "F3: Go conflates JSON decoding with request validation, uses parse-error ID 0, and accepts invalid version/handshake inputs. Preferred: validate JSON-RPC envelopes separately, use -32700 only for invalid JSON with id:null, -32600 for invalid requests, preserve valid IDs, and reject unsupported plugin protocol before load."
+  ]
 }

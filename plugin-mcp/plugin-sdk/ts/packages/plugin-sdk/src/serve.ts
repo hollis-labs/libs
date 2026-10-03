@@ -3,7 +3,8 @@ import process from 'node:process';
 import { Readable } from 'node:stream';
 import type { Writable } from 'node:stream';
 import { ConfigReader } from './config.js';
-import { Dispatcher, decodeRequest, RPCFault } from './dispatch.js';
+import { Dispatcher, decodeRequest } from './dispatch.js';
+import { EnvelopeFault } from './envelope.js';
 import { errorMessage } from './errors.js';
 import { createLogger, SecretTracker } from './log.js';
 import type { ServerPlugin } from './types.js';
@@ -84,13 +85,14 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
       if (controller.signal.aborted) break;
       try {
         const request = decodeRequest(line);
+        if (!request) continue; // Unsolicited reply: no outgoing waiters yet.
         const task = dispatcher.dispatch(request).then(async response => { if (response) await write(response); });
         if(request.method === 'plugin/init') { await task; continue; }
         pending.add(task);
         void task.finally(() => pending.delete(task));
       } catch (error) {
-        const fault = error as RPCFault;
-        await write({jsonrpc:'2.0',id:0,error:{code:fault.code,message:fault.message}});
+        if (!(error instanceof EnvelopeFault)) throw error;
+        await write({jsonrpc:'2.0',id:error.id,error:{code:error.code,message:error.message}});
       }
     }
   } catch (error) { if (!controller.signal.aborted) inputError = error; }

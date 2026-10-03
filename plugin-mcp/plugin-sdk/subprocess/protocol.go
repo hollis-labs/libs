@@ -16,7 +16,7 @@ import "encoding/json"
 // RPCRequest is a JSON-RPC 2.0 request sent from host to plugin.
 type RPCRequest struct {
 	JSONRPC string `json:"jsonrpc"`
-	ID      int64  `json:"id,omitempty"` // 0 for notifications
+	ID      RPCID  `json:"id,omitempty"` // zero value for notifications
 	Method  string `json:"method"`
 	Params  any    `json:"params,omitempty"`
 }
@@ -24,7 +24,7 @@ type RPCRequest struct {
 // RPCResponse is a JSON-RPC 2.0 response from plugin to host.
 type RPCResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      int64           `json:"id"`
+	ID      RPCID           `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *RPCError       `json:"error,omitempty"`
 }

@@ -1,0 +1,728 @@
+{
+  "level": "normative",
+  "profile": "base",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "text-id",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "text-id",
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "",
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": -1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": -1,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9007199254740991,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 9007199254740991,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": -9007199254740991,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": -9007199254740991,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "quoted\"\\\n😀",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "quoted\"\\\n😀",
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2\\u002e0\",\"id\":\"\\ud83d\\ude00\",\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "😀",
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":-0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"plugin/health\",\"params\":{\"opaque\":{\"x\":1,\"x\":2}}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 42,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":9007199254740992,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":-9007199254740992,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":9223372036854775808,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":1.0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":1e0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":-2E+0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":true,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":[],\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"\\ud800\",\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"\\udfff\",\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":7,\"id\":8,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":7,\"i\\u0064\":7,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"recover\",\"method\":\"wrong\",\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "recover",
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"mix\",\"method\":\"plugin/health\",\"result\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "mix",
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":-3,\"method\":\"plugin/health\",\"error\":{\"code\":1,\"message\":\"x\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": -3,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":null,\"id\":\"version\",\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "version",
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"id\":9,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":null}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"\\ud800\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":12}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":13,\"result\":{},\"error\":{\"code\":1,\"message\":\"x\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":14,\"error\":null}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":15,\"error\":{\"code\":1.1,\"message\":\"x\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":16,\"error\":{\"code\":1,\"message\":null}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 16,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":17,\"error\":{\"code\":1,\"message\":\"\\ud800\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"method\":42}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "[]",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"plugin/health\"}]",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "null",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "42",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "\"text\"",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":01,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":1} {}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700
+        }
+      },
+      "message_prefix": "parse error:"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "method": "plugin/health"
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700,
+          "message": "parse error"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "other",
+        "result": null
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32603,
+          "message": "failed"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":18,\"result\":{},\"params\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":19,\"error\":{\"Code\":1,\"Message\":\"x\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 19,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":20,\"error\":{\"code\":9007199254740992,\"message\":\"x\"}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":21,\"\\ud800\":0,\"method\":\"plugin/health\"}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      }
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"plugin/init\",\"params\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "error": {
+          "code": -32600
+        }
+      },
+      "message_prefix": "init requires a positive safe"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"init-string\",\"method\":\"plugin/init\",\"params\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "init-string",
+        "error": {
+          "code": -32600
+        }
+      },
+      "message_prefix": "init requires a positive safe"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":-22,\"method\":\"plugin/init\",\"params\":{}}",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": -22,
+        "error": {
+          "code": -32600
+        }
+      },
+      "message_prefix": "init requires a positive safe"
+    },
+    {
+      "raw": "{\"jsonrpc\":\"2.0\",\"id\":23,\"error\":{\"code\":1e0,\"message\":\"ok\"}}"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "alive",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "alive",
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}
