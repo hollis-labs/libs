@@ -1,0 +1,89 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T18:30:59.566095-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - See the Boundaries section of AGENTS.md for the invariants and the tests that guard each.
+  agents_start_here: |-
+    - `worktree` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: Create, inspect, safely remove and sweep per-run git worktrees with injected policy.
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: worktree
+  repo_name: go-worktree
+  stability: pre-1.0
+computed:
+  import_line: worktree "github.com/hollis-labs/go-worktree"
+  import_path: github.com/hollis-labs/go-worktree
+  module_path: github.com/hollis-labs/go-worktree
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:b703eaba6acbe8e922d6f4905126d8012fe7e57e00365b4418cac2b11492c178
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:83b5c4bd91de9412a8860e87e040bab1cefe432070c1d9c75fdf20f0c1488d63
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:90235758d625c3198e44b6ad107bf76116e0c588ab7fe327c9ba84ac1ace3737
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:3b25629abc7fd38baf6430bd8b3a4c888cbf430818ad29a65ef5c49cb616daeb
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:20eb3d3f3bf670b745135e3dd422c53f3a9df284951319900a3a263d1d93436f
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:80da25a85095350443faccb0f742d28112d094ddf91da863e398abbabafe455f
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:0b761f4de790ace7a9a26cd99b55b1bb453415f976db750b993c354c17cf8ef1
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  worktree.go:
+    preset: go-lib
+    digest_at_gen: sha256:6306372f44c77098ad69f0b24ee6aebfebe58420978043a402f91ee5112a4c4f
+  worktree_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:9216df0233f3fc2c6230dafee8cf7d9ce58dfe762985f1d39903de4fc1587a8d
+sync_history:
+  - at: 2026-09-29T18:30:59.566095-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
