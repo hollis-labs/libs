@@ -4,16 +4,16 @@ A small, focused collection of string manipulation helpers for Go, modeled loose
 
 > **Status:** pre-1.0 (`v0.1.x`). API surface is stable enough for production use but may evolve in minor versions. Breaking changes will be called out loudly in [CHANGELOG.md](CHANGELOG.md).
 
-API reference: <https://pkg.go.dev/github.com/hollis-labs/go-strutil>
+API reference: <https://pkg.go.dev/github.com/hollis-labs/libs/util/strutil>
 
 ## Installation
 
 ```bash
-go get github.com/hollis-labs/go-strutil
+go get github.com/hollis-labs/libs/util/strutil
 ```
 
 ```go
-import "github.com/hollis-labs/go-strutil"
+import "github.com/hollis-labs/libs/util/strutil"
 
 slug := strutil.Slugify("Café du Monde") // "cafe-du-monde"
 ```

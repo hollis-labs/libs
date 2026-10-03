@@ -4,7 +4,7 @@ package main
 import (
 	"fmt"
 
-	strutil "github.com/hollis-labs/go-strutil"
+	strutil "github.com/hollis-labs/libs/util/strutil"
 )
 
 func main() {
