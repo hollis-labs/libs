@@ -89,4 +89,4 @@ jobs:
       # The published file list is a property of the package, checked before a
       # human runs `npm publish`, not after.
       - name: pack (dry run)
-        run: npm pack --dry-run -w @hollis-labs/plugin-registry
+        run: npm pack --dry-run --workspaces
