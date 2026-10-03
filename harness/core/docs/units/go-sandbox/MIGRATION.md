@@ -21,4 +21,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** It required `gopkg.in/yaml.v3` v3.0.1 (same version) and `github.com/hollis-labs/go-safefs` v0.1.0. go-safefs is now `harness/sandbox/atomicfile` and `harness/sandbox/pathsafe`, so `sandbox` builds against the source at go-safefs `main` (v0.1.0 plus 2 commits).
 - **Files not carried to the new location** (git history still has them): `.gitignore`, `go.mod`, `go.sum`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.

@@ -45,4 +45,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** It required `github.com/creack/pty` v1.1.24, `gopkg.in/yaml.v3` v3.0.1 and `github.com/kr/text` v0.2.0 (indirect), the same versions the merged `harness/go.mod` carries. Its requirements on `go-llm-types` v0.5.1, `go-llm-contracts` v0.4.0 and `agent-contracts-leaf` v0.3.0 are now `github.com/hollis-labs/substrate/llm-core` v0.1.0 (go-llm-contracts at its `main`: v0.4.0 plus 1 commit). `go-materialize` v0.1.0, `go-permission` v0.1.0, `go-providers` v0.46.0, `go-runner` v0.8.2, `go-sandbox` v0.6.0 and `go-safefs` v0.1.0 are packages of this module, at their `main` (materialize and permission plus 1 and 2 commits, safefs plus 2; providers, runner and sandbox are at their tags).
 - **Files not carried to the new location** (git history still has them): `.github`, `.folio.yaml`, `.gitignore`, `go.mod`, `go.sum`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.

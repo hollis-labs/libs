@@ -1,0 +1,311 @@
+package wrapper
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"sort"
+
+	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+
+	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+
+	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+)
+
+var (
+	ErrPreparedExecutionConflict    = errors.New("wrapper: prepared execution inputs conflict")
+	ErrPreparedPlantConflict        = errors.New("wrapper: prepared materialization conflicts with wrapper planter")
+	ErrACPSandboxProfileUnsupported = errors.New("wrapper: ACP adapters require resolved SandboxPolicy; legacy SandboxProfile is unsupported")
+	// ErrProtectedPathsUnsupported means Config.ProtectedPaths was set on a
+	// launch path that cannot write-protect them, so the launch is refused
+	// rather than run with the control plane writable.
+	ErrProtectedPathsUnsupported = errors.New("wrapper: Config.ProtectedPaths cannot be enforced")
+)
+
+func (w *Wrapper) defaultBootDir() string {
+	if w.cfg.BootDir != "" {
+		return w.cfg.BootDir
+	}
+	return filepath.Join(w.cfg.Workdir, ".wrapper-boot", w.sessionID)
+}
+
+func (w *Wrapper) resolvePreparedExecution(ctx context.Context, bootDir string) (*agentlaunch.PreparedExecution, error) {
+	if w.cfg.PreparedExecution != nil && w.cfg.PrepareRequest != nil {
+		return nil, ErrPreparedExecutionConflict
+	}
+	if w.cfg.PreparedExecution != nil {
+		if err := w.cfg.PreparedExecution.Validate(); err != nil {
+			return nil, fmt.Errorf("wrapper: prepared execution: %w", err)
+		}
+		return w.cfg.PreparedExecution, nil
+	}
+	if w.cfg.PrepareRequest == nil {
+		return nil, nil
+	}
+	req := *w.cfg.PrepareRequest
+	if req.Roots.ProjectRoot == "" {
+		req.Roots.ProjectRoot = w.cfg.Workdir
+	}
+	if req.Roots.CWD == "" {
+		req.Roots.CWD = w.cfg.Workdir
+	}
+	if req.Roots.BootRoot == "" {
+		req.Roots.BootRoot = bootDir
+	}
+	if req.Projection.Bindings.CWD == "" {
+		req.Projection.Bindings.CWD = req.Roots.CWD
+	}
+	prepared, err := agentlaunch.ResolvePreparation(ctx, req, agentlaunch.WithMaterializationEngine(w.cfg.MaterializationEngine))
+	if err != nil {
+		return nil, fmt.Errorf("wrapper: resolve preparation: %w", err)
+	}
+	if err := prepared.Validate(); err != nil {
+		return nil, fmt.Errorf("wrapper: prepared execution: %w", err)
+	}
+	return prepared, nil
+}
+
+func preparedEnvSlice(prepared *agentlaunch.PreparedExecution) []string {
+	if prepared == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(prepared.Bindings.Env))
+	for key := range prepared.Bindings.Env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+prepared.Bindings.Env[key].Value)
+	}
+	return out
+}
+
+func preparedLaunchCommand(prepared *agentlaunch.PreparedExecution) *acp.LaunchCommand {
+	if prepared == nil {
+		return nil
+	}
+	args := append([]string(nil), prepared.Bindings.Argv[1:]...)
+	return &acp.LaunchCommand{Binary: prepared.Bindings.Argv[0], Args: args}
+}
+
+func acpSandboxPolicyFromPrepared(prepared *agentlaunch.PreparedExecution, fallbackCWD string) (*sandboxprofile.ResolvedAccessPolicy, error) {
+	if prepared == nil {
+		return nil, nil
+	}
+	return agentsessions.PreparedSandboxPolicy(prepared, fallbackCWD)
+}
+
+func preparedCLIAdapter(inner provider.CLIAdapter, prepared *agentlaunch.PreparedExecution) (provider.CLIAdapter, error) {
+	if prepared == nil {
+		return inner, nil
+	}
+	if err := prepared.Validate(); err != nil {
+		return nil, err
+	}
+	adapter := &preparedAdapter{inner: inner, binary: prepared.Bindings.Argv[0], launch: prepared.Bindings.Launch}
+	if interrupter, ok := inner.(provider.TurnInterrupter); ok {
+		return &interruptiblePreparedAdapter{preparedAdapter: adapter, interrupter: interrupter}, nil
+	}
+	if interrupter, ok := inner.(provider.RPCTurnInterrupter); ok {
+		return &rpcInterruptiblePreparedAdapter{preparedAdapter: adapter, interrupter: interrupter}, nil
+	}
+	return adapter, nil
+}
+
+// preparedAdapter runs the inner adapter under a prepared execution's spawn
+// bindings: the prepared binary, and argv from the prepared launch template.
+// It forwards every optional interface the session runtimes consult
+// (EventParser, SessionLostClassifier, AuthFailureClassifier,
+// SessionResumeVerifier, Preflighter), answering as an adapter without that
+// interface would when the inner one lacks it, so wrapping never hides a
+// capability. TurnInterrupter has no such neutral answer, so it is forwarded
+// by a separate type, only when the inner adapter has it.
+//
+// BootDirProvider is deliberately not forwarded. A prepared execution's boot
+// dir was already planted when it was prepared, and agentsessions plants
+// through BootDirProvider whenever StartOptions.AutoPlantBootDir is set (only
+// a prepared execution with a materialization handle switches that off).
+// Forwarding it would let the session plant the boot dir a second time, over
+// the prepared files.
+type preparedAdapter struct {
+	inner  provider.CLIAdapter
+	binary string
+	launch *agentlaunch.TurnTemplate
+}
+
+var (
+	_ provider.EventParser           = (*preparedAdapter)(nil)
+	_ provider.SessionLostClassifier = (*preparedAdapter)(nil)
+	_ provider.AuthFailureClassifier = (*preparedAdapter)(nil)
+	_ provider.SessionResumeVerifier = (*preparedAdapter)(nil)
+	_ provider.Preflighter           = (*preparedAdapter)(nil)
+)
+
+func (a *preparedAdapter) Name() string { return a.inner.Name() }
+func (a *preparedAdapter) Detect() (string, bool) {
+	return a.binary, a.binary != ""
+}
+
+// BuildArgs resolves the prepared launch template for the turn. The session
+// runtimes resolve the same template themselves (StartOptions.Launch), so this
+// matters only to a caller that asks the adapter directly. A prepared
+// execution without a template keeps its frozen Bindings.Argv, which the
+// runtime passes as ExtraArgs, so its BuildArgs contributes nothing.
+func (a *preparedAdapter) BuildArgs(prompt, systemPrompt, sessionID string) []string {
+	if a.launch == nil {
+		return nil
+	}
+	args, err := a.launch.TurnArgv(provider.TurnInput{Prompt: prompt, SystemPrompt: systemPrompt, ResumeID: sessionID})
+	if err != nil {
+		return nil
+	}
+	return args
+}
+
+func (a *preparedAdapter) ParseLine(line []byte) ([]llmtypes.StreamEvent, error) {
+	return a.inner.ParseLine(line)
+}
+
+func (a *preparedAdapter) ParseLineEvents(line []byte) ([]pevents.Event, error) {
+	parser, ok := a.inner.(provider.EventParser)
+	if !ok {
+		return nil, nil
+	}
+	return parser.ParseLineEvents(line)
+}
+
+func (a *preparedAdapter) IsSessionLost(stderrTail []byte) bool {
+	c, ok := a.inner.(provider.SessionLostClassifier)
+	return ok && c.IsSessionLost(stderrTail)
+}
+
+func (a *preparedAdapter) IsNotAuthenticated(stderrTail []byte) bool {
+	c, ok := a.inner.(provider.AuthFailureClassifier)
+	return ok && c.IsNotAuthenticated(stderrTail)
+}
+
+func (a *preparedAdapter) ResumeKeepsSessionID() bool {
+	v, ok := a.inner.(provider.SessionResumeVerifier)
+	return ok && v.ResumeKeepsSessionID()
+}
+
+func (a *preparedAdapter) Preflight() error {
+	if p, ok := a.inner.(provider.Preflighter); ok {
+		return p.Preflight()
+	}
+	return nil
+}
+
+func emitPreparedMaterialization(ctx context.Context, bridgeActivity *activity.Bridge, source runtimeevents.Source, handle *materialize.Handle) {
+	if handle == nil || bridgeActivity == nil {
+		return
+	}
+	payload := materializationPayload(handle)
+	_ = bridgeActivity.Emit(ctx, runtimeevents.KindPlantCompleted, source, payload)
+}
+
+func materializationPayload(handle *materialize.Handle) map[string]any {
+	payload := map[string]any{
+		"boot_dir":  handle.TargetRoot,
+		"operation": string(handle.Report.Operation),
+		"complete":  handle.Report.Complete,
+	}
+	planned := make([]string, 0, len(handle.Manifest.Entries))
+	written := []string{}
+	unchanged := []string{}
+	conflicts := []string{}
+	for _, entry := range handle.Manifest.Entries {
+		planned = append(planned, filepath.Join(handle.TargetRoot, filepath.FromSlash(entry.Path)))
+	}
+	for _, change := range handle.Report.Changes {
+		abs := filepath.Join(handle.TargetRoot, filepath.FromSlash(change.Path))
+		switch change.Kind {
+		case materialize.ChangeUnchanged:
+			unchanged = append(unchanged, abs)
+		case materialize.ChangeConflict:
+			conflicts = append(conflicts, abs)
+		default:
+			written = append(written, abs)
+		}
+	}
+	payload["planned_files"] = planned
+	payload["written_files"] = written
+	payload["unchanged_files"] = unchanged
+	payload["conflict_files"] = conflicts
+	payload["planted_files"] = written
+	return payload
+}
+
+func emitSandboxOutcome(ctx context.Context, bridgeActivity *activity.Bridge, source runtimeevents.Source, out agentsessions.SandboxOutcome) {
+	if bridgeActivity == nil {
+		return
+	}
+	_ = bridgeActivity.Emit(ctx, runtimeevents.KindSandboxApplied, source, sandboxOutcomePayload(out, ""))
+}
+
+func sandboxOutcomePayload(out agentsessions.SandboxOutcome, errText string) map[string]any {
+	payload := map[string]any{
+		"policy_id":     out.PolicyID,
+		"mode":          string(out.Mode),
+		"backend":       string(out.Backend),
+		"state":         string(out.State),
+		"enforced":      out.Enforced,
+		"disabled":      out.Disabled,
+		"unsupported":   append([]string(nil), out.Unsupported...),
+		"diagnostics":   append([]string(nil), out.Diagnostics...),
+		"backend_goos":  out.BackendGOOS,
+		"backend_ready": out.BackendReady,
+		"legacy":        out.Legacy,
+		"applied":       out.Enforced,
+	}
+	if errText != "" {
+		payload["error"] = errText
+	}
+	return payload
+}
+
+func emitACPSandboxOutcome(ctx context.Context, bridgeActivity *activity.Bridge, source runtimeevents.Source, out sandboxprofile.EnforcementOutcome) {
+	if bridgeActivity == nil {
+		return
+	}
+	unsupported := make([]string, 0, len(out.Unsupported))
+	for _, cap := range out.Unsupported {
+		unsupported = append(unsupported, string(cap))
+	}
+	payload := map[string]any{
+		"policy_id":     out.PolicyID,
+		"mode":          string(out.Mode),
+		"backend":       string(out.Backend),
+		"state":         string(out.State),
+		"enforced":      out.Enforced,
+		"disabled":      out.Disabled,
+		"unsupported":   unsupported,
+		"diagnostics":   append([]string(nil), out.Diagnostics...),
+		"backend_goos":  out.BackendGOOS,
+		"backend_ready": out.BackendReady,
+		"legacy":        false,
+		"applied":       out.Enforced,
+	}
+	_ = bridgeActivity.Emit(ctx, runtimeevents.KindSandboxApplied, source, payload)
+}
+
+func emitRuntimeStartSandboxError(ctx context.Context, bridgeActivity *activity.Bridge, source runtimeevents.Source, err error) {
+	if bridgeActivity == nil {
+		return
+	}
+	var sandboxErr *agentsessions.SandboxError
+	if !errors.As(err, &sandboxErr) {
+		return
+	}
+	_ = bridgeActivity.Emit(ctx, runtimeevents.KindSandboxApplied, source, sandboxOutcomePayload(sandboxErr.Outcome, sandboxErr.Error()))
+}

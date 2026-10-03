@@ -21,4 +21,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** It required `gopkg.in/yaml.v3` v3.0.1; the merged `harness/go.mod` carries the same version.
 - **Files not carried to the new location** (git history still has them): `.github`, `lefthook.yml`, `.folio.yaml`, `.golangci.yml`, `.gitignore`, `go.mod`, `go.sum`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.

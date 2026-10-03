@@ -23,11 +23,16 @@ const (
 	loopbackHelperForwardPortsEnv = "__GO_SANDBOX_LOOPBACK_FORWARD_PORTS"
 )
 
-// Linux loopback note: bwrap's --unshare-net leaves the namespace-local
-// lo device present but DOWN. Reusing the importing binary as a one-shot
-// trampoline keeps the public API additive: the library's init() runs
-// before main(), raises lo inside the unshared netns, and then execs the
-// original target argv. This avoids a caller-visible helper binary.
+// Linux loopback note: with --unshare-net, bwrap 0.9.0 raises the
+// namespace-local lo device itself while it still holds CAP_NET_ADMIN, and
+// then drops every capability, so this helper (the bwrap child) cannot change
+// interface flags: SIOCSIFFLAGS fails with EPERM even when the flags would not
+// change. The helper therefore reads the flags first and writes only when lo is
+// down, and never asks for a change that is already done. Reusing the importing
+// binary as a one-shot trampoline keeps the public API additive: the library's
+// init() runs before main(), makes sure lo is up inside the unshared netns,
+// and then execs the original target argv. This avoids a caller-visible helper
+// binary.
 func init() {
 	if os.Getenv(loopbackHelperEnv) != "1" {
 		return
@@ -61,6 +66,9 @@ func bringInterfaceUp(name string) error {
 	}
 
 	flags := *(*uint16)(unsafe.Pointer(&ifr.data[0]))
+	if flags&uint16(syscall.IFF_UP) != 0 {
+		return nil
+	}
 	flags |= uint16(syscall.IFF_UP)
 	*(*uint16)(unsafe.Pointer(&ifr.data[0])) = flags
 

@@ -22,4 +22,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** It required `go-llm-types` v0.3.0, `go-providers` v0.26.0, `go-sandbox` v0.3.0 and `go-llm-contracts` v0.3.0 (and `github.com/creack/pty` v1.1.24, `gopkg.in/yaml.v3` v3.0.1 and test-only indirect pins). It now builds against llm-core v0.1.0, `harness/adapters/provider` (go-providers `main`, v0.46.0) and `harness/sandbox` (go-sandbox `main`, v0.6.0), so it moves up from the tags it pinned. Its test-only indirect pins (`github.com/kr/pretty`, `github.com/rogpeppe/go-internal`, `gopkg.in/check.v1`) are not needed by any package here.
 - **Files not carried to the new location** (git history still has them): `.gitignore`, `go.mod`, `go.sum`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.

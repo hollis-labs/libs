@@ -29,4 +29,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** It required `github.com/creack/pty` v1.1.24 and `gopkg.in/yaml.v3` v3.0.1 (same versions), `github.com/hollis-labs/go-llm-types` v0.5.1, `go-llm-contracts` v0.1.0, `agent-contracts-leaf` v0.3.0 and `go-permission` v0.1.0. The first three are now packages of `github.com/hollis-labs/substrate/llm-core` v0.1.0 (llmtypes at the same level; llmcontracts moves from v0.1.0 to go-llm-contracts `main`, v0.4.0 plus 1 commit; the contracts runtimes package unchanged); go-permission is now `harness/interception/permission` at its `main` (v0.1.0 plus 2 commits).
 - **Files not carried to the new location** (git history still has them): `.github`, `.golangci.yml`, `.gitignore`, `go.mod`, `go.sum`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.

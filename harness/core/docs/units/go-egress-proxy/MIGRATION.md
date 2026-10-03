@@ -20,4 +20,4 @@
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** Everything this unit required is at the same version it had before (it required nothing outside the standard library).
 - **Files not carried to the new location** (git history still has them): `.github`, `.golangci.yml`, `.gitignore`, `go.mod`.
-- **Not done here.** Restructuring into the target layout (merges, splits, renames) is CW-20261003-0135.
+- **Not done here.** Restructuring into the target layout (merges, splits, renames) is a separate task.
