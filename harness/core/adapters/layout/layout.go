@@ -112,6 +112,7 @@ type Entry struct {
 }
 
 // Table returns a copy of the one table, in stable order.
+// Deprecated: use adapters/layout/plan; legacy table retires at S7.
 func Table() []Entry {
 	out := make([]Entry, len(table))
 	for i, e := range table {
@@ -144,6 +145,7 @@ func (e Entry) appliesTo(s Shape) (specificity int, ok bool) {
 // For returns the rows that apply to runtime r in shape s: rows whose Mode and
 // Variant are each empty or equal to s's. The zero Shape returns only the
 // every-mode rows.
+// Deprecated: use adapters/layout/plan; legacy table retires at S7.
 func For(r runtimes.ID, s Shape) []Entry {
 	var out []Entry
 	for _, e := range table {
@@ -158,6 +160,7 @@ func For(r runtimes.ID, s Shape) []Entry {
 // one pinning both Mode and Variant beats one pinning either, which beats an
 // every-mode row. Among rows of equal specificity the first in Table order
 // (the primary) wins.
+// Deprecated: use adapters/layout/plan; legacy table retires at S7.
 func Find(r runtimes.ID, s Shape, c Concern) (Entry, bool) {
 	var best *Entry
 	bestSpec := -1
@@ -180,11 +183,13 @@ func Find(r runtimes.ID, s Shape, c Concern) (Entry, bool) {
 // it, a skill package (<name>/SKILL.md) is placed under for runtime r in shape
 // s. Flag, Env and CWD on the row are what the launch must also carry for the
 // harness to scan it.
+// Deprecated: use adapters/layout/plan; legacy table retires at S7.
 func SkillRoot(r runtimes.ID, s Shape) (Entry, bool) { return Find(r, s, Skills) }
 
 // Runtimes returns the runtimes the table has rows for, in canonical
 // (runtimes.IDs) order. A runtime without rows has no boot-dir layout: it is
 // launched only over ACP.
+// Deprecated: use adapters/layout/plan; legacy table retires at S7.
 func Runtimes() []runtimes.ID {
 	have := map[runtimes.ID]bool{}
 	for _, e := range table {

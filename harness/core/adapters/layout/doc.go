@@ -1,4 +1,10 @@
-// Package layout is the single source of truth for where each agent CLI
+// Package layout retains the legacy discovery table during migration.
+// The final authored provider layout plan-field table lives permanently in
+// adapters/layout/plan. At S7 this root table is deleted; the root retains
+// the generator and generated exports and may re-export the new API.
+// Existing generated files continue to describe legacy behavior until cutover.
+//
+// The legacy table describes where each agent CLI
 // (Claude Code, Codex, OpenCode, Antigravity) looks for its files, skills and config, and
 // which flags, environment variables and working directory locate them. Copilot
 // and Pi have no rows: they are launched only over ACP and have no boot dir.
