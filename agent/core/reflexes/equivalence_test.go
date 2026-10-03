@@ -17,7 +17,7 @@ func dispatchRow(id string, prio int64, spec string) Reflex {
 	return Reflex{
 		ID: id, Name: "dispatch-" + id, Priority: prio, CreatedAt: "2026-01-01",
 		TriggerKind: "predicate",
-		TriggerSpec: `{"kind":"AND","clauses":[{"kind":"attr","key":"scope_tier","value":"open"},{"kind":"attr","key":"execution_pattern","value":"subagent"},{"kind":"user_regex_window","window":1,"pattern":"research"}]}`,
+		TriggerSpec: `{"kind":"AND","clauses":[{"kind":"scope_tier","value":"open"},{"kind":"execution_pattern","value":"subagent"},{"kind":"user_regex_window","window":1,"pattern":"research"}]}`,
 		ActionKind:  ActionDispatchToAgent, ActionSpec: spec,
 	}
 }
@@ -25,7 +25,7 @@ func dispatchRow(id string, prio int64, spec string) Reflex {
 func dispatchState() State {
 	return State{
 		SessionID: "sess-d", AgentID: "agent-a", AgentClass: "advisor",
-		Attrs:        map[string]string{"scope_tier": "open", "execution_pattern": "subagent"},
+		ScopeTier: "open", ExecutionPattern: "subagent",
 		UserMessages: []MessageSignal{{Content: "please research this"}},
 	}
 }
@@ -96,7 +96,7 @@ func TestRunEquivalence_DispatchAttempt(t *testing.T) {
 	if len(res.Applied.Actions) != 1 || res.Applied.FiredReflexes[0].ID != "d1" || res.Considered != 2 {
 		t.Fatalf("winner/considered: %+v considered=%d", res.Applied.FiredReflexes, res.Considered)
 	}
-	want := `{"reflex_id":"d1","reflex_name":"dispatch-d1","action_kind":"dispatch_to_agent","category":"execute_action","combining_algorithm":"first_applicable","priority":50,"agent_id":"agent-a","agent_class":"advisor","session_id":"sess-d","attrs":{"execution_pattern":"subagent","scope_tier":"open"},"spec":{"agent_slug":"researcher","confidence":0.9,"reason":"reflex:dispatch-d1"},"alternatives_considered":[{"reflex_id":"d2","reflex_name":"dispatch-d2","fired":true}]}`
+	want := `{"reflex_id":"d1","reflex_name":"dispatch-d1","action_kind":"dispatch_to_agent","category":"execute_action","combining_algorithm":"first_applicable","priority":50,"agent_id":"agent-a","agent_class":"advisor","session_id":"sess-d","scope_tier":"open","execution_pattern":"subagent","spec":{"agent_slug":"researcher","confidence":0.9,"reason":"reflex:dispatch-d1"},"alternatives_considered":[{"reflex_id":"d2","reflex_name":"dispatch-d2","fired":true}]}`
 	assertTraces(t, fs, []string{want})
 
 	// The same result must come out of the hand-composed pipeline.
@@ -130,8 +130,6 @@ func TestRunEquivalence_SelfToolsDispatch(t *testing.T) {
 	fl := &fakeFilters{}
 	e := newEngine(t, fs, WithFilters(fl))
 	st := dispatchState()
-	st.Attrs = nil
-	st.Attrs = map[string]string{"scope_tier": "open", "execution_pattern": "subagent"}
 	st.SessionID = "sess-s"
 	res, err := e.Run(context.Background(), RunInput{
 		AgentID: "agent-a", AgentClass: "advisor", State: &st, Candidates: rows,
@@ -152,7 +150,7 @@ func TestRunEquivalence_SelfToolsDispatch(t *testing.T) {
 	if fl.actionFilters != 0 || fl.stateFilters != 0 || fl.fired != 1 {
 		t.Errorf("filters=%d/%d fired=%d, want 0/0/1", fl.stateFilters, fl.actionFilters, fl.fired)
 	}
-	want := `{"action_kind":"dispatch_to_agent","agent_class":"advisor","agent_id":"agent-a","attrs":{"execution_pattern":"subagent","scope_tier":"open"},"category":"execute_action","combining_algorithm":"first_applicable","matched_input_excerpt":"research","priority":50,"raw_input_text":"raw","reflex_id":"d1","reflex_name":"dispatch-d1","sent_input_text":"sent","session_id":"sess-s","spec":{"agent_slug":"researcher"},"unrelated_extra_number":3}`
+	want := `{"action_kind":"dispatch_to_agent","agent_class":"advisor","agent_id":"agent-a","category":"execute_action","combining_algorithm":"first_applicable","execution_pattern":"subagent","matched_input_excerpt":"research","priority":50,"raw_input_text":"raw","reflex_id":"d1","reflex_name":"dispatch-d1","scope_tier":"open","sent_input_text":"sent","session_id":"sess-s","spec":{"agent_slug":"researcher"},"unrelated_extra_number":3}`
 	assertTraces(t, fs, []string{want})
 }
 

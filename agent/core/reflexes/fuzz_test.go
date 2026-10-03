@@ -12,6 +12,8 @@ func FuzzEvaluateTrigger(f *testing.F) {
 		{"predicate", `{"kind":"entity_mention_window","entity":"task_id","scope":"user","window":1}`},
 		{"predicate", `{"kind":"tool_name_window","window":2,"names":["a","b"],"mode":"all","pattern":"x.*"}`},
 		{"predicate", `{"kind":"attr","key":"scope_tier","op":"!=","value":"x"}`},
+		{"predicate", `{"kind":"scope_tier","value":"open"}`},
+		{"predicate", `{"kind":"execution_pattern","op":"!=","value":"subagent"}`},
 		{"predicate", `{"kind":"output_growth_window","window":3,"factor":1e308}`},
 		{"predicate", `{"kind":"prefix_pressure","ratio":-1,"context_window":0}`},
 		{"predicate", `{"kind":"OR","clauses":[1]}`},
@@ -31,6 +33,7 @@ func FuzzEvaluateTrigger(f *testing.F) {
 		}
 		st := State{
 			Messages: msgs, UserMessages: msgs, TickN: n, PrefixTokens: n, MailUnreadCount: n,
+			ScopeTier: content, ExecutionPattern: content,
 			Events: []EventSignal{{EventType: content}}, Attrs: map[string]string{"scope_tier": content, content: content},
 		}
 		_, _ = EvaluateTrigger(kind, spec, st)
@@ -48,8 +51,8 @@ func TestEvaluator_AttrPredicate(t *testing.T) {
 		{"attr_mismatch", `{"kind":"attr","key":"region","value":"us"}`, false, false},
 		{"attr_missing_key_is_empty", `{"kind":"attr","key":"absent","value":""}`, true, false},
 		{"attr_requires_key", `{"kind":"attr","value":"eu"}`, false, true},
-		{"scope_tier_is_not_a_predicate_kind", `{"kind":"scope_tier","value":"open"}`, false, true},
-		{"execution_pattern_is_not_a_predicate_kind", `{"kind":"execution_pattern","value":"subagent"}`, false, true},
+		{"scope_tier_does_not_read_attrs", `{"kind":"scope_tier","value":"open"}`, false, false},
+		{"execution_pattern_does_not_read_attrs", `{"kind":"execution_pattern","value":"subagent"}`, false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -91,6 +91,11 @@ type State struct {
 	// PrefixTokens is the most recent input prefix size, used by the
 	// prefix_pressure predicate. 0 means unknown.
 	PrefixTokens int `json:"prefix_tokens"`
+	// ScopeTier and ExecutionPattern carry the current turn's live
+	// classification, supplied by the caller rather than message history.
+	// Empty strings mean the caller has no classification to offer.
+	ScopeTier        string `json:"scope_tier,omitempty"`
+	ExecutionPattern string `json:"execution_pattern,omitempty"`
 	// Attrs carries host-defined string signals for the attr predicate. The
 	// library gives no key a special meaning; every entry is copied into the
 	// trace record's attrs.

@@ -19,7 +19,8 @@ consume this module yet.
 Behavioral equivalence with Nanite's engine is not established. The
 `TestRunEquivalence_*` goldens were transcribed from Nanite's code, not
 captured from a Nanite run, and they pin this library's own trace shape
-(which carries `attrs`). Nanite's adoption should confirm equivalence against
+(including host-defined `attrs` and top-level live classification fields).
+Nanite's adoption should confirm equivalence against
 a real Nanite trace.
 
 ## Install
@@ -132,6 +133,32 @@ Numeric message signals (`InputTokens`, `OutputTokens`, `CacheRead`,
 A host that does not report cache reads makes `cache_read_window = 0` true.
 Write predicates as conjunctions over several signals. Explicit "known" flags
 may come in a later version; the semantics do not change in v0.1.
+
+### Live classification and host attributes
+
+`State.ScopeTier` and `State.ExecutionPattern` carry the current turn's
+classification, supplied by the host. Predicate kinds `scope_tier` and
+`execution_pattern` compare those fields directly:
+
+```json
+{"kind":"AND","clauses":[{"kind":"scope_tier","value":"open"},{"kind":"execution_pattern","value":"subagent"}]}
+```
+
+Comparisons are case-sensitive. `op` accepts `=` (the default), `==` and
+`!=`; any other operator returns false without an error. A missing or
+non-string `value` is an empty string, which matches an unset signal under
+`=`. There is no message window or cold-start guard.
+
+Firing traces copy these signals verbatim into top-level `scope_tier` and
+`execution_pattern` fields, omitting empty strings. The library does not
+insert them into `attrs`. `State.Attrs`, the generic `attr` predicate and the
+trace's copy of `Attrs` remain available for host-defined signals.
+
+When upgrading from v0.1.0, hosts that mapped classification through `Attrs`
+can populate the first-class fields and use the corresponding predicate kinds.
+This changes their trace shape from nested `attrs` entries to top-level fields;
+update trace readers along with the state mapping. Explicit entries still
+supplied in `Attrs` retain their existing meaning and placement.
 
 ### `Filters`, not `Hooks`
 
