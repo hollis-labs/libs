@@ -183,13 +183,13 @@ type InstanceView struct {
 	Limits       Limits       `json:"limits"`
 }
 type Task struct {
-	ID      URN             `json:"id"`
-	Agent   URN             `json:"agent"`
-	Caller  Actor           `json:"caller"`
-	Parent  URN             `json:"parent,omitempty"`
-	State   TaskState       `json:"state"`
-	History HistoryPolicy   `json:"history"`
-	Result  json.RawMessage `json:"result,omitempty"`
+	ID      URN           `json:"id"`
+	Agent   URN           `json:"agent"`
+	Caller  Actor         `json:"caller"`
+	Parent  URN           `json:"parent,omitempty"`
+	State   TaskState     `json:"state"`
+	History HistoryPolicy `json:"history"`
+	Result  []byte        `json:"result,omitempty"`
 }
 
 // Member keeps functional slot and role label separate. ID is the provider's
@@ -219,12 +219,16 @@ type Message struct {
 // Request is the portable command union. Target names the resource; Team scopes
 // member/address verbs. Parent records launch/task lineage; InReplyTo names a message.
 type Request struct {
-	Verb       Verb  `json:"verb"`
-	Actor      Actor `json:"actor"`
-	OnBehalfOf []URN `json:"on_behalf_of,omitempty"`
-	Target     URN   `json:"target,omitempty"`
-	Team       URN   `json:"team,omitempty"`
-	Parent     URN   `json:"parent,omitempty"`
+	Admission  *AdmissionConstraints `json:"admission,omitempty"`
+	Lookup     *LookupRequest        `json:"lookup,omitempty"`
+	Follow     *FollowRequest        `json:"follow,omitempty"`
+	Result     *VersionedResult      `json:"versioned_result,omitempty"`
+	Verb       Verb                  `json:"verb"`
+	Actor      Actor                 `json:"actor"`
+	OnBehalfOf []URN                 `json:"on_behalf_of,omitempty"`
+	Target     URN                   `json:"target,omitempty"`
+	Team       URN                   `json:"team,omitempty"`
+	Parent     URN                   `json:"parent,omitempty"`
 	// Address is resolved by the provider using its own roster and dispatch.
 	// A host that resolves and authorizes routing itself sends the retained
 	// recipient URNs with MessageSend instead of resolving the address twice.
@@ -240,11 +244,14 @@ type Request struct {
 	CorrelationID  string          `json:"correlation_id,omitempty"`
 }
 type Response struct {
-	Instance *InstanceView `json:"instance,omitempty"`
-	Task     *Task         `json:"task,omitempty"`
-	Team     *Team         `json:"team,omitempty"`
-	Message  *Message      `json:"message,omitempty"`
-	Events   []Event       `json:"events,omitempty"`
+	Receipt  *AssignmentReceipt `json:"receipt,omitempty"`
+	Snapshot *TaskSnapshot      `json:"snapshot,omitempty"`
+	Replay   *ReplayPage        `json:"replay,omitempty"`
+	Instance *InstanceView      `json:"instance,omitempty"`
+	Task     *Task              `json:"task,omitempty"`
+	Team     *Team              `json:"team,omitempty"`
+	Message  *Message           `json:"message,omitempty"`
+	Events   []Event            `json:"events,omitempty"`
 }
 
 // Provider implementations expose live capabilities. Unsupported commands return

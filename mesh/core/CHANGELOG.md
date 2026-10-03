@@ -32,6 +32,20 @@ All notable changes to the `mesh` module are documented here. The format follows
   pinned resolution contracts and a glossary of distinct lease and fencing scopes.
 - Orthogonal instance and session state projection to task states and the A2A
   wire vocabulary, retaining waiting reasons and connectivity metadata.
+- Durable assignment contract with actor-scoped intent keys, atomic receipts,
+  pinned team selection, current task lookup and typed admission diagnostics.
+- Authorized bounded log replay with atomic snapshot watermarks, explicit
+  retention gaps, visibility masking and live waits using opaque cursors.
+- Versioned result envelopes binding schema, media type and exact content digest;
+  unsupported schemas cannot complete work.
+- Fake restart checkpoints, queued delivery and reusable dispatch conformance.
+
+### Changed
+
+- Assign requires a caller-scoped idempotency key; ReportResult requires a
+  supported versioned result envelope instead of a body-only result.
+- Task result content is encoded as bytes to preserve the exact digest input
+  across JSON transport and snapshot reads.
 
 ## v0.1.0
 

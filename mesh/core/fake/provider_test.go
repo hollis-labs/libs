@@ -3,6 +3,7 @@ package fake_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	mesh "github.com/hollis-labs/substrate/mesh"
 	"github.com/hollis-labs/substrate/mesh/conformance"
 	"github.com/hollis-labs/substrate/mesh/fake"
@@ -104,8 +105,12 @@ func TestHistoryPoliciesAndResultAttribution(t *testing.T) {
 		if err != nil || out.Task.History != policy {
 			t.Fatalf("history policy lost: %v", err)
 		}
-		if _, err := p.Invoke(context.Background(), mesh.Request{Actor: owner, Verb: mesh.ReportResult, Target: out.Task.ID}); err == nil {
-			t.Fatal("unassigned actor reported result")
+		content := []byte(`{"answer":42}`)
+		result := mesh.VersionedResult{SchemaVersion: mesh.ResultSchemaV1, ContentType: "application/json", Content: content, Digest: mesh.ContentDigest(content)}
+		_, err = p.Invoke(context.Background(), mesh.Request{Actor: owner, Verb: mesh.ReportResult, Target: out.Task.ID, Result: &result})
+		var denied *mesh.Error
+		if !errors.As(err, &denied) || denied.Code != mesh.ErrorDenied {
+			t.Fatalf("unassigned actor was not denied for a valid result: %v", err)
 		}
 		task, ok := p.Task(out.Task.ID)
 		if !ok || task.State != mesh.TaskWorking {
