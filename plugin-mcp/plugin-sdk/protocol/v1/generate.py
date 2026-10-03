@@ -58,5 +58,9 @@ for name, definition in SCHEMA['$defs'].items():
     go.extend(['}', ''])
     ts.extend(['}', ''])
 (ROOT / 'wire.go').write_text('\n'.join(go).rstrip() + '\n')
-(ROOT / 'wire.ts').write_text('\n'.join(ts).rstrip() + '\n')
+typescript = '\n'.join(ts).rstrip() + '\n'
+(ROOT / 'wire.ts').write_text(typescript)
+server_wire = ROOT.parent.parent / 'ts/packages/plugin-sdk/src/wire.ts'
+server_wire.parent.mkdir(parents=True, exist_ok=True)
+server_wire.write_text(typescript)
 subprocess.run(['gofmt', '-w', str(ROOT / 'wire.go')], check=True)

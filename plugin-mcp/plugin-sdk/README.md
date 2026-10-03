@@ -4,8 +4,9 @@
 
 The plugin contract, in two halves. A universal **Go SDK** for building
 plugins that talk to a host application over JSON-RPC stdio, and a
-**TypeScript companion** (`ts/`) for the browser side — the registry a host
-publishes and the loader that resolves it.
+**TypeScript companion** (`ts/`) for both the browser registry/loader and a
+**TS server SDK**
+(`@hollis-labs/plugin-sdk`) running the same stdio contract on Node 22+ and Deno.
 
 Both halves are host-neutral: neither has a dependency on any specific host
 product, and host applications extend them with their own registration
@@ -62,6 +63,10 @@ go get github.com/hollis-labs/plugin-sdk
   contributions, with host kind/region admission, runtime and digest verification,
   revision publication, and reverse-order disposal scopes. See the
   [registry wire and lifecycle contract](docs/protocol/registry-v2.md).
+- `ts/packages/plugin-sdk` — zero-runtime-dependency Node/Deno stdio runtime,
+  capability interfaces, config and redacting logger, plus the `/test` harness.
+  See [the server package](ts/packages/plugin-sdk/README.md) and
+  [the provisional protocol spec](docs/protocol/v1/README.md).
 - `ts/packages/plugin-registry` — `@hollis-labs/plugin-registry`, the
   browser half. The TypeScript view of the same contract, and a loader
   that dynamic-imports each plugin's ES module, resolves the named
@@ -143,13 +148,14 @@ github.com/hollis-labs/plugin-sdk
         └── harness.go     in-process test harness
 ```
 
-The browser half, an npm workspace nested one level down so Go tooling and
+The TypeScript packages, an npm workspace nested one level down so Go tooling and
 `node_modules/` stay out of each other's way:
 
 ```
 ts/
 ├── package.json           private workspace root
 └── packages/
+    ├── plugin-sdk/        @hollis-labs/plugin-sdk (server runtime and /test harness)
     └── plugin-registry/   @hollis-labs/plugin-registry
         └── src/
             ├── types.ts        the wire contract, TypeScript view
@@ -190,7 +196,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for per-release notes.
 go test ./...
 ```
 
-The browser half builds and tests with `npm`, from `ts/`:
+Both TypeScript packages build and test with `npm`, from `ts/`:
 
 ```bash
 cd ts && npm install
