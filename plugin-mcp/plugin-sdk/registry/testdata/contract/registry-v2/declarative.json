@@ -1,7 +1,6 @@
 {
-  "description": "handler",
+  "description": "declarative",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 3,
     "plugins": {
@@ -10,29 +9,27 @@
       }
     },
     "kinds": {
-      "mcp.tool": {
+      "nav.item": {
         "schema_version": 1,
         "metadata_schema": {},
         "representations": [
-          "handler"
+          "declarative"
         ],
         "regions": [],
-        "required_capabilities": [
-          "mcp.define"
-        ]
+        "required_capabilities": []
       }
     },
     "regions": {},
     "contributions": {
-      "mcp.tool": {
-        "p/read": {
+      "nav.item": {
+        "p/nav": {
           "owner_id": "p",
           "owner_generation": "2",
-          "local_key": "read",
-          "kind": "mcp.tool",
+          "local_key": "nav",
+          "kind": "nav.item",
           "schema_version": 1,
           "required": false,
-          "representation": "handler",
+          "representation": "declarative",
           "metadata": {
             "nested": [
               1,
@@ -42,14 +39,19 @@
               }
             ]
           },
-          "handler": {
-            "id": "notes.read"
+          "declarative": {
+            "label": "Notes",
+            "action": {
+              "type": "navigate",
+              "route": "notes"
+            }
           },
-          "public_binding": "notes__read"
+          "status": "accepted"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
     "validate": "ok"

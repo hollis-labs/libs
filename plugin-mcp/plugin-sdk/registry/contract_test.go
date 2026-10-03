@@ -9,13 +9,13 @@ import (
 	"testing"
 )
 
-// Frozen per-protocol fixtures are historical wire inputs shared by Go and TS.
+// Frozen per-registry-version fixtures are historical wire inputs shared by Go and TS.
 // Delete this bridge when either language is generated from one schema.
 func classify(err error) string {
 	for _, pair := range []struct {
 		err  error
 		name string
-	}{{ErrProtocol, "ErrProtocol"}, {ErrInvalidContribution, "ErrInvalidContribution"}, {ErrUnknownPlugin, "ErrUnknownPlugin"}, {ErrIntegrity, "ErrIntegrity"}, {ErrRuntime, "ErrRuntime"}, {ErrCollision, "ErrCollision"}} {
+	}{{ErrRegistryVersion, "ErrRegistryVersion"}, {ErrInvalidContribution, "ErrInvalidContribution"}, {ErrUnknownPlugin, "ErrUnknownPlugin"}, {ErrIntegrity, "ErrIntegrity"}, {ErrRuntime, "ErrRuntime"}, {ErrCollision, "ErrCollision"}} {
 		if errors.Is(err, pair.err) {
 			return pair.name
 		}
@@ -26,7 +26,7 @@ func classify(err error) string {
 	return "ok"
 }
 func TestContractFixtures(t *testing.T) {
-	dir := filepath.Join("testdata", "contract", fmt.Sprintf("protocol-%d", Protocol))
+	dir := filepath.Join("testdata", "contract", fmt.Sprintf("registry-v%d", RegistryVersion))
 	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
 		t.Fatal(err)

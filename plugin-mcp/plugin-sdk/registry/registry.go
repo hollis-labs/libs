@@ -1,4 +1,4 @@
-// Package registry defines the protocol-2 host-authoritative contribution catalog.
+// Package registry defines the registry-v2 host-authoritative contribution catalog.
 // Wire structure is shared with @hollis-labs/plugin-registry. Admission and
 // execution authority belong to the host; this package never grants capabilities.
 package registry
@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const Protocol = 2
+const RegistryVersion = 2
 const MaxRevision = uint64(1<<53 - 1)
 
 type Representation string
@@ -25,15 +25,26 @@ const (
 	Handler     Representation = "handler"
 )
 
+// ContributionStatus carries host selection/availability, never SDK selection logic.
+// Unknown nonempty values are preserved, diagnosed and never active.
+type ContributionStatus string
+
+const (
+	StatusAccepted            ContributionStatus = "accepted"
+	StatusDeclaredNotSelected ContributionStatus = "declared_not_selected"
+	StatusRefused             ContributionStatus = "refused"
+	StatusUnavailable         ContributionStatus = "unavailable"
+)
+
 type Response struct {
-	Protocol      int                                `json:"protocol"`
-	HostInstance  string                             `json:"host_instance"`
-	Revision      uint64                             `json:"revision"`
-	Plugins       map[string]Plugin                  `json:"plugins"`
-	Kinds         map[string]KindDescriptor          `json:"kinds"`
-	Regions       map[string]RegionDescriptor        `json:"regions"`
-	Contributions map[string]map[string]Contribution `json:"contributions"`
-	Refusals      []Refusal                          `json:"refusals"`
+	RegistryVersion int                                `json:"registry_version"`
+	HostInstance    string                             `json:"host_instance"`
+	Revision        uint64                             `json:"revision"`
+	Plugins         map[string]Plugin                  `json:"plugins"`
+	Kinds           map[string]KindDescriptor          `json:"kinds"`
+	Regions         map[string]RegionDescriptor        `json:"regions"`
+	Contributions   map[string]map[string]Contribution `json:"contributions"`
+	Refusals        []Refusal                          `json:"refusals"`
 }
 
 type Plugin struct {
@@ -79,18 +90,20 @@ type HandlerRef struct {
 }
 
 type Contribution struct {
-	OwnerID         string          `json:"owner_id"`
-	OwnerGeneration string          `json:"owner_generation"`
-	LocalKey        string          `json:"local_key"`
-	Kind            string          `json:"kind"`
-	SchemaVersion   uint64          `json:"schema_version"`
-	Required        bool            `json:"required"`
-	Representation  Representation  `json:"representation"`
-	Metadata        json.RawMessage `json:"metadata"`
-	Component       *ComponentRef   `json:"component,omitempty"`
-	Declarative     json.RawMessage `json:"declarative,omitempty"`
-	Handler         *HandlerRef     `json:"handler,omitempty"`
-	PublicBinding   string          `json:"public_binding,omitempty"`
+	Status          ContributionStatus `json:"status"`
+	StatusReason    string             `json:"status_reason,omitempty"`
+	OwnerID         string             `json:"owner_id"`
+	OwnerGeneration string             `json:"owner_generation"`
+	LocalKey        string             `json:"local_key"`
+	Kind            string             `json:"kind"`
+	SchemaVersion   uint64             `json:"schema_version"`
+	Required        bool               `json:"required"`
+	Representation  Representation     `json:"representation"`
+	Metadata        json.RawMessage    `json:"metadata"`
+	Component       *ComponentRef      `json:"component,omitempty"`
+	Declarative     json.RawMessage    `json:"declarative,omitempty"`
+	Handler         *HandlerRef        `json:"handler,omitempty"`
+	PublicBinding   string             `json:"public_binding,omitempty"`
 }
 
 type Refusal struct {
@@ -103,7 +116,7 @@ type Refusal struct {
 }
 
 var (
-	ErrProtocol            = errors.New("registry: protocol mismatch")
+	ErrRegistryVersion     = errors.New("registry: registry version mismatch")
 	ErrInvalidContribution = errors.New("registry: invalid contribution")
 	ErrUnknownPlugin       = errors.New("registry: unknown owner")
 	ErrCollision           = errors.New("registry: collision")
@@ -115,7 +128,7 @@ var name = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 var digest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
 func NewResponse(hostInstance string, revision uint64) Response {
-	return Response{Protocol: Protocol, HostInstance: hostInstance, Revision: revision,
+	return Response{RegistryVersion: RegistryVersion, HostInstance: hostInstance, Revision: revision,
 		Plugins: map[string]Plugin{}, Kinds: map[string]KindDescriptor{}, Regions: map[string]RegionDescriptor{},
 		Contributions: map[string]map[string]Contribution{}, Refusals: []Refusal{}}
 }
@@ -168,8 +181,8 @@ func validStrings(values []string) bool {
 
 // Validate checks shape/references only. Unknown optional kinds are admission refusals.
 func (r Response) Validate() error {
-	if r.Protocol != Protocol {
-		return ErrProtocol
+	if r.RegistryVersion != RegistryVersion {
+		return ErrRegistryVersion
 	}
 	if r.HostInstance == "" || r.Revision == 0 || r.Revision > MaxRevision || r.Plugins == nil || r.Kinds == nil || r.Regions == nil || r.Contributions == nil || r.Refusals == nil {
 		return ErrInvalidContribution
@@ -205,7 +218,7 @@ func (r Response) Validate() error {
 			return ErrInvalidContribution
 		}
 		for key, c := range byKey {
-			if c.Kind != kind || !name.MatchString(c.OwnerID) || !name.MatchString(c.LocalKey) || c.Key() != key || c.OwnerGeneration == "" || c.SchemaVersion == 0 || c.SchemaVersion > MaxRevision || !validJSON(c.Metadata) {
+			if c.Kind != kind || !name.MatchString(c.OwnerID) || !name.MatchString(c.LocalKey) || c.Key() != key || c.OwnerGeneration == "" || c.SchemaVersion == 0 || c.SchemaVersion > MaxRevision || !validJSON(c.Metadata) || c.Status == "" {
 				return ErrInvalidContribution
 			}
 			p, ok := r.Plugins[c.OwnerID]
@@ -240,6 +253,27 @@ func (r Response) Validate() error {
 			}
 		}
 	}
+	type identity struct{ owner, generation, kind, key string }
+	refusalByEntry := map[identity]Refusal{}
+	for _, refusal := range r.Refusals {
+		id := identity{refusal.OwnerID, refusal.OwnerGeneration, refusal.Kind, refusal.LocalKey}
+		if _, exists := refusalByEntry[id]; exists {
+			return ErrCollision
+		}
+		refusalByEntry[id] = refusal
+	}
+	for _, entries := range r.Contributions {
+		for _, entry := range entries {
+			refusal, exists := refusalByEntry[identity{entry.OwnerID, entry.OwnerGeneration, entry.Kind, entry.LocalKey}]
+			if entry.Status == StatusRefused {
+				if !exists || refusal.Required != entry.Required || entry.StatusReason != "" && entry.StatusReason != refusal.Reason {
+					return ErrInvalidContribution
+				}
+			} else if exists {
+				return ErrInvalidContribution
+			}
+		}
+	}
 	for _, f := range r.Refusals {
 		if f.OwnerID == "" || f.OwnerGeneration == "" || f.Kind == "" || f.LocalKey == "" || f.Reason == "" {
 			return ErrInvalidContribution
@@ -256,8 +290,12 @@ type AdmissionPolicy struct {
 	ValidateMetadata func(schema, metadata json.RawMessage) error
 }
 type Plan struct {
-	Accepted []Contribution
-	Refusals []Refusal
+	// Listed contains admitted projection entries, including inactive status values.
+	Listed []Contribution
+	// Accepted contains only entries explicitly active in the host projection.
+	Accepted          []Contribution
+	Refusals          []Refusal
+	StatusDiagnostics []Refusal
 }
 
 func includes[T comparable](values []T, value T) bool {
@@ -278,7 +316,7 @@ func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
 	if err := r.Validate(); err != nil {
 		return Plan{}, err
 	}
-	plan := Plan{Accepted: []Contribution{}, Refusals: append([]Refusal{}, r.Refusals...)}
+	plan := Plan{Listed: []Contribution{}, Accepted: []Contribution{}, Refusals: append([]Refusal{}, r.Refusals...), StatusDiagnostics: []Refusal{}}
 	kinds := make([]string, 0, len(r.Contributions))
 	for k := range r.Contributions {
 		kinds = append(kinds, k)
@@ -296,6 +334,10 @@ func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
 		sort.Strings(keys)
 		for _, key := range keys {
 			c := r.Contributions[kind][key]
+			if c.Status == StatusRefused {
+				plan.Listed = append(plan.Listed, c)
+				continue
+			}
 			reason := ""
 			d, ok := policy.Kinds[kind]
 			published, pubOK := r.Kinds[kind]
@@ -332,7 +374,14 @@ func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
 				plan.Refusals = append(plan.Refusals, Refusal{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, reason, c.Required})
 				required = required || c.Required
 			} else {
-				plan.Accepted = append(plan.Accepted, c)
+				plan.Listed = append(plan.Listed, c)
+				switch c.Status {
+				case StatusAccepted:
+					plan.Accepted = append(plan.Accepted, c)
+				case StatusDeclaredNotSelected, StatusUnavailable:
+				default:
+					plan.StatusDiagnostics = append(plan.StatusDiagnostics, Refusal{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, "unknown-status", c.Required})
+				}
 			}
 		}
 	}

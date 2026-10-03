@@ -10,11 +10,11 @@
 
 ### Changed
 
-- **Breaking:** browser contribution registry protocol 2 replaces protocol 1.
+- **Breaking:** browser contribution registry v2 replaces the legacy registry protocol-1 shape.
   Entries carry owner generation and representation-specific data, component,
   or public handler references; hosts explicitly opt into kind/region schemas.
-  Bundle versions are SHA-256 digests with named runtime admission. No protocol-1
-  fallback; applications remain on their released SDK until separate adoption.
+  Bundle versions are SHA-256 digests with named runtime admission. Only registry_version:2 is emitted; legacy protocol-only/dual-key documents
+  are refused by name, with no fallback; applications remain on their released SDK until separate adoption.
 
 - Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
 
@@ -24,7 +24,11 @@
   replacement or withdrawal before explicit revocation. `registry.Scope` fences
   calls, cancels admitted work, and attempts reverse-order idempotent disposal.
   Optional contribution refusals remain visible; required refusals abort planning.
-  Protocol-2 shared fixtures and a [wire/lifecycle contract](docs/protocol/registry-v2.md).
+  Host-declared status is required per entry; inactive/unknown states remain listed
+  and never execute, with unknown-state diagnostics and one authoritative refusal
+  source in refusals[].
+  Registry-v2 shared fixtures and a [wire/lifecycle contract](docs/protocol/registry-v2.md).
+
 - Optional manifest tool `annotations` using MCP names: `title`,
   `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint`,
   preserving explicit false. The only cross-field refusal is read-only plus

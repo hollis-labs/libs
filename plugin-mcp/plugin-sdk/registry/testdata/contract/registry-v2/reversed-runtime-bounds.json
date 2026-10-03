@@ -1,7 +1,6 @@
 {
-  "description": "wrong-qualified-key",
+  "description": "reversed-runtime-bounds",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -13,8 +12,8 @@
         "runtime": [
           {
             "name": "react",
-            "min": "19.0.0",
-            "max": "19.9.9"
+            "min": "20.0.0",
+            "max": "19.0.0"
           }
         ]
       }
@@ -46,7 +45,7 @@
     },
     "contributions": {
       "panel": {
-        "wrong": {
+        "notes/main": {
           "owner_id": "notes",
           "owner_generation": "1",
           "local_key": "main",
@@ -61,16 +60,18 @@
             "export": "Panel",
             "region": "rail"
           },
-          "public_binding": "notes-panel"
+          "public_binding": "notes-panel",
+          "status": "accepted"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ErrRuntime"
   },
   "ts": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ErrRuntime"
   }
 }

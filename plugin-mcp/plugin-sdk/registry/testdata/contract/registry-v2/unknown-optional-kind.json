@@ -1,7 +1,6 @@
 {
   "description": "Structurally valid unknown optional kind; admission refuses unsupported-kind by name.",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 3,
     "plugins": {
@@ -36,11 +35,13 @@
               "type": "navigate",
               "route": "notes"
             }
-          }
+          },
+          "status": "accepted"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
     "validate": "ok"

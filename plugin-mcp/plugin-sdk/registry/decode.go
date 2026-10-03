@@ -18,6 +18,15 @@ func (r *Response) UnmarshalJSON(raw []byte) error {
 	if _, err := decoder.Token(); err != io.EOF {
 		return ErrInvalidContribution
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return ErrInvalidContribution
+	}
+	for key := range fields {
+		if strings.EqualFold(key, "protocol") {
+			return ErrRegistryVersion
+		}
+	}
 	type wire Response
 	var decoded wire
 	if err := decodeExact(raw, &decoded); err != nil {
@@ -104,8 +113,11 @@ func (c *Contribution) UnmarshalJSON(raw []byte) error {
 			return ErrInvalidContribution
 		}
 	}
-	if err := optionalStrings(fields, "public_binding"); err != nil {
+	if err := optionalStrings(fields, "public_binding", "status_reason"); err != nil {
 		return err
+	}
+	if value.Status == "" {
+		return ErrInvalidContribution
 	}
 	*c = Contribution(value)
 	return nil
