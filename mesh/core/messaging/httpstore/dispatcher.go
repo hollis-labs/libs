@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Dispatcher is a messaging.Dispatcher over the same server as its embedded

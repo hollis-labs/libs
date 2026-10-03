@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
-	"github.com/hollis-labs/go-messaging/messagingtest"
-	tether "github.com/hollis-labs/go-tether-client"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 // TestHTTPStore_Contract runs all 13 messaging.Store contract sub-tests against

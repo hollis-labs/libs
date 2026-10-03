@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/delivery"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
 )
 
 // LegacyTupleAddress preserves a historical Nanite-style (session, agent)

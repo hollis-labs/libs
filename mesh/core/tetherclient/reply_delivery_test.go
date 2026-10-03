@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	tether "github.com/hollis-labs/go-tether-client"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 func TestReplyDelivery(t *testing.T) {

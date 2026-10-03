@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	gomsg "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 func newIdentity(t testing.TB, notBefore, notAfter time.Time) tls.Certificate {

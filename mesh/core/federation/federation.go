@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	gomsg "github.com/hollis-labs/go-messaging"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Federation is a configured federation subsystem: the inbound mutual-TLS

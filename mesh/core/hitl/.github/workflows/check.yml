@@ -52,12 +52,12 @@ jobs:
       - name: dependency boundaries
         run: |
           for pkg in . ./memstore; do
-            if go list -deps "$pkg" | grep -E '^[^/]+\.[^/]+/' | grep -v '^github.com/hollis-labs/go-hitl'; then
+            if go list -deps "$pkg" | grep -E '^[^/]+\.[^/]+/' | grep -v '^github.com/hollis-labs/substrate/mesh/hitl'; then
               echo "$pkg imports something outside the standard library"
               exit 1
             fi
           done
-          if go list -deps ./... | grep hollis-labs | grep -v '^github.com/hollis-labs/go-hitl'; then
+          if go list -deps ./... | grep hollis-labs | grep -v '^github.com/hollis-labs/substrate/mesh/hitl'; then
             echo "another hollis-labs module is imported"
             exit 1
           fi

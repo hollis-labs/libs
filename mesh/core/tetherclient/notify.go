@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Notify urgencies (RFC 8030 Web Push vocabulary). An empty

@@ -1,6 +1,6 @@
 # go-tether-client
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-tether-client.svg)](https://pkg.go.dev/github.com/hollis-labs/go-tether-client)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/mesh/tetherclient.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/mesh/tetherclient)
 
 A typed Go client for the Tether daemon control-plane API.
 
@@ -14,7 +14,7 @@ versions; see [CHANGELOG.md](./CHANGELOG.md).
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-tether-client
+go get github.com/hollis-labs/substrate/mesh/tetherclient
 ```
 
 Requires Go 1.26.6 or newer.
@@ -42,7 +42,7 @@ package main
 import (
 	"context"
 
-	tether "github.com/hollis-labs/go-tether-client"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 func main() {

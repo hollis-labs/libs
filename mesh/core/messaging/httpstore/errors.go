@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 var (

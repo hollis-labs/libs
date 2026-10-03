@@ -9,7 +9,7 @@ A kind-agnostic contract for asking a human (or any slow responder) and getting 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-hitl
+go get github.com/hollis-labs/substrate/mesh/hitl
 ```
 
 The module is not tagged yet, so this resolves only once a version exists. The root package `hitl` and `memstore` are stdlib-only; `schema` and `hitltest` depend on `github.com/santhosh-tekuri/jsonschema/v6`.
@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/hollis-labs/go-hitl"
-	"github.com/hollis-labs/go-hitl/memstore"
+	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl/memstore"
 )
 
 func main() {

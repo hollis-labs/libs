@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hollis-labs/go-hitl"
-	"github.com/hollis-labs/go-hitl/hitltest"
+	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl/hitltest"
 )
 
 func FuzzUnmarshalOutcome(f *testing.F) {

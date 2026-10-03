@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/url"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/delivery"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
 )
 
 // Durable delivery primitives — the claim/ack/nack cycle behind

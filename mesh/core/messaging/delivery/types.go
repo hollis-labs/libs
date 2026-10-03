@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 var (

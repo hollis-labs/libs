@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 func agent(authority, id string) messaging.Address {

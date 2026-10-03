@@ -1,6 +1,6 @@
 # go-messaging
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-messaging.svg)](https://pkg.go.dev/github.com/hollis-labs/go-messaging)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/mesh/messaging.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/mesh/messaging)
 
 A shared Go contract for agent-to-agent, agent-to-service, and
 agent-to-user messaging.
@@ -28,7 +28,7 @@ breaking changes may still occur in minor versions; see
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-messaging
+go get github.com/hollis-labs/substrate/mesh/messaging
 ```
 
 Requires Go 1.26.6 or newer.
@@ -40,8 +40,8 @@ import (
     "context"
     "encoding/json"
 
-    "github.com/hollis-labs/go-messaging"
-    "github.com/hollis-labs/go-messaging/memstore"
+    "github.com/hollis-labs/substrate/mesh/messaging"
+    "github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 store := memstore.New()
@@ -177,7 +177,7 @@ The optional `httpstore` subpackage is one `Store` and `Dispatcher` client for
 a remote HTTP daemon, in place of a private copy per application:
 
 ```bash
-go get github.com/hollis-labs/go-messaging/httpstore
+go get github.com/hollis-labs/substrate/mesh/messaging/httpstore
 ```
 
 ```go
@@ -188,10 +188,10 @@ import (
     "fmt"
     "net/http/httptest"
 
-    "github.com/hollis-labs/go-messaging"
-    "github.com/hollis-labs/go-messaging/httpstore"
-    "github.com/hollis-labs/go-messaging/httpstore/httpstoretest"
-    "github.com/hollis-labs/go-messaging/memstore"
+    "github.com/hollis-labs/substrate/mesh/messaging"
+    "github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+    "github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
+    "github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 func main() {
@@ -250,8 +250,8 @@ import (
 
     _ "modernc.org/sqlite" // the caller picks the driver
 
-    messaging "github.com/hollis-labs/go-messaging"
-    "github.com/hollis-labs/go-messaging/sqlstore"
+    messaging "github.com/hollis-labs/substrate/mesh/messaging"
+    "github.com/hollis-labs/substrate/mesh/messaging/sqlstore"
 )
 
 func main() {
@@ -301,8 +301,8 @@ package mystore_test
 import (
     "testing"
 
-    "github.com/hollis-labs/go-messaging"
-    "github.com/hollis-labs/go-messaging/messagingtest"
+    "github.com/hollis-labs/substrate/mesh/messaging"
+    "github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
     "github.com/example/mystore"
 )
 
@@ -357,7 +357,7 @@ must bump it to use `httpstore`.
 ## Documentation
 
 Full API reference on
-[pkg.go.dev/github.com/hollis-labs/go-messaging](https://pkg.go.dev/github.com/hollis-labs/go-messaging).
+[pkg.go.dev/github.com/hollis-labs/substrate/mesh/messaging](https://pkg.go.dev/github.com/hollis-labs/substrate/mesh/messaging).
 
 ## License
 

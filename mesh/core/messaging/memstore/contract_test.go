@@ -3,9 +3,9 @@ package memstore_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
-	"github.com/hollis-labs/go-messaging/messagingtest"
+	"github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
 )
 
 func TestMemstore_Contract(t *testing.T) {

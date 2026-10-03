@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/httpstore"
-	"github.com/hollis-labs/go-messaging/httpstore/httpstoretest"
-	"github.com/hollis-labs/go-messaging/memstore"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 // sseServer runs h as the /messages/subscribe handler, after the response

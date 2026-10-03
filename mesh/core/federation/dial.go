@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	gomsg "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/httpstore"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
 )
 
 // Profile returns the httpstore dialect Dial speaks: Torque's federation hop

@@ -3,8 +3,8 @@ package federation
 import (
 	"testing"
 
-	gomsg "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/messagingtest"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
 )
 
 // The federation hop is a go-messaging Store, so it runs the same contract every

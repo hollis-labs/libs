@@ -13,9 +13,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/messagingtest"
-	"github.com/hollis-labs/go-messaging/sqlstore"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
+	"github.com/hollis-labs/substrate/mesh/messaging/sqlstore"
 )
 
 // newDB opens a migrated file database with a busy timeout and WAL, the

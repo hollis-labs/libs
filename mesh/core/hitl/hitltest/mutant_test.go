@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-hitl"
-	"github.com/hollis-labs/go-hitl/memstore"
+	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl/memstore"
 )
 
 type stop struct{}

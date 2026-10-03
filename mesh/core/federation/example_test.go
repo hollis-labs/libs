@@ -3,8 +3,8 @@ package federation_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-federation"
-	"github.com/hollis-labs/go-messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/federation"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 // The default operation set is Torque's; Inbox and Subscribe stay off until an

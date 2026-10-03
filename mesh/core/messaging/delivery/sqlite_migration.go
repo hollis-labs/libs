@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 const legacyMailboxAmbiguousReason = "legacy mailbox delivery state ambiguous; authorize redrive to replay"

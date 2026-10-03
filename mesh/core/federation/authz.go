@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	gomsg "github.com/hollis-labs/go-messaging"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Authorization errors. They are internal: a server maps them to a status and

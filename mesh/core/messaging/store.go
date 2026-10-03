@@ -26,7 +26,7 @@ var (
 // Every Store implementation — including the in-memory reference at
 // memstore/, daemon-backed clients, and SQL-backed adapters — MUST
 // satisfy this contract identically. The contract test suite at
-// github.com/hollis-labs/go-messaging/messagingtest.RunContract
+// github.com/hollis-labs/substrate/mesh/messaging/messagingtest.RunContract
 // verifies every Store impl runs through the same behavioral checks.
 type Store interface {
 	// Send persists an envelope.

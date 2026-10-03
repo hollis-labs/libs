@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/hollis-labs/go-hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl"
 )
 
 // ServiceAdapter adapts a *hitl.Service to Adapter, so the reference

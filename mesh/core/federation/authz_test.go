@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	gomsg "github.com/hollis-labs/go-messaging"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 func authz(t *testing.T, local ...string) *authorizer {

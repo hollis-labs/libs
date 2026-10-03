@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // DefaultTimeout bounds each non-streaming call unless WithTimeout says

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/delivery"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
 )
 
 // FakeClock is a deterministic, goroutine-safe test clock.

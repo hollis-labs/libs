@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-messaging/delivery"
-	"github.com/hollis-labs/go-messaging/deliverytest"
+	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
+	"github.com/hollis-labs/substrate/mesh/messaging/deliverytest"
 )
 
 func TestMemoryStoreContract(t *testing.T) {

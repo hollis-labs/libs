@@ -29,9 +29,9 @@ inputs:
   repo_name: go-federation
   stability: pre-1.0
 computed:
-  import_line: federation "github.com/hollis-labs/go-federation"
-  import_path: github.com/hollis-labs/go-federation
-  module_path: github.com/hollis-labs/go-federation
+  import_line: federation "github.com/hollis-labs/substrate/mesh/federation"
+  import_path: github.com/hollis-labs/substrate/mesh/federation
+  module_path: github.com/hollis-labs/substrate/mesh/federation
   year: "2026"
 files:
   .github/workflows/check.yml:

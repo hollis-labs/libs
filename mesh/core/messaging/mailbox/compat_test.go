@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/delivery"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
 )
 
 func TestCompatibilityAddressesPreserveTupleAndStableActor(t *testing.T) {

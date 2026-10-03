@@ -6,7 +6,7 @@ This document freezes the G01 contract allocation for Messaging vNext. It is an 
 
 | Area | Owner | Dependency rule |
 | --- | --- | --- |
-| Address URNs, envelope content, sender-scoped idempotency, delivery obligations, leases, receipts, replay cursors, and store conformance | `github.com/hollis-labs/go-messaging` | Must not import `agentkit`, `go-agent-wrapper`, `go-providers`, Tether, Nanite, or Torque. |
+| Address URNs, envelope content, sender-scoped idempotency, delivery obligations, leases, receipts, replay cursors, and store conformance | `github.com/hollis-labs/substrate/mesh/messaging` | Must not import `agentkit`, `go-agent-wrapper`, `go-providers`, Tether, Nanite, or Torque. |
 | Canonical session/bootstrap identity records, optional actor/definition/runtime refs, and launch-time propagation | `github.com/hollis-labs/agentkit` | May reference neutral strings and addresses from consumers, but `go-messaging` remains independent. |
 | Provider/runtime delivery capabilities and observation vocabulary for running sessions | `github.com/hollis-labs/go-agent-wrapper` plus provider seams | May depend on `agentkit` and provider libraries; unsupported runtime operations return typed capability errors rather than fabricated success. |
 | Tether registration, authorization, routing, room service, and hosted bridges | Tether/go-tether-client workstream | Uses the library contracts after G09 landing; not required for local-only messaging. |
@@ -169,7 +169,7 @@ These references were refreshed after the G00 local landing and are read-only in
 
 | Consumer shape | Current usage to preserve |
 | --- | --- |
-| Nanite | `apps/nanite/go.mod` imports `github.com/hollis-labs/go-messaging v0.4.0`; CLI/background/service code uses `go-messaging/mailbox` `Service`, `SendInput`, `Inbox`, `Ack`, `Resolve`, `SetWakeReactor`, `EventStore`, and `HandoffCoordinator` semantics. |
+| Nanite | `apps/nanite/go.mod` imports `github.com/hollis-labs/substrate/mesh/messaging v0.4.0`; CLI/background/service code uses `go-messaging/mailbox` `Service`, `SendInput`, `Inbox`, `Ack`, `Resolve`, `SetWakeReactor`, `EventStore`, and `HandoffCoordinator` semantics. |
 | go-tether-client | Uses root `go-messaging` `Store`, `Dispatcher`, `Envelope`, `Address`, `Filter`, `memstore`, and `messagingtest.RunContract`. |
 | Tether | Has service/store/API/message transport code that should adapt to reliable delivery after G09; no Tether repository changes occur in this stream. |
 | Torque | Has broker/federation/session messaging code and a later single adoption task; this stream may use disposable compile probes but does not modify Torque. |

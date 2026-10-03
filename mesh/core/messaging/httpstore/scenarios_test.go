@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/httpstore"
-	"github.com/hollis-labs/go-messaging/httpstore/httpstoretest"
-	"github.com/hollis-labs/go-messaging/memstore"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 // The scenarios below are ported from the five private copies this package

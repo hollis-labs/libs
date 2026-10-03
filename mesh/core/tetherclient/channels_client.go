@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	gomsg "github.com/hollis-labs/go-messaging"
+	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Channel's name is its stable handle; Address is derived by the daemon.

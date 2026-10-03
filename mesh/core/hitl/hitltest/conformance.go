@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-hitl"
-	"github.com/hollis-labs/go-hitl/schema"
+	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl/schema"
 )
 
 // RunConformance runs every scenario against a. Scenarios whose Requires

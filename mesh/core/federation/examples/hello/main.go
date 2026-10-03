@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-federation"
-	"github.com/hollis-labs/go-messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/federation"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 func main() {

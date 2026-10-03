@@ -10,15 +10,15 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 
 ### Added
 
-- **Channel consumers** ([#9](https://github.com/hollis-labs/go-tether-client/pull/9)): `Client.ListChannels`, `Client.ChannelMessages` and `Client.SubscribeChannel`, with durable `Seq`/`NextSince` cursors, latest-N history and purge tombstones. Subscriptions use caller context, report stream errors separately and resume explicitly from the last received sequence.
-- **`Client.RoutingCapabilities`** ([#9](https://github.com/hollis-labs/go-tether-client/pull/9)): discover gateway-wide or per-session routing, reply and interrupt availability, runtime kinds and final-text confidence.
-- **`Client.Reply`**, **`ReplyOptions{Interrupt, IdempotencyKey}`** and **`ReplyReceipt`** ([#10](https://github.com/hollis-labs/go-tether-client/pull/10)): queue a reply as the publishing session's next turn, optionally interrupting its active turn. The idempotency key is sent in the `Idempotency-Key` header. A 202 receipt confirms acceptance, not delivery; retries are explicit.
-- **`Client.ReplyDelivery`**, **`ReplyDelivery`**, **`ReplyState`**, the `ReplyPending`/`ReplyQueued`/`ReplyDelivering`/`ReplyDelivered`/`ReplyUndeliverable` states and **`ReplyReason*` constants** ([#10](https://github.com/hollis-labs/go-tether-client/pull/10)): read delivery status, reason, attempts and timestamps. A delivered `turn_failed` reply was injected and must not be sent again.
-- **Typed reply `APIError` codes** ([#10](https://github.com/hollis-labs/go-tether-client/pull/10)): `CodeInterruptUnsupported` (`interrupt_unsupported`), `CodeTurnNotYetStarted` (`turn_not_yet_started`), `CodeTurnFeedUnavailable` (`turn_feed_unavailable`), `CodeReplyTargetNotSession` (`reply_target_not_a_session`) and `CodeReplyNotMailbox` (`reply_not_mailbox`). Daemon status/code identity is preserved for `errors.Is` and `errors.As`.
+- **Channel consumers** ([#9](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/9)): `Client.ListChannels`, `Client.ChannelMessages` and `Client.SubscribeChannel`, with durable `Seq`/`NextSince` cursors, latest-N history and purge tombstones. Subscriptions use caller context, report stream errors separately and resume explicitly from the last received sequence.
+- **`Client.RoutingCapabilities`** ([#9](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/9)): discover gateway-wide or per-session routing, reply and interrupt availability, runtime kinds and final-text confidence.
+- **`Client.Reply`**, **`ReplyOptions{Interrupt, IdempotencyKey}`** and **`ReplyReceipt`** ([#10](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/10)): queue a reply as the publishing session's next turn, optionally interrupting its active turn. The idempotency key is sent in the `Idempotency-Key` header. A 202 receipt confirms acceptance, not delivery; retries are explicit.
+- **`Client.ReplyDelivery`**, **`ReplyDelivery`**, **`ReplyState`**, the `ReplyPending`/`ReplyQueued`/`ReplyDelivering`/`ReplyDelivered`/`ReplyUndeliverable` states and **`ReplyReason*` constants** ([#10](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/10)): read delivery status, reason, attempts and timestamps. A delivered `turn_failed` reply was injected and must not be sent again.
+- **Typed reply `APIError` codes** ([#10](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/10)): `CodeInterruptUnsupported` (`interrupt_unsupported`), `CodeTurnNotYetStarted` (`turn_not_yet_started`), `CodeTurnFeedUnavailable` (`turn_feed_unavailable`), `CodeReplyTargetNotSession` (`reply_target_not_a_session`) and `CodeReplyNotMailbox` (`reply_not_mailbox`). Daemon status/code identity is preserved for `errors.Is` and `errors.As`.
 
 ### Changed
 
-- Channel SSE decoding supports routed JSON payload lines up to **16 MiB**, including large escaped output, instead of relying on the scanner's default limit ([#9](https://github.com/hollis-labs/go-tether-client/pull/9)).
+- Channel SSE decoding supports routed JSON payload lines up to **16 MiB**, including large escaped output, instead of relying on the scanner's default limit ([#9](https://github.com/hollis-labs/substrate/mesh/tetherclient/pull/9)).
 
 ## v0.9.1 — 2026-10-02
 
@@ -275,7 +275,7 @@ and the `ErrDaemonUnreachable` wrap behave as they do for every other method.
 Initial public release as the successor to `go-agentmux-client`.
 
 ### Added
-- New module path: `github.com/hollis-labs/go-tether-client`.
+- New module path: `github.com/hollis-labs/substrate/mesh/tetherclient`.
 - Tether naming and defaults throughout the package and docs, including the
   default socket path `unix:~/.tether/run/muxd.sock`.
 - Session creation helpers for newer daemon payloads:

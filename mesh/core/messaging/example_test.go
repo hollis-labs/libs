@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 // Example demonstrates the canonical usage pattern: construct a Dispatcher,

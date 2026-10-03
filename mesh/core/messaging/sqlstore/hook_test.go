@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-messaging/sqlstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/sqlstore"
 )
 
 // hookConnector wraps the registered SQLite driver so a test can run code

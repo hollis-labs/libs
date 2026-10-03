@@ -3,10 +3,10 @@ package httpstoretest
 import (
 	"testing"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/httpstore"
-	"github.com/hollis-labs/go-messaging/memstore"
-	"github.com/hollis-labs/go-messaging/messagingtest"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
 )
 
 // ConformanceIdentity is the identity RunConformance configures on the

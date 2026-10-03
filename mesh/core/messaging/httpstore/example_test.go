@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http/httptest"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/httpstore"
-	"github.com/hollis-labs/go-messaging/httpstore/httpstoretest"
-	"github.com/hollis-labs/go-messaging/memstore"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
 )
 
 // A Store client for a Tether-style daemon. Here the daemon is the reference

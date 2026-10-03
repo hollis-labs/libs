@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging"
-	tether "github.com/hollis-labs/go-tether-client"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 // ExampleClient_AsDispatcher shows the canonical cross-system request/reply

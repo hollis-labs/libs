@@ -3,7 +3,7 @@ package schema_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-hitl/schema"
+	"github.com/hollis-labs/substrate/mesh/hitl/schema"
 )
 
 func ExampleNewValidator() {

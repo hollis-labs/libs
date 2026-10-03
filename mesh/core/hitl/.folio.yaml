@@ -29,9 +29,9 @@ inputs:
   repo_name: go-hitl
   stability: pre-1.0
 computed:
-  import_line: hitl "github.com/hollis-labs/go-hitl"
-  import_path: github.com/hollis-labs/go-hitl
-  module_path: github.com/hollis-labs/go-hitl
+  import_line: hitl "github.com/hollis-labs/substrate/mesh/hitl"
+  import_path: github.com/hollis-labs/substrate/mesh/hitl
+  module_path: github.com/hollis-labs/substrate/mesh/hitl
   year: "2026"
 files:
   .github/workflows/check.yml:

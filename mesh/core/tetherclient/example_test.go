@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	tether "github.com/hollis-labs/go-tether-client"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 func ExampleClient_CreateEnvelope_naniteHostChat() {

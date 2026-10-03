@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/go-hitl/hitltest"
-	"github.com/hollis-labs/go-hitl/schema"
+	"github.com/hollis-labs/substrate/mesh/hitl/hitltest"
+	"github.com/hollis-labs/substrate/mesh/hitl/schema"
 )
 
 func TestFixturesValidateAgainstTheirDefinition(t *testing.T) {

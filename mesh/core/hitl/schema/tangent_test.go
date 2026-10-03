@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/go-hitl/schema"
+	"github.com/hollis-labs/substrate/mesh/hitl/schema"
 )
 
 const tangentEnv = "HITL_TANGENT_SCHEMA"

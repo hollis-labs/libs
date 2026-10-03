@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	tether "github.com/hollis-labs/go-tether-client"
+	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
 )
 
 // ExampleResolveSessionBootstrap shows the launch/host-boundary shape:

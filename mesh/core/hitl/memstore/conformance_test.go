@@ -3,9 +3,9 @@ package memstore_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/go-hitl"
-	"github.com/hollis-labs/go-hitl/hitltest"
-	"github.com/hollis-labs/go-hitl/memstore"
+	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/substrate/mesh/hitl/hitltest"
+	"github.com/hollis-labs/substrate/mesh/hitl/memstore"
 )
 
 // TestReferenceServiceConformance runs the reference Service over memstore

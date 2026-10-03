@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // Clock supplies deterministic time for stores and tests.

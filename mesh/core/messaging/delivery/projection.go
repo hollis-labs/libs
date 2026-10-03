@@ -1,7 +1,7 @@
 package delivery
 
 import (
-	messaging "github.com/hollis-labs/go-messaging"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // EnvelopeEnqueueRequest projects a legacy root Envelope send into the reliable
