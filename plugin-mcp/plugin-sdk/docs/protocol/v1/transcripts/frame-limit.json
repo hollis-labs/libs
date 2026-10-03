@@ -1,0 +1,10 @@
+{
+  "profile": "base",
+  "steps": [
+    {
+      "raw": "x",
+      "repeat": 8388608
+    }
+  ],
+  "termination": "frame-too-large"
+}

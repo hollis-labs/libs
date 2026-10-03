@@ -1,0 +1,91 @@
+{
+  "profile": "base",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {
+            "key": "value"
+          },
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 1
+          },
+          "granted": [
+            "storage.read"
+          ],
+          "identity": {
+            "subject": "caller"
+          },
+          "future_field": true
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/load"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "skipped_registrations": [
+            {
+              "kind": "command",
+              "id": "optional",
+              "reason": "no config"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "plugin/unload"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}
