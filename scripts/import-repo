@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# Import an existing repository into a module subdirectory, keeping its history.
+#
+# Usage: scripts/import-repo [options] <source> <module>/<subdir>
+#
+#   <source>          path or URL of the repository; its default branch is imported
+#   <module>/<subdir> where the files land, relative to the repository root. The first
+#                     element must be an existing module (a directory holding a go.mod).
+#
+# Options:
+#   --target DIR   repository to import into (default: the repository this script is in)
+#   --name NAME    name recorded in the commit message (default: source basename)
+#   --keep-gomod   keep the imported go.mod and go.sum (default: remove them, see below)
+#   --allow-main   allow the import while main is checked out
+#   -h, --help
+#
+# What it does: clones the source into a scratch directory, rewrites that clone with
+# git filter-repo so every path sits under <module>/<subdir> (original commits, authors
+# and dates are kept; abbreviated hashes in messages are rewritten), then merges it into
+# the target with a merge commit that records the source name, its HEAD and its tags.
+# The source repository is only read. The target must be clean.
+#
+# Old tags are not carried. A bare v1.2.3 tag means nothing in a repository whose
+# modules are tagged <module>/vX.Y.Z, and a tag push is an owner decision. The tags
+# the source had are listed in the merge commit message instead.
+#
+# The imported go.mod and go.sum are removed in a follow-up commit (history keeps them)
+# because a go.mod inside a module carves the subtree out of it. Merge the old
+# requirements into <module>/go.mod afterwards, for example with go mod tidy.
+#
+# Work on a branch, not main: run this in a worktree and open a pull request.
+# Needs git-filter-repo: set GIT_FILTER_REPO to the executable, or put it on PATH
+# (python3 -m venv V && V/bin/pip install git-filter-repo).
+set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
+
+usage() {
+  sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+target="$REPO_ROOT"
+name=""
+keep_gomod=0
+allow_main=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) [ $# -ge 2 ] || die "--target needs a directory"; target="$2"; shift 2 ;;
+    --name) [ $# -ge 2 ] || die "--name needs a value"; name="$2"; shift 2 ;;
+    --keep-gomod) keep_gomod=1; shift ;;
+    --allow-main) allow_main=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    -*) die "unknown flag: $1 (see --help)" ;;
+    *) break ;;
+  esac
+done
+[ $# -eq 2 ] || { usage >&2; exit 2; }
+source_repo="$1"
+dest="${2%/}"
+
+# --- validate the destination and the target repository -------------------------------
+case "$dest" in
+  /* | "" ) die "destination must be a relative path like <module>/<subdir>, got '$2'" ;;
+  */*) ;;
+  *) die "destination must be <module>/<subdir>; '$dest' names a module but no subdirectory" ;;
+esac
+if printf '%s\n' "$dest" | grep -Eq '(^|/)\.\.?(/|$)'; then
+  die "destination must not contain '.' or '..' elements: '$dest'"
+fi
+
+target="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" || die "--target is not a git repository"
+module="${dest%%/*}"
+[ -f "$target/$module/go.mod" ] || die "'$module' is not a module in $target (no $module/go.mod)"
+[ ! -e "$target/$dest" ] || die "$dest already exists in the target"
+git -C "$target" rev-parse -q --verify HEAD >/dev/null || die "the target has no commits yet"
+[ -z "$(git -C "$target" status --porcelain)" ] || die "the target working tree is not clean; commit or stash first"
+
+branch="$(git -C "$target" symbolic-ref --short -q HEAD || true)"
+if [ "$allow_main" -eq 0 ] && { [ "$branch" = "main" ] || [ "$branch" = "master" ]; }; then
+  die "refusing to import onto $branch; use a task branch or worktree (or pass --allow-main)"
+fi
+
+if [ -z "$name" ]; then
+  name="$(basename "$source_repo")"
+  name="${name%.git}"
+fi
+printf '%s\n' "$name" | grep -Eq '^[A-Za-z0-9._-]+$' || die "name '$name' must match [A-Za-z0-9._-]+ (use --name)"
+
+# --- find git-filter-repo --------------------------------------------------------------
+if [ -n "${GIT_FILTER_REPO:-}" ]; then
+  [ -x "$GIT_FILTER_REPO" ] || die "GIT_FILTER_REPO='$GIT_FILTER_REPO' is not an executable file"
+  filter_repo="$GIT_FILTER_REPO"
+else
+  filter_repo="$(command -v git-filter-repo || true)"
+  [ -n "$filter_repo" ] || die "git-filter-repo not found: set GIT_FILTER_REPO or put it on PATH (pip install git-filter-repo in a venv)"
+fi
+
+# --- work in a scratch directory --------------------------------------------------------
+work="$(mktemp -d "${TMPDIR:-/tmp}/import-repo.XXXXXX")"
+tmpref="refs/import-tmp/$name"
+cleanup() {
+  git -C "$target" update-ref -d "$tmpref" >/dev/null 2>&1 || true
+  # Only ever remove the scratch directory this script made, and only if it still looks like it.
+  case "${work:-}" in
+    */import-repo.??????) [ ! -d "$work" ] || rm -rf -- "$work" ;;
+  esac
+}
+trap cleanup EXIT
+
+echo "cloning $name"
+git clone --quiet --no-hardlinks "$source_repo" "$work/src" || die "could not clone '$source_repo'"
+src_head="$(git -C "$work/src" rev-parse HEAD)"
+src_commits="$(git -C "$work/src" rev-list --count HEAD)"
+src_tags="$(git -C "$work/src" tag --merged HEAD | sort -V | tr '\n' ' ' | sed 's/ $//')"
+
+echo "rewriting $src_commits commits under $dest/"
+(cd "$work/src" && "$filter_repo" --force --to-subdirectory-filter "$dest") >"$work/filter.log" 2>&1 || {
+  cat "$work/filter.log" >&2
+  die "git filter-repo failed"
+}
+
+echo "merging into $target"
+git -C "$target" fetch --quiet --no-tags "$work/src" "HEAD:$tmpref"
+
+msg="import: $name into $dest (history preserved)
+
+Source: $name
+Source HEAD: ${src_head:0:12} ($src_commits commits)
+Source tags, not carried: ${src_tags:-none}
+Imported with scripts/import-repo (git filter-repo --to-subdirectory-filter $dest)."
+
+if ! git -C "$target" merge --quiet --no-ff --allow-unrelated-histories -m "$msg" "$tmpref"; then
+  git -C "$target" merge --abort >/dev/null 2>&1 || true
+  die "merge failed and was aborted; the target is unchanged"
+fi
+
+requirements=""
+if [ "$keep_gomod" -eq 0 ] && [ -f "$target/$dest/go.mod" ]; then
+  # Record what the old go.mod required: go mod tidy alone resolves the latest versions,
+  # not the ones the source was tested with.
+  requirements="$(awk '
+    $1 == "require" && $2 == "(" { inblock = 1; next }
+    inblock && $1 == ")" { inblock = 0; next }
+    inblock { print $1, $2; next }
+    $1 == "require" { print $2, $3 }
+  ' "$target/$dest/go.mod")"
+  git -C "$target" rm --quiet -f "$dest/go.mod"
+  [ ! -f "$target/$dest/go.sum" ] || git -C "$target" rm --quiet -f "$dest/go.sum"
+  git -C "$target" commit --quiet -m "import: drop $name's go.mod and go.sum
+
+$dest is now part of the $module module. Its requirements must be merged into
+$module/go.mod at these versions (go mod tidy alone picks the latest); history
+keeps the old files.
+
+Requirements of the dropped go.mod:
+${requirements:-  (none)}"
+fi
+
+echo
+echo "imported $name into $dest: $src_commits source commits preserved"
+echo "HEAD $(git -C "$target" rev-parse --short HEAD)  ($(git -C "$target" log -1 --format=%s))"
+nested="$(git -C "$target" ls-files "$dest" | grep '/go\.mod$' | grep -v '/testdata/' || true)"
+if [ -n "$nested" ]; then
+  echo "warning: nested go.mod left under $dest (scripts/check-layout will fail):" >&2
+  while IFS= read -r n; do
+    echo "  $n" >&2
+  done <<EOF
+$nested
+EOF
+fi
+if [ -n "$requirements" ]; then
+  echo "requirements of the dropped go.mod (carry these versions into $module/go.mod; go mod tidy alone picks the latest):"
+  while IFS= read -r r; do
+    echo "  $r"
+  done <<EOF
+$requirements
+EOF
+fi
+echo "next: merge requirements into $module/go.mod, fix import paths, run scripts/check $module and scripts/check-layout"
