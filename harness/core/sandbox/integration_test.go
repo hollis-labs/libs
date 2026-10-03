@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 )
 
 // requireSandboxTool skips the test if the platform's sandbox tool is absent.

@@ -29,7 +29,7 @@ import (
     "os/exec"
 
     "github.com/hollis-labs/substrate/harness/interception/egress"
-    // import "github.com/hollis-labs/go-sandbox/sandbox" — see examples/
+    // import "github.com/hollis-labs/substrate/harness/sandbox" — see examples/
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 )
 
 func TestApplyResolvedPolicyParity_FilesystemAllowlist(t *testing.T) {

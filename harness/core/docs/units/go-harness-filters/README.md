@@ -33,7 +33,7 @@ emitter helper yet.
 See [ROADMAP.md](./ROADMAP.md) for deferred scope and the policy-boundary
 decision.
 
-Module path: `github.com/hollis-labs/go-harness-filters`
+Module path: `github.com/hollis-labs/substrate/harness/interception/filters`
 
 ## Quickstart
 

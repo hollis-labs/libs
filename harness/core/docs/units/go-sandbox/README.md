@@ -137,7 +137,7 @@ import (
     "os"
     "os/exec"
 
-    "github.com/hollis-labs/go-sandbox/sandbox"
+    "github.com/hollis-labs/substrate/harness/sandbox"
 )
 
 func main() {
@@ -189,7 +189,7 @@ In:
 - Linux bwrap backend with narrowed `--ro-bind` candidate set, resolved-policy read/write/provider-state/scratch binds, source-read exclusion, deny shadowing, per-invocation `--tmpfs /tmp`, namespace unsharing (`--unshare-pid` / `--unshare-ipc` / `--unshare-uts` / `--unshare-cgroup-try` / `--unshare-user-try`), `--die-with-parent`, `--new-session`, conditional `--unshare-net`
 - `LoadProfile` / `LoadProfiles` YAML loaders
 - Cleanup-function return on darwin so callers can `defer cleanup()` without leaking temp profile files
-- Bounded path resolution through `github.com/hollis-labs/go-safefs/pathsafe` (`ResolveUnder`), which judges a dangling symlink by where it points
+- Bounded path resolution through `github.com/hollis-labs/substrate/harness/sandbox/pathsafe` (`ResolveUnder`), which judges a dangling symlink by where it points
 - `examples/mux_integration` and `examples/clockwork_integration` showing both YAML and programmatic profile shapes
 
 Out (intentionally):

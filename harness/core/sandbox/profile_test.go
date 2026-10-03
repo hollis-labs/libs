@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/go-sandbox/sandbox"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 	"gopkg.in/yaml.v3"
 )
 
