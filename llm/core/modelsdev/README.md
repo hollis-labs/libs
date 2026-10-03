@@ -2,7 +2,7 @@
 
 `go-modelsdev` is a Go library for consuming the [models.dev](https://models.dev) API. It provides a cached client that returns LLM provider and model metadata — pricing, context limits, modalities, and capabilities — for use in services that need to look up model info at runtime.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-modelsdev.svg)](https://pkg.go.dev/github.com/hollis-labs/go-modelsdev)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/llm-core/modelsdev.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/llm-core/modelsdev)
 
 ## Status
 
@@ -11,7 +11,7 @@ Pre-1.0 (v0.x.y). The exported API surface is small and intended to remain stabl
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-modelsdev
+go get github.com/hollis-labs/substrate/llm-core/modelsdev
 ```
 
 ## Quick Usage
@@ -26,7 +26,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/hollis-labs/go-modelsdev/modelsdev"
+    "github.com/hollis-labs/substrate/llm-core/modelsdev"
 )
 
 func main() {

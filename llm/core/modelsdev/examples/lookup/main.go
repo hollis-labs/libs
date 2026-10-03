@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/hollis-labs/go-modelsdev/modelsdev"
+	"github.com/hollis-labs/substrate/llm-core/modelsdev"
 )
 
 const (
