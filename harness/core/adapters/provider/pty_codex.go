@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // CodexAdapter implements CLIAdapter for the OpenAI Codex CLI.

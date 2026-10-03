@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-providers/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
 )
 
 // CW-20260930-0136: the same PlantContext.MCPServers reach every runtime's

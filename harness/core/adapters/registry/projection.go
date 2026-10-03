@@ -3,7 +3,7 @@ package registry
 import (
 	"maps"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // Feature is something a runtime's boot-dir projection can provide, which a

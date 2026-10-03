@@ -24,9 +24,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	"github.com/hollis-labs/go-providers/provider"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func main() {

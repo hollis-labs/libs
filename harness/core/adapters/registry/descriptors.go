@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/hollis-labs/agent-contracts-leaf/runtimes"
+import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 // The capabilities each mode declares are what the code that drives it does
 // today, not what the runtime could do: go-providers' adapters for the native

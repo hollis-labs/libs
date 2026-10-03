@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-providers/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
 )
 
 var updateLayoutGolden = flag.Bool("update-layout-golden", false, "rewrite provider/testdata/layout-regression/projection.golden")

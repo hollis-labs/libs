@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 var _ TurnInterrupter = (*ClaudeAdapter)(nil)

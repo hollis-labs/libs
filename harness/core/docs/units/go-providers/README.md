@@ -2,7 +2,7 @@
 
 `go-providers` is a Go library that drives agent CLIs (Claude Code, Codex, OpenCode, Antigravity) through CLI-bridge adapters wrapped via PTY or plain subprocess, each bridge implementing go-llm-contracts' `Provider` interface. It also ships the runtime registry and cross-cutting primitives for the adapter layer — cost monitoring, scope guarding, progress-loop detection, per-line typed events, boot-dir spec metadata, and a decorator pipeline that layers monitors on top of any underlying provider.
 
-This library is **CLI/PTY-only**: it has no direct HTTP chat or embedding adapter and does not own the shared LLM contracts or rate-budget primitives. The shared transport-agnostic model types live in `github.com/hollis-labs/go-llm-types`, and the shared provider contracts (the `Provider` interface) and rate-budget primitives in `github.com/hollis-labs/go-llm-contracts`.
+This library is **CLI/PTY-only**: it has no direct HTTP chat or embedding adapter and does not own the shared LLM contracts or rate-budget primitives. The shared transport-agnostic model types live in `github.com/hollis-labs/substrate/llm-core/llmtypes`, and the shared provider contracts (the `Provider` interface) and rate-budget primitives in `github.com/hollis-labs/substrate/llm-core/llmcontracts`.
 
 ## Status
 
@@ -30,8 +30,8 @@ import (
     "os"
     "path/filepath"
 
-    llmtypes "github.com/hollis-labs/go-llm-types"
-    "github.com/hollis-labs/go-providers/provider"
+    llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+    "github.com/hollis-labs/substrate/harness/adapters/provider"
 )
 
 func main() {
@@ -170,7 +170,7 @@ The one list of agent CLI runtimes (Claude Code, Codex, OpenCode, Copilot CLI, P
 In addition to the `<-chan llmtypes.StreamEvent` a bridge's `StreamChat` returns, CLI/PTY bridges can fire a richer typed-event taxonomy when a callback is wired into the spawn context. The two surfaces are parallel: typed events do not replace `StreamEvent`; they augment it with information the legacy union struct can't carry (per-tool `ToolResult`, sub-agent spawn detection, `SubprocessStderr` lines, `Heartbeat` ticks, `PermissionDenied` refusals).
 
 ```go
-import "github.com/hollis-labs/go-providers/provider/events"
+import "github.com/hollis-labs/substrate/harness/adapters/provider/events"
 
 ctx := provider.WithEvents(ctx, func(ev events.Event) {
     switch e := ev.(type) {
@@ -432,10 +432,10 @@ CLI bridges use a two-level abstraction: a `CLIAdapter` (one per CLI tool) defin
 
 ### Framework-internal
 
-- `github.com/hollis-labs/agent-contracts-leaf` — the `runtimes` vocabulary (runtime ids, modes, capabilities).
-- `github.com/hollis-labs/go-llm-contracts` — the `Provider` interface.
-- `github.com/hollis-labs/go-llm-types` — request, message, event and usage types.
-- `github.com/hollis-labs/go-permission` — the permission posture `Mode`.
+- `github.com/hollis-labs/substrate/llm-core/contracts` — the `runtimes` vocabulary (runtime ids, modes, capabilities).
+- `github.com/hollis-labs/substrate/llm-core/llmcontracts` — the `Provider` interface.
+- `github.com/hollis-labs/substrate/llm-core/llmtypes` — request, message, event and usage types.
+- `github.com/hollis-labs/substrate/harness/interception/permission` — the permission posture `Mode`.
 
 ### External (direct)
 
@@ -471,7 +471,7 @@ Tests are pure-Go unit tests. PTY/subprocess tests do not spawn real CLI binarie
 `providertest` gives any test a fake agent CLI that replays what the real one writes, so libraries and apps test against one shared, captured wire format instead of hand-written scripts:
 
 ```go
-import "github.com/hollis-labs/go-providers/providertest"
+import "github.com/hollis-labs/substrate/harness/adapters/providertest"
 
 fake := providertest.New(t, "claude",
     providertest.Replay("claude/print_turn1"),

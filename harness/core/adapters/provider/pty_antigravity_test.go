@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 // The antigravity fixtures are verbatim `agy -p=<prompt> --output-format

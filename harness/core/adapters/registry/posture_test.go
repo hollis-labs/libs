@@ -6,9 +6,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	permission "github.com/hollis-labs/go-permission"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // The mappings measured live on 2026-10-01 (see the package doc). A change

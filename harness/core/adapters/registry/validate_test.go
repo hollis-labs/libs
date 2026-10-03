@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // The rules only a built-in must meet: a runtimes.ID, layout rows exactly when

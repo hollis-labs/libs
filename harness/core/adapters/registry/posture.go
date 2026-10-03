@@ -6,8 +6,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	permission "github.com/hollis-labs/go-permission"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // ErrNoPostureMapping is returned by a Posture hook, and by

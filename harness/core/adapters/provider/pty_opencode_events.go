@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 // opencode `run --format json` line mapping (opencode 1.18.30):

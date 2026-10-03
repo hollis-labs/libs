@@ -1,6 +1,6 @@
 package provider
 
-import llmtypes "github.com/hollis-labs/go-llm-types"
+import llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
 // CLIAdapter abstracts the differences between CLI tools (Claude, Codex,
 // OpenCode, Antigravity) so the PTY bridge and subprocess bridge can spawn and

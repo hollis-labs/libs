@@ -1,6 +1,6 @@
 package layout
 
-import "github.com/hollis-labs/agent-contracts-leaf/runtimes"
+import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 // Variant names a runtime-specific launch variant: a flag that changes where
 // the harness looks for its files without changing the transport mode. The

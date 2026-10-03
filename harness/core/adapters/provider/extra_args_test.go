@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
 )
 
 // A caller's extras land where the prepared path puts them: for every runtime,

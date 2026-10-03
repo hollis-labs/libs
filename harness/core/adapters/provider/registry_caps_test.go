@@ -3,9 +3,9 @@ package provider
 import (
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/providertest"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 type runtimeMode struct {

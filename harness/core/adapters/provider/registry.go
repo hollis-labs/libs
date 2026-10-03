@@ -3,7 +3,7 @@ package provider
 import (
 	"sync"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
 )
 
 // Registry holds named Provider implementations. It is safe for concurrent use.

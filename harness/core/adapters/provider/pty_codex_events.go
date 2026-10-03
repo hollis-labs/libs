@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 // ParseLineEvents implements EventParser for the OpenAI Codex CLI.

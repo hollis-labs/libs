@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // ProgressLoop represents a detected processing loop.

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 // agy `--output-format stream-json` line mapping (agy 1.2.7). Each line is

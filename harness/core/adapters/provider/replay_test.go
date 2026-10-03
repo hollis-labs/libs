@@ -9,10 +9,10 @@ import (
 	"sync"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 // These tests replay captured CLI output through a fake binary and the

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	permission "github.com/hollis-labs/go-permission"
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 )
 
 // A posture's flags go at the convention's extra-argument slot, so in every

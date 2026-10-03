@@ -13,8 +13,8 @@ Values passed to the calls below are the ones the table holds today. Where a
 consumer's current value differs, the call fails, which is the point: the
 difference is a finding, and each one is recorded in `CHANGELOG.md` (v0.27.0,
 "What consumers can delete after adopting `layout`") and `docs/HARNESS-DISCOVERY.md`. Import paths:
-`github.com/hollis-labs/go-providers/layout` and
-`github.com/hollis-labs/go-providers/layout/layouttest`. Consumers need
+`github.com/hollis-labs/substrate/harness/adapters/layout` and
+`github.com/hollis-labs/substrate/harness/adapters/layout/layouttest`. Consumers need
 `go >= 1.26.6` and a go-providers release that contains this package.
 
 Non-Go readers (Cairn YAML layouts, agent-launcher) read

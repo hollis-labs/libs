@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // TestIsTurnComplete asserts the predicate for every named llmtypes.EventType.

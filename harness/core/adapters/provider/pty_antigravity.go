@@ -3,8 +3,8 @@ package provider
 import (
 	"bytes"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // AntigravityAdapter implements CLIAdapter for the Antigravity CLI (`agy`),

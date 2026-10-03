@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // Descriptor is everything the libraries know about one agent CLI runtime.

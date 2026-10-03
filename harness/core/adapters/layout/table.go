@@ -1,6 +1,6 @@
 package layout
 
-import "github.com/hollis-labs/agent-contracts-leaf/runtimes"
+import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 // table is the one source of truth. Values were decided by the Step 0 probe
 // (docs/HARNESS-DISCOVERY.md); the probe ids on each row exist in the newest

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // Turn text is untrusted: it can come from another agent, a wake or a

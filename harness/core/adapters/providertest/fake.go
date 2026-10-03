@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/go-providers/registry"
+	"github.com/hollis-labs/substrate/harness/adapters/registry"
 )
 
 // Fake is a fake CLI binary for one runtime, serving the runs given to

@@ -5,10 +5,10 @@ import (
 	"math"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 // CW-20260930-0137 (event vocabulary), CW-20260930-0228 (block boundaries,

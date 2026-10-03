@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // stubProvider is a minimal Provider used for registry tests.

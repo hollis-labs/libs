@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	pevents "github.com/hollis-labs/go-providers/provider/events"
+	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 // SubprocessBridge is a provider that wraps CLI tools using standard pipes

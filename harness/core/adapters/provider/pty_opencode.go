@@ -1,8 +1,8 @@
 package provider
 
 import (
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // OpencodeAdapter implements CLIAdapter for the opencode CLI

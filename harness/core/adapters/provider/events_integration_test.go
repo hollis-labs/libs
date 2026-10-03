@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 // TestPTYBridge_TypedEvents_EndToEnd spawns a fake claude-shaped CLI

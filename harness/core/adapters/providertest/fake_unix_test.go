@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-providers/providertest"
+	"github.com/hollis-labs/substrate/harness/adapters/providertest"
 )
 
 // waitForSignal polls the call record until the fake has recorded a

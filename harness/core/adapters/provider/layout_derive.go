@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/agent-contracts-leaf/runtimes"
-	"github.com/hollis-labs/go-providers/layout"
+	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 // The built-in adapters derive every path, flag, environment variable and

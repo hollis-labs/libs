@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 func TestClaudeParseLineEvents_AssistantText(t *testing.T) {

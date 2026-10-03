@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/go-providers/provider/events"
+	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
 )
 
 // EventsCallback is invoked once per typed event produced by a CLI/PTY
