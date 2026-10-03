@@ -111,12 +111,13 @@ using `json.RawMessage`), or change only paths declared mutable and visible.
 
 All six declared modes execute. Breaker, tracing, remote wire, schema compiler,
 TS parity, durable delivery and consumer adoption are unavailable. There are no
-compatibility aliases, published repository or tags in this local implementation.
+compatibility aliases or release tags yet.
 
 ## Checks
 
 Run fast checks with `GOWORK=off go test .`, `GOWORK=off go vet ./...` and
 `golangci-lint run --allow-parallel-runners`. At final review run
-`heavytest ./scripts/check.sh`; it matches CI checks and repeats concurrency-heavy
+`./scripts/check.sh`; the full gate is slow and computationally heavy. It runs
+`go test -race -count=1 ./...`, matches CI checks and repeats concurrency-heavy
 lifecycle tests with race instrumentation. Install local hooks with `lefthook install`
 if desired; the tracked configuration alone installs nothing.
