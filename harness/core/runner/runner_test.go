@@ -49,7 +49,7 @@ func (s *stubAdapter) ParseLine(line []byte) ([]llmtypes.StreamEvent, error) {
 func buildStubCLI(t *testing.T) string {
 	t.Helper()
 	out := filepath.Join(t.TempDir(), "stubcli")
-	cmd := exec.Command("go", "build", "-o", out, "github.com/hollis-labs/go-runner/internal/stubcli")
+	cmd := exec.Command("go", "build", "-o", out, "github.com/hollis-labs/substrate/harness/runner/internal/stubcli")
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("build stubcli: %v", err)
