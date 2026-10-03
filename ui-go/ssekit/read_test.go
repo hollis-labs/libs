@@ -9,8 +9,8 @@ import (
 	"testing"
 	"testing/iotest"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/conformance"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/conformance"
 )
 
 func collect(t *testing.T, r io.Reader, o ...ssekit.ReadOption) ([]ssekit.Event, error) {

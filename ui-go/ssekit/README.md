@@ -11,7 +11,7 @@ Seventeen hand-written SSE writers in six applications disagree on keepalive, bu
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-ssekit
+go get github.com/hollis-labs/libs/ui-go/ssekit
 ```
 
 Requires Go 1.26.6 or newer. Standard library only; no third-party modules.
@@ -29,7 +29,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 func main() {

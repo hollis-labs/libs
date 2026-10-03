@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/ssetest"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/ssetest"
 )
 
 func get(t *testing.T, srv *httptest.Server, header string) (*http.Response, string) {

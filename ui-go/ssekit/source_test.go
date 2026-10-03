@@ -11,7 +11,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 func drain(ctx context.Context, t *testing.T, s ssekit.Source) ([]string, error) {

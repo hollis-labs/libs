@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/conformance"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/conformance"
 )
 
 // parseWithSSEKit adapts ssekit.Read to conformance.ParseFunc; any other

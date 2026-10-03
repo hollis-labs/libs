@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/ssetest"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/ssetest"
 )
 
 func ExampleRead() {

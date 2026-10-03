@@ -8,7 +8,7 @@ import (
 	"testing/iotest"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // Vector is one raw byte stream and the events a conforming parser

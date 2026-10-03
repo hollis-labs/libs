@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // The expected strings below are the bytes produced by testdata/capture, a

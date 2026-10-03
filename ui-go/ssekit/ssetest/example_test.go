@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/hollis-labs/go-ssekit/ssetest"
+	"github.com/hollis-labs/libs/ui-go/ssekit/ssetest"
 )
 
 func ExampleScript() {

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // Step is one instruction of a script. See Script.

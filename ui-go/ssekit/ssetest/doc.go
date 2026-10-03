@@ -1,5 +1,5 @@
 // Package ssetest is the test harness for code that speaks Server-Sent Events
-// through github.com/hollis-labs/go-ssekit.
+// through github.com/hollis-labs/libs/ui-go/ssekit.
 //
 // Script builds an http.Handler that plays a scripted, deliberately hostile
 // server: it drops connections, overlaps and skips event ids, answers with

@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 func newServeWriter(t *testing.T) (*ssekit.Writer, *memWriter) {

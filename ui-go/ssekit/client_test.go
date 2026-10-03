@@ -13,8 +13,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
-	"github.com/hollis-labs/go-ssekit/ssetest"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
+	"github.com/hollis-labs/libs/ui-go/ssekit/ssetest"
 )
 
 // fast retries: no jitter, 1 ms.

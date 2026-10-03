@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	ssekit "github.com/hollis-labs/go-ssekit"
+	ssekit "github.com/hollis-labs/libs/ui-go/ssekit"
 )
 
 // fakeT records a fatal and, like *testing.T, stops the calling goroutine.
