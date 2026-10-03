@@ -102,8 +102,10 @@ capability: the engine has no transaction driver.
 ## Conformance and plugin tests
 
 `hookstest.Run` exercises a host dispatcher through a small factory and scope
-adapter. Requirements R01-R15 cover registration, execution and unload; waivers
-must name a requirement and a reason. The library's own run has zero waivers.
+adapter. Requirements R01-R15 cover registration, execution and unload; R16-R22
+cover remote admission, results, fences, ancestry, batches, notifications and
+breakers. Waivers must name a requirement and a reason. The library's own run has
+zero waivers.
 `hookstest.NewHarness` drives plugin callbacks in process with an explicit catalog.
 See [hookstest usage and requirement list](hookstest/README.md).
 
@@ -117,11 +119,22 @@ using `json.RawMessage`), or change only paths declared mutable and visible.
 
 ## Current boundary
 
-All six declared modes execute. Remote wire, schema compiler,
-durable delivery and consumer adoption are unavailable. The private
-[TypeScript twin](ts/README.md) implements the execution/lifecycle contract and
-shares JSON conformance fixtures with Go; breaker/telemetry parity is deferred.
-There are no compatibility aliases or release tags yet.
+All six declared modes execute in the Go engine. The library includes catalog
+validation/introspection/discovery, scoped registrations, generation breakers and
+sanitized telemetry. Its transport-agnostic remote seams cover single calls,
+connection fences, structured results, latency admission, verified callback
+ancestry with shared depth/budget/trace and cycle rejection, observation batches,
+and opt-in queued-only notifications. See the [remote contract](docs/remote.md).
+
+The private [TypeScript twin](ts/README.md) implements local execution/lifecycle
+and catalog validation, using shared JSON conformance fixtures with Go. It is
+unpublished and has no npm publication workflow. Go breaker/telemetry parity and
+remote execution are outside the TS twin.
+
+There is no wire protocol implementation, concrete transport or SDK bridge,
+schema compiler, durable delivery or application adoption. Hosts supply identity,
+authorization, compiled validators, binding resolution and transport integration.
+There are no compatibility aliases or automatic delivery retries.
 
 ## Checks
 
@@ -244,15 +257,15 @@ handler error text. No tracing backend, operator endpoint or app is adopted.
 The private browser/Node ESM package lives entirely under [ts/](ts/README.md).
 Run `npm ci --ignore-scripts` and `npm run check` from that directory.
 Go and vitest consume the same execution and registration-policy JSON fixtures
-in `conformance/`; Go production code remains dependency-free. No npm publication
-workflow or release tag is added.
+in `conformance/`; Go production code remains dependency-free. The TS package
+remains private and unpublished; no npm publication workflow is installed.
 
-## Remote single-call seam
+## Remote execution seams
 
 Hosts can attach `RemoteHandler` implementations with `AddRemoteAction` /
 `AddRemoteFilter` in remote-only scopes. A positive catalog
 `remote_latency_budget_ms` is required for remote-enabled declarations.
-The [remote seam contract](docs/remote.md) explains structured results, latency,
+The [remote execution contract](docs/remote.md) explains structured results, latency,
 connection fences, breaker accounting and the introspection format change.
 Hosts also have verified callback bindings, bounded observation batches and
 opt-in notification receipts. No SDK or concrete transport dependency, publication

@@ -201,4 +201,4 @@ in lockstep with Go. There is no independent catalog document-format version.
 Existing remote-enabled documents must add the latency field. Local zero/default
 fields may remain omitted. Remote scopes refuse in-process callbacks; the twin
 implements catalog/preflight policy but does not implement the Go remote transport
-seam. See the repository's [single-call contract](../docs/remote.md).
+seam. See the repository's [remote execution contract](../docs/remote.md).
