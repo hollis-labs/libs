@@ -246,3 +246,12 @@ Run `npm ci --ignore-scripts` and `npm run check` from that directory.
 Go and vitest consume the same execution and registration-policy JSON fixtures
 in `conformance/`; Go production code remains dependency-free. No npm publication
 workflow or release tag is added.
+
+## Remote single-call seam
+
+Hosts can attach `RemoteHandler` implementations with `AddRemoteAction` /
+`AddRemoteFilter` in remote-only scopes. A positive catalog
+`remote_latency_budget_ms` is required for remote-enabled declarations.
+The [remote seam contract](docs/remote.md) explains structured results, latency,
+connection fences, breaker accounting and the introspection format change.
+No SDK or wire dependency, batching, notification transport or app adoption is added.

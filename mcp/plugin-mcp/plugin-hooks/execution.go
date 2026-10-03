@@ -440,7 +440,7 @@ func outcome(d *dispatch, entry *entry, err error, class string) HandlerOutcome 
 
 // invoke is called in priority admission order. Capacity is reserved synchronously
 // before the goroutine and once claim; its release follows actual completion.
-func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, validate func(json.RawMessage) (json.RawMessage, error)) (channel <-chan callResult, invokeErr error) {
+func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, validate func(json.RawMessage) (json.RawMessage, error), admissionBegan time.Time) (channel <-chan callResult, invokeErr error) {
 	call := e.observedCall(d, entry)
 	defer func() {
 		if invokeErr != nil {
@@ -452,9 +452,27 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 		return nil, err
 	}
 	call.ticket, call.admitted = ticket, true
-	ctx, cancelDeadline := context.WithTimeout(d.ctx, entry.registration.Options.Timeout)
+	deadline := time.Now().Add(entry.registration.Options.Timeout)
+	if entry.remote != nil {
+		remoteDeadline := admissionBegan.Add(d.definition.RemoteLatencyBudget)
+		if remoteDeadline.Before(deadline) {
+			deadline = remoteDeadline
+		}
+	}
+	ctx, cancelDeadline := context.WithDeadline(d.ctx, deadline)
+	if actualDeadline, ok := ctx.Deadline(); ok && entry.remote != nil {
+		call.record.EffectiveTimeoutMS = milliseconds(time.Until(actualDeadline))
+	}
+	if admissionErr := remoteAdmission(ctx, entry); admissionErr != nil {
+		cancelDeadline()
+		return nil, admissionErr
+	}
+	stopConnection := func() bool { return false }
+	if entry.remote != nil {
+		stopConnection = context.AfterFunc(entry.remote.Connection.ctx, cancelDeadline)
+	}
 	stopRemoval := context.AfterFunc(entry.removalContext, cancelDeadline)
-	cancel := func() { stopRemoval(); cancelDeadline() }
+	cancel := func() { stopRemoval(); stopConnection(); cancelDeadline() }
 	select {
 	case d.permits <- struct{}{}:
 	case <-ctx.Done():
@@ -468,10 +486,15 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 		cancel()
 		return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
+	if admissionErr := remoteAdmission(ctx, entry); admissionErr != nil {
+		release()
+		cancel()
+		return nil, admissionErr
+	}
 	l, err := e.registry.start(ctx, entry)
 	if err != nil {
 		e.registry.mu.Lock()
-		if entry.removed || entry.scope.disposed {
+		if entry.removed || entry.scope.disposed || remoteEntryUnavailable(entry) {
 			err = ErrUnavailable
 		}
 		e.registry.mu.Unlock()
@@ -495,7 +518,9 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 				}
 			}()
 			v := Invocation{ID: d.id, Hook: d.definition.Name, Owner: entry.registration.Owner, Generation: entry.registration.Generation, Registration: entry.registration.Name, Payload: input, Metadata: metadata}
-			if entry.action != nil {
+			if entry.remote != nil {
+				out.payload, out.err = e.invokeRemote(handlerCtx, d, entry, input, metadata)
+			} else if entry.action != nil {
 				out.err = entry.action(handlerCtx, v)
 			} else {
 				out.payload, out.err = entry.filter(handlerCtx, v)
@@ -530,7 +555,7 @@ func (e *Engine) invoke(d *dispatch, entry *entry, payload json.RawMessage, vali
 			default:
 				terminal.err = l.ctx.Err()
 				e.registry.mu.Lock()
-				removed := entry.removed || entry.scope.disposed
+				removed := entry.removed || entry.scope.disposed || remoteEntryUnavailable(entry)
 				e.registry.mu.Unlock()
 				if removed {
 					terminal.err = ErrUnavailable
@@ -566,6 +591,7 @@ func (e *Engine) execute(d *dispatch) (result DispatchResult, executeErr error) 
 			result.Status = CallerCancelled
 			return result, err
 		}
+		admissionBegan := time.Now()
 		input := current
 		if def.Kind == Action {
 			input = d.payload
@@ -587,7 +613,7 @@ func (e *Engine) execute(d *dispatch) (result DispatchResult, executeErr error) 
 				return validateFilterResult(def, full, view, entry.registration.Options.View, raw)
 			}
 		}
-		ch, callErr := e.invoke(d, entry, encode(view), validate)
+		ch, callErr := e.invoke(d, entry, encode(view), validate, admissionBegan)
 		out := callResult{err: callErr}
 		if callErr == nil {
 			select {
@@ -666,13 +692,14 @@ func (e *Engine) parallel(d *dispatch) (DispatchResult, error) {
 			collect(batch[0])
 			batch = batch[1:]
 		}
+		admissionBegan := time.Now()
 		input := d.payload
 		if name := entry.registration.Options.View; name != "" {
 			v, _ := decode(input)
 			view := project(v, d.definition.Views[name])
 			input = encode(view)
 		}
-		ch, err := e.invoke(d, entry, input, nil)
+		ch, err := e.invoke(d, entry, input, nil, admissionBegan)
 		if err != nil {
 			chResult := make(chan callResult, 1)
 			chResult <- callResult{err: err}

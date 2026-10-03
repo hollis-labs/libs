@@ -51,6 +51,10 @@ var requirements = []requirement{
 	{Requirement{"R13", "ingress handler output and metadata isolation"}, (*env).isolation},
 	{Requirement{"R14", "deep views merge only visible mutable fields"}, (*env).views},
 	{Requirement{"R15", "catalog validation and registration admission"}, (*env).catalog},
+	{Requirement{"R16", "remote policy and latency admission"}, (*env).remoteAdmission},
+	{Requirement{"R17", "structured remote results and vetoes"}, (*env).remoteResults},
+	{Requirement{"R18", "remote scope binding and output fences"}, (*env).remoteFences},
+	{Requirement{"R22", "remote generation breaker accounting"}, (*env).remoteBreaker},
 }
 
 // Requirements returns a detached list for host migration reports.
@@ -80,7 +84,7 @@ func validateConfig(c *config) error {
 	return nil
 }
 
-// Run executes R01-R15 against fresh dispatchers, one subtest per requirement.
+// Run executes the published requirements against fresh dispatchers, one subtest per requirement.
 // Factories must not substitute the reference Engine for the host's real path.
 func Run(t *testing.T, factory Factory, options ...Option) {
 	t.Helper()

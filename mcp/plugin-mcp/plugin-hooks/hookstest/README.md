@@ -97,3 +97,22 @@ cannot skip teardown. This harness does not start external plugin processes.
 From the repository root run `./scripts/check.sh` for the full gate. It is slow
 and computationally heavy, including full race tests and 20 repeated conformance
 and harness runs. During development use `go test ./hookstest` and `go vet ./...`.
+
+## Remote seam requirements
+
+Factories implementing `RemoteScope` and `RemoteDispatcher` also run these
+requirements against an in-memory fake `RemoteHandler` transport. The reference
+passes with zero waivers. A factory lacking the remote extension must explicitly
+waive the affected IDs with a reason; no implicit waiver is provided.
+
+| ID | Requirement |
+| --- | --- |
+| R16 | Remote-only scopes, remote_ok, latency ceiling and remaining-budget admission |
+| R17 | Structured result branches, deliberate bail vetoes and no text/sentinel heuristics |
+| R18 | Correlation/digest/context snapshots, field views, connection/unload and generation fences |
+| R22 | Transport failure accounting, open skip and half-open recovery under existing policy |
+
+R01-R15 retain their existing identities. R19-R21 are reserved for the following
+callback/batch/notification surface and are not published runnable requirements
+yet. Separate broken-adapter probes prove that every new requirement rejects a
+specific bad integration. Run the same `./scripts/check.sh` gate.

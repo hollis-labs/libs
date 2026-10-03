@@ -20,6 +20,9 @@ export interface Definition {
   since: string;
   deprecated?: Deprecation;
   remote_ok: boolean;
+  remote_latency_budget_ms?: number;
+  remote_batch_max?: number;
+  remote_fire_and_forget?: boolean;
   budget_ms: number;
   handler_timeout_ms: number;
   on_error_default: ErrorPolicy;
@@ -135,6 +138,9 @@ export function readCatalog(json: string): CatalogDocument {
         "output_schema",
         "deprecated",
         "required_view",
+        "remote_latency_budget_ms",
+        "remote_batch_max",
+        "remote_fire_and_forget",
       ],
       required,
     );
@@ -162,6 +168,44 @@ export function readCatalog(json: string): CatalogDocument {
       !positive(d.budget_ms) ||
       !positive(d.handler_timeout_ms) ||
       d.handler_timeout_ms > d.budget_ms
+    )
+      return fail("invalid_definition");
+    const latency =
+      d.remote_latency_budget_ms === undefined ? 0 : d.remote_latency_budget_ms;
+    const cap = d.remote_batch_max === undefined ? 0 : d.remote_batch_max;
+    const notify =
+      d.remote_fire_and_forget === undefined ? false : d.remote_fire_and_forget;
+    if (
+      typeof latency !== "number" ||
+      !Number.isFinite(latency) ||
+      typeof cap !== "number" ||
+      !Number.isSafeInteger(cap) ||
+      cap < 0 ||
+      cap > 64 ||
+      typeof notify !== "boolean"
+    )
+      return fail("invalid_definition");
+    if (
+      d.remote_batch_max !== undefined &&
+      !/^[0-9]+$/.test(numericLiteral(rawDefinition.remote_batch_max!) ?? "")
+    )
+      return fail("invalid_definition");
+    if (
+      d.remote_ok
+        ? latency <= 0 || latency > d.handler_timeout_ms
+        : latency !== 0 || cap !== 0 || notify
+    )
+      return fail("invalid_definition");
+    const observation =
+      d.kind === "action" &&
+      ["sequential", "parallel", "async", "after_commit"].includes(
+        String(d.mode),
+      );
+    if (
+      (cap !== 0 && !observation) ||
+      (notify &&
+        (d.kind !== "action" ||
+          (d.mode !== "async" && d.mode !== "after_commit")))
     )
       return fail("invalid_definition");
     for (const k of ["max_payload_bytes", "max_handlers", "max_parallelism"])

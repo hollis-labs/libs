@@ -80,6 +80,7 @@ type entry struct {
 	action           ActionFunc
 	filter           FilterFunc
 	removed, claimed bool
+	remote           *RemoteRegistration
 	active           map[uint64]context.CancelFunc
 	removalContext   context.Context
 	cancelRemoval    context.CancelFunc
@@ -152,7 +153,7 @@ func (r *Registry) NewScope(c ScopeConfig) (*Scope, error) {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownHook, n)
 		}
 		if c.Remote && !*d.RemoteOK {
-			return nil, fmt.Errorf("%w: remote %s", ErrUnauthorized, n)
+			return nil, fmt.Errorf("%w: %s", &RemoteFailure{Code: RemoteNotAllowed}, n)
 		}
 		allowed[n] = true
 	}
@@ -194,12 +195,12 @@ func resolve(d Definition, o Options) (ResolvedOptions, error) {
 	return v, nil
 }
 func (s *Scope) AddAction(hook, name string, o Options, f ActionFunc) (Handle, error) {
-	return s.add(hook, name, o, f, nil, Action)
+	return s.add(hook, name, o, f, nil, Action, nil)
 }
 func (s *Scope) AddFilter(hook, name string, o Options, f FilterFunc) (Handle, error) {
-	return s.add(hook, name, o, nil, f, Filter)
+	return s.add(hook, name, o, nil, f, Filter, nil)
 }
-func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, kind Kind) (Handle, error) {
+func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, kind Kind, remote *RemoteRegistration) (Handle, error) {
 	r := s.registry
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -207,10 +208,18 @@ func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, ki
 	if err != nil {
 		return Handle{}, err
 	}
-	if a == nil && f == nil {
+	if a == nil && f == nil && remote == nil {
 		return Handle{}, fmt.Errorf("%w: %s: handler required", ErrInvalidOptions, hook)
 	}
+	if s.state.remote != (remote != nil) {
+		return Handle{}, fmt.Errorf("%w: handler transport must match scope", ErrUnauthorized)
+	}
 	d := r.definitions[hook]
+	if remote != nil {
+		if err := validateRemoteRegistration(d, *remote); err != nil {
+			return Handle{}, err
+		}
+	}
 	count := 0
 	for _, e := range r.entries {
 		if e.scope == s.state && !e.removed && e.registration.Name == name {
@@ -227,7 +236,7 @@ func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, ki
 	handle := Handle{r, r.sequence, s.state.key.generation}
 	reg := Registration{Handle: handle, Owner: s.state.key.owner, Generation: s.state.key.generation, Hook: hook, Name: name, Sequence: r.sequence, Options: policy.Options, Warnings: policy.Warnings}
 	removalContext, cancelRemoval := context.WithCancel(context.Background()) //nolint:gosec // Cancellation belongs to removeLocked; it is retained on the registration.
-	r.entries[handle.id] = &entry{removalContext: removalContext, cancelRemoval: cancelRemoval, registration: reg, scope: s.state, action: a, filter: f, active: map[uint64]context.CancelFunc{}}
+	r.entries[handle.id] = &entry{removalContext: removalContext, cancelRemoval: cancelRemoval, registration: reg, scope: s.state, remote: remote, action: a, filter: f, active: map[uint64]context.CancelFunc{}}
 	return handle, nil
 }
 
@@ -403,7 +412,7 @@ func (r *Registry) start(ctx context.Context, e *entry) (*lease, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if e.removed || e.claimed || e.scope.disposed {
+	if e.removed || e.claimed || e.scope.disposed || remoteEntryUnavailable(e) {
 		return nil, ErrUnavailable
 	}
 	callCtx, cancel := context.WithCancel(ctx)
@@ -431,7 +440,7 @@ func (l *lease) finish() bool {
 		close(l.entry.scope.changed)
 		l.entry.scope.changed = make(chan struct{})
 	}
-	valid := !l.entry.removed && !l.entry.scope.disposed
+	valid := !l.entry.removed && !l.entry.scope.disposed && !remoteEntryUnavailable(l.entry)
 	r.mu.Unlock()
 	l.cancel()
 	return valid

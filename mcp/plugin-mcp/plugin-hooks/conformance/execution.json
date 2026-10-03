@@ -304,6 +304,52 @@
         "views": {},
         "schema_digest": "test",
         "output_schema": {}
+      },
+      {
+        "name": "remote.observe",
+        "kind": "action",
+        "mode": "sequential",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": true,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "remote_latency_budget_ms": 80,
+        "remote_batch_max": 32
+      },
+      {
+        "name": "remote.queued",
+        "kind": "action",
+        "mode": "async",
+        "input_schema": {},
+        "mutable_paths": [],
+        "since": "1",
+        "remote_ok": true,
+        "budget_ms": 1000,
+        "handler_timeout_ms": 100,
+        "on_error_default": "open",
+        "allowed_on_error": [
+          "open",
+          "closed"
+        ],
+        "max_payload_bytes": 4096,
+        "max_handlers": 16,
+        "max_parallelism": 2,
+        "views": {},
+        "schema_digest": "test",
+        "remote_latency_budget_ms": 80,
+        "remote_fire_and_forget": true
       }
     ]
   },
