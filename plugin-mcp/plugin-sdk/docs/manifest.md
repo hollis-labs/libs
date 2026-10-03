@@ -28,7 +28,8 @@ and legacy host dialects are errors; there is no inference or fallback.
   A key cannot be both a field and a secret. The host resolves secret values.
 - `tools`: name, description, an inline JSON Schema with `type: object`, and
   a required `effect` in the host's vocabulary. The SDK checks structure only;
-  it does not define effects, infer them, or grant execution authority.
+  it does not define effects, infer them, or grant execution authority. Optional
+  `annotations` carries MCP hints checked for consistency as described below.
 - `hosts`: a map of host names to inclusive `min`/`max` SemVer bounds. At least
   one bound is required for each host. Hosts interpret and enforce their own
   compatibility ranges, bound ordering and prerelease policy.
@@ -40,6 +41,63 @@ and legacy host dialects are errors; there is no inference or fallback.
 
 No archive, signature, catalog tier or compiled-in runtime belongs to this
 contract. Archives and checksums belong to distribution catalogs.
+
+## Tool annotations
+
+`annotations` is an optional object using the MCP field names: optional string
+`title` and optional booleans `readOnlyHint`, `destructiveHint`, `idempotentHint`
+and `openWorldHint`. Projection of this object to MCP uses the same keys and
+values. Explicit `false` survives encoding; omitted fields acquire no defaults.
+Omitting the object leaves existing manifest behavior and output unchanged.
+This change does not implement host registration. Hints never authorize
+execution or lower policy: `effect` stays authoritative.
+
+The only cross-field rule is that `readOnlyHint: true` cannot accompany
+`destructiveHint: true`. The SDK refuses that conflict with the tool name and
+hints in the error. All other combinations are accepted, including idempotent
+read or destructive tools. Effects remain an open host vocabulary and are not
+compared with hints. An empty annotation object is valid.
+
+For example, a repeatable write can declare:
+
+```json
+{"name":"notes_save","description":"Save notes","input_schema":{"type":"object"},"effect":"write","annotations":{"title":"Save notes","readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}}
+```
+
+### Compatibility with older strict hosts
+
+The new decoder reads existing manifests unchanged. A manifest that **uses**
+`annotations` requires the SDK release carrying this field. Older strict hosts
+refuse it by name with `manifest: unknown field "annotations"`; they do not
+silently ignore it. This is not forward compatible with those hosts. No release
+number is assigned here, and neither schema version 2 nor subprocess protocol 1
+changes. The rollout order is: SDK release carrying annotations, then the Nanite SDK
+bump, then updated nanite-plugins manifests. Phase A therefore requires SDK,
+host and plugin updates; it is not host-only. Each host adopts on its own
+schedule, with no lockstep release.
+
+Compatibility fixtures live in `manifest/testdata/annotations/`: manifests with
+and without hints, plus `older-strict-host-error.txt`, the frozen diagnostic
+observed from the pre-change decoder. That diagnostic is documentation of
+version skew, not a test that builds or simulates old SDK code.
+
+### Historical tool definitions
+
+`manifest/testdata/annotations/nanite-pre-cutover.json` freezes the exact
+`context_pin`, `context_unpin` and `reminder_set` names, descriptions, input
+schemas and annotations. Source: Nanite
+`2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe`, the commit built into the
+pre-cutover binary with SHA256 prefix `ef20f9be` (a binary hash, not a Git
+revision). Definitions come from `internal/selftools/self_tools.go`; the four
+boolean hints come from `internal/mcpserver/annotations.go` and are applied
+unchanged by `buildTool` in `internal/mcpserver/server.go`. The source has no
+title for these tools. Zero-value false hints are preserved explicitly.
+
+The golden test decodes these definitions and validates them through a manifest
+roundtrip, preserving the MCP annotation keys and values. Historical MCP
+definitions have no `effect` field; the test supplies an opaque host-defined
+effect rather than inferring historical metadata. No Nanite checkout or binary
+is required to run the test.
 
 ## Validation and enforcement
 

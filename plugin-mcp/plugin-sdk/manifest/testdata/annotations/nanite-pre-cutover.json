@@ -1,0 +1,123 @@
+{
+  "source_commit": "2de304e3d1cebe8d875f7806c03ec0eae8f6b8fe",
+  "binary_sha256_prefix": "ef20f9be",
+  "tools": [
+    {
+      "name": "reminder_set",
+      "description": "Set a deterministic reminder that fires at a future time or after N turns, injecting your reminder text into context as a \u003csystem-reminder\u003e block.\n\n**When to use:** When you want to remember to do something later — e.g. 'don't forget to file a ticket', 'review the plan after 5 turns', 'check status at 3pm'.\n\n**Trigger shapes (v1):**\n- Time-based: `{\"type\":\"time\",\"at\":\"\u003cRFC3339\u003e\"}` — fires when the clock reaches the given time.\n- Turn-count: `{\"type\":\"turn_count\",\"n\":5}` — fires N turns after this call.\n\n**Scope (D1, CW-20260428-0014):**\n- `turn`: fires within the same turn it was created in.\n- `session` (default): fires only in the originating session.\n- `project`: fires in any session of the same project; requires project_id (resolved from the current session's project when omitted).\n\n**When NOT to use:** Do not use for calendar events, cross-system notifications, or anything requiring an LLM to decide when to fire — triggers are always deterministic in v1.\n\n**Reminder display:** When a reminder fires, its text is injected as `\u003csystem-reminder\u003e` into the next turn's context and surfaced in the I1 dev-mode inspector. There is no UI toast in v1.\n\n**Output shape:** `{reminder_id, scope, status: 'set', trigger}`.",
+      "inputSchema": {
+        "properties": {
+          "project_id": {
+            "description": "Project ID — required when scope=project. Auto-resolved from the current session's project when omitted.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Reminder lifetime. Default: session.",
+            "enum": [
+              "turn",
+              "session",
+              "project"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "description": "The reminder text to inject when the trigger fires.",
+            "type": "string"
+          },
+          "trigger": {
+            "description": "Trigger condition. v1 shapes: {type:'time',at:'\u003cRFC3339\u003e'} or {type:'turn_count',n:\u003cN\u003e}.",
+            "properties": {
+              "at": {
+                "description": "RFC3339 fire time (for type=time)",
+                "type": "string"
+              },
+              "n": {
+                "description": "Number of turns to wait (for type=turn_count)",
+                "type": "integer"
+              },
+              "type": {
+                "enum": [
+                  "time",
+                  "turn_count"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "text",
+          "trigger"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "context_pin",
+      "description": "Pin content so the system keeps it in context across turns (session scope) or across sessions in a project (project scope). Pinned content rides in the SlotUserContext budget and is visible in the bottom drawer Pins tab.\n\n**When to use:** When you want to keep a piece of context visible throughout the conversation or across sessions — e.g. a key decision, a reference snippet, a current task description.\n\n**Scopes (D1, CW-20260428-0014):**\n- `turn`: ephemeral, cleared after the current turn (not stored in DB).\n- `session` (default): survives compaction, cleared at session end.\n- `project`: persists for the project; surfaces in any session of the same project. Requires project_id (resolved from the current session's project when omitted).\n\n**Budget:** Pinned content shares the 2000-token SlotUserContext budget. Oldest pins truncate first when over budget. Keep pins thin.\n\n**Output shape:** `{pin_id, scope, status: 'pinned'}`.",
+      "inputSchema": {
+        "properties": {
+          "content": {
+            "description": "Content to pin. Keep thin — shares the 2000-token SlotUserContext budget.",
+            "type": "string"
+          },
+          "project_id": {
+            "description": "Project ID — required when scope=project. Auto-resolved from the current session's project when omitted.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Pin lifetime. Default: session.",
+            "enum": [
+              "turn",
+              "session",
+              "project"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "context_unpin",
+      "description": "Remove a pinned item by ID, freeing its context budget.\n\n**When to use:** When pinned content is no longer needed — after the user acknowledges it, after the task it describes is complete, or when the budget needs freeing.\n\n**Required context:** pin_id from a prior context_pin call.\n\n**Output shape:** `{pin_id, status: 'unpinned'}`.",
+      "inputSchema": {
+        "properties": {
+          "pin_id": {
+            "description": "Pin ID to remove (from prior context_pin call).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin_id"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 {
+  "level": "observed-quirk",
   "profile": "base",
   "steps": [
     {
@@ -31,5 +32,6 @@
         }
       }
     }
-  ]
+  ],
+  "preferred": "F5: these scanner-specific input boundaries sit beside unbounded SDK output and a different host inbound cap. Preferred: specify byte accounting and explicit limits for both directions in protocol 2; do not inherit Go scanner or asymmetric defaults accidentally."
 }

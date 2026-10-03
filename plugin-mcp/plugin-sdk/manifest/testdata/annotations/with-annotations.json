@@ -1,0 +1,59 @@
+{
+  "schema_version": 2,
+  "id": "example.notes",
+  "name": "Notes",
+  "version": "0.1.0",
+  "protocol": 1,
+  "runtime": "subprocess",
+  "entrypoint": {
+    "command": "bin/notes"
+  },
+  "hosts": {
+    "nanite": {
+      "min": "0.1.0"
+    }
+  },
+  "tools": [
+    {
+      "name": "notes_list",
+      "description": "List saved notes",
+      "input_schema": {
+        "type": "object"
+      },
+      "effect": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "notes_save",
+      "description": "Save notes",
+      "input_schema": {
+        "type": "object"
+      },
+      "effect": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "title": "Save notes"
+      }
+    },
+    {
+      "name": "notes_delete",
+      "description": "Delete notes",
+      "input_schema": {
+        "type": "object"
+      },
+      "effect": "destructive",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
+      }
+    }
+  ]
+}
