@@ -1,0 +1,31 @@
+{
+  "def": "HITLTerminalConflictErrorV1",
+  "name": "terminal-conflict",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "terminal_conflict",
+    "message": "item is already resolved",
+    "terminal_outcome": {
+      "contract_version": "1.0",
+      "state": "resolved",
+      "item_id": "item_01",
+      "interaction_revision": 5,
+      "resolution": {
+        "resolution_id": "resolution_01",
+        "response": {
+          "kind": "approval",
+          "decision": "approved"
+        },
+        "participant": {
+          "responder": {
+            "kind": "human",
+            "ref": "operator@example.test"
+          },
+          "assurance": "asserted"
+        },
+        "resolved_at": "2026-09-04T03:30:00Z",
+        "interaction_revision": 5
+      }
+    }
+  }
+}

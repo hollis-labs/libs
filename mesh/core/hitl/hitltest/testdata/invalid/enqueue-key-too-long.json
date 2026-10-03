@@ -1,0 +1,14 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-key-too-long",
+  "rejects_because": "/idempotency_key",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+    "source": {
+      "application_id": "codex",
+      "agent_id": "msg://agent/codex/worker-7"
+    }
+  }
+}

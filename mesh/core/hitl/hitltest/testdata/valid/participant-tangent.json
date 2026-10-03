@@ -1,0 +1,9 @@
+{
+  "def": "ParticipantCaptureV1",
+  "name": "participant-tangent",
+  "doc": {
+    "principal_ref": "local-operator",
+    "authority": "tangent-loopback",
+    "assurance": "loopback-unverified"
+  }
+}

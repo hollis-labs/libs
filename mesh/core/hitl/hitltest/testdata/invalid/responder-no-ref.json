@@ -1,0 +1,8 @@
+{
+  "def": "ResponderV1",
+  "name": "responder-no-ref",
+  "rejects_because": "",
+  "doc": {
+    "kind": "human"
+  }
+}

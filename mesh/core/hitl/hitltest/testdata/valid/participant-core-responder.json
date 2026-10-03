@@ -1,0 +1,11 @@
+{
+  "def": "ParticipantCaptureCoreV1",
+  "name": "participant-core-responder",
+  "doc": {
+    "responder": {
+      "kind": "human",
+      "ref": "operator@example.test"
+    },
+    "assurance": "asserted"
+  }
+}

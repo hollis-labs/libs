@@ -1,0 +1,13 @@
+{
+  "def": "HITLTerminalOutcomeCoreV1",
+  "name": "outcome-canceled",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "canceled",
+    "item_id": "item_02",
+    "interaction_revision": 3,
+    "cause": "caller_withdrawn",
+    "reason": "superseded by a newer plan",
+    "terminated_at": "2026-09-04T03:30:00Z"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-custom-kind",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "choice",
+    "idempotency_key": "k-1",
+    "source": {
+      "application_id": "codex",
+      "agent_id": "msg://agent/codex/worker-7"
+    }
+  }
+}

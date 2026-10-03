@@ -1,0 +1,12 @@
+{
+  "def": "HITLAwaitCommandV1",
+  "name": "await-wait-zero",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "caller": {
+      "application_id": "codex"
+    },
+    "wait_ms": 0
+  }
+}

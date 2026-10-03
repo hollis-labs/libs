@@ -1,0 +1,11 @@
+{
+  "def": "ParticipantCaptureCoreV1",
+  "name": "participant-no-assurance",
+  "rejects_because": "",
+  "doc": {
+    "responder": {
+      "kind": "human",
+      "ref": "x"
+    }
+  }
+}

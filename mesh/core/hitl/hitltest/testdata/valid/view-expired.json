@@ -1,0 +1,29 @@
+{
+  "def": "HITLItemViewCoreV1",
+  "name": "view-expired",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "expired",
+    "revision": 4,
+    "request_snapshot": {
+      "contract_version": "1.0",
+      "kind": "approval",
+      "idempotency_key": "k-1",
+      "source": {
+        "application_id": "codex",
+        "agent_id": "msg://agent/codex/worker-7"
+      }
+    },
+    "enqueued_at": "2026-09-04T03:28:00Z",
+    "updated_at": "2026-09-04T03:30:00Z",
+    "terminal_outcome": {
+      "contract_version": "1.0",
+      "state": "expired",
+      "item_id": "item_03",
+      "interaction_revision": 4,
+      "policy_ref": "request.expires_at",
+      "terminated_at": "2026-09-04T03:30:00Z"
+    }
+  }
+}

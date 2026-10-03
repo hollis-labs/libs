@@ -32,3 +32,28 @@ All notable changes to the `mesh` module are documented here. The format follows
   pinned resolution contracts and a glossary of distinct lease and fencing scopes.
 - Orthogonal instance and session state projection to task states and the A2A
   wire vocabulary, retaining waiting reasons and connectivity metadata.
+
+## v0.1.0
+
+### Added
+
+- The complete, history-preserved packages from `go-messaging`,
+  `go-federation`, `go-tether-client`, and `go-hitl`, including their tests,
+  examples, contracts, and package documentation.
+
+### Changed
+
+- The packages now share the `github.com/hollis-labs/substrate/mesh` module.
+  Imports move as follows; no consumer adoption is included in this release
+  preparation:
+
+  | Old import prefix | New import prefix |
+  |---|---|
+  | `github.com/hollis-labs/go-messaging` | `github.com/hollis-labs/substrate/mesh/messaging` |
+  | `github.com/hollis-labs/go-federation` | `github.com/hollis-labs/substrate/mesh/federation` |
+  | `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/substrate/mesh/tetherclient` |
+  | `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/substrate/mesh/hitl` |
+- Federation and tether-client now import messaging as a package in the same
+  module rather than requiring the former `go-messaging` module.
+- Old repository tags are not carried into substrate; the module's first tag
+  will be `mesh/v0.1.0` after approval.

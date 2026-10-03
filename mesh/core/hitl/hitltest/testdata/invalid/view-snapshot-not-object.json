@@ -1,0 +1,14 @@
+{
+  "def": "HITLItemViewCoreV1",
+  "name": "view-snapshot-not-object",
+  "rejects_because": "/request_snapshot",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "presented",
+    "revision": 4,
+    "request_snapshot": "x",
+    "enqueued_at": "2026-09-04T03:28:00Z",
+    "updated_at": "2026-09-04T03:30:00Z"
+  }
+}

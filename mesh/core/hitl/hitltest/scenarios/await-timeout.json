@@ -1,0 +1,77 @@
+{
+  "name": "await-timeout",
+  "description": "Await with wait_ms 0 (and with a short wait) reports await/timeout and changes no state.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:658 (await does not mutate)",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "await",
+      "item": "a",
+      "fields": {
+        "wait_ms": 0
+      },
+      "expect": {
+        "mode": "await",
+        "wait_status": "timeout",
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    },
+    {
+      "op": "await",
+      "item": "a",
+      "fields": {
+        "wait_ms": 20
+      },
+      "expect": {
+        "mode": "await",
+        "wait_status": "timeout",
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    }
+  ]
+}

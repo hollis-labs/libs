@@ -1,0 +1,14 @@
+{
+  "def": "HITLStaleRevisionErrorCoreV1",
+  "name": "stale-resolve-interaction",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "stale_revision",
+    "operation": "resolve",
+    "item_id": "item_01",
+    "revision_kind": "interaction",
+    "expected_revision": 2,
+    "actual_revision": 3,
+    "current_state": "presented"
+  }
+}

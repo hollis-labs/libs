@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\n    \"contract_version\": \"1.0\",\n    \"state\": \"resolved\",\n    \"item_id\": \"item_01\",\n    \"interaction_revision\": 5,\n    \"resolution\": {\n      \"resolution_id\": \"resolution_01\",\n      \"response\": {\n        \"kind\": \"approval\",\n        \"decision\": \"tangent-loopback\",\n        \"assurance\": \"&000000000000000000\"       },       \"00000000000\": \"00000000000000000000\",       \"00000000000000000000\":10,       \"00000000000000000000000000000\":1000000}   }")

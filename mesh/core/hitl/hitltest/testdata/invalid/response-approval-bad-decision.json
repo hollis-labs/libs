@@ -1,0 +1,9 @@
+{
+  "def": "ApprovalResponseV1",
+  "name": "response-approval-bad-decision",
+  "rejects_because": "/decision",
+  "doc": {
+    "kind": "approval",
+    "decision": "maybe"
+  }
+}
