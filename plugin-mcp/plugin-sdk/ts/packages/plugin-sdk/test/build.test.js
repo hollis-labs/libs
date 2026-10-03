@@ -77,3 +77,19 @@ test('build refuses a path with no payload or a legacy manifest declaration',asy
  await writeFile(join(dir,'bin/server.js'),'worker');
  await assert.rejects(writeManifest(dir,{...declaration,entrypoint:{command:'bin/server.js'}}),/unknown field/u);
 });
+
+test('hook schema_digest preserves optional opaque compatibility assertions',()=>{
+ const base={...manifest,hooks:[{name:'session.end',mode:'sequential',timeout:1000,on_error:'open'}]};
+ assert.ok(!Object.hasOwn(decodeManifest(encodeManifest(base)).hooks[0],'schema_digest'));
+ for(const digest of ['catalog-v2','SHA256:ABC/opaque+value=','  Résumé:二\n ']) {
+  const value={...base,hooks:[{...base.hooks[0],schema_digest:digest}]};
+  assert.equal(decodeManifest(encodeManifest(value)).hooks[0].schema_digest,digest);
+ }
+ for(const digest of [null,true,42,{},[],'',' \t\n','\u0085\u2003']) {
+  const value={...base,hooks:[{...base.hooks[0],schema_digest:digest}]};
+  assert.throws(()=>encodeManifest(value));
+  assert.throws(()=>decodeManifest(JSON.stringify(value)));
+ }
+ const raw=encodeManifest({...base,hooks:[{...base.hooks[0],schema_digest:'one'}]});
+ for(const bad of [raw.replace('"schema_digest"','"Schema_Digest"'),raw.replace('"schema_digest"','"schemaDigest"'),raw.replace('"schema_digest": "one"','"schema_digest": "one", "schema_digest": "two"'),raw.replace('"schema_digest": "one"','"schema_digest": "one", "schema_\\u0064igest": "two"')]) assert.throws(()=>decodeManifest(bad));
+});

@@ -13,7 +13,7 @@ export interface ToolDeclaration {
   annotations?: { title?: string; readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
 }
 export interface HookDeclaration {
-  name: string; priority?: number; once?: boolean; view?: string;
+  name: string; priority?: number; once?: boolean; view?: string; schema_digest?: string;
   mode: 'sequential' | 'parallel' | 'bail' | 'waterfall' | 'async' | 'after_commit';
   timeout: number; on_error: 'open' | 'closed';
 }
