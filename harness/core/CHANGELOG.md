@@ -15,6 +15,7 @@ First release of the harness module: the packages of eleven former Hollis Labs m
 ### Known issues
 
 - `TestNativeTurnOrder_CodexJSONRPCStdio` (`adapters/wrapper`) is skipped. Since agentkit v0.23.0 (commit 433cd74) both the wrapper's own turn lifecycle derivation and agentkit's Manager end a Codex JSON-RPC turn, so the test sees a second, empty turn lifecycle. The wrapper passes it against agentkit v0.21.0, the version it pinned, so a consumer that pins go-agent-wrapper v0.28.0 together with an older agentkit does not see the problem. Fixing it is part of the restructure that puts the wrapper on sessions.
+- `TestSandbox_OutsideWorkspaceReadBlocked` (`sandbox`) is skipped unconditionally on Linux: the skip says the test needs additional bind configuration, and it has said so since the sandbox was first extracted, before this move. So the test suite does not verify that a sandboxed process on Linux cannot read a denied path outside its workspace. That is not known to be broken; it is not verified. On macOS the same test runs only when `~/.ssh` exists. The other Linux sandbox isolation tests run and pass in CI: network isolation, loopback, protected paths and the filesystem-allowlist parity tests.
 
 ### Added
 
