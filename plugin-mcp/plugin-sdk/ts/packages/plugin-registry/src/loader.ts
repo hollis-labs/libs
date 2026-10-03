@@ -1,4 +1,4 @@
-import { PROTOCOL, qualifiedKey } from "./types.js";
+import { REGISTRY_VERSION, qualifiedKey } from "./types.js";
 import type {
   PluginRegistryResponse,
   RegistryPlugin,
@@ -35,6 +35,7 @@ export interface PluginLoadError {
 export type LoaderDiagnostic =
   | { type: "response-refused"; reason: string }
   | { type: "contribution-refused"; refusal: Refusal }
+  | { type: "status-diagnostic"; diagnostic: Refusal }
   | { type: "plugin-failed"; error: PluginLoadError };
 export interface SyncResult {
   accepted: boolean;
@@ -45,7 +46,7 @@ export interface SyncResult {
   refused: number;
 }
 export interface PluginRegistrySnapshot {
-  protocol: number;
+  registryVersion: number;
   hostInstance: string;
   revision: number;
   version: number;
@@ -231,7 +232,7 @@ export function createPluginRegistry(
     stage: PluginLoadError["stage"],
     reason: string,
   ) => {
-    const error = { pluginId, generation, stage, reason };
+    const error = Object.freeze({ pluginId, generation, stage, reason });
     errors.push(error);
     emit({ type: "plugin-failed", error });
   };
@@ -378,6 +379,8 @@ export function createPluginRegistry(
     }
     for (const refusal of plan.refusals)
       emit({ type: "contribution-refused", refusal });
+    for (const diagnostic of plan.statusDiagnostics)
+      emit({ type: "status-diagnostic", diagnostic });
     if (plan.requiredFailed) {
       emit({ type: "response-refused", reason: "required-refused" });
       return result(false);
@@ -499,7 +502,10 @@ export function createPluginRegistry(
           withdrawn.push(entry);
         }
       }
-      for (const owner of changed) withdrawn.push(...revoke(owner));
+      for (const owner of changed)
+        withdrawn.push(
+          ...revoke(owner, current!.plugins[owner].owner_generation),
+        );
       if (withdrawn.length || changed.size) notify(); // old entries fenced before any new import
       await disposeEntries(withdrawn);
       if (
@@ -619,8 +625,8 @@ export function createPluginRegistry(
       hostInstance = candidate.host_instance;
       revision = candidate.revision;
       current = candidate;
-      declarations = plan.accepted.map((c) =>
-        Object.freeze(declared(c, candidate.host_instance)),
+      declarations = plan.listed.map((c) =>
+        frozenJSON(declared(c, candidate.host_instance)),
       );
       refusals = plan.refusals;
       const wantedStyles = new Set<string>();
@@ -710,8 +716,8 @@ export function createPluginRegistry(
     list: (kind) => [...entries.values()].filter((c) => c.kind === kind),
     ownerOf: (kind, key) =>
       declarations.find((c) => c.kind === kind && c.key === key)?.owner_id,
-    errors: () => [...errors],
-    refusals: () => [...refusals],
+    errors: () => errors.map((e) => ({ ...e })),
+    refusals: () => refusals.map((f) => ({ ...f })),
     subscribe(listener) {
       listeners.add(listener);
       return () => {
@@ -725,7 +731,7 @@ export function createPluginRegistry(
       own(current.plugins, owner)?.owner_generation === generation &&
       !blocked.has(owner),
     snapshot: () => ({
-      protocol: PROTOCOL,
+      registryVersion: REGISTRY_VERSION,
       hostInstance,
       revision,
       version: versionCounter,
@@ -738,8 +744,8 @@ export function createPluginRegistry(
         ...c,
         resolved: entries.has(identity(c.kind, c.key)),
       })),
-      errors: [...errors],
-      refusals: [...refusals],
+      errors: errors.map((e) => ({ ...e })),
+      refusals: refusals.map((f) => ({ ...f })),
     }),
   };
 }

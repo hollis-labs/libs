@@ -1,15 +1,8 @@
 import type { PluginRegistryResponse } from "./types.js";
-import { validateResponse } from "./validation.js";
+import { validateResponse, foldKey } from "./validation.js";
 
-/** A structural/wire failure, distinct from a named host admission refusal. */
-export class RegistryError extends Error {
-  readonly code: string;
-  constructor(code: string) {
-    super(code);
-    this.name = "RegistryError";
-    this.code = code;
-  }
-}
+import { RegistryError } from "./error.js";
+export { RegistryError } from "./error.js";
 
 /** Parse the original response text. JSON.parse alone loses duplicate keys.
  * The scan checks every object, including opaque metadata and unknown fields.
@@ -50,7 +43,7 @@ export function parseRegistryResponse(raw: string): PluginRegistryResponse {
       }
       while (at < raw.length) {
         whitespace();
-        const key = string().toLowerCase();
+        const key = foldKey(string());
         if (keys.has(key)) throw new RegistryError("ErrCollision");
         keys.add(key);
         whitespace();

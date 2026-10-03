@@ -1,80 +1,91 @@
 # @hollis-labs/plugin-registry
 
-The browser half of the plugin contract. The Go half is
-`github.com/hollis-labs/plugin-sdk` in the same repository, and
-`registry/registry.go` there is the other view of the wire contract
-`src/types.ts` declares here.
-
-A host publishes a registry describing what its plugins registered. This
-package fetches nothing and decides nothing — you hand it that registry and it
-dynamic-imports each plugin's ES module, pulls the named exports the registry
-names, and keeps a table you can look contributions up in. One bad bundle is
-one plugin's absence, not a blank surface.
-
-## Install
+The browser registry, loader and optional React adapter for
+`github.com/hollis-labs/plugin-sdk`. The Go and TypeScript views share the
+[registry contract](../../../docs/protocol/registry-v2.md) and conformance fixtures.
+The core has no runtime dependencies. React `^19` is an optional peer behind
+`./react`. This is a breaking replacement for the registry shape in 0.1.0;
+there is no compatibility fallback. Documents require `registry_version: 2`;
+legacy `protocol` keys, dual-key documents and unsupported versions fail with
+`ErrRegistryVersion`.
 
 ```sh
 npm i @hollis-labs/plugin-registry
 ```
 
-ESM only. Zero runtime dependencies; `react` `^19` is an optional peer, needed
-only for the `./react` entry point. Release history is in
-[CHANGELOG.md](./CHANGELOG.md).
+## Host admission
 
-## The model
-
-**The host manifest is authoritative.** A plugin does not declare at runtime
-what it registers; the host does, and this loader never learns a registration
-from a bundle it imported.
-
-**A plugin may claim an unclaimed name and may never displace a core one.**
-Supply `reserved` and a contribution claiming one of your core names is
-refused, recorded and reported rather than silently shadowed.
-
-**Contributions are flat.** One contribution per `(kind, key)`. A kind is an
-open string you choose; its `meta` is opaque JSON this package never reads.
-Where you group or order contributions — an ordered rail, a priority-sorted
-toolbar — the group and the order live in `meta`, because they are your
-taxonomy and no loader needs them.
-
-## Use
+The registry describes contributions by owner, generation and local key.
+The manifest is authoritative: importing a bundle never discovers additional
+contributions. Hosts explicitly opt into kind and region descriptors and
+supply their own metadata validator for nonempty schemas. Unsupported optional
+entries produce named refusals; a required refusal stops preflight and keeps
+the serving registry intact. Capability declarations carry information; hosts
+remain responsible for authorization and isolation.
 
 ```ts
-import { createPluginRegistry } from '@hollis-labs/plugin-registry'
+import { createPluginRegistry, type KindDescriptor, type RegionDescriptor } from '@hollis-labs/plugin-registry'
 
-const registry = createPluginRegistry()
-
-const response = await fetch('/api/plugins/registry').then((r) => r.json())
-await registry.sync(response)
-
-registry.get('envelope', 'acme.report')?.value
-```
-
-It works with no configuration: it imports modules, injects stylesheets,
-resolves exports and notifies subscribers. Every option is an override.
-
-```ts
+const panel: KindDescriptor = {
+  schema_version: 1,
+  metadata_schema: {},
+  representations: ['component'],
+  regions: ['rail'],
+  required_capabilities: [],
+}
+const rail: RegionDescriptor = {
+  kinds: ['panel'],
+  representations: ['component'],
+  context_schema: {},
+  ordering: 'manifest' as const,
+}
 const registry = createPluginRegistry({
-  // Turn a resolved export into what you render. Default: the raw export.
-  // This is where a host that must contain plugin code puts that containment.
-  adopt: (resolved) => wrap(resolved.export),
-
-  // Names your core owns.
-  reserved: (kind, key) => kind === 'envelope' && CORE_KINDS.has(key),
-
-  // Injectable so tests need no network.
-  importModule: (url) => import(url),
-
-  // A `<link>` in document.head by default. `false` touches no DOM at all.
+  kinds: { panel },
+  regions: { rail },
+  runtimes: { react: '19.1.0' },
   stylesheets: false,
-
-  // Structured, because a library that writes to the console is one you
-  // cannot quiet.
-  onDiagnostic: (event) => log(event),
+  onDiagnostic: (event) => report(event),
 })
+
+// Pass original JSON text so duplicate keys can be detected before JSON.parse.
+const raw = await fetch('/api/plugins/registry').then((r) => r.text())
+await registry.sync(raw)
+const contribution = registry.get('panel', 'acme/main')
 ```
 
-### React
+`sync` also accepts a validated object, but an object cannot retain duplicate
+keys discarded by a prior JSON parser. Original text is required at the wire
+boundary. Validation rejects case-insensitive duplicate keys at every nesting
+level, mis-cased known fields, unsafe revisions, unknown owners and malformed
+representations. Runtime bounds use normalized semantic versions, inclusive
+endpoints and explicit prerelease opt-in.
+
+## Verified bundles and lifecycle
+
+Component bundles require an exact `sha256:` digest. The loader fetches bytes
+once, checks that digest, and imports the same bytes. Its default importer uses
+an immutable data URL, so bundles must be self-contained and the host CSP must
+permit that URL. Relative module imports and automatic runtime sharing are not
+provided. A custom `importModule` receives a `VerifiedBundle`; it must execute
+`bundle.bytes`, never refetch `bundle.sourceUrl`. Hosts can override
+`fetchBundle` to control transport and credentials.
+
+Preflight checks admission, runtime compatibility and integrity before retiring
+an active owner. Replacement then fences captured entries and disposes resources
+in reverse acquisition order before importing or adopting the replacement.
+Import or adoption failure after revocation leaves the old generation revoked.
+Cleanup failures quarantine the owner, and disposal continues for other
+resources. Unchanged contributions retain their values and disposer accounting.
+The host supplies `dispose` for resources its `adopt` callback creates.
+
+`unload(owner, generation?)` fences immediately and aborts cooperative pending
+work before awaiting disposal. Late completions cannot reactivate tombstoned
+generations. `clear()` retires the host epoch; reconnect with a fresh epoch.
+Cancellation is cooperative: a custom importer or disposer that never settles
+can hold subsequent activation work. Tombstones and cleanup quarantines live
+for the lifetime of a registry instance.
+
+## React
 
 ```ts
 import {
@@ -82,56 +93,36 @@ import {
   usePluginContribution,
 } from '@hollis-labs/plugin-registry/react'
 
-const registry = createReactPluginRegistry() // adopt = React.lazy wrapping
+const registry = createReactPluginRegistry({
+  kinds: { panel }, regions: { rail }, runtimes: { react: '19.1.0' },
+})
 
-function Slot({ kind, id }) {
-  const contribution = usePluginContribution(registry, kind, id)
-  if (!contribution) return <Missing owner={registry.ownerOf(kind, id)} />
+function Slot() {
+  const contribution = usePluginContribution(registry, 'panel', 'acme/main')
+  if (!contribution) return null
   const Component = contribution.value
-  return (
-    <Suspense fallback={null}>
-      <Component />
-    </Suspense>
-  )
+  return <Suspense fallback={null}><Component /></Suspense>
 }
 ```
 
-React is an optional peer behind the `./react` subpath; the core entry point
-has no dependencies.
+The adapter wraps component exports in `React.lazy` and checks the captured
+entry's active generation on render. An old captured component renders nothing
+after revocation. Declarative data and browser-safe handler bindings remain
+data; the SDK does not execute handlers or select a winner for a host surface.
 
-## Attributing what is missing
+## Inspecting the registry
 
-`ownerOf(kind, key)` answers for any contribution the host declared, whether
-or not its bundle loaded — so a surface that is empty because a plugin failed
-can say whose fault it is. `errors()` names the plugins whose bundle did not
-import, `refusals()` the contributions that were refused, and `snapshot()`
-gives you everything at once for devtools.
+`get` and `list` return active adopted contributions. `ownerOf` attributes
+listed declarations, including unresolved exports. `snapshot` exposes declared
+entries, resolution state and owner generations; `refusals` and `errors` expose
+named admission and lifecycle failures. Entries carry host-declared `status` and
+optional `status_reason`. Only `accepted` entries resolve. `declared_not_selected`,
+`unavailable`, and unknown statuses remain listed and inactive; unknown values
+emit `status-diagnostic` with reason `unknown-status`. A retained `refused` entry
+must match the authoritative top-level refusal. Status never bypasses admission
+checks or adds SDK selection logic. `subscribe` and `version` support
+external-store integrations. Hosts define the meaning of kinds, ordering,
+selection, schema compilation, trust, CSP and shared runtimes.
 
-## What this package does not know
-
-What a contribution *kind* means; your trust, capability or isolation model;
-where bundles are served from and under what CSP; and how a bundle obtains
-shared runtime dependencies such as a React copy. Each of those has a
-different right answer in every host, and a shared package that learned one
-host's answer would impose it on the rest.
-
-## Compatibility
-
-`PROTOCOL` — the `protocol` number in the registry response — is the
-compatibility contract between a host and this loader, and the same number is
-pinned on the Go side (`registry.Protocol` in
-`github.com/hollis-labs/plugin-sdk`). A response whose `protocol` differs, or
-that lacks one, is refused whole rather than partly loaded. Within a protocol
-number the exported API follows semver; before 1.0, a minor release may break
-it and CHANGELOG.md says so.
-
-## Out of scope
-
-- What a contribution *kind* means, or any taxonomy of kinds.
-- Trust, capability, isolation and CSP: how plugin code is contained.
-- Serving bundles: where they live and under what headers.
-- A shared runtime, including a shared React copy, for plugin bundles.
-
-## License
-
-MIT — see [LICENSE](./LICENSE).
+Release history is in [CHANGELOG.md](./CHANGELOG.md). MIT — see
+[LICENSE](./LICENSE).

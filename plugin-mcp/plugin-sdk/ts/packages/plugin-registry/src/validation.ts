@@ -1,4 +1,4 @@
-import { PROTOCOL, qualifiedKey } from "./types.js";
+import { REGISTRY_VERSION, qualifiedKey } from "./types.js";
 import type {
   PluginRegistryResponse,
   RegistryContribution,
@@ -6,6 +6,7 @@ import type {
   RegionDescriptor,
   Refusal,
 } from "./types.js";
+import { RegistryError } from "./error.js";
 import { validBounds } from "./version.js";
 export const record = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" &&
@@ -38,20 +39,34 @@ const json = (v: unknown): boolean => {
   if (record(v)) return Object.values(v).every(json);
   return false;
 };
+/** Match Go strings.ToLower: scalar lowercase, without contextual sigma or expansion. */
+export const foldKey = (key: string): string =>
+  Array.from(key, (char) =>
+    char === "\u0130" ? "i" : char.toLowerCase(),
+  ).join("");
 const exactKeys = (v: Record<string, unknown>, keys: string[]) =>
   Object.keys(v).every(
-    (k) => !keys.includes(k.toLowerCase()) || keys.includes(k),
+    (k) =>
+      !keys.includes(k.toLowerCase().replaceAll("\u017f", "s")) ||
+      keys.includes(k),
   );
 function validate(value: unknown): string | undefined {
   if (
     !record(value) ||
-    !Object.hasOwn(value, "protocol") ||
-    value.protocol !== PROTOCOL
+    Object.keys(value).some(
+      (key) => key.toLowerCase().replaceAll("\u017f", "s") === "protocol",
+    )
   )
-    return "ErrProtocol";
+    return "ErrRegistryVersion";
+  if (!exactKeys(value, ["registry_version"])) return "ErrInvalidContribution";
+  if (
+    !Object.hasOwn(value, "registry_version") ||
+    value.registry_version !== REGISTRY_VERSION
+  )
+    return "ErrRegistryVersion";
   if (
     !exactKeys(value, [
-      "protocol",
+      "registry_version",
       "host_instance",
       "revision",
       "plugins",
@@ -176,6 +191,8 @@ function validate(value: unknown): string | undefined {
           "kind",
           "schema_version",
           "required",
+          "status",
+          "status_reason",
           "representation",
           "metadata",
           "component",
@@ -190,6 +207,7 @@ function validate(value: unknown): string | undefined {
           "kind",
           "schema_version",
           "required",
+          "status",
           "representation",
           "metadata",
         ].every((k) => Object.hasOwn(c, k)) ||
@@ -200,6 +218,8 @@ function validate(value: unknown): string | undefined {
         !nonempty(c.owner_generation) ||
         !integer(c.schema_version) ||
         typeof c.required !== "boolean" ||
+        !nonempty(c.status) ||
+        (c.status_reason !== undefined && !nonempty(c.status_reason)) ||
         !json(c.metadata)
       )
         return "ErrInvalidContribution";
@@ -262,6 +282,28 @@ function validate(value: unknown): string | undefined {
       typeof f.required !== "boolean"
     )
       return "ErrInvalidContribution";
+  const refusalIdentity = (c: Record<string, unknown>) =>
+    JSON.stringify([c.owner_id, c.owner_generation, c.kind, c.local_key]);
+  const byEntry = new Map<string, Record<string, unknown>>();
+  for (const f of value.refusals) {
+    const id = refusalIdentity(f as Record<string, unknown>);
+    if (byEntry.has(id)) return "ErrCollision";
+    byEntry.set(id, f as Record<string, unknown>);
+  }
+  for (const entries of Object.values(value.contributions))
+    for (const c of Object.values(
+      entries as Record<string, Record<string, unknown>>,
+    )) {
+      const f = byEntry.get(refusalIdentity(c));
+      if (c.status === "refused") {
+        if (
+          !f ||
+          f.required !== c.required ||
+          (c.status_reason !== undefined && c.status_reason !== f.reason)
+        )
+          return "ErrInvalidContribution";
+      } else if (f) return "ErrInvalidContribution";
+    }
   return;
 }
 export interface AdmissionPolicy {
@@ -271,6 +313,8 @@ export interface AdmissionPolicy {
   validateMetadata?: (schema: unknown, metadata: unknown) => boolean;
 }
 export interface Plan {
+  listed: RegistryContribution[];
+  statusDiagnostics: Refusal[];
   accepted: RegistryContribution[];
   refusals: Refusal[];
   requiredFailed: boolean;
@@ -279,7 +323,11 @@ export function planResponse(
   r: PluginRegistryResponse,
   policy: AdmissionPolicy,
 ): Plan {
+  const invalid = validateResponse(r);
+  if (invalid) throw new RegistryError(invalid);
   const plan: Plan = {
+    listed: [],
+    statusDiagnostics: [],
     accepted: [],
     refusals: [...r.refusals],
     requiredFailed: r.refusals.some((f) => f.required),
@@ -289,6 +337,10 @@ export function planResponse(
       const c = r.contributions[kind][key],
         d = own(policy.kinds, kind),
         wire = own(r.kinds, kind);
+      if (c.status === "refused") {
+        plan.listed.push(c);
+        continue;
+      }
       let reason = "";
       if (
         c.owner_id === "core" ||
@@ -344,7 +396,19 @@ export function planResponse(
           reason,
         });
         plan.requiredFailed ||= c.required;
-      } else plan.accepted.push(c);
+      } else {
+        plan.listed.push(c);
+        if (c.status === "accepted") plan.accepted.push(c);
+        else if (!["declared_not_selected", "unavailable"].includes(c.status))
+          plan.statusDiagnostics.push({
+            owner_id: c.owner_id,
+            owner_generation: c.owner_generation,
+            kind,
+            local_key: c.local_key,
+            required: c.required,
+            reason: "unknown-status",
+          });
+      }
     }
   return plan;
 }
@@ -352,7 +416,7 @@ export function planResponse(
 function collisions(value: unknown): boolean {
   if (value === null || typeof value !== "object") return false;
   if (!Array.isArray(value)) {
-    const keys = Object.keys(value).map((k) => k.toLowerCase());
+    const keys = Object.keys(value).map(foldKey);
     if (new Set(keys).size !== keys.length) return true;
   }
   return Object.values(value).some(collisions);

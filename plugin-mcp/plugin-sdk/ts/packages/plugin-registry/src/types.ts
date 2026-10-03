@@ -1,5 +1,5 @@
-/** Protocol 2 is a clean break; protocol 1 is never guessed or translated. */
-export const PROTOCOL = 2;
+/** Registry v2 is independent of the plugin subprocess protocol. */
+export const REGISTRY_VERSION = 2;
 export const MAX_REVISION = Number.MAX_SAFE_INTEGER;
 export type Representation = "declarative" | "component" | "handler";
 export interface RegistryRuntime {
@@ -35,6 +35,9 @@ export interface RegistryContribution {
   kind: string;
   schema_version: number;
   required: boolean;
+  /** Host projection. Unknown nonempty statuses remain listed and inactive. */
+  status: string;
+  status_reason?: string;
   representation: Representation;
   metadata: unknown;
   component?: { export: string; region: string };
@@ -52,7 +55,7 @@ export interface Refusal {
   required: boolean;
 }
 export interface PluginRegistryResponse {
-  protocol: number;
+  registry_version: number;
   host_instance: string;
   revision: number;
   plugins: Record<string, RegistryPlugin>;

@@ -1,17 +1,30 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PROTOCOL,
+  REGISTRY_VERSION,
   parseRegistryResponse,
   RegistryError,
   validateResponse,
+  planResponse,
   checkRuntimes,
 } from "../dist/index.js";
 import { response } from "./helpers.js";
 
-test("protocol is locked at 2; protocol 1 has no fallback", () => {
-  assert.equal(PROTOCOL, 2);
-  assert.equal(validateResponse({ ...response(), protocol: 1 }), "ErrProtocol");
+test("registry version is locked at 2; legacy and dual keys have no fallback", () => {
+  assert.equal(REGISTRY_VERSION, 2);
+  const legacy = response();
+  delete legacy.registry_version;
+  legacy.protocol = 1;
+  for (const value of [
+    legacy,
+    { ...response(), protocol: 2 },
+    { ...response(), Protocol: 2 },
+  ])
+    assert.equal(validateResponse(value), "ErrRegistryVersion");
+  assert.equal(
+    validateResponse({ ...response(), registry_version: 1 }),
+    "ErrRegistryVersion",
+  );
 });
 test("raw parser rejects exact, escaped and case-variant duplicate keys at every depth", () => {
   for (const raw of [
@@ -19,6 +32,8 @@ test("raw parser rejects exact, escaped and case-variant duplicate keys at every
     '{"required":true,"REQUIRED":false}',
     '{"x":{"a":1,"\\u0061":2}}',
     '{"metadata":{"key":1,"KEY":2}}',
+    '{"metadata":{"ΟΣ":1,"οσ":2}}',
+    '{"metadata":{"İ":1,"i":2}}',
   ])
     assert.throws(
       () => parseRegistryResponse(raw),
@@ -39,6 +54,9 @@ test("raw parser fails invalid JSON and malformed input with typed errors", () =
 });
 test("mis-cased known fields are rejected rather than treated as unknown extensions", () => {
   for (const mutate of [
+    (r) => {
+      r.reviſion = 1;
+    },
     (r) => {
       r.Revision = r.revision;
       delete r.revision;
@@ -78,7 +96,7 @@ test("missing/null mandatory booleans and forbidden null representation fields f
 });
 test("structural validation refuses inherited and non-JSON values", () => {
   const inherited = Object.create(response());
-  assert.equal(validateResponse(inherited), "ErrProtocol");
+  assert.equal(validateResponse(inherited), "ErrRegistryVersion");
   const c = response();
   c.plugins = Object.create(c.plugins);
   assert.equal(validateResponse(c), "ErrInvalidContribution");
@@ -159,5 +177,20 @@ test("normalized runtime bounds use inclusive numeric semantic ordering", () => 
       Object.create({ react: "19.0.0" }),
     ),
     false,
+  );
+});
+
+test("public planning validates before host callbacks or admission", () => {
+  const c = response();
+  delete c.contributions.panel["p/main"].status;
+  assert.throws(
+    () =>
+      planResponse(c, {
+        kinds: {},
+        regions: {},
+        reserved: () => assert.fail("policy ran before validation"),
+      }),
+    (error) =>
+      error instanceof RegistryError && error.code === "ErrInvalidContribution",
   );
 });

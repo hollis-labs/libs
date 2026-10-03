@@ -1,5 +1,16 @@
 # @hollis-labs/plugin-registry
 
+## Unreleased
+
+- Breaking: replace the original registry shape with owner generations, host
+  epochs, safe revisions, explicit kind/region admission and three contribution
+  representations. No fallback to the previous registry shape.
+- Validate raw JSON duplicates and field casing against the shared Go fixtures;
+  enforce runtime ranges and SHA-256 integrity on the bytes actually imported.
+- Revoke before replacement import, dispose in reverse order, quarantine failed
+  cleanup and reject stale completions. React components retain generation gates;
+  unchanged data retains identity and one disposer.
+
 ## 0.1.0 — 2026-09-29
 
 First npm release. Wire protocol 1.

@@ -367,7 +367,7 @@ test("stale revisions/epochs and reused revision content are refused unchanged",
 test("malformed protocol does not clear last known registry", async () => {
   const r = registry();
   await r.sync(response());
-  for (const c of [null, {}, { ...response(2), protocol: 1 }])
+  for (const c of [null, {}, { ...response(2), registry_version: 1 }])
     assert.equal((await r.sync(c)).accepted, false);
   assert.ok(r.get("panel", "p/main"));
 });
@@ -421,4 +421,117 @@ test("inherited exports and policy map keys are never admitted", async () => {
   assert.equal((await r.sync(response())).accepted, false);
   const inherited = registry({ kinds: Object.create(policy.kinds) });
   assert.equal((await inherited.sync(response())).accepted, false);
+});
+
+test("retiring an old generation does not tombstone its replacement", async () => {
+  const r = registry();
+  await r.sync(response());
+  assert.equal((await r.sync(response(2, "2"))).accepted, true);
+  const current = r.get("panel", "p/main");
+  assert.equal((await r.sync(response(3, "2"))).accepted, true);
+  assert.equal(current.isActive(), true);
+});
+
+test("inactive statuses stay listed without fetch, import or adoption", async () => {
+  for (const status of [
+    "declared_not_selected",
+    "unavailable",
+    "future_status",
+  ]) {
+    const diagnostics = [];
+    const r = registry({
+      fetchBundle: async () => {
+        assert.fail("inactive bundle fetched");
+      },
+      importModule: async () => {
+        assert.fail("inactive bundle imported");
+      },
+      adopt: () => {
+        assert.fail("inactive contribution adopted");
+      },
+      onDiagnostic: (e) => diagnostics.push(e),
+    });
+    const c = response();
+    c.contributions.panel["p/main"].status = status;
+    c.contributions.panel["p/main"].status_reason = "host-choice";
+    assert.equal((await r.sync(c)).accepted, true);
+    assert.equal(r.get("panel", "p/main"), undefined);
+    assert.equal(r.list("panel").length, 0);
+    assert.equal(r.ownerOf("panel", "p/main"), "p");
+    const listed = r.snapshot().contributions[0];
+    assert.equal(listed.status, status);
+    assert.equal(listed.status_reason, "host-choice");
+    assert.equal(listed.resolved, false);
+    assert.deepEqual(r.refusals(), []);
+    assert.equal(diagnostics.length, status === "future_status" ? 1 : 0);
+    if (diagnostics.length) {
+      assert.equal(diagnostics[0].type, "status-diagnostic");
+      assert.equal(diagnostics[0].diagnostic.reason, "unknown-status");
+    }
+  }
+});
+test("retained refused entry uses one authoritative top-level refusal", async () => {
+  const c = response();
+  c.contributions.panel["p/main"].required = false;
+  c.contributions.panel["p/main"].status = "refused";
+  c.contributions.panel["p/main"].status_reason = "host-denied";
+  c.refusals.push({
+    owner_id: "p",
+    owner_generation: "1",
+    kind: "panel",
+    local_key: "main",
+    required: false,
+    reason: "host-denied",
+  });
+  const diagnostics = [];
+  const r = registry({
+    kinds: {},
+    regions: {},
+    fetchBundle: async () => {
+      assert.fail("refused bundle fetched");
+    },
+    onDiagnostic: (e) => diagnostics.push(e),
+  });
+  assert.equal((await r.sync(c)).accepted, true);
+  assert.equal(r.get("panel", "p/main"), undefined);
+  assert.equal(r.snapshot().contributions[0].status, "refused");
+  assert.equal(r.refusals().length, 1);
+  assert.equal(
+    diagnostics.filter((e) => e.type === "contribution-refused").length,
+    1,
+  );
+});
+test("inactive status cannot bypass required admission", async () => {
+  for (const status of [
+    "declared_not_selected",
+    "unavailable",
+    "future_status",
+  ]) {
+    const c = response();
+    c.contributions.panel["p/main"].status = status;
+    const r = registry({ kinds: {}, regions: {} });
+    assert.equal((await r.sync(c)).accepted, false);
+  }
+});
+test("status withdrawal fences and disposes before the same generation is selected again", async () => {
+  const disposed = [];
+  let imports = 0;
+  const r = registry({
+    importModule: async () => {
+      imports++;
+      return { Panel: () => null };
+    },
+    dispose: (e) => disposed.push(e.local_key),
+  });
+  await r.sync(response());
+  const captured = r.get("panel", "p/main");
+  const inactive = response(2);
+  inactive.contributions.panel["p/main"].status = "declared_not_selected";
+  assert.equal((await r.sync(inactive)).accepted, true);
+  assert.equal(captured.isActive(), false);
+  assert.deepEqual(disposed, ["main"]);
+  assert.equal((await r.sync(response(3))).accepted, true);
+  assert.equal(r.get("panel", "p/main").isActive(), true);
+  assert.equal(captured.isActive(), false);
+  assert.equal(imports, 1);
 });

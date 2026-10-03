@@ -53,6 +53,7 @@ export function entry({
     kind,
     schema_version: 1,
     required,
+    status: "accepted",
     representation,
     metadata,
     ...(representation === "component"
@@ -65,7 +66,7 @@ export function entry({
 }
 export function response(revision = 1, generation = "1") {
   return {
-    protocol: 2,
+    registry_version: 2,
     host_instance: "epoch",
     revision,
     plugins: {

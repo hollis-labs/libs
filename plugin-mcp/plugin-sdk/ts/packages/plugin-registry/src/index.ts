@@ -10,7 +10,7 @@
  * renders React components — is at `@hollis-labs/plugin-registry/react` and
  * takes React as an optional peer.
  */
-export { PROTOCOL } from "./types.js";
+export { REGISTRY_VERSION } from "./types.js";
 export type {
   PluginRegistryResponse,
   RegistryContribution,

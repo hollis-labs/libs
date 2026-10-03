@@ -87,3 +87,33 @@ test("React adapter retains core admission opt-in and named reservation", async 
   });
   assert.equal((await registry.sync(response())).accepted, false);
 });
+
+test("React never resolves inactive statuses and fences a newly unselected captured component", async () => {
+  for (const status of [
+    "declared_not_selected",
+    "unavailable",
+    "future_status",
+  ]) {
+    const registry = createReactPluginRegistry({
+      ...options,
+      fetchBundle: async () => {
+        assert.fail("inactive React bundle fetched");
+      },
+      importModule: async () => {
+        assert.fail("inactive React bundle imported");
+      },
+    });
+    const c = response();
+    c.contributions.panel["p/main"].status = status;
+    assert.equal((await registry.sync(c)).accepted, true);
+    assert.equal(registry.get("panel", "p/main"), undefined);
+    assert.equal(registry.snapshot().contributions[0].status, status);
+  }
+  const registry = createReactPluginRegistry(options);
+  await registry.sync(response());
+  const Guard = await lazyComponent(registry.get("panel", "p/main").value);
+  const c = response(2);
+  c.contributions.panel["p/main"].status = "declared_not_selected";
+  await registry.sync(c);
+  assert.equal(Guard({}), null);
+});
