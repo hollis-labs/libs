@@ -28,4 +28,7 @@ All notable changes to the `mesh` module are documented here. The format follows
 - Enrolled stable pool identities and ephemeral fresh identities with keyed
   cleanup, host interfaces and an in-memory host for contract tests.
 - Test-only composition check for the teams host and mesh provider contracts.
-
+- Shared enrollment, execution instance, session and binding lease records,
+  pinned resolution contracts and a glossary of distinct lease and fencing scopes.
+- Orthogonal instance and session state projection to task states and the A2A
+  wire vocabulary, retaining waiting reasons and connectivity metadata.
