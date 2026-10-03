@@ -15,6 +15,10 @@ export function fixturePlugin(profile) {
     load() { return { skipped_registrations: [{ kind: 'command', id: 'optional', reason: 'no config' }] }; },
     unload() {},
   };
+  if (profile === 'lifecycle-shutdown') {
+    const effects = {unload_attempts:0,health_calls:0};
+    return {...base,unload(){effects.unload_attempts++;},health(){effects.health_calls++;return {ok:true};},effects(){return {...effects};}};
+  }
   if (profile === 'base') return base;
   if (profile === 'lifecycle-error') return { ...base, init() { throw errNotFound('missing'); }, load() { throw ErrCancelled; } };
   if (profile === 'health-error') return { ...base, health() { throw new Error('unhealthy'); } };

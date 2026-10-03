@@ -25,6 +25,7 @@ type transcript struct {
 	Finding     string           `json:"finding,omitempty"`
 	Profile     string           `json:"profile"`
 	Steps       []transcriptStep `json:"steps"`
+	Effects     map[string]int   `json:"effects,omitempty"`
 	Termination string           `json:"termination,omitempty"`
 }
 type transcriptStep struct {
@@ -65,6 +66,8 @@ func TestProtocolTranscripts(t *testing.T) {
 			}
 			var p Plugin
 			switch fixture.Profile {
+			case "lifecycle-shutdown":
+				p = &transcriptShutdown{}
 			case "base":
 				p = &transcriptBase{}
 			case "full":
@@ -164,6 +167,12 @@ func TestProtocolTranscripts(t *testing.T) {
 			}
 			select {
 			case err := <-done:
+				if fixture.Effects != nil {
+					effects, ok := p.(interface{ Effects() map[string]int })
+					if !ok || !reflect.DeepEqual(effects.Effects(), fixture.Effects) {
+						t.Fatalf("effects=%v want=%v", p, fixture.Effects)
+					}
+				}
 				if fixture.Termination == "" && err != nil {
 					t.Fatal(err)
 				}
@@ -296,4 +305,18 @@ type transcriptHealthError struct{ transcriptBase }
 
 func (*transcriptHealthError) Health(context.Context) (HealthStatus, error) {
 	return HealthStatus{}, errors.New("unhealthy")
+}
+
+type transcriptShutdown struct {
+	transcriptBase
+	unloadAttempts, healthCalls int
+}
+
+func (p *transcriptShutdown) Unload(context.Context) error { p.unloadAttempts++; return nil }
+func (p *transcriptShutdown) Health(context.Context) (HealthStatus, error) {
+	p.healthCalls++
+	return HealthStatus{OK: true}, nil
+}
+func (p *transcriptShutdown) Effects() map[string]int {
+	return map[string]int{"unload_attempts": p.unloadAttempts, "health_calls": p.healthCalls}
 }

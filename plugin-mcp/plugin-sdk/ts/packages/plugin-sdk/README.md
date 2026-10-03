@@ -53,13 +53,13 @@ or `PluginError(status, message)` for typed errors; throw `ErrCancelled` for a
 veto. Native `Error.cause` wrapping is supported. Cancellation takes precedence
 and preserves the outer error message; typed errors use their underlying
 message. Ordinary thrown/rejected errors map to -32603 and the loop survives.
-Like Go, lifecycle errors always map to -32603, and health errors are returned
-as `{ok:false,message}` rather than RPC errors. A successful event veto is
+Init/load/unload/health callback failures use that same typed mapping. An authored
+`{ok:false,message}` health status is successful; a callback failure is an RPC error. A successful event veto is
 `{cancel:true,reason}` and is distinct from throwing cancellation.
 
 ## Transport and lifecycle
 
-`serve(plugin, {input, output, stderr, signal, handleSignals})` accepts injectable
+`serve(plugin, {input, output, stderr, signal, handleSignals, shutdownTimeoutMs})` accepts injectable
 Node streams for testing. Defaults use process stdout/stderr and Node process stdin (Deno native stdin
 through a stream adapter under Deno), and handle
 SIGINT/SIGTERM; injected input defaults to no process signal listeners. In-flight
@@ -75,12 +75,17 @@ LF are accepted. Oversize input rejects serve with `FrameTooLargeError`, invokes
 final unload, and emits no RPC error. There is no output frame cap or in-flight
 request quota, matching the current Go contract.
 
-EOF waits for every accepted handler and queued response before final unload.
-Signals/AbortSignal stop input and abort the shared handler context; handlers
-must cooperate with cancellation. Final unload gets a fresh non-aborted signal.
-An explicit unload RPC acknowledges cleanup but leaves the reader running;
-EOF therefore calls unload again. Cleanup must tolerate that. Injected output
-and stderr remain owned by the caller and are not ended by serve.
+Explicit unload is terminal: it fences new work, aborts and drains admitted
+handlers, attempts cleanup once with a fresh signal, flushes its result/error,
+and ends Serve without waiting for host EOF. EOF and signals share that path;
+cleanup failures and throws are never retried. The total drain/cleanup/flush
+budget defaults to five seconds (`shutdownTimeoutMs`, positive finite value up to 2147483647 ms).
+`ShutdownTimeoutError` means shutdown is incomplete; callback code cannot be
+forcibly killed in-process and must yield for the deadline to run. A drain
+timeout does not invoke cleanup concurrently with an uncooperative handler.
+Injected input/output/stderr remain caller-owned. Serve detaches input listeners
+and does not destroy those streams; callers close outstanding I/O on transport
+failure. See the [protocol-2 lifecycle contract](../../../docs/protocol/v2/README.md#lifecycle-shutdown-and-errors).
 
 ## Config and logging
 
@@ -139,19 +144,18 @@ fixtures stay skipped. The SDK implements neither proposal.
 
 Known differences outside the observed corpus, recorded for post-spike review:
 
-- IDs and integer fields are restricted to JavaScript-safe integers. Go uses
-  int64 and can preserve larger IDs; TS rejects them with -32700 rather than
-  silently correlating a rounded ID. Config integers outside that range return
-  zero rather than Go's full platform integer range.
-- JSON.parse accepts integral numeric tokens written with a decimal/exponent
-  (for example id 1.0 or 1e0); Go's int64 JSON decoder rejects those tokens.
-  Known fields are matched case-sensitively in TS; Go's struct decoder also
-  matches case-insensitively. Duplicate keys use the last value in both.
-- Decoder message detail is runtime-specific. Parse/params prefixes and codes
-  match the corpus. JavaScript has no independent distinction between returned
-  errors and Go panics; thrown Error maps as an error, while a non-Error thrown
-  value gets a `panic:` prefix. Health's thrown errors follow Go's returned
-  health-error result convention.
+- Envelope IDs are strings or safe integers in both SDKs; fraction/exponent
+  tokens and duplicate top-level keys are invalid. The shared protocol-2 corpus
+  covers that contract. Config integers outside the JS-safe range return zero
+  rather than Go's full platform integer range.
+- Non-init payload fields still inherit historical defaults: known fields are
+  matched case-sensitively in TS, while Go's struct decoder also matches
+  case-insensitively; duplicate payload keys can use the last value. These
+  method-owned policies have a separate validation stage.
+- Decoder message detail is runtime-specific. JavaScript has no independent
+  distinction between returned errors and Go panics; thrown Error maps as an
+  error, while a non-Error thrown value gets a `panic:` prefix. Both SDKs map
+  failing health callbacks to RPC errors.
 - JSON values can differ at numbers outside JS precision and at unsupported
   values such as undefined. Use JSON-safe payloads. The optional harness catches
   common impossible values; it is not a schema validator.

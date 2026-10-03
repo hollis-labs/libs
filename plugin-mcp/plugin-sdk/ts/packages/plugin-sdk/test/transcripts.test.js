@@ -27,7 +27,8 @@ for (const name of names) {
     const lines = createInterface({ input: output, crlfDelay: Infinity });
     const replies = lines[Symbol.asyncIterator]();
     t.after(() => { input.destroy(); output.destroy(); lines.close(); });
-    const done = serve(fixturePlugin(fixture.profile), { input, output, stderr: new Writable({ write(_b, _e, cb) { cb(); } }) }).then(
+    const plugin = fixturePlugin(fixture.profile);
+    const done = serve(plugin, { input, output, stderr: new Writable({ write(_b, _e, cb) { cb(); } }) }).then(
       () => { output.end(); return undefined; },
       error => { output.end(); return error; },
     );
@@ -52,6 +53,7 @@ for (const name of names) {
     const error = await done;
     if (fixture.termination === 'frame-too-large') assert.ok(error instanceof FrameTooLargeError);
     else assert.equal(error, undefined);
+    if(fixture.effects) assert.deepEqual(plugin.effects(),fixture.effects);
     for (const index of quirks) {
       t.diagnostic(`COPIED GO V1 QUIRK ${name} step ${index}: ${fixture.steps[index - 1].preferred ?? fixture.preferred}`);
     }

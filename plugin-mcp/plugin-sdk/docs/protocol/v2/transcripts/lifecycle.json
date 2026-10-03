@@ -42,7 +42,8 @@
           "protocol": 2,
           "capability_contract": 1
         }
-      }
+      },
+      "level": "normative"
     },
     {
       "send": {
@@ -62,7 +63,8 @@
             }
           ]
         }
-      }
+      },
+      "level": "normative"
     },
     {
       "send": {
@@ -76,7 +78,8 @@
         "result": {
           "ok": true
         }
-      }
+      },
+      "level": "normative"
     },
     {
       "send": {
@@ -91,8 +94,7 @@
           "ok": true
         }
       },
-      "level": "observed-quirk",
-      "preferred": "Explicit unload should enter terminal shutdown and cleanup exactly once; EOF after acknowledgement must not call unload again. The transcript observes the acknowledgement and EOF only; the repeated cleanup is verified by runtime tests/code, not its reply assertions."
+      "level": "normative"
     }
   ]
 }

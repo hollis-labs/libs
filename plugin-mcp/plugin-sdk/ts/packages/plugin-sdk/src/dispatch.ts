@@ -66,6 +66,7 @@ export class Dispatcher {
   context: Context;
   private attempted = false;
   private initialized = false;
+  private unloadAttempt?: Promise<void>;
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker) { this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown): Promise<void> { if (value !== undefined) await this.plugin.identity?.(this.context, value); }
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
@@ -79,8 +80,9 @@ export class Dispatcher {
       return {jsonrpc: '2.0', id, error: fault};
     }
   }
-  private async lifecycle<T>(call: () => T | Promise<T>): Promise<T> {
-    try { return await call(); } catch (error) { throw new RPCFault(-32603, errorMessage(error)); }
+  /** Record the attempt before user code; failed cleanup is never retried. */
+  shutdown(context: Context): Promise<void> {
+    return this.unloadAttempt ??= Promise.resolve().then(() => this.plugin.unload(context));
   }
   private async call(req: Wire.RPCRequest): Promise<unknown> {
     const p = this.plugin;
@@ -105,7 +107,7 @@ export class Dispatcher {
           } else input = decodeInitParams(JSON.stringify(req.params));
         } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
         this.context = { ...ctx, config: new ConfigReader(input.config, this.secrets) };
-        const authored = await this.lifecycle(() => p.init(this.context, input));
+        const authored = await p.init(this.context, input);
         const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
         const result = decodeInitResult(encodeInitResult(base));
         validateInitResult(input,result);
@@ -114,14 +116,14 @@ export class Dispatcher {
         return result;
       }
       case 'plugin/load': {
-        const result = await this.lifecycle(() => p.load(ctx));
+        const result = await p.load(ctx);
         return optionalObject(result, ['skipped_registrations']);
       }
-      case 'plugin/unload': await this.lifecycle(() => p.unload(ctx)); return {ok: true};
+      case 'plugin/unload': await this.shutdown(ctx); return {ok: true};
       case 'plugin/health': {
         if (!p.health) return {ok: true};
-        try { const result = await p.health(ctx); return {ok: result.ok ?? false, ...optionalObject(result, ['message'])}; }
-        catch (error) { return {ok: false, message: errorMessage(error)}; }
+        const result = await p.health(ctx);
+        return {ok: result.ok ?? false, ...optionalObject(result, ['message'])};
       }
       case 'command/execute': {
         if (!p.command) return notImplemented('CommandHandler');

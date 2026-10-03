@@ -68,6 +68,7 @@ test('AbortSignal wakes stdin, cancels pending handler, unload gets fresh signal
   const r = await rig(t,p,{signal:controller.signal});
   r.send(1,'command/execute',{name:'wait'}); await started.promise;
   controller.abort(); assert.equal((await r.reply()).error.code,-32003); await r.done;
+  assert.equal(r.input.destroyed,false);assert.equal(r.input.listenerCount('readable'),0);
 });
 
 test('identity is opaque, per call; null is present and omitted is not delivered', {timeout:5000}, async t => {
@@ -106,11 +107,14 @@ test('output errors reject serve after unload without an unhandled rejection', {
   assert.equal(unloaded,true);
 });
 
-test('explicit unload acknowledges without ending loop, then EOF cleanup follows', {timeout:5000}, async t => {
+test('explicit unload fences new work, acknowledges once and ends without host EOF', {timeout:5000}, async t => {
   const order = []; const p = {...fixturePlugin('base'),unload(){order.push('unload');},health(){order.push('health');return {ok:true};}};
-  const r = await rig(t,p); r.send(1,'plugin/unload'); assert.equal((await r.reply()).result.ok,true);
-  r.send(2,'plugin/health'); await r.reply(); r.input.end(); await r.done;
-  assert.deepEqual(order,['unload','health','unload']);
+  const r = await rig(t,p);
+  r.input.write('{"jsonrpc":"2.0","id":1,"method":"plugin/unload"}\n{"jsonrpc":"2.0","id":2,"method":"plugin/health"}\n');
+  assert.equal((await r.reply()).result.ok,true);
+  await r.done;assert.deepEqual(order,['unload']);
+  assert.equal(r.input.destroyed,false);assert.equal(r.output.destroyed,false);
+
 });
 
 test('wrapped typed error and cancellation precedence follow Go', {timeout:5000}, async t => {
@@ -174,4 +178,86 @@ test('Init is an admission barrier for pipelined handlers; optional offers are d
  assert.equal((await r.reply()).id,2);assert.equal(handled,true);
  r.send(3,'plugin/init',initParams());assert.equal((await r.reply()).error.code,-32600);
  r.input.end();await r.done;
+});
+
+test('lifecycle and health callbacks preserve typed errors and wrapped veto', {timeout:5000}, async t => {
+  for (const method of ['plugin/init','plugin/load','plugin/health','plugin/unload']) {
+    for (const [error,code] of [[new Error('wrapped',{cause:new PluginError(404,'missing')}),-32000],[new PluginError(409,'conflict'),-32001],[new PluginError(422,'invalid'),-32002],[new Error('wrapped',{cause:ErrCancelled}),-32003],[new Error('failure'),-32603]]) {
+      const name = method.slice(7);
+      let attempts = 0;
+      const plugin = {...fixturePlugin('base'),[name](){attempts++;throw error;}};
+      const r = await rig(t,plugin,{initialize:method !== 'plugin/init'});
+      r.send(1,method,method === 'plugin/init' ? initParams() : undefined);
+      assert.equal((await r.reply()).error.code,code);
+      if (method !== 'plugin/unload') r.input.end();
+      await r.done;assert.equal(attempts,1);
+    }
+  }
+});
+
+test('authored unhealthy is successful; a thrown health callback is an RPC failure', {timeout:5000}, async t => {
+  let throws = false;
+  const r = await rig(t,{...fixturePlugin('base'),health(){if(throws) throw 'health panic';return {ok:false,message:'maintenance'};}});
+  r.send(1,'plugin/health');assert.deepEqual((await r.reply()).result,{ok:false,message:'maintenance'});
+  throws = true;r.send(2,'plugin/health');assert.equal((await r.reply()).error.code,-32603);
+  r.input.end();await r.done;
+});
+
+test('EOF during explicit cleanup and external abort share one attempt and terminal reply', {timeout:5000}, async t => {
+  const controller = new AbortController(),started = deferred(),release = deferred();t.after(()=>release.resolve());
+  let attempts = 0;
+  const r = await rig(t,{...fixturePlugin('base'),async unload(ctx){attempts++;assert.equal(ctx.signal.aborted,false);started.resolve();await release.promise;}},{signal:controller.signal});
+  r.send('terminal','plugin/unload');await started.promise;
+  controller.abort();r.input.end();release.resolve();
+  assert.deepEqual(await r.reply(),{jsonrpc:'2.0',id:'terminal',result:{ok:true}});
+  await r.done;assert.equal(attempts,1);
+});
+
+test('cleanup throw and panic are not retried, including EOF failure', {timeout:5000}, async t => {
+  for (const explicit of [false,true]) {
+    for (const failure of [new PluginError(409,'cleanup failed'),'cleanup panic',null]) {
+      let attempts = 0;
+      const r = await rig(t,{...fixturePlugin('base'),unload(){attempts++;throw failure;}});
+      // Observe rejection immediately, including primitive/null thrown values.
+      const result = r.done.then(()=>({ok:true}),error=>({ok:false,error}));
+      if(explicit) {r.send(1,'plugin/unload');assert.equal((await r.reply()).error.code,failure instanceof PluginError ? -32001 : -32603);}
+      else r.input.end();
+      const outcome = await result;assert.equal(outcome.ok,explicit);assert.equal(attempts,1);
+    }
+  }
+});
+
+test('shutdown times out an uncooperative handler without late cleanup or success', {timeout:5000}, async t => {
+  const started = deferred(),release = deferred();t.after(()=>release.resolve());let attempts = 0;
+  const r = await rig(t,{...fixturePlugin('base'),async command(){started.resolve();await release.promise;return {action:'noop'};},unload(){attempts++;}},{shutdownTimeoutMs:20});
+  r.send(1,'command/execute');await started.promise;
+  const result = assert.rejects(r.done,{name:'ShutdownTimeoutError'});r.input.end();await result;
+  let late = '';r.output.on('data',chunk=>{late+=chunk;});
+  release.resolve();await nextTurn();
+  assert.equal(attempts,0);assert.equal(late,'');assert.equal(r.output.destroyed,false);
+});
+
+test('shutdown bounds hanging Init, cleanup and blocked output without owning injected streams', {timeout:5000}, async t => {
+  for (const phase of ['init','unload','output']) {
+    const release = deferred(),started = deferred();t.after(()=>release.resolve());let attempts = 0;
+    const plugin = {...fixturePlugin('base'),async init(){if(phase === 'init'){started.resolve();await release.promise;}return fixturePlugin('base').init();},async unload(ctx){attempts++;if(phase === 'unload'){started.resolve();await release.promise;assert.equal(ctx.signal.aborted,true);}}};
+    const input = new PassThrough({autoDestroy:false});let pendingWrite;
+    const output = new Writable({write(_b,_e,cb){if(phase === 'output'){pendingWrite=cb;started.resolve();}else cb();}});
+    t.after(()=>{pendingWrite?.();input.destroy();output.destroy();});
+    const done = serve(plugin,{input,output,shutdownTimeoutMs:20});
+    const result = assert.rejects(done,{name:'ShutdownTimeoutError'});
+    input.end(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams()})+'\n');
+    await started.promise;await result;
+    assert.equal(input.destroyed,false);assert.equal(output.destroyed,false);
+    release.resolve();pendingWrite?.();pendingWrite=undefined;await nextTurn();
+    assert.equal(attempts,phase === 'init' ? 0 : 1);
+  }
+});
+
+test('unload before successful Init is a terminal refusal with one final cleanup', {timeout:5000}, async t => {
+  const plugin = fixturePlugin('lifecycle-shutdown');
+  const r = await rig(t,plugin,{initialize:false});
+  r.input.write('{"jsonrpc":"2.0","id":1,"method":"plugin/unload"}\n{"jsonrpc":"2.0","id":2,"method":"plugin/health"}\n');
+  assert.equal((await r.reply()).error.code,-32600);await r.done;
+  assert.deepEqual(plugin.effects(),{unload_attempts:1,health_calls:0});
 });
