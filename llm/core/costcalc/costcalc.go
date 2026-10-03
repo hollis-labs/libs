@@ -1,8 +1,8 @@
 package costcalc
 
 import (
-	"github.com/hollis-labs/go-modelsdev/modelsdev"
-	usageledger "github.com/hollis-labs/go-usage-ledger"
+	"github.com/hollis-labs/substrate/llm-core/modelsdev"
+	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
 )
 
 // Catalog is the minimal read surface this package needs from a pricing

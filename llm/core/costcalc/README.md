@@ -11,7 +11,7 @@ Cost calculation over disjoint LLM usage components: go-usage-ledger Usage price
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-modelsdev-catalog-helpers
+go get github.com/hollis-labs/substrate/llm-core/costcalc
 ```
 
 Requires Go 1.26.6 or newer. Depends on [go-usage-ledger](https://github.com/hollis-labs/go-usage-ledger) v0.1.0 and [go-modelsdev](https://github.com/hollis-labs/go-modelsdev) v0.2.0 (which pulls in `cenkalti/backoff/v5`).
@@ -24,9 +24,9 @@ package main
 import (
 	"fmt"
 
-	costcalc "github.com/hollis-labs/go-modelsdev-catalog-helpers"
-	"github.com/hollis-labs/go-modelsdev/modelsdev"
-	usageledger "github.com/hollis-labs/go-usage-ledger"
+	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
+	"github.com/hollis-labs/substrate/llm-core/modelsdev"
+	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
 )
 
 func main() {

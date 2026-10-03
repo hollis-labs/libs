@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	costcalc "github.com/hollis-labs/go-modelsdev-catalog-helpers"
-	"github.com/hollis-labs/go-modelsdev/modelsdev"
-	usageledger "github.com/hollis-labs/go-usage-ledger"
+	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
+	"github.com/hollis-labs/substrate/llm-core/modelsdev"
+	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
 )
 
 func main() {
