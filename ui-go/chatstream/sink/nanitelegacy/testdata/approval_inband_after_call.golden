@@ -1,0 +1,4 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=3 event=tool_call {"event_id":3,"tool":"bash","tool_id":"c1","type":"tool_call"}
+id=6 event=approval_request {"data":"{\"input\":{\"cmd\":\"ls\"},\"reason\":\"runs a shell command\",\"request_id\":\"ap-1\",\"tool\":\"bash\"}","event_id":6,"type":"approval_request"}
+id=8 event=stream_end {"event_id":8,"message_id":"run-1","type":"stream_end","usage":{"input_tokens":0,"output_tokens":0,"stop_reason":"tool_use"}}

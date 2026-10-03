@@ -1,0 +1,45 @@
+{
+  "name": "failed-invalid-prompt",
+  "description": "response.failed with a non-retryable error code.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.failed",
+      "data": {
+        "type": "response.failed",
+        "sequence_number": 2,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "failed",
+          "error": {
+            "code": "invalid_prompt",
+            "message": "Your prompt was flagged"
+          },
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "anthropic",
+    "model": "claude-opus-5"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg_01Tool",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 472,
+      "cache_read": 1200,
+      "output": 2,
+      "total": 1674
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Tool:0",
+    "kind": "text"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Tool:0",
+    "text": "Okay, let me check the weather."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Tool:0"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Tool:1",
+    "kind": "tool_call",
+    "meta": {
+      "id": "toolu_01T1x1fJ34qAmk2tNTrN7Up6",
+      "name": "get_weather"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Tool:1",
+    "json_fragment": "{\"location\":"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Tool:1",
+    "json_fragment": " \"San Francisco, CA\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Tool:1",
+    "final": {
+      "location": "San Francisco, CA"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 472,
+      "cache_read": 1200,
+      "output": 89,
+      "total": 1761
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg_01Tool"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "tool_calls",
+    "raw_reason": "tool_use",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 472,
+      "cache_read": 1200,
+      "output": 89,
+      "total": 1761
+    }
+  }
+]

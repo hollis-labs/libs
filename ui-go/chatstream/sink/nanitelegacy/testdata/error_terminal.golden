@@ -1,0 +1,3 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=4 event=delta {"content":"partial","event_id":4,"type":"delta"}
+id=6 event=error {"error":"slow down","event_id":6,"structured_error":{"code":"rate_limited","message":"slow down"},"type":"error"}

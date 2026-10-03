@@ -1,0 +1,182 @@
+{
+  "name": "tool-calls-parallel",
+  "description": "Text, then two tool calls streamed by index with interleaved argument fragments; the second has malformed (incomplete) JSON arguments.",
+  "frames": [
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "role": "assistant",
+              "content": "Checking"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "tool_calls": [
+                {
+                  "index": 0,
+                  "id": "call_a",
+                  "type": "function",
+                  "function": {
+                    "name": "get_weather",
+                    "arguments": ""
+                  }
+                }
+              ]
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "tool_calls": [
+                {
+                  "index": 0,
+                  "function": {
+                    "arguments": "{\"city\":"
+                  }
+                }
+              ]
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "tool_calls": [
+                {
+                  "index": 1,
+                  "id": "call_b",
+                  "type": "function",
+                  "function": {
+                    "name": "get_time",
+                    "arguments": "{\"tz\""
+                  }
+                }
+              ]
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "tool_calls": [
+                {
+                  "index": 0,
+                  "function": {
+                    "arguments": "\"Oslo\"}"
+                  }
+                }
+              ]
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "tool_calls": [
+                {
+                  "index": 1,
+                  "function": {
+                    "arguments": ": \"UTC"
+                  }
+                }
+              ]
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {},
+            "logprobs": null,
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "data_text": "[DONE]"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"t1","type":"text-start"}
+{"delta":"Hello","id":"t1","type":"text-delta"}
+{"delta":", world","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"stop","messageMetadata":{"rawFinishReason":"end_turn"},"type":"finish"}
+[DONE]

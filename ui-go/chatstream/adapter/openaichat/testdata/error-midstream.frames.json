@@ -1,0 +1,36 @@
+{
+  "name": "error-midstream",
+  "description": "An error object arrives after some text (rate limit): terminal run.error, the open text part is closed first.",
+  "frames": [
+    {
+      "data": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion.chunk",
+        "created": 1694268190,
+        "model": "gpt-6-astra",
+        "system_fingerprint": "fp_44709d6fcb",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "role": "assistant",
+              "content": "Partial"
+            },
+            "logprobs": null,
+            "finish_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "data": {
+        "error": {
+          "message": "Rate limit reached for gpt-6-astra",
+          "type": "rate_limit_exceeded",
+          "param": null,
+          "code": "rate_limit_exceeded"
+        }
+      }
+    }
+  ]
+}

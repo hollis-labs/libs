@@ -1,0 +1,59 @@
+{
+  "name": "error-event",
+  "description": "A standalone error event mid-stream: terminal, retryable server_error.",
+  "frames": [
+    {
+      "event": "response.created",
+      "data": {
+        "type": "response.created",
+        "sequence_number": 1,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    },
+    {
+      "event": "response.output_item.added",
+      "data": {
+        "type": "response.output_item.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "item": {
+          "id": "fc_e",
+          "type": "function_call",
+          "call_id": "call_e",
+          "name": "f",
+          "arguments": ""
+        }
+      }
+    },
+    {
+      "event": "response.function_call_arguments.delta",
+      "data": {
+        "type": "response.function_call_arguments.delta",
+        "sequence_number": 3,
+        "item_id": "fc_e",
+        "output_index": 0,
+        "delta": "{\"a\":"
+      }
+    },
+    {
+      "event": "error",
+      "data": {
+        "type": "error",
+        "sequence_number": 4,
+        "code": "server_error",
+        "message": "The server had an error",
+        "param": null
+      }
+    }
+  ]
+}

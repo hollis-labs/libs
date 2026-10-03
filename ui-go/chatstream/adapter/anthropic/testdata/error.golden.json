@@ -1,0 +1,86 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "anthropic",
+    "model": "claude-opus-5"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg_01Err",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 5,
+      "output": 1,
+      "total": 6
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Err:0",
+    "kind": "text"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Err:0",
+    "text": "Partial"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Err:0"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg_01Err"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.error",
+    "code": "overloaded_error",
+    "retryable": true,
+    "message": "Overloaded",
+    "ext": {
+      "anthropic": {
+        "type": "error",
+        "error": {
+          "type": "overloaded_error",
+          "message": "Overloaded"
+        }
+      }
+    }
+  }
+]

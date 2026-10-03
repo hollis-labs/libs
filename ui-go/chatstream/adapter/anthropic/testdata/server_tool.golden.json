@@ -1,0 +1,196 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "anthropic",
+    "model": "claude-opus-5"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg_01Web",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 100,
+      "output": 1,
+      "total": 101
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Web:0",
+    "kind": "tool_call",
+    "meta": {
+      "block_type": "server_tool_use",
+      "id": "srvtoolu_01",
+      "name": "web_search",
+      "server": true
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Web:0",
+    "json_fragment": "{\"query\": \"claude shannon birth date\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Web:0",
+    "final": {
+      "query": "claude shannon birth date"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Web:1",
+    "kind": "tool_result",
+    "meta": {
+      "block_type": "web_search_tool_result",
+      "call_id": "msg_01Web:0",
+      "server": true,
+      "tool_use_id": "srvtoolu_01"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Web:1",
+    "final": {
+      "type": "web_search_tool_result",
+      "tool_use_id": "srvtoolu_01",
+      "content": [
+        {
+          "type": "web_search_result",
+          "title": "Claude Shannon",
+          "url": "https://en.wikipedia.org/wiki/Claude_Shannon",
+          "encrypted_content": "EqgfCioIARgB",
+          "page_age": "April 30, 2025"
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Web:2",
+    "kind": "text"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_01Web:2",
+    "text": "Shannon was born in 1916."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_01Web:2:c1",
+    "kind": "source"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Web:2:c1",
+    "final": {
+      "type": "web_search_result_location",
+      "cited_text": "born April 30, 1916",
+      "url": "https://en.wikipedia.org/wiki/Claude_Shannon",
+      "title": "Claude Shannon",
+      "encrypted_index": "Eo8BCioI"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_01Web:2"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "usage",
+    "usage": {
+      "scope": "cumulative",
+      "uncached_input": 100,
+      "output": 51,
+      "extra": {
+        "server_tool_use.web_search_requests": 1
+      },
+      "total": 151
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg_01Web"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "raw_reason": "end_turn",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 100,
+      "output": 51,
+      "extra": {
+        "server_tool_use.web_search_requests": 1
+      },
+      "total": 151
+    }
+  }
+]

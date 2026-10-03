@@ -1,0 +1,10 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"t1","type":"text-start"}
+{"delta":"line one\nline two\r\nquote \" backslash \\ \u2028 tab\t","id":"t1","type":"text-delta"}
+{"delta":"data: not a frame\n\nevent: nope","id":"t1","type":"text-delta"}
+{"delta":"héllo 世界 🌍 <script>&","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"stop","type":"finish"}
+[DONE]

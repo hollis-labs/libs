@@ -1,0 +1,87 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "openai",
+    "model": "gpt-6-astra",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "run-1",
+    "role": "assistant",
+    "ext": {
+      "openai": {
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "run-1",
+    "ext": {
+      "openai": {
+        "sequence_number": 2
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 2
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "usage_inconsistent",
+      "payload": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "input_tokens_details": {
+          "cached_tokens": 99,
+          "cache_write_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "raw_reason": "completed",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 2,
+        "status": "completed"
+      }
+    }
+  }
+]

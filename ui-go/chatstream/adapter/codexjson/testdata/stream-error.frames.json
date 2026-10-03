@@ -1,0 +1,43 @@
+{
+ "name": "stream-error",
+ "description": "A top-level unrecoverable error while a message is still growing (started with text, updated, never completed).",
+ "frames": [
+  {
+   "data": {
+    "type": "thread.started",
+    "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"
+   }
+  },
+  {
+   "data": {
+    "type": "turn.started"
+   }
+  },
+  {
+   "data": {
+    "type": "item.started",
+    "item": {
+     "id": "a1",
+     "type": "agent_message",
+     "text": "Working"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "item.updated",
+    "item": {
+     "id": "a1",
+     "type": "agent_message",
+     "text": "Working on it"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "error",
+    "message": "stream disconnected"
+   }
+  }
+ ]
+}

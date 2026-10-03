@@ -1,0 +1,5 @@
+id=1 event=stream_start {"event_id":1,"message_id":"run-1","type":"stream_start"}
+id=4 event=delta {"content":"before","event_id":4,"type":"delta"}
+id=5 event=status {"content":"events 5..9 are missing (retention)","event_id":5,"type":"status"}
+id=6 event=delta {"content":"after","event_id":6,"type":"delta"}
+id=9 event=stream_end {"event_id":9,"message_id":"run-1","type":"stream_end","usage":{"input_tokens":0,"output_tokens":0,"stop_reason":"end_turn"}}

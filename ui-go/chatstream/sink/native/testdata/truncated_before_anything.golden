@@ -1,0 +1,1 @@
+event=run.error {"v":"1","seq":0,"run_id":"","time":"2026-01-02T03:04:05Z","verb":"run.error","code":"stream_lost","retryable":true,"message":"the stream ended before the run finished: connection reset by peer"}

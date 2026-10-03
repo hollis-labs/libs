@@ -1,0 +1,7 @@
+id=1 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_STARTED"}
+id=3 {"messageId":"t1","role":"assistant","timestamp":1767323045000,"type":"TEXT_MESSAGE_START"}
+id=4 {"delta":"before","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=5 {"name":"chatstream.gap","timestamp":1767323045000,"type":"CUSTOM","value":{"from":5,"reason":"retention","to":9}}
+id=6 {"delta":"after","messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_CONTENT"}
+id=7 {"messageId":"t1","timestamp":1767323045000,"type":"TEXT_MESSAGE_END"}
+id=9 {"runId":"run-1","threadId":"run-1","timestamp":1767323045000,"type":"RUN_FINISHED"}

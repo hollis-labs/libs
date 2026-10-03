@@ -1,0 +1,52 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "claude",
+    "model": "claude-opus-5",
+    "ext": {
+      "claude": {
+        "type": "system",
+        "subtype": "init",
+        "session_id": "sess-1",
+        "model": "claude-opus-5",
+        "cwd": "/work",
+        "tools": [
+          "Bash",
+          "Read"
+        ],
+        "mcp_servers": [],
+        "permissionMode": "default"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "context_exceeded",
+    "raw_reason": "prompt_too_long",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 10,
+      "cache_read": 900,
+      "cache_write": 100,
+      "output": 42,
+      "total": 1052
+    },
+    "ext": {
+      "claude": {
+        "duration_ms": 1234,
+        "num_turns": 2,
+        "subtype": "error_during_execution",
+        "terminal_reason": "prompt_too_long",
+        "total_cost_usd": 0.0123
+      }
+    }
+  }
+]

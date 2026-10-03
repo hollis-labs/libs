@@ -1,0 +1,60 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "openai",
+    "model": "gpt-6-astra",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "run-1",
+    "role": "assistant",
+    "ext": {
+      "openai": {
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "run-1",
+    "ext": {
+      "openai": {
+        "sequence_number": 2
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.error",
+    "code": "invalid_prompt",
+    "message": "Your prompt was flagged",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 2,
+        "status": "failed"
+      }
+    }
+  }
+]

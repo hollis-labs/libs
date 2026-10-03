@@ -1,0 +1,231 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "openai",
+    "ext": {
+      "openai": {
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "run-1",
+    "role": "assistant",
+    "ext": {
+      "openai": {
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_o/0",
+    "kind": "text",
+    "meta": {
+      "content_index": 0,
+      "item_id": "msg_o"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 2
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_o/0",
+    "text": "A",
+    "ext": {
+      "openai": {
+        "sequence_number": 2
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "malformed",
+      "payload": "not json at all"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "malformed",
+      "payload": [
+        1,
+        2
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 3
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "response.future.new_event",
+      "payload": {
+        "type": "response.future.new_event",
+        "sequence_number": 3,
+        "foo": "bar"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 4
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "response.created",
+      "payload": {
+        "type": "response.created",
+        "sequence_number": 4,
+        "response": {
+          "id": "resp_67c9fd",
+          "object": "response",
+          "created_at": 1741290958,
+          "status": "in_progress",
+          "error": null,
+          "incomplete_details": null,
+          "model": "gpt-6-astra",
+          "output": [],
+          "usage": null
+        }
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_o/0",
+    "text": "B",
+    "ext": {
+      "openai": {
+        "sequence_number": 7
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.response.queued",
+    "value": {},
+    "ext": {
+      "openai": {
+        "sequence_number": 8
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 9
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "response.audio.delta",
+      "payload": {
+        "type": "response.audio.delta",
+        "sequence_number": 9,
+        "delta": "AAAA"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_o/0",
+    "ext": {
+      "openai": {
+        "sequence_number": 10
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "run-1",
+    "ext": {
+      "openai": {
+        "sequence_number": 10
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "raw_reason": "completed",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 10,
+        "status": "completed"
+      }
+    }
+  }
+]

@@ -1,0 +1,138 @@
+{
+ "name": "approval",
+ "description": "a control_request permission prompt becomes an in-band approval.request; the response line is raw",
+ "frames": [
+  {
+   "data": {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "sess-1",
+    "model": "claude-opus-5",
+    "cwd": "/work",
+    "tools": [
+     "Bash",
+     "Read"
+    ],
+    "mcp_servers": [],
+    "permissionMode": "default"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_A",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "toolu_09",
+       "name": "Bash",
+       "input": {
+        "command": "rm -rf build"
+       }
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "control_request",
+    "request_id": "req_1",
+    "request": {
+     "subtype": "can_use_tool",
+     "tool_name": "Bash",
+     "tool_use_id": "toolu_09",
+     "input": {
+      "command": "rm -rf build"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "control_response",
+    "response": {
+     "subtype": "success",
+     "request_id": "req_1",
+     "response": {
+      "behavior": "allow"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "control_request",
+    "request_id": "req_2",
+    "request": {
+     "subtype": "hook_callback",
+     "callback_id": "cb1"
+    }
+   }
+  },
+  {
+   "data": {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "toolu_09",
+       "content": "file.txt\n"
+      }
+     ]
+    },
+    "parent_tool_use_id": null,
+    "uuid": "ur1",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "assistant",
+    "message": {
+     "id": "msg_B",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "Removed."
+      }
+     ],
+     "model": "claude-opus-5"
+    },
+    "parent_tool_use_id": null,
+    "uuid": "a",
+    "session_id": "sess-1"
+   }
+  },
+  {
+   "data": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 1234,
+    "num_turns": 2,
+    "result": "ok",
+    "stop_reason": "end_turn",
+    "total_cost_usd": 0.0123,
+    "usage": {
+     "input_tokens": 10,
+     "output_tokens": 42,
+     "cache_creation_input_tokens": 100,
+     "cache_read_input_tokens": 900
+    },
+    "permission_denials": [],
+    "terminal_reason": "completed",
+    "session_id": "sess-1"
+   }
+  }
+ ]
+}

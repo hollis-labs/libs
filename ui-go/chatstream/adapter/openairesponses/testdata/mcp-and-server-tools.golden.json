@@ -1,0 +1,448 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "provider": "openai",
+    "model": "gpt-6-astra",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "run-1",
+    "role": "assistant",
+    "ext": {
+      "openai": {
+        "sequence_number": 1
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.mcp_list_tools.in_progress",
+    "value": {
+      "item_id": "mcpl_1",
+      "output_index": 0
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 3
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.mcp_list_tools.completed",
+    "value": {
+      "item_id": "mcpl_1",
+      "output_index": 0
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 4
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.mcp_list_tools",
+    "value": {
+      "item": {
+        "id": "mcpl_1",
+        "type": "mcp_list_tools",
+        "server_label": "docs",
+        "tools": [
+          {
+            "name": "search"
+          }
+        ]
+      }
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 5
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "mcp_1",
+    "kind": "tool_call",
+    "meta": {
+      "item_id": "mcp_1",
+      "name": "search",
+      "server_label": "docs",
+      "type": "mcp_call"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 6
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.mcp_call.in_progress",
+    "value": {
+      "item_id": "mcp_1",
+      "output_index": 1
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 7
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "mcp_1",
+    "json_fragment": "{\"q\":",
+    "ext": {
+      "openai": {
+        "sequence_number": 8
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "mcp_1",
+    "json_fragment": "\"go\"}",
+    "ext": {
+      "openai": {
+        "sequence_number": 9
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "mcp_1",
+    "final": {
+      "q": "go"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 10
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.mcp_call.completed",
+    "value": {
+      "item_id": "mcp_1",
+      "output_index": 1
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 11
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "mcp_1/result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "mcp_1",
+      "is_error": false,
+      "item_id": "mcp_1"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 12
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "mcp_1/result",
+    "final": {
+      "output": "3 results"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 12
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "approval.request",
+    "reason": "mcp approval requested",
+    "approval_id": "mcpr_1",
+    "descriptor": {
+      "arguments": "{\"id\":7}",
+      "name": "delete",
+      "server_label": "docs"
+    },
+    "mode": "inband",
+    "ext": {
+      "openai": {
+        "sequence_number": 13
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "ws_1",
+    "kind": "data",
+    "meta": {
+      "item_id": "ws_1",
+      "status": "in_progress",
+      "type": "web_search_call"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 15
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.web_search_call.in_progress",
+    "value": {
+      "item_id": "ws_1",
+      "output_index": 3
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 16
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.web_search_call.searching",
+    "value": {
+      "item_id": "ws_1",
+      "output_index": 3
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 17
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "openai.web_search_call.completed",
+    "value": {
+      "item_id": "ws_1",
+      "output_index": 3
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 18
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "ws_1",
+    "final": {
+      "id": "ws_1",
+      "type": "web_search_call",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "go"
+      }
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 19
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "ci_1",
+    "kind": "data",
+    "meta": {
+      "item_id": "ci_1",
+      "status": "in_progress",
+      "type": "code_interpreter_call"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 20
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 21
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "response.code_interpreter_call_code.delta",
+      "payload": {
+        "type": "response.code_interpreter_call_code.delta",
+        "sequence_number": 21,
+        "output_index": 4,
+        "item_id": "ci_1",
+        "delta": "print(1)"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "ext": {
+      "openai": {
+        "sequence_number": 22
+      }
+    },
+    "raw": {
+      "dialect": "openai.responses",
+      "type": "response.code_interpreter_call_code.done",
+      "payload": {
+        "type": "response.code_interpreter_call_code.done",
+        "sequence_number": 22,
+        "output_index": 4,
+        "item_id": "ci_1",
+        "code": "print(1)"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "ci_1",
+    "final": {
+      "id": "ci_1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "print(1)"
+    },
+    "ext": {
+      "openai": {
+        "sequence_number": 23
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "run-1",
+    "ext": {
+      "openai": {
+        "sequence_number": 24
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "raw_reason": "completed",
+    "ext": {
+      "openai": {
+        "response_id": "resp_67c9fd",
+        "sequence_number": 24,
+        "status": "completed"
+      }
+    }
+  }
+]

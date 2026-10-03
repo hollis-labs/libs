@@ -1,0 +1,11 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"id":"r1","type":"reasoning-start"}
+{"delta":"hmm","id":"r1","type":"reasoning-delta"}
+{"id":"r1","type":"reasoning-end"}
+{"id":"t1","type":"text-start"}
+{"delta":"done","id":"t1","type":"text-delta"}
+{"id":"t1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"length","messageMetadata":{"rawFinishReason":"max_tokens","usage":{"inputTokenDetails":{"cacheReadTokens":600,"cacheWriteTokens":50,"noCacheTokens":400},"inputTokens":1050,"outputTokenDetails":{"reasoningTokens":50,"textTokens":150},"outputTokens":200,"totalTokens":1250}},"type":"finish"}
+[DONE]

@@ -1,0 +1,368 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "turn-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "r1",
+    "kind": "reasoning"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "r1",
+    "text": "Plan: list files, then patch."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "r1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "c1",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "ls",
+      "item_type": "command_execution",
+      "name": "shell",
+      "status": "in_progress"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "c1",
+    "json_fragment": "{\"command\":\"ls\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "c1",
+    "final": {
+      "command": "ls"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "c1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "c1",
+      "is_error": false
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "c1#result",
+    "final": {
+      "aggregated_output": "a.go\nb.go\n",
+      "exit_code": 0,
+      "status": "completed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "m1",
+    "kind": "tool_call",
+    "meta": {
+      "item_type": "mcp_tool_call",
+      "name": "search",
+      "server": "docs",
+      "status": "in_progress"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "m1",
+    "json_fragment": "{\"arguments\":{\"q\":\"x\"},\"server\":\"docs\",\"tool\":\"search\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "m1",
+    "final": {
+      "arguments": {
+        "q": "x"
+      },
+      "server": "docs",
+      "tool": "search"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "m1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "m1",
+      "is_error": true
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "m1#result",
+    "final": {
+      "error": {
+        "message": "timeout"
+      },
+      "status": "failed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "f1",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "a.go",
+      "item_type": "file_change",
+      "name": "apply_patch",
+      "status": "completed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "f1",
+    "json_fragment": "{\"changes\":[{\"path\":\"a.go\",\"kind\":\"update\"}]}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "f1",
+    "final": {
+      "changes": [
+        {
+          "path": "a.go",
+          "kind": "update"
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "f1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "f1",
+      "is_error": false
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "f1#result",
+    "final": {
+      "changes": [
+        {
+          "path": "a.go",
+          "kind": "update"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.todo_list",
+    "value": {
+      "items": [
+        {
+          "text": "patch",
+          "completed": false
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.todo_list",
+    "value": {
+      "items": [
+        {
+          "text": "patch",
+          "completed": true
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.error",
+    "value": {
+      "message": "could not read .env"
+    },
+    "raw": {
+      "dialect": "codex",
+      "type": "item.completed",
+      "payload": {
+        "type": "item.completed",
+        "item": {
+          "id": "e1",
+          "type": "error",
+          "message": "could not read .env"
+        }
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "a1",
+    "kind": "text"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "a1",
+    "text": "Patched a.go."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "a1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "turn-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 300,
+      "cache_read": 600,
+      "cache_write": 100,
+      "output": 180,
+      "reasoning": 120,
+      "total": 1300
+    }
+  }
+]

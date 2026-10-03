@@ -1,0 +1,11 @@
+id=1 event=run.start {"v":"1","seq":1,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"run.start","provider":"anthropic","model":"claude-x"}
+id=2 event=message.start {"v":"1","seq":2,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"message.start","message_id":"msg-1","role":"assistant"}
+id=3 event=part.start {"v":"1","seq":3,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.start","part_id":"r1","kind":"reasoning"}
+id=4 event=part.delta {"v":"1","seq":4,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.delta","part_id":"r1","text":"let me think "}
+id=5 event=part.delta {"v":"1","seq":5,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.delta","part_id":"r1","text":"about it"}
+id=6 event=part.end {"v":"1","seq":6,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.end","part_id":"r1","final":"sig-abc"}
+id=7 event=part.start {"v":"1","seq":7,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.start","part_id":"t1","kind":"text"}
+id=8 event=part.delta {"v":"1","seq":8,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.delta","part_id":"t1","text":"Answer."}
+id=9 event=part.end {"v":"1","seq":9,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.end","part_id":"t1"}
+id=10 event=message.end {"v":"1","seq":10,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"message.end"}
+id=11 event=run.finish {"v":"1","seq":11,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"run.finish","reason":"stop","raw_reason":"stop"}

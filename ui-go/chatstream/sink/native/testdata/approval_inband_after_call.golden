@@ -1,0 +1,8 @@
+id=1 event=run.start {"v":"1","seq":1,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"run.start","provider":"anthropic","model":"claude-x"}
+id=2 event=message.start {"v":"1","seq":2,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"message.start","message_id":"msg-1","role":"assistant"}
+id=3 event=part.start {"v":"1","seq":3,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.start","part_id":"c1","kind":"tool_call","meta":{"name":"bash"}}
+id=4 event=part.delta {"v":"1","seq":4,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.delta","part_id":"c1","json_fragment":"{\"cmd\":\"ls\"}"}
+id=5 event=part.end {"v":"1","seq":5,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"part.end","part_id":"c1"}
+id=6 event=approval.request {"v":"1","seq":6,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"approval.request","reason":"runs a shell command","approval_id":"ap-1","call_id":"c1","descriptor":{"tool":"bash","input":{"cmd":"ls"}},"mode":"inband"}
+id=7 event=message.end {"v":"1","seq":7,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"message.end"}
+id=8 event=run.finish {"v":"1","seq":8,"run_id":"run-1","time":"2026-01-02T03:04:05Z","verb":"run.finish","reason":"tool_calls"}

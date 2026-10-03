@@ -1,0 +1,47 @@
+{
+ "name": "cancelled",
+ "description": "The client cancelled mid-message: the prompt response carries stopReason cancelled, which is an abort, not a finish.",
+ "frames": [
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "Working on"
+      }
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "sess_abc123def456",
+     "update": {
+      "sessionUpdate": "tool_call",
+      "toolCallId": "call_9",
+      "title": "Run tests",
+      "kind": "execute",
+      "status": "pending"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+     "stopReason": "cancelled"
+    }
+   }
+  }
+ ]
+}

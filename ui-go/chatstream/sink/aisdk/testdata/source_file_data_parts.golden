@@ -1,0 +1,11 @@
+{"messageMetadata":{"model":"claude-x","provider":"anthropic","runId":"run-1"},"type":"start"}
+{"type":"start-step"}
+{"sourceId":"s1","title":"A","type":"source-url","url":"https://example.com/a"}
+{"mediaType":"image/png","type":"file","url":"data:image/png;base64,AAAA"}
+{"data":{"temp":21},"id":"d1","type":"data-weather"}
+{"id":"x1","type":"text-start"}
+{"delta":"I can't help with that.","id":"x1","type":"text-delta"}
+{"id":"x1","type":"text-end"}
+{"type":"finish-step"}
+{"finishReason":"content-filter","messageMetadata":{"rawFinishReason":"refusal"},"type":"finish"}
+[DONE]

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "envelopes-v1.schema.json",
+  "title": "go-envelopes Manifest",
+  "description": "Defines core envelope types for Go validation and TypeScript codegen. This manifest asserts wire identity only and carries no appearance metadata. Runtime envelope instances carry additional fields not modeled here (presentation, trace, etc.) — see types.go for the Envelope struct and docs/manifest-spec.md for the full manifest contract. Host-specific routing fields (e.g. drawer/panel ids) and component bindings belong to each host, not to go-envelopes.",
+  "type": "object",
+  "required": ["core"],
+  "additionalProperties": false,
+  "properties": {
+    "core": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/EnvelopeEntry" }
+    }
+  },
+  "$defs": {
+    "EnvelopeEntry": {
+      "type": "object",
+      "description": "One core envelope type. WIRE IDENTITY ONLY. `component`, `export` and `props` were carried through v0.4.x and removed in v0.5.0: each named a path, symbol or prop convention inside one host's source tree, which is an appearance claim this library has no authority to make. Because additionalProperties is false, a manifest reasserting any of them is rejected BY NAME rather than silently accepted — excluding them by omission is how one comes back the next time a sweep regenerates. Which component renders a type is a binding concern, owned outside this library.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+$",
+          "description": "Envelope type identifier (kebab-case)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional human-readable description."
+        }
+      }
+    }
+  }
+}
