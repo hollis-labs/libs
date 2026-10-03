@@ -5,6 +5,14 @@ wire contract, with executable observations and explicitly pending proposals.
 It is provisional until the JS/TS spikes (0141/0142); it does not freeze the
 manifest or authorize a change to either runtime.
 
+**Status (architect review round 2, P5):** v1 is the observed baseline.
+Protocol 2 supersedes it as a clean break: a plugin built on the new protocol-2
+SDK speaks protocol 2 only, with **no v1 fallback shim**. Protocol 2's complete
+wire contract is still pending; the existing Go and 0140 TS runtimes continue
+to speak v1 until that separate work lands. Preferred notes below are design
+guidance for that work, not a completed protocol-2 specification. This spec
+remains provisional. Reverse RPC stays proposed pending CW-20261003-0163.
+
 Primary sources read at SDK commit `8668e05`: `subprocess/protocol.go`,
 `types.go`, `types_sdk.go`, `server.go`, `capability.go`, root `errors.go` and
 `envelope.go`. Host behavior was checked against the authored `plugin-host`
@@ -194,6 +202,82 @@ through `heavytest` as described in AGENTS.md/MISSION.md. Regenerate views with
 file-sync assertion; regenerate and review generated changes when editing the
 schema. Shared schema types are reference wire DTOs, not a replacement for
 plugin interfaces, helpers, or TS server implementation.
+
+## Conformance levels
+
+Every transcript has a required file-level `level`, with an optional `level`
+override on each step. The effective level is `step.level ?? fixture.level`:
+
+- **`normative` (NORMATIVE):** any conforming SDK for the described contract
+  must match the assertion using the fixture plugin recipe. This includes
+  correlation, notification silence, capability results, typed handler errors,
+  and error isolation. Fixture setup isolates dispatch: capability/error
+  transcripts intentionally omit the handshake. This setup does not require
+  future SDKs to accept calls before init/load; their adapters should establish
+  the appropriate lifecycle before replaying normative handler assertions.
+- **`observed-quirk` (OBSERVED-QUIRK):** Go v1 behavior recorded as evidence.
+  A new SDK must **not** copy it as a conformance requirement; report the
+  divergence and the preferred behavior instead. Each quirk has a nonempty
+  `preferred` note, either on its step or inherited from the file. These notes
+  identify the problem and a proposed correct protocol-2 outcome; when the
+  judgment is uncertain, classify as a quirk and explain it.
+
+`status` remains independent: `observed` (default) means executable baseline
+evidence, while `proposed` means unavailable/pending. A proposed fixture's
+`normative` level describes its candidate assertion **if adopted**; it imposes
+no obligation today. Do not activate proposed fixtures merely because they
+have that level.
+
+Runner rules:
+
+1. Resolve and validate levels; for quirks resolve `step.preferred ??
+   fixture.preferred`. Keep availability/status checks separate.
+2. A v1 **regression** runner replays both observed levels against their
+   recorded expectations. The Go runner's ordinary JSON decoder ignores these
+   additive metadata fields; it continues replaying unchanged Serve. The TS
+   runner validates metadata and prints `COPIED GO V1 QUIRK` with each fixture,
+   step number (one-based), and preferred note after its assertions pass.
+   These passes expose compatibility debt, not protocol-2 conformance.
+3. A new SDK's conformance runner must assert normative entries and report
+   quirk divergences separately. Do not fail it merely for implementing the
+   preferred behavior or add a v1 fallback to obtain a green quirk replay.
+   A mixed-level file cannot be skipped wholesale: retain normative steps,
+   adapting correlation/transport expectations for the new contract where
+   necessary. Until protocol 2 is defined, this PR changes no runtime behavior.
+4. Skip proposed fixtures by default, regardless of level. An explicit future
+   profile may opt in only after defining and implementing that profile.
+
+Classification uses the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification)
+for envelope validity, IDs, error categories and batches; lifecycle/error/cap
+preferences are SDK design judgments. For example, empty batches are invalid
+requests (-32600), malformed JSON is a parse error (-32700), and an unknown
+response ID is null. They must not all become parse errors with ID 0.
+
+### Quirks copied by the 0140 TS SDK
+
+Confirmed from `src/dispatch.ts` and `src/serve.ts` in
+`ts/packages/plugin-sdk` at revision base `793464a`:
+
+| Copied behavior | Evidence / preferred direction |
+| --- | --- |
+| Integer-only IDs; string IDs and array envelopes yield -32700; every parse error replies with ID 0 | `decodeRequest` and Serve's decode catch; decoder-findings steps 1–3 and 8. Preserve string/numeric IDs, use null for unknown IDs, distinguish invalid JSON from invalid requests/batches. |
+| Missing/wrong jsonrpc version is dispatched; missing method becomes empty/unknown method; invalid field types produce -32700; -32600 is never emitted | `decodeRequest` fills missing fields; decoder-findings steps 4, 6–8. Validate the envelope before dispatch. |
+| ID 0 (and explicit null) is suppressed as a notification | `field(..., 'int')` defaults null to zero; `dispatch` suppresses zero. notifications step 2 covers zero; null is code evidence, not a corpus assertion. Only absence of ID should mean notification. |
+| No handshake state or incoming protocol check | Dispatcher calls handlers directly and delegates init; decoder-findings step 5 covers ignored protocol 999. Validate protocol and lifecycle explicitly. |
+| Explicit unload leaves the loop active; final unload repeats at EOF | Unload case returns an acknowledgement; Serve finally always calls unload. lifecycle step 4 only covers acknowledgement/EOF, not call count; TS runtime tests cover post-unload health and repeated cleanup. Enter terminal shutdown and clean up once. |
+| Lifecycle typed errors/cancellation flatten to -32603 | `lifecycle`; lifecycle-errors fixture. Preserve typed/cancellation mappings consistently. |
+| A throwing/rejecting health handler returns successful ok:false | Health catch; health-error fixture. Return an RPC error for handler failures; intentional unhealthy status remains a successful health result. **Difference:** Go returned health errors become ok:false, but a Go panic is recovered as -32603; TS catches both throws/rejections as ok:false. |
+| Exact 8 MiB scanner input threshold with no SDK output cap | `frames` and `write`; frame-accepted/frame-limit fixtures only test input. Define explicit budgets/accounting for both directions. Host default 64 MiB inbound cap is observed host policy, not implemented by TS Serve. |
+| Omitted/null params and fields become zero values; unknown fields are ignored; capability absence is checked before params | `params`, `field` and optional handler cases. Payload defaults/extension tolerance are intentional v1 semantics where documented; protocol 2 must define required fields explicitly, not accidentally inherit decoder permissiveness. |
+
+Additional decoder details were **not** copied: TS accepts integral numeric
+tokens such as `1.0`/`1e0` (Go's int64 decoder rejects them), matches known
+field names case-sensitively (Go matches without case), and rejects unsafe
+integer IDs (Go accepts int64). These remain recorded 0140 divergences. Native
+TS Error throws use their message while non-Error throws get a panic prefix;
+Go panic recovery prefixes panics. Error isolation remains normative.
+
+## Transcript encoding
 
 Each JSON transcript starts a fresh fixture plugin with `profile`, optional
 `status` (default observed; proposed means pending), `finding`, `steps`, and

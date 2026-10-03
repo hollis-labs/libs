@@ -1,4 +1,5 @@
 {
+  "level": "observed-quirk",
   "profile": "lifecycle-error",
   "steps": [
     {
@@ -32,5 +33,6 @@
         }
       }
     }
-  ]
+  ],
+  "preferred": "F4: lifecycle typed not-found and cancellation errors are flattened to -32603. Preferred: preserve the same typed error/cancellation mapping as ordinary handlers and reject load after failed init."
 }

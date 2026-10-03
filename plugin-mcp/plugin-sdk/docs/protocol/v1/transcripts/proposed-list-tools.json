@@ -1,4 +1,5 @@
 {
+  "level": "normative",
   "status": "proposed",
   "finding": "F2: method constant exists without dispatcher; registrations are manifest-authoritative",
   "profile": "full",
