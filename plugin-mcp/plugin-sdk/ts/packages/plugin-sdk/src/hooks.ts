@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { decodeJSONObject, rawJSONItems, parseJSONTokens } from './strict-json.js';
-import { decodeForwardContext, decodeHostRPCDTO } from './host-rpc.js';
+import { decodeForwardContext, validateTimestamp } from './host-rpc.js';
 import { decodeRuntimeIdentity } from './init-contract.js';
 import { authoredResult } from './payload.js';
 import { rawJSON } from './raw-json.js';
@@ -73,8 +73,7 @@ export function decodeHookHandleParams(raw: string): HookRequest {
   if((kind==='filter') !== (mode==='waterfall')) invalid('mode','kind/mode mismatch');
   decodeHookScope(f.get('scope')!);decodeHookTrace(f.get('trace')!);
   try { decodeForwardContext(f.get('context')!); } catch { invalid('context'); }
-  // Use the existing timestamp rule, without exposing a second parser.
-  try { decodeHostRPCDTO('SecretsGetResult', '{"value_base64":"","expires_at":'+f.get('deadline')!+'}'); } catch { invalid('deadline'); }
+  try { validateTimestamp(parseJSONTokens(f.get('deadline')!), 'deadline'); } catch { invalid('deadline'); }
   u32(f.get('aggregate_budget_ms')!,'aggregate_budget_ms');u32(f.get('depth')!,'depth');
   const metadata=fields(f.get('metadata')!,[],rawJSONItems(f.get('metadata')!).map(member => {
     const m=/^("(?:[^"\\]|\\.)*")\s*:/.exec(member)!;return parseJSONTokens(m[1]!) as string;

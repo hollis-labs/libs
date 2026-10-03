@@ -1245,5 +1245,113 @@
     "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"x\\u005d\":1.50},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
     "valid": true,
     "notification": false
+  },
+  {
+    "name": "deadline timestamp whole seconds",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp one fractional digit",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00.1Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp nine fractional digits",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00.123456789Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp ten fractional digits",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00.1234567890Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp empty fraction",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00.Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp leap day",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2000-02-29T23:59:59Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp non-leap century",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"1900-02-29T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp year zero",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"0000-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp two-digit year value",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"0099-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp last four-digit year",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"9999-12-31T23:59:59.999999999Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": true
+  },
+  {
+    "name": "deadline timestamp five-digit year",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"10000-01-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp UTC offset",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00+00:00\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp lowercase z",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:00z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp leap second",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T00:00:60Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp hour rollover",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-01T24:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp month zero",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-00-01T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp day zero",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":\"2030-01-00T00:00:00Z\",\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
+  },
+  {
+    "name": "deadline timestamp non-string",
+    "dto": "HookHandleParams",
+    "raw": "{\"invocation_id\":\"call-1\",\"catalog_version\":\"1\",\"hook\":\"example.record.before_save\",\"schema_digest\":\"decl-v1\",\"kind\":\"filter\",\"mode\":\"waterfall\",\"scope\":{\"incarnation\":{\"host_instance\":\"fixture-host\",\"owner_id\":\"fixture\",\"owner_generation\":1},\"registration_id\":\"reg-1\"},\"context\":{\"binding_id\":\"binding-1\",\"timeout_ms\":1000},\"payload\":{\"title\":\"old\"},\"metadata\":{},\"deadline\":2030,\"aggregate_budget_ms\":1000,\"depth\":1,\"trace\":{\"trace_id\":\"0123456789abcdef0123456789abcdef\",\"span_id\":\"0123456789abcdef\"},\"root_invocation_id\":\"root-1\"}",
+    "valid": false
   }
 ]
