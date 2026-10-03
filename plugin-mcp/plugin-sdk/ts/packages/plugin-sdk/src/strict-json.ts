@@ -89,9 +89,9 @@ export function validatePortableJSON(text: string): void { inspect(text, true); 
 
 // Return unparsed field JSON, preserving numeric tokens for DTO range checks.
 // All fields are required/non-null and extra/case-folded spellings are refused.
-export function decodeJSONObject(text: string, fields: readonly string[], optional: readonly string[] = []): Map<string, string> {
+export function decodeJSONObject(text: string, fields: readonly string[], optional: readonly string[] = [], nullable: readonly string[] = []): Map<string, string> {
   const result = inspect(text);
-  if (!result || fields.some(key => !result.has(key)) || [...result].some(([key, raw]) => (!fields.includes(key) && !optional.includes(key)) || raw === 'null')) {
+  if (!result || fields.some(key => !result.has(key)) || [...result].some(([key, raw]) => (!fields.includes(key) && !optional.includes(key)) || raw === 'null' && !nullable.includes(key))) {
     throw new SyntaxError('Expected closed JSON object with required non-null fields');
   }
   return result;

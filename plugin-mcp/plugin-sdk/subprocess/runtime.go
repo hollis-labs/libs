@@ -78,6 +78,9 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 	setPackageLogger(logger)
 	srv := &server{plugin: p, logger: logger, secrets: secrets, unloadDone: make(chan struct{})}
 	srv.detectCapabilities()
+	if hookFixtureSetup != nil {
+		hookFixtureSetup(srv)
+	}
 
 	// A single writer owns the transport. Producers stop enqueueing after Serve
 	// returns, including callbacks that ignored cancellation and finished late.

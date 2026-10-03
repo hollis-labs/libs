@@ -143,3 +143,5 @@ Every forward params DTO permits optional closed ForwardContext metadata.
 `payload-validation.json` is normative, including scanner-based escaped-key
 preservation and invalid-unload recovery. Framing policies retain their existing
 levels until the framing slice.
+
+[Reserved hooks/1 wire and host codecs](hooks.md) describe the independently gated hook methods and shared hook conformance fixtures.

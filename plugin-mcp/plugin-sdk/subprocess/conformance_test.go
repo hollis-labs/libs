@@ -29,12 +29,13 @@ type transcript struct {
 	Termination string           `json:"termination,omitempty"`
 }
 type transcriptStep struct {
-	PadBytes      int             `json:"pad_bytes,omitempty"`
-	Send          json.RawMessage `json:"send,omitempty"`
-	Raw           string          `json:"raw,omitempty"`
-	Repeat        int             `json:"repeat,omitempty"`
-	Expect        json.RawMessage `json:"expect,omitempty"`
-	MessagePrefix string          `json:"message_prefix,omitempty"`
+	PadBytes       int             `json:"pad_bytes,omitempty"`
+	Send           json.RawMessage `json:"send,omitempty"`
+	Raw            string          `json:"raw,omitempty"`
+	Repeat         int             `json:"repeat,omitempty"`
+	Expect         json.RawMessage `json:"expect,omitempty"`
+	ExpectContains string          `json:"expect_contains,omitempty"`
+	MessagePrefix  string          `json:"message_prefix,omitempty"`
 }
 
 func TestProtocolTranscripts(t *testing.T) {
@@ -66,6 +67,11 @@ func TestProtocolTranscripts(t *testing.T) {
 			}
 			var p Plugin
 			switch fixture.Profile {
+			case "hooks-fixture", "hooks-declined":
+				p = &hookTranscriptPlugin{}
+				if fixture.Profile == "hooks-fixture" {
+					enableHookFixture(t)
+				}
 			case "lifecycle-shutdown":
 				p = &transcriptShutdown{}
 			case "base":
@@ -188,6 +194,9 @@ func TestProtocolTranscripts(t *testing.T) {
 
 func compareTranscriptResponse(t *testing.T, step int, got json.RawMessage, want transcriptStep) {
 	t.Helper()
+	if want.ExpectContains != "" && !bytes.Contains(got, []byte(want.ExpectContains)) {
+		t.Fatalf("step %d: missing literal %s in %s", step, want.ExpectContains, got)
+	}
 	var actual, expected map[string]any
 	if err := json.Unmarshal(got, &actual); err != nil {
 		t.Fatal(err)

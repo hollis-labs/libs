@@ -1,3 +1,4 @@
+import { enableHooksFixture } from '../dist/hooks-fixture.js';
 import { ErrCancelled, errNotFound, errConflict, errValidation, PluginError } from '../dist/index.js';
 
 function fail(name) {
@@ -15,6 +16,20 @@ export function fixturePlugin(profile) {
     load() { return { skipped_registrations: [{ kind: 'command', id: 'optional', reason: 'no config' }] }; },
     unload() {},
   };
+  if (profile === 'hooks-fixture' || profile === 'hooks-declined') {
+    const plugin = {...base, init(){return {...base.init(),hooks_profile_version:1};}, health(){return {ok:true};}, hookHandle(ctx,p) {
+      switch(p.metadata.fixture) {
+        case 'cancelled': case 'approval_required': return {invocation_id:p.invocation_id,status:p.metadata.fixture,reason:'fixture veto'};
+        case 'handler_error': throw new Error('private backend');
+        case 'panic': throw 'fixture panic';
+        case 'invalid_output': return {invocation_id:'wrong',status:'ok'};
+        case 'wait': return new Promise(resolve=>ctx.signal.addEventListener('abort',()=>resolve({invocation_id:p.invocation_id,status:'ok'}),{once:true}));
+      }
+      return {invocation_id:p.invocation_id,status:'ok',...(p.kind==='filter'?{payloadJSON:p.payloadJSON}:{})};
+    }};
+    if(profile==='hooks-fixture') enableHooksFixture(plugin);
+    return plugin;
+  }
   if (profile === 'lifecycle-shutdown') {
     const effects = {unload_attempts:0,health_calls:0};
     return {...base,unload(){effects.unload_attempts++;},health(){effects.health_calls++;return {ok:true};},effects(){return {...effects};}};

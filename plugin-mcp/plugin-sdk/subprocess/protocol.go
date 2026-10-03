@@ -49,13 +49,15 @@ const (
 	MethodHealth = "plugin/health"
 
 	// Runtime methods (host -> plugin).
-	MethodCommandExecute = "command/execute"
-	MethodEventHandle    = "event/handle"
-	MethodCRUDCreate     = "crud/create"
-	MethodCRUDRead       = "crud/read"
-	MethodCRUDUpdate     = "crud/update"
-	MethodCRUDDelete     = "crud/delete"
-	MethodCRUDList       = "crud/list"
+	MethodCommandExecute  = "command/execute"
+	MethodEventHandle     = "event/handle"
+	MethodHookHandle      = "hook/handle"
+	MethodHookHandleBatch = "hook/handle_batch"
+	MethodCRUDCreate      = "crud/create"
+	MethodCRUDRead        = "crud/read"
+	MethodCRUDUpdate      = "crud/update"
+	MethodCRUDDelete      = "crud/delete"
+	MethodCRUDList        = "crud/list"
 
 	// MCP methods (host -> plugin).
 	MethodListTools = "mcp/list_tools"

@@ -13,3 +13,6 @@ export type { InitFailureCode } from './init-contract.js';
 export type { Grant, GrantSet, RuntimeIdentity, HostServices, HostServiceLimits, HooksProfile } from './wire.js';
 
 export type { ForwardContext } from './host-rpc.js';
+
+export * from './hooks.js';
+export type { HookHandler } from './types.js';

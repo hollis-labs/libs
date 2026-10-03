@@ -1,3 +1,4 @@
+import { hookResponseJSON } from './hooks-dispatch.js';
 import { decodeRuntimeParams, PayloadError } from './payload.js';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -110,10 +111,10 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   const write = (response: RPCResponse): Promise<void> => {
     if (closed || transportError) return Promise.resolve();
     let line: string;
-    try { line = JSON.stringify(response, (_key, value: unknown) => {
+    try { line = (hookResponseJSON(response) ?? JSON.stringify(response, (_key, value: unknown) => {
       if (typeof value === 'function' || typeof value === 'symbol' || (typeof value === 'number' && !Number.isFinite(value))) throw new Error('unserializable result value');
       return value;
-    }) + '\n'; }
+    })) + '\n'; }
     catch (error) { line = JSON.stringify({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:`marshal result: ${errorMessage(error)}`}}) + '\n'; }
     writeTail = writeTail.then(() => {
       if (closed || transportError) return;

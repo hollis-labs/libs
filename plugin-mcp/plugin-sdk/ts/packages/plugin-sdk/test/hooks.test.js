@@ -1,0 +1,101 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import * as sdk from '../dist/index.js';
+import { parseJSONTokens } from '../dist/strict-json.js';
+import { Dispatcher, decodeRequest } from '../dist/dispatch.js';
+import { hookResponseJSON } from '../dist/hooks-dispatch.js';
+import { enableHooksFixture } from '../dist/hooks-fixture.js';
+import { fixturePlugin, initParams } from './fixtures.js';
+const root=new URL('../../../../protocol/v2/fixtures/hooks.json',import.meta.url);
+const vectors=parseJSONTokens(await readFile(root,'utf8'));
+for(const v of vectors) test('hook DTO: '+v.name,()=>{
+  const validate=()=>{
+    let result;
+    switch(v.dto){
+      case 'HookHandleParams':result=sdk.decodeHookHandleParams(v.raw);if(v.notification!==undefined)sdk.validateHookRequest(result,v.notification);break;
+      case 'HookHandleBatchParams':result=sdk.decodeHookHandleBatchParams(v.raw);if(v.notification!==undefined)sdk.validateHookBatchRequest(result,v.notification);break;
+      case 'HookHandleResult':result=sdk.decodeHookHandleResult(v.raw);if(v.request)sdk.validateHookResultFor(v.request,result);break;
+      case 'HookHandleBatchResult':result=sdk.decodeHookHandleBatchResult(v.raw);break;
+      default:throw new Error('unhandled vector '+v.dto);
+    }
+    return result;
+  };
+  if(v.valid) assert.doesNotThrow(validate);else assert.throws(validate);
+});
+const base=vectors[0];
+const context=()=>({signal:new AbortController().signal,config:new sdk.ConfigReader({}),logger:{debug(){},info(){},warn(){},error(){}}});
+async function dispatcher(plugin,enabled=true){
+  if(enabled) enableHooksFixture(plugin);
+  const d=new Dispatcher(plugin,context(),new sdk.SecretTracker());
+  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams({hooks_profile:{hooks_profile_version:1}})})));
+  assert.equal(r.result.hooks_profile_version,undefined);
+  return d;
+}
+test('RawJSON preserves literals and escaped keys through author and wire paths',async()=>{
+  const raw=base.raw.replace('{"title":"old"}', '{"n":1.50,"large":9007199254740993,"x\\u005b":"<x>&"}');
+  const p=sdk.decodeHookHandleParams(raw);
+  assert.equal(p.payloadJSON,'{"n":1.50,"large":9007199254740993,"x\\u005b":"<x>&"}');
+  assert.equal(p.payload['x['],'<x>&');
+  assert.ok(sdk.encodeHookHandleParams(p).includes(p.payloadJSON));
+  const result={invocation_id:p.invocation_id,status:'ok',payloadJSON:p.payloadJSON};
+  assert.ok(sdk.encodeHookHandleResult(result).includes(p.payloadJSON));
+  const r=sdk.decodeHookHandleResult(sdk.encodeHookHandleResult(result));
+  assert.equal(sdk.hookPayloadJSON(r),p.payloadJSON);
+  assert.ok(sdk.encodeHookHandleResult(r).includes(p.payloadJSON));
+  assert.throws(()=>sdk.encodeHookHandleResult({...result,payload:{}}));
+  assert.throws(()=>sdk.rawJSON('{"a":1,"a":2}'));
+  assert.throws(()=>sdk.rawJSON('1e999'));
+  const d=await dispatcher(fixturePlugin('hooks-fixture'));
+  const reply=await d.dispatch(decodeRequest('{"jsonrpc":"2.0","id":7,"method":"hook/handle","params":'+raw+'}'));
+  assert.ok(hookResponseJSON(reply).includes(p.payloadJSON));
+});
+test('all batch params validate before any invocation',async()=>{
+  let calls=0;
+  const plugin={...fixturePlugin('hooks-fixture'),hookHandle(_ctx,p){calls++;return {invocation_id:p.invocation_id,status:'ok'};}};
+  const d=await dispatcher(plugin);
+  const p={...JSON.parse(base.raw),kind:'action',mode:'parallel'};
+  const items=[p,{...p,invocation_id:'second',context:{timeout_ms:1}}];
+  const response=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:8,method:'hook/handle_batch',params:{items}})));
+  assert.equal(response.error.code,-32602);assert.equal(response.error.data.contract,'hooks/1');assert.equal(calls,0);
+});
+test('shipped entry points cannot enable hooks, and neither sentinel is a veto',async()=>{
+  assert.equal(sdk.enableHooksFixture,undefined);
+  await assert.rejects(import('@hollis-labs/plugin-sdk/hooks-fixture'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+  const d=await dispatcher(fixturePlugin('hooks-declined'),false);
+  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:7,method:'hook/handle',params:JSON.parse(base.raw)})));
+  assert.equal(r.error.code,-32601);
+  assert.throws(()=>sdk.hookRPCError(-32003,'invalid_params'));
+  assert.throws(()=>sdk.hookRPCError(-32010,'invalid_params'));
+});
+test('hook timeout and caller cancellation are operational failures',async()=>{
+  const plugin=fixturePlugin('hooks-fixture');const d=await dispatcher(plugin);
+  const p={...JSON.parse(base.raw),kind:'action',mode:'sequential',metadata:{fixture:'wait'},context:{binding_id:'b',timeout_ms:10},aggregate_budget_ms:5};
+  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:7,method:'hook/handle',params:p})));
+  assert.equal(r.result.status,'failed');assert.equal(r.result.error.code,'deadline_exceeded');
+  const controller=new AbortController();d.context={...d.context,signal:controller.signal};controller.abort();
+  const c=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:8,method:'hook/handle',params:p})));
+  assert.equal(c.result.error.code,'caller_cancelled');
+});
+const directory=new URL('../../../../docs/protocol/v2/transcripts/',import.meta.url);
+for(const name of (await readdir(directory)).filter(n=>n.startsWith('hooks-')&&n.endsWith('.json'))) {
+  test('real Node hook transcript: '+name,{timeout:15000},async t=>{
+    const fixture=parseJSONTokens(await readFile(new URL(name,directory),'utf8'));
+    const child=spawn(process.execPath,[new URL('./hooks-child.js',import.meta.url).pathname,fixture.profile],{stdio:['pipe','pipe','pipe']});
+    const exited=new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',(code,signal)=>resolve({code,signal}));});
+    let stderr='';child.stderr.on('data',b=>stderr+=b);
+    t.after(()=>child.kill());
+    const lines=createInterface({input:child.stdout,crlfDelay:Infinity});t.after(()=>lines.close());const replies=lines[Symbol.asyncIterator]();
+    for(const step of fixture.steps) {
+      child.stdin.write((step.raw??JSON.stringify(step.send))+'\n');
+      if(step.expect===undefined)continue;
+      const line=await replies.next();assert.equal(line.done,false,stderr);if(step.expect_contains)assert.ok(line.value.includes(step.expect_contains),line.value);const actual=parseJSONTokens(line.value);
+      if(step.message_prefix){assert.ok(actual.error.message.startsWith(step.message_prefix));delete actual.error.message;}
+      assert.deepEqual(actual,step.expect);
+    }
+    child.stdin.end();for await(const extra of {[Symbol.asyncIterator]:()=>replies})assert.fail('unexpected child reply '+extra);
+    assert.deepEqual(await exited,{code:0,signal:null},stderr);
+  });
+}
