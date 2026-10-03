@@ -1,0 +1,76 @@
+# go-egress-proxy
+
+A host-side, domain-allowlisted HTTP proxy for sandboxed child processes. It is
+the network-policy half deliberately left out of `go-sandbox`: it listens on
+loopback, hands the child `HTTP_PROXY` / `HTTPS_PROXY` via `EnvVars`, and
+enforces the allowlist plus an SSRF deny set on every resolved IP before any
+dial. It confines network egress and nothing else — no filesystem or process
+confinement, no traffic inspection.
+
+## Start Here
+
+- `README.md`'s "What this library is — and isn't" is the scope statement, and
+  documents the wildcard semantics.
+- `egress/doc.go` states the threat model.
+- `egress/proxy.go` owns `Config`, `Start`/`Stop`, the allowlist and
+  `builtinDeniedCIDRs`, the deny set.
+- `egress/ssrf.go` owns the SSRF guard itself: `ResolveAndPin`, `Guard`,
+  `DefaultResolver`, `IsLocalhostName`. `(*Proxy).resolveAndPin` only
+  delegates to it; there is one copy of the policy.
+- `egress/tunnels.go` owns CONNECT tunnels and the shutdown drain.
+- `examples/sandbox_integration/main.go` shows the `go-sandbox` call site.
+
+## Commands
+
+```bash
+gofmt -l .
+go vet ./...
+golangci-lint run
+go test -race -count=1 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+```
+
+`.github/workflows/check.yml` runs those five on push and on pull request to
+`main`, with golangci-lint pinned at v2.11.4, and is the landing gate.
+`.golangci.yml` is the portfolio go-baseline config. The tree is clean
+against it with no ratchet, so any new finding fails the build.
+
+## Boundaries
+
+This is security-critical code and its guarantees are not optional. Every one
+below has a named regression test; if you change the behavior, you are changing
+the security posture, not refactoring.
+
+Validate-then-pin defeats DNS rebinding: every IP the resolver returns is
+checked against the deny set, then the dial targets the IP literal, so DNS
+cannot rebind between check and dial. `TestProxy_CONNECT_PinsValidatedIP` and
+`TestProxy_CONNECT_FailsClosedOnMixedIPs` hold this — note the second: a
+hostname resolving to both an allowed and a denied IP fails closed.
+
+The deny set covers link-local including cloud IMDS (169.254/16), RFC1918,
+CGNAT, the special-purpose ranges (192.0.0/24, 192.88.99/24, 198.18/15,
+240/4 with 255.255.255.255), IPv6 ULA, link-local and site-local, the NAT64
+local-use prefix, and unspecified. `TestProxy_CONNECT_BlocksIMDS`
+and `TestProxy_HTTP_BlocksRFC1918` are the ones to keep green.
+
+An IPv6 transition form (NAT64 well-known, 6to4, Teredo, IPv4-compatible) is
+judged by the IPv4 it carries (`embeddedIPv4s`, ported from Nanite's
+internal/ssrf). Denying those prefixes whole would break DNS64 egress, and not
+reading them lets a denied IPv4 through. Embedded loopback is denied even
+with `AllowLocalhost` — `TestResolveAndPin_JudgesEmbeddedIPv4` and
+`TestResolveAndPin_EmbeddedLoopbackDeniedEvenWithAllowLocalhost`.
+
+Loopback is denied unless `AllowLocalhost` is set, and it is off by default —
+`TestProxy_HTTP_RejectsLocalhostByName` covers reaching it by name rather than
+by address.
+
+CONNECT is restricted to TLS ports (443, 8443); `ExtraCONNECTPorts` exists for
+tests, not for production widening.
+
+`Stop` explicitly closes hijacked CONNECT connections. `http.Server.Shutdown`
+is documented not to touch them, so without the tracked-conn drain a stalled
+upstream wedges shutdown — `TestProxy_Stop_DrainsStalledCONNECT`.
+
+The `Host` header is scrubbed on the plain-HTTP forward path. That is a
+regression test for a prior audit finding, not a stylistic choice
+(`TestProxy_HTTP_HostHeaderNotForwarded`).
