@@ -53,6 +53,7 @@ type Registration struct {
 	Owner, Generation, Hook, Name string
 	Sequence                      uint64
 	Options                       ResolvedOptions
+	Warnings                      []RegistrationWarning
 }
 
 // ScopeConfig is supplied by the trusted host, not by a plugin. Hooks is an
@@ -194,23 +195,14 @@ func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, ki
 	r := s.registry
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if s.state.disposed {
-		return Handle{}, ErrDisposed
-	}
-	d, ok := r.definitions[hook]
-	if !ok {
-		return Handle{}, ErrUnknownHook
-	}
-	if !s.state.allowed[hook] {
-		return Handle{}, ErrUnauthorized
-	}
-	if name == "" || d.Kind != kind || (a == nil && f == nil) {
-		return Handle{}, ErrInvalidOptions
-	}
-	options, err := resolve(d, o)
+	policy, err := s.validateRegistrationLocked(hook, name, kind, o)
 	if err != nil {
 		return Handle{}, err
 	}
+	if a == nil && f == nil {
+		return Handle{}, fmt.Errorf("%w: %s: handler required", ErrInvalidOptions, hook)
+	}
+	d := r.definitions[hook]
 	count := 0
 	for _, e := range r.entries {
 		if e.scope == s.state && !e.removed && e.registration.Name == name {
@@ -225,7 +217,7 @@ func (s *Scope) add(hook, name string, o Options, a ActionFunc, f FilterFunc, ki
 	}
 	r.sequence++
 	handle := Handle{r, r.sequence, s.state.key.generation}
-	reg := Registration{handle, s.state.key.owner, s.state.key.generation, hook, name, r.sequence, options}
+	reg := Registration{Handle: handle, Owner: s.state.key.owner, Generation: s.state.key.generation, Hook: hook, Name: name, Sequence: r.sequence, Options: policy.Options, Warnings: policy.Warnings}
 	removalContext, cancelRemoval := context.WithCancel(context.Background()) //nolint:gosec // Cancellation belongs to removeLocked; it is retained on the registration.
 	r.entries[handle.id] = &entry{removalContext: removalContext, cancelRemoval: cancelRemoval, registration: reg, scope: s.state, action: a, filter: f, active: map[uint64]context.CancelFunc{}}
 	return handle, nil
@@ -240,7 +232,9 @@ func (s *Scope) Registrations() []Registration {
 	var out []Registration
 	for _, e := range r.entries {
 		if e.scope == s.state && !e.removed && !e.claimed {
-			out = append(out, e.registration)
+			reg := e.registration
+			reg.Warnings = slices.Clone(reg.Warnings)
+			out = append(out, reg)
 		}
 	}
 	sortRegistrations(out)
@@ -410,4 +404,52 @@ func (l *lease) finish() bool {
 	r.mu.Unlock()
 	l.cancel()
 	return valid
+}
+
+// RegistrationWarning is returned without logging, so hosts choose their
+// operator surface. It describes deprecation and never redirects registration.
+type RegistrationWarning struct {
+	Hook        string      `json:"hook"`
+	Deprecation Deprecation `json:"deprecation"`
+}
+
+// RegistrationValidation contains resolved policy and registration warnings.
+type RegistrationValidation struct {
+	Options  ResolvedOptions
+	Warnings []RegistrationWarning
+}
+
+// ValidateRegistration preflights a manifest declaration against this scope's
+// catalog, kind, allowlist and options. It does not reserve a name or capacity;
+// AddAction/AddFilter recheck policy, duplicates and capacity atomically.
+func (s *Scope) ValidateRegistration(hook, name string, kind Kind, o Options) (RegistrationValidation, error) {
+	s.registry.mu.Lock()
+	defer s.registry.mu.Unlock()
+	return s.validateRegistrationLocked(hook, name, kind, o)
+}
+func (s *Scope) validateRegistrationLocked(hook, name string, kind Kind, o Options) (RegistrationValidation, error) {
+	var v RegistrationValidation
+	fail := func(err error) (RegistrationValidation, error) { return v, fmt.Errorf("%w: %s", err, hook) }
+	if s.state.disposed {
+		return fail(ErrDisposed)
+	}
+	d, ok := s.registry.definitions[hook]
+	if !ok {
+		return fail(ErrUnknownHook)
+	}
+	if !s.state.allowed[hook] {
+		return fail(ErrUnauthorized)
+	}
+	if name == "" || d.Kind != kind {
+		return fail(ErrInvalidOptions)
+	}
+	options, err := resolve(d, o)
+	if err != nil {
+		return fail(err)
+	}
+	v.Options = options
+	if d.Deprecated != nil {
+		v.Warnings = []RegistrationWarning{{Hook: hook, Deprecation: *d.Deprecated}}
+	}
+	return v, nil
 }

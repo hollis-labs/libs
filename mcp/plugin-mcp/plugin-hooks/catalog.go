@@ -53,12 +53,20 @@ var (
 type Validator func(json.RawMessage) error
 
 // Deprecation describes a declaration's removal plan; it never aliases names.
-type Deprecation struct{ Since, Replacement, Reason, Removal string }
+type Deprecation struct {
+	Since       string `json:"since"`
+	Replacement string `json:"replacement,omitempty"`
+	Reason      string `json:"reason"`
+	Removal     string `json:"removal"`
+}
 
 // Definition is an explicit host policy, with no runtime presets.
 // RemoteOK is a pointer so omission can be rejected distinctly from false.
 type Definition struct {
-	Name                                         string
+	Name string
+	// OwnerNamespace is assigned by the trusted host for custom declarations.
+	// It is not a plugin ID conversion or registration permission.
+	OwnerNamespace                               string
 	Kind                                         Kind
 	Mode                                         Mode
 	InputSchema, OutputSchema                    json.RawMessage
@@ -105,6 +113,14 @@ func validateDefinition(d Definition) error {
 	bad := func(s string) error { return fmt.Errorf("%w: %s: %s", ErrInvalidDefinition, d.Name, s) }
 	if !hookName.MatchString(d.Name) || d.Since == "" || d.SchemaDigest == "" {
 		return bad("name, since and schema digest required")
+	}
+	if err := validateCustomName(d.Name, d.OwnerNamespace); err != nil {
+		return bad(err.Error())
+	}
+	if p := d.Deprecated; p != nil {
+		if p.Since == "" || p.Reason == "" || p.Removal == "" || (p.Replacement != "" && (!hookName.MatchString(p.Replacement) || p.Replacement == d.Name)) {
+			return bad("deprecation needs since, reason, removal and a distinct canonical replacement (if supplied)")
+		}
 	}
 	if d.RemoteOK == nil || d.Budget <= 0 || d.HandlerTimeout <= 0 || d.HandlerTimeout > d.Budget || d.MaxPayloadBytes <= 0 || d.MaxHandlers <= 0 || d.MaxParallelism <= 0 {
 		return bad("explicit finite policy limits required")
@@ -187,4 +203,18 @@ func copyDefinition(d Definition) Definition {
 		d.Views = v
 	}
 	return d
+}
+
+func validateCustomName(name, namespace string) error {
+	parts := strings.Split(name, ".")
+	if parts[0] != "plugin" {
+		if namespace != "" {
+			return fmt.Errorf("owner namespace is only valid for custom declarations")
+		}
+		return nil
+	}
+	if len(parts) != 4 || namespace == "" || parts[1] != namespace {
+		return fmt.Errorf("custom name must be plugin.<host-assigned owner_namespace>.<subject>.<event>")
+	}
+	return nil
 }
