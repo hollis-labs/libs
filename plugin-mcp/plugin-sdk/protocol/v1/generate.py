@@ -57,6 +57,6 @@ for name, definition in SCHEMA['$defs'].items():
         ts.append(f'  {key}{"?" if optional else ""}: {type_for(prop, "ts")};')
     go.extend(['}', ''])
     ts.extend(['}', ''])
-(ROOT / 'wire.go').write_text('\n'.join(go) + '\n')
-(ROOT / 'wire.ts').write_text('\n'.join(ts) + '\n')
+(ROOT / 'wire.go').write_text('\n'.join(go).rstrip() + '\n')
+(ROOT / 'wire.ts').write_text('\n'.join(ts).rstrip() + '\n')
 subprocess.run(['gofmt', '-w', str(ROOT / 'wire.go')], check=True)

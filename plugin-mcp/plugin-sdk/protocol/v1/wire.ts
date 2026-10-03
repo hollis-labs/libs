@@ -164,4 +164,3 @@ export interface EmptyParams {
 export interface OKResult {
   ok: boolean;
 }
-
