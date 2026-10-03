@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -450,6 +451,11 @@ func TestStatusProjectionNeverActivatesInactiveEntries(t *testing.T) {
 			r := validResponse()
 			c := r.Contributions["panel"]["notes/main"]
 			c.Status = status
+			c.StatusReason = "host-state"
+			wantStatus := status
+			if status == "future_status" {
+				wantStatus = StatusUnavailable
+			}
 			r.Contributions[c.Kind][c.Key()] = c
 			if err := r.Validate(); err != nil {
 				t.Fatal(err)
@@ -458,7 +464,7 @@ func TestStatusProjectionNeverActivatesInactiveEntries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || plan.Listed[0].Status != status {
+			if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || plan.Listed[0].Status != wantStatus {
 				t.Fatal("inactive entry lost or activated")
 			}
 			if status == "future_status" && (len(plan.StatusDiagnostics) != 1 || plan.StatusDiagnostics[0].Reason != "unknown-status") {
@@ -468,8 +474,20 @@ func TestStatusProjectionNeverActivatesInactiveEntries(t *testing.T) {
 			if _, err := catalog.Activate(r, policyFor(r)); err != nil {
 				t.Fatal(err)
 			}
-			if catalog.Snapshot().Contributions[c.Kind][c.Key()].Status != status {
+			if catalog.Snapshot().Contributions[c.Kind][c.Key()].Status != wantStatus {
 				t.Fatal("projection status dropped")
+			}
+			if plan.Listed[0].StatusReason != "host-state" || catalog.Snapshot().Contributions[c.Kind][c.Key()].StatusReason != "host-state" {
+				t.Fatal("status reason changed")
+			}
+			if status == "future_status" {
+				published, _ := json.Marshal(struct {
+					Plan     Plan
+					Snapshot Response
+				}{plan, catalog.Snapshot()})
+				if strings.Contains(string(published), string(status)) {
+					t.Fatal("raw unknown status echoed")
+				}
 			}
 		})
 	}

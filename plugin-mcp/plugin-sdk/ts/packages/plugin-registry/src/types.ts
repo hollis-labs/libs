@@ -35,7 +35,7 @@ export interface RegistryContribution {
   kind: string;
   schema_version: number;
   required: boolean;
-  /** Host projection. Unknown nonempty statuses remain listed and inactive. */
+  /** Host projection. Unknown nonempty statuses project as unavailable and inactive. */
   status: string;
   status_reason?: string;
   representation: Representation;

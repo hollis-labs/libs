@@ -459,7 +459,10 @@ test("inactive statuses stay listed without fetch, import or adoption", async ()
     assert.equal(r.list("panel").length, 0);
     assert.equal(r.ownerOf("panel", "p/main"), "p");
     const listed = r.snapshot().contributions[0];
-    assert.equal(listed.status, status);
+    assert.equal(
+      listed.status,
+      status === "future_status" ? "unavailable" : status,
+    );
     assert.equal(listed.status_reason, "host-choice");
     assert.equal(listed.resolved, false);
     assert.deepEqual(r.refusals(), []);
@@ -467,6 +470,15 @@ test("inactive statuses stay listed without fetch, import or adoption", async ()
     if (diagnostics.length) {
       assert.equal(diagnostics[0].type, "status-diagnostic");
       assert.equal(diagnostics[0].diagnostic.reason, "unknown-status");
+      assert.equal(
+        JSON.stringify({
+          snapshot: r.snapshot(),
+          diagnostics,
+          errors: r.errors(),
+          refusals: r.refusals(),
+        }).includes(status),
+        false,
+      );
     }
   }
 });

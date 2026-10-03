@@ -1,11 +1,13 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -43,7 +45,13 @@ func TestContractFixtures(t *testing.T) {
 			var fx struct {
 				Response    json.RawMessage `json:"response"`
 				ResponseRaw *string         `json:"response_raw"`
-				Go          struct {
+				Projection  *struct {
+					Kind, Key, Status string
+					StatusReason      string `json:"status_reason"`
+					Diagnostics       []string
+					Accepted          int
+				} `json:"projection"`
+				Go struct {
 					Validate string `json:"validate"`
 				} `json:"go"`
 			}
@@ -61,6 +69,46 @@ func TestContractFixtures(t *testing.T) {
 			}
 			if got := classify(err); got != fx.Go.Validate {
 				t.Fatalf("got %s want %s", got, fx.Go.Validate)
+			}
+			if err == nil && fx.Projection != nil {
+				expectation := fx.Projection
+				plan, planErr := response.Plan(policyFor(response))
+				if planErr != nil {
+					t.Fatal(planErr)
+				}
+				if len(plan.Listed) != 1 || len(plan.Accepted) != expectation.Accepted {
+					t.Fatal("unexpected projection admission")
+				}
+				listed := plan.Listed[0]
+				if listed.Status != ContributionStatus(expectation.Status) || listed.StatusReason != expectation.StatusReason {
+					t.Fatal("status projection mismatch")
+				}
+				reasons := []string{}
+				for _, diagnostic := range plan.StatusDiagnostics {
+					reasons = append(reasons, diagnostic.Reason)
+				}
+				if !reflect.DeepEqual(reasons, expectation.Diagnostics) {
+					t.Fatal("status diagnostics mismatch")
+				}
+				catalog := NewCatalog(response.HostInstance)
+				activated, activationErr := catalog.Activate(response, policyFor(response))
+				if activationErr != nil {
+					t.Fatal(activationErr)
+				}
+				snapshot := catalog.Snapshot()
+				entry := snapshot.Contributions[expectation.Kind][expectation.Key]
+				if entry.Status != ContributionStatus(expectation.Status) || entry.StatusReason != expectation.StatusReason {
+					t.Fatal("snapshot status mismatch")
+				}
+				published, _ := json.Marshal(struct {
+					Plan      Plan
+					Activated Plan
+					Snapshot  Response
+				}{plan, activated, snapshot})
+				original := response.Contributions[expectation.Kind][expectation.Key].Status
+				if bytes.Contains(published, []byte(original)) {
+					t.Fatal("raw unknown status echoed into output")
+				}
 			}
 			if err == nil {
 				wire, err := json.Marshal(response)

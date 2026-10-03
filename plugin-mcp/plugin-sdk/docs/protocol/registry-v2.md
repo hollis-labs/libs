@@ -62,8 +62,11 @@ and availability; the SDK validates and carries the projection, with no selectio
 algorithm or automatic status changes. Only `accepted` entries are active.
 `declared_not_selected` and `unavailable` entries remain listed but are never
 resolved, imported for that entry, mounted, or dispatched. Unknown nonempty status
-strings keep the document valid and the entry listed, but remain inactive with an
-`unknown-status` diagnostic. They never fall back to accepted, even if required.
+strings keep the document valid and normalize to `unavailable` in the listed
+projection and published snapshots, with an `unknown-status` diagnostic. The raw
+unknown status is never echoed in projections, snapshots, diagnostics or loader
+events; optional `status_reason` stays as supplied. They never fall back to accepted,
+even if required.
 Required schema/admission failures still abort planning; inactive host status is
 not a substitute for admission or authority.
 

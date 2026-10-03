@@ -26,7 +26,7 @@ const (
 )
 
 // ContributionStatus carries host selection/availability, never SDK selection logic.
-// Unknown nonempty values are preserved, diagnosed and never active.
+// Unknown nonempty values project as unavailable, are diagnosed and never active.
 type ContributionStatus string
 
 const (
@@ -334,6 +334,12 @@ func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
 		sort.Strings(keys)
 		for _, key := range keys {
 			c := r.Contributions[kind][key]
+			switch c.Status {
+			case StatusAccepted, StatusDeclaredNotSelected, StatusRefused, StatusUnavailable:
+			default:
+				c.Status = StatusUnavailable
+				plan.StatusDiagnostics = append(plan.StatusDiagnostics, Refusal{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, "unknown-status", c.Required})
+			}
 			if c.Status == StatusRefused {
 				plan.Listed = append(plan.Listed, c)
 				continue
@@ -375,12 +381,8 @@ func (r Response) Plan(policy AdmissionPolicy) (Plan, error) {
 				required = required || c.Required
 			} else {
 				plan.Listed = append(plan.Listed, c)
-				switch c.Status {
-				case StatusAccepted:
+				if c.Status == StatusAccepted {
 					plan.Accepted = append(plan.Accepted, c)
-				case StatusDeclaredNotSelected, StatusUnavailable:
-				default:
-					plan.StatusDiagnostics = append(plan.StatusDiagnostics, Refusal{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, "unknown-status", c.Required})
 				}
 			}
 		}
