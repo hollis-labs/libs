@@ -45,7 +45,7 @@ func enforcementFixture(t *testing.T) (*Enforcer, *Authority, Call, context.Canc
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := Call{Capability: capability.StorageWrite, GrantID: "grant", Operation: "host/storage/put", Target: "owner", Effect: capability.Write, Dimensions: map[string]string{"keys": "preferences"}, Usage: map[string]int64{"request_bytes": 10}, RequestID: "request", TraceID: "trace"}
+	call := Call{Capability: capability.StorageWrite, GrantID: "grant", Operation: "host/storage/put", Target: "owner", Effect: capability.Write, Dimensions: map[string]string{"keys": "preferences"}, Usage: map[string]int64{"request_bytes": 10}, RequestID: 1, TraceID: "trace"}
 	return enforcer, auth, call, cancel, releases, events
 }
 func failureCode(t *testing.T, err error, want capability.Code) {
@@ -122,7 +122,7 @@ func TestEnforcementBeforeEffects(t *testing.T) {
 			if effects != 0 || releases.Load() != 0 {
 				t.Fatal("refusal caused effects or reserved budget")
 			}
-			if len(*events) != 1 || (*events)[0].Outcome != tc.code || (*events)[0].RequestID != c.RequestID {
+			if len(*events) != 1 || (*events)[0].Outcome != tc.code || (*events)[0].RequestID != "1" {
 				t.Fatal("denial audit missing")
 			}
 			if a.Authenticated && (*events)[0].Actor != (Actor{string(a.Actor.Kind), a.Actor.ID}) {
@@ -428,7 +428,7 @@ func TestRequestCancellationAndUnavailableAdaptersFailBeforeEffects(t *testing.T
 			case "nil catalog":
 				e.Catalog = nil
 			case "empty request":
-				c.RequestID = ""
+				c.RequestID = 0
 				want = capability.InvalidRequest
 			case "nil release":
 				e.Budget = budgetFunc(func(context.Context, Authority, Call) (func(), error) { return nil, nil })

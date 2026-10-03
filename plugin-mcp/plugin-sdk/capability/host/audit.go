@@ -99,7 +99,7 @@ func denialKey(code capability.Code, reason capability.FailureDetail) DenialKey 
 		code = capability.InternalError
 	}
 	switch reason {
-	case "", capability.StaleBinding, capability.CallbackCycle, capability.DepthExceeded:
+	case "", capability.StaleBinding, capability.CallbackCycle, capability.DepthExceeded, capability.ParentInvalid, capability.ParentTerminal:
 	default:
 		reason = ""
 	}

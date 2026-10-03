@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,7 +29,8 @@ type Call struct {
 	Effect                                 capability.Effect
 	Dimensions                             map[string]string
 	Usage                                  map[string]int64
-	TraceID, RequestID, Server, Tool       string
+	TraceID, Server, Tool                  string
+	RequestID                              capability.RequestID
 }
 
 // Authority is resolved afresh from a trusted host transport/policy adapter.
@@ -142,7 +144,7 @@ func staleBinding(name string) *capability.Error {
 }
 
 // Admission failures are classified by our state, never by a caller's asserted outcome.
-func admissionFailure(err error, name, requestID string) *capability.Error {
+func admissionFailure(err error, name string, requestID capability.RequestID) *capability.Error {
 	failure := safeFailure(err, name, requestID)
 	if failure.Code == capability.UnknownOutcome {
 		failure.Code = capability.InternalError
@@ -150,14 +152,21 @@ func admissionFailure(err error, name, requestID string) *capability.Error {
 	failure.EffectState = capability.NotStarted
 	return failure
 }
-func safeFailure(err error, name, requestID string) *capability.Error {
+func safeFailure(err error, name string, requestID capability.RequestID) *capability.Error {
+	// An invalid envelope ID cannot correlate an application error. Preserve
+	// its internal classification; the adapter emits a standard envelope error.
+	if requestID.Validate() != nil {
+		requestID = 0
+	}
 	var failure *capability.Error
 	if errors.As(err, &failure) && failure != nil {
 		copy := *failure
 		copy.Capability = name
 		copy.RequestID = requestID
-		if payload, validation := copy.RPCData(); validation == nil {
-			copy.EffectState = payload.EffectState
+		if validation := copy.Validate(); validation == nil {
+			if copy.EffectState == "" {
+				copy.EffectState = capability.Unknown
+			}
 			return &copy
 		}
 	}
@@ -175,7 +184,7 @@ func (e *Enforcer) check(ctx context.Context, call Call) (auth Authority, expiry
 	if e == nil || e.Resolver == nil || e.Catalog == nil || e.host == "" || e.audience == "" {
 		return Authority{}, time.Time{}, refusal(capability.InternalError, call.Capability)
 	}
-	if call.Capability == "" || call.GrantID == "" || call.Operation == "" || call.Target == "" || call.RequestID == "" {
+	if call.Capability == "" || call.GrantID == "" || call.Operation == "" || call.Target == "" || call.RequestID.Validate() != nil {
 		return Authority{}, time.Time{}, refusal(capability.InvalidRequest, call.Capability)
 	}
 	auth, err = e.Resolver.Resolve(ctx, cloneCall(call))
@@ -540,7 +549,7 @@ func (e *Enforcer) record(ctx context.Context, call Call, auth Authority, start 
 		auth.InitiatingCaller = nil
 	}
 	now := e.auditTime()
-	event := AuditEvent{Timestamp: now, TraceID: call.TraceID, RequestID: call.RequestID, Actor: Actor{Kind: string(auth.Actor.Kind), ID: auth.Actor.ID}, InitiatingCaller: auditActor(auth.InitiatingCaller), Owner: auth.Owner, Capability: call.Capability, GrantID: call.GrantID, PolicyRevision: auth.PolicyRevision, Target: call.Target, Server: call.Server, Tool: call.Tool, Effect: call.Effect, EffectState: successState, Duration: max(time.Duration(0), now.Sub(start))}
+	event := AuditEvent{Timestamp: now, TraceID: call.TraceID, RequestID: strconv.FormatUint(uint64(call.RequestID), 10), Actor: Actor{Kind: string(auth.Actor.Kind), ID: auth.Actor.ID}, InitiatingCaller: auditActor(auth.InitiatingCaller), Owner: auth.Owner, Capability: call.Capability, GrantID: call.GrantID, PolicyRevision: auth.PolicyRevision, Target: call.Target, Server: call.Server, Tool: call.Tool, Effect: call.Effect, EffectState: successState, Duration: max(time.Duration(0), now.Sub(start))}
 	if err != nil {
 		failure := safeFailure(err, call.Capability, call.RequestID)
 		event.Outcome = failure.Code
@@ -631,7 +640,7 @@ func (e *Enforcer) require(ctx context.Context, call Call) (permit *Permit, auth
 func callbackFailure(err error, call Call) *capability.Error {
 	var typed *capability.Error
 	if errors.As(err, &typed) && typed != nil {
-		if _, validation := typed.RPCData(); validation == nil {
+		if validation := typed.Validate(); validation == nil {
 			failure := safeFailure(err, call.Capability, call.RequestID)
 			if failure.EffectState == capability.Unknown && call.Effect != capability.Read {
 				failure.Code = capability.UnknownOutcome

@@ -128,16 +128,17 @@ func TestRPCDataValidationAndDetails(t *testing.T) {
 		{Code: "unknown", EffectState: Unknown},
 		{Code: InternalError, EffectState: Unknown, Detail: "raw secret detail"},
 	} {
+		e.RequestID = 1
 		if _, err := e.RPCData(); err == nil {
 			t.Fatalf("accepted %#v", e)
 		}
 	}
-	d, err := (&Error{Code: InternalError}).RPCData()
+	d, err := (&Error{Code: InternalError, RequestID: 1}).RPCData()
 	if err != nil || d.EffectState != Unknown {
 		t.Fatal("missing state did not default unknown")
 	}
-	for _, detail := range []FailureDetail{StaleBinding, CallbackCycle, DepthExceeded} {
-		e := &Error{Code: Conflict, EffectState: NotCommitted, Detail: detail}
+	for _, detail := range []FailureDetail{StaleBinding, CallbackCycle, DepthExceeded, ParentInvalid, ParentTerminal} {
+		e := &Error{Code: Conflict, EffectState: NotCommitted, Detail: detail, RequestID: 1}
 		d, err := e.RPCData()
 		if err != nil || d.Detail != detail || d.Code != Conflict || d.Retryable {
 			t.Fatalf("detail: %#v %v", d, err)

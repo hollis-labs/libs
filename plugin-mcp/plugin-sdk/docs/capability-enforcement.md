@@ -50,6 +50,10 @@ bearer credentials from this library.
 `Call` contains host-normalized demands, not raw arguments. Supply capability,
 grant, exact operation/target/effect, request/trace IDs, every descriptor-specific
 identifier dimension, and measured/reserved usage for every numeric limit.
+`Call.RequestID` uses the leaf positive safe-integer type. Audit records its
+decimal representation. An invalid ID produces an internal invalid_request
+classification without RPC correlation; the adapter must emit a standard
+JSON-RPC envelope error rather than invent an application error ID.
 A missing dimension/usage fails closed. Core operation/target/effect cannot be
 overridden through the dimensions map. Canonical paired identifiers must include
 all reviewed identity/revision information; the helper does not resolve URLs,
