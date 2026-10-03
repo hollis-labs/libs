@@ -1,7 +1,6 @@
 {
   "description": "refusals",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 3,
     "plugins": {},
@@ -17,7 +16,8 @@
         "required": false,
         "reason": "unsupported-kind"
       }
-    ]
+    ],
+    "registry_version": 2
   },
   "go": {
     "validate": "ok"

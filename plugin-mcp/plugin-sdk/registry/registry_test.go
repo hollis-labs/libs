@@ -14,15 +14,15 @@ func validResponse() Response {
 	r.Plugins["notes"] = Plugin{OwnerGeneration: "1", BundleURL: "/notes.js", BundleVersion: BundleDigest([]byte("export const Panel = {};")), Runtime: []Runtime{{Name: "react", Min: "19.0.0", Max: "19.9.9"}}}
 	r.Kinds["panel"] = KindDescriptor{1, json.RawMessage(`{}`), []Representation{Component}, []string{"rail"}, []string{}}
 	r.Regions["rail"] = RegionDescriptor{[]string{"panel"}, []Representation{Component}, json.RawMessage(`{}`), "priority-ascending"}
-	_ = r.Set(Contribution{OwnerID: "notes", OwnerGeneration: "1", LocalKey: "main", Kind: "panel", SchemaVersion: 1, Required: true, Representation: Component, Metadata: json.RawMessage(`{"title":"Notes"}`), Component: &ComponentRef{"Panel", "rail"}})
+	_ = r.Set(Contribution{Status: StatusAccepted, OwnerID: "notes", OwnerGeneration: "1", LocalKey: "main", Kind: "panel", SchemaVersion: 1, Required: true, Representation: Component, Metadata: json.RawMessage(`{"title":"Notes"}`), Component: &ComponentRef{"Panel", "rail"}})
 	return r
 }
 func policyFor(r Response) AdmissionPolicy {
 	return AdmissionPolicy{Kinds: r.Kinds, Regions: r.Regions}
 }
-func TestProtocolLockedAt2(t *testing.T) {
-	if Protocol != 2 {
-		t.Fatal("registry protocol must be 2")
+func TestRegistryVersionLockedAt2(t *testing.T) {
+	if RegistryVersion != 2 {
+		t.Fatal("registry version must be 2")
 	}
 }
 func TestWireRoundtrip(t *testing.T) {
@@ -121,8 +121,8 @@ func TestRepresentationsAndOwnership(t *testing.T) {
 	r = NewResponse("epoch", 2)
 	r.Plugins["p"] = Plugin{OwnerGeneration: "1"}
 	for _, c := range []Contribution{
-		{OwnerID: "p", OwnerGeneration: "1", LocalKey: "nav", Kind: "nav.item", SchemaVersion: 1, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{"label":"Hi"}`)},
-		{OwnerID: "p", OwnerGeneration: "1", LocalKey: "tool", Kind: "mcp.tool", SchemaVersion: 1, Representation: Handler, Metadata: json.RawMessage(`{}`), Handler: &HandlerRef{ID: "notes.read"}},
+		{Status: StatusAccepted, OwnerID: "p", OwnerGeneration: "1", LocalKey: "nav", Kind: "nav.item", SchemaVersion: 1, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{"label":"Hi"}`)},
+		{Status: StatusAccepted, OwnerID: "p", OwnerGeneration: "1", LocalKey: "tool", Kind: "mcp.tool", SchemaVersion: 1, Representation: Handler, Metadata: json.RawMessage(`{}`), Handler: &HandlerRef{ID: "notes.read"}},
 	} {
 		if err := r.Set(c); err != nil {
 			t.Fatal(err)
@@ -244,7 +244,7 @@ func TestScopeFencesAndContinuesCleanup(t *testing.T) {
 }
 func TestDuplicateJSONKeysRefused(t *testing.T) {
 	var r Response
-	if err := json.Unmarshal([]byte(`{"protocol":2,"protocol":2}`), &r); !errors.Is(err, ErrCollision) {
+	if err := json.Unmarshal([]byte(`{"registry_version":2,"registry_version":2}`), &r); !errors.Is(err, ErrCollision) {
 		t.Fatalf("duplicate: %v", err)
 	}
 }
@@ -351,7 +351,7 @@ func TestCoreAndForeignNamespacesRefused(t *testing.T) {
 		r.Plugins[owner] = Plugin{OwnerGeneration: "1"}
 		kind := "plugin.someone_else.nav"
 		r.Kinds[kind] = KindDescriptor{1, json.RawMessage(`{}`), []Representation{Declarative}, []string{}, []string{}}
-		_ = r.Set(Contribution{OwnerID: owner, OwnerGeneration: "1", LocalKey: "nav", Kind: kind, SchemaVersion: 1, Required: true, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{}`)})
+		_ = r.Set(Contribution{Status: StatusAccepted, OwnerID: owner, OwnerGeneration: "1", LocalKey: "nav", Kind: kind, SchemaVersion: 1, Required: true, Representation: Declarative, Metadata: json.RawMessage(`{}`), Declarative: json.RawMessage(`{}`)})
 		plan, err := r.Plan(policyFor(r))
 		if !errors.Is(err, ErrRequired) || plan.Refusals[0].Reason != "reserved" {
 			t.Fatalf("namespace accepted: %+v %v", plan, err)
@@ -369,7 +369,7 @@ func TestPublicBindingCollisionAndNestedDuplicateJSON(t *testing.T) {
 	if !errors.Is(r.Validate(), ErrCollision) {
 		t.Fatal("public binding collision accepted")
 	}
-	raw := []byte(`{"protocol":2,"metadata":{"nested":1,"nested":2}}`)
+	raw := []byte(`{"registry_version":2,"metadata":{"nested":1,"nested":2}}`)
 	if !errors.Is(json.Unmarshal(raw, &r), ErrCollision) {
 		t.Fatal("nested duplicate key accepted")
 	}
@@ -441,5 +441,61 @@ func TestRevokeRefusalOnlyOwnerPublishesAbsence(t *testing.T) {
 	}
 	if notifications != 1 || catalog.Snapshot().Revision != 3 {
 		t.Fatal("idempotent revoke republished unchanged catalog")
+	}
+}
+
+func TestStatusProjectionNeverActivatesInactiveEntries(t *testing.T) {
+	for _, status := range []ContributionStatus{StatusDeclaredNotSelected, StatusUnavailable, "future_status"} {
+		t.Run(string(status), func(t *testing.T) {
+			r := validResponse()
+			c := r.Contributions["panel"]["notes/main"]
+			c.Status = status
+			r.Contributions[c.Kind][c.Key()] = c
+			if err := r.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := r.Plan(policyFor(r))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || plan.Listed[0].Status != status {
+				t.Fatal("inactive entry lost or activated")
+			}
+			if status == "future_status" && (len(plan.StatusDiagnostics) != 1 || plan.StatusDiagnostics[0].Reason != "unknown-status") {
+				t.Fatal("unknown status not diagnosed")
+			}
+			catalog := NewCatalog(r.HostInstance)
+			if _, err := catalog.Activate(r, policyFor(r)); err != nil {
+				t.Fatal(err)
+			}
+			if catalog.Snapshot().Contributions[c.Kind][c.Key()].Status != status {
+				t.Fatal("projection status dropped")
+			}
+		})
+	}
+}
+
+func TestRefusedStatusHasSingleAuthoritativeRefusal(t *testing.T) {
+	r := validResponse()
+	c := r.Contributions["panel"]["notes/main"]
+	c.Required = false
+	c.Status = StatusRefused
+	c.StatusReason = "host-policy"
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("unbacked refused status accepted")
+	}
+	r.Refusals = []Refusal{{c.OwnerID, c.OwnerGeneration, c.Kind, c.LocalKey, "host-policy", false}}
+	plan, err := r.Plan(policyFor(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Accepted) != 0 || len(plan.Listed) != 1 || len(plan.Refusals) != 1 {
+		t.Fatal("refusal duplicated or activated")
+	}
+	c.Status = StatusAccepted
+	r.Contributions[c.Kind][c.Key()] = c
+	if !errors.Is(r.Validate(), ErrInvalidContribution) {
+		t.Fatal("accepted/refused contradiction allowed")
 	}
 }

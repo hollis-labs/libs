@@ -1,0 +1,10 @@
+{
+  "description": "Case variants collide rather than overwrite the revision.",
+  "response_raw": "{\"registry_version\":2,\"host_instance\":\"host-epoch\",\"revision\":3,\"REVISION\":4,\"plugins\":{},\"kinds\":{},\"regions\":{},\"contributions\":{},\"refusals\":[]}",
+  "go": {
+    "validate": "ErrCollision"
+  },
+  "ts": {
+    "validate": "ErrCollision"
+  }
+}

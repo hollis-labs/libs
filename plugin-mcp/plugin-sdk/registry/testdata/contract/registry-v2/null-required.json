@@ -1,7 +1,6 @@
 {
-  "description": "An extra representation is forbidden even when null.",
+  "description": "A required flag cannot be null.",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -52,7 +51,7 @@
           "local_key": "main",
           "kind": "panel",
           "schema_version": 1,
-          "required": true,
+          "required": null,
           "representation": "component",
           "metadata": {
             "title": "Notes"
@@ -62,11 +61,12 @@
             "region": "rail"
           },
           "public_binding": "notes-panel",
-          "handler": null
+          "status": "accepted"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
     "validate": "ErrInvalidContribution"

@@ -1,7 +1,6 @@
 {
-  "description": "protocol-1",
+  "description": "missing-status",
   "response": {
-    "protocol": 1,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -65,12 +64,13 @@
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
-    "validate": "ErrProtocol"
+    "validate": "ErrInvalidContribution"
   },
   "ts": {
-    "validate": "ErrProtocol"
+    "validate": "ErrInvalidContribution"
   }
 }

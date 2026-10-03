@@ -1,7 +1,6 @@
 {
-  "description": "both-representations",
+  "description": "Refused payload has one authoritative top-level refusal.",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -52,7 +51,7 @@
           "local_key": "main",
           "kind": "panel",
           "schema_version": 1,
-          "required": true,
+          "required": false,
           "representation": "component",
           "metadata": {
             "title": "Notes"
@@ -62,16 +61,27 @@
             "region": "rail"
           },
           "public_binding": "notes-panel",
-          "declarative": {}
+          "status": "refused",
+          "status_reason": "host-policy"
         }
       }
     },
-    "refusals": []
+    "refusals": [
+      {
+        "owner_id": "notes",
+        "owner_generation": "1",
+        "kind": "panel",
+        "local_key": "main",
+        "required": false,
+        "reason": "host-policy"
+      }
+    ],
+    "registry_version": 2
   },
   "go": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ok"
   },
   "ts": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ok"
   }
 }

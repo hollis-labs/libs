@@ -73,7 +73,7 @@ func (c *Catalog) Activate(response Response, policy AdmissionPolicy) (Plan, err
 		return plan, err
 	}
 	candidate.Contributions = map[string]map[string]Contribution{}
-	for _, entry := range plan.Accepted {
+	for _, entry := range plan.Listed {
 		_ = candidate.Set(entry)
 	}
 	candidate.Refusals = plan.Refusals

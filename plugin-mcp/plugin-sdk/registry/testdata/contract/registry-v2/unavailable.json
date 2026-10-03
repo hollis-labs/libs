@@ -1,7 +1,6 @@
 {
-  "description": "reversed-runtime-bounds",
+  "description": "unavailable",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -13,8 +12,8 @@
         "runtime": [
           {
             "name": "react",
-            "min": "20.0.0",
-            "max": "19.0.0"
+            "min": "19.0.0",
+            "max": "19.9.9"
           }
         ]
       }
@@ -61,16 +60,19 @@
             "export": "Panel",
             "region": "rail"
           },
-          "public_binding": "notes-panel"
+          "public_binding": "notes-panel",
+          "status": "unavailable",
+          "status_reason": "host-state"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
-    "validate": "ErrRuntime"
+    "validate": "ok"
   },
   "ts": {
-    "validate": "ErrRuntime"
+    "validate": "ok"
   }
 }

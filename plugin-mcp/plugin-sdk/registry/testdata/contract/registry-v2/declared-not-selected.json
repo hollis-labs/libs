@@ -1,7 +1,6 @@
 {
-  "description": "missing-required",
+  "description": "declared-not-selected",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 2,
     "plugins": {
@@ -52,6 +51,7 @@
           "local_key": "main",
           "kind": "panel",
           "schema_version": 1,
+          "required": true,
           "representation": "component",
           "metadata": {
             "title": "Notes"
@@ -60,16 +60,19 @@
             "export": "Panel",
             "region": "rail"
           },
-          "public_binding": "notes-panel"
+          "public_binding": "notes-panel",
+          "status": "declared_not_selected",
+          "status_reason": "host-state"
         }
       }
     },
-    "refusals": []
+    "refusals": [],
+    "registry_version": 2
   },
   "go": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ok"
   },
   "ts": {
-    "validate": "ErrInvalidContribution"
+    "validate": "ok"
   }
 }

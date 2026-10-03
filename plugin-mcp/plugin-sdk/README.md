@@ -59,7 +59,7 @@ go get github.com/hollis-labs/plugin-sdk
   decoder refuses legacy dialects, unknown fields and duplicate keys.
   See [the manifest contract](docs/manifest.md).
 - `registry` — the Go view of the plugin registry wire contract: the
-  protocol-2 catalog of owner-qualified declarative, component, and handler
+  registry-v2 catalog of owner-qualified declarative, component, and handler
   contributions, with host kind/region admission, runtime and digest verification,
   revision publication, and reverse-order disposal scopes. See the
   [registry wire and lifecycle contract](docs/protocol/registry-v2.md).

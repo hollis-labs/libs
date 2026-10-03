@@ -1,12 +1,15 @@
-# Contribution registry protocol 2
+# Contribution registry v2
 
 This is the shared implementation contract for CW-20261003-0037, based on
-CW-20261003-0025 and CW-20261003-0026. Protocol 1 is rejected; there is no fallback
+CW-20261003-0025 and CW-20261003-0026. Legacy registry protocol-only documents are rejected; there is no fallback
 or compatibility shim. Nanite remains pinned to its released SDK during wave 1.
 
 ## Wire fields
 
-The response requires `protocol: 2`, `host_instance` (opaque host epoch),
+The response requires `registry_version: 2` and forbids a `protocol` key.
+Protocol-only, dual-key and unsupported registry-version documents fail by name
+with `ErrRegistryVersion`; no fallback or dual-key emission is allowed. Plugin
+protocol 2 is a separate stdio/grants contract. The response also requires `host_instance` (opaque host epoch),
 `revision` (positive integer, at most 2^53−1), `plugins`, `kinds`, `regions`,
 `contributions`, and `refusals`. Empty maps are `{}` and empty lists are `[]`.
 Duplicate JSON object keys are collisions, including nested keys and case variants
@@ -31,7 +34,7 @@ built-in kind enumeration. Descriptors declare contracts, never grant authority.
 
 `contributions[kind][owner_id + "/" + local_key]` contains `owner_id`,
 `owner_generation`, `local_key`, `kind`, `schema_version`, explicit boolean
-`required`, `representation`, and JSON `metadata`. Optional `public_binding`
+`required`, `status`, `representation`, and JSON `metadata`. Optional `public_binding`
 is unique within a kind. Owner IDs and local keys match `[A-Za-z0-9_.-]+`.
 Generation is opaque and must match its plugin record. Exactly one
 representation-specific field is allowed:
@@ -45,6 +48,35 @@ and `required`. An unknown optional kind remains structurally valid, then receiv
 a named admission refusal. Any required refusal aborts the candidate's activation.
 Optional refusals preserve admitted siblings.
 
+## Entry status and one refusal authority
+
+Every contribution has an explicit nonempty `status`: the known vocabulary is
+`accepted`, `declared_not_selected`, `refused`, or `unavailable`. Optional
+`status_reason` is a nonempty diagnostic code when present. The host owns selection
+and availability; the SDK validates and carries the projection, with no selection
+algorithm or automatic status changes. Only `accepted` entries are active.
+`declared_not_selected` and `unavailable` entries remain listed but are never
+resolved, imported for that entry, mounted, or dispatched. Unknown nonempty status
+strings keep the document valid and the entry listed, but remain inactive with an
+`unknown-status` diagnostic. They never fall back to accepted, even if required.
+Required schema/admission failures still abort planning; inactive host status is
+not a substitute for admission or authority.
+
+Top-level `refusals[]` is the ONLY refusal authority. A refusal may have no
+contribution payload. If the host additionally retains an entry with `status:
+refused` for presentation, it must match exactly one top-level refusal by
+owner/generation/kind/local_key and `required`; its optional `status_reason` must
+match that refusal's reason. A refused entry without that authoritative record,
+a non-refused entry also named in refusals, or contradictory required/reason data
+is invalid. Duplicate refusal identities collide. The registry does not generate
+a second refusal for that listed refused entry.
+
+Go planning returns `Listed` for admitted projection entries, `Accepted` for only
+active entries, and `StatusDiagnostics` for unknown status values. Catalog
+publication preserves Listed entries including inactive statuses. Host callers
+execute/resolve only the active Accepted subset and gate later calls on generation
+and scope. Diagnostic records are not additional refusal authority.
+
 ## Host admission
 
 The host explicitly opts into kinds and component regions. Both published and
@@ -56,7 +88,7 @@ another owner's `plugin.<owner>.*` namespace are refused.
 Admission refusal codes are `reserved`, `unsupported-kind`, `unsupported-schema`,
 `unsupported-representation`, `unsupported-region`, `invalid-metadata`, and
 `unsupported-metadata-schema`. Structural failures are separate errors:
-`ErrProtocol`, `ErrInvalidContribution`, `ErrUnknownPlugin`, `ErrCollision`,
+`ErrRegistryVersion`, `ErrInvalidContribution`, `ErrUnknownPlugin`, `ErrCollision`,
 `ErrIntegrity`, and `ErrRuntime`; required admission refusal is `ErrRequired`.
 Lifecycle errors are `ErrStale`, `ErrNeedsRevocation`, and `ErrRevoked`.
 The registry does not grant capabilities or enforce server-side authorization;
@@ -88,11 +120,11 @@ cancellation: an in-process library cannot forcibly stop arbitrary code.
 
 ## Shared fixtures and split ownership
 
-`registry/testdata/contract/protocol-2/*.json` carries `description`, `response` (or `response_raw` for raw-JSON inputs),
+`registry/testdata/contract/registry-v2/*.json` carries `description`, `response` (or `response_raw` for raw-JSON inputs),
 `go.validate`, and `ts.validate`. Validation expectations describe structural
 validation, not host-specific admission. The unknown-optional fixture is `ok`
 structurally and must separately exercise `unsupported-kind` admission.
-Protocol-1 fixtures remain frozen historical evidence, not supported input.
+Legacy protocol-1 fixtures remain frozen historical evidence, not supported input.
 
 The first PR owns Go, these fixtures, and this summary. The stacked second PR owns
 TypeScript types, verified-byte loader, React adapter, and TypeScript conformance.

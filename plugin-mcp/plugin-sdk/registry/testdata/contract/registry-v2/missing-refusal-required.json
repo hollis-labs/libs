@@ -1,7 +1,6 @@
 {
   "description": "A refusal requires an explicit required boolean.",
   "response": {
-    "protocol": 2,
     "host_instance": "host-epoch",
     "revision": 3,
     "plugins": {},
@@ -16,7 +15,8 @@
         "local_key": "x",
         "reason": "unsupported-kind"
       }
-    ]
+    ],
+    "registry_version": 2
   },
   "go": {
     "validate": "ErrInvalidContribution"
