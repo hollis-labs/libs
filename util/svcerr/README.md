@@ -11,7 +11,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-svcerr
+go get github.com/hollis-labs/libs/util/svcerr
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	svcerr "github.com/hollis-labs/go-svcerr"
+	svcerr "github.com/hollis-labs/libs/util/svcerr"
 )
 
 func main() {

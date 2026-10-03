@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/hollis-labs/go-svcerr"
+	"github.com/hollis-labs/libs/util/svcerr"
 )
 
 func ExampleNew() {
