@@ -6,9 +6,9 @@ import (
 	"io/fs"
 )
 
-func normalizeMode(req Request, e artifact.Entry, field layout.Field, pkg bool) (fs.FileMode, *Diagnostic, error) {
+func normalizeMode(req Request, e artifact.Entry, field layout.Field, pkg bool, defaultMode fs.FileMode) (fs.FileMode, *Diagnostic, error) {
 	if !e.Kind.Valid() || e.Kind == artifact.EntryFile && e.Mode.Type() != 0 || e.Kind == artifact.EntryDirectory && e.Mode.Type()&^fs.ModeDir != 0 {
-		return 0, nil, refuse(req, field, "invalid_entry_type", "managed entries must be regular files or directories")
+		return 0, nil, &Diagnostic{Class: ClassRefusal, Code: CodeInvalidEntryType, Provider: req.Provider, Mode: req.Mode, Concern: field, Entry: e.Path, Reason: "managed entries must be regular files or directories"}
 	}
 	declared := e.Mode
 	applied := declared.Perm() &^ 0022
@@ -24,9 +24,13 @@ func normalizeMode(req Request, e artifact.Entry, field layout.Field, pkg bool) 
 			code = CodeNormalizedOverlayDirectoryMode
 		}
 	} else if applied == 0 {
-		applied = 0644
+		applied = defaultMode
 	}
-	if declared != 0 && declared != applied || e.Kind == artifact.EntryDirectory && declared != applied {
+	changed := declared != 0 && declared != applied
+	if e.Kind == artifact.EntryDirectory {
+		changed = declared != 0 && declared.Perm() != 0755
+	}
+	if changed {
 		return applied, &Diagnostic{Class: ClassInformational, Code: code, Provider: req.Provider, Mode: req.Mode, Concern: field, Reason: "entry permission mode was normalized", Entry: e.Path, Declared: declared, Applied: applied}, nil
 	}
 	return applied, nil, nil

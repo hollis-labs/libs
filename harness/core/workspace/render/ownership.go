@@ -6,9 +6,7 @@ import (
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"io"
 	"slices"
-	"strings"
 )
 
 // DocumentOwnership is encoded in a native entry's Provenance.Note. The apply
@@ -71,25 +69,31 @@ func ParseOwnershipNote(note string) (DocumentOwnership, error) {
 	if contract.ValidateValue(contract.Context{}, note) != nil {
 		return DocumentOwnership{}, ErrInvalidOwnershipNote
 	}
-	if _, err := contract.Object(contract.Context{}, []contract.Slot{{Key: "note", Value: json.RawMessage(note)}}); err != nil {
+	object, err := contract.Object(contract.Context{}, []contract.Slot{{Key: "note", Value: json.RawMessage(note)}})
+	if err != nil {
 		return DocumentOwnership{}, ErrInvalidOwnershipNote
 	}
-	d := json.NewDecoder(strings.NewReader(note))
-	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil || out.Schema != OwnershipNoteSchema || out.OwnedKeyPaths == nil || out.ReservedSlots == nil {
+	keys, ok := object["note"].(map[string]any)
+	if !ok || len(keys) != 3 {
 		return DocumentOwnership{}, ErrInvalidOwnershipNote
 	}
-	var trailing any
-	if d.Decode(&trailing) != io.EOF {
+	for key := range keys {
+		switch key {
+		case "schema", "owned_key_paths", "reserved_slots":
+		default:
+			return DocumentOwnership{}, ErrInvalidOwnershipNote
+		}
+	}
+	// The shared decoder already rejects duplicate keys, trailing input and
+	// invalid UTF-8. Exact spelling here prevents json's case-insensitive matching.
+	if json.Unmarshal([]byte(note), &out) != nil || out.Schema != OwnershipNoteSchema || out.OwnedKeyPaths == nil || out.ReservedSlots == nil {
 		return DocumentOwnership{}, ErrInvalidOwnershipNote
 	}
+	// Leaf shape is a semantic check distinct from JSON/UTF-8 validation.
 	for _, parts := range out.OwnedKeyPaths {
 		if len(parts) == 0 {
 			return DocumentOwnership{}, ErrInvalidOwnershipNote
 		}
-	}
-	if contract.ValidateValue(contract.Context{}, out) != nil {
-		return DocumentOwnership{}, ErrInvalidOwnershipNote
 	}
 	return out, nil
 }

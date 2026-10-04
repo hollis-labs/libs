@@ -261,7 +261,7 @@ func Render(req Request) (Result, error) {
 		if overlay.ContentRef != nil {
 			return Result{}, refuse(req, layout.Resources, "unresolved_content", "overlay content must already be resolved")
 		}
-		mode, diag, err := normalizeMode(req, overlay, layout.Resources, false)
+		mode, diag, err := normalizeMode(req, overlay, layout.Resources, false, fs.FileMode(layout.FileMode))
 		if err != nil {
 			return Result{}, err
 		}
@@ -301,6 +301,7 @@ func Render(req Request) (Result, error) {
 		if err := ValidateRelPath(e.Path); err != nil {
 			return Result{}, refuse(req, layout.Resources, "unsafe_path", "artifact destination is unsafe")
 		}
+		// Checking every component here also excludes all synthesized ancestors.
 		if credential(e.Path) {
 			return Result{}, refuse(req, layout.Credentials, "credential_write", "credential destinations cannot be managed entries")
 		}
@@ -309,28 +310,11 @@ func Render(req Request) (Result, error) {
 		}
 		files[contract.FoldPath(e.Path)] = e
 	}
-	for _, e := range out.Tree.Entries {
-		for dir := path.Dir(e.Path); dir != "."; dir = path.Dir(dir) {
-			if old, ok := files[contract.FoldPath(dir)]; ok {
-				if old.Kind != artifact.EntryDirectory || old.Path != dir {
-					return Result{}, refuse(req, layout.Resources, "path_collision", "file blocks a parent directory")
-				}
-				continue
-			}
-			if len(files) >= MaxTreeEntries {
-				return Result{}, refuse(req, layout.Resources, "input_limit", "expanded entry count exceeds render limit")
-			}
-			files[contract.FoldPath(dir)] = artifact.Entry{Path: dir, Kind: artifact.EntryDirectory, Mode: 0755, Ownership: artifact.Ownership{EntryID: "workspace.render:" + dir, GroupID: "workspace.render:directories"}, Provenance: artifact.Provenance{Source: "workspace/render"}}
-		}
+	if _, err := synthesizeDirectories(req, out.Tree.Entries, files); err != nil {
+		return Result{}, err
 	}
 	out.Tree.Entries = nil
 	for _, e := range files {
-		if len(files) > MaxTreeEntries {
-			return Result{}, refuse(req, layout.Resources, "input_limit", "expanded entry count exceeds render limit")
-		}
-		if credential(e.Path) {
-			return Result{}, refuse(req, layout.Credentials, "credential_write", "credential destinations cannot be managed entries")
-		}
 		if e.Kind == artifact.EntryFile {
 			sum := sha256.Sum256(e.Bytes)
 			e.Digest = artifact.Digest{Algorithm: "sha256", Hex: hex.EncodeToString(sum[:])}
@@ -362,16 +346,18 @@ func validateRow(req Request, r layout.Row) error {
 	if err != nil {
 		return err
 	}
-	if r.Mode != expected.Mode || r.Variant != expected.Variant || r.DocumentSlot != expected.DocumentSlot || r.Concern != expected.Concern || r.Capability != layout.Supported || expected.Capability != layout.Supported || r.ExclusiveMCP != expected.ExclusiveMCP || r.Form != expected.Form || r.Renderer != expected.Renderer || r.ModeBits != expected.ModeBits || r.Root != expected.Root || r.Composition != expected.Composition || r.CredentialPolicy != expected.CredentialPolicy || !patternMatches(expected.Path, r.Path) {
+	// Capability must match its authored value and be eligible for emission.
+	if r.Mode != expected.Mode || r.Variant != expected.Variant || r.DocumentSlot != expected.DocumentSlot || r.Concern != expected.Concern || r.Capability != expected.Capability || r.Capability != layout.Supported || r.ExclusiveMCP != expected.ExclusiveMCP || r.Form != expected.Form || r.Renderer != expected.Renderer || r.ModeBits != expected.ModeBits || r.Root != expected.Root || r.Composition != expected.Composition || r.CredentialPolicy != expected.CredentialPolicy || !patternMatches(expected.Path, r.Path) {
 		return refuse(req, r.Field, "invalid_resolution", "resolved row differs from the authored table")
 	}
 	if r.Form != layout.RuntimeBinding && ValidateRelPath(r.Path) != nil {
 		return refuse(req, r.Field, "unsafe_path", "row destination is unsafe")
 	}
+	usesAgent := strings.Contains(expected.Path, "{agent}") || slices.Contains(expected.Locator.Argv, "{agent}") || expected.Locator.RPCProject == "directory/agent"
+	if usesAgent && (ValidateComponent(req.Agent) != nil || strings.HasPrefix(req.Agent, "-")) {
+		return refuse(req, r.Field, "invalid_component", "agent used by a selected path or locator must be a safe non-option component")
+	}
 	if strings.Contains(expected.Path, "{agent}") {
-		if ValidateComponent(req.Agent) != nil {
-			return refuse(req, r.Field, "invalid_component", "agent must be a safe single component")
-		}
 		concrete, err := layout.Expand(expected.Path, map[string]string{"agent": req.Agent})
 		if err != nil || concrete != r.Path {
 			return refuse(req, r.Field, "agent_mismatch", "rendered agent ID must match launch selection")
@@ -408,6 +394,9 @@ func matchPattern(pattern, rel string, fold bool) bool {
 // IsCredentialDestination is the table's sole credential exclusion rule.
 func IsCredentialDestination(rel string) bool { return layout.IsCredentialDestination(rel) }
 func credential(rel string) bool              { return IsCredentialDestination(rel) }
+
+// reserved retains folded namespace/ancestor checks as defense in depth
+// beyond the shared composition comparison, including package patterns.
 func reserved(rows []layout.Row, rel string) bool {
 	if credential(rel) {
 		return true
@@ -510,7 +499,9 @@ func packageEntries(req Request, r layout.Row, content Content) ([]artifact.Entr
 		if e.Path == "SKILL.md" && e.Kind == artifact.EntryFile {
 			main = true
 		}
-		applied, diag, err := normalizeMode(req, *e, r.Field, true)
+		modeEntry := *e
+		modeEntry.Path = path.Join(base, e.Path)
+		applied, diag, err := normalizeMode(req, modeEntry, r.Field, true, fs.FileMode(r.ModeBits))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -649,4 +640,28 @@ func reservedPaths(rows []layout.Row) []string {
 		}
 	}
 	return out
+}
+
+// synthesizeDirectories stops at an already-seen parent. Every explicit parent
+// is also visited as an input entry, so its ancestors are still checked. Work is
+// one existing-parent probe per entry plus one probe per new ancestor.
+func synthesizeDirectories(req Request, entries []artifact.Entry, files map[string]artifact.Entry) (int, error) {
+	steps := 0
+	for _, e := range entries {
+		for dir := path.Dir(e.Path); dir != "."; dir = path.Dir(dir) {
+			steps++
+			key := contract.FoldPath(dir)
+			if old, ok := files[key]; ok {
+				if old.Kind != artifact.EntryDirectory || old.Path != dir {
+					return steps, refuse(req, layout.Resources, "path_collision", "file blocks a parent directory")
+				}
+				break
+			}
+			if len(files) >= MaxTreeEntries {
+				return steps, refuse(req, layout.Resources, "input_limit", "expanded entry count exceeds render limit")
+			}
+			files[key] = artifact.Entry{Path: dir, Kind: artifact.EntryDirectory, Mode: 0755, Ownership: artifact.Ownership{EntryID: "workspace.render:" + dir, GroupID: "workspace.render:directories"}, Provenance: artifact.Provenance{Source: "workspace/render"}}
+		}
+	}
+	return steps, nil
 }
