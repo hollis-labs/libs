@@ -268,3 +268,15 @@ func TestSeparateAllowedBaseRejectsGlobalCanonicalBase(t *testing.T) {
 	_, err := workspace.Plan(s, c, r, o)
 	refusal(t, err, workspace.CodeObservationBaseMismatch)
 }
+
+func TestAvailableGrantTupleOrderingWithEmbeddedNul(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	for _, pair := range [][2]string{{"a", "b\x00c"}, {"a\x00b", "c"}, {"a", "b"}, {"a", "b\x00d"}, {"z", "c"}} {
+		r.Grants = append(r.Grants, workspace.EffectGrant{Kind: workspace.ArtifactEffect, RootID: s.Boot.Candidate.ID, AuthorizationID: pair[0], Version: pair[1]})
+	}
+	p := planned(t, s, c, r, o)
+	slices.Reverse(r.Grants)
+	if planned(t, s, c, r, o).Digest() != p.Digest() {
+		t.Fatal("available authorization/version tuple order changed digest")
+	}
+}
