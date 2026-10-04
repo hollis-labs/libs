@@ -27,3 +27,25 @@ func TestInstalledStaticFIFORefusedBeforeMutation(t *testing.T) {
 		t.Fatal("FIFO accepted or staged")
 	}
 }
+
+func TestInstalledDefensiveOpenDoesNotFollowEvenConfinedLink(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ordinary"), []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("ordinary", filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	file, err := openInstalledRegular(root, "link")
+	if file != nil {
+		file.Close()
+	}
+	if err == nil {
+		t.Fatal("defensive open followed link")
+	}
+}

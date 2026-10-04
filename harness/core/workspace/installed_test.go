@@ -669,3 +669,18 @@ func TestInstalledCredentialSentinelUntouched(t *testing.T) {
 		t.Fatal("credential bytes leaked into output")
 	}
 }
+
+func TestInstalledLockReleaseFailureRetainsCommittedRoot(t *testing.T) {
+	s, c, r, o, f := installedInputs(t, runtimes.Claude)
+	p := planned(t, s, c, r, o)
+	f.failRelease = true
+	result, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err == nil || result.ArtifactsComplete() || len(result.Retained) == 0 {
+		t.Fatal("lost committed root after release failure")
+	}
+	for _, record := range f.records {
+		if record.Phase == workspace.ArtifactsCommitted && record.Installed == nil {
+			t.Fatal("lost durable committed metadata")
+		}
+	}
+}

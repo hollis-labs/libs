@@ -302,6 +302,9 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 			if e := held[j].Release(); e != nil {
 				err = errors.Join(err, e)
 				result.artifactsComplete = false
+				if mutated {
+					result.Retained = appendRoot(result.Retained, p.spec.Installed.Target)
+				}
 				appendObligation(&result, Obligation{Kind: RecoveryInspectionRequired, Code: "lock_release_failed"})
 			}
 		}
