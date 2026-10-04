@@ -147,3 +147,11 @@ func TestRealLeafHandlesCompose(t *testing.T) {
 		t.Fatal("overlay acquired serializer authority")
 	}
 }
+
+func TestAliasedSlicesCannotHideInvalidUTF8(t *testing.T) {
+	bad := []string{string([]byte{0xff})}
+	value := []any{bad[:0], bad}
+	if _, err := claude.Settings(claude.SettingsInput{Slots: []contract.Slot{{Key: "value", Value: value}}}); err == nil {
+		t.Fatal("aliased slice hid invalid UTF-8")
+	}
+}

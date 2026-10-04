@@ -308,8 +308,10 @@ func merge(ctx Context, dst, src map[string]any) error {
 // it. It checks nested keys and values, including raw JSON, without printing them.
 func ValidateValue(ctx Context, value any) error {
 	type visit struct {
-		kind reflect.Kind
-		ptr  uintptr
+		kind   reflect.Kind
+		ptr    uintptr
+		typ    reflect.Type
+		length int
 	}
 	seen := map[visit]bool{}
 	var valid func(reflect.Value) bool
@@ -332,7 +334,11 @@ func ValidateValue(ctx Context, value any) error {
 			if v.IsNil() {
 				return true
 			}
-			id := visit{v.Kind(), v.Pointer()}
+			length := 0
+			if v.Kind() == reflect.Slice {
+				length = v.Len()
+			}
+			id := visit{kind: v.Kind(), ptr: v.Pointer(), typ: v.Type(), length: length}
 			if seen[id] {
 				return true
 			}
