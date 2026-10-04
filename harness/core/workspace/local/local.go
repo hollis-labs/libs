@@ -3,7 +3,7 @@
 // No constructor creates storage or discovers a home, registry or credential.
 // Locks use exclusive flock on Linux and Darwin and refuse other platforms.
 // Receipts synchronize ID bindings, sync their file before confined rename and
-// make no directory-fsync or crash-recovery promise. Close requires no active
+// sync the control directory before reporting success. Close requires no active
 // operations or held locks. Existing directories retain their modes.
 package local
 
@@ -274,7 +274,16 @@ func (p *ports) Record(ctx context.Context, r workspace.Receipt) (retErr error) 
 	if err = file.Close(); err != nil {
 		return err
 	}
-	return p.control.Rename(tmp, name)
+	if err = p.control.Rename(tmp, name); err != nil {
+		return err
+	}
+	// The name binding must be durable before callers begin artifact mutation.
+	// A sync error is a failed Record even when the renamed file is visible.
+	directory, err := p.control.Open(".")
+	if err != nil {
+		return err
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
 func (p *ports) Acquire(ctx context.Context, k workspace.LockKey) (workspace.HeldLock, error) {
 	if k.Namespace != p.options.ControlRoot.Path {
