@@ -195,3 +195,65 @@ func TestParentWalkBoundAndPackageDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestSpecialBitNormalizationDiagnostics(t *testing.T) {
+	for _, special := range []fs.FileMode{fs.ModeSetuid, fs.ModeSetgid, fs.ModeSticky, 04000, 02000, 01000} {
+		for _, pkg := range []bool{false, true} {
+			for _, kind := range []artifact.EntryKind{artifact.EntryFile, artifact.EntryDirectory} {
+				descriptive := []fs.FileMode{0}
+				if kind == artifact.EntryDirectory {
+					descriptive = append(descriptive, fs.ModeDir)
+				}
+				for _, typeBit := range descriptive {
+					t.Run(fmt.Sprintf("%o/package=%t/%s/type=%o", special, pkg, kind, typeBit), func(t *testing.T) {
+						req := request(runtimes.Claude)
+						path := "notes"
+						declared := special | typeBit | 0755
+						entry := artifact.Entry{Path: path, Kind: kind, Mode: declared}
+						if kind == artifact.EntryFile {
+							entry.Bytes = []byte("body")
+						}
+						wantCode := CodeClampedOverlayMode
+						if kind == artifact.EntryDirectory {
+							wantCode = CodeNormalizedOverlayDirectoryMode
+						}
+						if pkg {
+							if kind == artifact.EntryDirectory {
+								wantCode = CodeNormalizedPackageDirectoryMode
+							} else {
+								wantCode = CodeClampedPackageMode
+							}
+							req.Inputs = []Input{{Resolved: resolved(t, req.Provider, layout.Skills), Content: Content{Pin: Pin{"fixture", "revision"}, Package: artifact.Tree{Entries: []artifact.Entry{{Path: "SKILL.md", Kind: artifact.EntryFile, Bytes: []byte{}}, entry}}}}}
+							path = ".claude/skills/sample/notes"
+						} else {
+							req.Overlays = []artifact.Entry{entry}
+						}
+						out, err := Render(req)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if len(out.Diagnostics) != 1 {
+							t.Fatalf("expected normalization diagnostic: %v", out.Diagnostics)
+						}
+						d := out.Diagnostics[0]
+						if d.Class != ClassInformational || d.Code != wantCode || d.Provider != req.Provider || d.Mode != req.Mode || d.Entry != path || d.Declared != declared || d.Applied != 0755 {
+							t.Fatalf("incorrect diagnostic: %+v", d)
+						}
+						found := false
+						for _, applied := range out.Tree.Entries {
+							if applied.Path == path {
+								found = true
+								if applied.Mode != 0755 {
+									t.Fatalf("special bits retained: %o", applied.Mode)
+								}
+							}
+						}
+						if !found {
+							t.Fatal("entry missing")
+						}
+					})
+				}
+			}
+		}
+	}
+}
