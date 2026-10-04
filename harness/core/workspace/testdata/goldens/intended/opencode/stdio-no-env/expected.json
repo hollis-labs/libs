@@ -1,0 +1,57 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": "agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "agents/fixture.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\ndescription: Launch agent fixture\nmode: primary\n---\n\nFixture instructions.\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  },
+  {
+    "path": "opencode.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcp\": {\n    \"mux\": {\n      \"command\": [\n        \"fixture-mcp\"\n      ],\n      \"enabled\": true,\n      \"type\": \"local\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": "skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

@@ -89,7 +89,7 @@ func buildTable() []Row {
 	out[len(out)-1].ExclusiveMCP = Unsupported
 	add(oc, Boot, Skills, "skills", "skills/{name}/SKILL.md", "skill-package", Package, 0644, obs("O2"))
 	add(agy, Boot, Permissions, "runtime-permissions", "", "", RuntimeBinding, 0, source("adapters/registry/posture.go: agy permission mapping is runtime-only; no native permission file; agy 1.2.14 accepts flags, behavior is not fully measured"))
-	add(agy, Boot, Instructions, "instructions", "AGENTS.md", "instructions", File, 0644, source("agy 1.2.7 live transcript; model-visible, not Step 0"))
+	add(agy, Boot, Instructions, "instructions", "AGENTS.md", "instructions", File, 0644, source("agy 1.2.7 live transcript; model-visible, separate from the archived probe"))
 	add(agy, Boot, PlantingPlugin, "native-config", ".agents/plugins/tether/plugin.json", "antigravity-plugin", File, 0644, source("agy 1.2.7: stable tether marker"))
 	add(agy, Boot, MCP, "mcp", ".agents/plugins/tether/mcp_config.json", "antigravity-mcp", File, 0600, source("agy 1.2.7 live plugin discovery; isolation unmeasured"))
 	out[len(out)-1].ExclusiveMCP = Unmeasured

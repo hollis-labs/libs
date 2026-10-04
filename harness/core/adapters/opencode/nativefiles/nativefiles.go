@@ -66,14 +66,17 @@ type ConfigInput struct {
 }
 
 // Config encodes one native configuration document.
-func Config(in ConfigInput) ([]byte, error) {
+func Config(in ConfigInput) ([]byte, error) { doc, err := ConfigDocument(in); return doc.Bytes, err }
+
+// ConfigDocument also returns declared leaf ownership for installed apply.
+func ConfigDocument(in ConfigInput) (contract.Document, error) {
 	ctx := contract.Context{Provider: "opencode", Mode: in.Mode, Concern: "settings"}
 	if err := contract.ValidateServers(ctx, in.Servers); err != nil {
-		return nil, err
+		return contract.Document{}, err
 	}
 	for _, slot := range in.Slots {
 		if slot.Key == "mcp" {
-			return nil, ctx.Refuse(contract.DuplicateKey, "MCP native slot belongs to typed server bindings")
+			return contract.Document{}, ctx.Refuse(contract.DuplicateKey, "MCP native slot belongs to typed server bindings")
 		}
 	}
 	generated := []contract.Slot{}
@@ -98,11 +101,11 @@ func Config(in ConfigInput) ([]byte, error) {
 	}
 	doc, err := contract.Object(ctx, in.Slots, generated)
 	if err != nil {
-		return nil, err
+		return contract.Document{}, err
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return nil, ctx.Refuse(contract.InvalidInput, "config cannot be encoded")
+		return contract.Document{}, ctx.Refuse(contract.InvalidInput, "config cannot be encoded")
 	}
-	return append(out, '\n'), nil
+	return contract.Document{Bytes: append(out, '\n'), KeyPaths: contract.ObjectKeyPaths(doc)}, nil
 }

@@ -1,0 +1,6 @@
+{
+  "provider": "claude",
+  "runtime": "subprocess-per-turn",
+  "variant": "",
+  "scenario": "package-modes"
+}

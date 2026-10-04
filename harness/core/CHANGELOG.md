@@ -17,6 +17,15 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 
 ### Added
 
+- Pure provider document assembly under `workspace/render`, native leaf-key
+  ownership metadata, intended offline snapshots, and separate generated
+  exports for the authored provider plan-field table. Existing writers remain
+  in place while callers migrate.
+- Installed Codex encoding preserves literal strings and explicit parent MCP
+  tables; installed instruction markers retain their format and use the resolved
+  definition identifier.
+
+
 - The packages of six former Hollis Labs modules, moved in with their git history at their final homes: `sandbox/atomicfile` and `sandbox/pathsafe` (from `go-safefs`), `interception/permission` with `pathgrants` and `summary` (from `go-permission`), `workspace/materialize` with `artifact` (from `go-materialize`), `interception/filters/{classify,directive,event,normalize,repair}` (from `go-harness-filters`), `interception/egress` (from `go-egress-proxy`) and `adapters/runtimeevents` (from `go-runtime-events`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/`, with a `MIGRATION.md` listing old and new import paths. The old modules' release tags were not carried over.
 - Requirement: `gopkg.in/yaml.v3` v3.0.1 (from `go-permission`).
 - The packages of three more former modules, moved in with their git history at their final homes: `sandbox` (from `go-sandbox`), `adapters/provider` with `provider/events`, `adapters/providertest`, `adapters/registry` and `adapters/layout` with `gen` and `layouttest` (from `go-providers`), and `runner` with `internal/stubcli` (from `go-runner`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/` with a `MIGRATION.md`; the layout documents are in `adapters/layout/docs/`.
@@ -30,6 +39,13 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
   idempotency, controller fencing and process-group cleanup.
 
 ### Changed
+
+- The new artifact contract requests owner-only permissions for installed native
+  settings and configuration. At installed apply, existing settings are tightened
+  to 0600 on the next explicit install; no permission is widened. This narrows
+  the archived Claude settings mode of 0644. Existing planting behavior has not
+  been routed to this contract yet, and content drift checks ignore file modes.
+
 
 - `adapters/layout/gen` writes `adapters/layout/layout.json` and `adapters/layout/docs/LAYOUT.md`, the files' new locations relative to the module root (the generator's two path constants; it would otherwise have written `layout/layout.json` and `docs/LAYOUT.md` next to the module root).
 - Code that pinned a sibling at a tag now builds against the sibling's source at its old repository's `main`: `runner` (was `go-providers` v0.26.0, `go-sandbox` v0.3.0, `go-llm-types` v0.3.0), `adapters/provider` (was `go-llm-contracts` v0.1.0, `go-permission` v0.1.0) and `sandbox` (was `go-safefs` v0.1.0).

@@ -1,0 +1,25 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {},
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": ""
+  },
+  "diagnostics": [
+    "{\"Posture\":\"\",\"Code\":\"invalid_component\",\"Provider\":\"claude\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"instructions\",\"Reason\":\"agent must be a safe single component\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+  ]
+}

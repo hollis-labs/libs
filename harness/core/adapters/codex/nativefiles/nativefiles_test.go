@@ -1,6 +1,7 @@
 package nativefiles
 
 import (
+	"encoding/json"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 	"strings"
 	"testing"
@@ -50,5 +51,29 @@ func TestConfigExactEncodingAndInvalidNativeValues(t *testing.T) {
 		if _, err := Config(ConfigInput{Slots: []contract.Slot{slot}}); err == nil {
 			t.Fatalf("invalid native value accepted for %s", slot.Key)
 		}
+	}
+}
+
+func TestInstalledEncodingPreservesArchivedDocument(t *testing.T) {
+	in := ConfigInput{Mode: "install", Encoding: InstalledEncoding, ApprovalPolicy: "on-request", Servers: []contract.Server{{Name: "fixture", Command: "fixture-server", Args: []string{"one", "two"}}}}
+	got, err := Config(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "approval_policy = 'on-request'\n\n[mcp_servers]\n[mcp_servers.fixture]\nargs = ['one', 'two']\ncommand = 'fixture-server'\n"
+	if string(got) != want {
+		t.Fatalf("%q", got)
+	}
+}
+
+func TestInstalledEncodingScalarAndArrayConventions(t *testing.T) {
+	in := ConfigInput{Encoding: InstalledEncoding, Slots: []contract.Slot{{Key: "float", Value: json.Number("1e0")}, {Key: "escaped", Value: "can't\n<>&\x7f"}, {Key: "items", Value: []any{map[string]any{"name": "one"}, map[string]any{"name": "two"}}}}}
+	got, err := Config(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "escaped = \"can't\\n<>&\\u007F\"\nfloat = 1.0\n\n[[items]]\nname = 'one'\n\n[[items]]\nname = 'two'\n"
+	if string(got) != want {
+		t.Fatalf("%q", got)
 	}
 }

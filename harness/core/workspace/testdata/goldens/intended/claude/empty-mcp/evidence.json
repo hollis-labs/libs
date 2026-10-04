@@ -1,0 +1,144 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "--add-dir",
+        "/fixture/project",
+        "--mcp-config",
+        "<boot>/.mcp.json"
+      ],
+      "cwd": "<boot>",
+      "posture": {
+        "Provider": "claude",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      }
+    },
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": "boot"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".claude",
+      "ownership": {
+        "entry_id": "workspace.render:.claude",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".claude/settings.json",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/settings.json",
+        "group_id": "workspace.render:claude-settings"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[]}"
+      }
+    },
+    {
+      "path": ".claude/skills",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".claude/skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".claude/skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/skills/sample/SKILL.md",
+        "group_id": "workspace.render:.claude/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": ".claude/skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".claude/skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:.claude/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": ".mcp.json",
+      "ownership": {
+        "entry_id": "workspace.render:.mcp.json",
+        "group_id": "workspace.render:claude-mcp"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[]}"
+      }
+    },
+    {
+      "path": "CLAUDE.md",
+      "ownership": {
+        "entry_id": "workspace.render:CLAUDE.md",
+        "group_id": "workspace.render:claude-instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      }
+    }
+  ]
+}

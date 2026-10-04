@@ -1,0 +1,6 @@
+{
+  "provider": "codex",
+  "runtime": "jsonrpc-stdio",
+  "posture": "yolo",
+  "scenario": "native"
+}
