@@ -1,8 +1,7 @@
 package subprocess
 
 import (
-	"encoding/json"
-	"fmt"
+	"encoding/base64"
 	"io"
 	"os"
 	"sync"
@@ -19,6 +18,7 @@ type stderrLogger struct {
 	mu      sync.Mutex
 	out     io.Writer
 	kvs     []interface{}
+	invalid bool
 	secrets *secretTracker
 }
 
@@ -30,8 +30,8 @@ type logRecord struct {
 }
 
 // secretTracker records values that have been marked as secrets so that
-// the logger can redact any key-value pair whose value matches a known
-// secret before writing it to stderr.
+// SDK logging can redact message text and serialized structured values.
+// It does not intercept writes made directly to stderr.
 type secretTracker struct {
 	mu      sync.RWMutex
 	secrets map[string]struct{}
@@ -47,14 +47,12 @@ func (s *secretTracker) add(v string) {
 	}
 	s.mu.Lock()
 	s.secrets[v] = struct{}{}
+	// Encoded bytes are strings in JSON. Keep representations in this same
+	// tracker, and avoid allocating an alias too large to fit a log record.
+	if len(v) <= 3*(maxLogRecordBytes/4) {
+		s.secrets[base64.StdEncoding.EncodeToString([]byte(v))] = struct{}{}
+	}
 	s.mu.Unlock()
-}
-
-func (s *secretTracker) isSecret(v string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	_, ok := s.secrets[v]
-	return ok
 }
 
 // packageLogger is the singleton returned by Log(). It is nil-safe
@@ -97,10 +95,11 @@ func (l *stderrLogger) Error(msg string, kv ...interface{}) { l.log("error", msg
 // every record. Implementations share the underlying writer + secret
 // tracker; only the accumulated kvs diverge.
 func (l *stderrLogger) With(kv ...interface{}) plugin.Logger {
-	child := &stderrLogger{
-		out:     l.out,
-		secrets: l.secrets,
-		kvs:     append(append([]interface{}{}, l.kvs...), kv...),
+	child := &stderrLogger{out: l.out, secrets: l.secrets, invalid: l.invalid}
+	if len(l.kvs)+len(kv) > 2*maxLogFields {
+		child.invalid = true
+	} else {
+		child.kvs = append(append([]interface{}{}, l.kvs...), kv...)
 	}
 	return child
 }
@@ -109,44 +108,34 @@ func (l *stderrLogger) log(level, msg string, kv []interface{}) {
 	if l == nil || l.out == nil {
 		return
 	}
-
-	// Flatten base kvs + per-call kvs into an ordered map so JSON
-	// preserves the arguments' original order.
-	flat := map[string]interface{}{
-		"ts":    time.Now().UTC().Format(time.RFC3339Nano),
-		"level": level,
-		"msg":   msg,
+	flat := map[string]interface{}{"ts": time.Now().UTC().Format(time.RFC3339Nano), "level": level, "msg": msg}
+	data, err := stageLogRecord(flat, l.kvs, kv, l.invalid)
+	// Snapshot after user serialization: a custom marshaler may register a
+	// secret, and none of its error text is safe for the fallback.
+	redact, maskAll := l.secrets.redactor()
+	if maskAll {
+		err = errLogRecord
 	}
-	flat = mergeKVs(flat, l.kvs, l.secrets)
-	flat = mergeKVs(flat, kv, l.secrets)
-
-	data, err := json.Marshal(flat)
+	if err == nil {
+		data, err = redactLogJSON(data, redact)
+	}
 	if err != nil {
-		// As a fallback, write a plain line so we don't swallow events
-		// silently. Still goes to stderr.
-		_, _ = fmt.Fprintf(l.out, "{\"level\":%q,\"msg\":%q,\"marshal_error\":%q}\n", level, msg, err.Error())
-		return
+		data = safeLogFallback(level, msg, redact)
 	}
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	_, _ = l.out.Write(append(data, '\n'))
 }
 
-// mergeKVs copies pairs from kv into dst, redacting string values the
-// secret tracker knows about. Odd-length slices are ignored past the
-// last complete pair.
-func mergeKVs(dst map[string]interface{}, kv []interface{}, secrets *secretTracker) map[string]interface{} {
+// mergeKVs accepts string keys and ignores an unmatched trailing argument.
+// Other keys must not invoke unbounded author formatting in the fallback.
+func mergeKVs(dst map[string]interface{}, kv []interface{}) error {
 	for i := 0; i+1 < len(kv); i += 2 {
 		key, ok := kv[i].(string)
 		if !ok {
-			key = fmt.Sprintf("%v", kv[i])
+			return errLogRecord
 		}
-		val := kv[i+1]
-		if s, ok := val.(string); ok && secrets != nil && secrets.isSecret(s) {
-			val = "[REDACTED]"
-		}
-		dst[key] = val
+		dst[key] = kv[i+1]
 	}
-	return dst
+	return nil
 }
