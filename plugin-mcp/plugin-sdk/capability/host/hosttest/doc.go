@@ -6,7 +6,8 @@
 // Enforcer directly from the test adapter. A host maps the fixture's canonical
 // test resources onto its own reviewed resources and observes actual backend
 // calls and audit delivery. The suite has no per-probe waivers. Declared unsupported descriptors are
-// visible; ADR workflow subsystem bindings remain explicitly host-owned.
+// visible and are probed for typed refusal; empty supported profiles fail.
+// ADR workflow subsystem bindings remain explicitly host-owned.
 // Reference fixtures do not certify a consumer host, complete ADR coverage,
 // transport profiles, MCP registration surfaces or an OS sandbox.
 package hosttest

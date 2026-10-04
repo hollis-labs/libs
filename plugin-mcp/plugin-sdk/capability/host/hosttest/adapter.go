@@ -239,17 +239,20 @@ func (o *Observer) ReceivedCaller(caller host.Subject) {
 // ProxyRequest instruments an attempted proxy hop, independently of its result.
 func (o *Observer) ProxyRequest() { o.mu.Lock(); defer o.mu.Unlock(); o.state.ProxyRequests++ }
 
-// ContainsSecret recognizes raw and common encoded representations, including
-// meaningful prefixes. Test secrets must be at least sixteen bytes long.
+// ContainsSecret detects raw or encoded substrings of at least eight bytes.
+// Fixture secrets and issued tokens must be at least sixteen bytes long.
 func ContainsSecret(output, secret string) bool {
 	if len(secret) < 16 {
 		return false
 	}
-	forms := []string{secret, "Bearer " + secret}
-	for _, raw := range forms {
-		for _, encoded := range []string{raw, base64.StdEncoding.EncodeToString([]byte(raw)), base64.RawStdEncoding.EncodeToString([]byte(raw)), base64.RawURLEncoding.EncodeToString([]byte(raw)), hex.EncodeToString([]byte(raw)), strings.ToUpper(hex.EncodeToString([]byte(raw)))} {
-			if strings.Contains(output, encoded) || strings.Contains(output, encoded[:min(16, len(encoded))]) {
-				return true
+	for start := 0; start+8 <= len(secret); start++ {
+		// Check every suffix and every eight-byte window. Complete encodings of
+		// suffixes catch leaks whose encoder started at an arbitrary offset.
+		for _, raw := range []string{secret[start : start+8], secret[start:], "Bearer " + secret[start:]} {
+			for _, encoded := range []string{raw, base64.StdEncoding.EncodeToString([]byte(raw)), base64.RawStdEncoding.EncodeToString([]byte(raw)), base64.URLEncoding.EncodeToString([]byte(raw)), base64.RawURLEncoding.EncodeToString([]byte(raw)), hex.EncodeToString([]byte(raw)), strings.ToUpper(hex.EncodeToString([]byte(raw)))} {
+				if strings.Contains(output, encoded) {
+					return true
+				}
 			}
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -28,34 +29,44 @@ import (
 // credential store, budget and mutable backend. Mutants alter those adapters;
 // they do not manufacture a failure list or a canned probe reply.
 type referenceAdapter struct{ broken string }
+type requestKey struct {
+	actor      host.Subject
+	connection string
+	id         capability.RequestID
+}
+type toolDefinition struct {
+	revision string
+	effect   capability.Effect
+}
 type referenceInstance struct {
-	mu, guard                                  sync.Mutex
-	fixture                                    Fixture
-	observer                                   *Observer
-	catalog                                    *capability.Catalog
-	server                                     *httptest.Server
-	plugin                                     *httptest.Server
-	proxy                                      *httptest.Server
-	client                                     *http.Client
-	credentials                                *host.CredentialStore
-	token, binding, broken                     string
-	active, revoked, cycle, exhausted          bool
-	unavailable                                bool
-	rateUsed                                   int64
-	graph                                      map[string][]string
-	generation                                 uint64
-	audience, wrongOwner, revision, toolEffect string
-	policy                                     capability.Scope
-	bindingScopes                              map[string]capability.Scope
-	lease                                      context.Context
-	cancel                                     context.CancelFunc
-	grants                                     capability.GrantSet
-	inflight                                   int
-	depth                                      int
-	releases                                   []func()
-	requests                                   map[capability.RequestID]context.CancelFunc
-	store                                      map[string]int
-	artifacts                                  map[string]string
+	mu, guard              sync.Mutex
+	fixture                Fixture
+	observer               *Observer
+	catalog                *capability.Catalog
+	server                 *httptest.Server
+	plugin                 *httptest.Server
+	proxy                  *httptest.Server
+	client                 *http.Client
+	credentials            *host.CredentialStore
+	token, binding, broken string
+	active                 bool
+	unavailable            bool
+	rateUsed               int64
+	graph                  map[string][]string
+	tools                  map[string]toolDefinition
+	generation             uint64
+	audience, wrongOwner   string
+	policy                 capability.Scope
+	bindingScopes          map[string]capability.Scope
+	lease                  context.Context
+	cancel                 context.CancelFunc
+	grants                 capability.GrantSet
+	inflight               int
+	depth                  int
+	releases               []func()
+	requests               map[requestKey]context.CancelFunc
+	store                  map[string]int
+	artifacts              map[string]string
 }
 
 func (a referenceAdapter) Open(ctx context.Context, f Fixture, o *Observer) (Instance, error) {
@@ -87,7 +98,7 @@ func (a referenceAdapter) Open(ctx context.Context, f Fixture, o *Observer) (Ins
 		return nil, err
 	}
 	lease, cancel := context.WithCancel(context.Background())
-	r := &referenceInstance{fixture: f, observer: o, catalog: catalog, client: &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 4 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, broken: a.broken, generation: 1, audience: "stdio", revision: "1", toolEffect: "write", policy: cloneScope(f.Policy), grants: append(capability.GrantSet{}, f.Grants...), lease: lease, cancel: cancel, requests: map[capability.RequestID]context.CancelFunc{}, graph: map[string][]string{}, store: map[string]int{}, artifacts: map[string]string{}}
+	r := &referenceInstance{fixture: f, observer: o, catalog: catalog, client: &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 4 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, broken: a.broken, generation: 1, audience: "stdio", policy: cloneScope(f.Policy), grants: append(capability.GrantSet{}, f.Grants...), lease: lease, cancel: cancel, requests: map[requestKey]context.CancelFunc{}, graph: map[string][]string{}, tools: map[string]toolDefinition{"server/tool": {"1", capability.Write}}, store: map[string]int{}, artifacts: map[string]string{}}
 	r.bindingScopes = map[string]capability.Scope{}
 	for _, g := range f.Grants {
 		var scope capability.Scope
@@ -128,35 +139,8 @@ func (a referenceAdapter) Open(ctx context.Context, f Fixture, o *Observer) (Ins
 			r.Close()
 			return nil, err
 		}
-		for _, surface := range []string{"logs", "registry", "browser"} {
-			if a.broken != "redaction unexercised" {
-				o.SecretInput(surface, f.Secret)
-			}
-		}
-		var logs bytes.Buffer
-		fmt.Fprintln(&logs, "credential", issued, "broker", redactFixture(f.Secret, r.token, f.Secret))
-		if a.broken == "token only" {
-			fmt.Fprintln(&logs, r.token)
-		}
-		if a.broken == "secret only" {
-			fmt.Fprintln(&logs, f.Secret)
-		}
-		if a.broken == "hex leak" {
-			fmt.Fprintln(&logs, fmt.Sprintf("%x", []byte(f.Secret)))
-		}
-		if a.broken == "prefix leak" && len(f.Secret) > 16 {
-			fmt.Fprintln(&logs, f.Secret[:16])
-		}
-		if a.broken == "secret leak" {
-			fmt.Fprintln(&logs, r.token, f.Secret)
-		}
-		if a.broken == "encoded leak" {
-			fmt.Fprintln(&logs, "auth", base64.StdEncoding.EncodeToString([]byte("Bearer "+r.token)), "cfg", base64.StdEncoding.EncodeToString([]byte(f.Secret)), "prefix", r.token[:24])
-		}
-		registry, _ := json.Marshal(map[string]any{"credential": issued, "capability": f.Catalog[0].Name, "config": redactFixture(f.Secret, r.token, f.Secret)})
-		browser, _ := json.Marshal(map[string]any{"credential": issued, "ui": "fixture", "config": redactFixture(f.Secret, r.token, f.Secret)})
-		r.artifacts = map[string]string{"logs": logs.String(), "registry": string(registry), "browser": string(browser)}
 	}
+
 	r.plugin = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var caller host.Subject
 		if json.NewDecoder(req.Body).Decode(&caller) != nil {
@@ -346,6 +330,9 @@ func (r *referenceInstance) Change(ctx context.Context, c Change) error {
 		r.grants = append(capability.GrantSet{}, r.fixture.Grants...)
 		r.lease, r.cancel = context.WithCancel(context.Background())
 	case Reconnect:
+		if r.broken == "reconnect broken" {
+			return nil
+		}
 		r.fixture.Runtime.OwnerGeneration = r.generation
 		for index := range r.grants {
 			r.grants[index].OwnerGeneration = r.generation
@@ -385,7 +372,9 @@ func (r *referenceInstance) Change(ctx context.Context, c Change) error {
 			r.grants[index].HostInstance = "old-host"
 		}
 	case "owner":
-		r.wrongOwner = "different"
+		if r.broken != "owner ignored" {
+			r.wrongOwner = "different"
+		}
 	case "generation":
 		for index := range r.grants {
 			r.grants[index].OwnerGeneration++
@@ -409,12 +398,16 @@ func (r *referenceInstance) Change(ctx context.Context, c Change) error {
 		scope.Allowlists["server_tools"] = nil
 		r.fixture.CallerPolicy = &scope
 	case "tool revision":
-		r.revision = c.Value
+		d := r.tools["server/tool"]
+		d.revision = c.Value
+		r.tools["server/tool"] = d
 	case "tool effect":
-		r.toolEffect = c.Value
+		d := r.tools["server/tool"]
+		d.effect = capability.Effect(c.Value)
+		r.tools["server/tool"] = d
 	case "cycle":
-		r.graph["call"] = []string{"parent"}
-		r.graph["parent"] = []string{"call"}
+		r.graph["server/tool@1"] = []string{"parent"}
+		r.graph["parent"] = []string{"server/tool@1"}
 	case "depth":
 		r.policy.Limits["call_depth"] = 1
 		r.depth = 2
@@ -439,14 +432,18 @@ func (r *referenceInstance) Change(ctx context.Context, c Change) error {
 func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/catalog" {
 		descriptors := []capability.Descriptor{}
+		candidates := capability.SharedDescriptors()
 		for _, d := range r.fixture.Catalog {
-			known, err := r.catalog.Lookup(d.Name, d.SchemaVersion)
-			if err != nil {
-				http.Error(w, "catalog unavailable", 500)
-				return
+			if strings.HasPrefix(d.Name, "host.") || strings.HasPrefix(d.Name, "plugin.") {
+				candidates = append(candidates, d)
 			}
-			descriptors = append(descriptors, known)
 		}
+		for _, d := range candidates {
+			if known, err := r.catalog.Lookup(d.Name, d.SchemaVersion); err == nil {
+				descriptors = append(descriptors, known)
+			}
+		}
+
 		if r.broken == "publish reinterpreted" {
 			for index := range descriptors {
 				if descriptors[index].Name == capability.StorageWrite {
@@ -470,7 +467,12 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if strings.HasPrefix(req.URL.Path, "/redirect/") {
-		http.Redirect(w, req, r.server.URL+"/bridge/host%2Freadonly%2Fquery", http.StatusTemporaryRedirect)
+		var input struct{ Attempt Attempt }
+		json.NewDecoder(req.Body).Decode(&input)
+		if r.broken == "redirect executes" {
+			r.execute(input.Attempt.Call)
+		}
+		r.writeReply(w, application(capability.ScopeDenied, input.Attempt.Call.RequestID, ""))
 		return
 	}
 	var envelope struct {
@@ -487,6 +489,17 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	// relabel a write as a read. Client usage is replaced by measured byte demand.
 	op := strings.TrimPrefix(strings.TrimPrefix(req.URL.Path, "/rpc/"), "/bridge/")
 	a.Call.Operation = op
+	if r.broken != "skip enforcement" {
+		if _, err := r.catalog.Lookup(a.Call.Capability, 1); err != nil {
+			if r.broken == "unsupported accepted" {
+				r.execute(a.Call)
+				r.writeReply(w, Reply{})
+				return
+			}
+			r.writeReply(w, application(capability.UnsupportedCapability, a.Call.RequestID, ""))
+			return
+		}
+	}
 	if r.broken == "catalog overclaim" && op == "unimplemented/read" {
 		r.writeReply(w, application(capability.UnsupportedCapability, a.Call.RequestID, ""))
 		return
@@ -499,7 +512,10 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		effect = capability.Destructive
 	case "host/mcp/call_tool":
 		r.mu.Lock()
-		effect = capability.Effect(r.toolEffect)
+		effect = r.tools[a.Call.Server+"/"+a.Call.Tool].effect
+		if effect == "" {
+			effect = capability.Write
+		}
 		r.mu.Unlock()
 	}
 	if r.broken == "scope effect" && a.Call.Capability == workflowName {
@@ -542,10 +558,7 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	})
 	budget := budgetAdapter{instance: r}
 	auditor := host.NewAuditor(sinkFunc(func(_ context.Context, event host.AuditEvent) error {
-		if r.broken != "redaction unexercised" {
-			r.observer.SecretInput("audit", event.TraceID)
-		}
-		event.TraceID = redactFixture(r.fixture.Secret, r.token, event.TraceID)
+		event.TraceID = r.adaptOutput("audit", "broker="+event.TraceID)
 		r.observer.Audit(event)
 		raw, _ := json.Marshal(event)
 		r.mu.Lock()
@@ -564,12 +577,7 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		defer stop()
 	}
 	defer cancelRequest()
-	if op == "host/mcp/call_tool" {
-		r.mu.Lock()
-		r.requests[a.Call.RequestID] = cancelRequest
-		r.mu.Unlock()
-		defer func() { r.mu.Lock(); delete(r.requests, a.Call.RequestID); r.mu.Unlock() }()
-	}
+
 	enforcer, err := host.NewEnforcer(host.EnforcerConfig{HostInstance: r.fixture.Runtime.HostInstance, Audience: audience, Catalog: r.catalog, Resolver: resolver, Budget: budget, Audit: auditor})
 	if err != nil {
 		panic(err)
@@ -591,12 +599,29 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		r.writeReply(w, reply)
 		return
 	}
-	if (r.broken == "measured output" || r.broken == "late read limit") && bridge {
+	if (r.broken == "measured output" || r.broken == "late read limit" || r.broken == "output after write") && bridge {
 		if _, ok := a.Call.Usage["response_bytes"]; ok {
 			a.Call.Usage["response_bytes"] = 1
 		}
 	}
+	started := false
 	err = enforcer.Run(requestContext, a.Call, func(ctx context.Context, p *host.Permit) error {
+		started = true
+		actor := host.Subject{Kind: host.PluginActor, ID: r.fixture.Runtime.OwnerID}
+		if bridge {
+			actor = host.Subject{Kind: host.SessionClient, ID: "session-client"}
+		}
+		connection := req.Header.Get("X-Binding")
+		if bridge {
+			connection = ""
+		}
+		key := requestKey{actor: actor, connection: connection, id: a.Call.RequestID}
+		if op == "host/mcp/call_tool" {
+			r.mu.Lock()
+			r.requests[key] = cancelRequest
+			r.mu.Unlock()
+			defer func() { r.mu.Lock(); delete(r.requests, key); r.mu.Unlock() }()
+		}
 		gate := r.fixture.Gate
 		if a.Call.RequestID == 3 && r.fixture.SecondGate != nil {
 			gate = r.fixture.SecondGate
@@ -630,15 +655,36 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		}
 		if op == "host/mcp/cancel_call" && r.broken != "cancel ignored" {
 			r.mu.Lock()
-			target := r.requests[a.CancelID]
+			target := r.requests[requestKey{actor: actor, connection: connection, id: a.CancelID}]
+			if r.broken == "cross actor cancel" {
+				for key, stop := range r.requests {
+					if key.id == a.CancelID {
+						target = stop
+					}
+				}
+			}
 			r.mu.Unlock()
 			if target != nil {
 				target()
 			}
+			if r.broken == "cancel all" {
+				r.mu.Lock()
+				for _, stop := range r.requests {
+					stop()
+				}
+				r.mu.Unlock()
+				if r.fixture.SecondGate != nil {
+					<-r.fixture.SecondGate.Cancelled
+				}
+			}
 		}
-		r.execute(a.Call)
+		actualCall := a.Call
+		if r.broken == "output after write" && bridge && r.fixture.OutputBytes > 1000 {
+			actualCall.Effect = capability.Write
+		}
+		r.execute(actualCall)
 		r.guard.Unlock()
-		if (r.broken == "measured output" && bridge && a.ResponseBytes > 1000) || (r.broken == "late read limit" && bridge && r.fixture.OutputBytes > 1000) {
+		if (r.broken == "measured output" && bridge && a.ResponseBytes > 1000) || ((r.broken == "late read limit" || r.broken == "output after write") && bridge && r.fixture.OutputBytes > 1000) {
 			// Host bounds the ACTUAL produced response after the read ran.
 			return &capability.Error{Code: capability.BudgetExceeded, EffectState: capability.NotCommitted}
 		}
@@ -649,20 +695,25 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 			if r.broken == "retry unknown" {
 				r.execute(a.Call)
 			}
-			diagnostic := fmt.Sprintf("backend outcome lost: %s", r.fixture.Secret)
-			if r.broken != "redaction unexercised" {
-				r.observer.SecretInput("errors", diagnostic)
-				r.observer.SecretInput("replies", diagnostic)
-			}
+			diagnostic := fmt.Sprintf("backend outcome lost: broker=%s", r.fixture.Secret)
+			diagnostic = r.adaptOutput("errors", diagnostic)
+			diagnostic = r.adaptOutput("replies", "broker="+r.fixture.Secret+" "+diagnostic)
 			r.mu.Lock()
-			r.artifacts["logs"] += redactFixture(r.fixture.Secret, r.token, diagnostic)
+			r.artifacts["logs"] += r.adaptOutput("logs", "broker="+r.fixture.Secret)
 			r.mu.Unlock()
 			return errors.New(diagnostic)
 		}
 		return nil
 	})
+	if r.broken == "cancel all" && a.Call.RequestID == 3 && err != nil {
+		r.execute(a.Call)
+		err = nil
+	}
 	if r.broken == "audit changes decision" && auditor.Failures() > 0 {
 		err = &capability.Error{Code: capability.CapabilityDenied, RequestID: a.Call.RequestID, EffectState: capability.NotStarted}
+	}
+	if r.broken == "withdrawal executes" && started && err != nil && r.fixture.Gate != nil && !r.fixture.AfterCommit {
+		r.execute(a.Call)
 	}
 	if r.broken == "definite failure" && r.fixture.AfterCommit && err == nil {
 		err = &capability.Error{Code: capability.Cancelled, EffectState: capability.NotStarted, RequestID: a.Call.RequestID}
@@ -744,6 +795,7 @@ func (r *referenceInstance) activate(w http.ResponseWriter, req *http.Request) {
 			r.bindingScopes[grant.GrantID] = scope
 		}
 		r.mu.Unlock()
+		r.publishConfiguration(params.Config["broker_secret"])
 		r.observer.Activate()
 	}
 	if r.broken == "activation before refusal" && failure != nil {
@@ -766,6 +818,10 @@ func (r *referenceInstance) activate(w http.ResponseWriter, req *http.Request) {
 	}
 	if r.broken == "planning name" && failure != nil {
 		failure.Capability = "wrong"
+	}
+	if r.broken == "activation receipt changed" && len(grants) > 0 && len(input.Requests) == 0 {
+		grants = append(capability.GrantSet{}, grants...)
+		grants[0].PolicyRevision = "changed"
 	}
 	json.NewEncoder(w).Encode(struct {
 		Grants  capability.GrantSet
@@ -811,7 +867,7 @@ func (r *referenceInstance) authority(ctx context.Context, c host.Call, a Attemp
 		r.bindingScopes[c.GrantID] = cloneScope(r.policy)
 	}
 
-	if r.broken == "expiry ignored" || r.broken == "expire as revoke" {
+	if r.broken == "expiry ignored" || (r.broken == "list expiry ignored" && c.Operation == "host/mcp/list_tools") || r.broken == "expire as revoke" {
 		base.Grant.IssuedAt = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
 		base.Grant.ExpiresAt = time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano)
 	}
@@ -829,10 +885,10 @@ func (r *referenceInstance) authority(ctx context.Context, c host.Call, a Attemp
 		base.Grant.OwnerID = r.wrongOwner
 	}
 
-	if graphCycle(r.graph, "call", map[string]bool{}, map[string]bool{}) {
+	if c.Operation == "host/mcp/call_tool" && graphCycle(r.graph, c.Server+"/"+c.Tool+"@1", map[string]bool{}, map[string]bool{}) {
 		return base, &capability.Error{Code: capability.ScopeDenied, Detail: capability.CallbackCycle, EffectState: capability.NotStarted}
 	}
-	if c.Capability == capability.MCPReach && r.revision != "1" {
+	if c.Capability == capability.MCPReach && r.tools[c.Server+"/"+c.Tool].revision != "" && !slices.Contains(r.bindingScopes[c.GrantID].Allowlists["server_tools"], c.Server+"/"+c.Tool+"@"+r.tools[c.Server+"/"+c.Tool].revision) {
 		return base, &capability.Error{Code: capability.TargetUnavailable, Detail: capability.StaleBinding, EffectState: capability.NotStarted}
 	}
 	scope := cloneScope(r.bindingScopes[c.GrantID])
@@ -960,7 +1016,11 @@ func (b budgetAdapter) Reserve(ctx context.Context, a host.Authority, c host.Cal
 			r.inflight--
 			r.observer.Release()
 		}
-		return nil, &capability.Error{Code: capability.BudgetExceeded, EffectState: capability.NotStarted}
+		code := capability.BudgetExceeded
+		if r.broken == "concurrency wrong code" {
+			code = capability.Conflict
+		}
+		return nil, &capability.Error{Code: code, EffectState: capability.NotStarted}
 	}
 	r.inflight++
 	r.rateUsed++
@@ -1023,6 +1083,9 @@ func (r *referenceInstance) writeReply(w http.ResponseWriter, reply Reply) {
 		json.NewEncoder(w).Encode(map[string]any{"RPCCode": reply.RPCCode, "Failure": fields})
 		return
 	}
+	if r.broken == "reply wire leak" && r.fixture.FailAfterCommit && r.fixture.Secret != "" {
+		reply.Payload = "broker=" + r.fixture.Secret
+	}
 	json.NewEncoder(w).Encode(reply)
 }
 
@@ -1057,32 +1120,46 @@ func TestBrokenAdaptersMustFail(t *testing.T) {
 		"scope expired":             {"S09", "workflow expired"},
 		"scope revoked":             {"S09", "workflow revoked"},
 
-		"claimed caller":            {"C04", "delegated identity reaches audit"},
-		"list without admission":    {"C05", "discovery after stop"},
-		"unsafe widens keys":        {"C08", "unsafe dimension keys"},
-		"planning ignores version":  {"C02", "planning wrong version"},
-		"planning trusts request":   {"C02", "planning wider than policy"},
-		"bridge cancel":             {"C07", "bridge cancellation is request-local"},
-		"publish reinterpreted":     {"C10", capability.StorageWrite + " scoped and direct bypass"},
-		"encoded leak":              {"C08", "unsafe install does not widen grants and artifacts redact"},
-		"expire as revoke":          {"C03", "expiry distinct from revocation"},
-		"expiry ignored":            {"C03", "expiry distinct from revocation"},
-		"revoked ignored":           {"C03", "revocation distinct from expiry"},
-		"audience ignored":          {"C03", "direct audience"},
-		"ambient empty":             {"C01", "empty grants deny"},
-		"background bypass":         {"C04", "forged caller cannot replace verified caller"},
-		"unsafe widen operations":   {"C08", "unsafe dimension operations"},
-		"unsafe widen effects":      {"C08", "unsafe dimension effects"},
-		"unsafe widen budget":       {"C08", "unsafe limit request_bytes"},
-		"redaction unexercised":     {"C08", "secret diagnostic output"},
-		"unavailable as stop":       {"C07", "bridge unavailable"},
-		"list caller ignored":       {"C05", "discovery intersects caller permission"},
-		"narrowing hidden":          {"C02", "planning wider than policy"},
-		"wide plan marked narrowed": {"C02", "planning wider than policy"},
-		"plugin bearer accepted":    {"C04", "plugin cannot substitute proxy credential"},
-		"oversized denial":          {"C07", "bridge output"},
-		"measured output":           {"C07", "bridge output"},
-		"cancel ignored":            {"C07", "cancel_call leaves concurrent request running"},
+		"claimed caller":             {"C04", "delegated identity reaches audit"},
+		"list without admission":     {"C05", "discovery after stop"},
+		"unsafe widens keys":         {"C08", "unsafe dimension keys"},
+		"planning ignores version":   {"C02", "planning wrong version"},
+		"planning trusts request":    {"C02", "planning wider than policy"},
+		"bridge cancel":              {"C07", "bridge cancellation is request-local"},
+		"publish reinterpreted":      {"C10", capability.StorageWrite + " scoped and direct bypass"},
+		"encoded leak":               {"C08", "unsafe install does not widen grants and artifacts redact"},
+		"expire as revoke":           {"C03", "expiry distinct from revocation"},
+		"expiry ignored":             {"C03", "expiry distinct from revocation"},
+		"revoked ignored":            {"C03", "revocation distinct from expiry"},
+		"audience ignored":           {"C03", "direct audience"},
+		"ambient empty":              {"C01", "empty grants deny"},
+		"background bypass":          {"C04", "forged caller cannot replace verified caller"},
+		"unsafe widen operations":    {"C08", "unsafe dimension operations"},
+		"unsafe widen effects":       {"C08", "unsafe dimension effects"},
+		"unsafe widen budget":        {"C08", "unsafe limit request_bytes"},
+		"redaction unexercised":      {"C08", "secret diagnostic output"},
+		"unavailable as stop":        {"C07", "bridge unavailable"},
+		"list caller ignored":        {"C05", "discovery intersects caller permission"},
+		"narrowing hidden":           {"C02", "planning wider than policy"},
+		"wide plan marked narrowed":  {"C02", "planning wider than policy"},
+		"plugin bearer accepted":     {"C04", "plugin cannot substitute proxy credential"},
+		"oversized denial":           {"C07", "bridge output"},
+		"measured output":            {"C07", "bridge output"},
+		"unsupported accepted":       {"C10", capability.StorageRead + " declared unsupported refuses"},
+		"output after write":         {"C07", "bridge output"},
+		"reply wire leak":            {"C08", "secret diagnostic output"},
+		"concurrency wrong code":     {"C05", "concurrency is reserved atomically"},
+		"withdrawal executes":        {"C06", "stop before commit"},
+		"suffix leak":                {"C08", "unsafe install does not widen grants and artifacts redact"},
+		"base64 only":                {"C08", "unsafe install does not widen grants and artifacts redact"},
+		"cross actor cancel":         {"C07", "cancel_call cannot cross actors"},
+		"cancel all":                 {"C07", "cancel_call leaves concurrent request running"},
+		"owner ignored":              {"C03", "direct owner"},
+		"reconnect broken":           {"C04", "replayed generation binding is fenced"},
+		"list expiry ignored":        {"C05", "discovery after expired"},
+		"redirect executes":          {"C07", "bridge redirect"},
+		"activation receipt changed": {"C03", "direct absent binding"},
+		"cancel ignored":             {"C07", "cancel_call leaves concurrent request running"},
 
 		"missing contract":       {"C01", "missing capability_contract"},
 		"catalog override":       {"C02", "shared descriptor cannot be overwritten"},
@@ -1177,13 +1254,13 @@ func graphCycle(graph map[string][]string, node string, path, seen map[string]bo
 	return false
 }
 
-func redactFixture(secret, token, value string) string {
-	for _, s := range []string{secret, token} {
-		if s != "" {
-			value = strings.ReplaceAll(value, s, "[redacted]")
-		}
+var sensitiveField = regexp.MustCompile(`(?i)(broker|credential|authorization|token)=([^\s,;]+)`)
+
+func (r *referenceInstance) adaptOutput(surface, value string) string {
+	if r.broken != "redaction unexercised" {
+		r.observer.SecretInput(surface, value)
 	}
-	return value
+	return sensitiveField.ReplaceAllString(value, "$1=[redacted]")
 }
 
 func TestDeclaredSubsetWithoutStorageWrite(t *testing.T) {
@@ -1220,22 +1297,61 @@ func (rejectStorageAdapter) Open(ctx context.Context, f Fixture, o *Observer) (I
 }
 
 func TestWatchdogAndWorkerPanic(t *testing.T) {
-	for _, mode := range []string{"worker panic", "hung invoke"} {
-		t.Run(mode, func(t *testing.T) {
-			release := make(chan struct{})
-			defer close(release)
-			start := time.Now()
-			report := Evaluate(context.Background(), boundedAdapter{mode, release}, Profile{Timeout: 50 * time.Millisecond})
-			if time.Since(start) > time.Second || len(report.Violations) == 0 {
-				t.Fatal("adapter failure not bounded")
+	t.Run("worker panic", func(t *testing.T) {
+		release := make(chan struct{})
+		defer close(release)
+		report := Evaluate(context.Background(), boundedAdapter{"worker panic", release}, Profile{Timeout: 5 * time.Second})
+		found := false
+		for _, v := range report.Violations {
+			if v.Reason == "adapter panicked" {
+				found = true
 			}
-			for _, v := range report.Violations {
-				if strings.Contains(v.Reason, "private") {
-					t.Fatal("private adapter diagnostic leaked")
+		}
+		if !found {
+			t.Fatal("worker panic not contained and reported")
+		}
+	})
+	t.Run("hung callback", func(t *testing.T) {
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		returned := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		done := make(chan Report, 1)
+		go func() { done <- Evaluate(ctx, blockedOpenAdapter{entered, release, returned}, Profile{}) }()
+		<-entered
+		cancel() // Deterministic watchdog trigger, independent of machine speed.
+		report := <-done
+		select {
+		case <-returned:
+			t.Fatal("fixture was not actually blocked")
+		default:
+		}
+		close(release)
+		<-returned
+		requireViolation(t, report, "C01", "missing capability_contract")
+		requireStatus(t, report, "C01", Failed)
+		for _, id := range []string{"C06", "C07", "C08", "C10"} {
+			requireStatus(t, report, id, NotRun)
+			for _, q := range report.Requirements {
+				if q.ID == id && q.Reason == "" {
+					t.Fatal("truncation reason omitted")
 				}
 			}
-		})
-	}
+		}
+		if !strings.Contains(report.String(), "probe deadline exceeded") {
+			t.Fatal("watchdog reason lost")
+		}
+	})
+}
+
+type blockedOpenAdapter struct{ entered, release, returned chan struct{} }
+
+func (a blockedOpenAdapter) Open(context.Context, Fixture, *Observer) (Instance, error) {
+	close(a.entered)
+	<-a.release
+	close(a.returned)
+	return nil, errors.New("private hung callback")
 }
 
 type boundedAdapter struct {
@@ -1329,4 +1445,38 @@ func TestActualOutputMayBeBoundedAfterRead(t *testing.T) {
 	for _, v := range Check(context.Background(), referenceAdapter{"late read limit"}) {
 		t.Errorf("%s/%s: %s", v.Requirement, v.Probe, v.Reason)
 	}
+}
+
+func (r *referenceInstance) publishConfiguration(secret string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var logs bytes.Buffer
+	fmt.Fprintln(&logs, r.adaptOutput("logs", "credential="+r.token), r.adaptOutput("logs", "broker="+secret))
+	if r.broken == "token only" {
+		fmt.Fprintln(&logs, r.token)
+	}
+	if r.broken == "secret only" {
+		fmt.Fprintln(&logs, secret)
+	}
+	if r.broken == "hex leak" {
+		fmt.Fprintln(&logs, fmt.Sprintf("%x", []byte(secret)))
+	}
+	if r.broken == "prefix leak" && len(secret) > 16 {
+		fmt.Fprintln(&logs, secret[:16])
+	}
+	if r.broken == "suffix leak" && len(secret) > 8 {
+		fmt.Fprintln(&logs, r.token[8:], secret[4:])
+	}
+	if r.broken == "base64 only" {
+		fmt.Fprintln(&logs, base64.StdEncoding.EncodeToString([]byte(secret)))
+	}
+	if r.broken == "secret leak" {
+		fmt.Fprintln(&logs, r.token, secret)
+	}
+	if r.broken == "encoded leak" {
+		fmt.Fprintln(&logs, "auth", base64.StdEncoding.EncodeToString([]byte("Bearer "+r.token)), "cfg", base64.StdEncoding.EncodeToString([]byte(secret)), "prefix", r.token[:24])
+	}
+	registry, _ := json.Marshal(map[string]any{"credential": r.adaptOutput("registry", "credential="+r.token), "capability": "fixture", "config": r.adaptOutput("registry", "broker="+secret)})
+	browser, _ := json.Marshal(map[string]any{"credential": r.adaptOutput("browser", "credential="+r.token), "ui": "fixture", "config": r.adaptOutput("browser", "broker="+secret)})
+	r.artifacts = map[string]string{"logs": logs.String(), "registry": string(registry), "browser": string(browser)}
 }

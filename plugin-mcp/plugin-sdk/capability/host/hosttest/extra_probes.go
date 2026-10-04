@@ -3,11 +3,11 @@ package hosttest
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/capability/host"
 	"reflect"
 	"slices"
+
+	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/plugin-sdk/capability/host"
 )
 
 func resourceKey(s capability.Scope) string {
@@ -47,7 +47,7 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 		defer i.Close()
 		_, _, err = i.Activate(ctx, initJSON(f), []host.Request{{Name: core, SchemaVersion: 7, Scope: f.Policy}})
 		if err == nil || o.Snapshot().Activations != 0 {
-			return errors.New("version mismatch activated")
+			return suiteError("version mismatch activated")
 		}
 		return namedFailure(err, capability.UnsupportedCapability, core)
 	})
@@ -66,11 +66,11 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 			return err
 		}
 		if len(grants) != 1 || len(notices) != 1 || !notices[0].Narrowed || notices[0].Capability != core || notices[0].GrantID != grants[0].GrantID {
-			return errors.New("missing named narrowing notice")
+			return suiteError("missing named narrowing notice")
 		}
 		var actual capability.Scope
 		if json.Unmarshal(grants[0].Scope, &actual) != nil || capability.CheckNarrowing(core, f.Policy, actual) != nil || capability.CheckNarrowing(core, actual, f.Policy) != nil {
-			return errors.New("planner widened approved scope")
+			return suiteError("planner widened approved scope")
 		}
 		return nil
 	})
@@ -180,7 +180,7 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 			}
 			after := o.Snapshot()
 			if r.Failure != nil || !reflect.DeepEqual(r.Tools, []string{"tool"}) || after.Executions != before.Executions+1 || after.Reserved-after.Released != before.Reserved-before.Released {
-				return errors.New("discovery ignored caller or admission")
+				return suiteError("discovery ignored caller or admission")
 			}
 			return nil
 		})
@@ -192,7 +192,7 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 func secretDiagnosticProbe(descriptor capability.Descriptor) probe {
 	return probe{"C08", "secret diagnostic output", func(ctx context.Context, a Adapter) error {
 		f, c := descriptorFixture(descriptor)
-		f.Secret = "fixture-secret-diagnostic-07e891a3"
+		f.Secret = freshSecret()
 		f.FailAfterCommit = true
 		c.Call.TraceID = f.Secret
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
@@ -208,30 +208,30 @@ func secretDiagnosticProbe(descriptor capability.Descriptor) probe {
 				want = capability.InternalError
 			}
 			if r.Failure.Code != want || r.Failure.EffectState != capability.Unknown || r.Failure.Retryable {
-				return errors.New("diagnostic failure not normalized")
+				return suiteError("diagnostic failure not normalized")
 			}
 			if o.Snapshot().Executions != 1 {
-				return errors.New("diagnostic never exercised backend")
+				return suiteError("diagnostic never exercised backend")
 			}
 			_, token := i.Access()
 			if len(token) < 16 {
-				return errors.New("credential leak path unexercised")
+				return suiteError("credential leak path unexercised")
 			}
 			artifacts, err := i.Artifacts(ctx)
 			if err != nil {
 				return err
 			}
 			if ContainsSecret(string(r.Wire), token) || ContainsSecret(string(r.Wire), f.Secret) || ContainsSecret(string(r.Data), token) || ContainsSecret(string(r.Data), f.Secret) {
-				return errors.New("reply data secret leak")
+				return suiteError("reply data secret leak")
 			}
 			inputs := o.Snapshot().SensitiveInputs
 			for _, surface := range []string{"logs", "registry", "browser", "audit", "replies", "errors"} {
 				value, ok := artifacts[surface]
 				if !ok || value == "" || inputs[surface] == 0 {
-					return errors.New("sensitive output adaptation unexercised")
+					return suiteError("sensitive output adaptation unexercised")
 				}
 				if ContainsSecret(value, token) || ContainsSecret(value, f.Secret) {
-					return errors.New("encoded/prefix secret leak")
+					return suiteError("encoded/prefix secret leak")
 				}
 			}
 			return nil
@@ -239,28 +239,26 @@ func secretDiagnosticProbe(descriptor capability.Descriptor) probe {
 	}}
 }
 
-func emptyProfileProbes() []probe {
+// Unsupported calls use the actual declared catalog, never an adapter waiver.
+func unsupportedProbes(supported []capability.Descriptor) []probe {
+	names := map[string]bool{}
+	for _, d := range supported {
+		names[d.Name] = true
+	}
 	out := []probe{}
-	for _, field := range []string{"capability_contract", "grants"} {
-		out = append(out, probe{"C01", "missing " + field, func(ctx context.Context, a Adapter) error {
-			f, _ := basic(capability.ReadonlyQuery)
-			f.Catalog = []capability.Descriptor{}
+	for _, d := range capability.SharedDescriptors() {
+		if names[d.Name] {
+			continue
+		}
+		out = append(out, probe{"C10", d.Name + " declared unsupported refuses", func(ctx context.Context, a Adapter) error {
+			f, c := descriptorFixture(d)
+			f.Catalog = append([]capability.Descriptor{}, supported...)
 			f.Grants = capability.GrantSet{}
-			o := new(Observer)
-			i, err := a.Open(ctx, f, o)
-			if err != nil {
-				return err
-			}
-			defer i.Close()
-			var raw map[string]json.RawMessage
-			json.Unmarshal(initJSON(f), &raw)
-			delete(raw, field)
-			data, _ := json.Marshal(raw)
-			_, _, err = i.Activate(ctx, data, nil)
-			if err == nil || o.Snapshot().Activations != 0 {
-				return errors.New("unsupported subset bypassed handshake")
-			}
-			return nil
+			// No installed grant can authorize an unsupported descriptor.
+			return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
+				c.Direct = true
+				return denied(ctx, i, o, c, capability.UnsupportedCapability)
+			})
 		}})
 	}
 	return out

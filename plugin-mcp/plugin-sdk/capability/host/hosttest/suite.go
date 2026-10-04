@@ -2,10 +2,13 @@ package hosttest
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +30,7 @@ type Profile struct {
 }
 type RequirementResult struct {
 	ID, Status string
+	Reason     string
 	Violations []Violation
 }
 type DescriptorResult struct{ Name, Status string }
@@ -46,13 +50,24 @@ const (
 
 // Run uses the reference fixture profile; consumers should use RunProfile.
 func Run(t *testing.T, a Adapter) { RunProfile(t, a, Profile{}) }
-func RunProfile(t *testing.T, a Adapter, profile Profile) {
+
+// TestReporter is the reporting subset of testing.TB; it permits recording
+// reporters to verify that violations fail the consumer's test.
+type TestReporter interface {
+	Helper()
+	Logf(string, ...any)
+	Errorf(string, ...any)
+}
+
+func RunProfile(t TestReporter, a Adapter, profile Profile) {
 	t.Helper()
 	ctx := context.Background()
-	if deadline, ok := t.Deadline(); ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, deadline)
-		defer cancel()
+	if dt, ok := t.(interface{ Deadline() (time.Time, bool) }); ok {
+		if deadline, ok := dt.Deadline(); ok {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, deadline)
+			defer cancel()
+		}
 	}
 	report := Evaluate(ctx, a, profile)
 	for _, r := range report.Requirements {
@@ -72,6 +87,7 @@ func Check(ctx context.Context, a Adapter) []Violation { return Evaluate(ctx, a,
 // Evaluate checks the declared host profile and reports coverage per requirement.
 func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 	report := Report{}
+	truncatedReason := ""
 	supported := profile.Supported
 	if supported == nil {
 		for _, name := range []string{capability.ReadonlyQuery, capability.ContextSource, capability.DurableAgentWake, capability.ReflexSeed, capability.MCPReach, capability.StorageWrite, workflowName} {
@@ -100,6 +116,10 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 		timeout = time.Second
 	}
 	probeList := probes(supported)
+	probeList = append(probeList, unsupportedProbes(supported)...)
+	if len(supported) == 0 {
+		report.Violations = append(report.Violations, Violation{"C02", "profile", "no supported descriptor declared"})
+	}
 	totals := map[string]int{}
 	ran := map[string]int{}
 	for _, p := range probeList {
@@ -116,7 +136,7 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 			select {
 			case err = <-done:
 			case <-bounded.Done():
-				err = errors.New("probe deadline exceeded")
+				err = suiteError("probe deadline exceeded")
 			}
 			ran[p.requirement]++
 			if p.requirement == "C10" {
@@ -135,6 +155,7 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 				report.Violations = append(report.Violations, Violation{p.requirement, p.name, safeReason(err)})
 			}
 			if timedOut && err != nil {
+				truncatedReason = "adapter timed out; remaining probes not run"
 				break
 			} // Stop invoking a hung/uncooperative adapter.
 		}
@@ -143,11 +164,12 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 		result := RequirementResult{ID: id, Status: Passed}
 		if ran[id] < totals[id] {
 			result.Status = NotRun
+			result.Reason = truncatedReason
 		}
 		if id == "C09" {
 			result.Status = HostOwned
 		}
-		if (id == "C05" || id == "C07") && !names[capability.MCPReach] || id == "S09" && !names[workflowName] || len(supported) == 0 && id != "C09" && id != "C01" {
+		if (id == "C05" || id == "C07") && !names[capability.MCPReach] || id == "S09" && !names[workflowName] {
 			result.Status = DeclaredUnsupported
 		}
 		for _, v := range report.Violations {
@@ -160,7 +182,31 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 	}
 	return report
 }
+
+// suiteReason is private: external adapters cannot supply trusted prose.
+type suiteReason string
+
+func (s suiteReason) Error() string                { return string(s) }
+func suiteError(s string) error                    { return suiteReason(s) }
+func suiteErrorf(format string, args ...any) error { return suiteReason(fmt.Sprintf(format, args...)) }
+func (r Report) String() string {
+	var b strings.Builder
+	for _, q := range r.Requirements {
+		fmt.Fprintf(&b, "%s: %s %s\n", q.ID, q.Status, q.Reason)
+	}
+	for _, d := range r.Descriptors {
+		fmt.Fprintf(&b, "%s: %s\n", d.Name, d.Status)
+	}
+	for _, v := range r.Violations {
+		fmt.Fprintf(&b, "%s/%s: %s\n", v.Requirement, v.Probe, v.Reason)
+	}
+	return b.String()
+}
 func safeReason(err error) string {
+	var own suiteReason
+	if errors.As(err, &own) {
+		return own.Error()
+	}
 	var e *capability.Error
 	if errors.As(err, &e) && e != nil && e.Validate() == nil {
 		return fmt.Sprintf("observed code=%s effect_state=%s", e.Code, e.EffectState)
@@ -179,7 +225,7 @@ func safeReason(err error) string {
 	return "probe failed (adapter text withheld)"
 }
 
-var errProbePanic = errors.New("adapter panicked")
+var errProbePanic = suiteError("adapter panicked")
 
 type observedFailure struct {
 	code  capability.Code
@@ -221,9 +267,7 @@ func probes(supported []capability.Descriptor) []probe {
 	if !names[core] && len(supported) > 0 {
 		core = supported[0].Name
 	}
-	if len(supported) == 0 {
-		return emptyProfileProbes()
-	}
+
 	fallbackBasic := basic
 	basic := func(name string) (Fixture, Attempt) {
 		for _, d := range supported {
@@ -233,7 +277,8 @@ func probes(supported []capability.Descriptor) []probe {
 		}
 		return fallbackBasic(name)
 	}
-	coreDescriptor := supported[0]
+	coreDescriptorFixture, _ := basic(core)
+	coreDescriptor := coreDescriptorFixture.Catalog[0]
 	for _, d := range supported {
 		if d.Name == core {
 			coreDescriptor = d
@@ -265,10 +310,10 @@ func probes(supported []capability.Descriptor) []probe {
 			data, _ := json.Marshal(raw)
 			_, _, err = i.Activate(ctx, data, nil)
 			if err == nil {
-				return errors.New("missing grant contract activated")
+				return suiteError("missing grant contract activated")
 			}
 			if o.Snapshot().Activations != 0 {
-				return errors.New("activation happened before refusal")
+				return suiteError("activation happened before refusal")
 			}
 			return nil
 		})
@@ -294,12 +339,12 @@ func probes(supported []capability.Descriptor) []probe {
 			grants, notices, err := i.Activate(ctx, initJSON(f), []host.Request{bad, good})
 			if !optional {
 				if err == nil || o.Snapshot().Activations != 0 {
-					return errors.New("required refusal activated")
+					return suiteError("required refusal activated")
 				}
 				return namedFailure(err, capability.UnsupportedCapability, bad.Name)
 			}
 			if err != nil || len(grants) != 1 || len(notices) != 1 || notices[0].Capability != bad.Name || notices[0].Code != capability.UnsupportedCapability || o.Snapshot().Activations != 1 {
-				return errors.New("optional denial was not visible or degraded unrelated authority")
+				return suiteError("optional denial was not visible or degraded unrelated authority")
 			}
 			binding, _ := i.Access()
 			c.BindingID = binding
@@ -348,10 +393,10 @@ func probes(supported []capability.Descriptor) []probe {
 			defer i.Close()
 		}
 		if err == nil {
-			return errors.New("shared descriptor override accepted")
+			return suiteError("shared descriptor override accepted")
 		}
 		if o.Snapshot().Activations != 0 || o.Snapshot().Executions != 0 {
-			return errors.New("override caused activation/effect")
+			return suiteError("override caused activation/effect")
 		}
 		return namedFailure(err, capability.UnsupportedCapability, core)
 	})
@@ -430,7 +475,7 @@ func probes(supported []capability.Descriptor) []probe {
 	add("C04", "replayed generation binding is fenced", func(ctx context.Context, a Adapter) error {
 		f, c := basic(core)
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
-			if err := i.Change(ctx, Change{"replace generation", ""}); err != nil {
+			if err := i.Change(ctx, Change{ReplaceGeneration, ""}); err != nil {
 				return err
 			}
 			if err := denied(ctx, i, o, c, capability.TargetUnavailable); err != nil {
@@ -456,24 +501,24 @@ func probes(supported []capability.Descriptor) []probe {
 				case "tool":
 					c.Call.Tool = "other"
 				case "effect":
-					if err := i.Change(ctx, Change{"tool effect", "destructive"}); err != nil {
+					if err := i.Change(ctx, Change{ToolEffect, "destructive"}); err != nil {
 						return err
 					}
 				case "revision":
-					if err := i.Change(ctx, Change{"tool revision", "2"}); err != nil {
+					if err := i.Change(ctx, Change{ToolRevision, "2"}); err != nil {
 						return err
 					}
 					want = capability.TargetUnavailable
 				case "caller":
-					if err := i.Change(ctx, Change{"deny caller", ""}); err != nil {
+					if err := i.Change(ctx, Change{DenyCaller, ""}); err != nil {
 						return err
 					}
 				case "cycle":
-					if err := i.Change(ctx, Change{"cycle", ""}); err != nil {
+					if err := i.Change(ctx, Change{CreateCycle, ""}); err != nil {
 						return err
 					}
 				case "depth":
-					if err := i.Change(ctx, Change{"depth", ""}); err != nil {
+					if err := i.Change(ctx, Change{IncreaseDepth, ""}); err != nil {
 						return err
 					}
 					want = capability.BudgetExceeded
@@ -481,7 +526,7 @@ func probes(supported []capability.Descriptor) []probe {
 					c.BodyBytes = 1001
 					want = capability.BudgetExceeded
 				case "rate":
-					if err := i.Change(ctx, Change{"rate exhausted", ""}); err != nil {
+					if err := i.Change(ctx, Change{SpendRate, ""}); err != nil {
 						return err
 					}
 					want = capability.RateLimited
@@ -507,7 +552,7 @@ func probes(supported []capability.Descriptor) []probe {
 				return err
 			}
 			if reply.Failure != nil || len(reply.Tools) != 1 || reply.Tools[0] != "tool" {
-				return errors.New("discovery leaked or hid permitted tools")
+				return suiteError("discovery leaked or hid permitted tools")
 			}
 			return nil
 		})
@@ -529,7 +574,7 @@ func probes(supported []capability.Descriptor) []probe {
 			}
 			s := o.Snapshot()
 			if reply.Failure == nil || reply.Failure.Code != capability.UnknownOutcome || reply.Failure.Retryable || s.Executions != 1 || s.Reserved != s.Released {
-				return errors.New("ambiguous write retried or claimed a definite outcome")
+				return suiteError("ambiguous write retried or claimed a definite outcome")
 			}
 			return nil
 		})
@@ -570,8 +615,15 @@ func probes(supported []capability.Descriptor) []probe {
 				if problem == "redirect" {
 					before := o.Snapshot()
 					r, e := i.Invoke(ctx, c)
-					if e != nil || r.HTTPStatus < 300 || r.HTTPStatus >= 400 || o.Snapshot().Executions != before.Executions {
-						return errors.New("redirect followed or not refused")
+					if e != nil {
+						return e
+					}
+					if err := validateFailure(r, c.Call.RequestID); err != nil {
+						return err
+					}
+					after := o.Snapshot()
+					if r.Failure.Code != capability.ScopeDenied || r.Failure.EffectState != capability.NotStarted || after.Executions != before.Executions || after.Reserved-after.Released != before.Reserved-before.Released {
+						return suiteError("redirect followed or not refused")
 					}
 				} else if problem == "proxy" {
 					err = allowed(ctx, i, o, c)
@@ -586,21 +638,21 @@ func probes(supported []capability.Descriptor) []probe {
 						return err
 					}
 					if r.Failure.Code != capability.BudgetExceeded || r.Failure.Retryable {
-						return errors.New("output refusal classification")
+						return suiteError("output refusal classification")
 					}
 					if r.Failure.EffectState == capability.NotStarted {
 						if after.Executions != before.Executions {
-							return errors.New("output pre-admission refusal executed")
+							return suiteError("output pre-admission refusal executed")
 						}
 					} else if r.Failure.EffectState == capability.NotCommitted {
 						if after.Executions > before.Executions+1 || len(after.Calls) == 0 || after.Calls[len(after.Calls)-1].Effect != capability.Read {
-							return errors.New("output limit followed a write")
+							return suiteError("output limit followed a write")
 						}
 					} else {
-						return errors.New("unsafe output effect state")
+						return suiteError("unsafe output effect state")
 					}
 					if after.Reserved-after.Released != before.Reserved-before.Released || r.WireBytes <= 0 || r.WireBytes > f.Policy.Limits["response_bytes"] || int64(len(r.Payload)) > f.Policy.Limits["response_bytes"] {
-						return errors.New("actual bridge output exceeded limit or leaked budget")
+						return suiteError("actual bridge output exceeded limit or leaked budget")
 					}
 
 				} else {
@@ -614,7 +666,7 @@ func probes(supported []capability.Descriptor) []probe {
 					}
 				}
 				if problem == "proxy" && o.Snapshot().ProxyRequests != 0 {
-					return errors.New("bridge contacted a proxy")
+					return suiteError("bridge contacted a proxy")
 				}
 				return err
 			})
@@ -624,12 +676,12 @@ func probes(supported []capability.Descriptor) []probe {
 	add("C08", "unsafe install does not widen grants and artifacts redact", func(ctx context.Context, a Adapter) error {
 		f, c := basic(core)
 		f.UnsafeInstall = true
-		f.Secret = "fixture-secret-c58f7ea63a09430b"
+		f.Secret = freshSecret()
 		c.Call.TraceID = f.Secret
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
 			_, token := i.Access()
 			if len(token) < 16 {
-				return errors.New("credential leak path unexercised")
+				return suiteError("credential leak path unexercised")
 			}
 			c.Call.Target = "other"
 			if err := denied(ctx, i, o, c, capability.ScopeDenied); err != nil {
@@ -642,10 +694,10 @@ func probes(supported []capability.Descriptor) []probe {
 			for _, surface := range []string{"logs", "registry", "browser", "audit", "replies", "errors"} {
 				value, ok := artifacts[surface]
 				if !ok || value == "" {
-					return fmt.Errorf("missing captured %s", surface)
+					return suiteErrorf("missing captured %s", surface)
 				}
 				if ContainsSecret(value, token) || ContainsSecret(value, f.Secret) {
-					return fmt.Errorf("secret leaked to %s", surface)
+					return suiteErrorf("secret leaked to %s", surface)
 				}
 			}
 			return nil
@@ -687,16 +739,16 @@ func probes(supported []capability.Descriptor) []probe {
 					return err
 				}
 				if len(published) == 0 {
-					return errors.New("host published no selected fixture descriptors")
+					return suiteError("host published no selected fixture descriptors")
 				}
 				seen := map[string]bool{}
 				for _, d := range published {
 					if seen[d.Name] || d.SchemaVersion < 1 || uint64(d.SchemaVersion) > uint64(^uint32(0)) || len(d.Operations) == 0 {
-						return errors.New("invalid or duplicate descriptor publication")
+						return suiteError("invalid or duplicate descriptor publication")
 					}
 					for _, shared := range capability.SharedDescriptors() {
 						if shared.Name == d.Name && !reflect.DeepEqual(d, shared) {
-							return errors.New("shared descriptor reinterpreted")
+							return suiteError("shared descriptor reinterpreted")
 						}
 					}
 					seen[d.Name] = true
@@ -709,11 +761,11 @@ func probes(supported []capability.Descriptor) []probe {
 						attempt.Call.Target = "other"
 						return denied(ctx, other, observed, attempt, capability.ScopeDenied)
 					}); err != nil {
-						return fmt.Errorf("published %s: %w", d.Name, err)
+						return suiteErrorf("published descriptor failed: %s", safeReason(err))
 					}
 				}
 				if !seen[name] {
-					return errors.New("selected descriptor not published")
+					return suiteError("selected descriptor not published")
 				}
 				if err := allowed(ctx, i, o, c); err != nil {
 					return err
@@ -776,19 +828,19 @@ func withActive(ctx context.Context, a Adapter, f Fixture, c Attempt, fn func(In
 	}
 	defer func() {
 		if cleanupErr := i.Close(); cleanupErr != nil {
-			err = errors.New("adapter cleanup failed")
+			err = suiteError("adapter cleanup failed")
 		}
 	}()
 	granted, _, activationErr := i.Activate(ctx, initJSON(f), nil)
 	err = activationErr
 	if err == nil && !reflect.DeepEqual(granted, f.Grants) {
-		return errors.New("activation widened or changed supplied grants")
+		return suiteError("activation widened or changed supplied grants")
 	}
 	if err != nil {
 		return err
 	}
 	if o.Snapshot().Activations != 1 {
-		return errors.New("fixture did not activate through host")
+		return suiteError("fixture did not activate through host")
 	}
 	c.BindingID, _ = i.Access()
 	return fn(i, o, c)
@@ -801,7 +853,7 @@ func allowed(ctx context.Context, i Instance, o *Observer, c Attempt) error {
 	}
 	after := o.Snapshot()
 	if reply.Failure != nil || reply.RPCCode != 0 || after.Executions != before.Executions+1 || after.Reserved != before.Reserved+1 || after.Released != before.Released+1 {
-		return errors.New("scoped operation did not execute once with balanced reservation")
+		return suiteError("scoped operation did not execute once with balanced reservation")
 	}
 	return nil
 }
@@ -818,7 +870,7 @@ func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want c
 	after := o.Snapshot()
 	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.Contract != "host-rpc/1" || reply.Failure.Code != want || reply.Failure.RequestID != c.Call.RequestID || reply.Failure.Retryable || reply.Failure.EffectState != capability.NotStarted {
 		if reply.Failure == nil {
-			return reply, errors.New("missing application refusal")
+			return reply, suiteError("missing application refusal")
 		}
 		return reply, &observedFailure{reply.Failure.Code, reply.Failure.EffectState}
 	}
@@ -826,31 +878,31 @@ func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want c
 		return reply, err
 	}
 	if after.Executions != before.Executions || after.Reserved-after.Released != before.Reserved-before.Released {
-		return reply, errors.New("refusal caused backend execution or leaked reservation")
+		return reply, suiteError("refusal caused backend execution or leaked reservation")
 	}
 	return reply, nil
 }
 func validateFailure(reply Reply, id capability.RequestID) error {
 	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.RequestID != id || reply.Failure.Contract != "host-rpc/1" {
-		return errors.New("invalid application error envelope")
+		return suiteError("invalid application error envelope")
 	}
 	if _, err := strictjson.ObjectFields(reply.Data, []string{"contract", "code", "request_id", "effect_state", "retryable"}, []string{"detail"}); err != nil {
-		return errors.New("application error data is not closed/non-null")
+		return suiteError("application error data is not closed/non-null")
 	}
 	var actual capability.RPCErrorData
 	if err := json.Unmarshal(reply.Data, &actual); err != nil || actual != *reply.Failure {
-		return errors.New("application error data differs from parsed classification")
+		return suiteError("application error data differs from parsed classification")
 	}
 	classified := &capability.Error{Code: actual.Code, RequestID: actual.RequestID, EffectState: actual.EffectState, Detail: actual.Detail}
 	if _, err := classified.RPCData(); err != nil {
-		return errors.New("application error classification is invalid")
+		return suiteError("application error classification is invalid")
 	}
 	return nil
 }
 func namedFailure(err error, code capability.Code, name string) error {
 	var e *capability.Error
 	if !errors.As(err, &e) || e.Code != code || e.Capability != name {
-		return errors.New("planning/catalog refusal lost symbolic code or name")
+		return suiteError("planning/catalog refusal lost symbolic code or name")
 	}
 	return nil
 }
@@ -878,15 +930,15 @@ func delegationProbe(descriptor capability.Descriptor, forged bool) func(context
 			}
 			snapshot := o.Snapshot()
 			if len(snapshot.DeliveredCallers) != 1 || snapshot.DeliveredCallers[0] != caller {
-				return errors.New("plugin received the wrong verified caller")
+				return suiteError("plugin received the wrong verified caller")
 			}
 			events := snapshot.Audits
 			if len(events) == 0 {
-				return errors.New("missing delegated audit")
+				return suiteError("missing delegated audit")
 			}
 			event := events[len(events)-1]
 			if event.Actor.ID != f.Runtime.OwnerID || event.Actor.Kind != "plugin" || event.InitiatingCaller == nil || event.InitiatingCaller.ID != caller.ID {
-				return errors.New("delegated actor/caller not preserved")
+				return suiteError("delegated actor/caller not preserved")
 			}
 			return nil
 		})
@@ -908,9 +960,9 @@ func waitingProbe(descriptor capability.Descriptor, event string, afterCommit bo
 			select {
 			case <-f.Gate.Entered:
 			case <-done:
-				return errors.New("call returned without reaching real work barrier")
+				return suiteError("call returned without reaching real work barrier")
 			case <-ctx.Done():
-				return errors.New("call never reached real work barrier")
+				return suiteError("call never reached real work barrier")
 			}
 			if err := i.Change(ctx, Change{ChangeKind(event), ""}); err != nil {
 				return err
@@ -918,30 +970,30 @@ func waitingProbe(descriptor capability.Descriptor, event string, afterCommit bo
 			select {
 			case <-f.Gate.Cancelled:
 			case <-ctx.Done():
-				return errors.New("lifecycle withdrawal did not cancel in-flight lease")
+				return suiteError("lifecycle withdrawal did not cancel in-flight lease")
 			}
 			mid := o.Snapshot()
 			if mid.Reserved-mid.Released != 1 {
-				return errors.New("running work lost reservation before actual completion")
+				return suiteError("running work lost reservation before actual completion")
 			}
 			f.Gate.Release()
 			var got result
 			select {
 			case got = <-done:
 			case <-ctx.Done():
-				return errors.New("withdrawn work did not finish")
+				return suiteError("withdrawn work did not finish")
 			}
 			end := o.Snapshot()
 			if got.err != nil || end.Reserved != end.Released {
-				return errors.New("call failed transport or leaked reservation")
+				return suiteError("call failed transport or leaked reservation")
 			}
 			if afterCommit {
 				if got.reply.Failure != nil || end.Executions != 1 {
-					return errors.New("definite commit was retried, undone or mislabeled")
+					return suiteError("definite commit was retried, undone or mislabeled")
 				}
 			} else {
 				if got.reply.Failure == nil || end.Executions != 0 || got.reply.Failure.EffectState != capability.NotStarted {
-					return errors.New("withdrawal before commit executed")
+					return suiteError("withdrawal before commit executed")
 				}
 			}
 			return denied(ctx, i, o, c, capability.TargetUnavailable)
@@ -963,28 +1015,28 @@ func bridgeCancellation(ctx context.Context, a Adapter) error {
 		case <-f.Gate.Entered:
 		case <-done:
 			stop()
-			return errors.New("bridge call returned without reaching barrier")
+			return suiteError("bridge call returned without reaching barrier")
 		case <-ctx.Done():
 			stop()
-			return errors.New("bridge call never entered")
+			return suiteError("bridge call never entered")
 		}
 		stop()
 		select {
 		case <-f.Gate.Cancelled:
 		case <-ctx.Done():
-			return errors.New("bridge request cancellation not delivered")
+			return suiteError("bridge request cancellation not delivered")
 		}
 		f.Gate.Release()
 		select {
 		case <-done:
 		case <-ctx.Done():
-			return errors.New("cancelled bridge did not return")
+			return suiteError("cancelled bridge did not return")
 		}
 		if err := waitFor(ctx, func() bool { s := o.Snapshot(); return s.Reserved == s.Released }); err != nil {
 			return err
 		}
 		if o.Snapshot().Executions != 0 {
-			return errors.New("cancelled bridge executed")
+			return suiteError("cancelled bridge executed")
 		}
 		// Same credential/instance must remain usable after cancelling one request.
 		c.Call.RequestID = 2
@@ -1044,10 +1096,10 @@ func descriptorFixture(d capability.Descriptor) (Fixture, Attempt) {
 	}
 	raw, _ := json.Marshal(s)
 	issued, expiry := fixtureTimes()
-	runtime := capability.RuntimeIdentity{HostInstance: "fixture-host", OwnerID: "owner", OwnerGeneration: 1}
+	runtime := capability.RuntimeIdentity{HostInstance: "harness-host", OwnerID: "owner", OwnerGeneration: 1}
 	g := capability.Grant{GrantID: "grant", Name: name, SchemaVersion: uint32(d.SchemaVersion), Scope: raw, HostInstance: runtime.HostInstance, OwnerID: runtime.OwnerID, OwnerGeneration: 1, Audience: "stdio", IssuedAt: issued, ExpiresAt: expiry, PolicyRevision: "review"}
 	f := Fixture{Runtime: runtime, Grants: capability.GrantSet{g}, Catalog: []capability.Descriptor{d}, Policy: cloneScope(s)}
-	call := host.Call{Capability: name, GrantID: g.GrantID, Operation: d.Operations[0], Target: "owner", Effect: effect, Dimensions: dimensions, Usage: usage, RequestID: 1, TraceID: "fixture-trace", Server: "server", Tool: "tool"}
+	call := host.Call{Capability: name, GrantID: g.GrantID, Operation: d.Operations[0], Target: "owner", Effect: effect, Dimensions: dimensions, Usage: usage, RequestID: 1, TraceID: "request-trace", Server: "server", Tool: "tool"}
 	if name == capability.MCPReach {
 		call.Operation = "host/mcp/call_tool"
 	}
@@ -1060,7 +1112,7 @@ func cloneScope(s capability.Scope) capability.Scope {
 	return out
 }
 func initJSON(f Fixture) json.RawMessage {
-	fields := map[string]any{"capability_contract": capability.ContractVersion, "grants": f.Grants, "incarnation": f.Runtime, "plugin_dir": "/fixture", "config": map[string]string{}, "data_dir": "/fixture/data", "cache_dir": "/fixture/cache", "log_level": "info", "host_info": map[string]any{"version": "fixture", "protocol": 2}}
+	fields := map[string]any{"capability_contract": capability.ContractVersion, "grants": f.Grants, "incarnation": f.Runtime, "plugin_dir": "/fixture", "config": map[string]string{"broker_secret": f.Secret}, "data_dir": "/fixture/data", "cache_dir": "/fixture/cache", "log_level": "info", "host_info": map[string]any{"version": "fixture", "protocol": 2}}
 	if f.InitIdentity != nil {
 		fields["identity"] = f.InitIdentity
 	}
@@ -1075,7 +1127,7 @@ func waitFor(ctx context.Context, predicate func() bool) error {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return errors.New("fixture work did not settle")
+			return suiteError("fixture work did not settle")
 		}
 	}
 	return nil
@@ -1095,7 +1147,7 @@ func concurrencyProbe(ctx context.Context, a Adapter) error {
 		select {
 		case <-f.Gate.Entered:
 		case <-done:
-			return errors.New("call did not reserve live work")
+			return suiteError("call did not reserve live work")
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -1107,13 +1159,13 @@ func concurrencyProbe(ctx context.Context, a Adapter) error {
 			return err
 		}
 		if reply.Failure == nil || reply.Failure.Code != capability.BudgetExceeded || reply.Failure.EffectState != capability.NotStarted {
-			return errors.New("parallel call not refused")
+			return suiteError("parallel call not refused")
 		}
 		if err := validateFailure(reply, second.Call.RequestID); err != nil {
 			return err
 		}
 		if s := o.Snapshot(); s.Reserved-s.Released != 1 {
-			return errors.New("parallel refusal changed live reservation")
+			return suiteError("parallel refusal changed live reservation")
 		}
 		f.Gate.Release()
 		select {
@@ -1123,4 +1175,12 @@ func concurrencyProbe(ctx context.Context, a Adapter) error {
 			return ctx.Err()
 		}
 	})
+}
+
+func freshSecret() string {
+	var raw [24]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(raw[:])
 }
