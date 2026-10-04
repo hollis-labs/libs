@@ -1,3 +1,5 @@
+//go:build unix
+
 package procuse
 
 import (
@@ -7,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,28 +38,29 @@ func (f *fakeRunner) run(ctx context.Context, args ...string) ([]byte, []byte, e
 		f.t.Fatal("unbounded lsof call")
 	}
 	f.calls = append(f.calls, append([]string(nil), args...))
-	cwdOnly := len(args) == 6
+	cwdOnly := len(args) > 1 && args[1] == "-d"
+	ownControl := len(args) > 1 && args[len(args)-2] == "-p"
 	var path string
-	if cwdOnly {
-		if !reflect.DeepEqual(args[:5], []string{"-a", "-d", "cwd", "-F0pfn", "+D"}) {
-			f.t.Fatalf("unexpected cwd command %v", args)
+	if ownControl {
+		if strings.Join(args, " ") != strings.Join(probeArgs("", true, os.Getpid()), " ") {
+			f.t.Fatalf("unexpected cwd control %v", args)
 		}
-		path = args[5]
+		path = f.cwd
 	} else {
-		if len(args) != 3 || !reflect.DeepEqual(args[:2], []string{"-F0pfn", "+D"}) {
-			f.t.Fatalf("unexpected open command %v", args)
+		path = args[len(args)-1]
+		if strings.Join(args, " ") != strings.Join(probeArgs(path, cwdOnly, 0), " ") {
+			f.t.Fatalf("unexpected target command %v", args)
 		}
-		path = args[2]
 	}
 	var r reply
 	switch {
-	case path == f.target:
+	case !ownControl && path == f.target:
 		if cwdOnly {
 			r = f.targetCwd
 		} else {
 			r = f.targetOpen
 		}
-	case cwdOnly && path == f.cwd:
+	case ownControl:
 		r.stdout = record(os.Getpid(), "cwd", path)
 		if f.controlCwd != nil {
 			r = *f.controlCwd
@@ -80,8 +82,15 @@ func (f *fakeRunner) run(ctx context.Context, args ...string) ([]byte, []byte, e
 
 func fixture(t *testing.T) (*fakeRunner, Options) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cwd, err = filepath.EvalSymlinks(cwd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,17 +144,36 @@ func TestCheckThreeOutcomes(t *testing.T) {
 
 func TestCheckFreshControlsAndOrdering(t *testing.T) {
 	f, options := fixture(t)
+	roots := map[string]bool{}
 	for i := 0; i < 2; i++ {
-		if got := check(t, f, options); got.Outcome != NotInUse {
+		start := len(f.calls)
+		got := check(t, f, options)
+		if got.Outcome != NotInUse || !got.SafeToClean() {
 			t.Fatal(got)
 		}
-		calls := f.calls[i*4 : (i+1)*4]
-		if calls[0][5] != f.cwd || !strings.HasPrefix(filepath.Base(calls[1][2]), "procuse-control-") || calls[2][5] != f.target || calls[3][2] != f.target {
-			t.Fatalf("probe ordering = %v", calls)
+		cwdProven, fileProven := false, false
+		for _, args := range f.calls[start:] {
+			switch {
+			case args[len(args)-2] == "-p":
+				cwdProven = true
+			case strings.HasPrefix(filepath.Base(args[len(args)-1]), "procuse-control-"):
+				root := args[len(args)-1]
+				if roots[root] {
+					t.Fatal("control reused")
+				}
+				roots[root] = true
+				fileProven = true
+			case args[len(args)-1] == f.target:
+				if !cwdProven || !fileProven {
+					t.Fatal("target before both fresh controls")
+				}
+			default:
+				t.Fatal("unexpected probe", args)
+			}
 		}
-	}
-	if f.calls[1][2] == f.calls[5][2] {
-		t.Fatal("open-file control reused across checks")
+		if !cwdProven || !fileProven {
+			t.Fatal("missing fresh controls")
+		}
 	}
 	// A formerly working mechanism becoming blind must not reuse cached proof.
 	f.controlFile = &reply{}
@@ -286,6 +314,14 @@ func TestProbeExitStatusSanity(t *testing.T) {
 	}
 }
 
+func TestProbeExitOneWithRows(t *testing.T) {
+	f, options := fixture(t)
+	f.targetOpen = reply{stdout: record(123, "9", filepath.Join(f.target, "open")), err: &exec.ExitError{ProcessState: testProcessState(t, 1)}}
+	if got := check(t, f, options); got.Outcome != InUse || got.SafeToClean() {
+		t.Fatal(got)
+	}
+}
+
 // ProcessState cannot be constructed by Go callers. A tiny child of this test
 // binary supplies real exit statuses without depending on a shell command.
 func testProcessState(t *testing.T, code int) *os.ProcessState {
@@ -397,7 +433,14 @@ func TestRealLsofControlsAndReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer held.Close()
-	runner := ExecRunner(path)
+	base := ExecRunner(path)
+	runner := func(ctx context.Context, args ...string) ([]byte, []byte, error) {
+		stdout, stderr, err := base(ctx, args...)
+		if len(stderr) != 0 {
+			t.Skip("lsof warnings: visibility test unavailable in this environment")
+		}
+		return stdout, stderr, err
+	}
 	options := Options{ScratchDir: scratch}
 	if got := Check(context.Background(), candidate, runner, options); got.Outcome != InUse {
 		t.Fatalf("open reference: %+v", got)
@@ -411,12 +454,37 @@ func TestRealLsofControlsAndReferences(t *testing.T) {
 	if got := Check(context.Background(), free, runner, options); got.Outcome != NotInUse {
 		t.Fatalf("free: %+v", got)
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
+	t.Chdir(candidate)
+	if got := Check(context.Background(), candidate, runner, options); got.Outcome != InUse {
+		t.Fatalf("fixture cwd: %+v", got)
+	}
+	alias := filepath.Join(root, "pwd-alias")
+	if err := os.Symlink(candidate, alias); err != nil {
 		t.Fatal(err)
 	}
-	if got := Check(context.Background(), cwd, runner, options); got.Outcome != InUse {
-		t.Fatalf("cwd: %+v", got)
+	t.Setenv("PWD", alias)
+	if got := Check(context.Background(), candidate, runner, options); got.Outcome != InUse {
+		t.Fatalf("aliased cwd: %+v", got)
+	}
+	for _, locale := range []string{"C", "C.UTF-8"} {
+		t.Setenv("LC_ALL", locale)
+		unicodeTarget := filepath.Join(root, "café")
+		if err := os.MkdirAll(unicodeTarget, 0700); err != nil {
+			t.Fatal(err)
+		}
+		unicodeFile, err := os.Create(filepath.Join(unicodeTarget, "open"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := Check(context.Background(), unicodeTarget, runner, options)
+		_ = unicodeFile.Close()
+		if got.Outcome != InUse {
+			t.Fatalf("Unicode under %s: %+v", locale, got)
+		}
+	}
+	t.Chdir("/")
+	if got := Check(context.Background(), free, runner, options); got.Outcome != NotInUse {
+		t.Fatalf("root cwd required recursion: %+v", got)
 	}
 	if got := Check(context.Background(), candidate, ExecRunner(filepath.Join(root, "missing-lsof")), options); got.Outcome != Unknown {
 		t.Fatalf("missing tool: %+v", got)

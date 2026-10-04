@@ -1,7 +1,6 @@
 package procuse
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -37,32 +36,35 @@ func (o Outcome) String() string {
 type Result struct {
 	Outcome Outcome
 	Reason  string
+	Code    ReasonCode
+	proof   bool
+}
+
+// ReasonCode identifies a preflight refusal without including host paths.
+type ReasonCode string
+
+const (
+	ReasonNonCanonicalPath      ReasonCode = "non-canonical-path"
+	ReasonDeviceMismatch        ReasonCode = "device-mismatch"
+	ReasonUnsupportedFilesystem ReasonCode = "unsupported-filesystem"
+	ReasonUnsupportedPlatform   ReasonCode = "unsupported-platform"
+)
+
+// SafeToClean reports an intact, scoped negative observation earned by Check.
+// A hand-built Result is never proof. This method does not authorize removal:
+// ownership, retention, pin-lock proof and launch coordination remain required.
+func (r Result) SafeToClean() bool {
+	return r.proof && r.Outcome == NotInUse && r.Reason == "" && r.Code == ""
 }
 
 // Runner executes lsof directly and captures stdout and stderr separately.
 // Implementations must honor context cancellation, including pipe shutdown.
 type Runner func(context.Context, ...string) (stdout, stderr []byte, err error)
 
-// ExecRunner uses an explicit lsof executable or PATH lookup when path is empty.
-// It invokes no shell or wrapper. Pipe shutdown is bounded after cancellation.
-func ExecRunner(path string) Runner {
-	if path == "" {
-		path = "lsof"
-	}
-	return func(ctx context.Context, args ...string) ([]byte, []byte, error) {
-		cmd := exec.CommandContext(ctx, path, args...)
-		cmd.WaitDelay = time.Second
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout, cmd.Stderr = &stdout, &stderr
-		err := cmd.Run()
-		return stdout.Bytes(), stderr.Bytes(), err
-	}
-}
-
 // Options binds private control storage and the timeout of each invocation.
 // ScratchDir is required, canonical, absolute, caller-authorized storage outside
-// the target. A nonpositive
-// Timeout uses five seconds; larger values are capped at five seconds.
+// the target. A nonpositive Timeout uses five seconds; larger values are capped
+// at five seconds.
 type Options struct {
 	ScratchDir string
 	Timeout    time.Duration
@@ -71,16 +73,41 @@ type Options struct {
 // Check runs fresh cwd and open-file positive controls, then both target
 // probes. An empty result is meaningful only after both controls succeed.
 // Each command has its own deadline; the parent context bounds the whole check.
+// With the real runner, four commands take at most about 4 x (5s + 1s),
+// excluding filesystem preflight and control creation/cleanup.
 // Any failed command sanity check, stderr, invalid record or failed control is
 // Unknown, even when another probe found a reference. lsof exit status 1 alone
 // is accepted after output validation; other nonzero statuses are uncertain.
 func Check(ctx context.Context, target string, runner Runner, options Options) (result Result) {
 	unknown := func(reason string) Result { return Result{Outcome: Unknown, Reason: reason} }
-	if runner == nil || !safeAbsolute(target) || !safeAbsolute(options.ScratchDir) || within(target, options.ScratchDir) {
+	if ctx == nil {
+		return unknown("context is required")
+	}
+	if runner == nil || !safeAbsolute(target) || !safeAbsolute(options.ScratchDir) {
 		return unknown("runner, absolute paths and scratch outside target are required")
 	}
+	targetRoot, ok := canonicalDirectory(target)
+	if !ok {
+		return Result{Outcome: Unknown, Code: ReasonNonCanonicalPath, Reason: "non-canonical path"}
+	}
+	scratchRoot, ok := canonicalDirectory(options.ScratchDir)
+	if !ok {
+		return Result{Outcome: Unknown, Code: ReasonNonCanonicalPath, Reason: "non-canonical path"}
+	}
+	target, options.ScratchDir = targetRoot, scratchRoot
+	if within(target, scratchRoot) {
+		return unknown("scratch must be outside target")
+	}
+	if code := platformRoots(target, scratchRoot); code != "" {
+		return Result{Outcome: Unknown, Code: code, Reason: string(code)}
+	}
+	// Canonicalize cwd only for identity comparison; never walk its descendants.
 	cwd, err := os.Getwd()
-	if err != nil || !safeAbsolute(cwd) {
+	if err != nil {
+		return unknown("caller cwd unavailable")
+	}
+	cwd, err = filepath.EvalSymlinks(cwd)
+	if err != nil {
 		return unknown("caller cwd unavailable")
 	}
 	controlDir, err := os.MkdirTemp(options.ScratchDir, "procuse-control-")
@@ -109,7 +136,7 @@ func Check(ctx context.Context, target string, runner Runner, options Options) (
 	if timeout <= 0 || timeout > 5*time.Second {
 		timeout = 5 * time.Second
 	}
-	cwdControl, reason := probe(ctx, runner, cwd, true, timeout)
+	cwdControl, reason := probeSelection(ctx, runner, cwd, true, os.Getpid(), timeout)
 	if reason != "" {
 		return unknown("cwd control: " + reason)
 	}
@@ -134,7 +161,16 @@ func Check(ctx context.Context, target string, runner Runner, options Options) (
 	if len(cwdRefs) > 0 || len(openRefs) > 0 {
 		return Result{Outcome: InUse}
 	}
-	return Result{Outcome: NotInUse}
+	return Result{Outcome: NotInUse, proof: true}
+}
+
+func canonicalDirectory(path string) (string, bool) {
+	physical, err := filepath.EvalSymlinks(path)
+	if err != nil || physical != filepath.Clean(path) {
+		return "", false
+	}
+	info, err := os.Stat(physical)
+	return physical, err == nil && info.IsDir()
 }
 
 func safeAbsolute(path string) bool {
@@ -157,12 +193,13 @@ func hasReference(refs []reference, pid int, fd, name string) bool {
 }
 
 func probe(ctx context.Context, runner Runner, target string, cwdOnly bool, timeout time.Duration) ([]reference, string) {
+	return probeSelection(ctx, runner, target, cwdOnly, 0, timeout)
+}
+
+func probeSelection(ctx context.Context, runner Runner, target string, cwdOnly bool, pid int, timeout time.Duration) ([]reference, string) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	args := []string{"-F0pfn", "+D", target}
-	if cwdOnly {
-		args = append([]string{"-a", "-d", "cwd"}, args...)
-	}
+	args := probeArgs(target, cwdOnly, pid)
 	stdout, stderr, err := runner(callCtx, args...)
 	if callCtx.Err() != nil {
 		return nil, "deadline exceeded or canceled"
@@ -172,6 +209,9 @@ func probe(ctx context.Context, runner Runner, target string, cwdOnly bool, time
 		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
 			return nil, "command failed"
 		}
+	}
+	if len(stdout) > outputLimit || len(stderr) > outputLimit {
+		return nil, "output limit exceeded"
 	}
 	if len(stderr) != 0 {
 		return nil, "stderr output"
@@ -186,6 +226,17 @@ func probe(ctx context.Context, runner Runner, target string, cwdOnly bool, time
 		}
 	}
 	return refs, ""
+}
+
+func probeArgs(target string, cwdOnly bool, pid int) []string {
+	args := []string{"-F0pfn"}
+	if cwdOnly {
+		args = append([]string{"-a", "-d", "cwd"}, args...)
+	}
+	if pid > 0 {
+		return append(args, "-p", strconv.Itoa(pid))
+	}
+	return append(args, "+D", target)
 }
 
 func within(root, name string) bool {
@@ -230,10 +281,14 @@ func parseRecords(output []byte) ([]reference, bool) {
 			files = 0
 		case 'f':
 			if pid == 0 || len(fields) != 2 || !validFD(fields[0][1:]) ||
-				len(fields[1]) < 2 || fields[1][0] != 'n' || !safeAbsolute(fields[1][1:]) {
+				len(fields[1]) < 2 || fields[1][0] != 'n' {
 				return nil, false
 			}
-			refs = append(refs, reference{pid: pid, fd: fields[0][1:], name: fields[1][1:]})
+			name, ok := unescapeName(fields[1][1:])
+			if !ok || !filepath.IsAbs(name) || strings.ContainsRune(name, 0) {
+				return nil, false
+			}
+			refs = append(refs, reference{pid: pid, fd: fields[0][1:], name: name})
 			files++
 		default:
 			return nil, false

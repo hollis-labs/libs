@@ -1,18 +1,31 @@
 // Package procuse reports process-use evidence without mutating the target.
-// A check probes both current working directories and open references through
-// lsof, using validated NUL-delimited field records rather than display rows.
-// Before trusting empty results, every check proves that the same mechanisms
-// can see the caller's cwd and a file the caller holds open in explicit scratch
-// storage. Failed controls or uncertain observations return Unknown: retain.
+// A check probes cwd and open references with lsof and validates structured
+// field records. Every check first confirms visibility of this process's cwd
+// with a bounded own-PID selection (no recursive cwd scan), and of a file this
+// process holds open in private scratch storage. Both controls use the same
+// command builder and parser as target probes. Failed controls or uncertain
+// observations return Unknown: retain. A hand-built Result is never proof;
+// callers must check Result.SafeToClean rather than Outcome alone.
 //
-// NotInUse means no cwd or open reference visible to lsof for this user at the
-// time of the probes. It does not prove universal absence: permissions, other
-// users, namespaces, symlinks and nested mounts limit visibility. The host must
-// supply a canonical target within its supported visibility scope. No symlink
-// or mount cross-over is requested. An independent generation pin proof and
-// the cooperating launch guard remain required to close the observation race.
+// Target and scratch must be canonical directories on the same device, with
+// scratch outside the target. Known unscannable virtual filesystems are refused
+// on Linux and macOS. Other platforms return Unknown. Symlink paths refuse
+// before control creation. The host must keep these roots stable during Check;
+// observations do not protect against an unrelated actor replacing an ancestor.
 //
-// This package does not decide ownership or retention, enumerate candidates,
-// rename targets or delete them. Scratch control files are private, transient,
-// and removed after each check. No model CLI or provider home is consulted.
+// NotInUse means no reference visible to lsof for this user at scan time, not
+// universal absence. Same-user PR_SET_DUMPABLE=0 processes and threads with a
+// private cwd can be invisible. Other users, namespaces and containers can hide
+// references. +D takes a directory snapshot: files opened after scanning starts
+// can be missed. Nested mounts and symlinks are not crossed. FUSE, NFS and overlay
+// filesystems add visibility uncertainty even on the same device. Independent
+// pin-lock proof, ownership/retention checks and coordination with new launches
+// remain required; no negative result alone authorizes cleanup.
+//
+// This package does not enumerate candidates, rename or delete targets. Its two
+// os.Remove calls clean up only its own private control file and directory.
+// Direct commands run with a minimal C locale environment, bounded output and
+// process-group cancellation on Unix. Four invocations can take about
+// 4 x (5 seconds + 1 second pipe shutdown), excluding filesystem preflight and
+// control cleanup; use the parent context to request a shorter command budget.
 package procuse
