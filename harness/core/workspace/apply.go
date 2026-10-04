@@ -32,6 +32,9 @@ func Materialize(ctx context.Context, p PlannedWorkspace, ports Ports) (ApplyRes
 func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyResult, err error) {
 	result.Status = Partial
 	result.Receipt = Receipt{SchemaVersion: SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest, IdentityKey: p.spec.Identity.EncodedKey, Identity: p.spec.Identity, Phase: Planned}
+	for _, root := range p.roots {
+		result.Receipt.Roots = append(result.Receipt.Roots, RootReceipt{Root: root})
+	}
 	result.Diagnostics = p.Diagnostics()
 	if ctx == nil || ports.Clock == nil || ports.Host == nil || ports.Locks == nil || ports.Observations == nil || ports.ReceiptStore == nil {
 		return result, refuse("missing_apply_port", "ports", Unsupported)
@@ -155,7 +158,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 		switch a.Kind {
 		case EnsureDirectoryAction:
 			if !physical[a.Root.ID].Exists {
-				result.Receipt.Roots = append(result.Receipt.Roots, RootReceipt{Root: a.Root})
+				result.Receipt.Roots = setRootReceipt(result.Receipt.Roots, RootReceipt{Root: a.Root})
 				mutated = true
 				result.Retained = appendRoot(result.Retained, a.Root)
 				if err = ports.Host.EnsureOwnedDirectory(ctx, a.Root, a.RootMode); err != nil {
@@ -175,7 +178,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			}
 			result.Receipt.Roots = setRootReceipt(result.Receipt.Roots, RootReceipt{Root: a.Root, Complete: true})
 		case TreeAction:
-			result.Receipt.Roots = append(result.Receipt.Roots, RootReceipt{Root: a.Root})
+			result.Receipt.Roots = setRootReceipt(result.Receipt.Roots, RootReceipt{Root: a.Root})
 			mutated = true
 			result.Retained = appendRoot(result.Retained, a.Root)
 			var handle materialize.Handle

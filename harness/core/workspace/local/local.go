@@ -1,6 +1,10 @@
 // Package local provides opt-in ports for protected local filesystems. Callers
 // supply ownership and live fabric authority explicitly; paths grant neither.
 // No constructor creates storage or discovers a home, registry or credential.
+// Locks use exclusive flock on Linux and Darwin and refuse other platforms.
+// Receipts synchronize ID bindings, sync their file before confined rename and
+// make no directory-fsync or crash-recovery promise. Close requires no active
+// operations or held locks. Existing directories retain their modes.
 package local
 
 import (
