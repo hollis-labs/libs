@@ -6,6 +6,7 @@ package workspace
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"reflect"
@@ -1285,6 +1286,11 @@ func TestPlanningZeroValues(t *testing.T) {
 
 func TestPlanningCanonicalAccessKeepsDeclaredSpec(t *testing.T) {
 	s, c, r, o := fixtureRichInputs(t)
+	ref := s.ExtraDirs[0]
+	s.ExtraDirs = make([]AccessRef, 9)
+	for i := range s.ExtraDirs {
+		s.ExtraDirs[i] = ref
+	}
 	for i := range o.Roots {
 		o.Roots[i].CanonicalBase = "/physical/fixture"
 		o.Roots[i].CanonicalPath = strings.Replace(o.Roots[i].DeclaredPath, "/fixture", "/physical/fixture", 1)
@@ -1461,6 +1467,27 @@ func TestPlanningFrozenValueLimits(t *testing.T) {
 	fixtureExpect(t, "invalid map value", validateFrozenValues(map[string]string{"key": string([]byte{255})}), "invalid_utf8")
 	fixtureExpect(t, "invalid pointer field", validateFrozenValues(&ResourceRef{Revision: string([]byte{255})}), "invalid_utf8")
 	fixtureExpect(t, "oversized binary", validateFrozenValues(make([]byte, MaxFrozenBytes+1)), "input_limit")
+	inner := map[string]string{}
+	for i := 0; i < MaxCollectionItems; i++ {
+		inner[fmt.Sprint(i)] = ""
+	}
+	outer := map[string]map[string]string{}
+	for i := 0; i < 17; i++ {
+		outer[fmt.Sprint(i)] = inner
+	}
+	fixtureExpect(t, "aggregate map items", validateFrozenValues(outer), "input_limit")
+}
+
+func TestPlanningPublicValidatorsCheckTextBeforeCopy(t *testing.T) {
+	s := fixtureSpec(t)
+	s.Identity.DefinitionRevision = string([]byte{255})
+	fixtureExpect(t, "spec text", s.Validate(), "invalid_utf8")
+	r := fixtureRoot("x")
+	r.Provenance = string([]byte{255})
+	fixtureExpect(t, "root text", r.Validate(), "invalid_utf8")
+	tree := fixtureTree("file")
+	tree.Entries[0].Provenance.Note = string([]byte{255})
+	fixtureExpect(t, "tree metadata", ValidateManagedTree(tree, nil), "invalid_utf8")
 }
 
 func TestPlanningDirectoryMetadataAndNativePaths(t *testing.T) {

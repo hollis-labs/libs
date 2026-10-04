@@ -282,7 +282,7 @@ func TestCanonicalBootSiblingRelationship(t *testing.T) {
 }
 
 func TestAdditionalSemanticReferencesAndCapabilities(t *testing.T) {
-	for _, kind := range []string{"cleanup owned root", "cleanup generation root", "cwd child", "cwd protocol", "access root", "access provenance", "sandbox capability host", "cleanup capability host", "sandbox capability observation", "cleanup capability observation"} {
+	for _, kind := range []string{"cleanup owned root", "cleanup generation root", "cwd child", "cwd protocol", "access root", "access path", "access provenance", "sandbox capability host", "cleanup capability host", "sandbox capability observation", "cleanup capability observation"} {
 		t.Run(kind, func(t *testing.T) {
 			s, c, r, o := planInputs(t)
 			code := ""
@@ -301,6 +301,9 @@ func TestAdditionalSemanticReferencesAndCapabilities(t *testing.T) {
 				code = "unresolved_cwd"
 			case "access root":
 				s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: "missing", Path: s.Home.Root.Path, Provenance: s.Home.Root.Provenance}}}
+				code = "unresolved_access_resource"
+			case "access path":
+				s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: s.Home.Root.ID, Path: "/fixture/other", Provenance: s.Home.Root.Provenance}}}
 				code = "unresolved_access_resource"
 			case "access provenance":
 				s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: s.Home.Root.ID, Path: s.Home.Root.Path, Provenance: "wrong"}}}
