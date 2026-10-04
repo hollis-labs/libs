@@ -21,3 +21,7 @@ export type { QueueLimits } from './publication.js';
 
 export { TransportCancelledError, DeadlineExceededError, RPCTransportError } from './request-control.js';
 export type { AdmissionLimits } from './admission.js';
+
+export { HostClientError, HostRPCFailure } from './host-client.js';
+export type { HostClient, HostCallOptions, SecretValue, StorageGetArgs, StoragePutArgs, StorageDeleteArgs, SecretsGetArgs, EgressRequestArgs, EventsPublishArgs, HostLogArgs } from './host-client.js';
+export type { StorageGetResult, StoragePutResult, StorageDeleteResult, EgressRequestResult, EventsPublishResult, LogResult, HostRPCHeader, HostRPCLogField, HostRPCErrorData } from './host-rpc.js';

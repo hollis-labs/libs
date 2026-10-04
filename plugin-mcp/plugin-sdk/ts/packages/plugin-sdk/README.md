@@ -190,3 +190,10 @@ Reverse offers stay declined, and hook contexts provide no host client or
 plugin-originated callbacks. See [hooks/1](../../../docs/protocol/v2/hooks.md).
 
 Runtime params require the fields in the protocol-2 [payload matrix](../../../docs/protocol/v2/payloads.md). Optional `context` reuses the closed `ForwardContext` DTO; callbacks read `context.forwardContext`. It carries metadata only; this runtime does not authorize bindings or enforce its timeout. Invalid params return -32602 before invocation, and unrepresentable or malformed results return -32603.
+
+The SDK-owned `HostClient` type has seven request-scoped helpers for storage,
+secrets, egress, events, and log. Authors never implement this type. `Context.host`
+is currently available only through private conformance activation; base and
+hooks-only production connections omit it. See the repository's
+[host client contract](../../../docs/protocol/v2/host-clients.md) for explicit
+grant selection, budgets, typed failures, and secret registration.
