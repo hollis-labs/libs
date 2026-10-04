@@ -85,7 +85,7 @@ func (l fixtureLock) Release() error {
 func (f *fixturePorts) ports() workspace.Ports {
 	return workspace.Ports{Clock: f, Host: f, Locks: f, Observations: f, ReceiptStore: f}
 }
-func applyFixture(t *testing.T) (workspace.PlannedWorkspace, *fixturePorts, workspace.Spec) {
+func applyFixture(t *testing.T, deferred ...bool) (workspace.PlannedWorkspace, *fixturePorts, workspace.Spec) {
 	t.Helper()
 	s, c, r, o := planInputs(t)
 	base := t.TempDir()
@@ -117,6 +117,11 @@ func applyFixture(t *testing.T) (workspace.PlannedWorkspace, *fixturePorts, work
 		t.Fatal(err)
 	}
 	o.Roots[len(o.Roots)-1].Empty = true
+	if len(deferred) > 0 && deferred[0] {
+		g := workspace.EffectGrant{Kind: workspace.TrustEffect, RootID: s.Home.Root.ID, AuthorizationID: "fixture-authority", Version: "1"}
+		s.Effects = append(s.Effects, g)
+		r.Grants = append(r.Grants, g)
+	}
 	return planned(t, s, c, r, o), &fixturePorts{observed: o}, s
 }
 func TestMaterializeCommitsRealManifestWithoutReady(t *testing.T) {
@@ -402,5 +407,16 @@ func TestMaterializeCancellationAtMutationBoundaries(t *testing.T) {
 				t.Fatal("cancelled apply leaked held lock", f.events)
 			}
 		})
+	}
+}
+
+func TestMaterializeTypedEffectsStayUnsupportedBeforeMutation(t *testing.T) {
+	p, f, s := applyFixture(t, true)
+	got, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err == nil || got.Status != workspace.Unsupported || got.ArtifactsComplete() || len(f.events) != 0 || len(got.Retained) != 0 {
+		t.Fatal("unsupported effect crossed apply preflight", err, f.events)
+	}
+	if _, err := os.Stat(s.Home.Root.Path); !os.IsNotExist(err) {
+		t.Fatal("unsupported effect mutated directory", err)
 	}
 }
