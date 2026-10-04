@@ -1,0 +1,173 @@
+{
+  "writer": "providerplant",
+  "source": "substrate legacy provider projection",
+  "bindings": {
+    "Bindings": {
+      "argv": [
+        "claude",
+        "--mcp-config",
+        "<boot>/.mcp.json",
+        "--add-dir",
+        "/fixture/project"
+      ],
+      "launch": {
+        "convention": {
+          "executable": "claude",
+          "mode": "pty",
+          "cwd": "boot",
+          "config_root": "boot",
+          "argv": [
+            {
+              "kind": "resume",
+              "value": "--resume"
+            },
+            {
+              "kind": "file",
+              "value": "--mcp-config",
+              "root": "boot",
+              "rel_path": ".mcp.json",
+              "omit_empty": true
+            },
+            {
+              "kind": "extra"
+            },
+            {
+              "kind": "root",
+              "value": "--add-dir",
+              "root": "project",
+              "omit_empty": true
+            }
+          ],
+          "env": null
+        },
+        "roots": {
+          "ProjectRoot": "/fixture/project",
+          "BootRoot": "<boot>",
+          "ConfigRoot": "<boot>",
+          "StateRoot": "/fixture/state",
+          "ScratchRoot": "",
+          "CWD": "/fixture/project"
+        }
+      },
+      "cwd": "<boot>",
+      "config_root": "<boot>"
+    },
+    "First": [
+      "--mcp-config",
+      "<boot>/.mcp.json",
+      "--add-dir",
+      "/fixture/project"
+    ],
+    "Resumed": [
+      "--resume",
+      "fixture-session",
+      "--mcp-config",
+      "<boot>/.mcp.json",
+      "--add-dir",
+      "/fixture/project"
+    ]
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".claude/settings.json",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+      },
+      "ownership": {
+        "entry_id": "provider:claude:.claude/settings.json",
+        "group_id": "provider:claude:pty"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "native-config"
+      }
+    },
+    {
+      "path": ".claude/skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      },
+      "ownership": {
+        "entry_id": "injection:native:.claude/skills/sample/SKILL.md",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    },
+    {
+      "path": ".claude/skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "injection:native:.claude/skills/sample/scripts/run.sh",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    },
+    {
+      "path": ".mcp.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "b7147d366919d8aa20fe1dd9189578c358f0a7b58f2417dfaa19a285aa131ddd"
+      },
+      "ownership": {
+        "entry_id": "provider:claude:.mcp.json",
+        "group_id": "provider:claude:pty"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "mcp"
+      }
+    },
+    {
+      "path": "CLAUDE.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "6bd82b6cd336e1e9b2c91a8e4cf180a073f89a99d7db99b560d47f90ab7366c2"
+      },
+      "ownership": {
+        "entry_id": "provider:claude:CLAUDE.md",
+        "group_id": "provider:claude:pty"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "instructions"
+      }
+    },
+    {
+      "path": "boot.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
+      },
+      "ownership": {
+        "entry_id": "provider:claude:boot.md",
+        "group_id": "provider:claude:pty"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "boot"
+      }
+    }
+  ]
+}

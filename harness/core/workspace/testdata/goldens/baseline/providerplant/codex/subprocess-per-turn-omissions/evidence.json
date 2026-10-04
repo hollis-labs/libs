@@ -1,0 +1,221 @@
+{
+  "writer": "providerplant",
+  "source": "substrate legacy provider projection",
+  "bindings": {
+    "Bindings": {
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "--cd",
+        "/fixture/project",
+        "--",
+        ""
+      ],
+      "launch": {
+        "convention": {
+          "executable": "codex",
+          "mode": "subprocess-per-turn",
+          "cwd": "boot",
+          "config_root": "boot",
+          "argv": [
+            {
+              "kind": "literal",
+              "value": "exec"
+            },
+            {
+              "kind": "extra"
+            },
+            {
+              "kind": "literal",
+              "value": "--json"
+            },
+            {
+              "kind": "literal",
+              "value": "--skip-git-repo-check"
+            },
+            {
+              "kind": "root",
+              "value": "--cd",
+              "root": "project",
+              "omit_empty": true
+            },
+            {
+              "kind": "resume",
+              "value": "resume"
+            },
+            {
+              "kind": "prompt"
+            }
+          ],
+          "env": [
+            {
+              "name": "CODEX_HOME",
+              "value": "boot",
+              "operation": "set",
+              "precedence": "provider-wins"
+            }
+          ]
+        },
+        "roots": {
+          "ProjectRoot": "/fixture/project",
+          "BootRoot": "<boot>",
+          "ConfigRoot": "<boot>",
+          "StateRoot": "/fixture/state",
+          "ScratchRoot": "",
+          "CWD": "/fixture/project"
+        }
+      },
+      "env": {
+        "CODEX_HOME": {
+          "value": "<boot>",
+          "source": "provider",
+          "precedence": 20
+        }
+      },
+      "cwd": "<boot>",
+      "config_root": "<boot>"
+    },
+    "First": [
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "--cd",
+      "/fixture/project",
+      "--",
+      "Fixture turn."
+    ],
+    "Resumed": [
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "--cd",
+      "/fixture/project",
+      "resume",
+      "fixture-session",
+      "--",
+      "Fixture next turn."
+    ]
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".mcp.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b"
+      },
+      "ownership": {
+        "entry_id": "provider:codex:.mcp.json",
+        "group_id": "provider:codex:subprocess-per-turn"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "mcp-mirror"
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "368d9d3dd20697233098ed9432e301ce879e703f6f0ebc87fea7bb6cfc0f07c0"
+      },
+      "ownership": {
+        "entry_id": "provider:codex:AGENTS.md",
+        "group_id": "provider:codex:subprocess-per-turn"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "instructions"
+      }
+    },
+    {
+      "path": "auth.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ownership": {
+        "entry_id": "provider:codex:auth.json",
+        "group_id": "provider:codex:subprocess-per-turn"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "credential-placeholder"
+      }
+    },
+    {
+      "path": "boot.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ownership": {
+        "entry_id": "provider:codex:boot.md",
+        "group_id": "provider:codex:subprocess-per-turn"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "boot"
+      }
+    },
+    {
+      "path": "config.toml",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "7c39569dfc57a8121239bb9f95dfcd43448981d08277c22ef7b7397ef0d9e12e"
+      },
+      "ownership": {
+        "entry_id": "provider:codex:config.toml",
+        "group_id": "provider:codex:subprocess-per-turn"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "native-config"
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      },
+      "ownership": {
+        "entry_id": "injection:native:skills/sample/SKILL.md",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "injection:native:skills/sample/scripts/run.sh",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    }
+  ]
+}

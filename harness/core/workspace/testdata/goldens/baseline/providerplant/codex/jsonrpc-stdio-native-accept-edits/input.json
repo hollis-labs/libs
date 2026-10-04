@@ -1,0 +1,7 @@
+{
+  "provider": "codex",
+  "runtime": "jsonrpc-stdio",
+  "variant": "native",
+  "posture": "accept-edits",
+  "scenario": "create"
+}

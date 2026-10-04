@@ -1,0 +1,35 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "/fixture/project",
+    "Env": [
+      "OPENCODE_CONFIG_DIR=<boot>"
+    ],
+    "ExtraArgs": [
+      "--dir",
+      "/fixture/project"
+    ],
+    "First": [
+      "run",
+      "--format",
+      "json",
+      "--agent",
+      "",
+      "--",
+      "System: Fixture instructions.\n\nFixture turn."
+    ],
+    "Resumed": [
+      "run",
+      "--format",
+      "json",
+      "--agent",
+      "",
+      "--session",
+      "fixture-session",
+      "--",
+      "System: Fixture instructions.\n\nFixture next turn."
+    ]
+  },
+  "diagnostics": []
+}

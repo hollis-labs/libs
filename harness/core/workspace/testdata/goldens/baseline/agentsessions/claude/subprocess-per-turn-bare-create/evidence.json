@@ -1,0 +1,46 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "<boot>",
+    "Env": null,
+    "ExtraArgs": null,
+    "First": [
+      "-p",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--bare",
+      "--mcp-config",
+      "<boot>/.mcp.json",
+      "--append-system-prompt-file",
+      "<boot>/CLAUDE.md",
+      "--settings",
+      "<boot>/.claude/settings.json",
+      "--add-dir",
+      "/fixture/project",
+      "--",
+      "Fixture turn."
+    ],
+    "Resumed": [
+      "--resume",
+      "fixture-session",
+      "-p",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--bare",
+      "--mcp-config",
+      "<boot>/.mcp.json",
+      "--append-system-prompt-file",
+      "<boot>/CLAUDE.md",
+      "--settings",
+      "<boot>/.claude/settings.json",
+      "--add-dir",
+      "/fixture/project",
+      "--",
+      "Fixture next turn."
+    ]
+  },
+  "diagnostics": []
+}

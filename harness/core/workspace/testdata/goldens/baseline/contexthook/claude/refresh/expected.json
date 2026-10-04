@@ -1,0 +1,24 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": "context",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "context/task_context.txt",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Refreshed task.\n"
+  },
+  {
+    "path": "operator.txt",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Operator owned.\n"
+  }
+]

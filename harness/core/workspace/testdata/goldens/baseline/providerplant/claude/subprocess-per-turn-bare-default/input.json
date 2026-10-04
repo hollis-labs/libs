@@ -1,0 +1,7 @@
+{
+  "provider": "claude",
+  "runtime": "subprocess-per-turn",
+  "variant": "bare",
+  "posture": "default",
+  "scenario": "create"
+}

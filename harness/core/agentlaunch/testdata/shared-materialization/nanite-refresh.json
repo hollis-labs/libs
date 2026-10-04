@@ -2,7 +2,7 @@
   "fixture": "nanite-refresh",
   "source": {
     "app": "nanite",
-    "checkout": "/Users/chrispian/dev/hollis-labs/apps/nanite",
+    "checkout": "/fixture-root/nanite",
     "head": "c56aad70",
     "dirty": false,
     "paths": [

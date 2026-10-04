@@ -1,0 +1,83 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether/mcp_config.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {}\n}\n"
+  },
+  {
+    "path": ".agents/plugins/tether/plugin.json",
+    "kind": "file",
+    "mode": "0644",
+    "content": "{\"name\":\"tether\"}\n"
+  },
+  {
+    "path": ".agents/skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": ".agents/skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"fixture-plan\",\n  \"roots\": {\n    \"project_root\": \"/fixture/project\",\n    \"boot_root\": \"\u003cboot\u003e\",\n    \"state_root\": \"/fixture/state\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".agents/plugins/tether/mcp_config.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"d8e397af03b5b032f21d0aa967086f0c78b33c87b76f2e9898ae0a144df7de02\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:antigravity:.agents/plugins/tether/mcp_config.json\",\n        \"group_id\": \"provider:antigravity:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"mcp\"\n      }\n    },\n    {\n      \"path\": \".agents/plugins/tether/plugin.json\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"bad44d0f8ae7218b22b2adfcbea41325cbb191dc060c9265d4abe67a011e05c5\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:antigravity:.agents/plugins/tether/plugin.json\",\n        \"group_id\": \"provider:antigravity:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"native-config\"\n      }\n    },\n    {\n      \"path\": \".agents/skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:.agents/skills/sample/SKILL.md\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \".agents/skills/sample/scripts/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:.agents/skills/sample/scripts/run.sh\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \"AGENTS.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"368d9d3dd20697233098ed9432e301ce879e703f6f0ebc87fea7bb6cfc0f07c0\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:antigravity:AGENTS.md\",\n        \"group_id\": \"provider:antigravity:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"instructions\"\n      }\n    },\n    {\n      \"path\": \"boot.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:antigravity:boot.md\",\n        \"group_id\": \"provider:antigravity:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"boot\"\n      }\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\nname: \"fixture\"\n---\n\n# fixture\n\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644"
+  }
+]

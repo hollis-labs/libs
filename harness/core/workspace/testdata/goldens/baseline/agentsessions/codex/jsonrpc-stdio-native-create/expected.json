@@ -1,0 +1,36 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"http\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"stdio\": {\n      \"args\": [\n        \"one\",\n        \"two\"\n      ],\n      \"command\": \"fixture-server\",\n      \"type\": \"stdio\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\nname: \"fixture\"\n---\n\n# fixture\n\nFixture instructions.\n\n## MCP\n\nTools for this task are available via the MCP server at http://127.0.0.1:23456/mcp (configured in .mcp.json).\n\n"
+  },
+  {
+    "path": "auth.json",
+    "kind": "file",
+    "mode": "0644"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  },
+  {
+    "path": "config.toml",
+    "kind": "file",
+    "mode": "0644",
+    "content": "approval_policy = \"never\"\nsandbox_mode = \"workspace-write\"\n\n[mcp_servers.loopback]\nurl = \"http://127.0.0.1:23456/mcp\"\n\n[mcp_servers.http]\nurl = \"http://127.0.0.1:23457/mcp\"\n\n[mcp_servers.stdio]\ncommand = \"fixture-server\"\nargs = [\"one\", \"two\"]\n"
+  }
+]
