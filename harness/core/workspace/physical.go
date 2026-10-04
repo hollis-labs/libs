@@ -112,12 +112,21 @@ func readManifest(root *os.Root) (materialize.Manifest, error) {
 	if err := noSymlinks(root, materialize.ManifestRelPath); err != nil {
 		return materialize.Manifest{}, err
 	}
+	// Reject static unsafe types before open: opening a FIFO for reading can
+	// wait indefinitely for a writer while apply holds the workspace locks.
+	info, err := root.Lstat(materialize.ManifestRelPath)
+	if err != nil {
+		return materialize.Manifest{}, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > 16<<20 {
+		return materialize.Manifest{}, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
+	}
 	file, err := root.Open(materialize.ManifestRelPath)
 	if err != nil {
 		return materialize.Manifest{}, err
 	}
 	defer file.Close()
-	info, err := file.Stat()
+	info, err = file.Stat()
 	if err != nil {
 		return materialize.Manifest{}, err
 	}
