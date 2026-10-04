@@ -684,3 +684,37 @@ func TestInstalledLockReleaseFailureRetainsCommittedRoot(t *testing.T) {
 		}
 	}
 }
+
+func TestInstalledFutureFrozenObservationCannotBorrowFreshWindow(t *testing.T) {
+	s, c, r, o, f := installedInputs(t, runtimes.Claude)
+	future := o
+	future.At = future.At.Add(time.Hour)
+	future.ExpiresAt = future.ExpiresAt.Add(time.Hour)
+	p := planned(t, s, c, r, future)
+	result, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err == nil || result.ArtifactsComplete() || len(f.records) > 0 {
+		t.Fatal("borrowed another observation window")
+	}
+	for _, event := range f.events {
+		if event == "validate" || event == "observe" {
+			t.Fatal("known invalid frozen time reached host callback")
+		}
+	}
+}
+func TestInstalledBenignLateContentStillRequiresNewPlan(t *testing.T) {
+	s, c, r, o, f := installedInputs(t, runtimes.Claude)
+	p := planned(t, s, c, r, o)
+	path := filepath.Join(s.Installed.Target.Path, s.Installed.Grants[0].Path)
+	operator := []byte(`{"operator":"preserved"}`)
+	if err := os.WriteFile(path, operator, 0600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err == nil || result.ArtifactsComplete() || len(f.records) > 0 {
+		t.Fatal("bound new physical inputs to old frozen digest")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !reflect.DeepEqual(raw, operator) {
+		t.Fatal("mutated unplanned existing state")
+	}
+}
