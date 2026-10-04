@@ -16,3 +16,5 @@ export type { ForwardContext } from './host-rpc.js';
 
 export * from './hooks.js';
 export type { HookHandler } from './types.js';
+
+export type { QueueLimits } from './publication.js';

@@ -34,6 +34,7 @@ type ServeOptions struct {
 	Context         context.Context
 	ShutdownTimeout time.Duration
 	FrameLimits     FrameLimits
+	QueueLimits     QueueLimits
 	WriteTimeout    time.Duration
 }
 
@@ -48,6 +49,10 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 		return errors.New("subprocess: Serve called with nil plugin")
 	}
 	limits, err := frameLimits(options.FrameLimits)
+	if err != nil {
+		return err
+	}
+	queues, err := queueLimits(options.QueueLimits)
 	if err != nil {
 		return err
 	}
@@ -109,22 +114,22 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 	}
 
 	// Physical writes retain 3d bounds/timeouts. Correlation owns publication receipts.
-	writer := newFrameWriter(out, writeTimeout, func() {
+	writer := newFrameWriterWithLimits(out, writeTimeout, func() {
 		if ownOutput {
 			_ = os.Stdout.Close()
 		}
-	})
+	}, queues)
 	writer.onFailure = func(err error) { core.close(err); srv.fence(err) }
 	defer func() { writer.abort(errConnectionClosed); core.close(errConnectionClosed) }()
 	core.encode = srv.encodeFrame
 	core.publish = writer.submit
 	srv.writeFrame = func(data []byte) {
-		if err := writer.submit(data, nil); err != nil {
+		if err := writer.submitControl(data, nil); err != nil {
 			srv.fence(err)
 		}
 	}
 	srv.publishResponse = func(id RPCID, data []byte) {
-		err := writer.submit(data, func(err error) {
+		err := writer.submitControl(data, func(err error) {
 			core.release(id)
 			if err != nil {
 				core.close(err)
@@ -223,7 +228,7 @@ loop:
 					inputErr = err
 					break loop
 				}
-				if err = writer.submit(data, nil); err != nil {
+				if err = writer.submitControl(data, nil); err != nil {
 					inputErr = err
 					break loop
 				}

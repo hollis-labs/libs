@@ -1,6 +1,7 @@
 import { hookResponseJSON } from './hooks-dispatch.js';
 import {Correlation, CorrelationError, CORE_CAPACITY, replyCandidate} from './correlation.js';
-import {FrameWriter} from './publication.js';
+import {FrameWriter, queueLimits} from './publication.js';
+import type {QueueLimits} from './publication.js';
 import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, encodeBoundedJSON, frameLimit } from './frame-codec.js';
 export { FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError } from './frame-codec.js';
 import { decodeRuntimeParams, PayloadError } from './payload.js';
@@ -18,6 +19,7 @@ import type { RPCResponse } from './wire.js';
 export const MAX_INPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export const MAX_OUTPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export interface ServeOptions {
+  queueLimits?: QueueLimits;
   inputFrameBytes?: number;
   outputFrameBytes?: number;
   /** Maximum time for one complete write, default 5000 ms. */
@@ -112,6 +114,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
 /** Internal fixture seam; not exported from the author entry points. */
 export async function serveConnection(plugin: ServerPlugin, options: ServeOptions, core: Correlation): Promise<void> {
   if (!plugin || typeof plugin.init !== 'function' || typeof plugin.load !== 'function' || typeof plugin.unload !== 'function') throw new Error('serve requires init, load and unload');
+  const queues = queueLimits(options.queueLimits);
   const inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
   const writeTimeout = options.writeTimeoutMs ?? 5000;
   if (!Number.isFinite(writeTimeout) || writeTimeout <= 0 || writeTimeout > 2147483647) throw new Error('writeTimeoutMs must be positive and at most 2147483647');
@@ -140,7 +143,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   options.signal?.addEventListener('abort',stop,{once:true});
   output.on('error',onOutputError);
   if (options.signal?.aborted) stop();
-  const writer=new FrameWriter(output,writeTimeout,onOutputError);
+  const writer=new FrameWriter(output,writeTimeout,onOutputError,queues);
   core.encode=value=>encodeBoundedJSON(value,outputLimit-1)+'\n';
   core.publish=frame=>writer.publish(frame);
   const write = (response: RPCResponse, admitted=true): Promise<void> => {
@@ -150,7 +153,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
       try { line = core.encode({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:'outbound response rejected'}}); }
       catch (error) { onOutputError(error as Error); core.close(error); return Promise.reject(error); }
     }
-    const receipt=writer.publish(line);
+    const receipt=writer.publish(line,'control');
     void receipt.then(()=>{if(admitted)core.release(response.id);},error=>{if(admitted)core.release(response.id);core.close(error);onOutputError(error as Error);});
     return receipt;
   };
