@@ -266,6 +266,15 @@ func Inspect(ctx context.Context, prepared Prepared, c effects.PreflightContext,
 	// Pending intent cannot rule out a crash after replacement. Completed
 	// AlreadyPresent and terminal aborts attest no mutation by this operation.
 	possibleMutation := intent || interrupted || (complete && e.Outcome == effects.Applied)
+	if len(e.Attachments) != 0 {
+		out := result(r, effects.Refused, "evidence_shape_refused")
+		out.Evidence = e.Clone()
+		out.Evidence.Attachments = nil
+		if possibleMutation {
+			out.Obligations = []effects.Obligation{{RootID: r.Config.ID, Code: "recovery_required"}}
+		}
+		return out
+	}
 	unavailable := func() effects.Result {
 		out := effects.Result{Outcome: effects.Refused, Code: "inspection_unavailable", Evidence: e.Clone()}
 		if possibleMutation {
