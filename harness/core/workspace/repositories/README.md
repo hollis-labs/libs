@@ -52,7 +52,9 @@ no preservation refs or shipped proofs are fabricated. Reads cap at 4 MiB,
 1,024 log records and 256 distinct commit IDs. Missing, changed, malformed,
 oversized or unrecognized private history retains. Any unknown or failed check
 retains. `Retire` rechecks after durable intent and immediately before non-forced
-Git removal, keeps the branch, and never deletes folders generically. User
+Git removal, keeps the branch, and never deletes folders generically. The
+concrete adapter observes safety again after its final authorization callback,
+before removal, so that callback cannot hide late work behind a stale snapshot. User
 checkouts are never retired. `InspectRetirement` binds the proof revisions and
 classifies receipts without replay or cleanup. Publication, use-pin enforcement,
 retirement scheduling and recovery execution remain caller responsibilities.

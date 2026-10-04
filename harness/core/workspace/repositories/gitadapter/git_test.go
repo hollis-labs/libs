@@ -664,3 +664,47 @@ func TestRemovalSafetyRevocationStopsBeforeGitEffect(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestFinalRemovalCallbackCannotHideTrackedEdit(t *testing.T) {
+	for _, flag := range []string{"--assume-unchanged", "--skip-worktree"} {
+		t.Run(flag, func(t *testing.T) {
+			p, r, c := fixture(t)
+			done := create(t, p, r, c)
+			calls := 0
+			mutations := 0
+			flagState := ""
+			p.trace = func(args []string) {
+				if len(args) > 1 && args[0] == "worktree" && args[1] == "remove" {
+					mutations++
+				}
+			}
+			validate := func(context.Context) error {
+				calls++
+				if calls == 2 {
+					if _, _, e := p.run(context.Background(), r.Path, "update-index", flag, "--", "tracked.txt"); e != nil {
+						return e
+					}
+					if e := os.WriteFile(filepath.Join(r.Path, "tracked.txt"), []byte("late callback unshipped work\n"), 0600); e != nil {
+						return e
+					}
+					var e error
+					flagState, _, e = p.run(context.Background(), r.Path, "ls-files", "-v", "-z")
+					return e
+				}
+				return nil
+			}
+			changed, e := p.Remove(context.Background(), r, done.Evidence.Attachments[0], validate)
+			if changed || e == nil || mutations != 0 {
+				t.Fatalf("late callback bypassed safety: calls=%d changed=%t error=%v mutations=%d", calls, changed, e, mutations)
+			}
+			b, e := os.ReadFile(filepath.Join(r.Path, "tracked.txt"))
+			if e != nil || string(b) != "late callback unshipped work\n" {
+				t.Fatal("late edit lost", e)
+			}
+			after, _, e := p.run(context.Background(), r.Path, "ls-files", "-v", "-z")
+			if e != nil || after != flagState {
+				t.Fatal("late index flags changed", e)
+			}
+		})
+	}
+}

@@ -610,6 +610,12 @@ func (p *Port) Remove(ctx context.Context, r repositories.Request, a effects.Att
 	if ctx.Err() != nil || validate(ctx) != nil || ctx.Err() != nil || !q.valid() {
 		return false, errGit
 	}
+	// Authority refresh is a host callback and can change the observed resource.
+	// Recheck safety after that final callback, immediately before Git removal.
+	s, e = p.Safety(ctx, r, a)
+	if e != nil || !s.Complete || s.Head != a.Head || s.Dirty || s.Untracked || s.Ignored || s.Unknown || s.Locked || s.Unreachable != 0 || s.Ahead != 0 || ctx.Err() != nil || !q.valid() {
+		return false, errGit
+	}
 	if _, _, e = p.run(ctx, r.Source.Path, "worktree", "remove", "--", r.Path); e != nil {
 		return true, errGit
 	}
