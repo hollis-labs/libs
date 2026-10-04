@@ -77,6 +77,7 @@ func planInstalledWorkspace(s Spec, c ResolvedContent, r Resources, o Observatio
 	}
 	slices.SortFunc(r.Roots, func(a, b RootRef) int { return cmp.Compare(a.ID, b.ID) })
 	slices.SortFunc(o.Roots, func(a, b RootObservation) int { return cmp.Compare(a.RootID, b.RootID) })
+	slices.SortFunc(o.InstalledVolumes, func(a, b materialize.InstalledCapabilities) int { return cmp.Compare(a.RootIdentity, b.RootIdentity) })
 	slices.Sort(o.Capabilities)
 	o.Capabilities = slices.Compact(o.Capabilities)
 	slices.SortFunc(o.InstalledFiles, func(a, b install.FileSnapshot) int { return cmp.Compare(a.Path, b.Path) })
@@ -169,7 +170,7 @@ func planInstalledWorkspace(s Spec, c ResolvedContent, r Resources, o Observatio
 	if err != nil {
 		return PlannedWorkspace{}, err
 	}
-	request := install.Request{Target: installRootInput(s.Installed.Target), Control: installRootInput(s.Installed.Control), Grants: s.Installed.Grants, Previous: previous, CaseMode: o.InstalledCaseMode}
+	request := install.Request{Target: installRootInput(s.Installed.Target), Control: installRootInput(s.Installed.Control), Grants: s.Installed.Grants, Previous: previous, Capabilities: installedTargetCapabilities(o, s.Installed.Target.ID), CaseMode: o.InstalledCaseMode}
 	if _, err := install.Prepare(request, c.Rendered[0], o.InstalledFiles); err != nil {
 		return PlannedWorkspace{}, installRefusal(err)
 	}
@@ -287,7 +288,12 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	}
 	var held []HeldLock
 	mutated := false
+	var validate func() error
+	var operationCancel context.CancelFunc
 	defer func() {
+		if operationCancel != nil {
+			defer operationCancel()
+		}
 		if err != nil && mutated {
 			result.Status = Partial
 			result.Receipt.Phase = Interrupted
@@ -299,7 +305,17 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 			result.Receipt.Obligations = slices.Clone(result.Obligations)
 			recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 			defer cancel()
-			err = errors.Join(err, ports.ReceiptStore.Record(recordCtx, copyRecord(result.Receipt)))
+			// Do not send recovery evidence through a store whose configured or
+			// physical custody was lost. Returned trusted obligations still survive.
+			if store.ControlRoot() == p.spec.Installed.Control {
+				fresh, ce := observeInstallRoot(p.spec.Installed.Control)
+				if ce == nil && fresh.FileIdentity == installedTargetCapabilities(p.observed, p.spec.Installed.Control.ID).RootIdentity {
+					cap, ce := materialize.InspectInstalledCapabilities(recordCtx, p.spec.Installed.Control.Path, p.observed.InstalledCaseMode)
+					if ce == nil && cap == installedTargetCapabilities(p.observed, p.spec.Installed.Control.ID) {
+						err = errors.Join(err, ports.ReceiptStore.Record(recordCtx, copyRecord(result.Receipt)))
+					}
+				}
+			}
 		}
 		for j := len(held) - 1; j >= 0; j-- {
 			if e := held[j].Release(); e != nil {
@@ -311,9 +327,38 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 				appendObligation(&result, Obligation{Kind: RecoveryInspectionRequired, Code: "lock_release_failed"})
 			}
 		}
+		if validate != nil {
+			ve := validate()
+			if ve == nil && result.artifactsComplete {
+				ve = verifyInstalledCompletion(ctx, p.spec.Installed.Target.Path, p.content[0].Tree, p.observed.InstalledCaseMode, result.Receipt.Installed, result.Receipt.Installed.Directories)
+			}
+			if ve != nil {
+				err = errors.Join(err, ve)
+				result.artifactsComplete = false
+				if mutated {
+					result.Status = Partial
+					result.Retained = appendRoot(result.Retained, p.spec.Installed.Target)
+					result.Receipt.Phase = Interrupted
+					for j := range result.Receipt.Roots {
+						result.Receipt.Roots[j].Complete = false
+					}
+				}
+				appendObligation(&result, Obligation{Kind: RecoveryInspectionRequired, RootID: p.spec.Installed.Target.ID, Code: "installed_final_custody_lost"})
+			}
+		}
 		result.Receipt.Obligations = slices.Clone(result.Obligations)
 		if err != nil {
 			result.artifactsComplete = false
+			if mutated {
+				result.Status = Partial
+				result.Receipt.Phase = Interrupted
+				result.Retained = appendRoot(result.Retained, p.spec.Installed.Target)
+				for j := range result.Receipt.Roots {
+					result.Receipt.Roots[j].Complete = false
+				}
+				appendObligation(&result, Obligation{Kind: RecoveryInspectionRequired, RootID: p.spec.Installed.Target.ID})
+				result.Receipt.Obligations = slices.Clone(result.Obligations)
+			}
 			if !mutated {
 				var refusal *Refusal
 				if errors.As(err, &refusal) {
@@ -337,7 +382,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 		held = append(held, l)
 	}
 	var live Observations
-	validate := func() error {
+	validate = func() error {
 		if e := ctx.Err(); e != nil {
 			return e
 		}
@@ -350,10 +395,28 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 		if e := ports.Host.Validate(ctx, copyRecord(p.spec), copyRecord(p.resources)); e != nil {
 			return e
 		}
+		// Host validation is an external callback: it may change the configured
+		// store as well as physical custody. Never admit its earlier binding.
+		if store.ControlRoot() != p.spec.Installed.Control {
+			return refuse("installed_control_store_mismatch", "installed", Conflict)
+		}
 		if e := ctx.Err(); e != nil {
 			return e
 		}
+		if e := validateInstalledFreshness(p, live, ports.Clock.Now()); e != nil {
+			return e
+		}
+		if store.ControlRoot() != p.spec.Installed.Control {
+			return refuse("installed_control_store_mismatch", "installed", Conflict)
+		}
 		for _, root := range append(slices.Clone(p.roots), p.resources.LockRoot) {
+			cap, e := materialize.InspectInstalledCapabilities(ctx, root.Path, p.observed.InstalledCaseMode)
+			if e != nil {
+				return installRefusal(e)
+			}
+			if cap != installedTargetCapabilities(p.observed, root.ID) {
+				return refuse("installed_volume_changed", "installed", Conflict)
+			}
 			fresh, e := observeInstallRoot(root)
 			if e != nil {
 				return e
@@ -374,7 +437,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 				}
 			}
 		}
-		return validateInstalledFreshness(p, live, ports.Clock.Now())
+		return ctx.Err()
 	}
 	if err = validate(); err != nil {
 		return result, err
@@ -419,7 +482,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	remaining := min(p.observed.ExpiresAt.Sub(now), live.ExpiresAt.Sub(now))
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, remaining)
-	defer cancel()
+	operationCancel = cancel
 	for _, cap := range []Capability{CanonicalRoots, MutationLocks, InstalledMerge} {
 		if !slices.Contains(live.Capabilities, cap) {
 			return result, refuse("installed_capability_missing", "installed", Unsupported)
@@ -442,7 +505,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	if err != nil {
 		return result, err
 	}
-	request := install.Request{Header: effects.Header{Version: effects.SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest}, Target: installRootInput(p.spec.Installed.Target), Control: installRootInput(p.spec.Installed.Control), Grants: p.spec.Installed.Grants, Previous: previous, CaseMode: live.InstalledCaseMode}
+	request := install.Request{Header: effects.Header{Version: effects.SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest}, Target: installRootInput(p.spec.Installed.Target), Control: installRootInput(p.spec.Installed.Control), Grants: p.spec.Installed.Grants, Previous: previous, Capabilities: installedTargetCapabilities(live, p.spec.Installed.Target.ID), CaseMode: live.InstalledCaseMode}
 	prepared, err := install.Prepare(request, renderValue, snapshots)
 	if err != nil {
 		return result, installRefusal(err)
@@ -462,7 +525,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 		}
 	}
 	result.Receipt.Obligations = slices.Clone(result.Obligations)
-	engine := materialize.NewEngine(materialize.EngineOptions{Now: ports.Clock.Now, BeforeInstalledCommit: func(cctx context.Context, c materialize.InstalledFileChange) error {
+	engine := materialize.NewEngine(materialize.EngineOptions{Now: func() time.Time { return now }, BeforeInstalledCommit: func(cctx context.Context, c materialize.InstalledFileChange) error {
 		if e := validate(); e != nil {
 			return e
 		}
@@ -526,7 +589,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	for _, c := range result.Receipt.Installed.Files {
 		found := false
 		for _, s := range after {
-			if s.Path == c.Path && s.Exists && s.Digest == c.After && s.Mode == c.AfterMode {
+			if s.Path == c.Path && s.Exists && s.Digest == c.After && s.Mode == c.AfterMode && s.Metadata == c.AfterMetadata {
 				found = true
 			}
 		}
@@ -557,7 +620,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	for _, c := range result.Receipt.Installed.Files {
 		found := false
 		for _, snapshot := range final {
-			if snapshot.Path == c.Path && snapshot.Exists && snapshot.Digest == c.After && snapshot.Mode == c.AfterMode && snapshot.Identity == c.AfterIdentity {
+			if snapshot.Path == c.Path && snapshot.Exists && snapshot.Digest == c.After && snapshot.Mode == c.AfterMode && snapshot.Identity == c.AfterIdentity && snapshot.Metadata == c.AfterMetadata {
 				found = true
 			}
 		}
@@ -583,12 +646,12 @@ func verifyInstalledDirectories(snapshots []materialize.InstalledSnapshot, dirs 
 			seen[d.Path] = d
 		}
 		if s.Kind == artifact.EntryDirectory {
-			seen[s.Path] = materialize.InstalledDirectoryChange{Path: s.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode}
+			seen[s.Path] = materialize.InstalledDirectoryChange{Path: s.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode, Metadata: s.Metadata}
 		}
 	}
 	for _, d := range dirs {
 		actual, ok := seen[d.Path]
-		if !ok || actual.Exists != d.Exists || actual.Identity != d.Identity || actual.Mode != d.Mode {
+		if !ok || actual.Exists != d.Exists || actual.Identity != d.Identity || actual.Mode != d.Mode || actual.Metadata != d.Metadata {
 			return refuse("installed_directory_changed", "installed", Partial)
 		}
 	}
@@ -600,6 +663,18 @@ func validateInstalledObservations(s Spec, r Resources, o Observations) error {
 	if len(o.Roots) != len(refs) {
 		return refuse("installed_root_observation", "installed", Conflict)
 	}
+	if len(o.InstalledVolumes) != len(refs) {
+		return refuse("installed_volume_capability_missing", "installed", Unsupported)
+	}
+	seen := map[string]bool{}
+	for _, ref := range refs {
+		cap := installedTargetCapabilities(o, ref.ID)
+		if !cap.Valid() || cap.CaseMode != o.InstalledCaseMode || seen[cap.RootIdentity] {
+			return refuse("installed_volume_capability_missing", "installed", Unsupported)
+		}
+		seen[cap.RootIdentity] = true
+	}
+
 	ids := map[string]bool{}
 	physical := map[string]bool{}
 	for _, root := range refs {
@@ -636,4 +711,48 @@ func validateInstalledFreshness(p PlannedWorkspace, live Observations, now time.
 		return refuse(CodeInvalidObservationWindow, "installed", Conflict)
 	}
 	return nil
+}
+
+func installedTargetCapabilities(o Observations, id string) materialize.InstalledCapabilities {
+	var identity string
+	for _, r := range o.Roots {
+		if r.RootID == id {
+			identity = r.FileIdentity
+		}
+	}
+	var found materialize.InstalledCapabilities
+	for _, c := range o.InstalledVolumes {
+		if c.RootIdentity == identity {
+			if found.RootIdentity != "" {
+				return materialize.InstalledCapabilities{}
+			}
+			found = c
+		}
+	}
+	return found
+}
+
+func verifyInstalledCompletion(ctx context.Context, target string, tree artifact.Tree, mode materialize.CaseMode, evidence *install.Evidence, dirs []materialize.InstalledDirectoryChange) error {
+	if evidence == nil {
+		return refuse(CodeCommittedDigestMismatch, "installed", Partial)
+	}
+	final, err := materialize.InspectInstalled(ctx, target, tree, mode)
+	if err != nil {
+		return err
+	}
+	for _, c := range evidence.Files {
+		found := false
+		for _, s := range final {
+			if s.Path == c.Path && s.Exists && s.Identity == c.AfterIdentity && s.Digest == c.After && s.Mode == c.AfterMode && s.Metadata == c.AfterMetadata && c.Phase == materialize.InstalledVerified {
+				found = true
+			}
+		}
+		if !found {
+			return refuse(CodeCommittedDigestMismatch, "installed", Partial)
+		}
+	}
+	if err := verifyInstalledDirectories(final, dirs); err != nil {
+		return err
+	}
+	return ctx.Err()
 }

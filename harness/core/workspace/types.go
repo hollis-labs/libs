@@ -235,8 +235,9 @@ type Resources struct {
 // Observations are snapshots, not proof that an apply will succeed. The host
 // must refresh them under locks before applying any filesystem effects.
 type Observations struct {
-	InstalledFiles    []install.FileSnapshot `json:",omitempty"`
-	InstalledCaseMode materialize.CaseMode   `json:",omitempty"`
+	InstalledFiles    []install.FileSnapshot              `json:",omitempty"`
+	InstalledVolumes  []materialize.InstalledCapabilities `json:",omitempty"`
+	InstalledCaseMode materialize.CaseMode                `json:",omitempty"`
 	At, ExpiresAt     time.Time
 	Roots             []RootObservation
 	Receipts          []Receipt

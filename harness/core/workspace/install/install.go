@@ -35,6 +35,7 @@ type Request struct {
 	Target, Control effects.RootInput
 	Grants          []Grant
 	Previous        *Evidence
+	Capabilities    materialize.InstalledCapabilities
 	CaseMode        materialize.CaseMode
 }
 type Evidence struct {
@@ -70,6 +71,9 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 		return Prepared{}, ErrUnsupported
 	}
 	if r.Layer != layout.Installed || r.Root != layout.RootHome || r.RootMode != 0 || len(r.Effects) != 0 || len(r.Preparations) != 0 {
+		return Prepared{}, ErrUnsupported
+	}
+	if !req.Capabilities.Valid() || req.Capabilities.CaseMode != req.CaseMode {
 		return Prepared{}, ErrUnsupported
 	}
 	if req.CaseMode != materialize.CaseSensitive && req.CaseMode != materialize.CaseInsensitive {
@@ -113,6 +117,9 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 			return Prepared{}, ErrConflict
 		}
 		for _, c := range p.Files {
+			if !c.AfterMetadata.PreservableFile(req.Capabilities.Creation, c.AfterMode) {
+				return Prepared{}, ErrUnsupported
+			}
 			if _, dup := prior[c.Path]; dup || c.Phase != materialize.InstalledVerified {
 				return Prepared{}, ErrConflict
 			}
@@ -138,10 +145,13 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 			if !ok {
 				return Prepared{}, ErrConflict
 			}
-			directoryMap[entry.Path] = materialize.InstalledDirectoryChange{Path: entry.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode}
+			directoryMap[entry.Path] = materialize.InstalledDirectoryChange{Path: entry.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode, Metadata: s.Metadata}
 		}
 	}
 	for _, d := range directoryMap {
+		if d.Exists && (!d.Metadata.PreservableDirectory() || d.Metadata.Volume != req.Capabilities.Volume || d.Metadata.FullMode != d.Mode) {
+			return Prepared{}, ErrUnsupported
+		}
 		if render.ValidateRelPath(d.Path) != nil || d.Created || d.Phase != "" || d.Exists && (d.Identity == "" || d.Mode > 0777) || !d.Exists && (d.Identity != "" || d.Mode != 0) {
 			return Prepared{}, ErrConflict
 		}
@@ -166,10 +176,16 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 		if s.Exists && (s.Identity == "" || s.Mode > 0777 || s.Kind != e.Kind) {
 			return Prepared{}, ErrConflict
 		}
-		if !s.Exists && (s.Identity != "" || s.Mode != 0 || s.Kind != "" || s.Bytes != nil || s.Digest != (artifact.Digest{})) {
+		if !s.Exists && (s.Metadata != (materialize.InstalledMetadata{}) || s.Identity != "" || s.Mode != 0 || s.Kind != "" || s.Bytes != nil || s.Digest != (artifact.Digest{})) {
 			return Prepared{}, ErrConflict
 		}
+		if s.Creation != req.Capabilities.Creation {
+			return Prepared{}, ErrUnsupported
+		}
 		if e.Kind == artifact.EntryDirectory {
+			if s.Exists && !s.Metadata.PreservableDirectory() {
+				return Prepared{}, ErrUnsupported
+			}
 			out.Entries = append(out.Entries, e)
 			continue
 		}
@@ -187,7 +203,13 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 		if s.Exists && s.Digest != artifact.DigestBytes(s.Bytes) {
 			return Prepared{}, ErrConflict
 		}
-		c := materialize.InstalledFileChange{Path: e.Path, BeforeIdentity: s.Identity, BeforeExists: s.Exists, BeforeMode: s.Mode, Before: s.Digest, AfterMode: uint32(e.Mode.Perm()), GrantID: g.ID, GrantVersion: g.Version, Phase: materialize.InstalledPrepared}
+		if s.Exists && !s.Metadata.PreservableFile(s.Creation, uint32(e.Mode.Perm())) {
+			return Prepared{}, ErrUnsupported
+		}
+		expected := s.Creation
+		expected.FullMode = uint32(e.Mode.Perm())
+		expected.Links = 1
+		c := materialize.InstalledFileChange{BeforeMetadata: s.Metadata, AfterMetadata: expected, Path: e.Path, BeforeIdentity: s.Identity, BeforeExists: s.Exists, BeforeMode: s.Mode, Before: s.Digest, AfterMode: uint32(e.Mode.Perm()), GrantID: g.ID, GrantVersion: g.Version, Phase: materialize.InstalledPrepared}
 		old, hadPrior := prior[e.Path]
 		if g.WholeFile {
 			if isNativeDocument(r.Provider, e.Path) {
@@ -311,7 +333,7 @@ func Prepare(req Request, r render.Result, observed []FileSnapshot) (Prepared, e
 	if err != nil {
 		return Prepared{}, ErrConflict
 	}
-	request := materialize.Request{Operation: materialize.OperationInstall, TargetRoot: req.Target.Path, Artifacts: out, Installed: &materialize.InstalledPolicy{CaseMode: req.CaseMode, Files: clone(evidence.Files), Directories: clone(evidence.Directories), Stage: evidence.Stage}}
+	request := materialize.Request{Operation: materialize.OperationInstall, TargetRoot: req.Target.Path, Artifacts: out, Installed: &materialize.InstalledPolicy{Capabilities: req.Capabilities, CaseMode: req.CaseMode, Files: clone(evidence.Files), Directories: clone(evidence.Directories), Stage: evidence.Stage}}
 	return Prepared{request: request, evidence: evidence, valid: true}, nil
 }
 func samePaths(a, b [][]string) bool {
@@ -362,7 +384,7 @@ func allowedFile(rows []layout.Row, p string) bool {
 // EquivalentSnapshot compares content as well as identity, preserving explicit
 // zero-byte files. It is not a filesystem observation or an authority proof.
 func EquivalentSnapshot(a, b FileSnapshot) bool {
-	return a.Path == b.Path && a.Exists == b.Exists && a.Kind == b.Kind && a.Mode == b.Mode && a.Identity == b.Identity && a.Digest == b.Digest && bytes.Equal(a.Bytes, b.Bytes) && reflect.DeepEqual(a.Parents, b.Parents)
+	return a.Metadata == b.Metadata && a.Creation == b.Creation && a.Path == b.Path && a.Exists == b.Exists && a.Kind == b.Kind && a.Mode == b.Mode && a.Identity == b.Identity && a.Digest == b.Digest && bytes.Equal(a.Bytes, b.Bytes) && reflect.DeepEqual(a.Parents, b.Parents)
 }
 
 // Preserve a fully authorized absent render exactly. Equality of the COMPLETE

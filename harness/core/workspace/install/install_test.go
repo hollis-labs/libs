@@ -29,13 +29,18 @@ func nativeFixture(t *testing.T, provider runtimes.ID) (install.Request, render.
 	}
 	note, _ := json.Marshal(render.DocumentOwnership{Schema: render.OwnershipNoteSchema, OwnedKeyPaths: [][]string{{"managed"}}, ReservedSlots: slots})
 	r := render.Result{Provider: provider, Layer: layout.Installed, Mode: layout.InstallMode, Root: layout.RootHome, Tree: artifact.Tree{Entries: []artifact.Entry{{Path: file, Kind: artifact.EntryFile, Bytes: desired, Mode: 0600, Ownership: artifact.Ownership{EntryID: "fixture-entry", GroupID: "fixture-group"}, Provenance: artifact.Provenance{Source: "fixture", Note: string(note)}}}}}
-	req := install.Request{Header: effects.Header{Version: effects.SchemaVersion, OperationID: "fixture-operation", InputDigest: "sha256:" + artifact.DigestBytes([]byte("fixture")).Hex}, Target: effects.RootInput{ID: "target", Path: "/fixture/operator"}, Control: effects.RootInput{ID: "control", Path: "/fixture/control"}, CaseMode: materialize.CaseSensitive, Grants: []install.Grant{{ID: "fixture-grant", Version: "1", Path: file, KeyPaths: [][]string{{"managed"}}}}}
-	return req, r, []install.FileSnapshot{{Path: file, Parents: []materialize.InstalledDirectoryChange{{Path: path.Dir(file)}}}}
+	creation := materialize.InstalledMetadata{Volume: "fixture-ext4", Complete: true, ACLAbsent: true, XattrsAbsent: true}
+	cap := materialize.InstalledCapabilities{Volume: creation.Volume, RootIdentity: "fixture-root", Revision: "workspace.installed.metadata.v1", ObservationRevision: "synthetic-observation-v1", CaseMode: materialize.CaseSensitive, Creation: creation, RootMetadata: creation}
+	req := install.Request{Capabilities: cap, Header: effects.Header{Version: effects.SchemaVersion, OperationID: "fixture-operation", InputDigest: "sha256:" + artifact.DigestBytes([]byte("fixture")).Hex}, Target: effects.RootInput{ID: "target", Path: "/fixture/operator"}, Control: effects.RootInput{ID: "control", Path: "/fixture/control"}, CaseMode: materialize.CaseSensitive, Grants: []install.Grant{{ID: "fixture-grant", Version: "1", Path: file, KeyPaths: [][]string{{"managed"}}}}}
+	return req, r, []install.FileSnapshot{{Path: file, Creation: creation, Parents: []materialize.InstalledDirectoryChange{{Path: path.Dir(file)}}}}
 }
 func presentSnapshot(s *install.FileSnapshot, raw []byte) {
 	s.Exists = true
 	s.Kind = artifact.EntryFile
 	s.Mode = 0600
+	s.Metadata = s.Creation
+	s.Metadata.FullMode = 0600
+	s.Metadata.Links = 1
 	s.Identity = "fixture-inode"
 	s.Bytes = raw
 	s.Digest = artifact.DigestBytes(raw)
@@ -193,5 +198,92 @@ func TestInstalledAbsentDocumentPreservesApprovedRenderedBytes(t *testing.T) {
 	}
 	if bytes.Contains(p.EngineRequest().Artifacts.Entries[1].Bytes, []byte("excluded")) {
 		t.Fatal("created ungranted slot")
+	}
+}
+
+func TestInstalledPureMetadataRequiresCompletePreservableEvidence(t *testing.T) {
+	for _, kind := range []string{"unknown", "acl", "xattr", "flags", "hardlink", "uid", "gid", "mode", "volume", "creation-profile"} {
+		t.Run(kind, func(t *testing.T) {
+			req, r, obs := nativeFixture(t, runtimes.Claude)
+			presentSnapshot(&obs[0], []byte(`{"operator":1}`))
+			switch kind {
+			case "unknown":
+				obs[0].Metadata.Complete = false
+			case "acl":
+				obs[0].Metadata.ACLAbsent = false
+			case "xattr":
+				obs[0].Metadata.XattrsAbsent = false
+			case "flags":
+				obs[0].Metadata.Flags = 1
+			case "hardlink":
+				obs[0].Metadata.Links = 2
+			case "uid":
+				obs[0].Metadata.UID++
+			case "gid":
+				obs[0].Metadata.GID++
+			case "mode":
+				obs[0].Mode = 0644
+				obs[0].Metadata.FullMode = 0644
+			case "volume":
+				obs[0].Metadata.Volume = "foreign-volume"
+			case "creation-profile":
+				obs[0].Creation.ACLAbsent = false
+			}
+			if _, err := install.Prepare(req, r, obs); !errors.Is(err, install.ErrUnsupported) {
+				t.Fatalf("accepted unpreservable metadata: %v", err)
+			}
+		})
+	}
+}
+
+func TestInstalledPureCapabilitiesAreRootVolumeRevisionBound(t *testing.T) {
+	for _, kind := range []string{"missing", "volume", "root", "revision", "case", "root-metadata", "creation-mode", "creation-links", "creation-complete", "creation-acl", "creation-xattrs", "creation-flags", "creation-volume", "root-volume", "root-mode", "observation-revision"} {
+		t.Run(kind, func(t *testing.T) {
+			req, r, obs := nativeFixture(t, runtimes.Claude)
+			switch kind {
+			case "missing":
+				req.Capabilities = materialize.InstalledCapabilities{}
+			case "volume":
+				req.Capabilities.Volume = "foreign"
+			case "root":
+				req.Capabilities.RootIdentity = ""
+			case "revision":
+				req.Capabilities.Revision = "unknown"
+			case "case":
+				req.Capabilities.CaseMode = materialize.CaseMode("unknown")
+			case "root-metadata":
+				req.Capabilities.RootMetadata.Complete = false
+			case "creation-mode":
+				req.Capabilities.Creation.FullMode = 0600
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-links":
+				req.Capabilities.Creation.Links = 1
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-complete":
+				req.Capabilities.Creation.Complete = false
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-acl":
+				req.Capabilities.Creation.ACLAbsent = false
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-xattrs":
+				req.Capabilities.Creation.XattrsAbsent = false
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-flags":
+				req.Capabilities.Creation.Flags = 1
+				obs[0].Creation = req.Capabilities.Creation
+			case "creation-volume":
+				req.Capabilities.Creation.Volume = "foreign"
+				obs[0].Creation = req.Capabilities.Creation
+			case "root-volume":
+				req.Capabilities.RootMetadata.Volume = "foreign"
+			case "root-mode":
+				req.Capabilities.RootMetadata.FullMode = 04700
+			case "observation-revision":
+				req.Capabilities.ObservationRevision = ""
+			}
+			if _, err := install.Prepare(req, r, obs); !errors.Is(err, install.ErrUnsupported) {
+				t.Fatalf("accepted incomplete capability: %v", err)
+			}
+		})
 	}
 }

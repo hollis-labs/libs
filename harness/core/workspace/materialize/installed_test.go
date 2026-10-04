@@ -26,6 +26,7 @@ func TestInstalledExistingUserDirectoryIsTraversalNotOwnership(t *testing.T) {
 	}
 	req.Generation = "fixture-generation"
 	req.Installed = &InstalledPolicy{TargetIdentity: InstalledIdentity(info), ControlIdentity: "external-control", CaseMode: CaseSensitive, Files: []InstalledFileChange{{Path: ".claude/fixture.txt", After: artifact.DigestBytes([]byte("fixture")), AfterMode: 0600, GrantID: "fixture-grant", GrantVersion: "1", Phase: InstalledPrepared}}}
+	bindInstalledFixture(t, &req)
 	if _, err := NewEngine(EngineOptions{}).Apply(context.Background(), req); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +48,9 @@ func installedFixtureRequest(t *testing.T, root string) Request {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Request{Operation: OperationInstall, TargetRoot: root, Generation: "fixture-generation", Artifacts: artifact.Tree{Entries: []artifact.Entry{{Path: ".claude/fixture.txt", Kind: artifact.EntryFile, Mode: 0600, Bytes: []byte("fixture")}}}, Installed: &InstalledPolicy{TargetIdentity: InstalledIdentity(info), ControlIdentity: "external-control", CaseMode: CaseSensitive, Files: []InstalledFileChange{{Path: ".claude/fixture.txt", After: artifact.DigestBytes([]byte("fixture")), AfterMode: 0600, GrantID: "fixture-grant", GrantVersion: "1", Phase: InstalledPrepared}}}}
+	req := Request{Operation: OperationInstall, TargetRoot: root, Generation: "fixture-generation", Artifacts: artifact.Tree{Entries: []artifact.Entry{{Path: ".claude/fixture.txt", Kind: artifact.EntryFile, Mode: 0600, Bytes: []byte("fixture")}}}, Installed: &InstalledPolicy{TargetIdentity: InstalledIdentity(info), ControlIdentity: "external-control", CaseMode: CaseSensitive, Files: []InstalledFileChange{{Path: ".claude/fixture.txt", After: artifact.DigestBytes([]byte("fixture")), AfterMode: 0600, GrantID: "fixture-grant", GrantVersion: "1", Phase: InstalledPrepared}}}}
+	bindInstalledFixture(t, &req)
+	return req
 }
 func TestInstalledStageRevalidatedAfterCallback(t *testing.T) {
 	root := t.TempDir()
@@ -145,6 +148,7 @@ func TestInstalledCreatedParentsRecordedWithoutOwningExistingDirs(t *testing.T) 
 	req.Installed.Files[0].BeforeIdentity = InstalledIdentity(finfo)
 	req.Installed.Files[0].BeforeMode = 0600
 	req.Installed.Files[0].Before = req.Installed.Files[0].After
+	bindInstalledFixture(t, &req)
 	h, err = NewEngine(EngineOptions{}).Apply(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
@@ -167,8 +171,12 @@ func TestInstalledAliasesComparisonNeverRewritesPaths(t *testing.T) {
 			if _, err := InspectInstalled(context.Background(), root, artifact.Tree{Entries: entries[:1]}, mode); !errors.Is(err, ErrConflict) {
 				t.Fatal("accepted observed normalization alias")
 			}
-			if _, err := os.Stat(filepath.Join(root, ".agents/skills/caf\u00e9")); !os.IsNotExist(err) {
-				t.Fatal("rewrote observed path")
+			names, err := os.ReadDir(filepath.Join(root, ".agents/skills"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(names) != 1 || names[0].Name() != "cafe\u0301" {
+				t.Fatal("rewrote observed directory spelling")
 			}
 		})
 	}
@@ -177,7 +185,7 @@ func TestInstalledAliasesComparisonNeverRewritesPaths(t *testing.T) {
 	if _, err := InspectInstalled(context.Background(), root, artifact.Tree{Entries: entries}, CaseInsensitive); !errors.Is(err, ErrConflict) {
 		t.Fatal("accepted platform case aliases")
 	}
-	if _, err := InspectInstalled(context.Background(), root, artifact.Tree{Entries: entries}, CaseSensitive); err != nil {
+	if err := checkInstalledAliasFixture(t, root, entries, CaseSensitive); err != nil {
 		t.Fatal("refused distinct case-sensitive names")
 	}
 	if _, err := InspectInstalled(context.Background(), root, artifact.Tree{Entries: entries}, CaseMode("unknown")); !errors.Is(err, ErrUnsupportedOperation) {
@@ -263,4 +271,39 @@ func TestInstalledCancellationAndCallbackFailureRetainOnlyOwnStage(t *testing.T)
 			}
 		})
 	}
+}
+
+func bindInstalledFixture(t *testing.T, req *Request) {
+	t.Helper()
+	cap, err := InspectInstalledCapabilities(context.Background(), req.TargetRoot, req.Installed.CaseMode)
+	if errors.Is(err, ErrUnsupportedOperation) {
+		t.Skip("installed execution unsupported by this platform/filesystem metadata backend")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Installed.Capabilities = cap
+	snapshots, err := InspectInstalled(context.Background(), req.TargetRoot, req.Artifacts, req.Installed.CaseMode)
+	if err != nil {
+		return
+	} // Unsafe fixtures intentionally exercise engine preflight.
+	for j := range req.Installed.Files {
+		c := &req.Installed.Files[j]
+		for _, s := range snapshots {
+			if s.Path == c.Path {
+				c.BeforeMetadata = s.Metadata
+				c.AfterMetadata = expectedInstalledMetadata(cap.Creation, c.AfterMode)
+			}
+		}
+	}
+}
+
+func checkInstalledAliasFixture(t *testing.T, target string, entries []artifact.Entry, mode CaseMode) error {
+	t.Helper()
+	root, err := os.OpenRoot(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	return checkInstalledAliases(context.Background(), root, entries, mode)
 }

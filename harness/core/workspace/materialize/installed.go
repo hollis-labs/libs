@@ -2,6 +2,7 @@ package materialize
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/hollis-labs/substrate/harness/workspace/keymerge"
@@ -35,7 +36,84 @@ const (
 )
 const InstalledFileLimit = 16 << 20
 
+// InstalledMetadata is content-free descriptor evidence. Unknown enumeration is
+// never represented by an empty successful observation.
+type InstalledMetadata struct {
+	UID, GID, FullMode      uint32
+	Links                   uint64
+	Flags                   uint32
+	Volume                  string
+	Complete                bool
+	ACLAbsent, XattrsAbsent bool
+}
+
+// InstalledCapabilities binds backend semantics to a particular filesystem and
+// pinned root, rather than treating a case-mode string as filesystem authority.
+type InstalledCapabilities struct {
+	Volume, RootIdentity, Revision, ObservationRevision string
+	CaseMode                                            CaseMode
+	Creation                                            InstalledMetadata
+	RootMetadata                                        InstalledMetadata
+}
+
+func (c InstalledCapabilities) Valid() bool {
+	return c.Volume != "" && c.RootIdentity != "" && c.Revision == installedMetadataRevision && c.ObservationRevision != "" && (c.CaseMode == CaseSensitive || c.CaseMode == CaseInsensitive) && c.Creation.Complete && c.Creation.ACLAbsent && c.Creation.XattrsAbsent && c.Creation.Flags == 0 && c.Creation.Volume == c.Volume && c.Creation.FullMode == 0 && c.Creation.Links == 0 && allowedInstalledMetadata(c.RootMetadata, true) && c.RootMetadata.Volume == c.Volume
+}
+
+const installedMetadataRevision = "workspace.installed.metadata.v1"
+
+func allowedInstalledMetadata(m InstalledMetadata, directory bool) bool {
+	return m.Complete && m.ACLAbsent && m.XattrsAbsent && m.Volume != "" && m.Flags == 0 && m.FullMode & ^uint32(0777) == 0 && (directory || m.Links == 1)
+}
+
+func (m InstalledMetadata) PreservableDirectory() bool { return allowedInstalledMetadata(m, true) }
+func (m InstalledMetadata) PreservableFile(creation InstalledMetadata, mode uint32) bool {
+	return allowedInstalledMetadata(m, false) && m.UID == creation.UID && m.GID == creation.GID && m.FullMode == mode && m.Volume == creation.Volume
+}
+
+// InspectInstalledCapabilities performs no creation, chmod or metadata copying.
+func InspectInstalledCapabilities(ctx context.Context, target string, mode CaseMode) (InstalledCapabilities, error) {
+	if ctx == nil {
+		return InstalledCapabilities{}, ErrUnsafeTarget
+	}
+	if err := ctx.Err(); err != nil {
+		return InstalledCapabilities{}, err
+	}
+	root, _, err := openExistingTargetRoot(target)
+	if err != nil {
+		return InstalledCapabilities{}, ErrUnsafeTarget
+	}
+	defer root.Close()
+	f, err := root.Open(".")
+	if err != nil {
+		return InstalledCapabilities{}, ErrUnsafeTarget
+	}
+	defer f.Close()
+	m, id, err := installedMetadata(f, true)
+	if err != nil {
+		return InstalledCapabilities{}, err
+	}
+	if !allowedInstalledMetadata(m, true) || mode != CaseSensitive && mode != CaseInsensitive {
+		return InstalledCapabilities{}, ErrUnsupportedOperation
+	}
+	creation := m
+	creation.UID, creation.GID = installedCreator()
+	creation.FullMode = 0
+	creation.Links = 0
+	c := InstalledCapabilities{Volume: m.Volume, RootIdentity: id, Revision: installedMetadataRevision, CaseMode: mode, Creation: creation, RootMetadata: m}
+	// This revision identifies the observed descriptor/volume/profile tuple;
+	// protocol revision and freshness windows remain distinct fields.
+	raw, _ := json.Marshal(c)
+	c.ObservationRevision = artifact.DigestBytes(raw).Hex
+	if !c.Valid() {
+		return InstalledCapabilities{}, ErrUnsupportedOperation
+	}
+	return c, nil
+}
+
 type InstalledSnapshot struct {
+	Metadata InstalledMetadata
+	Creation InstalledMetadata
 	Path     string
 	Exists   bool
 	Kind     artifact.EntryKind
@@ -49,17 +127,20 @@ type InstalledSnapshot struct {
 // InstalledDirectoryChange records traversal observations and exact directories
 // created by this operation. Existing directories confer no ownership.
 type InstalledDirectoryChange struct {
+	Metadata        InstalledMetadata
 	Path, Identity  string
 	Mode            uint32
 	Exists, Created bool
 	Phase           InstalledPhase
 }
 type InstalledTemp struct {
+	Metadata       InstalledMetadata
 	Path, Identity string
 	Phase          InstalledPhase
 }
 type InstalledFileChange struct {
 	Path, BeforeIdentity, AfterIdentity string
+	BeforeMetadata, AfterMetadata       InstalledMetadata
 	BeforeExists                        bool
 	BeforeMode, AfterMode               uint32
 	Before, After                       artifact.Digest
@@ -69,6 +150,7 @@ type InstalledFileChange struct {
 	Stage                               InstalledTemp
 }
 type InstalledPolicy struct {
+	Capabilities                    InstalledCapabilities
 	TargetIdentity, ControlIdentity string
 	CaseMode                        CaseMode
 	Stage                           InstalledTemp
@@ -115,7 +197,7 @@ func InspectInstalled(ctx context.Context, target string, tree artifact.Tree, mo
 			return nil, ErrConflict
 		}
 		if e.Kind == artifact.EntryDirectory {
-			s.Parents = append(s.Parents, InstalledDirectoryChange{Path: e.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode})
+			s.Parents = append(s.Parents, InstalledDirectoryChange{Path: e.Path, Exists: s.Exists, Identity: s.Identity, Mode: s.Mode, Metadata: s.Metadata})
 		}
 		result = append(result, s)
 	}
@@ -123,6 +205,22 @@ func InspectInstalled(ctx context.Context, target string, tree artifact.Tree, mo
 }
 func inspectInstalledLeaf(root *os.Root, rel string) (InstalledSnapshot, error) {
 	s := InstalledSnapshot{Path: rel}
+	parent, err := root.Open(".")
+	if err != nil {
+		return s, ErrUnsafeTarget
+	}
+	pm, _, err := installedMetadata(parent, true)
+	parent.Close()
+	if err != nil {
+		return s, err
+	}
+	if !allowedInstalledMetadata(pm, true) {
+		return s, ErrUnsupportedOperation
+	}
+	pm.UID, pm.GID = installedCreator()
+	pm.FullMode = 0
+	pm.Links = 0
+	s.Creation = pm
 	parts := strings.Split(rel, "/")
 	for i := range parts {
 		p := strings.Join(parts[:i+1], "/")
@@ -136,7 +234,7 @@ func inspectInstalledLeaf(root *os.Root, rel string) (InstalledSnapshot, error) 
 		if err != nil {
 			return s, ErrUnsafeTarget
 		}
-		if info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+		if info.Mode()&os.ModeSymlink != 0 {
 			return s, ErrUnsafeTarget
 		}
 		if i < len(parts)-1 {
@@ -147,7 +245,27 @@ func inspectInstalledLeaf(root *os.Root, rel string) (InstalledSnapshot, error) 
 			if id == "" {
 				return s, ErrUnsupportedOperation
 			}
-			s.Parents = append(s.Parents, InstalledDirectoryChange{Path: p, Exists: true, Identity: id, Mode: uint32(info.Mode().Perm())})
+			f, er := openInstalledRegular(root, p)
+			if er != nil {
+				return s, ErrUnsafeTarget
+			}
+			dm, di, er := installedMetadata(f, true)
+			f.Close()
+			if er != nil {
+				return s, er
+			}
+			if di != id {
+				return s, ErrConflict
+			}
+			if !allowedInstalledMetadata(dm, true) {
+				return s, ErrUnsupportedOperation
+			}
+			dm.Links = 0
+			s.Parents = append(s.Parents, InstalledDirectoryChange{Path: p, Exists: true, Identity: id, Mode: uint32(info.Mode().Perm()), Metadata: dm})
+			creation := dm
+			creation.UID, creation.GID = installedCreator()
+			creation.FullMode = 0
+			s.Creation = creation
 			continue
 		}
 		s.Exists = true
@@ -158,6 +276,23 @@ func inspectInstalledLeaf(root *os.Root, rel string) (InstalledSnapshot, error) 
 		}
 		if info.IsDir() {
 			s.Kind = artifact.EntryDirectory
+			f, er := openInstalledRegular(root, p)
+			if er != nil {
+				return s, ErrUnsafeTarget
+			}
+			m, id, er := installedMetadata(f, true)
+			f.Close()
+			if er != nil {
+				return s, er
+			}
+			if id != s.Identity {
+				return s, ErrConflict
+			}
+			if !allowedInstalledMetadata(m, true) {
+				return s, ErrUnsupportedOperation
+			}
+			m.Links = 0
+			s.Metadata = m
 			return s, nil
 		}
 		if !info.Mode().IsRegular() || info.Size() > InstalledFileLimit {
@@ -173,8 +308,17 @@ func inspectInstalledLeaf(root *os.Root, rel string) (InstalledSnapshot, error) 
 			f.Close()
 			return s, ErrConflict
 		}
+		s.Metadata, _, err = installedMetadata(f, false)
+		if err != nil || !allowedInstalledMetadata(s.Metadata, false) {
+			f.Close()
+			return s, ErrUnsupportedOperation
+		}
 		s.Bytes, err = io.ReadAll(io.LimitReader(f, InstalledFileLimit+1))
+		second, _, me := installedMetadata(f, false)
 		ce := f.Close()
+		if me != nil || second != s.Metadata {
+			return s, ErrConflict
+		}
 		if err != nil || ce != nil || len(s.Bytes) > InstalledFileLimit {
 			return s, ErrUnsafeTarget
 		}
@@ -221,18 +365,28 @@ func checkInstalledAliases(ctx context.Context, root *os.Root, entries []artifac
 			return err
 		}
 		if d != "." {
-			s, err := inspectInstalledLeaf(root, d)
-			if err != nil {
-				return err
-			}
-			if !s.Exists {
-				continue
-			}
-			if s.Kind != artifact.EntryDirectory {
-				return ErrConflict
+			parts := strings.Split(d, "/")
+			for i := range parts {
+				p := strings.Join(parts[:i+1], "/")
+				info, er := root.Lstat(p)
+				if errors.Is(er, fs.ErrNotExist) {
+					break
+				}
+				if er != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+					return ErrUnsafeTarget
+				}
 			}
 		}
-		f, err := root.Open(d)
+		var f *os.File
+		var err error
+		if d == "." {
+			f, err = root.Open(".")
+		} else {
+			f, err = openInstalledRegular(root, d)
+		}
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return ErrUnsafeTarget
 		}
@@ -270,6 +424,13 @@ func (e *DefaultEngine) planInstalled(ctx context.Context, req Request) (Plan, e
 	if req.Installed == nil || req.Generation == "" || req.Installed.TargetIdentity == "" || req.Installed.ControlIdentity == "" {
 		return Plan{}, ErrUnsafeTarget
 	}
+	cap, err := InspectInstalledCapabilities(ctx, req.TargetRoot, req.Installed.CaseMode)
+	if err != nil || !req.Installed.Capabilities.Valid() {
+		return Plan{}, ErrUnsupportedOperation
+	}
+	if cap != req.Installed.Capabilities {
+		return Plan{}, ErrConflict
+	}
 	if req.Installed.Stage.Phase != "" && req.Installed.Stage.Phase != InstalledPrepared || req.Installed.Stage.Identity != "" {
 		return Plan{}, ErrConflict
 	}
@@ -306,6 +467,12 @@ func (e *DefaultEngine) planInstalled(ctx context.Context, req Request) (Plan, e
 		} // never adopt/chmod operator dirs
 		c, ok := changes[entry.Path]
 		if !ok || c.Phase != InstalledPrepared || c.GrantID == "" || c.GrantVersion == "" || c.After != artifact.DigestBytes(entry.Bytes) || c.AfterMode != uint32(modeFor(entry)) {
+			return Plan{}, ErrConflict
+		}
+		if !before.Creation.Complete || before.Creation != cap.Creation || c.AfterMetadata != expectedInstalledMetadata(cap.Creation, c.AfterMode) || before.Exists && !before.Metadata.PreservableFile(cap.Creation, c.AfterMode) {
+			return Plan{}, ErrUnsupportedOperation
+		}
+		if c.BeforeMetadata != before.Metadata {
 			return Plan{}, ErrConflict
 		}
 		if c.BeforeExists != before.Exists || c.BeforeIdentity != before.Identity || c.BeforeMode != before.Mode || c.Before != before.Digest {
@@ -379,6 +546,16 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 		return h, ErrUnsafeTarget
 	}
 	h.InstalledStage = InstalledTemp{Path: stage, Identity: installedIdentity(stageInfo), Phase: InstalledIntent}
+	stageFile, er := openInstalledRegular(root, stage)
+	if er != nil {
+		return h, ErrUnsafeTarget
+	}
+	stageMeta, _, er := installedMetadata(stageFile, true)
+	stageFile.Close()
+	if er != nil || stageMeta != expectedInstalledDirectoryMetadata(req.Installed.Capabilities.Creation, 0700) {
+		return h, ErrUnsupportedOperation
+	}
+	h.InstalledStage = InstalledTemp{Metadata: stageMeta, Path: stage, Identity: installedIdentity(stageInfo), Phase: InstalledIntent}
 	if h.InstalledStage.Identity == "" {
 		return h, ErrUnsupportedOperation
 	}
@@ -408,16 +585,20 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 		if er != nil {
 			return h, ErrUnsafeTarget
 		}
-		_, er = f.Write(entry.Bytes)
-		if er == nil {
-			er = f.Chmod(fs.FileMode(c.AfterMode))
+		// Observe creation metadata before writing or changing any mode. An
+		// unexpected inherited ACL/xattr/owner is retained, never repaired away.
+		created, _, me := installedMetadata(f, false)
+		if me != nil || created != c.AfterMetadata {
+			f.Close()
+			return h, ErrUnsupportedOperation
 		}
+		_, er = f.Write(entry.Bytes)
 		ce := f.Close()
 		if er != nil || ce != nil {
 			return h, ErrUnsafeTarget
 		}
 		staged, er := inspectInstalledLeaf(root, tmp)
-		if er != nil || staged.Digest != c.After || staged.Mode != c.AfterMode {
+		if er != nil || staged.Digest != c.After || staged.Mode != c.AfterMode || staged.Metadata != c.AfterMetadata {
 			return h, ErrConflict
 		}
 		c.Phase = InstalledIntent
@@ -434,12 +615,21 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 		if er = validateInstalledRoot(req); er != nil {
 			return h, er
 		}
+		stageFD, er := openInstalledRegular(root, stage)
+		if er != nil {
+			return h, ErrConflict
+		}
+		stageNow, _, er := installedMetadata(stageFD, true)
+		stageFD.Close()
+		if er != nil || stageNow != h.InstalledStage.Metadata {
+			return h, ErrConflict
+		}
 		currentStage, er := root.Lstat(stage)
 		if er != nil || !os.SameFile(stageInfo, currentStage) || !currentStage.IsDir() || currentStage.Mode().Perm() != 0700 {
 			return h, ErrConflict
 		}
 		currentTmp, er := inspectInstalledLeaf(root, tmp)
-		if er != nil || currentTmp.Identity != staged.Identity || currentTmp.Digest != staged.Digest || currentTmp.Mode != staged.Mode {
+		if er != nil || currentTmp.Identity != staged.Identity || currentTmp.Digest != staged.Digest || currentTmp.Mode != staged.Mode || currentTmp.Metadata != staged.Metadata {
 			return h, ErrConflict
 		}
 		fresh, er := InspectInstalled(ctx, req.TargetRoot, artifact.Tree{Entries: entries}, req.Installed.CaseMode)
@@ -485,10 +675,41 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 						h.InstalledDirectories[j].Phase = InstalledPublished
 					}
 				}
+				df, me := openInstalledRegular(root, d.Path)
+				if me != nil {
+					return h, ErrConflict
+				}
+				dm, _, me := installedMetadata(df, true)
+				df.Close()
+				if me != nil || dm != expectedInstalledDirectoryMetadata(req.Installed.Capabilities.Creation, 0755) {
+					return h, ErrUnsupportedOperation
+				}
+				for j := range h.InstalledDirectories {
+					if h.InstalledDirectories[j].Path == d.Path {
+						h.InstalledDirectories[j].Exists = true
+						h.InstalledDirectories[j].Created = true
+						h.InstalledDirectories[j].Identity = installedIdentity(info)
+						h.InstalledDirectories[j].Mode = uint32(info.Mode().Perm())
+						h.InstalledDirectories[j].Metadata = dm
+						h.InstalledDirectories[j].Phase = InstalledPublished
+					}
+				}
 			}
 		}
 		if err = ctx.Err(); err != nil {
 			return h, err
+		}
+		// Creating parents is mutation too. Revalidate the complete traversal and
+		// staged descriptor metadata immediately before destination publication.
+		if er = validateInstalledRoot(req); er != nil {
+			return h, er
+		}
+		if _, er = inspectInstalledLeaf(root, entry.Path); er != nil {
+			return h, er
+		}
+		stagedNow, er := inspectInstalledLeaf(root, tmp)
+		if er != nil || stagedNow.Metadata != c.AfterMetadata || stagedNow.Identity != staged.Identity || stagedNow.Digest != c.After {
+			return h, ErrConflict
 		}
 		if err = root.Rename(tmp, entry.Path); err != nil {
 			return h, ErrUnsafeTarget
@@ -496,7 +717,7 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 		c.Phase = InstalledPublished
 		h.Installed = append(h.Installed, c)
 		after, er := inspectInstalledLeaf(root, entry.Path)
-		if er != nil || after.Digest != c.After || after.Mode != c.AfterMode {
+		if er != nil || after.Digest != c.After || after.Mode != c.AfterMode || after.Metadata != c.AfterMetadata {
 			return h, ErrConflict
 		}
 		h.Installed[len(h.Installed)-1].Phase = InstalledVerified
@@ -506,6 +727,15 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 	// nonempty/uncertain stage. Root policy controls later retained recovery.
 	if err = validateInstalledRoot(req); err != nil {
 		return h, err
+	}
+	stageFD, er := openInstalledRegular(root, stage)
+	if er != nil {
+		return h, ErrConflict
+	}
+	stageNow, _, er := installedMetadata(stageFD, true)
+	stageFD.Close()
+	if er != nil || stageNow != h.InstalledStage.Metadata {
+		return h, ErrConflict
 	}
 	currentStage, er := root.Lstat(stage)
 	if er != nil || !os.SameFile(stageInfo, currentStage) || !currentStage.IsDir() || currentStage.Mode().Perm() != 0700 {
@@ -525,10 +755,29 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 	return h, nil
 }
 func matchesInstalledBefore(c InstalledFileChange, s InstalledSnapshot) bool {
-	return c.BeforeExists == s.Exists && c.BeforeIdentity == s.Identity && c.BeforeMode == s.Mode && reflect.DeepEqual(c.Before, s.Digest)
+	return c.BeforeExists == s.Exists && c.BeforeIdentity == s.Identity && c.BeforeMode == s.Mode && c.BeforeMetadata == s.Metadata && reflect.DeepEqual(c.Before, s.Digest)
 }
 
+func expectedInstalledMetadata(creation InstalledMetadata, mode uint32) InstalledMetadata {
+	m := creation
+	m.FullMode = mode
+	m.Links = 1
+	return m
+}
+func expectedInstalledDirectoryMetadata(creation InstalledMetadata, mode uint32) InstalledMetadata {
+	m := creation
+	m.FullMode = mode
+	m.Links = 0
+	return m
+}
 func validateInstalledRoot(req Request) error {
+	cap, err := InspectInstalledCapabilities(context.Background(), req.TargetRoot, req.Installed.CaseMode)
+	if err != nil {
+		return err
+	}
+	if cap != req.Installed.Capabilities {
+		return ErrConflict
+	}
 	info, err := os.Lstat(req.TargetRoot)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || installedIdentity(info) != req.Installed.TargetIdentity {
 		return ErrConflict
@@ -542,7 +791,7 @@ func installedDirectories(snapshots []InstalledSnapshot) []InstalledDirectoryCha
 			dirs[d.Path] = d
 		}
 		if s.Kind == artifact.EntryDirectory {
-			dirs[s.Path] = InstalledDirectoryChange{Path: s.Path, Identity: s.Identity, Mode: s.Mode, Exists: s.Exists}
+			dirs[s.Path] = InstalledDirectoryChange{Path: s.Path, Identity: s.Identity, Mode: s.Mode, Exists: s.Exists, Metadata: s.Metadata}
 		}
 	}
 	var result []InstalledDirectoryChange
@@ -559,7 +808,7 @@ func checkInstalledDirectories(snapshots []InstalledSnapshot, expected []Install
 	}
 	for i, d := range actual {
 		e := expected[i]
-		if d.Path != e.Path || d.Exists != e.Exists || d.Identity != e.Identity || d.Mode != e.Mode {
+		if d.Path != e.Path || d.Exists != e.Exists || d.Identity != e.Identity || d.Mode != e.Mode || d.Metadata != e.Metadata {
 			return ErrConflict
 		}
 	}

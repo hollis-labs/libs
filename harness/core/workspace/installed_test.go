@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/install"
@@ -26,6 +27,35 @@ type installedPorts struct {
 	records    []workspace.Receipt
 	onRecord   func(workspace.Receipt) error
 	onValidate func() error
+	onRelease  func() error
+	onClock    func()
+}
+
+func (f *installedPorts) Now() time.Time {
+	if f.onClock != nil {
+		f.onClock()
+	}
+	return f.fixturePorts.Now()
+}
+func (f *installedPorts) Acquire(ctx context.Context, key workspace.LockKey) (workspace.HeldLock, error) {
+	l, err := f.fixturePorts.Acquire(ctx, key)
+	if l == nil {
+		return nil, err
+	}
+	return installedHeldLock{l, f}, err
+}
+
+type installedHeldLock struct {
+	workspace.HeldLock
+	f *installedPorts
+}
+
+func (l installedHeldLock) Release() error {
+	err := l.HeldLock.Release()
+	if l.f.onRelease != nil {
+		err = errors.Join(err, l.f.onRelease())
+	}
+	return err
 }
 
 func (f *installedPorts) ControlRoot() workspace.RootRef { return f.control }
@@ -61,6 +91,9 @@ func (f *installedPorts) ports() workspace.Ports {
 	return workspace.Ports{Clock: f, Host: f, Locks: f, Observations: f, ReceiptStore: f}
 }
 func installedInputs(t *testing.T, provider runtimes.ID) (workspace.Spec, workspace.ResolvedContent, workspace.Resources, workspace.Observations, *installedPorts) {
+	return installedInputsMetadataFixture(t, provider, false)
+}
+func installedInputsMetadataFixture(t *testing.T, provider runtimes.ID, synthetic bool) (workspace.Spec, workspace.ResolvedContent, workspace.Resources, workspace.Observations, *installedPorts) {
 	t.Helper()
 	base := t.TempDir()
 	target, control, locks := root("operator"), root("control"), root("locks")
@@ -101,10 +134,34 @@ func installedInputs(t *testing.T, provider runtimes.ID) (workspace.Spec, worksp
 		if err != nil {
 			t.Fatal(err)
 		}
+		cap, err := materialize.InspectInstalledCapabilities(context.Background(), ref.Path, o.InstalledCaseMode)
+		if errors.Is(err, materialize.ErrUnsupportedOperation) {
+			if !synthetic {
+				t.Skip("installed execution unsupported by this platform/filesystem metadata backend")
+			}
+			creation := materialize.InstalledMetadata{Volume: "synthetic-only-volume", UID: uint32(os.Geteuid()), GID: uint32(os.Getegid()), Complete: true, ACLAbsent: true, XattrsAbsent: true}
+			metadata := creation
+			metadata.FullMode = uint32(info.Mode().Perm())
+			cap = materialize.InstalledCapabilities{Volume: creation.Volume, RootIdentity: materialize.InstalledIdentity(info), Revision: "workspace.installed.metadata.v1", ObservationRevision: "synthetic-observation-v1", CaseMode: o.InstalledCaseMode, Creation: creation, RootMetadata: metadata}
+			err = nil
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		o.InstalledVolumes = append(o.InstalledVolumes, cap)
 		o.Roots = append(o.Roots, workspace.RootObservation{RootID: ref.ID, DeclaredPath: ref.Path, CanonicalPath: ref.Path, CanonicalBase: ref.AllowedBase, Owner: ref.Owner, Exists: true, Directory: true, FileIdentity: materialize.InstalledIdentity(info)})
 	}
 	var err error
 	o.InstalledFiles, err = materialize.InspectInstalled(context.Background(), target.Path, tree, o.InstalledCaseMode)
+	if synthetic && errors.Is(err, materialize.ErrUnsupportedOperation) {
+		creation := o.InstalledVolumes[0].Creation
+		info, _ := os.Stat(filepath.Join(target.Path, dir))
+		dm := creation
+		dm.FullMode = uint32(info.Mode().Perm())
+		parent := materialize.InstalledDirectoryChange{Path: dir, Exists: true, Identity: materialize.InstalledIdentity(info), Mode: uint32(info.Mode().Perm()), Metadata: dm}
+		o.InstalledFiles = []install.FileSnapshot{{Path: dir, Exists: true, Kind: artifact.EntryDirectory, Mode: parent.Mode, Identity: parent.Identity, Metadata: dm, Creation: creation, Parents: []materialize.InstalledDirectoryChange{parent}}, {Path: file, Creation: creation, Parents: []materialize.InstalledDirectoryChange{parent}}}
+		err = nil
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,8 +310,18 @@ func TestInstalledReceiptFailureAndLateRevocation(t *testing.T) {
 			if phase == "file-intent" && (len(result.Retained) == 0 || result.Status != workspace.Partial || result.Receipt.Phase != workspace.Interrupted || len(result.Obligations) == 0) {
 				t.Fatal("lost actual staging mutation")
 			}
-			if !strings.HasPrefix(f.events[len(f.events)-1], "release:") {
-				t.Fatal("did not release locks")
+			var acquired, released []string
+			for _, event := range f.events {
+				if strings.HasPrefix(event, "acquire:") {
+					acquired = append(acquired, strings.TrimPrefix(event, "acquire:"))
+				}
+				if strings.HasPrefix(event, "release:") {
+					released = append(released, strings.TrimPrefix(event, "release:"))
+				}
+			}
+			slices.Reverse(acquired)
+			if !slices.Equal(acquired, released) {
+				t.Fatal("did not release every acquired lock in reverse order")
 			}
 		})
 	}
@@ -729,6 +796,94 @@ func TestInstalledMissingPhysicalObservationHasClosedRefusal(t *testing.T) {
 			var typed *workspace.Refusal
 			if !errors.As(err, &typed) || typed.Status != workspace.Conflict {
 				t.Fatal("missing explicit observation lost structural classification")
+			}
+		})
+	}
+}
+
+func TestInstalledUnknownRealEnumerationRefusesSyntheticCapabilityBeforeReceipt(t *testing.T) {
+	// This fixture is deliberately synthetic. Public complete-looking records
+	// cannot override the actual platform's unknown enumeration capability.
+	s, c, r, o, f := installedInputsMetadataFixture(t, runtimes.Claude, true)
+	p := planned(t, s, c, r, o)
+	result, err := workspace.Materialize(context.Background(), p, f.ports())
+	var typed *workspace.Refusal
+	if !errors.As(err, &typed) || typed.Status != workspace.Unsupported || result.ArtifactsComplete() || result.LaunchReady() {
+		t.Fatalf("unknown actual metadata coverage admitted: %v", err)
+	}
+	if len(f.records) != 0 || len(result.Handles) != 0 {
+		t.Fatal("receipt or stage preceded real enumeration refusal")
+	}
+	for _, ref := range []workspace.RootRef{s.Installed.Target, s.Installed.Control, r.LockRoot} {
+		info, err := os.Stat(ref.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, original := range o.Roots {
+			if original.RootID == ref.ID && materialize.InstalledIdentity(info) != original.FileIdentity {
+				t.Fatal("replaced root")
+			}
+		}
+	}
+	for _, ref := range []workspace.RootRef{s.Installed.Target, s.Installed.Control} {
+		names, err := os.ReadDir(ref.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			if strings.HasPrefix(name.Name(), ".installed-stage-") {
+				t.Fatal("staged with unknown complete metadata")
+			}
+		}
+	}
+	if _, err := os.Stat(filepath.Join(s.Installed.Target.Path, s.Installed.Grants[0].Path)); !os.IsNotExist(err) {
+		t.Fatal("published with synthetic capability")
+	}
+}
+
+func TestInstalledFrozenVolumeCapabilityAdmission(t *testing.T) {
+	for _, kind := range []string{"missing", "duplicate", "root", "revision", "unknown-case", "metadata", "unrelated"} {
+		t.Run(kind, func(t *testing.T) {
+			s, c, r, o, f := installedInputsMetadataFixture(t, runtimes.Claude, true)
+			switch kind {
+			case "missing":
+				o.InstalledVolumes = nil
+			case "duplicate":
+				o.InstalledVolumes[1] = o.InstalledVolumes[0]
+			case "root":
+				o.InstalledVolumes[0].RootIdentity = "foreign-descriptor"
+			case "revision":
+				o.InstalledVolumes[0].Revision = "unknown"
+			case "unknown-case":
+				o.InstalledCaseMode = "unknown"
+			case "metadata":
+				o.InstalledVolumes[0].RootMetadata.Complete = false
+			case "unrelated":
+				extra := o.InstalledVolumes[0]
+				extra.RootIdentity = "unrelated-root"
+				o.InstalledVolumes = append(o.InstalledVolumes, extra)
+			}
+			_, err := workspace.Plan(s, c, r, o)
+			var typed *workspace.Refusal
+			if !errors.As(err, &typed) || typed.Status != workspace.Unsupported {
+				t.Fatalf("accepted unbound capability: %v", err)
+			}
+			if len(f.records) != 0 {
+				t.Fatal("plan emitted receipts")
+			}
+		})
+	}
+}
+
+func TestInstalledEveryRootRequiresOwnCapability(t *testing.T) {
+	for _, index := range []int{0, 1, 2} {
+		t.Run(fmt.Sprint(index), func(t *testing.T) {
+			s, c, r, o, _ := installedInputsMetadataFixture(t, runtimes.Claude, true)
+			o.InstalledVolumes[index].Revision = "unknown"
+			_, err := workspace.Plan(s, c, r, o)
+			var typed *workspace.Refusal
+			if !errors.As(err, &typed) || typed.Status != workspace.Unsupported {
+				t.Fatalf("admitted unverified resource capability: %v", err)
 			}
 		})
 	}
