@@ -17,7 +17,7 @@ const manifest = JSON.parse(
     "utf8",
   ),
 );
-let parentSignal;
+let parentSignal, negotiatedMode = false;
 const template = JSON.parse(
   await readFile(
     new URL(
@@ -141,7 +141,7 @@ async function finish(s, success = true) {
   return e;
 }
 async function start(runtime, goChild, profile, generation = 1) {
-  const spec = childSpec(runtime, profile, goChild);
+  const spec = childSpec(runtime, negotiatedMode ? "negotiated:" + profile : profile, goChild);
   const s = await ChildSession.start(spec.command, spec.args, {
     ...spec.options,
     signal: parentSignal,
@@ -157,7 +157,7 @@ async function start(runtime, goChild, profile, generation = 1) {
     await send(s, 1, "plugin/init", init);
     const r = await response(s, 1);
     assert.equal(r.result.protocol, 2);
-    assert.equal(r.result.reverse_rpc_version, undefined);
+    assert.equal(r.result.reverse_rpc_version, negotiatedMode ? 1 : undefined);
     return s;
   } catch (error) {
     await s.dispose();
@@ -636,11 +636,13 @@ async function receiptRestart(s, host, runtime, goChild) {
     await again.dispose();
   }
 }
-export async function replayCases(runtime, goChild, names, signal) {
+export async function replayCases(runtime, goChild, names, signal, negotiated = false) {
   parentSignal = signal;
+  negotiatedMode = negotiated;
   const results = [];
   for (const recipe of manifest.expanded) {
     if (names && !names.includes(recipe.name)) continue;
+    if (negotiated && recipe.scenario === "base-cancel") continue;
     assert.ok(["observed", "proposed"].includes(recipe.status ?? "observed"));
     assert.equal(recipe.level, "normative");
     if (recipe.status === "proposed") {
@@ -734,6 +736,7 @@ export async function replayCases(runtime, goChild, names, signal) {
       results.push({
         case: recipe.name,
         status: "passed",
+        mode: negotiated ? "normal-serve-negotiated" : "internal-test-only",
         level: recipe.level,
       });
     } catch (e) {

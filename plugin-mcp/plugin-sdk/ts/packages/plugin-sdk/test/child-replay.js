@@ -281,10 +281,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       undefined,
       parentAbort.signal,
     );
-    for (const result of [...base, ...duplex, ...lifecycle, ...expanded])
+    const { replayNegotiated } = await import("./negotiated-replay.js");
+    const negotiated = await replayNegotiated(runtime, goChild, undefined, parentAbort.signal);
+    const negotiatedExpanded = await replayCases(runtime,goChild,undefined,parentAbort.signal,true);
+    for (const result of [...base, ...duplex, ...lifecycle, ...expanded, ...negotiated, ...negotiatedExpanded])
       console.log(JSON.stringify({ runtime, ...result }));
     console.log(
-      `${runtime} child replay PASS (${base.filter((r) => r.status === "passed").length} base, ${duplex.length} internal duplex, ${lifecycle.length} lifecycle, ${expanded.filter((r) => r.status === "passed").length} expanded; ${[...base, ...expanded].filter((r) => r.status === "unavailable").length} named proposals)`,
+      `${runtime} child replay PASS (${base.filter((r) => r.status === "passed").length} base, ${duplex.length} internal duplex, ${lifecycle.length} lifecycle, ${expanded.filter((r) => r.status === "passed").length} expanded, ${negotiated.length} negotiated, ${negotiatedExpanded.filter(r=>r.status === "passed").length} negotiated expanded; ${[...base, ...expanded].filter((r) => r.status === "unavailable").length} named proposals)`,
     );
   } catch (error) {
     console.error(

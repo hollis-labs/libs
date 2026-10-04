@@ -97,3 +97,42 @@ fake host uses the same bounded writer over the real parent pipe. Cleanup
 failure/panic, hung callbacks/cleanup and disconnect observe actual child exit.
 The 200 ms shutdown and short forward budgets in fault recipes are fixture-only
 safety/test values; they never change SDK defaults.
+
+## Negotiated normal-Serve children
+
+The same replay command also drives `TestNegotiatedFixtureChild` and
+`negotiated-worker.js` through the public Go `ServeWithOptions` and TypeScript
+`serve` APIs. These children never create or activate correlation, construct
+clients, or inject grants. The parent sends a real Init offer and host-issued
+bindings; callbacks consume `HostClientFromContext(ctx)` or `ctx.host`.
+Private scope/writer observations report limits and accounting without changing
+them. Controlled author/output barriers retain the existing deterministic
+saturation and queue probes.
+
+`negotiated-replay.js` replays the shared negotiation matrix, raw invalid offers,
+actual typed bound helpers, author mutation of the received Init, unoffered
+methods, provisional Init logging with colliding directional IDs, log-only
+Load/Unload, failed Init and cached-client revocation, late replies, EOF/SIGTERM,
+accepted minima and subsequent input bounds, and the consumed Init high-water.
+The expanded child recipes additionally run with runtime-delivered clients and
+an acknowledged reverse profile. Base cancellation and reusable string IDs stay
+in the declined-profile matrix. Results explicitly distinguish
+`normal-serve-negotiated` from `internal-test-only`.
+
+For focused negotiated replay after building the Go fixture binary and TS:
+
+```sh
+node ts/packages/plugin-sdk/test/negotiated-replay.js go "$GOTMPDIR/duplex-child"
+node ts/packages/plugin-sdk/test/negotiated-replay.js node
+node ts/packages/plugin-sdk/test/negotiated-replay.js deno
+```
+
+The normal child-replay entry point includes both matrices in existing CI legs.
+All children share the bounded parent, private control channel and guaranteed
+reaping. A proposal is reported as unavailable, never a pass. Hook helpers stay
+unconditionally unavailable, owned by the reverse-profile and Team F hook-context
+maintainers pending a separate per-item composition design.
+
+These are SDK fake-host transport proofs. Real plugin-host authority, binding
+ledgers, commit-time revocation, host-global admission, trusted depth and durable
+receipts still require a pinned Team E integration run before activation merges.

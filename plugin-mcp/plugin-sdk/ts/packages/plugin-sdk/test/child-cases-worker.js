@@ -8,7 +8,7 @@ import {
   TransportCancelledError,
 } from "../dist/request-control.js";
 import { SecretTracker } from "../dist/log.js";
-export function childCases(profile, core, event, releases) {
+export function childCases(profile, core, event, releases, negotiated = false) {
   const gates = new Map(),
     counts = {},
     base = fixturePlugin("base");
@@ -89,7 +89,8 @@ export function childCases(profile, core, event, releases) {
     init(ctx, p) {
       init = p;
       writer = requestScope(ctx).manager.writer;
-      core.methodTimeoutMS = { ...p.host_services.limits.method_timeout_ms };
+      if (negotiated) core = requestScope(ctx).manager.core; // Observation only.
+      else core.methodTimeoutMS = { ...p.host_services.limits.method_timeout_ms };
       return base.init(ctx, p);
     },
     async load(ctx) {
@@ -113,11 +114,11 @@ export function childCases(profile, core, event, releases) {
     effects() {
       return {
         ...counts,
-        reverse_pending: core.pending.size,
-        ordinary_queued: writer.ordinary.queue.length,
-        control_queued: writer.control.queue.length,
-        reserved_frames: writer.control.reservedFrames,
-        reserved_bytes: writer.control.reservedBytes,
+        reverse_pending: core?.pending.size ?? 0,
+        ordinary_queued: writer?.ordinary.queue.length ?? 0,
+        control_queued: writer?.control.queue.length ?? 0,
+        reserved_frames: writer?.control.reservedFrames ?? 0,
+        reserved_bytes: writer?.control.reservedBytes ?? 0,
       };
     },
     async command(ctx, p) {
@@ -149,12 +150,10 @@ export function childCases(profile, core, event, releases) {
           )
             throw new Error("fixture arguments");
           if (a.gate) await wait;
-          const h = hostClientContext(
-            ctx,
-            core,
-            init,
-            new SecretTracker(),
+          const h = negotiated ? ctx.host : hostClientContext(
+            ctx, core, init, new SecretTracker(),
           ).host;
+          if (!h) throw new Error("missing delivered host client");
           const results = await Promise.all(
             Array.from({ length: a.n }, async (_, index) => {
               let err;

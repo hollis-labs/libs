@@ -10,7 +10,9 @@
     "lifecycle-shutdown"
   ],
   "duplex_source": "duplex-correlation.json",
-  "duplex_runtime_cases": ["pending-init-and-quiescing-cleanup"],
+  "duplex_runtime_cases": [
+    "pending-init-and-quiescing-cleanup"
+  ],
   "lifecycle": [
     {
       "name": "host-eof-unloads-once",
@@ -81,8 +83,8 @@
   ],
   "pending_coverage": [
     {
-      "feature": "Negotiated reverse profile and pinned real plugin-host replay",
-      "owner": "SDK reverse profile and the plugin-host interop adapter"
+      "feature": "Pinned real plugin-host replay, authorization and durable receipts",
+      "owner": "Team E plugin-host interop adapter"
     }
   ],
   "expanded": [
@@ -211,7 +213,35 @@
       "status": "proposed",
       "owner": "SDK hook-context and plugin-hooks adapter maintainers (separate per-item scope/client design)",
       "reason": "Hook helpers remain unavailable even with both profiles negotiated; per-item binding/client composition requires a separate approved design.",
+
       "level": "normative"
     }
-  ]
+  ],
+  "negotiated": {
+    "mode": "normal-serve-negotiated",
+    "worker_api": {
+      "go": "ServeWithOptions(Plugin, ServeOptions{ReverseRPC: true})",
+      "typescript": "serve(plugin, {reverseRPC: true})"
+    },
+    "matrix": "negotiation.json",
+    "recipes": [
+      "invalid-raw-offers",
+      "bound-helper-and-immutable-snapshot",
+      "unoffered-helper",
+      "lifecycle-directional-id-collision",
+      "failed-init-error-panic-output-fallback-deadline",
+      "pending-provisional-log-revocation-late-reply",
+      "cleanup-eof-sigterm-no-parent",
+      "accepted-minima-and-input-bound",
+      "init-id-high-water"
+    ],
+    "expanded_scenarios": "All expanded observed cases except base-cancel (declined/base-only ID reuse).",
+    "unavailable": [
+      {
+        "feature": "hook-duplex",
+        "owner": "orch-jsts and Team F hook-context maintainers",
+        "reason": "Hooks unconditionally receive no helper client; per-item composition requires a separate design."
+      }
+    ]
+  }
 }
