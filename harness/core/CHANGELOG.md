@@ -13,6 +13,7 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 ### Known issues
 
 - `TestSandbox_OutsideWorkspaceReadBlocked` (`sandbox`) is skipped unconditionally on Linux: the skip says the test needs additional bind configuration, and it has said so since the sandbox was first extracted, before this move. So the test suite does not verify that a sandboxed process on Linux cannot read a denied path outside its workspace. That is not known to be broken; it is not verified. On macOS the same test runs only when `~/.ssh` exists. The other Linux sandbox isolation tests run and pass in CI: network isolation, loopback, protected paths and the filesystem-allowlist parity tests.
+- `adapters/wrapper`: the wrapper takes the end of a Codex JSON-RPC stdio turn from the session's typed terminal event only when the CLI adapter is named `codex`. The session layer emits that typed terminal only for an adapter with that name, so a compatible custom adapter that speaks the same protocol under another name does not get it, and the fix for the duplicated turn lifecycle does not cover it. Other runtimes keep taking their terminals from the legacy event stream.
 
 ### Added
 
