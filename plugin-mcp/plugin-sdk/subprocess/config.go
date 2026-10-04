@@ -23,8 +23,8 @@ type ConfigReader interface {
 	Int(key string) int
 
 	// Secret returns the value for key and records it with the logger's
-	// secret tracker so that subsequent log calls containing the value
-	// as a field write REDACTED rather than the cleartext. Use this for
+	// secret tracker so subsequent SDK logs redact it in message text,
+	// structured values and canonical base64-encoded bytes. Use this for
 	// API keys, tokens, and other sensitive strings.
 	Secret(key string) string
 

@@ -231,3 +231,19 @@ to preserve escaped path separators and the full query through `http/handle`.
 Plugins can parse `RawQuery` with `url.ParseQuery` to retain repeated and empty
 values instead of relying on a scalar query projection. These fields carry URL
 data; they do not verify a caller or grant route ownership.
+
+### SDK log redaction
+
+Go `Config.Secret` registers values with the connection's existing secret tracker.
+SDK JSON-line logging redacts registered values in message text, nested data,
+custom JSON output, and canonical base64 (including JSON-encoded byte slices).
+Overlapping values match longest first. Registration precedes exposure of a
+secret; logging an unregistered value cannot redact it.
+
+Go log records are bounded to 64 KiB of JSON, 128 field pairs, 4,096 values and
+128 nesting levels. Oversized, cyclic, invalid or unserializable records emit a
+sanitized fallback with redacted message text and no raw marshal error. A secret
+snapshot that exceeds its bounded pattern budget drops fields and masks the
+message instead of using a partial snapshot. Keys in Go field pairs must be
+strings. SDK bounds cannot preempt author `MarshalJSON` code. Redaction covers
+SDK logging, not direct stderr/printf writes or arbitrary transformed encodings.
