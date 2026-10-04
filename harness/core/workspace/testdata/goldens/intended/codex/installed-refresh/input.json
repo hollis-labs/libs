@@ -1,0 +1,5 @@
+{
+  "provider": "codex",
+  "runtime": "install",
+  "scenario": "installed-refresh"
+}

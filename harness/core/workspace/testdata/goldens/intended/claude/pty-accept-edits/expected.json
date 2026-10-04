@@ -1,0 +1,63 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": ".claude",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/settings.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"permissions\": {\n    \"defaultMode\": \"acceptEdits\"\n  }\n}\n"
+  },
+  {
+    "path": ".claude/skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": ".claude/skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"http\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"mux\": {\n      \"args\": [\n        \"--stdio\"\n      ],\n      \"command\": \"fixture-mcp\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    },\n    \"stdio\": {\n      \"args\": [\n        \"one\",\n        \"two\"\n      ],\n      \"command\": \"fixture-server\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "CLAUDE.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture instructions.\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  }
+]

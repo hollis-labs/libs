@@ -1,0 +1,187 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "--cd",
+        "/fixture/project"
+      ],
+      "environment": {
+        "CODEX_HOME": "<boot>"
+      },
+      "cwd": "<boot>",
+      "before_resume": true,
+      "posture": {
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": "yolo"
+      }
+    },
+    "resume_placement": "table argv precedes caller-owned resume subcommand; first launch also receives it",
+    "case_family": "posture-reference",
+    "permission_evidence": "adapters/provider/bootdir_codex.go: native approval/sandbox vocabulary; adapters/registry/posture.go: measured per-mode native overrides",
+    "root": "boot",
+    "effects": [
+      {
+        "credential_policy": "link-only-never-write",
+        "provider": "codex",
+        "layer": "boot",
+        "mode": "subprocess-per-turn",
+        "field": "credentials",
+        "concern": "credentials",
+        "root": "boot",
+        "path": "auth.json",
+        "form": "link-effect",
+        "mode_bits": 384,
+        "renderer": "credential-link",
+        "locator": {},
+        "capability": "supported",
+        "evidence": {
+          "reference": "adapters/layout/plan/doc.go",
+          "note": "explicit real-provider-home link; no rendering or ambient read"
+        }
+      }
+    ],
+    "preparation": [
+      {
+        "Provider": "codex",
+        "Kind": "credential-link",
+        "Destination": "auth.json",
+        "Policy": "link-only-never-write"
+      }
+    ]
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "AGENTS.md",
+      "ownership": {
+        "entry_id": "workspace.render:AGENTS.md",
+        "group_id": "workspace.render:instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
+      }
+    },
+    {
+      "path": "config.toml",
+      "ownership": {
+        "entry_id": "workspace.render:config.toml",
+        "group_id": "workspace.render:codex-config"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"approval_policy\"],[\"mcp_servers\",\"http\",\"url\"],[\"mcp_servers\",\"loopback\",\"url\"],[\"mcp_servers\",\"mux\",\"args\"],[\"mcp_servers\",\"mux\",\"command\"],[\"mcp_servers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcp_servers\",\"stdio\",\"args\"],[\"mcp_servers\",\"stdio\",\"command\"],[\"mcp_servers\",\"stdio\",\"env\",\"FIXTURE\"],[\"sandbox_mode\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "b202d69644a65b38af53b9889ea70c2807a298913ad0af30d0738d81bda2e3ac"
+      }
+    },
+    {
+      "path": "skills",
+      "ownership": {
+        "entry_id": "workspace.render:skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/SKILL.md",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      }
+    },
+    {
+      "path": "skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      }
+    }
+  ]
+}
