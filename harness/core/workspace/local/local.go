@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/hollis-labs/substrate/harness/workspace"
@@ -43,7 +42,6 @@ type Options struct {
 type ports struct {
 	options Options
 	control *os.Root
-	mu      sync.Mutex
 }
 type clock struct{}
 
@@ -238,10 +236,8 @@ func (p *ports) Record(ctx context.Context, r workspace.Receipt) (retErr error) 
 	if r.OperationID != p.options.OperationID || r.SchemaVersion != workspace.SchemaVersion || r.InputDigest == "" {
 		return errors.New("local: invalid operation receipt")
 	}
-	// A distinct receipt-store mutex protects the ID-to-input binding across
-	// disjoint workspaces. It is control storage, never an artifact mutation lock.
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	// A distinct, context-aware file lock protects the ID-to-input binding across
+	// callers and processes. It is control storage, not an artifact mutation lock.
 	lock, err := p.acquireFile(ctx, "receipt-lock-"+digestName(r.OperationID))
 	if err != nil {
 		return err

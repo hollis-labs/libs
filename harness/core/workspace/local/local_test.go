@@ -4,9 +4,12 @@ package local_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -253,5 +256,51 @@ func TestArtifactOnlyInputBindingRefusesBeforeMutation(t *testing.T) {
 				t.Fatal("invalid input mutated artifact root", err)
 			}
 		})
+	}
+}
+
+func TestContendedReceiptCancellation(t *testing.T) {
+	options, _ := fixture(t)
+	ports, closePorts, err := local.New(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closePorts()
+	sum := sha256.Sum256([]byte(options.OperationID))
+	lock, err := os.OpenFile(filepath.Join(options.ControlRoot.Path, "receipt-lock-"+hex.EncodeToString(sum[:])), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	receipt := workspace.Receipt{SchemaVersion: workspace.SchemaVersion, OperationID: options.OperationID, InputDigest: "fixture-digest", Phase: workspace.Planned}
+	first := make(chan error, 1)
+	go func() { first <- ports.ReceiptStore.Record(context.Background(), receipt) }()
+	// Let the first call wait on the externally held receipt lock.
+	time.Sleep(30 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	second := make(chan error, 1)
+	go func() { second <- ports.ReceiptStore.Record(ctx, receipt) }()
+	timely, received := false, false
+	select {
+	case err := <-second:
+		received = true
+		timely = errors.Is(err, context.DeadlineExceeded)
+	case <-time.After(200 * time.Millisecond):
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	if !timely {
+		if !received {
+			<-second
+		}
+		t.Fatal("receipt cancellation waited for another caller")
 	}
 }
