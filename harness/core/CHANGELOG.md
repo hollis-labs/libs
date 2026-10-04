@@ -44,6 +44,11 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 
 ### Added
 
+- Explicit Claude/Codex installed artifact planning and apply through the
+  concrete engine, external receipts and exact path/key authority. Existing
+  user directories remain untouched; unreadable or drifted owned documents
+  refuse. Installed completion remains artifact-only, without launch readiness.
+
 - Pure provider document assembly under `workspace/render`, native leaf-key
   ownership metadata, intended offline snapshots, and separate generated
   exports for the authored provider plan-field table. Existing writers remain

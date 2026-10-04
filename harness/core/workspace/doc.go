@@ -33,7 +33,13 @@
 // earlier-operation recovery receipts retain obligations across retries without
 // authorizing replay or cleanup. Unknown effects and repository requests remain
 // unsupported before mutation until their reviewed handler is integrated.
-// Installed merges refuse before mutation. Locks coordinate
+// Installed operations use explicit existing operator roots and external
+// private control receipts. Claude/Codex exact path/key grants, unchanged owned
+// state and all-target preflight are required. Existing provider directories are
+// traversal observations, never adopted or chmodded; unreadable documents and
+// unknown installed providers refuse. The separately named installed digest
+// leaves boot encoding unchanged. Installed completion never grants Ready.
+// Locks coordinate
 // cooperating local writers only; there is no launch pin, crash-safe publication
 // or protection promise against a noncooperating ancestor replacement.
 // Pre-existing directories are never chmodded or removed by directory ensure.

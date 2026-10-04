@@ -30,11 +30,12 @@ const (
 	OperationCreate    Operation = "create"
 	OperationReconcile Operation = "reconcile"
 	OperationRefresh   Operation = "refresh"
+	OperationInstall   Operation = "install"
 )
 
 func (o Operation) Valid() bool {
 	switch o {
-	case OperationPlan, OperationCreate, OperationReconcile, OperationRefresh:
+	case OperationPlan, OperationCreate, OperationReconcile, OperationRefresh, OperationInstall:
 		return true
 	default:
 		return false
@@ -80,6 +81,7 @@ type TargetRoots struct {
 
 // Request is the write boundary input for the shared engine.
 type Request struct {
+	Installed          *InstalledPolicy     `json:",omitempty"`
 	Operation          Operation            `yaml:"operation" json:"operation"`
 	TargetRoot         string               `yaml:"target_root" json:"target_root"`
 	Roots              TargetRoots          `yaml:"roots,omitempty" json:"roots,omitempty"`
@@ -155,9 +157,14 @@ type Manifest struct {
 }
 
 type Handle struct {
-	TargetRoot string   `yaml:"target_root" json:"target_root"`
-	Manifest   Manifest `yaml:"manifest" json:"manifest"`
-	Report     Report   `yaml:"report" json:"report"`
+	Installed            []InstalledFileChange      `json:",omitempty"`
+	InstalledDirectories []InstalledDirectoryChange `json:",omitempty"`
+	InstalledStage       InstalledTemp              `json:",omitzero"`
+	Mutated              bool                       `json:",omitempty"`
+	Retained             []string                   `json:",omitempty"`
+	TargetRoot           string                     `yaml:"target_root" json:"target_root"`
+	Manifest             Manifest                   `yaml:"manifest" json:"manifest"`
+	Report               Report                     `yaml:"report" json:"report"`
 }
 
 type Plan struct {
