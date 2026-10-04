@@ -412,3 +412,18 @@ func TestZeroPreparedGroupHasTypedRefusal(t *testing.T) {
 		t.Fatal(r)
 	}
 }
+
+func TestOptionalSourceAccessFailureRefused(t *testing.T) {
+	g, c, f, _ := fixture()
+	g.Bindings[0].Required = false
+	p := &viewPort{fakePort: f, source: func(h ResolvedHome, rel string) (SourceObservation, error) {
+		if rel == "a" {
+			return SourceObservation{}, ErrSourceUnavailable
+		}
+		return f.Source(context.Background(), h, rel)
+	}}
+	_, r := Preflight(context.Background(), g, c.PreflightContext, p)
+	if r.Outcome != effects.Refused || r.Code != "source_unavailable" {
+		t.Fatalf("optional source access failure must refuse: %+v", r)
+	}
+}
