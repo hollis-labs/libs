@@ -18,8 +18,9 @@ export function fixturePlugin(profile) {
     load() { return { skipped_registrations: [{ kind: 'command', id: 'optional', reason: 'no config' }] }; },
     unload() {},
   };
-  if (profile === 'hooks-fixture' || profile === 'hooks-declined') {
-    const plugin = {...base, init(){return {...base.init(),hooks_profile_version:1};}, health(){return {ok:true};}, hookHandle(ctx,p) {
+  if (profile === 'hooks-declined') return {...base, init(){return {...base.init(),hooks_profile_version:1,reverse_rpc_version:1};}};
+  if (profile === 'hooks-fixture' || profile === 'hooks-negotiated') {
+    const plugin = {...base, health(){return {ok:true};}, hookHandle(ctx,p) {
       const directive = p.metadata.fixture ?? 'echo';
       const wait = ms => new Promise((resolve, reject) => {
         if(ctx.signal.aborted) { reject(new Error('aborted')); return; }

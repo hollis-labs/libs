@@ -49,6 +49,7 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 
 // server holds the per-invocation state for one Serve call.
 type server struct {
+	hooksEnabled        bool
 	hooksFixtureEnabled bool
 	hooksIncarnation    capability.RuntimeIdentity
 	initMu              sync.Mutex
@@ -160,20 +161,27 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			return
 		}
 		ctx = withForwardContext(ctx, params.Context)
+		_, hookHandler := s.plugin.(HookHandler)
+		hooksEnabled := params.HooksProfile != nil && params.HooksProfile.HooksProfileVersion == HooksProfileVersion && hookHandler
 		res, err := s.plugin.Init(ctx, params)
 		if err != nil {
 			s.writeErrorFromPluginErr(req.ID, err)
 			return
 		}
-		// No reverse/hook profile implementation exists yet; decline both.
+		// Hooks negotiate independently; reverse callbacks remain unavailable.
 		res.ReverseRPCVersion = nil
 		res.HooksProfileVersion = nil
+		if hooksEnabled {
+			version := HooksProfileVersion
+			res.HooksProfileVersion = &version
+		}
 		if err := ValidateInitResult(params, res); err != nil {
 			s.writeInitError(req.ID, err)
 			return
 		}
 		s.notifyIdentity(ctx, params.Identity)
 		s.initMu.Lock()
+		s.hooksEnabled = hooksEnabled
 		s.hooksIncarnation = params.Incarnation
 		s.initialized = true
 		s.initMu.Unlock()

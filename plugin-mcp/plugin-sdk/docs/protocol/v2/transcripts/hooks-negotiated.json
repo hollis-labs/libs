@@ -1,0 +1,229 @@
+{
+  "level": "normative",
+  "profile": "hooks-negotiated",
+  "purpose": "Normal Init negotiation enables single and batch hooks without any reverse acknowledgement or fixture injection. The handler authors only base Init fields.",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": [],
+          "hooks_profile": {
+            "hooks_profile_version": 1
+          },
+          "host_services": {
+            "reverse_rpc_version": 1,
+            "incarnation": {
+              "host_instance": "fixture-host",
+              "owner_id": "fixture",
+              "owner_generation": 1
+            },
+            "methods": [
+              "host/log"
+            ],
+            "limits": {
+              "host_to_plugin_inflight": 16,
+              "plugin_to_host_inflight": 8,
+              "host_global_inflight": 64,
+              "control_slots": 2,
+              "max_frame_bytes": 8388608,
+              "max_queued_write_bytes": 16777216,
+              "write_timeout_ms": 1000,
+              "max_depth": 8,
+              "method_timeout_ms": {
+                "host/log": 1000
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1,
+          "hooks_profile_version": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "hook/handle",
+        "params": {
+          "invocation_id": "call-1",
+          "catalog_version": "1",
+          "hook": "example.record.before_save",
+          "schema_digest": "decl-v1",
+          "kind": "filter",
+          "mode": "waterfall",
+          "scope": {
+            "incarnation": {
+              "host_instance": "fixture-host",
+              "owner_id": "fixture",
+              "owner_generation": 1
+            },
+            "registration_id": "reg-1"
+          },
+          "context": {
+            "binding_id": "binding-1",
+            "timeout_ms": 1000
+          },
+          "payload": {
+            "title": "old"
+          },
+          "metadata": {},
+          "deadline": "2030-01-01T00:00:00Z",
+          "aggregate_budget_ms": 1000,
+          "depth": 1,
+          "trace": {
+            "trace_id": "0123456789abcdef0123456789abcdef",
+            "span_id": "0123456789abcdef"
+          },
+          "root_invocation_id": "root-1"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "invocation_id": "call-1",
+          "status": "ok",
+          "payload": {
+            "title": "old"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "hook/handle_batch",
+        "params": {
+          "items": [
+            {
+              "invocation_id": "batch-1",
+              "catalog_version": "1",
+              "hook": "example.record.before_save",
+              "schema_digest": "decl-v1",
+              "kind": "action",
+              "mode": "parallel",
+              "scope": {
+                "incarnation": {
+                  "host_instance": "fixture-host",
+                  "owner_id": "fixture",
+                  "owner_generation": 1
+                },
+                "registration_id": "reg-1"
+              },
+              "context": {
+                "binding_id": "binding-1",
+                "timeout_ms": 1000
+              },
+              "payload": {
+                "title": "old"
+              },
+              "metadata": {},
+              "deadline": "2030-01-01T00:00:00Z",
+              "aggregate_budget_ms": 1000,
+              "depth": 1,
+              "trace": {
+                "trace_id": "0123456789abcdef0123456789abcdef",
+                "span_id": "0123456789abcdef"
+              },
+              "root_invocation_id": "root-1"
+            },
+            {
+              "invocation_id": "batch-2",
+              "catalog_version": "1",
+              "hook": "example.record.before_save",
+              "schema_digest": "decl-v1",
+              "kind": "action",
+              "mode": "parallel",
+              "scope": {
+                "incarnation": {
+                  "host_instance": "fixture-host",
+                  "owner_id": "fixture",
+                  "owner_generation": 1
+                },
+                "registration_id": "reg-1"
+              },
+              "context": {
+                "binding_id": "binding-1",
+                "timeout_ms": 1000
+              },
+              "payload": {
+                "title": "old"
+              },
+              "metadata": {},
+              "deadline": "2030-01-01T00:00:00Z",
+              "aggregate_budget_ms": 1000,
+              "depth": 1,
+              "trace": {
+                "trace_id": "0123456789abcdef0123456789abcdef",
+                "span_id": "0123456789abcdef"
+              },
+              "root_invocation_id": "root-1"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "items": [
+            {
+              "invocation_id": "batch-1",
+              "status": "ok"
+            },
+            {
+              "invocation_id": "batch-2",
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "plugin/unload",
+        "params": {}
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}

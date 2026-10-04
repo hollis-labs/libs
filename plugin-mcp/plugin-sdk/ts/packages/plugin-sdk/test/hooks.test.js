@@ -30,7 +30,7 @@ const context=()=>({signal:new AbortController().signal,config:new sdk.ConfigRea
 async function dispatcher(plugin,enabled=true){
   if(enabled) enableHooksFixture(plugin);
   const d=new Dispatcher(plugin,context(),new sdk.SecretTracker());
-  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams({hooks_profile:{hooks_profile_version:1}})})));
+  const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams()})));
   assert.equal(r.result.hooks_profile_version,undefined);
   return d;
 }
@@ -61,10 +61,10 @@ test('all batch params validate before any invocation',async()=>{
   const response=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:8,method:'hook/handle_batch',params:{items}})));
   assert.equal(response.error.code,-32602);assert.equal(response.error.data.contract,'hooks/1');assert.equal(calls,0);
 });
-test('shipped entry points cannot enable hooks, and neither sentinel is a veto',async()=>{
+test('shipped entry points cannot bypass negotiation, and neither sentinel is a veto',async()=>{
   assert.equal(sdk.enableHooksFixture,undefined);
   await assert.rejects(import('@hollis-labs/plugin-sdk/hooks-fixture'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
-  const d=await dispatcher(fixturePlugin('hooks-declined'),false);
+  const d=await dispatcher(fixturePlugin('hooks-negotiated'),false);
   const r=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:7,method:'hook/handle',params:JSON.parse(base.raw)})));
   assert.equal(r.error.code,-32601);
   assert.throws(()=>sdk.hookRPCError(-32003,'invalid_params'));
@@ -122,4 +122,31 @@ test('programmable bridge fixture preserves scripts and rejects invalid output',
   for(const code of ['remote_not_allowed','latency_budget_exceeded','stale_scope','stale_binding','capacity_exhausted','deadline_exceeded','caller_cancelled','depth_exceeded','callback_cycle','transport_failure','handler_panic','invalid_output','handler_error','schema_mismatch','profile_unavailable']) {
     p.metadata={fixture:'fail:'+code};assert.equal((await plugin.hookHandle(context(),p)).error.code,code);
   }
+});
+
+test('negotiation stays on the connection when the author object is reused',async()=>{
+  const plugin=fixturePlugin('hooks-negotiated');
+  for(const offered of [true,false]) {
+    const d=new Dispatcher(plugin,context(),new sdk.SecretTracker());
+    const params=initParams(offered?{hooks_profile:{hooks_profile_version:1}}:{});
+    const init=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params})));
+    assert.equal(init.error,undefined);
+    assert.equal(init.result.hooks_profile_version,offered?1:undefined);
+    assert.equal(init.result.reverse_rpc_version,undefined);
+    const reply=await d.dispatch(decodeRequest('{"jsonrpc":"2.0","id":2,"method":"hook/handle","params":'+base.raw+'}'));
+    if(offered) assert.equal(reply.result.status,'ok');
+    else {assert.equal(reply.error.code,-32601);assert.equal(reply.error.data.code,'profile_unavailable');}
+  }
+});
+
+test('authoring an acknowledgement or mutating Init input cannot create a host offer',async()=>{
+  const plugin={...fixturePlugin('hooks-negotiated'),init(_ctx,input){
+    input.hooks_profile={hooks_profile_version:1};
+    return {id:'fixture',name:'Fixture',version:'1.0.0',description:'conformance',protocol:2,capability_contract:1,hooks_profile_version:1};
+  }};
+  const d=new Dispatcher(plugin,context(),new sdk.SecretTracker());
+  const init=await d.dispatch(decodeRequest(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams()})));
+  assert.equal(init.error,undefined);assert.equal(init.result.hooks_profile_version,undefined);
+  const reply=await d.dispatch(decodeRequest('{"jsonrpc":"2.0","id":2,"method":"hook/handle","params":'+base.raw+'}'));
+  assert.equal(reply.error.code,-32601);assert.equal(reply.error.data.code,'profile_unavailable');
 });

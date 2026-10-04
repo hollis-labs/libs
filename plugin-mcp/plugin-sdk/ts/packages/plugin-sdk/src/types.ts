@@ -14,6 +14,7 @@ export interface Plugin {
   load(context: Context): Awaitable<Wire.LoadResult>;
   unload(context: Context): Awaitable<void>;
 }
+/** Opts into hooks/1 when offered during Init. Context supplies no host client. */
 export interface HookHandler { hookHandle(context: Context, params: import('./hooks.js').HookRequest): Awaitable<import('./hooks.js').HookResult>; }
 export interface CommandHandler { command(context: Context, params: Wire.CommandExecParams): Awaitable<Wire.CommandExecResult>; }
 export interface EventHandler { eventHandle(context: Context, params: Wire.EventHandleParams): Awaitable<Wire.EventHandleResult>; }

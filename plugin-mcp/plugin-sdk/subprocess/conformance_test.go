@@ -68,8 +68,8 @@ func TestProtocolTranscripts(t *testing.T) {
 			}
 			var p Plugin
 			switch fixture.Profile {
-			case "hooks-fixture", "hooks-declined":
-				p = &hookTranscriptPlugin{}
+			case "hooks-fixture", "hooks-declined", "hooks-negotiated":
+				p = hookTranscriptFor(fixture.Profile)
 				if fixture.Profile == "hooks-fixture" {
 					enableHookFixture(t)
 				}

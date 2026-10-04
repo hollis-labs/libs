@@ -1,15 +1,27 @@
-# Reserved hooks/1 wire
+# Hooks/1 profile
 
-The SDK publishes data-only host/client codecs and author handler surfaces for
-`hook/handle` and `hook/handle_batch`. Both remain unavailable in production:
-Init validates the optional `hooks_profile` offer and declines it even when an
-author returns an acknowledgement or implements HookHandler. An initialized
-connection receives -32601 with `hooks/1` and `profile_unavailable`. Before Init,
-base lifecycle rules apply. Only internal conformance fixtures enable routing;
-there is no public option, environment flag, or supported package export for it.
-Advertising the profile requires the separate negotiation and bridge acceptance
-work. Reverse callbacks are also unavailable until their independent duplex lane
-and negotiation land.
+The SDK routes `hook/handle` and `hook/handle_batch` in production after
+connection-local Init negotiation. The host offers
+`hooks_profile: { "hooks_profile_version": 1 }`; the plugin opts in by implementing
+Go `HookHandler` or TypeScript `hookHandle`. After successful Init, Serve
+acknowledges `hooks_profile_version: 1` and enables that connection's hook methods.
+The runtime owns the acknowledgement: authoring that result field, package
+versions or the presence of DTOs cannot enable hooks. There is no public enable
+switch. Await the Init reply before sending hook requests.
+
+A valid offer without a handler, or a handler without an offer, completes Init
+without a hooks acknowledgement. Hook calls on those initialized connections
+receive -32601 with `hooks/1` and `profile_unavailable`. An offer with a version
+other than 1 retains the strict typed Init rejection, -32602 `profile_mismatch`;
+malformed, null or unknown fields retain existing Init errors. Before successful
+Init, base lifecycle admission rules apply. The internal conformance seam remains
+for tests that need to bypass negotiation; negotiated transcripts use normal Init.
+
+Hooks are acknowledged independently of reverse RPC. Even when `host_services`
+is offered alongside hooks, `reverse_rpc_version` remains absent. Hook handlers
+receive the ordinary context and no host client, so this profile supplies no
+plugin-originated callbacks. Reverse services await their own conformance and
+negotiation gate.
 
 `hooks.schema.json` defines flat DTOs. `generate.py` generates a separate
 `hooks-wire.ts`; existing wire.ts and historical v1 files do not change. The
@@ -78,9 +90,13 @@ become per-invocation operational results, not deliberate vetoes. No engine
 sentinels or plugin-hooks dependency enter this SDK; host adapters map structured
 statuses to their own engine outcomes.
 
-The normative hooks-handling and hooks-declined transcripts run through both
-in-process and real Go/Node child paths. They cover profile decline, all result
-branches, action modes, payload literals, escaped keys, batch bounds/order and
-notification silence. hooks.json adds raw DTO/presence/integer/branch vectors.
-The bridge's hookstest R16-R22 acceptance, catalog policy, reverse callbacks,
-latency measurement, profile advertisement and releases remain separate work.
+The normative hooks-handling, hooks-negotiated, hooks-declined, hooks-no-offer
+and hooks-wrong-version transcripts run through both in-process and real Go/Node
+child paths. Negotiated paths use the normal Init offer and handler, without
+fixture injection. They cover acknowledgement and its absence, independent reverse
+decline, strict version errors, all result branches, action modes, payload
+literals, escaped keys, batch bounds/order and notification silence. hooks.json
+adds raw DTO/presence/integer/branch vectors. The plugin-hooks bridge's hookstest
+R16-R22 acceptance satisfied the hooks acknowledgement gate. Hosts still own
+catalog policy and authority; reverse callbacks, latency measurement and releases
+remain separate work.

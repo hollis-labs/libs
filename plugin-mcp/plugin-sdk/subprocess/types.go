@@ -65,7 +65,7 @@ type HostInfo struct {
 }
 
 // InitResult acknowledges the base contract and any selected optional profiles.
-// Current Serve declines both profiles and never advertises their support.
+// Serve acknowledges hooks/1 only with an offer and HookHandler; reverse stays declined.
 type InitResult struct {
 	ID                  string `json:"id"`
 	Name                string `json:"name"`
@@ -77,7 +77,7 @@ type InitResult struct {
 	HooksProfileVersion *int   `json:"hooks_profile_version,omitempty"`
 }
 
-// HooksProfile reserves the independent hooks offer; hook/handle is not implemented.
+// HooksProfile offers the independent hooks protocol. Serve requires HookHandler to acknowledge it.
 type HooksProfile struct {
 	HooksProfileVersion int `json:"hooks_profile_version"`
 }
