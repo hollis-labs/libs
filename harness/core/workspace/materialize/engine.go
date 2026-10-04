@@ -17,9 +17,10 @@ import (
 )
 
 type EngineOptions struct {
-	BeforeWrite  func(stageRoot string, entry artifact.Entry) error
-	BeforeRename func(stageRoot string, targetRoot string) error
-	Now          func() time.Time
+	BeforeInstalledCommit func(context.Context, InstalledFileChange) error
+	BeforeWrite           func(stageRoot string, entry artifact.Entry) error
+	BeforeRename          func(stageRoot string, targetRoot string) error
+	Now                   func() time.Time
 }
 
 type DefaultEngine struct {
@@ -33,6 +34,9 @@ func NewEngine(opts EngineOptions) *DefaultEngine {
 var _ Engine = (*DefaultEngine)(nil)
 
 func (e *DefaultEngine) Plan(ctx context.Context, req Request) (Plan, error) {
+	if req.Operation == OperationInstall {
+		return e.planInstalled(ctx, req)
+	}
 	if err := ctx.Err(); err != nil {
 		return Plan{}, err
 	}
@@ -71,6 +75,9 @@ func (e *DefaultEngine) Plan(ctx context.Context, req Request) (Plan, error) {
 }
 
 func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) {
+	if req.Operation == OperationInstall {
+		return e.applyInstalled(ctx, req)
+	}
 	if req.Operation == OperationPlan {
 		plan, err := e.Plan(ctx, req)
 		if err != nil {

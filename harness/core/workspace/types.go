@@ -11,10 +11,12 @@ import (
 	"github.com/hollis-labs/substrate/harness/sandbox"
 	"github.com/hollis-labs/substrate/harness/workspace/credentials"
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/substrate/harness/workspace/install"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 const SchemaVersion = "workspace.v1"
@@ -154,6 +156,7 @@ const (
 	CredentialLinkEffect EffectKind = "credential_link"
 	TrustEffect          EffectKind = "trust"
 	RepositoryEffect     EffectKind = "repository"
+	InstalledEffect      EffectKind = "installed_artifacts"
 )
 
 type EffectGrant struct {
@@ -168,7 +171,14 @@ type CleanupPolicy struct {
 }
 
 // Spec is the resolved semantic input. It does not parse an agent definition.
+type InstallSpec struct {
+	Target, Control RootRef
+	Provider        runtimes.ID
+	Grants          []install.Grant
+}
+
 type Spec struct {
+	Installed                  *InstallSpec `json:",omitempty"`
 	SchemaVersion, OperationID string
 	Operation                  Operation
 	Identity                   IdentitySpec
@@ -225,13 +235,17 @@ type Resources struct {
 // Observations are snapshots, not proof that an apply will succeed. The host
 // must refresh them under locks before applying any filesystem effects.
 type Observations struct {
-	At, ExpiresAt time.Time
-	Roots         []RootObservation
-	Receipts      []Receipt
-	Capabilities  []Capability
-	FenceVersion  string
+	InstalledFiles    []install.FileSnapshot              `json:",omitempty"`
+	InstalledVolumes  []materialize.InstalledCapabilities `json:",omitempty"`
+	InstalledCaseMode materialize.CaseMode                `json:",omitempty"`
+	At, ExpiresAt     time.Time
+	Roots             []RootObservation
+	Receipts          []Receipt
+	Capabilities      []Capability
+	FenceVersion      string
 }
 type RootObservation struct {
+	FileIdentity                                              string `json:",omitempty"`
 	RootID, DeclaredPath, CanonicalPath, CanonicalBase, Owner string
 	Exists, Empty                                             bool
 	Directory                                                 bool
@@ -286,6 +300,7 @@ type RepositoryOrigin struct {
 }
 
 type Receipt struct {
+	Installed                                            *install.Evidence `json:",omitempty"`
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
 	// receipts leave it empty and make no enrollment or continuity claim.
@@ -388,4 +403,11 @@ type Observer interface {
 // carry paths, identities and digests; credential bytes never belong here.
 type ReceiptStore interface {
 	Record(context.Context, Receipt) error
+}
+
+// ControlledReceiptStore exposes the same durable store's configured custody.
+// Installed operations require this view; it is not a second store or writer.
+type ControlledReceiptStore interface {
+	ReceiptStore
+	ControlRoot() RootRef
 }

@@ -11,6 +11,7 @@ import (
 
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/substrate/harness/workspace/install"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
@@ -20,6 +21,7 @@ type ActionKind string
 const (
 	EnsureDirectoryAction ActionKind = "ensure_owned_directory"
 	TreeAction            ActionKind = "managed_tree"
+	InstalledTreeAction   ActionKind = "installed_tree"
 	DeferredAction        ActionKind = "deferred_effect"
 )
 
@@ -53,6 +55,7 @@ type PlannedWorkspace struct {
 	renderDiagnostics []RenderDiagnostic
 	effectInputs      EffectInputs
 	valid             bool
+	installed         *install.Prepared
 }
 
 func (p PlannedWorkspace) Valid() bool { return p.valid }
@@ -112,6 +115,9 @@ func (p PlannedWorkspace) Actions() []Action {
 // root identities and disk evidence come only from explicit observations;
 // successful planning promises neither apply success nor launch readiness.
 func Plan(spec Spec, content ResolvedContent, resources Resources, observed Observations) (PlannedWorkspace, error) {
+	if spec.Operation == Install && spec.Installed != nil {
+		return planInstalledWorkspace(spec, content, resources, observed)
+	}
 	if err := validateFrozenValues(spec, content, resources, observed); err != nil {
 		return PlannedWorkspace{}, err
 	}

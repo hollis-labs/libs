@@ -18,6 +18,9 @@ import (
 // effects refuse before mutation. It never publishes current, retires roots or
 // issues Ready. Every failure returns observed partial accounting, not rollback.
 func Materialize(ctx context.Context, p PlannedWorkspace, ports Ports) (ApplyResult, error) {
+	if p.installed != nil && p.valid {
+		return applyInstalledWorkspace(ctx, p, ports)
+	}
 	if !p.valid {
 		return ApplyResult{Status: Conflict}, refuse(CodeInvalidPlan, "plan", Conflict)
 	}

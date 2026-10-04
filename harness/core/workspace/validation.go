@@ -42,7 +42,7 @@ func (s Spec) Validate() error {
 	default:
 		return refuse(CodeUnsupportedOperation, "operation", Unsupported)
 	}
-	if s.Identity.AgentURN == "" || s.Identity.DefinitionRevision == "" || s.Identity.Session == "" || s.Identity.Fence.ID == "" || s.Identity.Fence.Revision == "" {
+	if s.Identity.AgentURN == "" || s.Identity.DefinitionRevision == "" || s.Identity.Session == "" && s.Operation != Install || s.Identity.Fence.ID == "" || s.Identity.Fence.Revision == "" {
 		return refuse(CodeMissingIdentityPin, "identity", Conflict)
 	}
 	for _, component := range []string{s.Identity.Session, s.Identity.Instance, s.Identity.Assignment} {
@@ -62,6 +62,12 @@ func (s Spec) Validate() error {
 		if d.Algorithm != "sha256" || err != nil || len(decoded) != 32 || strings.ToLower(d.Hex) != d.Hex {
 			return refuse(CodeUnsupportedInputDigest, "identity", Unsupported)
 		}
+	}
+	if s.Operation == Install && s.Installed != nil {
+		return validateInstallSpec(s)
+	}
+	if s.Operation != Install && s.Installed != nil {
+		return refuse("installed_operation_required", "installed", Conflict)
 	}
 	if s.Home.Continuity != Durable && s.Home.Continuity != Ephemeral {
 		return refuse(CodeUnsupportedContinuity, "home", Unsupported)
@@ -203,7 +209,7 @@ func validateAccess(access []sandbox.AccessKind) error {
 
 func validEffect(k EffectKind) bool {
 	switch k {
-	case DirectoryEffect, ArtifactEffect, CredentialLinkEffect, TrustEffect, RepositoryEffect:
+	case DirectoryEffect, ArtifactEffect, CredentialLinkEffect, TrustEffect, RepositoryEffect, InstalledEffect:
 		return true
 	}
 	return false
