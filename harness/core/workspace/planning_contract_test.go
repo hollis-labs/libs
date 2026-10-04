@@ -1457,7 +1457,7 @@ func TestPlanningFrozenValueLimits(t *testing.T) {
 		nested[i] = leaves
 	}
 	fixtureExpect(t, "aggregate collection items", validateFrozenValues(nested), "input_limit")
-	fixtureExpect(t, "oversized text", validateFrozenValues(strings.Repeat("x", render.MaxPathBytes+1)), "input_limit")
+	fixtureExpect(t, "oversized text", validateFrozenValues(strings.Repeat("x", MaxFrozenBytes+1)), "input_limit")
 	fixtureExpect(t, "invalid map value", validateFrozenValues(map[string]string{"key": string([]byte{255})}), "invalid_utf8")
 	fixtureExpect(t, "invalid pointer field", validateFrozenValues(&ResourceRef{Revision: string([]byte{255})}), "invalid_utf8")
 	fixtureExpect(t, "oversized binary", validateFrozenValues(make([]byte, MaxFrozenBytes+1)), "input_limit")

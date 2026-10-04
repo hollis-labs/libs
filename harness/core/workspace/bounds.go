@@ -34,9 +34,6 @@ func validateFrozenValues(values ...any) error {
 			if !utf8.ValidString(s) {
 				return refuse(CodeInvalidUtf8, "inputs", Conflict)
 			}
-			if len(s) > render.MaxPathBytes {
-				return refuse(CodeInputLimit, "inputs", Conflict)
-			}
 		case reflect.Pointer, reflect.Interface:
 			if !v.IsNil() {
 				return walk(v.Elem())

@@ -1,7 +1,9 @@
 package workspace_test
 
 import (
+	"fmt"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 	"github.com/hollis-labs/substrate/harness/adapters/registry"
 	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/workspace"
@@ -44,5 +46,25 @@ func TestRealRendererBindingsPlan(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRendererOwnershipMetadataHasContentBudget(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	resolution, err := layout.Resolve(layout.Request{Key: layout.Key{Provider: runtimes.Claude, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Field: layout.MCP}, Requirement: layout.Required})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := render.Request{Provider: runtimes.Claude, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Roots: c.Roots, Inputs: []render.Input{{Resolved: resolution}}}
+	for i := 0; i < 200; i++ {
+		req.Native.Servers = append(req.Native.Servers, nativefiles.Server{Name: fmt.Sprintf("fixture-%03d", i), Command: "fixture-mcp"})
+	}
+	output, err := render.Render(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Rendered = []render.Result{output}
+	if _, err := workspace.Plan(s, c, r, o); err != nil {
+		t.Fatal(err)
 	}
 }
