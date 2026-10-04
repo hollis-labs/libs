@@ -13,6 +13,7 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentcontext"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/harness/workspace/plant"
@@ -92,12 +93,17 @@ func scenarioRoot(root string) (string, func(), error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return base, func() { _ = os.RemoveAll(base) }, nil
+	return base, func() {}, nil
 }
 
 func runCairn(ctx context.Context, base string) (scenarioResult, error) {
 	sourceRoot := filepath.Join(base, "source")
 	bootRoot := filepath.Join(base, "boot")
+	authorize, err := syntheticAuthority(base, bootRoot)
+	if err != nil {
+		return scenarioResult{}, err
+	}
+
 	if err := writeFile(filepath.Join(sourceRoot, "bin", "install.sh"), []byte("#!/bin/sh\necho cairn\n"), 0o755); err != nil {
 		return scenarioResult{}, err
 	}
@@ -115,6 +121,7 @@ func runCairn(ctx context.Context, base string) (scenarioResult, error) {
 	if err != nil {
 		return scenarioResult{}, err
 	}
+	nameResolvedEntries(&fsTree)
 	jsonDoc, err := materialize.MergeDocument(materialize.DocumentPatch{
 		Kind:     materialize.DocumentJSON,
 		Existing: []byte(`{"unowned":true}`),
@@ -167,7 +174,7 @@ func runCairn(ctx context.Context, base string) (scenarioResult, error) {
 			Env:  map[string]agentlaunch.EnvVar{"CAIRN_BOOT": {Value: bootRoot, Source: "synthetic-cairn"}},
 		}},
 		Access: agentlaunch.AccessRequirements{Mode: agentlaunch.AccessDisabled, Host: agentlaunch.ExecutionHostLocal},
-	}, agentlaunch.WithCompositionDefinitions(defs))
+	}, agentlaunch.WithCompositionDefinitions(defs), agentlaunch.WithArtifactAuthorization(authorize))
 	if err != nil {
 		return scenarioResult{}, err
 	}
@@ -188,6 +195,11 @@ func runCairn(ctx context.Context, base string) (scenarioResult, error) {
 
 func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 	bootRoot := filepath.Join(base, "boot")
+	authorize, err := syntheticAuthority(base, bootRoot)
+	if err != nil {
+		return scenarioResult{}, err
+	}
+
 	blob := []byte{0, 1, 2, 3, 255}
 	ref := artifact.ImmutableRef{Store: "memory", Key: "blob.bin", Digest: artifact.DigestBytes(blob), SizeBytes: int64(len(blob))}
 	blobTree, err := artifact.NewResolver(artifact.ResolverOptions{ImmutableStore: artifact.MemoryStore{Objects: map[string][]byte{ref.Key: blob}}}).ResolveArtifacts(ctx, artifact.SourceRequest{
@@ -197,6 +209,12 @@ func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 	})
 	if err != nil {
 		return scenarioResult{}, err
+	}
+	nameResolvedEntries(&blobTree)
+	// The resolver verified the immutable object. Publish its frozen bytes,
+	// rather than handing a deferred store reference to the workspace engine.
+	for i := range blobTree.Entries {
+		blobTree.Entries[i].ContentRef = nil
 	}
 	tree := artifact.Tree{Entries: append([]artifact.Entry{
 		fileEntry("skills/nanite/SKILL.md", []byte("---\nname: nanite-synthetic\n---\nSynthetic Nanite skill\n"), 0o644, "nanite-skill-md", "nanite:skill-package"),
@@ -208,6 +226,7 @@ func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 		Artifacts:  tree,
 		Operation:  materialize.OperationCreate,
 		Generation: "gen-1",
+		Authorize:  authorize,
 	})
 	if err != nil {
 		return scenarioResult{}, err
@@ -216,6 +235,21 @@ func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 		fileEntry("skills/nanite/SKILL.md", []byte("---\nname: nanite-synthetic\n---\nRefreshed Nanite skill\n"), 0o644, "nanite-skill-md", "nanite:skill-package"),
 		{Path: "skills/nanite/empty", Kind: artifact.EntryDirectory, Mode: 0o755, Ownership: artifact.Ownership{EntryID: "nanite-empty", GroupID: "nanite:skill-package"}},
 	}}
+	_, removalErr := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{
+		TargetRoot:         bootRoot,
+		Roots:              roots(base, bootRoot),
+		Artifacts:          refreshedTree,
+		Operation:          materialize.OperationRefresh,
+		ExpectedGeneration: created.Manifest.Generation,
+		Generation:         "gen-2",
+		Authorize:          authorize,
+		Selection:          materialize.Selection{Groups: []string{"nanite:skill-package"}},
+		Reconcile:          materialize.ReconcilePolicy{RemoveOwned: true},
+	})
+	var refusal *workspace.Refusal
+	if !errors.As(removalErr, &refusal) || refusal.Status != workspace.Unsupported {
+		return scenarioResult{}, fmt.Errorf("retirement did not refuse: %v", removalErr)
+	}
 	refreshed, err := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{
 		TargetRoot:         bootRoot,
 		Roots:              roots(base, bootRoot),
@@ -223,15 +257,17 @@ func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 		Operation:          materialize.OperationRefresh,
 		ExpectedGeneration: created.Manifest.Generation,
 		Generation:         "gen-2",
+		Authorize:          authorize,
 		Selection:          materialize.Selection{Groups: []string{"nanite:skill-package"}},
-		Reconcile:          materialize.ReconcilePolicy{RemoveOwned: true},
+		Reconcile:          materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
 	})
 	if err != nil {
 		return scenarioResult{}, err
 	}
+
 	checks := []string{
 		mustContainFile(filepath.Join(bootRoot, "skills", "nanite", "SKILL.md"), "Refreshed Nanite skill"),
-		mustAbsent(filepath.Join(bootRoot, "skills", "nanite", "assets", "blob.bin")),
+		mustMode(filepath.Join(bootRoot, "skills", "nanite", "assets", "blob.bin"), 0644),
 		mustDir(filepath.Join(bootRoot, "skills", "nanite", "empty")),
 	}
 	if err := firstError(checks); err != nil {
@@ -243,6 +279,11 @@ func runNanite(ctx context.Context, base string) (scenarioResult, error) {
 func runTorque(ctx context.Context, base string) (scenarioResult, error) {
 	copiedRoot := filepath.Join(base, "copied-source")
 	bootRoot := filepath.Join(base, "boot")
+	authorize, err := syntheticAuthority(base, bootRoot)
+	if err != nil {
+		return scenarioResult{}, err
+	}
+
 	if err := writeFile(filepath.Join(copiedRoot, "task-assets", "notes.md"), []byte("copied task notes\n"), 0o644); err != nil {
 		return scenarioResult{}, err
 	}
@@ -257,6 +298,7 @@ func runTorque(ctx context.Context, base string) (scenarioResult, error) {
 	if err != nil {
 		return scenarioResult{}, err
 	}
+	nameResolvedEntries(&copied)
 	tree := artifact.Tree{Entries: append([]artifact.Entry{
 		fileEntry("tasks/T-100/task.json", []byte(`{"id":"T-100","loopback":true}`), 0o644, "torque-task-json", "torque:task"),
 		fileEntry("tasks/T-100/AGENTS.md", []byte("Synthetic Torque task context\n"), 0o644, "torque-task-agents", "torque:task"),
@@ -278,7 +320,7 @@ func runTorque(ctx context.Context, base string) (scenarioResult, error) {
 			Network:    agentlaunch.NetworkAccess{Loopback: true},
 			Subprocess: agentlaunch.SubprocessAccess{Allowed: true},
 		},
-	})
+	}, agentlaunch.WithArtifactAuthorization(authorize))
 	if err != nil {
 		return scenarioResult{}, err
 	}
@@ -302,6 +344,11 @@ func runTorque(ctx context.Context, base string) (scenarioResult, error) {
 func runTether(ctx context.Context, base string) (scenarioResult, error) {
 	copiedRoot := filepath.Join(base, "copied-source")
 	bootRoot := filepath.Join(base, "boot")
+	authorize, err := syntheticAuthority(base, bootRoot)
+	if err != nil {
+		return scenarioResult{}, err
+	}
+
 	if err := writeFile(filepath.Join(copiedRoot, "shared", "prompt.md"), []byte("copied Tether prompt\n"), 0o644); err != nil {
 		return scenarioResult{}, err
 	}
@@ -313,11 +360,12 @@ func runTether(ctx context.Context, base string) (scenarioResult, error) {
 	if err != nil {
 		return scenarioResult{}, err
 	}
+	nameResolvedEntries(&copied)
 	tree := artifact.Tree{Entries: append([]artifact.Entry{
 		fileEntry("bundles/task-alpha/AGENTS.md", []byte("alpha task bundle\n"), 0o644, "tether-alpha", "tether:task-alpha"),
 		fileEntry("bundles/task-beta/AGENTS.md", []byte("beta task bundle\n"), 0o644, "tether-beta", "tether:task-beta"),
 	}, copied.Entries...)}
-	result, err := (plant.SharedPlanter{}).Plant(ctx, bootRoot, plant.Spec{
+	result, err := (plant.SharedPlanter{Authorize: authorize}).Plant(ctx, bootRoot, plant.Spec{
 		Artifacts: tree,
 		Operation: materialize.OperationCreate,
 		ProviderSettings: map[string][]byte{
@@ -444,4 +492,14 @@ func firstError(checks []string) error {
 		}
 	}
 	return nil
+}
+
+// Resolver outputs are declared desired demo artifacts. Naming them does not
+// claim ownership of anything previously present in the candidate directory.
+func nameResolvedEntries(tree *artifact.Tree) {
+	for i := range tree.Entries {
+		if tree.Entries[i].Ownership.EntryID == "" {
+			tree.Entries[i].Ownership.EntryID = "synthetic-resolved:" + tree.Entries[i].Path
+		}
+	}
 }

@@ -13,7 +13,7 @@ import (
 type SharedPrepareOptions struct {
 	Composer    agentcontext.Composer
 	Definitions []agentcontext.AuthoredRecipe
-	Engine      materialize.Engine
+	Authorize   ArtifactAuthorizer
 }
 
 // SharedPrepareOption mutates SharedPrepareOptions.
@@ -27,8 +27,8 @@ func WithCompositionDefinitions(defs []agentcontext.AuthoredRecipe) SharedPrepar
 	return func(o *SharedPrepareOptions) { o.Definitions = append([]agentcontext.AuthoredRecipe(nil), defs...) }
 }
 
-func WithMaterializationEngine(e materialize.Engine) SharedPrepareOption {
-	return func(o *SharedPrepareOptions) { o.Engine = e }
+func WithArtifactAuthorization(a ArtifactAuthorizer) SharedPrepareOption {
+	return func(o *SharedPrepareOptions) { o.Authorize = a }
 }
 
 // ResolvePreparation is the shared preparation path for raw artifact,
@@ -74,8 +74,8 @@ func ResolvePreparation(ctx context.Context, req PrepareRequest, opts ...SharedP
 			Roots:      req.Roots,
 			Artifacts:  tree,
 			Operation:  materialize.OperationReconcile,
-			Engine:     cfg.Engine,
-			Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictOverwrite},
+			Authorize:  cfg.Authorize,
+			Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
 		})
 		if err != nil {
 			return nil, err

@@ -1,6 +1,6 @@
 // Package goldens provides offline test support for the legacy planting corpus.
-// It has no production callers. The workspace root remains reserved for the
-// future merged package.
+// It has no production callers. Archived apply expectations remain historical
+// evidence; active workspace routing names each approved semantic delta.
 //
 // Each case directory contains input.json, expected.json (a byte-exact tree
 // including the root, directory modes and empty directories), and evidence.json
@@ -16,9 +16,10 @@
 // Only execution roots, session identifiers and timestamps are normalized;
 // paths, permissions, argv order, diagnostics and ownership are preserved.
 // Provider-specific posture and turn bindings live in providerplant cases;
-// provider-neutral writers have no posture/bare launch API. agentsessions
-// allocates a fresh disposable root and has no owned-refresh API. The context
-// writer overwrites slot files without a manifest and retains unrelated files.
+// provider-neutral writers have no posture/bare launch API. Historical session
+// projection and bindings are checked without recreating their old writer.
+// Active sessions require host-owned private custody, real manifests and retained
+// roots. Active context routing checks all slot names before mutation.
 //
 // Cairn seeds are archived evidence from its pinned source, not a live test
 // dependency. They include boot and installed create/refresh, owned-key
@@ -266,4 +267,22 @@ func unixMode(mode fs.FileMode) uint32 {
 		bits |= 01000
 	}
 	return bits
+}
+
+// CheckHistoricalProjection compares a pure, in-memory reconstruction of the
+// archived renderer and binding evidence. It performs no planting or cleanup.
+// Active apply semantics must be covered separately by CheckRouting and refusal
+// witnesses; this does not claim the historical writer is safe to execute.
+func CheckHistoricalProjection(t *testing.T, dir string, tree []Entry, ev Evidence, normalize func([]byte) []byte) {
+	t.Helper()
+	for i := range tree {
+		if normalize != nil {
+			tree[i].Content = string(normalize([]byte(tree[i].Content)))
+		}
+	}
+	if ev.Diagnostics == nil {
+		ev.Diagnostics = []string{}
+	}
+	compare(t, filepath.Join(dir, "expected.json"), tree, nil)
+	compare(t, filepath.Join(dir, "evidence.json"), ev, normalize)
 }

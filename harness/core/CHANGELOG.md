@@ -15,6 +15,33 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - `TestSandbox_OutsideWorkspaceReadBlocked` (`sandbox`) is skipped unconditionally on Linux: the skip says the test needs additional bind configuration, and it has said so since the sandbox was first extracted, before this move. So the test suite does not verify that a sandboxed process on Linux cannot read a denied path outside its workspace. That is not known to be broken; it is not verified. On macOS the same test runs only when `~/.ssh` exists. The other Linux sandbox isolation tests run and pass in CI: network isolation, loopback, protected paths and the filesystem-allowlist parity tests.
 - `adapters/wrapper`: the wrapper takes the end of a Codex JSON-RPC stdio turn from the session's typed terminal event only when the CLI adapter is named `codex`. The session layer emits that typed terminal only for an adapter with that name, so a compatible custom adapter that speaks the same protocol under another name does not get it, and the fix for the duplicated turn lifecycle does not cover it. Other runtimes keep taking their terminals from the legacy event stream.
 
+### Changed
+
+- Workspace preparation freezes explicit credential and trust inputs, preflights
+  all groups under complete locks before mutation, and records leaf evidence
+  through one durable receipt store. Retry evidence retains earlier recovery
+  obligations; artifacts remain Partial and do not grant launch readiness.
+- Legacy planting requires explicit workspace authority and uses the sole
+  materialize engine. Side-writer and engine overrides are removed. Existing
+  unsafe roots, nonempty unmanifested content and credential placeholders refuse
+  before mutation. Pure provider projection remains available separately.
+  Archived baselines and seeds remain unchanged; active routing deltas are
+  documented in `workspace/README.md`.
+
+- Pre-first-tag API break: wrapper `Config.MaterializationEngine` and
+  `WithMaterializationEngine` are replaced by `ArtifactAuthorization` and
+  `WithArtifactAuthorization`, using `agentlaunch.ArtifactAuthorizer` instead
+  of `materialize.Engine`. Removed fields are `SharedPrepareOptions.Engine`,
+  `ArtifactMaterializationRequest.Engine` and `.Now`, `plant.SharedPlanter.Engine`,
+  `MaterializerOptions.DirMode` and `bootdir.Writer.AtomicWrite`, without a
+  compatibility authority adapter.
+- All five session start paths require explicit inactive/private artifact
+  custody through `StartOptions.ArtifactRoot` and `ArtifactAuthorization`.
+  Missing/invalid authority refuses before rendering or mutation. Verified
+  callbacks expose detached results; structured preparation/start errors retain
+  roots and obligations. Terminal and start-failure paths no longer delete
+  engine-owned roots; custody-aware retirement remains deferred.
+
 ### Added
 
 - Pure provider document assembly under `workspace/render`, native leaf-key
@@ -65,6 +92,11 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - `go-agent-wrapper`'s code, which pinned `agentkit` v0.21.0 and `go-runtime-events` v0.2.1 and the other sibling modules at tags, builds against their packages in this module: `agentkit` v0.26.1, `go-runtime-events` v0.2.2, the rest at their old repositories' `main`; its llm-core requirements are `llm-core` v0.1.0.
 
 ### Fixed
+
+- Materializing BootSpec and provider planting now validate explicit authority
+  and cancellation before renderer/resolver callbacks, retain late apply
+  validation, and close each resolved authority once. Standalone provider
+  projection remains pure and does not require authority.
 
 - `adapters/wrapper`: Codex JSON-RPC stdio turns consume the session's typed terminal event, preserving stop reasons and failure diagnostics while emitting exactly one turn lifecycle. Removed the duplicate empty lifecycle and restored the previously skipped native turn-order test.
 

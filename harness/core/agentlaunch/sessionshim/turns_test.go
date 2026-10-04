@@ -15,11 +15,12 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/internal/workspacetest"
 	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
 )
 
 // These tests drive a prepared launch end to end (compile, Prepare,
-// PrepareExecution, the shim, an agentsessions runtime) against a fake CLI
+// pure ProjectExecution, the shim, an agentsessions runtime) against a fake CLI
 // replaying captured output, and check the argv each spawn got. They are the
 // acceptance checks for CW-20260930-0135: every turn carries its own prompt
 // and resume id, the provider argv is not appended twice, and streaming-stdio
@@ -53,9 +54,12 @@ func preparedFor(t *testing.T, providerID string, mode runtimes.Mode, inj agentl
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	exec, err := providerplant.PrepareExecution(context.Background(), prepared)
+	// This fixture owns its candidate explicitly. Most cases exercise only
+	// projection/bindings against fake CLIs; the Plant case supplies authority.
+	prepared.PlantedBootDir = workspacetest.PrivateDir(t)
+	exec, err := providerplant.ProjectExecution(context.Background(), prepared)
 	if err != nil {
-		t.Fatalf("PrepareExecution: %v", err)
+		t.Fatalf("ProjectExecution: %v", err)
 	}
 	// Confinement is not what these tests exercise.
 	exec.Access.Mode = agentlaunch.AccessOptional
@@ -216,7 +220,7 @@ func TestPreparedStreamingClaude_BootPromptArrivesOnStdin(t *testing.T) {
 // and boot delivery.
 func TestToSessionLaunch_StreamingClaudeUsesTheTemplate(t *testing.T) {
 	prepared, _ := preparedFor(t, "claude", runtimes.ModeStreamingStdio, agentlaunch.InjectionSpec{})
-	if err := providerplant.Plant(context.Background(), prepared); err != nil {
+	if err := providerplant.Plant(context.Background(), prepared, providerplant.WithArtifactAuthorization(sessionFixtureAuthority(t))); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	sl, err := ToSessionLaunch(prepared)
@@ -335,5 +339,13 @@ func TestLaunchTemplateAndBuildArgsOverrideAreExclusive(t *testing.T) {
 			_ = sess.Stop(context.Background())
 		}
 		t.Fatalf("Start = %v, want the BuildArgs/template conflict", err)
+	}
+}
+
+func sessionFixtureAuthority(t *testing.T) agentlaunch.ArtifactAuthorizer {
+	resolve := workspacetest.New(t)
+	return func(ctx context.Context, path string) (agentlaunch.ArtifactAuthority, error) {
+		input, ports, closePorts, err := resolve(ctx, path)
+		return agentlaunch.ArtifactAuthority{Inactive: true, PrivateCustody: true, Input: input, Ports: ports, Close: closePorts}, err
 	}
 }

@@ -57,6 +57,7 @@ func newPlantThroughStreamingSession(t *testing.T, root, workspace string, onPla
 		Workdir:          workspace,
 		LogPath:          filepath.Join(workspace, "session.log"),
 		AutoPlantBootDir: true,
+		ArtifactRoot:     filepath.Join(root, "candidate"), ArtifactAuthorization: fixtureAuthorization(t),
 		BootDirRoot:      root,
 		OnBootDirPlanted: onPlanted,
 	})
@@ -84,7 +85,7 @@ func TestAutoPlantBootDir_Runtime_PlantedFilesExistDuringSession(t *testing.T) {
 	}
 }
 
-func TestAutoPlantBootDir_Runtime_CleanupOnStop(t *testing.T) {
+func TestAutoPlantBootDir_Runtime_RetainedOnStop(t *testing.T) {
 	root := t.TempDir()
 	workspace := t.TempDir()
 	var planted string
@@ -106,13 +107,13 @@ func TestAutoPlantBootDir_Runtime_CleanupOnStop(t *testing.T) {
 
 	if !waitFor(2*time.Second, func() bool {
 		_, err := os.Stat(planted)
-		return os.IsNotExist(err)
+		return err == nil
 	}) {
-		t.Errorf("bootDir %q still exists after Stop+Wait", planted)
+		t.Errorf("bootDir %q was removed after Stop+Wait", planted)
 	}
 }
 
-func TestAutoPlantBootDir_Runtime_CleanupOnCleanExit(t *testing.T) {
+func TestAutoPlantBootDir_Runtime_RetainedOnCleanExit(t *testing.T) {
 	root := t.TempDir()
 	workspace := t.TempDir()
 	// Script that emits one line then exits cleanly — drives the
@@ -148,6 +149,7 @@ exit 0
 		Workdir:          workspace,
 		LogPath:          filepath.Join(workspace, "session.log"),
 		AutoPlantBootDir: true,
+		ArtifactRoot:     filepath.Join(root, "candidate"), ArtifactAuthorization: fixtureAuthorization(t),
 		BootDirRoot:      root,
 		OnBootDirPlanted: func(p string) { planted = p },
 	})
@@ -164,9 +166,9 @@ exit 0
 	}
 	if !waitFor(2*time.Second, func() bool {
 		_, err := os.Stat(planted)
-		return os.IsNotExist(err)
+		return err == nil
 	}) {
-		t.Errorf("bootDir %q still exists after clean exit", planted)
+		t.Errorf("bootDir %q was removed after clean exit", planted)
 	}
 }
 
@@ -211,6 +213,7 @@ exit 0
 		Workdir:          workspace,
 		LogPath:          filepath.Join(workspace, "session.log"),
 		AutoPlantBootDir: true,
+		ArtifactRoot:     filepath.Join(root, "candidate"), ArtifactAuthorization: fixtureAuthorization(t),
 		BootDirRoot:      root,
 		OnBootDirPlanted: func(p string) { planted = p },
 		Env:              os.Environ(), // need PATH for the script's shebang to resolve sh

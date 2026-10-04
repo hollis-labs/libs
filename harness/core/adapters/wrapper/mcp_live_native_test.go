@@ -77,7 +77,7 @@ func preparedLiveMCP(t *testing.T, id runtimes.ID, mode runtimes.Mode, binary st
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	execution, err := providerplant.PrepareExecution(context.Background(), prepared)
+	execution, err := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithArtifactAuthorization(fixtureAuthorization(t)))
 	if err != nil {
 		t.Fatalf("PrepareExecution: %v", err)
 	}

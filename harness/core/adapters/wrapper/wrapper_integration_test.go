@@ -588,14 +588,15 @@ func TestRunPrepareRequestConvenienceMaterializesAndRunsPreparedExecution(t *tes
 	adapter := &fakeRuntimeAdapter{cli: &fakeCLI{name: "fakecli", script: "/bin/false"}}
 	sink := newCapturingSink()
 	w, err := New(Config{
-		App:               "test-prepare-request",
-		Adapter:           adapter,
-		Activity:          activity.NewBridge(sink),
-		Workdir:           dir,
-		BootDir:           bootDir,
-		PrepareRequest:    &req,
-		AutoFireFirstTurn: true,
-		FirstTurnPayload:  "ignored",
+		App:                   "test-prepare-request",
+		Adapter:               adapter,
+		Activity:              activity.NewBridge(sink),
+		Workdir:               dir,
+		BootDir:               bootDir,
+		PrepareRequest:        &req,
+		ArtifactAuthorization: fixtureAuthorization(t),
+		AutoFireFirstTurn:     true,
+		FirstTurnPayload:      "ignored",
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -624,7 +625,7 @@ func TestRunPrepareRequestConvenienceMaterializesAndRunsPreparedExecution(t *tes
 	if err := json.Unmarshal(evs[idxPlant].Payload, &payload); err != nil {
 		t.Fatalf("decode plant.completed: %v", err)
 	}
-	if payload["operation"] != string(materialize.OperationReconcile) || payload["complete"] != true {
+	if payload["operation"] != string(materialize.OperationCreate) || payload["complete"] != true {
 		t.Fatalf("plant payload = %#v", payload)
 	}
 	_ = w.Stop(context.Background())
@@ -633,7 +634,7 @@ func TestRunPrepareRequestConvenienceMaterializesAndRunsPreparedExecution(t *tes
 
 func TestRunSharedPlanterCreateDoesNotPrecreateTarget(t *testing.T) {
 	dir := t.TempDir()
-	bootDir := filepath.Join(dir, "boot-parent", "session-boot")
+	bootDir := filepath.Join(dir, "session-boot")
 	script := writeFakeScript(t, dir, []string{"done"})
 	sink := newCapturingSink()
 	w, err := New(Config{
@@ -642,7 +643,7 @@ func TestRunSharedPlanterCreateDoesNotPrecreateTarget(t *testing.T) {
 		Activity: activity.NewBridge(sink),
 		Workdir:  dir,
 		BootDir:  bootDir,
-		Planter:  plant.SharedPlanter{},
+		Planter:  plant.SharedPlanter{Authorize: fixtureAuthorization(t)},
 		PlantSpec: plant.Spec{
 			Operation: materialize.OperationCreate,
 			Artifacts: artifact.Tree{Entries: []artifact.Entry{
@@ -1062,8 +1063,8 @@ func TestRunInvokesPlanter(t *testing.T) {
 	if planter.lastDir != wantDir {
 		t.Errorf("planter.lastDir = %q, want %q", planter.lastDir, wantDir)
 	}
-	if _, err := os.Stat(wantDir); err != nil {
-		t.Errorf("boot dir %q was not created: %v", wantDir, err)
+	if _, err := os.Stat(wantDir); !os.IsNotExist(err) {
+		t.Errorf("wrapper fabricated planter root %q: %v", wantDir, err)
 	}
 	if len(planter.lastSpec.Files) != 1 || string(planter.lastSpec.Files["hello.txt"]) != "hi" {
 		t.Errorf("planter received unexpected spec.Files: %#v", planter.lastSpec.Files)

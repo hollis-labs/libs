@@ -1,6 +1,7 @@
 package contexthook
 
 import (
+	"context"
 	"github.com/hollis-labs/substrate/harness/agentcontext"
 	"github.com/hollis-labs/substrate/harness/workspace/goldens"
 	"os"
@@ -28,20 +29,20 @@ func TestGoldenContextFiles(t *testing.T) {
 			if in.Scenario == "collision" {
 				slots = append(slots, agentcontext.SlotResult{Name: "task_context", Content: "Colliding slot.\n"})
 			}
-			err = plantArtifacts(root, slots)
+			err = plantArtifacts(context.Background(), root, slots, fixtureAuthorization(t))
 			ev := goldens.Evidence{Writer: "contexthook", Source: "legacy context slot file writer", Bindings: slots}
 			if err == nil && in.Scenario == "refresh" {
 				if err := os.WriteFile(filepath.Join(root, "operator.txt"), []byte("Operator owned.\n"), 0640); err != nil {
 					t.Fatal(err)
 				}
 				slots[0].Content = "Refreshed task.\n"
-				err = plantArtifacts(root, slots)
+				err = plantArtifacts(context.Background(), root, slots, fixtureAuthorization(t))
 				ev.Bindings = slots
 			}
 			if err != nil {
 				ev.Diagnostics = append(ev.Diagnostics, err.Error())
 			}
-			goldens.Check(t, dir, root, ev, goldens.Roots(root, "<boot>", scratch, "<scratch>"))
+			goldens.CheckRouting(t, dir, root, ev, goldens.Roots(root, "<boot>", scratch, "<scratch>"), goldens.RoutingDeltas{NewManifest: in.Scenario != "collision", CollisionBeforeMutation: in.Scenario == "collision"})
 		})
 	}
 }

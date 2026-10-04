@@ -53,8 +53,7 @@ func (r *jsonRpcStdioRuntime) Prepare(_ context.Context) error {
 	return nil
 }
 
-func (r *jsonRpcStdioRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
-	var err error
+func (r *jsonRpcStdioRuntime) Start(ctx context.Context, opts StartOptions) (session Session, err error) {
 	opts, err = normalizeStartOptions(opts)
 	if err != nil {
 		return nil, err
@@ -70,20 +69,19 @@ func (r *jsonRpcStdioRuntime) Start(ctx context.Context, opts StartOptions) (Ses
 		opts.BootMode = ""
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	bootDir, planted, sessionAdapter, err := preparePlant(ctx, opts, r.cfg.Adapter, r.cfg.ID)
 	if err != nil {
 		return nil, err
 	}
 	opts = planted
+	defer func() { err = retainPreparationOnStartFailure(opts, err) }()
 
 	logPath, err := resolveJsonRpcStdioLogPath(opts)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 	logF, err := openSessionLog(logPath)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, fmt.Errorf("agentsessions: open log: %w", err)
 	}
 
@@ -110,7 +108,6 @@ func (r *jsonRpcStdioRuntime) Start(ctx context.Context, opts StartOptions) (Ses
 	cmd, stdin, stdout, attemptCleanup, err := s.spawnAttempt(0)
 	if err != nil {
 		_ = logF.Close()
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 
@@ -173,9 +170,9 @@ type jsonRpcStdioSession struct {
 	// runtime.cfg.Adapter, but a per-session clone when AutoPlantBootDir
 	// fired bare-mode injection. Always non-nil after Start.
 	adapter provider.CLIAdapter
-	// bootDir is the absolute path of the AutoPlantBootDir-planted tempdir,
-	// or "" when no plant happened. Cleaned up exactly once at terminal
-	// state via cleanupBootDir.
+	// bootDir is the explicitly authorized, engine-owned artifact root,
+	// or "" when no plant happened. Retained at terminal state; retirement
+	// requires a separate custody protocol.
 	bootDir string
 	opts    StartOptions
 
@@ -586,7 +583,6 @@ func (s *jsonRpcStdioSession) spawnWaiterLegacy(cmd *exec.Cmd, stdin io.WriteClo
 		if s.legacyCleanup != nil {
 			s.legacyCleanup()
 		}
-		cleanupBootDir(s.bootDir)
 	}()
 }
 
@@ -622,7 +618,6 @@ func (s *jsonRpcStdioSession) runSupervised(ctx context.Context, firstCmd *exec.
 			}
 			close(s.done)
 		})
-		cleanupBootDir(s.bootDir)
 	}()
 
 	for attempt := 0; attempt <= maxRestarts; attempt++ {

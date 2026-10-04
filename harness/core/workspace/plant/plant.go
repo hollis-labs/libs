@@ -114,7 +114,7 @@ type Result struct {
 // SharedPlanter adapts wrapper Spec into agentkit's neutral artifact and
 // materialization engine.
 type SharedPlanter struct {
-	Engine materialize.Engine
+	Authorize agentlaunch.ArtifactAuthorizer
 }
 
 // Plant implements [Planter].
@@ -135,7 +135,7 @@ func (p SharedPlanter) Plant(ctx context.Context, bootDir string, spec Spec) (Re
 		ExpectedGeneration: spec.ExpectedGeneration,
 		Selection:          spec.Selection,
 		Reconcile:          spec.Reconcile,
-		Engine:             p.Engine,
+		Authorize:          p.Authorize,
 	})
 	result := resultFromHandle(bootDir, handle)
 	if err != nil {

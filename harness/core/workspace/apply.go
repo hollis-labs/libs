@@ -13,7 +13,9 @@ import (
 )
 
 // Materialize prepares inactive artifacts under the full planned lock set.
-// It never publishes current, retires roots, executes deferred host effects or
+// Explicit credential and trust groups are preflighted under all locks before
+// mutation and dispatched after verified artifact commit. Unknown/deferred
+// effects refuse before mutation. It never publishes current, retires roots or
 // issues Ready. Every failure returns observed partial accounting, not rollback.
 func Materialize(ctx context.Context, p PlannedWorkspace, ports Ports) (ApplyResult, error) {
 	if !p.valid {
@@ -130,6 +132,21 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			return result, refuse(CodeStaleCurrentGeneration, "boot", Conflict)
 		}
 	}
+	if err = carryRecovery(&result, p, live); err != nil {
+		return result, err
+	}
+	var prepared preparedEffects
+	prepared, err = preflightEffects(ctx, p, ports)
+	if err != nil {
+		return result, err
+	}
+	for _, g := range p.effectInputs.Credentials {
+		appendObligation(&result, Obligation{Kind: EffectPending, RootID: g.Candidate.ID, Code: "effect_dispatch_pending:" + p.spec.OperationID})
+	}
+	for _, r := range p.effectInputs.Trust {
+		appendObligation(&result, Obligation{Kind: EffectPending, RootID: r.Config.ID, Code: "effect_dispatch_pending:" + p.spec.OperationID})
+	}
+	result.Receipt.Obligations = slices.Clone(result.Obligations)
 	result.Receipt.RecordedAt = ports.Clock.Now().UTC()
 	if err = ports.ReceiptStore.Record(ctx, copyRecord(result.Receipt)); err != nil {
 		return result, err
@@ -137,14 +154,14 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	// Record interrupted state before the first side effect. A killed process
 	// leaves explicit inspection obligations even if its final record is absent.
 	result.Receipt.Phase = Interrupted
-	result.Receipt.Obligations = []Obligation{{Kind: RecoveryInspectionRequired}}
+	result.Receipt.Obligations = append(slices.Clone(result.Obligations), Obligation{Kind: RecoveryInspectionRequired})
 	if err = ports.ReceiptStore.Record(ctx, copyRecord(result.Receipt)); err != nil {
 		return result, err
 	}
 	defer func() {
 		if err != nil && mutated {
 			result.Receipt.Phase = Interrupted
-			result.Receipt.Obligations = []Obligation{{Kind: RecoveryInspectionRequired}}
+			result.Receipt.Obligations = append(slices.Clone(result.Obligations), Obligation{Kind: RecoveryInspectionRequired})
 			result.Receipt.RecordedAt = ports.Clock.Now().UTC()
 			recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 			defer cancel()
@@ -208,6 +225,20 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	if err = ports.ReceiptStore.Record(ctx, copyRecord(result.Receipt)); err != nil {
 		return result, err
 	}
+	if err = applyEffects(ctx, p, ports, prepared, &result); err != nil {
+		return result, err
+	}
+	if len(prepared.credentials)+len(prepared.trust) > 0 {
+		result.Obligations = slices.DeleteFunc(result.Obligations, func(o Obligation) bool {
+			return o.Kind == EffectPending && o.Code == "effect_dispatch_pending:"+p.spec.OperationID
+		})
+		result.Receipt.Phase = ArtifactsCommitted
+		result.Receipt.Obligations = slices.Clone(result.Obligations)
+		result.Receipt.RecordedAt = ports.Clock.Now().UTC()
+		if err = ports.ReceiptStore.Record(ctx, copyRecord(result.Receipt)); err != nil {
+			return result, err
+		}
+	}
 	result.artifactsComplete = true
 	result.artifactSeal, result.artifactsComplete = resultSeal(result)
 	return result, nil
@@ -221,6 +252,17 @@ func appendRoot(roots []RootRef, r RootRef) []RootRef {
 	return append(roots, r)
 }
 func validateTarget(a Action, o RootObservation, destinations []string) error {
+	// Existing roots retain their host-declared permissions. In particular,
+	// Create/AllowEmpty must not let the engine chmod a pre-existing root.
+	if o.Exists {
+		info, err := os.Lstat(a.Root.Path)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() || info.Mode().Perm() != a.RootMode.Perm() || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+			return refuse(CodeUnsafeCandidateMode, "candidate", Conflict)
+		}
+	}
 	if o.Manifest != nil {
 		if err := ValidateManagedManifest(*o.Manifest, destinations); err != nil {
 			return err
@@ -231,14 +273,7 @@ func validateTarget(a Action, o RootObservation, destinations []string) error {
 		if o.Exists && !(o.Empty && o.Manifest == nil && a.Request.ExistingTarget == materialize.ExistingTargetAllowEmpty) {
 			return refuse(CodeCandidateChanged, "candidate", Conflict)
 		}
-	case materialize.OperationReconcile:
-		info, err := os.Lstat(a.Root.Path)
-		if err != nil {
-			return err
-		}
-		if info.Mode().Perm() != a.RootMode.Perm() || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
-			return refuse(CodeUnsafeCandidateMode, "candidate", Conflict)
-		}
+	case materialize.OperationReconcile, materialize.OperationRefresh:
 		if err := validateExistingPaths(a); err != nil {
 			return err
 		}
@@ -291,6 +326,14 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 			if !slices.Contains(o.Capabilities, c) {
 				return refuse(CodeRequiredCapabilityUnavailable, "capabilities", Unsupported)
 			}
+		}
+	}
+	for _, cap := range []struct {
+		enabled    bool
+		capability Capability
+	}{{len(p.effectInputs.Credentials) > 0, CredentialLinks}, {len(p.effectInputs.Trust) > 0, TrustHandling}} {
+		if cap.enabled && !slices.Contains(o.Capabilities, cap.capability) {
+			return refuse(CodeRequiredCapabilityUnavailable, "effects", Unsupported)
 		}
 	}
 	for _, r := range o.Receipts {

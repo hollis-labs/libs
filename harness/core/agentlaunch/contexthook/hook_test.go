@@ -17,11 +17,11 @@ import (
 )
 
 // newCompiled builds a minimal CompiledLaunch suitable for driving the
-// hook in isolation. Use t.TempDir() for ResolvedProjectRoot so resolver
+// hook in isolation. Use fixturePrivateDir(t) for ResolvedProjectRoot so resolver
 // CWD probes have a real directory to land in.
 func newCompiled(t *testing.T) *agentlaunch.CompiledLaunch {
 	t.Helper()
-	root := t.TempDir()
+	root := fixturePrivateDir(t)
 	plan := agentlaunch.LaunchPlan{
 		Project:  agentlaunch.ProjectSpec{ID: "proj", Name: "Project", Root: root},
 		Agent:    agentlaunch.AgentSpec{ID: "agent", Name: "Agent"},
@@ -65,11 +65,11 @@ func newProvider(t *testing.T) agentcontext.ContextProvider {
 // no SlotExtractor → empty bootPrompt, no files planted (even when
 // PlantArtifacts=true, because there are no slot results to plant).
 func TestNew_NoExtractor_NoOp(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		PlantArtifacts: true,
 	})
 
-	bootDir := t.TempDir()
+	bootDir := fixturePrivateDir(t)
 	out, err := hook(context.Background(), bootDir, newCompiled(t))
 	if err != nil {
 		t.Fatalf("hook returned error: %v", err)
@@ -87,7 +87,7 @@ func TestNew_NoExtractor_NoOp(t *testing.T) {
 // a single inline slot is assembled and the rendered string surfaces as
 // the bootPrompt.
 func TestNew_InlineSlot_RendersBootPrompt(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
 				{
@@ -102,7 +102,7 @@ func TestNew_InlineSlot_RendersBootPrompt(t *testing.T) {
 		},
 	})
 
-	out, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	out, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if err != nil {
 		t.Fatalf("hook returned error: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestNew_InlineSlot_RendersBootPrompt(t *testing.T) {
 // TestNew_PlantArtifacts_WritesPerSlotFiles confirms PlantArtifacts=true
 // writes each non-empty slot to <bootDir>/context/<name>.txt.
 func TestNew_PlantArtifacts_WritesPerSlotFiles(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		PlantArtifacts: true,
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
@@ -139,7 +139,7 @@ func TestNew_PlantArtifacts_WritesPerSlotFiles(t *testing.T) {
 		},
 	})
 
-	bootDir := t.TempDir()
+	bootDir := fixturePrivateDir(t)
 	if _, err := hook(context.Background(), bootDir, newCompiled(t)); err != nil {
 		t.Fatalf("hook returned error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestNew_PlantArtifacts_WritesPerSlotFiles(t *testing.T) {
 // TestNew_PlantArtifacts_SanitisesFilenames confirms slot names with
 // non-safe characters land as sanitised filenames (underscore-fill).
 func TestNew_PlantArtifacts_SanitisesFilenames(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		PlantArtifacts: true,
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
@@ -177,7 +177,7 @@ func TestNew_PlantArtifacts_SanitisesFilenames(t *testing.T) {
 		},
 	})
 
-	bootDir := t.TempDir()
+	bootDir := fixturePrivateDir(t)
 	if _, err := hook(context.Background(), bootDir, newCompiled(t)); err != nil {
 		t.Fatalf("hook returned error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestNew_ProviderError_Wrapped(t *testing.T) {
 		t.Fatalf("NewProvider: %v", err)
 	}
 
-	hook := contexthook.New(emptyProv, contexthook.Config{
+	hook := hookWithAuthority(t, emptyProv, contexthook.Config{
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
 				{
@@ -214,7 +214,7 @@ func TestNew_ProviderError_Wrapped(t *testing.T) {
 		},
 	})
 
-	_, hookErr := hook(context.Background(), t.TempDir(), newCompiled(t))
+	_, hookErr := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if hookErr == nil {
 		t.Fatalf("expected error from empty resolver map, got nil")
 	}
@@ -229,8 +229,8 @@ func TestNew_ProviderError_Wrapped(t *testing.T) {
 // TestNew_NilProvider_Sentinel confirms a nil provider yields the
 // documented sentinel on first invocation.
 func TestNew_NilProvider_Sentinel(t *testing.T) {
-	hook := contexthook.New(nil, contexthook.Config{})
-	_, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	hook := hookWithAuthority(t, nil, contexthook.Config{})
+	_, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if !errors.Is(err, contexthook.ErrProviderNil) {
 		t.Fatalf("expected ErrProviderNil, got %v", err)
 	}
@@ -239,8 +239,8 @@ func TestNew_NilProvider_Sentinel(t *testing.T) {
 // TestNew_NilCompiled_Sentinel confirms a nil compiled value yields the
 // documented sentinel.
 func TestNew_NilCompiled_Sentinel(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{})
-	_, err := hook(context.Background(), t.TempDir(), nil)
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{})
+	_, err := hook(context.Background(), fixturePrivateDir(t), nil)
 	if !errors.Is(err, contexthook.ErrCompiledNil) {
 		t.Fatalf("expected ErrCompiledNil, got %v", err)
 	}
@@ -250,13 +250,13 @@ func TestNew_NilCompiled_Sentinel(t *testing.T) {
 // error surfaces wrapped under the contexthook layer.
 func TestNew_ExtractorError_Wrapped(t *testing.T) {
 	wantErr := errors.New("extractor boom")
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return nil, wantErr
 		},
 	})
 
-	_, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	_, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if err == nil {
 		t.Fatalf("expected extractor error to surface")
 	}
@@ -272,7 +272,7 @@ func TestNew_ExtractorError_Wrapped(t *testing.T) {
 // wired correctly: we discover a real skill on disk and the rendered
 // output contains the skill's metadata.
 func TestNew_SkillIndex_EndToEnd(t *testing.T) {
-	skillsRoot := t.TempDir()
+	skillsRoot := fixturePrivateDir(t)
 	skillFile := filepath.Join(skillsRoot, "demo-skill.md")
 	skillBody := `---
 slug: demo-skill
@@ -287,7 +287,7 @@ Demo skill body — not surfaced by the index resolver, only metadata.
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
 				{
@@ -305,7 +305,7 @@ Demo skill body — not surfaced by the index resolver, only metadata.
 		},
 	})
 
-	out, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	out, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if err != nil {
 		t.Fatalf("hook returned error: %v", err)
 	}
@@ -342,7 +342,7 @@ func TestNew_CustomProvenance(t *testing.T) {
 		t.Fatalf("NewProvider: %v", err)
 	}
 
-	hook := contexthook.New(prov, contexthook.Config{
+	hook := hookWithAuthority(t, prov, contexthook.Config{
 		ProvenanceFor: func(_ *agentlaunch.CompiledLaunch) agentcontext.ProvenanceInput {
 			return agentcontext.ProvenanceInput{LineageAlias: "custom.lineage"}
 		},
@@ -359,7 +359,7 @@ func TestNew_CustomProvenance(t *testing.T) {
 		},
 	})
 
-	out, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	out, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if err != nil {
 		t.Fatalf("hook returned error: %v", err)
 	}
@@ -373,7 +373,7 @@ func TestNew_CustomProvenance(t *testing.T) {
 // ErrArtifactNameCollision rather than silently overwriting the
 // earlier artifact.
 func TestNew_PlantArtifacts_FilenameCollision(t *testing.T) {
-	hook := contexthook.New(newProvider(t), contexthook.Config{
+	hook := hookWithAuthority(t, newProvider(t), contexthook.Config{
 		PlantArtifacts: true,
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			// "foo-bar" and "foo_bar" both sanitise to "foo_bar".
@@ -396,7 +396,7 @@ func TestNew_PlantArtifacts_FilenameCollision(t *testing.T) {
 		},
 	})
 
-	_, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	_, err := hook(context.Background(), fixturePrivateDir(t), newCompiled(t))
 	if err == nil {
 		t.Fatalf("expected collision error, got nil")
 	}
@@ -423,7 +423,7 @@ func TestNew_WorkdirPrecedence(t *testing.T) {
 		t.Fatalf("NewProvider: %v", err)
 	}
 
-	hook := contexthook.New(prov, contexthook.Config{
+	hook := hookWithAuthority(t, prov, contexthook.Config{
 		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
 			return []agentcontext.SlotSpec{
 				{
@@ -479,7 +479,7 @@ func TestNew_WorkdirPrecedence(t *testing.T) {
 			compiled.Plan.Workspace.WorkspaceDir = tc.workspaceDir
 			compiled.ResolvedProjectRoot = tc.projectRoot
 
-			if _, err := hook(context.Background(), t.TempDir(), compiled); err != nil {
+			if _, err := hook(context.Background(), fixturePrivateDir(t), compiled); err != nil {
 				t.Fatalf("hook: %v", err)
 			}
 			if capturedWorkdir != tc.wantWorkdir {

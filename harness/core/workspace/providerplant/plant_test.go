@@ -15,7 +15,7 @@ import (
 func TestPlant_Claude(t *testing.T) {
 	isolateHome(t)
 	prepared := preparedFor(t, "claude", runtimes.ModePTY)
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	bd := prepared.PlantedBootDir
@@ -43,7 +43,7 @@ func TestPlant_Claude(t *testing.T) {
 func TestPlant_ClaudeStreaming(t *testing.T) {
 	isolateHome(t)
 	prepared := preparedFor(t, "claude", runtimes.ModeStreamingStdio)
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	for _, f := range []string{"CLAUDE.md", "boot.md", ".claude/settings.json", ".mcp.json"} {
@@ -54,30 +54,22 @@ func TestPlant_ClaudeStreaming(t *testing.T) {
 func TestPlant_Codex(t *testing.T) {
 	isolateHome(t)
 	prepared := preparedFor(t, "codex", runtimes.ModeSubprocessPerTurn)
-	if err := Plant(context.Background(), prepared); err != nil {
-		t.Fatalf("plant: %v", err)
+	requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
+	projection, err := projectionForTest(t, context.Background(), prepared)
+	if err != nil {
+		t.Fatal(err)
 	}
-	bd := prepared.PlantedBootDir
-
-	for _, f := range []string{"AGENTS.md", "boot.md", "config.toml", "auth.json", ".mcp.json"} {
-		assertExists(t, bd, f)
+	if got := projectedFile(t, projection, "AGENTS.md"); !strings.Contains(got, "PERSONA-PROMPT") {
+		t.Fatalf("prompt lost: %q", got)
 	}
-	if agentsMD := readFile(t, bd, "AGENTS.md"); !strings.Contains(agentsMD, "PERSONA-PROMPT") {
-		t.Errorf("AGENTS.md missing system prompt, got %q", agentsMD)
+	if projection.Bindings.Env["CODEX_HOME"].Value != prepared.PlantedBootDir || !slices.Contains(projection.Bindings.Argv, "--cd") {
+		t.Fatal("Codex projection bindings lost")
 	}
-	// CODEX_HOME env amendment merges into the prepared env, pointing at
-	// the planted bootdir.
-	if got := prepared.Env["CODEX_HOME"]; got != bd {
-		t.Errorf("Env[CODEX_HOME] = %q, want bootdir %q", got, bd)
+	for _, f := range projection.Artifacts.Entries {
+		if f.Path == "auth.json" && (f.Mode != 0600 || len(f.Bytes) != 0) {
+			t.Fatal("pure placeholder changed")
+		}
 	}
-	// codex exec mode grants project access via --cd.
-	if !slices.Contains(prepared.Argv, "--cd") {
-		t.Errorf("argv missing --cd project arg: %v", prepared.Argv)
-	}
-	// config.toml / auth.json / .mcp.json carry secret-ish content — the
-	// go-providers BootDirSpec declares them 0o600 and the planter honors it.
-	assertFileMode(t, bd, "config.toml", 0o600)
-	assertFileMode(t, bd, "auth.json", 0o600)
 }
 
 // TestPlant_CodexAppServer proves the jsonrpc-stdio runtime resolves the
@@ -85,11 +77,13 @@ func TestPlant_Codex(t *testing.T) {
 func TestPlant_CodexAppServer(t *testing.T) {
 	isolateHome(t)
 	prepared := preparedFor(t, "codex", runtimes.ModeJSONRPCStdio)
-	if err := Plant(context.Background(), prepared); err != nil {
-		t.Fatalf("plant: %v", err)
+	requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
+	projection, err := projectionForTest(t, context.Background(), prepared)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if slices.Contains(prepared.Argv, "--cd") {
-		t.Errorf("app-server argv must not carry --cd: %v", prepared.Argv)
+	if slices.Contains(projection.Bindings.Argv, "--cd") {
+		t.Fatalf("app-server --cd: %v", projection.Bindings.Argv)
 	}
 }
 
@@ -101,7 +95,7 @@ func TestPlant_Opencode(t *testing.T) {
 		t.Fatalf("prepare: %v", err)
 	}
 	projectRoot := prepared.Workdir // captured before Plant rewires it
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	bd := prepared.PlantedBootDir
@@ -133,7 +127,7 @@ func TestPlant_Antigravity(t *testing.T) {
 		t.Fatalf("prepare: %v", err)
 	}
 	projectRoot := prepared.Workdir
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	bd := prepared.PlantedBootDir
@@ -176,7 +170,11 @@ func TestPlant_MatrixCombinations(t *testing.T) {
 	for _, p := range pairs {
 		t.Run(p.provider+"/"+string(p.runtime), func(t *testing.T) {
 			prepared := preparedFor(t, p.provider, p.runtime)
-			if err := Plant(context.Background(), prepared); err != nil {
+			if p.provider == "codex" {
+				requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
+				return
+			}
+			if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 				t.Fatalf("plant: %v", err)
 			}
 			if err := prepared.Validate(); err != nil {
@@ -198,7 +196,7 @@ func TestPlant_NativeFileClaudeSkill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	if got := readFile(t, prepared.PlantedBootDir, ".claude/skills/code-review/SKILL.md"); got != "SKILL BODY" {
@@ -221,7 +219,7 @@ func TestPlant_NativeFileOpencodeSkill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	if got := readFile(t, prepared.PlantedBootDir, "skills/code-review/SKILL.md"); got != body {
@@ -247,12 +245,14 @@ func TestPlant_NativeFileRawAgentsMd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
-		t.Fatalf("plant: %v", err)
+	projection, err := projectionForTest(t, context.Background(), prepared)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := readFile(t, prepared.PlantedBootDir, "AGENTS.md"); got != "CALLER AGENTS.md" {
-		t.Errorf("AGENTS.md = %q, want caller override to win", got)
+	if got := projectedFile(t, projection, "AGENTS.md"); got != "CALLER AGENTS.md" {
+		t.Fatalf("override lost: %q", got)
 	}
+	requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
 }
 
 // TestPlant_NativeFileModeDefault proves a native file with Mode 0 lands
@@ -270,7 +270,7 @@ func TestPlant_NativeFileModeDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	assertFileMode(t, prepared.PlantedBootDir, "default.txt", 0o644)
@@ -289,7 +289,7 @@ func TestPlant_Overlay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	if got := readFile(t, prepared.PlantedBootDir, "scratch/notes.txt"); got != "OVERLAY NOTE" {
@@ -312,7 +312,7 @@ func TestPlant_OverlayOverridesProviderFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	if got := readFile(t, prepared.PlantedBootDir, "boot.md"); got != "OVERLAY KICKOFF" {
@@ -330,28 +330,28 @@ func TestPlant_UnsafeOverlayRejected(t *testing.T) {
 	prepared.Compiled.Plan.Injection.BootDirOverlay = map[string]string{
 		"../escape.txt": "pwned",
 	}
-	err := Plant(context.Background(), prepared)
+	err := plantWithAuthority(t, context.Background(), prepared)
 	if !errors.Is(err, agentlaunch.ErrUnsafeInjectionTarget) {
 		t.Fatalf("Plant err = %v, want ErrUnsafeInjectionTarget", err)
 	}
 }
 
 func TestPlant_NilPrepared(t *testing.T) {
-	if err := Plant(context.Background(), nil); !errors.Is(err, ErrNilPrepared) {
-		t.Fatalf("Plant(nil) err = %v, want ErrNilPrepared", err)
+	if err := plantWithAuthority(t, context.Background(), nil); !errors.Is(err, ErrNilPrepared) {
+		t.Fatalf("plantWithAuthority(t, nil) err = %v, want ErrNilPrepared", err)
 	}
 }
 
 func TestPlant_NilCompiled(t *testing.T) {
 	prepared := &agentlaunch.PreparedLaunch{
-		PlantedBootDir: t.TempDir(),
-		WorkspaceDir:   t.TempDir(),
+		PlantedBootDir: fixturePrivateDir(t),
+		WorkspaceDir:   fixturePrivateDir(t),
 		Argv:           []string{"claude"},
 	}
 	// prepared.Validate fails first on the nil Compiled — both the
 	// Validate gate and the explicit ErrNilCompiled check map to the
 	// same sentinel chain.
-	if err := Plant(context.Background(), prepared); err == nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err == nil {
 		t.Fatal("Plant with nil Compiled: expected error")
 	}
 }
@@ -379,10 +379,21 @@ func TestPlant_MCPServersReachEveryRuntimeConfig(t *testing.T) {
 				{Name: "hadron", URL: "http://127.0.0.1:7777/mcp"},
 				{Name: "nanite", Command: "/bin/nanite", Args: []string{"mcp"}},
 			}
-			if err := Plant(context.Background(), prepared); err != nil {
-				t.Fatalf("plant: %v", err)
+			var got string
+			if tc.provider == "codex" {
+				projection, err := projectionForTest(t, context.Background(), prepared)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = projectedFile(t, projection, tc.file)
+				requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
+			} else {
+				if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
+					t.Fatal(err)
+				}
+				got = readFile(t, prepared.PlantedBootDir, tc.file)
 			}
-			got := readFile(t, prepared.PlantedBootDir, tc.file)
+
 			for _, want := range []string{"hadron", "http://127.0.0.1:7777/mcp", "nanite", "/bin/nanite"} {
 				if !strings.Contains(got, want) {
 					t.Errorf("%s missing %q:\n%s", tc.file, want, got)

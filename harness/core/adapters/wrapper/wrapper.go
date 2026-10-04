@@ -17,7 +17,6 @@ import (
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
 	"github.com/hollis-labs/substrate/harness/adapters"
@@ -115,9 +114,9 @@ type Config struct {
 	// default from Config.Workdir and the wrapper boot dir.
 	PrepareRequest *agentlaunch.PrepareRequest
 
-	// MaterializationEngine optionally overrides the shared engine used for
-	// PrepareRequest. Nil uses agentkit's default engine.
-	MaterializationEngine materialize.Engine
+	// ArtifactAuthorization supplies explicit inactive-root host authority for
+	// PrepareRequest. A missing authority refuses artifact mutation.
+	ArtifactAuthorization agentlaunch.ArtifactAuthorizer
 
 	// SandboxPolicy is the resolved go-sandbox policy for pre-start
 	// enforcement. It is forwarded to agentsessions.StartOptions.SandboxPolicy
@@ -1212,13 +1211,6 @@ func (w *Wrapper) runPlanter(ctx context.Context, source runtimeevents.Source) e
 		return nil
 	}
 	bootDir := w.defaultBootDir()
-	ensureDir := bootDir
-	if w.cfg.PlantSpec.Operation == materialize.OperationCreate {
-		ensureDir = filepath.Dir(bootDir)
-	}
-	if err := os.MkdirAll(ensureDir, 0o750); err != nil {
-		return fmt.Errorf("wrapper: ensure boot dir %q: %w", bootDir, err)
-	}
 
 	_ = w.cfg.Activity.Emit(ctx, runtimeevents.KindPlantStarted, source, map[string]any{
 		"boot_dir":            bootDir,

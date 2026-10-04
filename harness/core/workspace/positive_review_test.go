@@ -86,7 +86,7 @@ func TestCanonicalPlanContentAndGrants(t *testing.T) {
 
 func TestPlanDigestEncodingGolden(t *testing.T) {
 	s, c, r, o := planInputs(t)
-	const expected = "855e7810a83830f9292cb1d240435d63c574e4469ab6362c8b8ddc004736ba1f"
+	const expected = "ac0d5e3452234883556d7f4fc4a1689cd1155d683a299ff0a5b079941f6342f9"
 	if got := planned(t, s, c, r, o).Digest(); got != expected {
 		t.Fatalf("digest %s (encoding %s)", got, workspace.DigestVersion)
 	}

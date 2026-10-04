@@ -474,3 +474,23 @@ func TestSerializedApplyResultDoesNotCarryCompletionAuthority(t *testing.T) {
 		t.Fatal("serialization changed the original proof")
 	}
 }
+
+func TestClonePreservesOnlyEarnedProofAndDetachesEvidence(t *testing.T) {
+	p, f, _ := applyFixture(t)
+	earned, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err != nil {
+		t.Fatal(err)
+	}
+	clone := earned.Clone()
+	if !clone.ArtifactsComplete() || clone.LaunchReady() {
+		t.Fatal("clone lost artifact proof")
+	}
+	clone.Receipt.Roots[0].Root.Path = "observer-change"
+	if clone.ArtifactsComplete() || !earned.ArtifactsComplete() {
+		t.Fatal("observer changed retained evidence or kept stale proof")
+	}
+	forged := workspace.ApplyResult{Status: workspace.Partial, Receipt: earned.Receipt}.Clone()
+	if forged.ArtifactsComplete() || forged.LaunchReady() {
+		t.Fatal("clone minted completion authority")
+	}
+}

@@ -51,10 +51,13 @@ type PlannedWorkspace struct {
 	locks             []LockKey
 	diagnostics       []Diagnostic
 	renderDiagnostics []RenderDiagnostic
+	effectInputs      EffectInputs
 	valid             bool
 }
 
 func (p PlannedWorkspace) Valid() bool { return p.valid }
+
+func (p PlannedWorkspace) EffectInputs() EffectInputs { return copyRecord(p.effectInputs) }
 
 func (p PlannedWorkspace) Digest() string            { return p.digest }
 func (p PlannedWorkspace) Roots() []RootRef          { return slices.Clone(p.roots) }
@@ -472,6 +475,9 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 	encoded = append([]byte(DigestVersion+"\x00"), encoded...)
 	sum := sha256.Sum256(encoded)
 	p.digest = hex.EncodeToString(sum[:])
+	if err := freezeEffects(&p, obs); err != nil {
+		return PlannedWorkspace{}, err
+	}
 	for _, receipt := range observed.Receipts {
 		if receipt.OperationID == spec.OperationID {
 			if receipt.SchemaVersion != SchemaVersion || receipt.IdentityKey != spec.Identity.EncodedKey {

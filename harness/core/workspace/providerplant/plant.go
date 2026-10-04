@@ -2,6 +2,7 @@ package providerplant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -13,18 +14,25 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/matrix"
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // plantConfig holds the resolved Plant options.
 type plantConfig struct {
-	adapter  provider.BootDirProvider
-	resolver AdapterResolver
+	adapter   provider.BootDirProvider
+	resolver  AdapterResolver
+	authorize agentlaunch.ArtifactAuthorizer
 }
 
 // Option mutates a plantConfig.
 type Option func(*plantConfig)
+
+// WithArtifactAuthorization supplies the explicit inactive-root host boundary.
+func WithArtifactAuthorization(a agentlaunch.ArtifactAuthorizer) Option {
+	return func(c *plantConfig) { c.authorize = a }
+}
 
 // WithAdapter pins the provider adapter Plant uses, bypassing resolver
 // lookup entirely. Use this to plant a specific CLI variant (bare-mode Claude,
@@ -39,35 +47,88 @@ func WithResolver(r AdapterResolver) Option {
 	return func(c *plantConfig) { c.resolver = r }
 }
 
-// PrepareExecution projects provider files, caller injection artifacts and
+// ProjectExecution projects provider files, caller injection artifacts and
 // launch bindings for an already prepared launch. It performs the shared
-// materialization step and returns the lossless prepared-execution handoff;
+// projection step without filesystem mutation or an artifact-completion claim;
 // Plant is the compatibility adapter that copies the same bindings back onto
 // PreparedLaunch.
-func PrepareExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (*agentlaunch.PreparedExecution, error) {
-	if prepared == nil {
-		return nil, ErrNilPrepared
-	}
-	if err := prepared.Validate(); err != nil {
-		return nil, fmt.Errorf("agentlaunch/providerplant: %w", err)
-	}
-	compiled := prepared.Compiled
-	if compiled == nil || compiled.Plan == nil {
-		return nil, ErrNilCompiled
+func ProjectExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (*agentlaunch.PreparedExecution, error) {
+	if err := validateProjectionRequest(prepared); err != nil {
+		return nil, err
 	}
 	cfg := plantConfig{resolver: DefaultResolver}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	adapter, err := resolveAdapter(compiled, cfg)
+	return projectExecutionWithConfig(prepared, cfg)
+}
+
+func validateProjectionRequest(prepared *agentlaunch.PreparedLaunch) error {
+	if prepared == nil {
+		return ErrNilPrepared
+	}
+	if err := prepared.Validate(); err != nil {
+		return fmt.Errorf("agentlaunch/providerplant: %w", err)
+	}
+	if prepared.Compiled == nil || prepared.Compiled.Plan == nil {
+		return ErrNilCompiled
+	}
+	return nil
+}
+
+func projectExecutionWithConfig(prepared *agentlaunch.PreparedLaunch, cfg plantConfig) (*agentlaunch.PreparedExecution, error) {
+	adapter, err := resolveAdapter(prepared.Compiled, cfg)
 	if err != nil {
 		return nil, err
 	}
-	execution, err := buildPreparedExecution(ctx, prepared, adapter)
+	return projectPreparedExecution(prepared, adapter)
+}
+
+// PrepareExecution validates explicit authority before resolving or rendering
+// providers. The pure projection and late workspace apply checks stay separate.
+func PrepareExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (out *agentlaunch.PreparedExecution, err error) {
+	if err := validateProjectionRequest(prepared); err != nil {
+		return nil, err
+	}
+	cfg := plantConfig{resolver: DefaultResolver}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	if ctx == nil || cfg.authorize == nil {
+		return nil, &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	authority, err := cfg.authorize(ctx, prepared.PlantedBootDir)
 	if err != nil {
 		return nil, err
 	}
-	return execution, nil
+	transferred := false
+	defer func() {
+		if !transferred && authority.Close != nil {
+			err = errors.Join(err, authority.Close())
+		}
+	}()
+	if err := agentlaunch.ValidateArtifactAuthority(ctx, authority, prepared.PlantedBootDir); err != nil {
+		return nil, err
+	}
+	adapter, err := resolveAdapter(prepared.Compiled, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	execution, err := projectPreparedExecution(prepared, adapter)
+	if err != nil {
+		return nil, err
+	}
+	authorize := func(context.Context, string) (agentlaunch.ArtifactAuthority, error) {
+		transferred = true
+		return authority, nil
+	}
+	return materializeExecution(ctx, prepared, execution, authorize)
 }
 
 // Plant materializes provider-specific boot files into an already Prepared
@@ -106,7 +167,7 @@ func resolveAdapter(compiled *agentlaunch.CompiledLaunch, cfg plantConfig) (prov
 	return resolved, nil
 }
 
-func buildPreparedExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, adapter provider.BootDirProvider) (*agentlaunch.PreparedExecution, error) {
+func projectPreparedExecution(prepared *agentlaunch.PreparedLaunch, adapter provider.BootDirProvider) (*agentlaunch.PreparedExecution, error) {
 	compiled := prepared.Compiled
 	plan := compiled.Plan
 	bootDir := prepared.PlantedBootDir
@@ -133,18 +194,6 @@ func buildPreparedExecution(ctx context.Context, prepared *agentlaunch.PreparedL
 		ScratchRoot: "",
 		CWD:         binding.CWD,
 	}
-	handle, err := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{
-		TargetRoot: bootDir,
-		Roots:      roots,
-		Artifacts:  artifacts,
-		Operation:  materialize.OperationReconcile,
-		Generation: compiled.Provenance.PlanHash,
-		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictOverwrite},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("agentlaunch/providerplant: materialize: %w", err)
-	}
-
 	argv, err := finalArgv(prepared, projection, binding, launch, posture)
 	if err != nil {
 		return nil, fmt.Errorf("agentlaunch/providerplant: %w", err)
@@ -164,9 +213,8 @@ func buildPreparedExecution(ctx context.Context, prepared *agentlaunch.PreparedL
 		}
 	}
 	execution := &agentlaunch.PreparedExecution{
-		InputKind:       agentlaunch.PrepareInputArtifacts,
-		Artifacts:       artifacts,
-		Materialization: handle,
+		InputKind: agentlaunch.PrepareInputArtifacts,
+		Artifacts: artifacts,
 		Bindings: agentlaunch.ExecutionBindings{
 			Argv:       argv,
 			Launch:     launch,
@@ -188,6 +236,21 @@ func buildPreparedExecution(ctx context.Context, prepared *agentlaunch.PreparedL
 	if err := execution.Validate(); err != nil {
 		return nil, fmt.Errorf("agentlaunch/providerplant: %w", err)
 	}
+	return execution, nil
+}
+
+// materializeExecution receives the validated projection and launch bindings
+// before entering the explicit artifact mutation boundary.
+func materializeExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, execution *agentlaunch.PreparedExecution, authorize agentlaunch.ArtifactAuthorizer) (*agentlaunch.PreparedExecution, error) {
+	handle, err := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{
+		TargetRoot: execution.Roots.BootRoot, Roots: execution.Roots, Artifacts: execution.Artifacts,
+		Operation: materialize.OperationReconcile, Generation: prepared.Compiled.Provenance.PlanHash,
+		Authorize: authorize, Reconcile: materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agentlaunch/providerplant: materialize: %w", err)
+	}
+	execution.Materialization = handle
 	return execution, nil
 }
 

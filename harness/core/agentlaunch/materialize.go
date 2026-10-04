@@ -8,48 +8,17 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
-// S4.3 — Materialization.
-//
-// This file IMPLEMENTS the locked S1.2 Materializer contract. It does not
-// redefine it: the frozen types (Materializer, ContractRenderer,
-// ReplantSelector, MaterializeRequest, MaterializeResult, BootFileSpec,
-// BootInjectionSpec, ContractObject / ContractObjectKind) are owned by
-// bootspec.go and shipped in S1. This file builds the concrete
-// DefaultMaterializer on top of them plus the S4.1 assembly types and the
-// S4.2 var-resolution surface.
-//
-// What it provides:
-//
-//   - DefaultMaterializer: a concrete Materializer that places a BootSpec's
-//     declared files and injections into a bootdir.
-//   - Library-resolved contract objects (literal / input / var) and a
-//     consumer-pluggable seam (slot) for per-harness contract-object
-//     CONTENT — the library owns the InjectionSpec/BootInjectionSpec
-//     vocabulary and the path-safe write loop, NOT the harness-specific
-//     CLAUDE.md / .mcp.json bodies.
-//   - Idempotent Populate for crash recovery: a second run, or a run over a
-//     partially-populated bootdir, converges without error or duplication.
-//   - Slot-granular Replant: re-render one file / injection / slot ref
-//     without touching the rest of the bootdir (Nanite's
-//     RegenerateSystemPromptSlot pattern).
-//
-// LOCKED constraints honored here (D5; do not reopen):
-//
-//   - Partial / slot-granular re-plant is first-class: Replant + the
-//     ReplantSelector narrow a reconcile to specific files, injections, or
-//     slot refs.
-//   - Populate is idempotent against an existing dir: writes are
-//     overwrite-if-changed, skip-if-identical; an already-populated bootdir
-//     is not an error.
-//   - The library owns the vocabulary + the path-safe write loop only.
-//     Per-harness contract-object CONTENT stays consumer-pluggable through
-//     the ContractRenderer seam. No harness-specific bodies are hardcoded.
-//   - D7: this extends the v0.1.0 lib; it adds no new field shapes to the
-//     frozen S1/S4.1/S4.2 types.
+// DefaultMaterializer preserves the BootSpec assembly and slot-selection
+// vocabulary. It resolves desired content and routes it through the sole
+// workspace authority, manifest and durable-receipt boundary. Existing
+// unmanifested content and owned drift refuse rather than being adopted or
+// overwritten. A retry must supply fresh host observations and the actual
+// committed generation; there is no independent path-based write loop.
 
 // Materialization sentinel errors. Kept local to this file so the S4.3
 // surface does not collide with the S4.1/S4.2 edits to errors.go. All are
@@ -101,14 +70,12 @@ type MaterializerOptions struct {
 	// declared on the spec.
 	Vars map[string]any
 
-	// DirMode is the mode used when the materializer creates parent
-	// directories. Zero falls back to 0o750.
-	DirMode os.FileMode
+	// Authorize supplies explicit inactive-root host authority for each call.
+	Authorize ArtifactAuthorizer
 }
 
-// DefaultMaterializer is the concrete library Materializer. It owns the
-// path-safe write loop and the literal/input/var contract-object
-// resolution; per-harness slot CONTENT is delegated to the supplied
+// DefaultMaterializer is the concrete library Materializer. It owns
+// literal/input/var contract-object resolution and workspace routing; per-harness slot CONTENT is delegated to the supplied
 // ContractRenderer.
 //
 // A DefaultMaterializer is safe to reuse across multiple Populate/Replant
@@ -119,9 +86,6 @@ type DefaultMaterializer struct {
 
 // NewDefaultMaterializer builds a DefaultMaterializer from opts.
 func NewDefaultMaterializer(opts MaterializerOptions) *DefaultMaterializer {
-	if opts.DirMode == 0 {
-		opts.DirMode = 0o750
-	}
 	return &DefaultMaterializer{opts: opts}
 }
 
@@ -129,11 +93,9 @@ func NewDefaultMaterializer(opts MaterializerOptions) *DefaultMaterializer {
 // Materializer contract.
 var _ Materializer = (*DefaultMaterializer)(nil)
 
-// Populate places every declared file and injection of the request's
-// BootSpec into bootDir. It is idempotent against an existing directory:
-// a second run, or a run over a partially-populated bootDir, converges
-// without error or duplication. Writes are overwrite-if-changed and
-// skip-if-identical so crash recovery is a plain re-run.
+// Populate resolves every declared file and injection of the request's
+// BootSpec and applies with explicit host authority. Identical committed
+// content may be repeated; unmanifested content and owned drift refuse.
 //
 // Populate is Replant with an empty selector — every declared object is
 // reconciled.
@@ -163,14 +125,14 @@ func (m *DefaultMaterializer) Replant(
 
 // reconcile is the shared body of Populate and Replant. It validates
 // inputs, resolves the effective input bag, selects the objects in scope,
-// and writes each one path-safely.
+// validates authority before rendering, then routes the selected artifacts.
 func (m *DefaultMaterializer) reconcile(
 	ctx context.Context,
 	bootDir string,
 	req MaterializeRequest,
 	sel ReplantSelector,
 	renderer ContractRenderer,
-) (*MaterializeResult, error) {
+) (out *MaterializeResult, err error) {
 	if req.Spec == nil {
 		return nil, ErrMaterializeMissingSpec
 	}
@@ -191,10 +153,39 @@ func (m *DefaultMaterializer) reconcile(
 		return nil, err
 	}
 
-	// Idempotency: creating the bootdir root is a no-op when it already
-	// exists, so a re-run over a partially-populated dir is safe.
-	if err := os.MkdirAll(bootRoot, m.opts.DirMode); err != nil {
-		return nil, fmt.Errorf("agentlaunch: materialize create bootDir %q: %w", bootRoot, err)
+	selected := false
+	for _, f := range req.Spec.Files {
+		selected = selected || scope.wantsFile(f)
+	}
+	for _, injection := range req.Spec.Injections {
+		selected = selected || scope.wantsInjection(injection)
+	}
+	if !selected {
+		return &MaterializeResult{Runtime: req.Spec.Runtime}, nil
+	}
+	if ctx == nil || m.opts.Authorize == nil {
+		return nil, &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	authority, err := m.opts.Authorize(ctx, bootRoot)
+	if err != nil {
+		return nil, err
+	}
+	transferred := false
+	defer func() {
+		if !transferred && authority.Close != nil {
+			err = errors.Join(err, authority.Close())
+		}
+	}()
+	if err := ValidateArtifactAuthority(ctx, authority, bootRoot); err != nil {
+		return nil, err
+	}
+	// The same frozen authority owns this render and the late apply checks.
+	authorize := func(context.Context, string) (ArtifactAuthority, error) {
+		transferred = true
+		return authority, nil
 	}
 
 	resolvedInputs := m.resolveInputs(req)
@@ -208,6 +199,9 @@ func (m *DefaultMaterializer) reconcile(
 		f := req.Spec.Files[i]
 		if !scope.wantsFile(f) {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return result, err
 		}
 		content, slot, rerr := m.renderObject(ctx, req.Spec, f.Object, resolvedInputs, renderer)
 		if rerr != nil {
@@ -230,6 +224,9 @@ func (m *DefaultMaterializer) reconcile(
 		inj := req.Spec.Injections[i]
 		if !scope.wantsInjection(inj) {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return result, err
 		}
 		content, slot, rerr := m.renderObject(ctx, req.Spec, inj.Object, resolvedInputs, renderer)
 		if rerr != nil {
@@ -263,7 +260,8 @@ func (m *DefaultMaterializer) reconcile(
 		Roots:      ExecutionRoots{BootRoot: bootRoot},
 		Artifacts:  artifact.Tree{Entries: normalized},
 		Operation:  materialize.OperationReconcile,
-		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictOverwrite},
+		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
+		Authorize:  authorize,
 	})
 	if err != nil {
 		return result, err

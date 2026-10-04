@@ -3,13 +3,12 @@ package contexthook
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/hollis-labs/substrate/harness/agentcontext"
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // New returns an agentlaunch.ContextHook that assembles mechanical
@@ -116,7 +115,7 @@ func New(provider agentcontext.ContextProvider, cfg Config) agentlaunch.ContextH
 
 		// 5. Plant per-slot artifacts if requested.
 		if cfg.PlantArtifacts {
-			if err := plantArtifacts(bootDir, result.Slots); err != nil {
+			if err := plantArtifacts(ctx, bootDir, result.Slots, cfg.Authorize); err != nil {
 				return "", fmt.Errorf("agentlaunch/contexthook: plant artifacts: %w", err)
 			}
 		}
@@ -165,14 +164,11 @@ func defaultProvenance(compiled *agentlaunch.CompiledLaunch) agentcontext.Proven
 // both sanitise to "foo_bar"). Rather than silently overwriting the
 // earlier artifact, we hard-fail with ErrArtifactNameCollision so the
 // caller fixes the slot naming.
-func plantArtifacts(bootDir string, results []agentcontext.SlotResult) error {
+func plantArtifacts(ctx context.Context, bootDir string, results []agentcontext.SlotResult, authorize agentlaunch.ArtifactAuthorizer) error {
 	if bootDir == "" {
 		return fmt.Errorf("%w: bootDir empty", ErrPlantArtifacts)
 	}
-	dir := filepath.Join(bootDir, "context")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("%w: mkdir %q: %v", ErrPlantArtifacts, dir, err)
-	}
+	entries := []artifact.Entry{}
 	seen := make(map[string]string, len(results))
 	for _, slot := range results {
 		if slot.Content == "" {
@@ -184,10 +180,14 @@ func plantArtifacts(bootDir string, results []agentcontext.SlotResult) error {
 				ErrArtifactNameCollision, prev, slot.Name, name)
 		}
 		seen[name] = slot.Name
-		path := filepath.Join(dir, name+".txt")
-		if err := os.WriteFile(path, []byte(slot.Content), 0o644); err != nil {
-			return fmt.Errorf("%w: write %q: %v", ErrPlantArtifacts, path, err)
-		}
+		entries = append(entries, artifact.Entry{Path: "context/" + name + ".txt", Kind: artifact.EntryFile, Mode: 0644, Bytes: []byte(slot.Content), Ownership: artifact.Ownership{EntryID: "context:" + slot.Name, GroupID: "context"}, Provenance: artifact.Provenance{Source: "agentlaunch/contexthook"}})
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	_, err := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{TargetRoot: bootDir, Artifacts: artifact.Tree{Entries: entries}, Authorize: authorize})
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPlantArtifacts, err)
 	}
 	return nil
 }

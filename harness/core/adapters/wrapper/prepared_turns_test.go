@@ -68,7 +68,7 @@ func preparedClaude(t *testing.T, binary string, mode runtimes.Mode) *agentlaunc
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	exec, err := providerplant.PrepareExecution(context.Background(), prepared)
+	exec, err := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithArtifactAuthorization(fixtureAuthorization(t)))
 	if err != nil {
 		t.Fatalf("PrepareExecution: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
@@ -161,8 +162,8 @@ func TestPopulateShapesContractObjectsPerHarness(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.provider, func(t *testing.T) {
-			bootDir := t.TempDir()
-			m := NewDefaultMaterializer(MaterializerOptions{
+			bootDir := fixturePrivateDir(t)
+			m := testMaterializer(t, MaterializerOptions{
 				Vars: map[string]any{
 					"tool_list":   "grep,read,bash",
 					"permissions": "read-only",
@@ -238,8 +239,8 @@ func TestPopulateShapesContractObjectsPerHarness(t *testing.T) {
 // Populate over an already-populated bootDir converges without error and
 // without re-writing unchanged files.
 func TestPopulateIdempotentReRun(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "t", "permissions": "p"},
 	})
 	req := MaterializeRequest{
@@ -285,45 +286,32 @@ func TestPopulateIdempotentReRun(t *testing.T) {
 	}
 }
 
-// TestPopulateIdempotentOverPartialDir checks that Populate converges when
-// run over a bootDir that a prior crashed run left partially populated.
-func TestPopulateIdempotentOverPartialDir(t *testing.T) {
-	bootDir := t.TempDir()
-	// Simulate a crashed prior run: CLAUDE.md exists with stale content,
-	// some files are missing entirely.
-	if err := os.WriteFile(filepath.Join(bootDir, "CLAUDE.md"),
-		[]byte("STALE PARTIAL CONTENT"), 0o644); err != nil {
-		t.Fatalf("seed partial: %v", err)
+// Unmanifested content is operator-owned until explicit recovery authorizes it.
+func TestPopulateRefusesUnmanifestedPartialDir(t *testing.T) {
+	bootDir := fixturePrivateDir(t)
+	path := filepath.Join(bootDir, "CLAUDE.md")
+	if err := os.WriteFile(path, []byte("STALE PARTIAL CONTENT"), 0644); err != nil {
+		t.Fatal(err)
 	}
-
-	m := NewDefaultMaterializer(MaterializerOptions{
-		Vars: map[string]any{"tool_list": "t", "permissions": "p"},
-	})
-	res, err := m.Populate(context.Background(), bootDir, MaterializeRequest{
-		Spec:   harnessSpec("claude"),
-		Inputs: map[string]any{"ticket": "CW-1"},
-	}, &harnessRenderer{})
-	if err != nil {
-		t.Fatalf("Populate over partial dir: %v", err)
+	m := testMaterializer(t, MaterializerOptions{})
+	res, err := m.Populate(context.Background(), bootDir, MaterializeRequest{Spec: harnessSpec("claude")}, &harnessRenderer{})
+	var refusal *workspace.Refusal
+	if !errors.As(err, &refusal) || refusal.Code != workspace.CodeMissingCommittedManifest || len(res.FilesWritten) != 0 {
+		t.Fatalf("unmanifested root accepted: %v %+v", err, res)
 	}
-	// The stale CLAUDE.md is reconciled to the correct content.
-	if got := readBootFile(t, bootDir, "CLAUDE.md"); !strings.Contains(got, "harness: claude") {
-		t.Errorf("stale file not reconciled: %q", got)
+	if got := readBootFile(t, bootDir, "CLAUDE.md"); got != "STALE PARTIAL CONTENT" {
+		t.Fatalf("operator bytes changed: %q", got)
 	}
-	// CLAUDE.md was changed, so it is reported written; the rest too.
-	if !contains(res.FilesWritten, "CLAUDE.md") {
-		t.Errorf("reconciled file not reported: %v", res.FilesWritten)
-	}
-	if len(res.FilesWritten) != 7 {
-		t.Errorf("FilesWritten = %v, want 7 (full convergence)", res.FilesWritten)
+	if _, err := os.Stat(filepath.Join(bootDir, ".materialize")); !os.IsNotExist(err) {
+		t.Fatalf("manifest synthesized: %v", err)
 	}
 }
 
 // TestReplantPartialFileID checks that a Replant narrowed to one file ID
 // re-renders only that file and leaves every other file untouched.
 func TestReplantPartialFileID(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "t1", "permissions": "p"},
 	})
 	spec := harnessSpec("claude")
@@ -368,8 +356,8 @@ func TestReplantPartialFileID(t *testing.T) {
 // narrowed to one slot ref re-renders only the slot(s) bound to that ref —
 // the Nanite RegenerateSystemPromptSlot pattern.
 func TestReplantPartialSlotRef(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "old", "permissions": "p"},
 	})
 	spec := harnessSpec("claude")
@@ -380,7 +368,7 @@ func TestReplantPartialSlotRef(t *testing.T) {
 	}
 
 	// Re-render ONLY the mcp-json slot with a fresh tool list.
-	m2 := NewDefaultMaterializer(MaterializerOptions{
+	m2 := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "fresh,tools", "permissions": "p"},
 	})
 	r := &harnessRenderer{}
@@ -408,8 +396,8 @@ func TestReplantPartialSlotRef(t *testing.T) {
 
 // TestReplantPartialInjectionID checks a Replant narrowed to one injection.
 func TestReplantPartialInjectionID(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "t", "permissions": "p"},
 	})
 	spec := harnessSpec("claude")
@@ -436,7 +424,7 @@ func TestReplantPartialInjectionID(t *testing.T) {
 // TestReplantSelectorMiss checks that a selector naming an undeclared
 // object is a hard error, not a silent no-op.
 func TestReplantSelectorMiss(t *testing.T) {
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := harnessSpec("claude")
 	cases := []ReplantSelector{
 		{FileIDs: []string{"no-such-file"}},
@@ -444,7 +432,7 @@ func TestReplantSelectorMiss(t *testing.T) {
 		{SlotRefs: []string{"no-such-slot"}},
 	}
 	for _, sel := range cases {
-		_, err := m.Replant(context.Background(), t.TempDir(),
+		_, err := m.Replant(context.Background(), fixturePrivateDir(t),
 			MaterializeRequest{Spec: spec, Inputs: map[string]any{"ticket": "x"}},
 			sel, &harnessRenderer{})
 		if !errors.Is(err, ErrMaterializeSelectorMiss) {
@@ -456,8 +444,8 @@ func TestReplantSelectorMiss(t *testing.T) {
 // TestMaterializePathSafety checks that a file whose RelPath would escape
 // the bootDir is rejected.
 func TestMaterializePathSafety(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := &BootSpec{
 		Files: []BootFileSpec{{
 			ID:      "escape",
@@ -481,7 +469,7 @@ func TestMaterializePathSafety(t *testing.T) {
 // TestMaterializeRawInjectionPathSafety checks that a raw injection cannot
 // traverse out of the bootDir.
 func TestMaterializeRawInjectionPathSafety(t *testing.T) {
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := &BootSpec{
 		Injections: []BootInjectionSpec{{
 			ID:      "escape",
@@ -491,7 +479,7 @@ func TestMaterializeRawInjectionPathSafety(t *testing.T) {
 		}},
 		Runtime: RuntimeBinding{Provider: "claude", RuntimeKind: runtimes.ModeSubprocessPerTurn},
 	}
-	_, err := m.Populate(context.Background(), t.TempDir(),
+	_, err := m.Populate(context.Background(), fixturePrivateDir(t),
 		MaterializeRequest{Spec: spec}, nil)
 	if !errors.Is(err, ErrUnsafeInjectionTarget) {
 		t.Fatalf("raw injection escape err = %v, want ErrUnsafeInjectionTarget", err)
@@ -501,8 +489,8 @@ func TestMaterializeRawInjectionPathSafety(t *testing.T) {
 // TestRenderObjectKinds checks each ContractObjectKind resolves correctly,
 // including the unknown-input / unknown-var error paths.
 func TestRenderObjectKinds(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{Vars: map[string]any{"v1": "VAL"}})
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{Vars: map[string]any{"v1": "VAL"}})
 
 	// Unknown input ref.
 	badInput := &BootSpec{
@@ -534,7 +522,7 @@ func TestRenderObjectKinds(t *testing.T) {
 // TestSlotWithoutRendererErrors checks that a slot object with no renderer
 // is a clear error rather than a nil-panic.
 func TestSlotWithoutRendererErrors(t *testing.T) {
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := &BootSpec{
 		Files: []BootFileSpec{{
 			ID: "s", RelPath: "s.md",
@@ -542,7 +530,7 @@ func TestSlotWithoutRendererErrors(t *testing.T) {
 		}},
 		Runtime: RuntimeBinding{Provider: "claude", RuntimeKind: runtimes.ModeSubprocessPerTurn},
 	}
-	_, err := m.Populate(context.Background(), t.TempDir(),
+	_, err := m.Populate(context.Background(), fixturePrivateDir(t),
 		MaterializeRequest{Spec: spec}, nil)
 	if !errors.Is(err, ErrMaterializeNoRenderer) {
 		t.Fatalf("slot w/o renderer err = %v, want ErrMaterializeNoRenderer", err)
@@ -551,7 +539,7 @@ func TestSlotWithoutRendererErrors(t *testing.T) {
 
 // TestSlotRendererErrorPropagates checks a failing renderer surfaces.
 func TestSlotRendererErrorPropagates(t *testing.T) {
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := &BootSpec{
 		Files: []BootFileSpec{{
 			ID: "s", RelPath: "s.md",
@@ -559,7 +547,7 @@ func TestSlotRendererErrorPropagates(t *testing.T) {
 		}},
 		Runtime: RuntimeBinding{Provider: "claude", RuntimeKind: runtimes.ModeSubprocessPerTurn},
 	}
-	_, err := m.Populate(context.Background(), t.TempDir(),
+	_, err := m.Populate(context.Background(), fixturePrivateDir(t),
 		MaterializeRequest{Spec: spec}, errRenderer{})
 	if err == nil || !strings.Contains(err.Error(), "renderer boom") {
 		t.Fatalf("renderer error not propagated: %v", err)
@@ -568,7 +556,7 @@ func TestSlotRendererErrorPropagates(t *testing.T) {
 
 // TestMaterializeMissingInputs checks the nil-spec and empty-bootDir guards.
 func TestMaterializeMissingInputs(t *testing.T) {
-	m := NewDefaultMaterializer(MaterializerOptions{})
+	m := testMaterializer(t, MaterializerOptions{})
 	if _, err := m.Populate(context.Background(), "x",
 		MaterializeRequest{Spec: nil}, nil); !errors.Is(err, ErrMaterializeMissingSpec) {
 		t.Errorf("nil spec err = %v, want ErrMaterializeMissingSpec", err)
@@ -579,11 +567,11 @@ func TestMaterializeMissingInputs(t *testing.T) {
 	}
 }
 
-// TestFileModeReconciled checks that a declared mode is applied on create
-// and reconciled when it drifts on disk.
-func TestFileModeReconciled(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{})
+// TestFileModeDriftRefusesOverwrite checks that a declared mode is applied on create
+// and protected from overwrite when it drifts on disk.
+func TestFileModeDriftRefusesOverwrite(t *testing.T) {
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{})
 	spec := &BootSpec{
 		Files: []BootFileSpec{{
 			ID: "exec", RelPath: "run.sh", Mode: 0o755,
@@ -610,23 +598,20 @@ func TestFileModeReconciled(t *testing.T) {
 	}
 	res, err := m.Populate(context.Background(), bootDir,
 		MaterializeRequest{Spec: spec}, nil)
-	if err != nil {
-		t.Fatalf("re-Populate: %v", err)
-	}
-	if !contains(res.FilesWritten, "run.sh") {
-		t.Errorf("mode drift not reconciled-as-written: %v", res.FilesWritten)
+	if err == nil || len(res.FilesWritten) != 0 {
+		t.Fatalf("mode drift overwritten: %v %+v", err, res)
 	}
 	info, _ = os.Stat(target)
-	if info.Mode().Perm() != 0o755 {
-		t.Errorf("mode not reconciled: %o", info.Mode().Perm())
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("mode changed despite conflict: %o", info.Mode().Perm())
 	}
 }
 
 // TestReplantEmptySelectorIsFullReconcile checks that Replant with an empty
 // selector behaves identically to Populate.
 func TestReplantEmptySelectorIsFullReconcile(t *testing.T) {
-	bootDir := t.TempDir()
-	m := NewDefaultMaterializer(MaterializerOptions{
+	bootDir := fixturePrivateDir(t)
+	m := testMaterializer(t, MaterializerOptions{
 		Vars: map[string]any{"tool_list": "t", "permissions": "p"},
 	})
 	res, err := m.Replant(context.Background(), bootDir,

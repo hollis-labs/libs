@@ -25,7 +25,7 @@ func preparedWithPosture(t *testing.T, providerID string, mode runtimes.Mode, po
 	if err != nil {
 		t.Fatalf("%s/%s: prepare: %v", providerID, mode, err)
 	}
-	exec, err := PrepareExecution(context.Background(), prepared)
+	exec, err := projectionForTest(t, context.Background(), prepared)
 	if err != nil {
 		t.Fatalf("%s/%s %s: PrepareExecution: %v", providerID, mode, posture, err)
 	}
@@ -128,7 +128,7 @@ func TestPrepareExecution_RefusesAnInvalidPosture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if _, err := PrepareExecution(context.Background(), prepared); !errors.Is(err, registry.ErrInvalidPosture) {
+	if _, err := projectionForTest(t, context.Background(), prepared); !errors.Is(err, registry.ErrInvalidPosture) {
 		t.Errorf("PrepareExecution = %v, want ErrInvalidPosture", err)
 	}
 }
