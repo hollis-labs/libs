@@ -65,7 +65,7 @@ func retirementCheck(ctx context.Context, r Retirement, c effects.PreflightConte
 		return false
 	}
 	s, e := p.Safety(ctx, r.Attachment, retirementEntry(r))
-	return e == nil && safe(s, r.AcceptedHead)
+	return e == nil && safe(s, r.AcceptedHead) && ctx.Err() == nil && c.Validate(ctx) == nil && ctx.Err() == nil
 }
 func CheckRetirement(ctx context.Context, r Retirement, c effects.PreflightContext, p Port) (PreparedRetirement, effects.Result) {
 	if !retirementBinding(r, c) {
@@ -117,7 +117,7 @@ func Retire(ctx context.Context, ticket PreparedRetirement, c effects.ApplyConte
 		return finish(ctx, c, out, effects.Conflict, effects.AbortedPhase, "retain_attachment", false)
 	}
 	o, e := p.Observe(ctx, r.Attachment)
-	if e != nil || o.Exists {
+	if e != nil || o.Exists || ctx.Err() != nil || c.Validate(ctx) != nil || ctx.Err() != nil {
 		return finish(ctx, c, out, effects.Partial, effects.InterruptedPhase, "removal_unproved", true)
 	}
 	return finish(ctx, c, out, effects.Removed, effects.CompletePhase, "retirement_complete", false)
@@ -152,7 +152,7 @@ func InspectRetirement(ctx context.Context, r Retirement, c effects.PreflightCon
 		return out
 	}
 	o, err := p.Observe(ctx, r.Attachment)
-	if err != nil {
+	if err != nil || ctx.Err() != nil || c.Validate(ctx) != nil || ctx.Err() != nil {
 		return out
 	}
 	state := effects.IntendedAfter

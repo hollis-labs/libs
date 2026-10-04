@@ -43,7 +43,14 @@ Linux/macOS are supported; other platforms refuse before mutation.
 Retirement requires separate current removal authorization, exact accepted
 shipped HEAD and unused-resource proofs. Complete safety inspection includes
 tracked, untracked and ignored files, unknown or populated private Git metadata,
-Git locks, unreachable commits and ahead counts. Any unknown or failed check
+Git locks, unreachable commits and ahead counts. Index flags that hide tracked
+changes (assume-unchanged or skip-worktree) retain as unknown; they are never
+cleared. Private HEAD logs are read through the pinned metadata root, including
+both old and new OIDs and the recognized ORIG_HEAD pseudoref. Their commits
+must remain reachable through common branch, remote or tag refs after removal;
+no preservation refs or shipped proofs are fabricated. Reads cap at 4 MiB,
+1,024 log records and 256 distinct commit IDs. Missing, changed, malformed,
+oversized or unrecognized private history retains. Any unknown or failed check
 retains. `Retire` rechecks after durable intent and immediately before non-forced
 Git removal, keeps the branch, and never deletes folders generically. User
 checkouts are never retired. `InspectRetirement` binds the proof revisions and

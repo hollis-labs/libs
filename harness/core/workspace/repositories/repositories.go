@@ -188,6 +188,9 @@ func precheck(ctx context.Context, r Request, c effects.PreflightContext, p Port
 	} else if o.Exists {
 		return o, "attachment_conflict"
 	}
+	if ctx.Err() != nil || c.Validate(ctx) != nil || ctx.Err() != nil {
+		return o, "authority_refused"
+	}
 	return o, ""
 }
 func Preflight(ctx context.Context, r Request, c effects.PreflightContext, p Port) (Prepared, effects.Result) {
@@ -277,7 +280,7 @@ func Apply(ctx context.Context, prepared Prepared, c effects.ApplyContext, p Por
 		return finish(ctx, c, out, effects.Partial, effects.InterruptedPhase, "authority_lost", true)
 	}
 	verified, e := p.Observe(ctx, r)
-	if e != nil || !matches(r, verified, false) {
+	if e != nil || !matches(r, verified, false) || ctx.Err() != nil || c.Validate(ctx) != nil || ctx.Err() != nil {
 		return finish(ctx, c, out, effects.Partial, effects.InterruptedPhase, "created_state_changed", true)
 	}
 	return finish(ctx, c, out, effects.Applied, effects.CompletePhase, "attachment_complete", false)
@@ -314,7 +317,7 @@ func InspectResume(ctx context.Context, r Request, c effects.PreflightContext, p
 		return out
 	}
 	o, err := p.Observe(ctx, r)
-	if err != nil {
+	if err != nil || ctx.Err() != nil || c.Validate(ctx) != nil || ctx.Err() != nil {
 		return out
 	}
 	state := effects.Missing

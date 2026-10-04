@@ -433,3 +433,234 @@ func TestSharedMetadataLockRefusesRemovalBeforeGitMutation(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestHiddenTrackedEditsRetainIndexFlagsAndBytes(t *testing.T) {
+	for _, flag := range []string{"--assume-unchanged", "--skip-worktree"} {
+		t.Run(flag, func(t *testing.T) {
+			p, r, c := fixture(t)
+			out := create(t, p, r, c)
+			if _, _, e := p.run(context.Background(), r.Path, "update-index", flag, "--", "tracked.txt"); e != nil {
+				t.Fatal(e)
+			}
+			file := filepath.Join(r.Path, "tracked.txt")
+			want := []byte("unshipped private work\n")
+			if e := os.WriteFile(file, want, 0600); e != nil {
+				t.Fatal(e)
+			}
+			before, _, e := p.run(context.Background(), r.Path, "ls-files", "-v", "-z")
+			if e != nil {
+				t.Fatal(e)
+			}
+			s, e := p.Safety(context.Background(), r, out.Evidence.Attachments[0])
+			if e == nil && s.Complete && !s.Unknown && !s.Dirty {
+				t.Fatalf("hidden edit classified safe: %+v", s)
+			}
+			if changed, e := p.Remove(context.Background(), r, out.Evidence.Attachments[0], c.Validate); e == nil || changed {
+				t.Fatal("hidden work removed", changed, e)
+			}
+			b, e := os.ReadFile(file)
+			if e != nil || string(b) != string(want) {
+				t.Fatal("hidden bytes lost", e)
+			}
+			after, _, e := p.run(context.Background(), r.Path, "ls-files", "-v", "-z")
+			if e != nil || after != before {
+				t.Fatal("index flags changed", e)
+			}
+		})
+	}
+}
+
+func TestIndexFlagInspectionFailureRetainsAttachment(t *testing.T) {
+	for _, kind := range []string{"error", "unterminated", "unknown", "missing-name", "empty-record"} {
+		t.Run(kind, func(t *testing.T) {
+			p, r, c := fixture(t)
+			out := create(t, p, r, c)
+			original := p.executable
+			action := map[string]string{"error": "exit 2", "unterminated": "printf 'H tracked.txt'", "unknown": "printf 'X tracked.txt\\000'", "missing-name": "printf 'H \\000'"}[kind]
+			if kind == "empty-record" {
+				action = "printf '\\000'"
+			}
+			wrapper := filepath.Join(t.TempDir(), "git-inspect")
+			script := "#!/bin/sh\ncase \"$*\" in *'ls-files -v -z'*) " + action + "; exit 0;; esac\nexec '" + strings.ReplaceAll(original, "'", "'\\''") + "' \"$@\"\n"
+			if e := os.WriteFile(wrapper, []byte(script), 0700); e != nil {
+				t.Fatal(e)
+			}
+			p.executable = wrapper
+			s, e := p.Safety(context.Background(), r, out.Evidence.Attachments[0])
+			if kind == "error" && (!s.Unknown || s.Complete || e == nil) {
+				t.Fatal("index query failure did not retain unknown", s, e)
+			}
+			if e == nil && s.Complete && !s.Unknown {
+				t.Fatal("index inspection failure accepted", s)
+			}
+			if changed, e := p.Remove(context.Background(), r, out.Evidence.Attachments[0], c.Validate); changed || e == nil {
+				t.Fatal("index inspection failure removed work", changed, e)
+			}
+			if _, e := os.Lstat(r.Path); e != nil {
+				t.Fatal("attachment lost", e)
+			}
+		})
+	}
+}
+
+func TestRetirementRetainsPlumbingReflogCommit(t *testing.T) {
+	p, r, c := fixture(t)
+	created := create(t, p, r, c)
+	run := func(args ...string) string {
+		t.Helper()
+		out, _, err := p.run(context.Background(), r.Path, args...)
+		if err != nil {
+			t.Fatal(args, err)
+		}
+		return trim(out)
+	}
+	run("checkout", "--detach", r.BaseCommit)
+	tree := run("rev-parse", "HEAD^{tree}")
+	unshipped := run("commit-tree", tree, "-p", r.BaseCommit, "-m", "unshipped detached commit")
+	run("update-ref", "-m", "private work", "HEAD", unshipped)
+	run("checkout", r.Branch)
+	if refs := run("for-each-ref", "--contains", unshipped, "--format=%(refname)"); refs != "" {
+		t.Fatal("unexpected ref", refs)
+	}
+	if log := run("reflog", "--format=%H", "HEAD"); !strings.Contains(log, unshipped) {
+		t.Fatal("missing reflog", log)
+	}
+	safety, err := p.Safety(context.Background(), r, created.Evidence.Attachments[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	ret := repositories.Retirement{Header: effects.Header{Version: effects.SchemaVersion, OperationID: "retire", InputDigest: "retire-input"}, Attachment: r, Receipt: created.Evidence, AcceptedHead: r.BaseCommit, ShippedProofID: "shipped", ShippedProofRevision: "1", UnusedProofID: "unused", UnusedProofRevision: "1", Provenance: "host", AuthorizationID: "retire", AuthorizationVersion: "1"}
+	c.Header = ret.Header
+	ticket, pre := repositories.CheckRetirement(context.Background(), ret, c.PreflightContext, p)
+	t.Logf("safety=%+v preflight=%s", safety, pre.Outcome)
+	if pre.Outcome == effects.Prepared {
+		removed := repositories.Retire(context.Background(), ticket, c, p)
+		after, _, e := p.run(context.Background(), r.Source.Path, "rev-list", "--all", "--reflog")
+		t.Fatalf("unshipped detached commit permitted retirement: result=%s private_commit_reachable=%t read_error=%v", removed.Outcome, strings.Contains(after, unshipped), e)
+	}
+}
+
+func TestPrivateHistoryOIDsAndMalformedRecordsRetain(t *testing.T) {
+	for _, kind := range []string{"old", "new", "original-head", "malformed-log", "malformed-original-head", "missing-log"} {
+		t.Run(kind, func(t *testing.T) {
+			p, r, c := fixture(t)
+			out := create(t, p, r, c)
+			run := func(args ...string) string {
+				t.Helper()
+				s, _, e := p.run(context.Background(), r.Path, args...)
+				if e != nil {
+					t.Fatal(args, e)
+				}
+				return trim(s)
+			}
+			tree := run("rev-parse", "HEAD^{tree}")
+			orphan := run("commit-tree", tree, "-p", r.BaseCommit, "-m", "private preserved work")
+			if run("for-each-ref", "--contains", orphan, "--format=%(refname)") != "" {
+				t.Fatal("private commit has durable ref")
+			}
+			admin := run("rev-parse", "--path-format=absolute", "--git-dir")
+			log := filepath.Join(admin, "logs", "HEAD")
+			originalHead := filepath.Join(admin, "ORIG_HEAD")
+			target := log
+			text := orphan + " " + r.BaseCommit + " Fixture <fixture@example.invalid> 1700000000 +0000\tprivate transition\n"
+			switch kind {
+			case "new":
+				text = r.BaseCommit + " " + orphan + " Fixture <fixture@example.invalid> 1700000000 +0000\tprivate transition\n"
+			case "original-head":
+				target = originalHead
+				text = orphan + "\n"
+			case "malformed-log":
+				text = "malformed private history\n"
+			case "malformed-original-head":
+				target = originalHead
+				text = "unknown private reference\n"
+			case "missing-log":
+				if e := os.Remove(log); e != nil {
+					t.Fatal(e)
+				}
+			}
+			if kind != "missing-log" {
+				if e := os.WriteFile(target, []byte(text), 0600); e != nil {
+					t.Fatal(e)
+				}
+			}
+			s, e := p.Safety(context.Background(), r, out.Evidence.Attachments[0])
+			if e == nil && s.Complete && !s.Unknown && s.Unreachable == 0 {
+				t.Fatal("private history accepted", kind, s)
+			}
+			if changed, e := p.Remove(context.Background(), r, out.Evidence.Attachments[0], c.Validate); changed || e == nil {
+				t.Fatal("private history lost", kind, changed, e)
+			}
+			if kind != "missing-log" {
+				b, e := os.ReadFile(target)
+				if e != nil || string(b) != text {
+					t.Fatal("private history mutated", kind, e)
+				}
+			}
+			if _, e := os.Lstat(r.Path); e != nil {
+				t.Fatal("attachment lost", e)
+			}
+		})
+	}
+}
+
+func TestPrivateCommitPreservedByCommonRefPermitsRetirement(t *testing.T) {
+	p, r, c := fixture(t)
+	done := create(t, p, r, c)
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		s, _, e := p.run(context.Background(), dir, args...)
+		if e != nil {
+			t.Fatal(args, e)
+		}
+		return trim(s)
+	}
+	tree := run(r.Path, "rev-parse", "HEAD^{tree}")
+	saved := run(r.Path, "commit-tree", tree, "-p", r.BaseCommit, "-m", "preserved private commit")
+	run(r.Path, "update-ref", "refs/heads/preserved", saved)
+	admin := run(r.Path, "rev-parse", "--path-format=absolute", "--git-dir")
+	if e := os.WriteFile(filepath.Join(admin, "ORIG_HEAD"), []byte(saved+"\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	text := saved + " " + r.BaseCommit + " Fixture <fixture@example.invalid> 1700000000 +0000\tpreserved transition\n"
+	if e := os.WriteFile(filepath.Join(admin, "logs", "HEAD"), []byte(text), 0600); e != nil {
+		t.Fatal(e)
+	}
+	s, e := p.Safety(context.Background(), r, done.Evidence.Attachments[0])
+	if e != nil || !s.Complete || s.Unknown || s.Unreachable != 0 {
+		t.Fatal(s, e)
+	}
+	if changed, e := p.Remove(context.Background(), r, done.Evidence.Attachments[0], c.Validate); !changed || e != nil {
+		t.Fatal(changed, e)
+	}
+	if run(r.Source.Path, "rev-parse", "refs/heads/preserved") != saved {
+		t.Fatal("common preservation ref lost")
+	}
+}
+
+func TestRemovalSafetyRevocationStopsBeforeGitEffect(t *testing.T) {
+	p, r, c := fixture(t)
+	done := create(t, p, r, c)
+	revoked := false
+	mutations := 0
+	p.trace = func(args []string) {
+		if len(args) > 0 && args[0] == "rev-list" && strings.Contains(strings.Join(args, " "), "--not") {
+			revoked = true
+		}
+		if len(args) > 1 && args[0] == "worktree" && args[1] == "remove" {
+			mutations++
+		}
+	}
+	validate := func(context.Context) error {
+		if revoked {
+			return errGit
+		}
+		return nil
+	}
+	if changed, e := p.Remove(context.Background(), r, done.Evidence.Attachments[0], validate); changed || e == nil || mutations != 0 {
+		t.Fatal("revoked removal grant executed", changed, e, mutations)
+	}
+	if _, e := os.Lstat(r.Path); e != nil {
+		t.Fatal(e)
+	}
+}

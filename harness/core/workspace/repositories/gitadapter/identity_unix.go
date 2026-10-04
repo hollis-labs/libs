@@ -9,6 +9,8 @@ import (
 	"syscall"
 )
 
+const readNonblockFlag = syscall.O_NONBLOCK
+
 func identity(st fs.FileInfo) string {
 	s, ok := st.Sys().(*syscall.Stat_t)
 	if !ok {

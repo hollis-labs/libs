@@ -459,6 +459,29 @@ func (p *Port) Safety(ctx context.Context, r repositories.Request, a effects.Att
 	if raw != "" && !strings.HasSuffix(raw, "\x00") {
 		s.Unknown = true
 	}
+	// Status may hide modified bytes behind assume-unchanged or skip-worktree
+	// flags. Observe the index flags without clearing them; any nonordinary or
+	// malformed entry leaves removal safety unknown even if status is clean.
+	flags, _, e := p.run(ctx, r.Path, "ls-files", "-v", "-z")
+	if e != nil {
+		s.Unknown = true
+		return s, errGit
+	}
+	if flags != "" && !strings.HasSuffix(flags, "\x00") {
+		s.Unknown = true
+	}
+	flagRecords := strings.Split(flags, "\x00")
+	for n, line := range flagRecords {
+		if line == "" {
+			if n < len(flagRecords)-1 {
+				s.Unknown = true
+			}
+			continue
+		}
+		if len(line) < 3 || line[0] != 'H' || line[1] != ' ' {
+			s.Unknown = true
+		}
+	}
 	stage, _, e := p.run(ctx, r.Path, "ls-files", "--stage", "-z")
 	if e != nil {
 		return s, errGit
@@ -467,14 +490,6 @@ func (p *Port) Safety(ctx context.Context, r repositories.Request, a effects.Att
 		if strings.HasPrefix(line, "160000 ") {
 			s.Unknown = true
 		}
-	}
-	raw, _, e = p.run(ctx, r.Path, "rev-list", "--count", "HEAD", "--not", "--branches", "--remotes", "--tags")
-	if e != nil {
-		return s, errGit
-	}
-	s.Unreachable, e = strconv.Atoi(trim(raw))
-	if e != nil || s.Unreachable < 0 {
-		return s, errGit
 	}
 	if !oid(a.Head) {
 		return s, errGit
@@ -548,6 +563,11 @@ func (p *Port) Safety(ctx context.Context, r repositories.Request, a effects.Att
 			s.Locked = true
 		}
 	}
+	s.Unreachable, e = p.privateHistoryCount(ctx, r, q.m.root, admin, o.Head)
+	if e != nil {
+		s.Unknown = true
+		return s, errGit
+	}
 	seen := 0
 	e = filepath.WalkDir(r.Common.Path, func(path string, d fs.DirEntry, e error) error {
 		if e != nil || ctx.Err() != nil {
@@ -585,6 +605,9 @@ func (p *Port) Remove(ctx context.Context, r repositories.Request, a effects.Att
 	}
 	s, e := p.Safety(ctx, r, a)
 	if e != nil || !s.Complete || s.Head != a.Head || s.Dirty || s.Untracked || s.Ignored || s.Unknown || s.Locked || s.Unreachable != 0 || s.Ahead != 0 || !q.valid() {
+		return false, errGit
+	}
+	if ctx.Err() != nil || validate(ctx) != nil || ctx.Err() != nil || !q.valid() {
 		return false, errGit
 	}
 	if _, _, e = p.run(ctx, r.Source.Path, "worktree", "remove", "--", r.Path); e != nil {

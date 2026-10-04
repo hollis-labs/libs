@@ -494,3 +494,190 @@ func TestResumeCancellationDuringAuthorityCallbackRetainsUncertainty(t *testing.
 		t.Fatal(got)
 	}
 }
+
+type callbackPort struct {
+	*fakePort
+	afterObserve func()
+	afterSafety  func()
+}
+
+func (p *callbackPort) Observe(ctx context.Context, r Request) (Observation, error) {
+	o, e := p.fakePort.Observe(ctx, r)
+	if p.afterObserve != nil {
+		p.afterObserve()
+	}
+	return o, e
+}
+func (p *callbackPort) Safety(ctx context.Context, r Request, a effects.AttachmentEvidence) (Safety, error) {
+	o, e := p.fakePort.Safety(ctx, r, a)
+	if p.afterSafety != nil {
+		p.afterSafety()
+	}
+	return o, e
+}
+func TestResumeObserveCancellationRetains(t *testing.T) {
+	r, c, p, _ := fixture()
+	done := apply(t, r, c, p)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	port := &callbackPort{fakePort: p, afterObserve: cancel}
+	got := InspectResume(ctx, r, c.PreflightContext, port, done.Evidence)
+	if got.Outcome != effects.Partial || len(got.Obligations) == 0 {
+		t.Fatalf("cancelled observation lost uncertainty: outcome=%s obligations=%v", got.Outcome, got.Obligations)
+	}
+}
+func TestRetirementObserveCancellationRetains(t *testing.T) {
+	r, c, p := retirementFixture(t)
+	ticket, pre := CheckRetirement(context.Background(), r, c.PreflightContext, p)
+	if pre.Outcome != effects.Prepared {
+		t.Fatal(pre)
+	}
+	done := Retire(context.Background(), ticket, c, p)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	port := &callbackPort{fakePort: p, afterObserve: cancel}
+	got := InspectRetirement(ctx, r, c.PreflightContext, port, done.Evidence)
+	if got.Outcome != effects.Partial || len(got.Obligations) == 0 {
+		t.Fatalf("cancelled retirement observation lost uncertainty: outcome=%s obligations=%v", got.Outcome, got.Obligations)
+	}
+}
+func TestFinalExistingObservationRevocation(t *testing.T) {
+	r, c, p, s := fixture()
+	r.Mode = Checkout
+	r.Existing = true
+	r.Ownership = UserOwned
+	r.Branch = "main"
+	r.UserWriteAuthorizationID = "write"
+	r.UserWriteAuthorizationVersion = "1"
+	p.observed = Observation{Exists: true, Path: r.Path, CommonPath: r.Common.Path, RepositoryID: r.RepositoryID, SourceIdentity: r.SourceIdentity, CommonIdentity: r.CommonIdentity, Branch: r.Branch, Head: baseCommit}
+	revoked := false
+	c.Validate = func(context.Context) error {
+		if revoked {
+			return errFixture
+		}
+		return nil
+	}
+	port := &callbackPort{fakePort: p}
+	ticket, pre := Preflight(context.Background(), r, c.PreflightContext, port)
+	if pre.Outcome != effects.Prepared {
+		t.Fatal(pre)
+	}
+	s.hook = func(e effects.Evidence) error {
+		if e.Phase == effects.IntentPhase {
+			port.afterObserve = func() { revoked = true }
+		}
+		return nil
+	}
+	got := Apply(context.Background(), ticket, c, port)
+	if got.Outcome != effects.Refused {
+		t.Fatalf("completed after host grant revoked during final observation: %s", got.Outcome)
+	}
+}
+
+func TestFinalCreatedObservationRevocationRetainsMutation(t *testing.T) {
+	r, c, p, _ := fixture()
+	revoked := false
+	c.Validate = func(context.Context) error {
+		if revoked {
+			return errFixture
+		}
+		return nil
+	}
+	port := &callbackPort{fakePort: p, afterObserve: func() {
+		if p.creates > 0 {
+			revoked = true
+		}
+	}}
+	out := apply(t, r, c, port)
+	if out.Outcome != effects.Partial || len(out.Obligations) == 0 || !out.Evidence.Attachments[0].Created || p.creates != 1 || p.removes != 0 {
+		t.Fatal(out)
+	}
+}
+func TestFinalRemovalObservationCancellationRetainsMutation(t *testing.T) {
+	r, c, p := retirementFixture(t)
+	ticket, pre := CheckRetirement(context.Background(), r, c.PreflightContext, p)
+	if pre.Outcome != effects.Prepared {
+		t.Fatal(pre)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	port := &callbackPort{fakePort: p, afterObserve: func() {
+		if p.removes > 0 {
+			cancel()
+		}
+	}}
+	out := Retire(ctx, ticket, c, port)
+	if out.Outcome != effects.Partial || len(out.Obligations) == 0 || p.removes != 1 || !out.Evidence.Attachments[0].SafetyComplete {
+		t.Fatal(out)
+	}
+}
+func TestFinalSafetyRevocationRetainsBeforeRetirement(t *testing.T) {
+	r, c, p := retirementFixture(t)
+	revoked := false
+	c.Validate = func(context.Context) error {
+		if revoked {
+			return errFixture
+		}
+		return nil
+	}
+	port := &callbackPort{fakePort: p, afterSafety: func() { revoked = true }}
+	if _, out := CheckRetirement(context.Background(), r, c.PreflightContext, port); out.Outcome != effects.Conflict || len(out.Obligations) == 0 || p.removes != 0 {
+		t.Fatal(out)
+	}
+}
+func TestResumeObservationRevocationRetainsTrustedReceipt(t *testing.T) {
+	r, c, p, _ := fixture()
+	done := apply(t, r, c, p)
+	revoked := false
+	c.Validate = func(context.Context) error {
+		if revoked {
+			return errFixture
+		}
+		return nil
+	}
+	port := &callbackPort{fakePort: p, afterObserve: func() { revoked = true }}
+	out := InspectResume(context.Background(), r, c.PreflightContext, port, done.Evidence)
+	if out.Outcome != effects.Partial || len(out.Obligations) == 0 || !out.Evidence.Attachments[0].Created {
+		t.Fatal(out)
+	}
+}
+
+func TestRetirementFinalObservationRevocationRetainsRecovery(t *testing.T) {
+	for _, inspect := range []bool{false, true} {
+		t.Run(map[bool]string{false: "retire", true: "inspect"}[inspect], func(t *testing.T) {
+			r, c, p := retirementFixture(t)
+			ticket, pre := CheckRetirement(context.Background(), r, c.PreflightContext, p)
+			if pre.Outcome != effects.Prepared {
+				t.Fatal(pre)
+			}
+			var done effects.Result
+			if inspect {
+				done = Retire(context.Background(), ticket, c, p)
+				if done.Outcome != effects.Removed {
+					t.Fatal(done)
+				}
+			}
+			revoked := false
+			c.Validate = func(context.Context) error {
+				if revoked {
+					return errFixture
+				}
+				return nil
+			}
+			port := &callbackPort{fakePort: p, afterObserve: func() {
+				if p.removes > 0 {
+					revoked = true
+				}
+			}}
+			var out effects.Result
+			if inspect {
+				out = InspectRetirement(context.Background(), r, c.PreflightContext, port, done.Evidence)
+			} else {
+				out = Retire(context.Background(), ticket, c, port)
+			}
+			if out.Outcome != effects.Partial || len(out.Obligations) == 0 || p.removes != 1 || !out.Evidence.Attachments[0].SafetyComplete {
+				t.Fatal(out)
+			}
+		})
+	}
+}
