@@ -5,6 +5,48 @@ duplex recipe and lifecycle recipes against real Go, Node and Deno children.
 `protocol/v2/fixtures/duplex-child.json` versions the selected profiles/cases and
 lists the remaining owners. No reader, demux or SDK publication is mocked.
 
+Expanded selection is authored in the same fixture as `expanded_selection`:
+
+```json
+{
+  "version": 1,
+  "kind": "source-group",
+  "source_group": "expanded",
+  "modes": {
+    "internal-test-only": {"exclude_scenarios": []},
+    "normal-serve-negotiated": {"exclude_scenarios": ["base-cancel"]}
+  }
+}
+```
+
+`negotiated.expanded_selection` links to `normal-serve-negotiated`. The SDK
+driver and a future generic host adapter consume this selector rather than
+maintain their own membership lists. Version 1 requires exactly these selector
+fields, both mode keys, and only the `exclude_scenarios` operator per mode.
+The source group must be an own fixture property containing an array. Selection
+keeps source order and excludes matching scenarios before disposition,
+including proposed rows. Exclusion is distinct from unavailability.
+
+Validate the entire referenced group before execution, even excluded or
+unrequested rows: unique nonblank names, normative level, observed or proposed
+status (only an absent status defaults to observed), nonblank observed scenario
+and profile, and nonblank proposed owner/reason. Optional proposed scenario and
+profile must be nonblank strings when present. Exclusions must be arrays of
+unique nonblank strings. Unsupported versions, kinds, modes, operators, source
+statuses, missing linkage/group or malformed metadata are refusals; they never
+fall back to all cases. Unknown future top-level corpus groups remain separately
+named pending coverage for consumers, not selected cases or passes.
+
+An empty source group or explicit empty requested subset is valid; missing or
+unknown modes are refused. Requested subsets retain source order. Unknown or
+excluded requested names and duplicate requests are newly refused instead of
+silently producing an empty or partial replay. Existing SDK dispatch continues
+to refuse unknown observed scenario implementations. Selection preserves source
+status and authored owner/reason; execution separately reports `passed` or
+`unavailable`. Proposed rows never become passes. Reports must identify the exact
+source commit, corpus and selector versions, fixture hash and execution mode;
+a new fixture receipt does not adopt a consumer pin or certify host replay.
+
 The minimum duplex recipe observes opposite-direction `id:1`, progress while
 Init waits for a typed `host/log` reply, refusal of pipelined ordinary work,
 reader progress during Unload's reverse log, once-only cleanup, terminal reply

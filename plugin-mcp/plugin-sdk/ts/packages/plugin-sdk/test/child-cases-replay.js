@@ -6,6 +6,7 @@ import { Writable } from "node:stream";
 import { FrameWriter } from "../dist/publication.js";
 import { ChildSession } from "./child-parent.js";
 import { childSpec } from "./child-spec.js";
+import { selectExpandedCases } from "./expanded-selection.js";
 import { decodeHostRPCDTO } from "../dist/host-rpc.js";
 import { inspectEnvelope, parseJSONTokens } from "../dist/strict-json.js";
 const manifest = JSON.parse(
@@ -640,9 +641,10 @@ export async function replayCases(runtime, goChild, names, signal, negotiated = 
   parentSignal = signal;
   negotiatedMode = negotiated;
   const results = [];
-  for (const recipe of manifest.expanded) {
-    if (names && !names.includes(recipe.name)) continue;
-    if (negotiated && recipe.scenario === "base-cancel") continue;
+  const mode = negotiated ? manifest.negotiated.expanded_selection : "internal-test-only";
+  // Validate the entire referenced source group before the first child starts.
+  const selected = selectExpandedCases(manifest, mode, names);
+  for (const recipe of selected) {
     assert.ok(["observed", "proposed"].includes(recipe.status ?? "observed"));
     assert.equal(recipe.level, "normative");
     if (recipe.status === "proposed") {

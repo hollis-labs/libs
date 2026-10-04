@@ -241,6 +241,22 @@
         "owner": "SDK hook-context and plugin-hooks adapter maintainers",
         "reason": "Hooks unconditionally receive no helper client; per-item composition requires a separate design."
       }
-    ]
+    ],
+    "expanded_selection": "normal-serve-negotiated"
+  },
+  "expanded_selection": {
+    "version": 1,
+    "kind": "source-group",
+    "source_group": "expanded",
+    "modes": {
+      "internal-test-only": {
+        "exclude_scenarios": []
+      },
+      "normal-serve-negotiated": {
+        "exclude_scenarios": [
+          "base-cancel"
+        ]
+      }
+    }
   }
 }
