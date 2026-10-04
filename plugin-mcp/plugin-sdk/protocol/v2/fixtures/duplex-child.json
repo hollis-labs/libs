@@ -1,6 +1,6 @@
 {
   "corpus_version": 1,
-  "coverage": "Real base stdio children and internal fixture duplex. Reverse remains declined; this is not negotiated plugin-host interoperability.",
+  "coverage": "Real stdio base, lifecycle and expanded client/admission/writer/effect cases with private fixture activation. Reverse remains declined; this is not negotiated plugin-host interoperability.",
   "base_profiles": [
     "base",
     "full",
@@ -17,9 +17,18 @@
       "profile": "base",
       "level": "normative",
       "steps": [
-        { "op": "init" },
-        { "op": "close_stdin" },
-        { "op": "expect_exit", "effects": { "unload_attempts": 1 } }
+        {
+          "op": "init"
+        },
+        {
+          "op": "close_stdin"
+        },
+        {
+          "op": "expect_exit",
+          "effects": {
+            "unload_attempts": 1
+          }
+        }
       ]
     },
     {
@@ -27,38 +36,182 @@
       "profile": "full",
       "level": "normative",
       "steps": [
-        { "op": "init" },
+        {
+          "op": "init"
+        },
         {
           "op": "send_host",
           "send": {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "command/execute",
-            "params": { "name": "wait-for-abort", "args": "", "session_id": "" }
+            "params": {
+              "name": "wait-for-abort",
+              "args": "",
+              "session_id": ""
+            }
           }
         },
-        { "op": "barrier", "event": "handler_waiting" },
-        { "op": "signal", "signal": "SIGTERM" },
+        {
+          "op": "barrier",
+          "event": "handler_waiting"
+        },
+        {
+          "op": "signal",
+          "signal": "SIGTERM"
+        },
         {
           "op": "expect_plugin_response",
           "expect": {
             "jsonrpc": "2.0",
             "id": 2,
-            "result": { "action": "noop" }
+            "result": {
+              "action": "noop"
+            }
           }
         },
-        { "op": "expect_exit", "effects": { "unload_attempts": 1 } }
+        {
+          "op": "expect_exit",
+          "effects": {
+            "unload_attempts": 1
+          }
+        }
       ]
     }
   ],
   "pending_coverage": [
     {
-      "feature": "Expanded duplex saturation/cancel/deadline/effect/hook composition",
-      "owner": "SDK 3k-2"
-    },
-    {
       "feature": "Negotiated reverse profile and pinned real plugin-host replay",
       "owner": "SDK reverse profile and the plugin-host interop adapter"
+    }
+  ],
+  "expanded": [
+    {
+      "name": "forward-and-lifecycle-saturation",
+      "scenario": "forward",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "reverse-pending-eight",
+      "scenario": "reverse",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "strict-cancel-retained-permit-and-base-reuse",
+      "scenario": "base-cancel",
+      "profile": "expanded-base",
+      "level": "normative"
+    },
+    {
+      "name": "parent-descendants-not-siblings",
+      "scenario": "descendants",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "arrival-deadline-and-absent-context",
+      "scenario": "deadline",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "reverse-deadline-includes-queue-time",
+      "scenario": "clip",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "mutation-receipt-no-retry",
+      "scenario": "effects",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "lost-receipt-unknown-outcome",
+      "scenario": "unknown",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "known-commit-output-overflow",
+      "scenario": "overflow",
+      "profile": "expanded-overflow",
+      "level": "normative"
+    },
+    {
+      "name": "writer-byte-queue-refuses-before-publication",
+      "scenario": "queue",
+      "profile": "expanded-queue",
+      "level": "normative"
+    },
+    {
+      "name": "cleanup-failure",
+      "scenario": "cleanup-error",
+      "profile": "expanded-cleanup-error",
+      "level": "normative"
+    },
+    {
+      "name": "cleanup-panic",
+      "scenario": "cleanup-panic",
+      "profile": "expanded-cleanup-panic",
+      "level": "normative"
+    },
+    {
+      "name": "cleanup-hung",
+      "scenario": "cleanup-hung",
+      "profile": "expanded-cleanup-hung",
+      "level": "normative"
+    },
+    {
+      "name": "hung-callback",
+      "scenario": "hung-callback",
+      "profile": "expanded-hung",
+      "level": "normative"
+    },
+    {
+      "name": "disconnect-with-pending-host-read",
+      "scenario": "disconnect",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "child-writer-four-frame-fairness",
+      "scenario": "child-fairness",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "host-writer-four-frame-fairness",
+      "scenario": "host-fairness",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "receipt-survives-owner-generation",
+      "scenario": "receipt-restart",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "simultaneous-admission-terminal-credit-arithmetic",
+      "scenario": "credits",
+      "profile": "expanded",
+      "level": "normative"
+    },
+    {
+      "name": "writer-frame-queue-refuses-before-publication",
+      "scenario": "queue-frames",
+      "profile": "expanded-queue-frames",
+      "level": "normative"
+    },
+    {
+      "name": "hook-duplex",
+      "status": "proposed",
+      "owner": "SDK reverse-profile and hook-context client maintainers",
+      "reason": "Hook handlers have no request-scoped host client until the reverse profile is negotiated.",
+      "level": "normative"
     }
   ]
 }

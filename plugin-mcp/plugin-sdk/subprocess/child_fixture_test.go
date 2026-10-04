@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -60,9 +61,15 @@ func TestDuplexFixtureChild(t *testing.T) {
 		p = &childFrameOutput{count: &unloads}
 	case "duplex-smoke":
 	default:
-		os.Exit(2)
+		if !strings.HasPrefix(profile, "expanded") {
+			os.Exit(2)
+		}
+
 	}
-	core := newFixtureCorrelation(profile == "duplex-smoke")
+	core := newFixtureCorrelation(profile == "duplex-smoke" || strings.HasPrefix(profile, "expanded") && profile != "expanded-base")
+	if strings.HasPrefix(profile, "expanded") {
+		p = newChildCases(profile, core, event)
+	}
 	if profile == "duplex-smoke" {
 		p = &childDuplex{core: core, count: &unloads}
 	}
@@ -92,6 +99,9 @@ func TestDuplexFixtureChild(t *testing.T) {
 				os.Exit(1)
 			}
 			last = value.Seq
+			if provider, ok := p.(interface{ Release(string) }); ok {
+				provider.Release(value.Gate)
+			}
 			event(map[string]any{"kind": "control_received", "seq": last})
 			if value.Gate == "snapshot" {
 				if provider, ok := p.(interface{ Snapshot() map[string]any }); ok {
@@ -102,7 +112,11 @@ func TestDuplexFixtureChild(t *testing.T) {
 	}()
 	event(map[string]any{"kind": "ready"})
 	// Omitted injected streams keep runtime-owned stdin/stdout and actual signals.
-	err := serveConnection(p, ServeOptions{}, core)
+	options := ServeOptions{}
+	if provider, ok := p.(interface{ Options() ServeOptions }); ok {
+		options = provider.Options()
+	}
+	err := serveConnection(p, options, core)
 	stopped.Store(true)
 	control.Close()
 	effects := map[string]int{"unload_attempts": int(unloads.Load())}

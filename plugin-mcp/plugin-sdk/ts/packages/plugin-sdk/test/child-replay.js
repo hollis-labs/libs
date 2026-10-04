@@ -21,35 +21,8 @@ const manifest = parseJSONTokens(
   ),
 );
 assert.equal(manifest.corpus_version, 1);
-const worker = fileURLToPath(new URL("./duplex-worker.js", import.meta.url));
-export function childSpec(runtime, profile, goChild) {
-  if (runtime === "go") {
-    assert.ok(goChild, "Go test child path required");
-    return {
-      command: goChild,
-      args: ["-test.run=^TestDuplexFixtureChild$"],
-      options: { env: { SDK_FIXTURE_CHILD: profile } },
-    };
-  }
-  if (runtime === "node")
-    return { command: process.execPath, args: [worker, profile], options: {} };
-  if (runtime === "deno")
-    return {
-      command: "deno",
-      args: [
-        "run",
-        "--cached-only",
-        "--no-npm",
-        "--no-check",
-        "--allow-env",
-        "--fixture-control-permission",
-        worker,
-        profile,
-      ],
-      options: { pathControl: true },
-    };
-  throw new Error("unknown fixture runtime");
-}
+import { childSpec } from "./child-spec.js";
+export { childSpec };
 let activeCase = "control-feasibility";
 const parentAbort = new AbortController();
 async function session(runtime, profile, goChild) {
@@ -301,17 +274,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const base = await replayBase(runtime, goChild),
       duplex = await replayDuplexSmoke(runtime, goChild),
       lifecycle = await replayLifecycle(runtime, goChild);
-    for (const result of [...base, ...duplex, ...lifecycle])
+    const { replayCases } = await import("./child-cases-replay.js");
+    const expanded = await replayCases(
+      runtime,
+      goChild,
+      undefined,
+      parentAbort.signal,
+    );
+    for (const result of [...base, ...duplex, ...lifecycle, ...expanded])
       console.log(JSON.stringify({ runtime, ...result }));
     console.log(
-      `${runtime} child replay PASS (${base.filter((r) => r.status === "passed").length} base, ${duplex.length} internal duplex, ${lifecycle.length} lifecycle; ${base.filter((r) => r.status === "unavailable").length} named proposals)`,
+      `${runtime} child replay PASS (${base.filter((r) => r.status === "passed").length} base, ${duplex.length} internal duplex, ${lifecycle.length} lifecycle, ${expanded.filter((r) => r.status === "passed").length} expanded; ${[...base, ...expanded].filter((r) => r.status === "unavailable").length} named proposals)`,
     );
   } catch (error) {
     console.error(
       JSON.stringify({
         runtime,
         status: "failed",
-        case: activeCase,
+        case: error.fixtureCase ?? activeCase,
         failure: error.code ?? "assertion_or_fixture_failure",
       }),
     );
