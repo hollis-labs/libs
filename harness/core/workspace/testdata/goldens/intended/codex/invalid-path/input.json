@@ -2,5 +2,6 @@
   "provider": "codex",
   "runtime": "subprocess-per-turn",
   "variant": "",
-  "scenario": "invalid-path"
+  "scenario": "invalid-path",
+  "posture": "default"
 }

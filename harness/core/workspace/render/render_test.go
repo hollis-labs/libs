@@ -4,27 +4,33 @@ import (
 	"errors"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
+	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"slices"
 	"testing"
 )
 
 func resolved(t *testing.T, p runtimes.ID, f layout.Field) layout.Resolution {
 	t.Helper()
-	r, err := layout.Resolve(layout.Request{Key: layout.Key{Provider: p, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Field: f}, Requirement: layout.Required, Components: map[string]string{"agent": "fixture", "name": "sample"}})
+	mode := runtimes.ModeSubprocessPerTurn
+
+	r, err := layout.Resolve(layout.Request{Key: layout.Key{Provider: p, Layer: layout.Boot, Mode: mode, Field: f}, Requirement: layout.Required, Components: map[string]string{"agent": "fixture", "name": "sample"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return r
 }
 func request(p runtimes.ID) Request {
-	return Request{Provider: p, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Agent: "fixture", Roots: map[layout.Root]string{layout.RootBoot: "/fixture/boot", layout.RootProject: "/fixture/project", layout.RootHome: "/fixture/home"}}
+	mode := runtimes.ModeSubprocessPerTurn
+
+	return Request{Provider: p, Layer: layout.Boot, Mode: mode, Agent: "fixture", Roots: map[layout.Root]string{layout.RootBoot: "/fixture/boot", layout.RootProject: "/fixture/project", layout.RootHome: "/fixture/home"}}
 }
 func TestComposeOneNativeDocument(t *testing.T) {
 	req := request(runtimes.Codex)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Settings)}, {Resolved: resolved(t, runtimes.Codex, layout.MCP)}, {Resolved: resolved(t, runtimes.Codex, layout.Instructions), Content: Content{Body: []byte("instructions\n")}}}
 	req.Native.Servers = []contract.Server{{Name: "fixture", Command: "fixture-mcp"}}
-	result, err := Render(req)
+	result, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +47,7 @@ func TestComposeOneNativeDocument(t *testing.T) {
 		t.Fatalf("%#v", result.Binding)
 	}
 	req.Overlays = []artifact.Entry{{Path: "config.toml", Kind: artifact.EntryFile, Bytes: []byte("replace")}}
-	if _, err = Render(req); err == nil {
+	if _, err = renderWithTestPosture(req); err == nil {
 		t.Fatal("overlay replaced native document")
 	}
 }
@@ -50,7 +56,7 @@ func TestCredentialEffectsAndMissingCredentialRefusals(t *testing.T) {
 	r := resolved(t, runtimes.Codex, layout.Credentials)
 	req.Inputs = []Input{{Resolved: r}}
 	req.Credentials = CredentialAvailable
-	result, err := Render(req)
+	result, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,24 +71,24 @@ func TestCredentialEffectsAndMissingCredentialRefusals(t *testing.T) {
 	for _, status := range []CredentialAvailability{CredentialMissing, CredentialDenied} {
 		req.Credentials = status
 		var d *Diagnostic
-		if _, err = Render(req); !errors.As(err, &d) {
+		if _, err = renderWithTestPosture(req); !errors.As(err, &d) {
 			t.Fatalf("%v", err)
 		}
 	}
 	req = request(runtimes.Codex)
 	req.Overlays = []artifact.Entry{{Path: "auth.json", Kind: artifact.EntryFile, Bytes: []byte("DUMMY-SENTINEL")}}
-	if _, err = Render(req); err == nil {
+	if _, err = renderWithTestPosture(req); err == nil {
 		t.Fatal("overlay creates credentials")
 	}
 }
 func TestPinnedRegistrationsAndRefusals(t *testing.T) {
 	req := request(runtimes.Claude)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Claude, layout.Commands), Content: Content{Body: []byte("command\n")}}}
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("unpinned command accepted")
 	}
 	req.Inputs[0].Content.Pin = Pin{Source: "fixture-resource", Revision: "fixture-revision"}
-	result, err := Render(req)
+	result, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +105,28 @@ func TestPinnedRegistrationsAndRefusals(t *testing.T) {
 		t.Fatal("command missing")
 	}
 	req.Inputs = append(req.Inputs, req.Inputs[0])
-	if _, err = Render(req); err == nil {
+	if _, err = renderWithTestPosture(req); err == nil {
 		t.Fatal("same-path duplicate without selected content accepted")
 	}
+}
+
+// Unrelated renderer tests explicitly bind the safe default rather than relying
+// on the removed implicit Codex headless policy. Absence tests call Render directly.
+func renderWithTestPosture(req Request) (Result, error) {
+	if req.Provider == runtimes.Codex && req.Layer == layout.Boot {
+		has := false
+		for _, in := range req.Inputs {
+			if in.Resolved.Row.Posture != nil {
+				has = true
+			}
+		}
+		if !has && !hostDefault(req.Native.Codex) {
+			res, err := layout.Resolve(layout.Request{Key: layout.Key{Provider: req.Provider, Layer: req.Layer, Mode: req.Mode, Field: layout.Permissions}, Requirement: layout.Required, Posture: permission.ModeDefault, LookupPosture: func(runtimes.ID, permission.Mode, runtimes.Mode) error { return nil }})
+			if err != nil {
+				return Result{}, err
+			}
+			req.Inputs = append(slices.Clone(req.Inputs), Input{Resolved: res})
+		}
+	}
+	return Render(req)
 }

@@ -2,5 +2,6 @@
   "provider": "codex",
   "runtime": "subprocess-per-turn",
   "variant": "",
-  "scenario": "native-overlay"
+  "scenario": "native-overlay",
+  "posture": "default"
 }

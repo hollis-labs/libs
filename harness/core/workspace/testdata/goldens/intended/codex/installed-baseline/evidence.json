@@ -5,6 +5,7 @@
     "installed_skill_evidence": "authored installed package row and declared-mode contract; archived installed seed supplies no installed skills; no installed-skill seed parity claimed",
     "installed_apply_acceptance": {
       "check_normalization": "reproduce settings comparison after owned-key merge and Codex TOML normalization",
+      "existing_directories": "never chmod, conflict on, or remove a pre-existing user directory, including declared parent directories",
       "found_json_key_order": "preserve existing JSON key order (Claude permissions before fixture_operator)",
       "source_seed": "seeds/cairn/codex/install-refresh must pass byte-for-byte at installed apply; these pure fixtures do not perform a merge",
       "unknown_nested_leaves": "preserve unknown operator leaves inside owned objects/tables, including Codex fixture_operator inside mcp_servers.fixture, without dropping or reordering",
@@ -38,6 +39,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -49,6 +54,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5325172137744cfd18cad54ed0f33d9722dc7f7b7e0bf39ebb65531dd49b6dad"
       }
     },
     {
@@ -60,6 +69,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"approval_policy\"],[\"mcp_servers\",\"fixture\",\"args\"],[\"mcp_servers\",\"fixture\",\"command\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "01c6422867e1ed9335467f3618ed6ebc3b5b11f910abb74b07c123d652f69a25"
       }
     }
   ]

@@ -3,6 +3,8 @@ package render
 import (
 	"bytes"
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"maps"
@@ -12,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	agy "github.com/hollis-labs/substrate/harness/adapters/antigravity/nativefiles"
 	claude "github.com/hollis-labs/substrate/harness/adapters/claude/nativefiles"
@@ -33,15 +36,22 @@ func Render(req Request) (Result, error) {
 	for _, root := range []layout.Root{layout.RootBoot, layout.RootProject, layout.RootHome} {
 		if value := req.Roots[root]; value != "" {
 			ctx := contract.Context{Provider: string(req.Provider), Mode: string(req.Mode), Concern: "roots"}
-			if err := contract.ValidateDirectories(ctx, []string{value}); err != nil || path.Clean(value) != value {
+			if err := contract.ValidateDirectories(ctx, []string{value}); err != nil || path.Clean(value) != value || value == "/" || !safeRootText(value) {
 				return Result{}, refuse(req, layout.Resources, "unsafe_root", "supplied root must be a canonical absolute directory")
 			}
 		}
 	}
-	if err := ValidateComponent(req.Agent); err != nil {
-		return Result{}, refuse(req, layout.Instructions, "invalid_component", "agent must be a safe single component")
+	if req.Layer == layout.Boot && req.Roots[layout.RootBoot] != "" && strings.EqualFold(req.Roots[layout.RootBoot], req.Roots[layout.RootProject]) {
+		return Result{}, refuse(req, layout.Resources, "unsafe_root", "boot root must differ from project root")
 	}
-	out := Result{Root: layout.RootBoot, RootMode: 0700, Tree: artifact.Tree{Provenance: artifact.Provenance{Source: "workspace/render"}}, Binding: Binding{Environment: map[string]string{}, RPCProject: map[string]string{}}}
+	count := len(req.Overlays) + len(req.Inputs)
+	for _, in := range req.Inputs {
+		count += len(in.Content.Package.Entries)
+	}
+	if count > MaxTreeEntries {
+		return Result{}, refuse(req, layout.Resources, "input_limit", "entry count exceeds render limit")
+	}
+	out := Result{Provider: req.Provider, Layer: req.Layer, Mode: req.Mode, Variant: req.Variant, Root: layout.RootBoot, RootMode: 0700, Tree: artifact.Tree{Provenance: artifact.Provenance{Source: "workspace/render"}}, Binding: Binding{Environment: map[string]string{}, RPCProject: map[string]string{}}}
 	if req.Layer == layout.Installed {
 		out.Root = layout.RootHome
 		out.RootMode = 0
@@ -67,6 +77,7 @@ func Render(req Request) (Result, error) {
 	configRows := map[string]layout.Row{}
 	seenFields := map[layout.Field]bool{}
 	claims := []contract.Claim{}
+	operatorMatches := make([]bool, len(req.Native.OperatorKeyPaths))
 	locators := []layout.Row{}
 	hasMCP := false
 	// Canonical table order defines binding token order, independently of caller
@@ -95,12 +106,15 @@ func Render(req Request) (Result, error) {
 	})
 	for _, input := range inputs {
 		res := input.Resolved
+		if !utf8.ValidString(input.Content.Pin.Source) || !utf8.ValidString(input.Content.Pin.Revision) {
+			return Result{}, refuse(req, layout.Resources, "invalid_pin", "content pin must be valid UTF-8")
+		}
 		if res.Omission != nil {
 			d := res.Omission
 			if res.Row.Provider != "" || len(res.Effects) > 0 || d.Provider != req.Provider || d.Layer != req.Layer || d.Mode != req.Mode {
 				return Result{}, refuse(req, d.Concern, "invalid_resolution", "omission does not match the target")
 			}
-			out.Diagnostics = append(out.Diagnostics, Diagnostic{Code: d.Code, Provider: d.Provider, Mode: d.Mode, Concern: d.Concern, Reason: d.Reason})
+			out.Diagnostics = append(out.Diagnostics, Diagnostic{Code: DiagnosticCode(d.Code), Class: ClassOmission, Provider: d.Provider, Mode: d.Mode, Concern: d.Concern, Reason: d.Reason})
 			continue
 		}
 		if len(res.Effects) > 0 {
@@ -115,11 +129,11 @@ func Render(req Request) (Result, error) {
 					return Result{}, refuse(req, layout.Credentials, "invalid_effect", "credential destination must be a preserve-only link")
 				}
 				for _, prior := range out.Effects {
-					if prior.Path == effect.Path {
+					if strings.EqualFold(prior.Path, effect.Path) {
 						return Result{}, refuse(req, layout.Credentials, "path_collision", "credential effect is repeated")
 					}
 				}
-				out.Effects = append(out.Effects, effect)
+				out.Effects = append(out.Effects, effect.Clone())
 				out.Preparations = append(out.Preparations, Preparation{Provider: req.Provider, Kind: "credential-link", Destination: effect.Path, Policy: effect.CredentialPolicy})
 			}
 			continue
@@ -136,9 +150,6 @@ func Render(req Request) (Result, error) {
 			hasMCP = true
 		}
 		if r.Posture != nil {
-			if out.Binding.Posture != nil && !reflect.DeepEqual(out.Binding.Posture, r.Posture) {
-				return Result{}, refuse(req, r.Field, "conflicting_posture", "permission references disagree")
-			}
 			p := *r.Posture
 			out.Binding.Posture = &p
 		}
@@ -180,7 +191,7 @@ func Render(req Request) (Result, error) {
 				return Result{}, refuse(req, r.Field, "invalid_definition_name", "installed instruction marker requires an explicit definition identifier")
 			}
 			if len(body) == 0 {
-				out.Diagnostics = append(out.Diagnostics, Diagnostic{Code: "omitted_empty_installed_instructions", Provider: req.Provider, Mode: req.Mode, Concern: r.Field, Reason: "empty installed instruction body emits no generated document"})
+				out.Diagnostics = append(out.Diagnostics, Diagnostic{Class: ClassOmission, Code: "omitted_empty_installed_instructions", Provider: req.Provider, Mode: req.Mode, Concern: r.Field, Reason: "empty installed instruction body emits no generated document"})
 				continue
 			}
 			body = append([]byte("<!-- Generated by `cairn install` from profile "+strconv.Quote(req.DefinitionName)+". -->\n\n"), body...)
@@ -188,10 +199,12 @@ func Render(req Request) (Result, error) {
 		e := entry(r, body, input.Content.Pin)
 		if r.Field == layout.MCP || r.Field == layout.PlantingPlugin {
 			var object map[string]any
+			// Keep this invariant check at the serializer boundary so future encoders
+			// cannot mint ownership metadata from malformed document bytes.
 			if json.Unmarshal(body, &object) != nil {
 				return Result{}, refuse(req, r.Field, "invalid_native_document", "native JSON serializer produced an invalid object")
 			}
-			if err := documentOwnership(req, r, contract.ObjectKeyPaths(object), selected, &e); err != nil {
+			if err := documentOwnership(req, r, contract.ObjectKeyPaths(object), selected, &e, operatorMatches); err != nil {
 				return Result{}, err
 			}
 		}
@@ -225,10 +238,15 @@ func Render(req Request) (Result, error) {
 			doc.Bytes = []byte{}
 		}
 		e := entry(r, doc.Bytes, Pin{})
-		if err := documentOwnership(req, r, doc.KeyPaths, selected, &e); err != nil {
+		if err := documentOwnership(req, r, doc.KeyPaths, selected, &e, operatorMatches); err != nil {
 			return Result{}, err
 		}
 		out.Tree.Entries = append(out.Tree.Entries, e)
+	}
+	for _, matched := range operatorMatches {
+		if !matched {
+			return Result{}, refuse(req, layout.Settings, "invalid_ownership", "operator key path must match an emitted leaf exactly")
+		}
 	}
 	for _, overlay := range artifact.CloneEntries(req.Overlays) {
 		if err := contract.ValidateComposition(ctx, []contract.Claim{contract.OverlayClaim(contract.Overlay{Path: overlay.Path})}, reservedPaths(selected)); err != nil {
@@ -243,12 +261,15 @@ func Render(req Request) (Result, error) {
 		if overlay.ContentRef != nil {
 			return Result{}, refuse(req, layout.Resources, "unresolved_content", "overlay content must already be resolved")
 		}
-		if overlay.Kind == artifact.EntryDirectory {
-			overlay.Mode = 0755
+		mode, diag, err := normalizeMode(req, overlay, layout.Resources, false)
+		if err != nil {
+			return Result{}, err
 		}
-		if overlay.Mode == 0 {
-			overlay.Mode = 0644
+		overlay.Mode = mode
+		if diag != nil {
+			out.Diagnostics = append(out.Diagnostics, *diag)
 		}
+		overlay.Provenance = artifact.Provenance{Source: "workspace/render"}
 		overlay.Ownership = artifact.Ownership{EntryID: "workspace.render:" + overlay.Path, GroupID: "workspace.render:overlay"}
 		out.Tree.Entries = append(out.Tree.Entries, overlay)
 	}
@@ -256,7 +277,12 @@ func Render(req Request) (Result, error) {
 		return Result{}, err
 	}
 	if req.Layer == layout.Boot && req.Provider == runtimes.Codex && (out.Binding.Posture == nil || out.Binding.Posture.Posture == "") {
-		reason := "posture absent: no native policy emitted; runtime default applies"
+		// PTY remains unsupported by the table. Retain the no-policy interactive
+		// rule here for a future measured PTY row; headless modes fail closed.
+		if req.Mode != runtimes.ModePTY && !hostDefault(req.Native.Codex) {
+			return Result{}, refuse(req, layout.Permissions, "posture_required", "headless Codex requires a bound posture or explicit host-declared native default")
+		}
+		reason := "posture absent: no native policy emitted; interactive runtime default applies"
 		if req.Native.Codex.ApprovalPolicy != "" || req.Native.Codex.SandboxMode != "" {
 			reason = "posture absent: host-declared native policy retained; runtime posture overrides absent"
 		}
@@ -267,6 +293,8 @@ func Render(req Request) (Result, error) {
 		}
 		out.Diagnostics = append(out.Diagnostics, Diagnostic{Code: "posture_absent", Provider: req.Provider, Mode: req.Mode, Concern: layout.Permissions, Reason: reason})
 	}
+	// Revalidate after package prefixing and native generation: those operations
+	// can exceed path depth/length even when the source-relative names are safe.
 	// Explicit directories, including empty packages, retain one stable owner.
 	files := map[string]artifact.Entry{}
 	for _, e := range out.Tree.Entries {
@@ -276,24 +304,39 @@ func Render(req Request) (Result, error) {
 		if credential(e.Path) {
 			return Result{}, refuse(req, layout.Credentials, "credential_write", "credential destinations cannot be managed entries")
 		}
-		if _, exists := files[e.Path]; exists {
+		if _, exists := files[contract.FoldPath(e.Path)]; exists {
 			return Result{}, refuse(req, layout.Resources, "path_collision", "multiple entries claim the same destination")
 		}
-		files[e.Path] = e
+		files[contract.FoldPath(e.Path)] = e
 	}
 	for _, e := range out.Tree.Entries {
 		for dir := path.Dir(e.Path); dir != "."; dir = path.Dir(dir) {
-			if old, ok := files[dir]; ok {
-				if old.Kind != artifact.EntryDirectory {
+			if old, ok := files[contract.FoldPath(dir)]; ok {
+				if old.Kind != artifact.EntryDirectory || old.Path != dir {
 					return Result{}, refuse(req, layout.Resources, "path_collision", "file blocks a parent directory")
 				}
 				continue
 			}
-			files[dir] = artifact.Entry{Path: dir, Kind: artifact.EntryDirectory, Mode: 0755, Ownership: artifact.Ownership{EntryID: "workspace.render:" + dir, GroupID: "workspace.render:directories"}, Provenance: artifact.Provenance{Source: "workspace/render"}}
+			if len(files) >= MaxTreeEntries {
+				return Result{}, refuse(req, layout.Resources, "input_limit", "expanded entry count exceeds render limit")
+			}
+			files[contract.FoldPath(dir)] = artifact.Entry{Path: dir, Kind: artifact.EntryDirectory, Mode: 0755, Ownership: artifact.Ownership{EntryID: "workspace.render:" + dir, GroupID: "workspace.render:directories"}, Provenance: artifact.Provenance{Source: "workspace/render"}}
 		}
 	}
 	out.Tree.Entries = nil
 	for _, e := range files {
+		if len(files) > MaxTreeEntries {
+			return Result{}, refuse(req, layout.Resources, "input_limit", "expanded entry count exceeds render limit")
+		}
+		if credential(e.Path) {
+			return Result{}, refuse(req, layout.Credentials, "credential_write", "credential destinations cannot be managed entries")
+		}
+		if e.Kind == artifact.EntryFile {
+			sum := sha256.Sum256(e.Bytes)
+			e.Digest = artifact.Digest{Algorithm: "sha256", Hex: hex.EncodeToString(sum[:])}
+		} else {
+			e.Digest = artifact.Digest{}
+		}
 		out.Tree.Entries = append(out.Tree.Entries, e)
 	}
 	normalized, err := artifact.Normalize(out.Tree.Entries)
@@ -301,6 +344,11 @@ func Render(req Request) (Result, error) {
 		return Result{}, refuse(req, layout.Resources, "invalid_artifact", "artifact entries are invalid or collide")
 	}
 	out.Tree.Entries = normalized
+	for i := range out.Diagnostics {
+		if out.Diagnostics[i].Class == "" {
+			out.Diagnostics[i].Class = ClassInformational
+		}
+	}
 	return out, nil
 }
 func entry(r layout.Row, body []byte, pin Pin) artifact.Entry {
@@ -321,6 +369,9 @@ func validateRow(req Request, r layout.Row) error {
 		return refuse(req, r.Field, "unsafe_path", "row destination is unsafe")
 	}
 	if strings.Contains(expected.Path, "{agent}") {
+		if ValidateComponent(req.Agent) != nil {
+			return refuse(req, r.Field, "invalid_component", "agent must be a safe single component")
+		}
 		concrete, err := layout.Expand(expected.Path, map[string]string{"agent": req.Agent})
 		if err != nil || concrete != r.Path {
 			return refuse(req, r.Field, "agent_mismatch", "rendered agent ID must match launch selection")
@@ -338,36 +389,38 @@ func validateRow(req Request, r layout.Row) error {
 	}
 	return nil
 }
-func patternMatches(pattern, rel string) bool {
+func patternMatches(pattern, rel string) bool     { return matchPattern(pattern, rel, false) }
+func patternMatchesFold(pattern, rel string) bool { return matchPattern(pattern, rel, true) }
+func matchPattern(pattern, rel string, fold bool) bool {
 	if pattern == rel {
 		return true
 	}
 	exp := regexp.QuoteMeta(pattern)
 	exp = strings.ReplaceAll(exp, regexp.QuoteMeta("{name}"), `[A-Za-z0-9_][A-Za-z0-9_.-]*`)
 	exp = strings.ReplaceAll(exp, regexp.QuoteMeta("{agent}"), `[A-Za-z0-9_][A-Za-z0-9_.-]*`)
+	if fold {
+		exp = "(?i)" + exp
+	}
 	ok, _ := regexp.MatchString("^"+exp+"$", rel)
 	return ok
 }
-func credential(rel string) bool {
-	switch path.Base(rel) {
-	case "auth.json", ".credentials.json", "oauth_creds.json":
-		return true
-	}
-	return false
-}
+
+// IsCredentialDestination is the table's sole credential exclusion rule.
+func IsCredentialDestination(rel string) bool { return layout.IsCredentialDestination(rel) }
+func credential(rel string) bool              { return IsCredentialDestination(rel) }
 func reserved(rows []layout.Row, rel string) bool {
 	if credential(rel) {
 		return true
 	}
 	for _, r := range rows {
-		if r.Path != "" && (patternMatches(r.Path, rel) || strings.HasPrefix(r.Path, rel+"/")) {
+		if r.Path != "" && (patternMatchesFold(r.Path, rel) || strings.HasPrefix(contract.FoldPath(r.Path), contract.FoldPath(rel+"/"))) {
 			return true
 		}
 		if r.Form == layout.Package {
 			prefix := strings.TrimSuffix(r.Path, "/SKILL.md")
 			parts := strings.Split(rel, "/")
 			for i := range parts {
-				if patternMatches(prefix, strings.Join(parts[:i+1], "/")) {
+				if patternMatchesFold(prefix, strings.Join(parts[:i+1], "/")) {
 					return true
 				}
 			}
@@ -379,6 +432,9 @@ func fileBytes(req Request, r layout.Row, body []byte) ([]byte, error) {
 	switch r.Renderer {
 	case "claude-instructions":
 		if req.InstructionPointer {
+			if body != nil {
+				return nil, refuse(req, r.Field, "pointer_body", "pointer input cannot also supply an instruction body")
+			}
 			return claude.Pointer(), nil
 		}
 		if body == nil {
@@ -454,15 +510,13 @@ func packageEntries(req Request, r layout.Row, content Content) ([]artifact.Entr
 		if e.Path == "SKILL.md" && e.Kind == artifact.EntryFile {
 			main = true
 		}
-		declared := e.Mode
-		applied := declared.Perm() &^ 0022
-		if e.Kind == artifact.EntryDirectory {
-			applied = 0755
-		} else if declared == 0 {
-			applied = fs.FileMode(r.ModeBits)
+		applied, diag, err := normalizeMode(req, *e, r.Field, true)
+		if err != nil {
+			return nil, nil, err
 		}
-		if declared != 0 && declared != applied {
-			diags = append(diags, Diagnostic{Code: "clamped_package_mode", Provider: req.Provider, Mode: req.Mode, Concern: r.Field, Reason: "package permission mode was normalized", Entry: path.Join(base, e.Path), Declared: declared, Applied: applied})
+		if diag != nil {
+			diag.Entry = path.Join(base, e.Path)
+			diags = append(diags, *diag)
 		}
 		e.Mode = applied
 		e.Path = path.Join(base, e.Path)
@@ -482,6 +536,8 @@ func bind(req Request, out *Result, rows []layout.Row) error {
 			if value == "" {
 				return refuse(req, r.Field, "missing_root", "environment binding requires an explicit root")
 			}
+			// Collision checks defend the binder if future authored locators share
+			// an environment name across distinct roots. Current rows agree.
 			if old, exists := out.Binding.Environment[name]; exists && old != value {
 				return refuse(req, r.Field, "binding_collision", "environment roots disagree")
 			}

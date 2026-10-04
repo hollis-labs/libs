@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -99,10 +100,11 @@ func TestGoldenIntended(t *testing.T) {
 					Path       string              `json:"path"`
 					Ownership  artifact.Ownership  `json:"ownership"`
 					Provenance artifact.Provenance `json:"provenance"`
+					Digest     artifact.Digest     `json:"digest"`
 				}
 				var entries []meta
 				for _, e := range result.Tree.Entries {
-					entries = append(entries, meta{e.Path, e.Ownership, e.Provenance})
+					entries = append(entries, meta{e.Path, e.Ownership, e.Provenance, e.Digest})
 				}
 				ev.Ownership = entries
 			}
@@ -291,6 +293,14 @@ func intendedRequest(in goldens.Input, root string) (render.Request, error) {
 		req.Inputs = append(req.Inputs, input)
 	}
 	switch in.Scenario {
+	case "overlay-modes":
+		req.Overlays = []artifact.Entry{
+			{Path: "notes/plain.txt", Kind: artifact.EntryFile, Bytes: []byte("plain")},
+			{Path: "notes/run.sh", Kind: artifact.EntryFile, Mode: 0751, Bytes: []byte("#!/bin/sh\n")},
+			{Path: "notes/clamp.sh", Kind: artifact.EntryFile, Mode: 04777, Bytes: []byte("#!/bin/sh\n")},
+			{Path: "notes/minimum", Kind: artifact.EntryFile, Mode: fs.ModeSetuid, Bytes: []byte{}},
+			{Path: "notes/empty", Kind: artifact.EntryDirectory, Mode: 0750},
+		}
 	case "missing-credentials":
 		req.Credentials = render.CredentialMissing
 	case "denied-credentials":
@@ -363,14 +373,18 @@ func TestInstalledCreateMatchesArchivedSeed(t *testing.T) {
 			}
 			wanted := map[string]goldens.Entry{}
 			for _, e := range archived {
-				if e.Kind == "file" {
-					wanted[e.Path] = e
-				}
+				wanted[e.Path] = e
 			}
+			// Installed root mode 0 preserves the existing private fixture root.
+			if out.RootMode != 0 {
+				t.Fatal("installed render changes home mode")
+			}
+			rootEntry, ok := wanted["."]
+			if !ok || rootEntry.Kind != "directory" || rootEntry.Mode != "0700" {
+				t.Fatal("archived root contract", rootEntry)
+			}
+			delete(wanted, ".")
 			for _, e := range out.Tree.Entries {
-				if e.Kind != artifact.EntryFile {
-					continue
-				}
 				want, exists := wanted[e.Path]
 				if !exists {
 					t.Fatalf("unattributed installed file %s", e.Path)
@@ -379,7 +393,7 @@ func TestInstalledCreateMatchesArchivedSeed(t *testing.T) {
 				if provider == "claude" && e.Path == ".claude/settings.json" {
 					want.Mode = "0600"
 				}
-				if string(e.Bytes) != want.Content || fmt.Sprintf("%04o", e.Mode.Perm()) != want.Mode {
+				if string(e.Kind) != want.Kind || string(e.Bytes) != want.Content || fmt.Sprintf("%04o", e.Mode.Perm()) != want.Mode {
 					t.Fatalf("installed seed parity: %s\nwant %q\ngot %q", e.Path, want.Content, e.Bytes)
 				}
 				delete(wanted, e.Path)
@@ -398,6 +412,7 @@ func installedApplyAcceptance(provider string) map[string]string {
 		"found_json_key_order":  "preserve existing JSON key order (Claude permissions before fixture_operator)",
 		"unknown_nested_leaves": "preserve unknown operator leaves inside owned objects/tables, including Codex fixture_operator inside mcp_servers.fixture, without dropping or reordering",
 		"unowned_values":        "never overwrite keys the installer does not own",
+		"existing_directories":  "never chmod, conflict on, or remove a pre-existing user directory, including declared parent directories",
 		"check_normalization":   "reproduce settings comparison after owned-key merge and Codex TOML normalization",
 	}
 }

@@ -25,13 +25,14 @@
       "cwd": "<boot>",
       "before_resume": true,
       "posture": {
-        "Provider": "codex",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": "default"
       }
     },
     "resume_placement": "table argv precedes caller-owned resume subcommand; first launch also receives it",
-    "case_family": "native files and table bindings",
+    "case_family": "posture-reference",
+    "permission_evidence": "adapters/provider/bootdir_codex.go: native approval/sandbox vocabulary; adapters/registry/posture.go: measured per-mode native overrides",
     "root": "boot",
     "effects": [
       {
@@ -63,9 +64,7 @@
       }
     ]
   },
-  "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"posture_absent\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"permissions\",\"Reason\":\"posture absent: no native policy emitted; runtime default applies\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
-  ],
+  "diagnostics": [],
   "ownership": [
     {
       "path": "AGENTS.md",
@@ -76,6 +75,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
       }
     },
     {
@@ -87,6 +90,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
       }
     },
     {
@@ -97,7 +104,11 @@
       },
       "provenance": {
         "source": "workspace/render",
-        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[\"mcp_servers\"]}"
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"approval_policy\"],[\"sandbox_mode\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "6b78df80be30babec3c2a22d93ea944407b513587a5cdd09de75598ed954d88f"
       }
     },
     {
@@ -108,6 +119,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -118,6 +133,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -129,6 +148,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -139,6 +162,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -150,6 +177,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     }
   ]

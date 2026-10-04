@@ -68,3 +68,17 @@ func TestNewPlanExportOwnsSeparateFiles(t *testing.T) {
 		t.Fatal("missing credential policy")
 	}
 }
+
+func TestPlanExportSchema(t *testing.T) {
+	outs, err := renderPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := string(outs[planJSONPath])
+	if !strings.Contains(data, `"mode_bits": "0644"`) || strings.Contains(data, `"Provider"`) {
+		t.Fatal("noncanonical row schema")
+	}
+	if !strings.Contains(string(outs[planDocPath]), "| field | concern |") {
+		t.Fatal("missing concern column")
+	}
+}

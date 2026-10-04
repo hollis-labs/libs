@@ -2,5 +2,6 @@
   "provider": "codex",
   "runtime": "subprocess-per-turn",
   "variant": "",
-  "scenario": "duplicate-mcp"
+  "scenario": "duplicate-mcp",
+  "posture": "default"
 }

@@ -2,10 +2,12 @@ package render
 
 import (
 	claude "github.com/hollis-labs/substrate/harness/adapters/claude/nativefiles"
+	codex "github.com/hollis-labs/substrate/harness/adapters/codex/nativefiles"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"strings"
 )
 
 // nativePolicy is selected once from the bound mode that also travels in the
@@ -31,7 +33,7 @@ func nativePosture(req *Request, out *Result) error {
 		if len(parts) == 0 {
 			continue
 		}
-		policyKey := req.Provider == runtimes.Claude && parts[0] == "permissions" || req.Provider == runtimes.Codex && (parts[0] == "approval_policy" || parts[0] == "sandbox_mode" || parts[0] == "sandbox_workspace_write") || req.Provider == runtimes.OpenCode && parts[0] == "permission"
+		policyKey := req.Provider == runtimes.Claude && parts[0] == "permissions" || req.Provider == runtimes.Codex && codexPolicyKey(parts[0]) || req.Provider == runtimes.OpenCode && parts[0] == "permission"
 		if policyKey {
 			return refuse(*req, layout.Permissions, "host_policy_mixture", "bound native permission policy cannot be annotated as unowned")
 		}
@@ -55,7 +57,7 @@ func nativePosture(req *Request, out *Result) error {
 	case runtimes.Codex:
 		mixture = req.Native.Codex.ApprovalPolicy != "" || req.Native.Codex.SandboxMode != "" || len(req.Native.Codex.WritableRoots) > 0
 		for _, slot := range req.Native.Codex.Slots {
-			if slot.Key == "approval_policy" || slot.Key == "sandbox_mode" || slot.Key == "sandbox_workspace_write" {
+			if codexPolicyKey(slot.Key) {
 				mixture = true
 			}
 		}
@@ -79,4 +81,29 @@ func nativePosture(req *Request, out *Result) error {
 		return refuse(*req, layout.Permissions, "host_policy_mixture", "posture reference cannot also carry host-supplied native permission settings")
 	}
 	return nil
+}
+
+// Policy namespaces may select or override policy indirectly; none may mix with
+// a posture reference until the provider precedence is evidenced.
+func codexPolicyKey(key string) bool {
+	first, _, _ := strings.Cut(key, ".")
+	switch first {
+	case "approval_policy", "sandbox_mode", "sandbox_workspace_write", "profiles", "profile", "default_permissions", "permissions":
+		return true
+	}
+	return false
+}
+func hostDefault(in codex.ConfigInput) bool {
+	approval, sandbox := in.ApprovalPolicy, in.SandboxMode
+	object, err := contract.Object(contract.Context{}, in.Slots)
+	if err != nil {
+		return false
+	}
+	if value, ok := object["approval_policy"].(string); ok {
+		approval = value
+	}
+	if value, ok := object["sandbox_mode"].(string); ok {
+		sandbox = value
+	}
+	return approval != "" && sandbox != ""
 }

@@ -9,7 +9,6 @@
       "root": "boot",
       "path": "CLAUDE.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-instructions",
       "locator": {
         "argv": [
@@ -22,7 +21,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "model-visible discovery; direct body or explicit pointer"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -32,7 +32,6 @@
       "root": "boot",
       "path": "AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {
         "argv": [
@@ -45,14 +44,15 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "optional content body; not a second discovery claim"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "claude-settings",
       "posture": {
-        "Provider": "claude",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "claude",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "claude",
       "layer": "boot",
@@ -61,7 +61,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -77,7 +76,8 @@
           "CFG1",
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -88,7 +88,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -104,7 +103,8 @@
           "CFG1",
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -115,7 +115,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -131,7 +130,8 @@
           "CFG1",
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "claude",
@@ -141,7 +141,6 @@
       "root": "boot",
       "path": ".mcp.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-mcp",
       "locator": {
         "argv": [
@@ -163,7 +162,8 @@
           "MCP10"
         ],
         "note": "strict covers measured config sources only"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "claude",
@@ -173,7 +173,6 @@
       "root": "boot",
       "path": ".claude/skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -190,7 +189,8 @@
           "C2",
           "C3"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -200,7 +200,6 @@
       "root": "boot",
       "path": ".claude/agents/{name}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-subagent",
       "locator": {
         "argv": [
@@ -213,7 +212,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "resolved pinned content registration"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "claude-command-pack",
@@ -224,7 +224,6 @@
       "root": "boot",
       "path": ".claude/commands/boot/{name}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-command",
       "locator": {
         "argv": [
@@ -237,7 +236,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "boot command namespace; resolved pinned content registration"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "claude-command-pack",
@@ -248,7 +248,6 @@
       "root": "boot",
       "path": ".claude/commands/boot/{name}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-command",
       "locator": {
         "argv": [
@@ -261,7 +260,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "boot command namespace; resolved pinned content registration"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -273,7 +273,6 @@
       "root": "boot",
       "path": "CLAUDE.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-instructions",
       "locator": {
         "argv": [
@@ -288,14 +287,15 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "model-visible discovery; direct body or explicit pointer"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "claude-settings",
       "posture": {
-        "Provider": "claude",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "claude",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "claude",
       "layer": "boot",
@@ -306,7 +306,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -323,7 +322,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -336,7 +336,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -353,7 +352,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -366,7 +366,6 @@
       "root": "boot",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {
         "argv": [
@@ -383,7 +382,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "claude",
@@ -395,7 +395,6 @@
       "root": "boot",
       "path": ".claude/skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -413,7 +412,8 @@
           "C4",
           "C5"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -423,7 +423,6 @@
       "root": "boot",
       "path": "AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {
         "env": {
@@ -438,14 +437,15 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "codex-config",
       "posture": {
-        "Provider": "codex",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "codex",
       "layer": "boot",
@@ -454,7 +454,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "env": {
@@ -469,7 +468,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -480,7 +480,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "env": {
@@ -495,7 +494,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -506,7 +506,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "document_slot": "mcp_servers",
       "locator": {
@@ -526,7 +525,8 @@
           "MCP8"
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "codex",
@@ -536,7 +536,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "env": {
@@ -552,7 +551,8 @@
           "X3",
           "X4"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "credential_policy": "link-only-never-write",
@@ -563,14 +563,14 @@
       "root": "boot",
       "path": "auth.json",
       "form": "link-effect",
-      "mode_bits": 384,
       "renderer": "credential-link",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "codex",
@@ -580,7 +580,6 @@
       "root": "boot",
       "path": "hooks.json",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "env": {
@@ -593,7 +592,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -603,7 +603,6 @@
       "root": "boot",
       "path": "hooks",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "env": {
@@ -616,7 +615,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -626,7 +626,6 @@
       "root": "boot",
       "path": "agents/{agent}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "opencode-agent",
       "locator": {
         "env": {
@@ -638,14 +637,15 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "primary agent front matter; ID must match launch selection"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "opencode-config",
       "posture": {
-        "Provider": "opencode",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "opencode",
       "layer": "boot",
@@ -654,7 +654,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "permission",
       "locator": {
@@ -667,7 +666,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "native permission slot plus runtime posture mapping"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -678,7 +678,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "locator": {
         "env": {
@@ -692,7 +691,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -703,7 +703,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "mcp",
       "locator": {
@@ -723,7 +722,8 @@
           "MCP4"
         ],
         "note": "no measured MCP-only isolation"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "opencode",
@@ -733,7 +733,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "env": {
@@ -747,13 +746,14 @@
         "observations": [
           "O2"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "posture": {
-        "Provider": "antigravity",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "antigravity",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "antigravity",
       "layer": "boot",
@@ -761,13 +761,13 @@
       "concern": "runtime-permissions",
       "root": "boot",
       "form": "runtime-binding",
-      "mode_bits": 0,
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "adapters/registry/posture.go: agy permission mapping is runtime-only; no native permission file; agy 1.2.14 accepts flags, behavior is not fully measured"
-      }
+      },
+      "mode_bits": "0000"
     },
     {
       "provider": "antigravity",
@@ -777,7 +777,6 @@
       "root": "boot",
       "path": "AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {
         "argv": [
@@ -790,7 +789,8 @@
       "evidence": {
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "agy 1.2.7 live transcript; model-visible, separate from the archived probe"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "antigravity-plugin",
@@ -801,7 +801,6 @@
       "root": "boot",
       "path": ".agents/plugins/tether/plugin.json",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "antigravity-plugin",
       "locator": {
         "argv": [
@@ -814,7 +813,8 @@
       "evidence": {
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "agy 1.2.7: stable tether marker"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "antigravity",
@@ -824,7 +824,6 @@
       "root": "boot",
       "path": ".agents/plugins/tether/mcp_config.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "antigravity-mcp",
       "locator": {
         "argv": [
@@ -838,7 +837,8 @@
       "evidence": {
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "agy 1.2.7 live plugin discovery; isolation unmeasured"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "antigravity",
@@ -848,7 +848,6 @@
       "root": "boot",
       "path": ".agents/skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -861,7 +860,8 @@
       "evidence": {
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "agy 1.2.7 live workspace skill discovery"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -871,7 +871,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "argv": [
@@ -884,7 +883,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -894,7 +894,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "env": {
@@ -906,7 +905,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -916,7 +916,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "env": {
@@ -928,7 +927,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "antigravity",
@@ -938,7 +938,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "argv": [
@@ -951,7 +950,8 @@
       "evidence": {
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -961,14 +961,14 @@
       "root": "home",
       "path": ".claude/AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn installed instruction body"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "claude",
@@ -978,14 +978,14 @@
       "root": "home",
       "path": ".claude/CLAUDE.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "claude-pointer",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit @AGENTS.md pointer"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "claude-settings",
@@ -996,14 +996,14 @@
       "root": "home",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key JSON merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -1014,14 +1014,14 @@
       "root": "home",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key JSON merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "claude-settings",
@@ -1032,14 +1032,14 @@
       "root": "home",
       "path": ".claude/settings.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "claude-settings",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key JSON merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "claude",
@@ -1049,14 +1049,14 @@
       "root": "home",
       "path": ".claude/skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn installed skill ownership"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1066,14 +1066,14 @@
       "root": "home",
       "path": ".codex/AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn installed instructions"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "codex-config",
@@ -1084,14 +1084,14 @@
       "root": "home",
       "path": ".codex/config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key TOML merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1102,14 +1102,14 @@
       "root": "home",
       "path": ".codex/config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key TOML merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1120,7 +1120,6 @@
       "root": "home",
       "path": ".codex/config.toml",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "document_slot": "mcp_servers",
       "locator": {},
@@ -1129,7 +1128,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "owned-key TOML merge preserves operator settings"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "codex",
@@ -1139,14 +1139,14 @@
       "root": "home",
       "path": ".agents/skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "installed skill path deliberately differs from isolated boot"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1157,7 +1157,6 @@
       "root": "boot",
       "path": "AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {
         "argv": [
@@ -1177,7 +1176,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1188,7 +1188,6 @@
       "root": "boot",
       "path": "AGENTS.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "instructions",
       "locator": {
         "env": {
@@ -1204,14 +1203,15 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "codex-config",
       "posture": {
-        "Provider": "codex",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "codex",
       "layer": "boot",
@@ -1221,7 +1221,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "argv": [
@@ -1241,14 +1240,15 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
       "posture": {
-        "Provider": "codex",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "codex",
       "layer": "boot",
@@ -1258,7 +1258,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "env": {
@@ -1274,7 +1273,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1286,7 +1286,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "argv": [
@@ -1306,7 +1305,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1318,7 +1318,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "locator": {
         "env": {
@@ -1334,7 +1333,8 @@
           "CFG2",
           "CFG3"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1346,7 +1346,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "document_slot": "mcp_servers",
       "locator": {
@@ -1371,7 +1370,8 @@
           "MCP8"
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "codex-config",
@@ -1383,7 +1383,6 @@
       "root": "boot",
       "path": "config.toml",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "codex-config",
       "document_slot": "mcp_servers",
       "locator": {
@@ -1404,7 +1403,8 @@
           "MCP8"
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "codex",
@@ -1415,7 +1415,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -1436,7 +1435,8 @@
           "X3",
           "X4"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1447,7 +1447,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "env": {
@@ -1464,7 +1463,8 @@
           "X3",
           "X4"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "credential_policy": "link-only-never-write",
@@ -1476,14 +1476,14 @@
       "root": "boot",
       "path": "auth.json",
       "form": "link-effect",
-      "mode_bits": 384,
       "renderer": "credential-link",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "credential_policy": "link-only-never-write",
@@ -1495,14 +1495,14 @@
       "root": "boot",
       "path": "auth.json",
       "form": "link-effect",
-      "mode_bits": 384,
       "renderer": "credential-link",
       "locator": {},
       "capability": "supported",
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "codex",
@@ -1513,7 +1513,6 @@
       "root": "boot",
       "path": "hooks.json",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "argv": [
@@ -1531,7 +1530,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1542,7 +1542,6 @@
       "root": "boot",
       "path": "hooks.json",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "env": {
@@ -1556,7 +1555,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1567,7 +1567,6 @@
       "root": "boot",
       "path": "hooks",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "argv": [
@@ -1585,7 +1584,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1596,7 +1596,6 @@
       "root": "boot",
       "path": "hooks",
       "form": "resource-request",
-      "mode_bits": 420,
       "renderer": "resource-request",
       "locator": {
         "env": {
@@ -1610,7 +1609,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "Cairn resource declaration is not hook support"
       },
-      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+      "reason": "requires a declared resource implementation; no native hook projection in this cut",
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -1621,7 +1621,6 @@
       "root": "boot",
       "path": "agents/{agent}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "opencode-agent",
       "locator": {
         "argv": [
@@ -1640,7 +1639,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "primary agent front matter; ID must match launch selection"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -1651,7 +1651,6 @@
       "root": "boot",
       "path": "agents/{agent}.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "opencode-agent",
       "locator": {
         "argv": [
@@ -1669,14 +1668,15 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "primary agent front matter; ID must match launch selection"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "composition": "opencode-config",
       "posture": {
-        "Provider": "opencode",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "opencode",
       "layer": "boot",
@@ -1686,7 +1686,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "permission",
       "locator": {
@@ -1706,14 +1705,15 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "native permission slot plus runtime posture mapping"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
       "posture": {
-        "Provider": "opencode",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       },
       "provider": "opencode",
       "layer": "boot",
@@ -1723,7 +1723,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "permission",
       "locator": {
@@ -1742,7 +1741,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "native permission slot plus runtime posture mapping"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -1754,7 +1754,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "locator": {
         "argv": [
@@ -1775,7 +1774,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -1787,7 +1787,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "file",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "locator": {
         "argv": [
@@ -1807,7 +1806,8 @@
         "observations": [
           "CFG2"
         ]
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -1819,7 +1819,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "mcp",
       "locator": {
@@ -1846,7 +1845,8 @@
           "MCP4"
         ],
         "note": "no measured MCP-only isolation"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "composition": "opencode-config",
@@ -1858,7 +1858,6 @@
       "root": "boot",
       "path": "opencode.json",
       "form": "document-slot",
-      "mode_bits": 384,
       "renderer": "opencode-config",
       "document_slot": "mcp",
       "locator": {
@@ -1884,7 +1883,8 @@
           "MCP4"
         ],
         "note": "no measured MCP-only isolation"
-      }
+      },
+      "mode_bits": "0600"
     },
     {
       "provider": "opencode",
@@ -1895,7 +1895,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -1916,7 +1915,8 @@
         "observations": [
           "O2"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -1927,7 +1927,6 @@
       "root": "boot",
       "path": "skills/{name}/SKILL.md",
       "form": "skill-package",
-      "mode_bits": 420,
       "renderer": "skill-package",
       "locator": {
         "argv": [
@@ -1947,7 +1946,8 @@
         "observations": [
           "O2"
         ]
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1958,7 +1958,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "argv": [
@@ -1975,7 +1974,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "codex",
@@ -1986,7 +1986,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "env": {
@@ -1999,7 +1998,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -2010,7 +2010,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "argv": [
@@ -2029,7 +2028,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     },
     {
       "provider": "opencode",
@@ -2040,7 +2040,6 @@
       "root": "boot",
       "path": "boot.md",
       "form": "file",
-      "mode_bits": 420,
       "renderer": "kickoff",
       "locator": {
         "argv": [
@@ -2058,7 +2057,8 @@
       "evidence": {
         "reference": "adapters/layout/plan/doc.go",
         "note": "launcher-read artifact, distinct from persona"
-      }
+      },
+      "mode_bits": "0644"
     }
   ]
 }

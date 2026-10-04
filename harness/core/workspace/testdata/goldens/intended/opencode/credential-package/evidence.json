@@ -20,6 +20,6 @@
     "root": ""
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"credential_write\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential destinations cannot be managed entries\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"\",\"Code\":\"credential_write\",\"Class\":\"refusal\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential destinations cannot be managed entries\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
   ]
 }

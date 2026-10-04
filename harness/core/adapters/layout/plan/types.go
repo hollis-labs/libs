@@ -113,9 +113,9 @@ type Locator struct {
 // PostureReference names the existing runtime mapper, without owning its argv/env.
 // Posture is supplied explicitly after profile binding; empty means absent.
 type PostureReference struct {
-	Provider runtimes.ID
-	Mapper   string
-	Posture  permission.Mode
+	Provider runtimes.ID     `json:"provider"`
+	Mapper   string          `json:"mapper"`
+	Posture  permission.Mode `json:"posture"`
 }
 
 type Evidence struct {
@@ -155,7 +155,8 @@ type Row struct {
 	Reason           string            `json:"reason,omitempty"`
 }
 
-func (r Row) clone() Row {
+// Clone returns a detached row including locator and evidence collections.
+func (r Row) Clone() Row {
 	if r.Posture != nil {
 		p := *r.Posture
 		r.Posture = &p
@@ -207,3 +208,5 @@ func NormalizeProvider(id runtimes.ID) runtimes.ID {
 	}
 	return id
 }
+
+func (r Row) clone() Row { return r.Clone() }

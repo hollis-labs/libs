@@ -381,13 +381,19 @@ func validToken(s string) bool {
 	return literalToken.MatchString(s)
 }
 
-func credentialPath(p string) bool {
-	switch path.Base(p) {
-	case "auth.json", ".credentials.json", "oauth_creds.json":
-		return true
+// IsCredentialDestination reports whether any relative path component names a
+// credential destination, including case aliases and credential-named parents.
+func IsCredentialDestination(p string) bool {
+	for _, part := range strings.Split(p, "/") {
+		for _, name := range []string{"auth.json", ".credentials.json", "oauth_creds.json"} {
+			if strings.EqualFold(part, name) {
+				return true
+			}
+		}
 	}
 	return false
 }
+func credentialPath(p string) bool { return IsCredentialDestination(p) }
 func emptyLocator(l Locator) bool {
 	return len(l.Argv) == 0 && len(l.Env) == 0 && l.CWD == "" && l.RPCProject == "" && !l.BeforeResume
 }

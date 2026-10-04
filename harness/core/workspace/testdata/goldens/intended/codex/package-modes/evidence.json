@@ -25,13 +25,14 @@
       "cwd": "<boot>",
       "before_resume": true,
       "posture": {
-        "Provider": "codex",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "codex",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": "default"
       }
     },
     "resume_placement": "table argv precedes caller-owned resume subcommand; first launch also receives it",
-    "case_family": "native files and table bindings",
+    "case_family": "posture-reference",
+    "permission_evidence": "adapters/provider/bootdir_codex.go: native approval/sandbox vocabulary; adapters/registry/posture.go: measured per-mode native overrides",
     "root": "boot",
     "effects": [
       {
@@ -64,8 +65,7 @@
     ]
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"clamped_package_mode\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"skills\",\"Reason\":\"package permission mode was normalized\",\"Entry\":\"skills/sample/clamp.sh\",\"Declared\":2559,\"Applied\":493}",
-    "{\"Posture\":\"\",\"Code\":\"posture_absent\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"permissions\",\"Reason\":\"posture absent: no native policy emitted; runtime default applies\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"\",\"Code\":\"clamped_package_mode\",\"Class\":\"informational\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"skills\",\"Reason\":\"entry permission mode was normalized\",\"Entry\":\"skills/sample/clamp.sh\",\"Declared\":2559,\"Applied\":493}"
   ],
   "ownership": [
     {
@@ -77,6 +77,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
       }
     },
     {
@@ -88,6 +92,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
       }
     },
     {
@@ -98,7 +106,11 @@
       },
       "provenance": {
         "source": "workspace/render",
-        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcp_servers\",\"http\",\"url\"],[\"mcp_servers\",\"loopback\",\"url\"],[\"mcp_servers\",\"mux\",\"args\"],[\"mcp_servers\",\"mux\",\"command\"],[\"mcp_servers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcp_servers\",\"stdio\",\"args\"],[\"mcp_servers\",\"stdio\",\"command\"],[\"mcp_servers\",\"stdio\",\"env\",\"FIXTURE\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"approval_policy\"],[\"mcp_servers\",\"http\",\"url\"],[\"mcp_servers\",\"loopback\",\"url\"],[\"mcp_servers\",\"mux\",\"args\"],[\"mcp_servers\",\"mux\",\"command\"],[\"mcp_servers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcp_servers\",\"stdio\",\"args\"],[\"mcp_servers\",\"stdio\",\"command\"],[\"mcp_servers\",\"stdio\",\"env\",\"FIXTURE\"],[\"sandbox_mode\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "01561940c0ccdd3e103c816e4445a28a89dffe240a6a936dcbcd7a43c662f3a5"
       }
     },
     {
@@ -109,6 +121,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -119,6 +135,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -130,6 +150,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -141,6 +165,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf"
       }
     },
     {
@@ -152,6 +180,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
       }
     },
     {
@@ -163,6 +195,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
@@ -174,6 +210,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -184,6 +224,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -195,6 +239,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     }
   ]

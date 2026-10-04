@@ -25,7 +25,7 @@ func TestPackageModesAndInputIsolation(t *testing.T) {
 		{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0750},
 	}
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Skills), Content: Content{Pin: Pin{"fixture-package", "revision"}, Package: artifact.Tree{Entries: entries}}}}
-	out, err := Render(req)
+	out, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,12 +57,12 @@ func TestPackageModesAndInputIsolation(t *testing.T) {
 func TestDeterministicAssembly(t *testing.T) {
 	req := request(runtimes.Claude)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Claude, layout.Skills), Content: Content{Pin: Pin{"fixture", "revision"}, Package: artifact.Tree{Entries: []artifact.Entry{{Path: "SKILL.md", Kind: artifact.EntryFile, Mode: 0640, Bytes: []byte("skill")}}}}}, {Resolved: resolved(t, runtimes.Claude, layout.Instructions), Content: Content{Body: []byte("instructions")}}, {Resolved: resolved(t, runtimes.Claude, layout.MCP)}}
-	first, err := Render(req)
+	first, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	slices.Reverse(req.Inputs)
-	second, err := Render(req)
+	second, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,11 +74,8 @@ func TestCodexAbsentAndDeclaredNativeDefaults(t *testing.T) {
 	req := request(runtimes.Codex)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Settings)}}
 	out, err := Render(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(out.Diagnostics) != 1 || out.Diagnostics[0].Code != "posture_absent" || len(out.Tree.Entries[0].Bytes) != 0 {
-		t.Fatalf("%#v", out)
+	if err == nil {
+		t.Fatal("headless absence accepted")
 	}
 	req.Native.Codex.ApprovalPolicy = "never"
 	req.Native.Codex.SandboxMode = "workspace-write"
@@ -96,7 +93,7 @@ func TestCodexAbsentAndDeclaredNativeDefaults(t *testing.T) {
 func TestCredentialPackageRefused(t *testing.T) {
 	req := request(runtimes.Codex)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Skills), Content: Content{Pin: Pin{"fixture", "revision"}, Package: artifact.Tree{Entries: []artifact.Entry{{Path: "SKILL.md", Kind: artifact.EntryFile, Bytes: []byte("skill")}, {Path: "auth.json", Kind: artifact.EntryFile, Bytes: []byte("DUMMY-SENTINEL")}}}}}}
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("credential managed inside package")
 	}
 }
@@ -105,11 +102,11 @@ func TestExplicitClaudePointer(t *testing.T) {
 	req := request(runtimes.Claude)
 	req.InstructionPointer = true
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Claude, layout.Instructions)}}
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("pointer without neutral body accepted")
 	}
 	req.Inputs = append(req.Inputs, Input{Resolved: resolved(t, runtimes.Claude, layout.NeutralInstructions), Content: Content{Body: []byte("resolved instructions\n")}})
-	out, err := Render(req)
+	out, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +118,7 @@ func TestExplicitClaudePointer(t *testing.T) {
 		t.Fatal(files)
 	}
 	req.Provider = runtimes.Codex
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("provider-specific pointer accepted on Codex")
 	}
 }
@@ -142,7 +139,7 @@ func TestPosturePolicyMixtureRefusal(t *testing.T) {
 		case runtimes.OpenCode:
 			req.Native.OpenCode.Slots = []contract.Slot{{Key: "permission", Value: "allow"}}
 		}
-		_, err = Render(req)
+		_, err = renderWithTestPosture(req)
 		var d *Diagnostic
 		if !errors.As(err, &d) || d.Code != "host_policy_mixture" || d.Provider != p || d.Mode != req.Mode || d.Concern != layout.Permissions || d.Reason == "" {
 			t.Fatalf("%s: %v", p, err)
@@ -162,7 +159,7 @@ func TestReservedDocumentsWithoutEmittedContent(t *testing.T) {
 				continue
 			}
 			req.Overlays = []artifact.Entry{{Path: "./" + row.Path, Kind: artifact.EntryFile, Bytes: []byte("DUMMY-SENTINEL")}}
-			if _, err = Render(req); err == nil {
+			if _, err = renderWithTestPosture(req); err == nil {
 				t.Errorf("%s %s native path accepted without emitted row", p, row.Path)
 			}
 		}
@@ -172,12 +169,12 @@ func TestResolutionCannotSpoofAgentOrLocator(t *testing.T) {
 	req := request(runtimes.OpenCode)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.OpenCode, layout.Instructions), Content: Content{Body: []byte("instructions")}}}
 	req.Agent = "other"
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("agent name diverged from selection")
 	}
 	req.Agent = "fixture"
 	req.Inputs[0].Resolved.Row.Locator.Argv = []string{"--unsafe"}
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("locator spoof accepted")
 	}
 }
@@ -185,9 +182,9 @@ func TestMissingRootIsTyped(t *testing.T) {
 	req := request(runtimes.Codex)
 	req.Roots = nil
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Settings)}}
-	_, err := Render(req)
+	_, err := renderWithTestPosture(req)
 	var d *Diagnostic
-	if !errors.As(err, &d) || d.Code != "missing_root" || d.Concern != layout.Settings {
+	if !errors.As(err, &d) || d.Code != "missing_root" || d.Concern != layout.Permissions {
 		t.Fatalf("%v", err)
 	}
 }
@@ -195,7 +192,7 @@ func TestMissingRootIsTyped(t *testing.T) {
 func TestExplicitDirectoryMode(t *testing.T) {
 	req := request(runtimes.Claude)
 	req.Overlays = []artifact.Entry{{Path: "notes", Kind: artifact.EntryDirectory, Mode: 0750}}
-	out, err := Render(req)
+	out, err := renderWithTestPosture(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +205,7 @@ func TestRootsAreExplicitAbsoluteDirectories(t *testing.T) {
 		req := request(runtimes.Codex)
 		req.Roots[layout.RootBoot] = root
 		req.Inputs = []Input{{Resolved: resolved(t, runtimes.Codex, layout.Settings)}}
-		if _, err := Render(req); err == nil {
+		if _, err := renderWithTestPosture(req); err == nil {
 			t.Errorf("accepted root %q", root)
 		}
 	}
@@ -217,13 +214,13 @@ func TestRootsAreExplicitAbsoluteDirectories(t *testing.T) {
 func TestNativeInputNeedsSelectedOwner(t *testing.T) {
 	req := request(runtimes.Codex)
 	req.Native.Codex.ApprovalPolicy = "never"
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("native policy silently discarded without resolved config row")
 	}
 	req = request(runtimes.Claude)
 	req.Inputs = []Input{{Resolved: resolved(t, runtimes.Claude, layout.Settings)}}
 	req.Native.Codex.SandboxMode = "danger-full-access"
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("foreign provider native inputs silently discarded")
 	}
 }
@@ -235,7 +232,7 @@ func TestPostureOwnershipCannotBeDisclaimed(t *testing.T) {
 	}
 	req.Inputs = []Input{{Resolved: r}}
 	req.Native.OperatorKeyPaths = [][]string{{"sandbox_mode"}}
-	if _, err = Render(req); err == nil {
+	if _, err = renderWithTestPosture(req); err == nil {
 		t.Fatal("bound native policy marked unowned")
 	}
 }
@@ -243,7 +240,7 @@ func TestPostureOwnershipCannotBeDisclaimed(t *testing.T) {
 func TestOverlayCannotBlockReservedNativeParent(t *testing.T) {
 	req := request(runtimes.Claude)
 	req.Overlays = []artifact.Entry{{Path: ".claude", Kind: artifact.EntryFile, Bytes: []byte("DUMMY-SENTINEL")}}
-	if _, err := Render(req); err == nil {
+	if _, err := renderWithTestPosture(req); err == nil {
 		t.Fatal("overlay blocks reserved native namespace when no row emitted")
 	}
 }

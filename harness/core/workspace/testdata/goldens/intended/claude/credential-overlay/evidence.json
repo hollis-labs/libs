@@ -20,6 +20,6 @@
     "root": ""
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"reserved_destination\",\"Provider\":\"claude\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"resources\",\"Reason\":\"overlay claims a native or credential destination\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"\",\"Code\":\"reserved_destination\",\"Class\":\"refusal\",\"Provider\":\"claude\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"resources\",\"Reason\":\"overlay claims a native or credential destination\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
   ]
 }

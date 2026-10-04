@@ -5,6 +5,7 @@
     "installed_skill_evidence": "authored installed package row and declared-mode contract; archived installed seed supplies no installed skills; no installed-skill seed parity claimed",
     "installed_apply_acceptance": {
       "check_normalization": "reproduce settings comparison after owned-key merge and Codex TOML normalization",
+      "existing_directories": "never chmod, conflict on, or remove a pre-existing user directory, including declared parent directories",
       "found_json_key_order": "preserve existing JSON key order (Claude permissions before fixture_operator)",
       "source_seed": "seeds/cairn/claude/install-refresh must pass byte-for-byte at installed apply; these pure fixtures do not perform a merge",
       "unknown_nested_leaves": "preserve unknown operator leaves inside owned objects/tables, including Codex fixture_operator inside mcp_servers.fixture, without dropping or reordering",
@@ -37,6 +38,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -48,6 +53,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5325172137744cfd18cad54ed0f33d9722dc7f7b7e0bf39ebb65531dd49b6dad"
       }
     },
     {
@@ -59,6 +68,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instruction-pointer"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49"
       }
     },
     {
@@ -70,6 +83,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
       }
     },
     {
@@ -80,6 +97,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -90,6 +111,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -101,6 +126,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -111,6 +140,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -122,6 +155,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     }
   ]

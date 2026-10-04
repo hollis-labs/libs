@@ -27,9 +27,9 @@
       },
       "cwd": "/fixture/project",
       "posture": {
-        "Provider": "opencode",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": "yolo"
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": "yolo"
       }
     },
     "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
@@ -47,6 +47,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -58,6 +62,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "6543a949999148c2e1c897847a2530274295df601a4a1c13c67ea2d2c121ffe3"
       }
     },
     {
@@ -69,6 +77,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
       }
     },
     {
@@ -80,6 +92,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcp\",\"http\",\"enabled\"],[\"mcp\",\"http\",\"type\"],[\"mcp\",\"http\",\"url\"],[\"mcp\",\"loopback\",\"enabled\"],[\"mcp\",\"loopback\",\"type\"],[\"mcp\",\"loopback\",\"url\"],[\"mcp\",\"mux\",\"command\"],[\"mcp\",\"mux\",\"enabled\"],[\"mcp\",\"mux\",\"environment\",\"FIXTURE\"],[\"mcp\",\"mux\",\"type\"],[\"mcp\",\"stdio\",\"command\"],[\"mcp\",\"stdio\",\"enabled\"],[\"mcp\",\"stdio\",\"environment\",\"FIXTURE\"],[\"mcp\",\"stdio\",\"type\"],[\"permission\",\"bash\"],[\"permission\",\"doom_loop\"],[\"permission\",\"edit\"],[\"permission\",\"external_directory\"],[\"permission\",\"webfetch\"]],\"reserved_slots\":[\"mcp\",\"permission\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "be7bff835c9fedb29aa78a4957a3d7ee4dd5ce1b20908120ab3f24f49803e6c3"
       }
     },
     {
@@ -90,6 +106,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -100,6 +120,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -111,6 +135,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -121,6 +149,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -132,6 +164,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     }
   ]

@@ -21,9 +21,9 @@
       ],
       "cwd": "<boot>",
       "posture": {
-        "Provider": "antigravity",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": "default"
+        "provider": "antigravity",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": "default"
       }
     },
     "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
@@ -32,7 +32,7 @@
     "root": "boot"
   },
   "diagnostics": [
-    "{\"Posture\":\"default\",\"Code\":\"native_permission_omitted\",\"Provider\":\"antigravity\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"permissions\",\"Reason\":\"no evidenced native permission file; runtime posture reference only\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"default\",\"Code\":\"native_permission_omitted\",\"Class\":\"informational\",\"Provider\":\"antigravity\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"permissions\",\"Reason\":\"no evidenced native permission file; runtime posture reference only\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
   ],
   "ownership": [
     {
@@ -43,6 +43,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -53,6 +57,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -63,6 +71,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -74,6 +86,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcpServers\",\"http\",\"serverUrl\"],[\"mcpServers\",\"loopback\",\"serverUrl\"],[\"mcpServers\",\"mux\",\"args\"],[\"mcpServers\",\"mux\",\"command\"],[\"mcpServers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcpServers\",\"stdio\",\"args\"],[\"mcpServers\",\"stdio\",\"command\"],[\"mcpServers\",\"stdio\",\"env\",\"FIXTURE\"]],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "7dbc95d649f7e98abca6ba612587a14602f48c116a65815bc4aaab367369ec93"
       }
     },
     {
@@ -85,6 +101,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"name\"]],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "bad44d0f8ae7218b22b2adfcbea41325cbb191dc060c9265d4abe67a011e05c5"
       }
     },
     {
@@ -95,6 +115,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -105,6 +129,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -116,6 +144,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -126,6 +158,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -137,6 +173,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     },
     {
@@ -148,6 +188,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
       }
     },
     {
@@ -159,6 +203,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
       }
     }
   ]
