@@ -303,3 +303,40 @@ func TestMaterializeReleasesCompleteLockSetInReverse(t *testing.T) {
 		t.Fatal("release order", events)
 	}
 }
+
+func TestArtifactProofIsBoundToResult(t *testing.T) {
+	for name, change := range map[string]func(*workspace.ApplyResult){
+		"input digest":    func(r *workspace.ApplyResult) { r.Receipt.InputDigest = "changed" },
+		"root identity":   func(r *workspace.ApplyResult) { r.Receipt.Roots[0].Root.Owner = "changed" },
+		"root completion": func(r *workspace.ApplyResult) { r.Receipt.Roots[0].Complete = false },
+		"handle":          func(r *workspace.ApplyResult) { r.Handles = nil },
+		"obligations":     func(r *workspace.ApplyResult) { r.Obligations = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, host, _ := applyFixture(t)
+			result, err := workspace.Materialize(context.Background(), p, host.ports())
+			if err != nil || !result.ArtifactsComplete() {
+				t.Fatalf("fixture did not earn completion: %v", err)
+			}
+			change(&result)
+			if result.ArtifactsComplete() {
+				t.Fatal("edited result retained completion proof")
+			}
+		})
+	}
+}
+
+func TestCallerCannotMintLaunchReadiness(t *testing.T) {
+	if (workspace.ApplyResult{Status: workspace.Ready}).LaunchReady() {
+		t.Fatal("caller minted launch readiness")
+	}
+	p, host, _ := applyFixture(t)
+	result, err := workspace.Materialize(context.Background(), p, host.ports())
+	if err != nil || !result.ArtifactsComplete() || result.LaunchReady() {
+		t.Fatalf("artifact-only guarantee changed: %v", err)
+	}
+	result.Status = workspace.Ready
+	if result.LaunchReady() || result.ArtifactsComplete() {
+		t.Fatal("status mutation minted a proof")
+	}
+}

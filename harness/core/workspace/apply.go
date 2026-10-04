@@ -182,7 +182,11 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			mutated = true
 			result.Retained = appendRoot(result.Retained, a.Root)
 			var handle materialize.Handle
-			handle, err = materialize.NewEngine(materialize.EngineOptions{Now: ports.Clock.Now}).Apply(ctx, a.Request)
+			request := a.Request
+			// The planned manifest is advisory. Only the independently loaded live
+			// manifest may instruct the engine's ownership-sensitive reconciliation.
+			request.CurrentManifest = copyRecord(physical[a.Root.ID].Manifest)
+			handle, err = materialize.NewEngine(materialize.EngineOptions{Now: ports.Clock.Now}).Apply(ctx, request)
 			if err != nil {
 				return result, err
 			}
@@ -205,6 +209,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 		return result, err
 	}
 	result.artifactsComplete = true
+	result.artifactSeal, result.artifactsComplete = resultSeal(result)
 	return result, nil
 }
 func appendRoot(roots []RootRef, r RootRef) []RootRef {

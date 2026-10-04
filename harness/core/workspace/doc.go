@@ -15,7 +15,7 @@
 // Artifact completion and launch readiness are separate guarantees. An earned
 // artifact-complete result has Partial status and a launch_reservation_pending
 // obligation. Legacy callers may proceed on ArtifactsComplete, preserving their
-// existing artifact-only guarantee. New launch integrations must require Ready,
+// existing artifact-only guarantee. New launch integrations must require LaunchReady,
 // which also requires effects, publication and an acknowledged use reservation.
 // No current operation in this package issues Ready. Apply records planned and
 // interrupted control receipts before mutation, then verifies engine manifests
