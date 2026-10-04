@@ -228,3 +228,35 @@ func TestAlreadyPresentDivergenceRemainsConflict(t *testing.T) {
 		t.Fatal(inspected)
 	}
 }
+
+func TestInspectionRejectsForeignGrantAndMechanism(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*effects.TrustEvidence)
+	}{
+		{"authorization", func(e *effects.TrustEvidence) { e.AuthorizationID = "other-grant" }},
+		{"mechanism", func(e *effects.TrustEvidence) { e.Mechanism = string(CodexProjects) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, c := fixture()
+			p := &fakePort{}
+			prepared, pre := Preflight(context.Background(), r, c.PreflightContext, p)
+			if pre.Outcome != effects.Prepared {
+				t.Fatal(pre)
+			}
+			applied := Apply(context.Background(), prepared, c, p)
+			if applied.Outcome != effects.Applied {
+				t.Fatal(applied)
+			}
+			if got := Inspect(context.Background(), prepared, c.PreflightContext, p, applied.Evidence); got.Outcome != effects.Applied {
+				t.Fatal(got)
+			}
+			e := applied.Evidence.Clone()
+			tc.mutate(&e.Trust[0])
+			got := Inspect(context.Background(), prepared, c.PreflightContext, p, e)
+			if got.Outcome != effects.Refused || got.Code != "evidence_refused" || p.updates != 1 {
+				t.Fatalf("foreign receipt accepted or replayed: %+v updates=%d", got, p.updates)
+			}
+		})
+	}
+}
