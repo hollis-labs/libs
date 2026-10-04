@@ -298,6 +298,7 @@ type Ports struct {
 	Host         Host
 	Locks        Locks
 	Observations Observer
+	ReceiptStore ReceiptStore
 }
 type Clock interface{ Now() time.Time }
 type IDs interface {
@@ -313,4 +314,10 @@ type Locks interface {
 type HeldLock interface{ Release() error }
 type Observer interface {
 	Observe(context.Context, Resources) (Observations, error)
+}
+
+// ReceiptStore persists control records outside every mutable workspace root.
+// Record must reject an operation ID bound to a different input digest.
+type ReceiptStore interface {
+	Record(context.Context, Receipt) error
 }
