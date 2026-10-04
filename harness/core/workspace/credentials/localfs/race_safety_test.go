@@ -609,8 +609,12 @@ func TestSafetySourceSwapAfterAuthorization(t *testing.T) {
 						return nil
 					}
 					c.Receipts = sink
+					prepared, pre := credentials.Preflight(context.Background(), g, c.PreflightContext, p)
+					if pre.Outcome != effects.Prepared {
+						t.Fatal(pre)
+					}
 					done := make(chan effects.Result, 1)
-					go func() { done <- runApply(t, g, c, p) }()
+					go func() { done <- credentials.Apply(context.Background(), prepared, c, p) }()
 					select {
 					case r := <-done:
 						reality(t, g, r, before, "src-swap")
