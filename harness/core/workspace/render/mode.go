@@ -28,7 +28,9 @@ func normalizeMode(req Request, e artifact.Entry, field layout.Field, pkg bool, 
 	}
 	changed := declared != 0 && declared != applied
 	if e.Kind == artifact.EntryDirectory {
-		changed = declared != 0 && declared.Perm() != 0755
+		// ModeDir describes the entry; special bits still require a diagnostic.
+		const specialBits = fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky | 07000
+		changed = declared != 0 && (declared.Perm() != 0755 || declared&specialBits != 0)
 	}
 	if changed {
 		return applied, &Diagnostic{Class: ClassInformational, Code: code, Provider: req.Provider, Mode: req.Mode, Concern: field, Reason: "entry permission mode was normalized", Entry: e.Path, Declared: declared, Applied: applied}, nil
