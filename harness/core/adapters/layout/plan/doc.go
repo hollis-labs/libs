@@ -12,8 +12,9 @@
 //
 // Intended deltas from legacy output, applied only at cutover:
 //   - Absent Codex posture drops implicit never/workspace-write native defaults.
-//     Headless operation then uses runtime defaults; a declared host default
-//     can explicitly retain the former native settings. Render diagnoses absence.
+//     Headless transports refuse absence; a declared host default
+//     can explicitly retain the former native settings. Interactive support
+//     makes no headless safety claim; Codex pty is currently unsupported.
 //   - Explicit postures add Claude defaultMode, posture-derived Codex approval
 //     and sandbox settings, and evidenced OpenCode permission config. The bound
 //     mode also drives the runtime reference; Antigravity diagnoses native absence.
@@ -31,10 +32,11 @@
 //   - Claude settings.json and .mcp.json are explicitly 0600.
 //   - Codex config.toml and Antigravity mcp_config.json are explicitly 0600;
 //     Codex auth.json is a credential link effect, never an empty planted file.
-//   - Unread MCP mirrors, OpenCode agents.json and .opencode/skills are dropped.
+//   - Unread MCP mirrors are dropped. OpenCode agents.json and .opencode/skills
+//     removals describe the legacy table; neither occurs in archived writer output.
 //
 // Installed encodings retain the generated-by banner (the resolved definition
-// identifier replaces the profile identifier) and Codex literal-string/parent
+// identifier replaces the profile identifier; safe component names are required) and Codex literal-string/parent
 // MCP tables so human-run drift checks retain their content semantics. Installed
 // Claude settings narrow 0644 to 0600 at explicit installed apply; no mode is
 // widened. Existing-document reads and recursive owned-key merge belong to that

@@ -2,5 +2,6 @@
   "provider": "codex",
   "runtime": "subprocess-per-turn",
   "variant": "",
-  "scenario": "stdio-no-env"
+  "scenario": "stdio-no-env",
+  "posture": "default"
 }

@@ -27,9 +27,9 @@
       },
       "cwd": "/fixture/project",
       "posture": {
-        "Provider": "opencode",
-        "Mapper": "adapters/registry.Descriptor.PostureFor",
-        "Posture": ""
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
       }
     },
     "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
@@ -37,7 +37,7 @@
     "root": "boot"
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"clamped_package_mode\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"skills\",\"Reason\":\"package permission mode was normalized\",\"Entry\":\"skills/sample/clamp.sh\",\"Declared\":2559,\"Applied\":493}"
+    "{\"Posture\":\"\",\"Code\":\"clamped_package_mode\",\"Class\":\"informational\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"skills\",\"Reason\":\"entry permission mode was normalized\",\"Entry\":\"skills/sample/clamp.sh\",\"Declared\":2559,\"Applied\":493}"
   ],
   "ownership": [
     {
@@ -48,6 +48,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -59,6 +63,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "6543a949999148c2e1c897847a2530274295df601a4a1c13c67ea2d2c121ffe3"
       }
     },
     {
@@ -70,6 +78,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
       }
     },
     {
@@ -81,6 +93,10 @@
       "provenance": {
         "source": "workspace/render",
         "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcp\",\"http\",\"enabled\"],[\"mcp\",\"http\",\"type\"],[\"mcp\",\"http\",\"url\"],[\"mcp\",\"loopback\",\"enabled\"],[\"mcp\",\"loopback\",\"type\"],[\"mcp\",\"loopback\",\"url\"],[\"mcp\",\"mux\",\"command\"],[\"mcp\",\"mux\",\"enabled\"],[\"mcp\",\"mux\",\"environment\",\"FIXTURE\"],[\"mcp\",\"mux\",\"type\"],[\"mcp\",\"stdio\",\"command\"],[\"mcp\",\"stdio\",\"enabled\"],[\"mcp\",\"stdio\",\"environment\",\"FIXTURE\"],[\"mcp\",\"stdio\",\"type\"]],\"reserved_slots\":[\"mcp\",\"permission\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "2a10183f36617dc4c0dcc0de3bbe672ea5db64234145abed73f3445ec70afb9d"
       }
     },
     {
@@ -91,6 +107,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -101,6 +121,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -112,6 +136,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
       }
     },
     {
@@ -123,6 +151,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf"
       }
     },
     {
@@ -134,6 +166,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
       }
     },
     {
@@ -145,6 +181,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
@@ -156,6 +196,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -166,6 +210,10 @@
       },
       "provenance": {
         "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
       }
     },
     {
@@ -177,6 +225,10 @@
       "provenance": {
         "source": "fixture-package",
         "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
       }
     }
   ]

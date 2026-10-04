@@ -20,6 +20,6 @@
     "root": ""
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"denied_credentials\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential provisioning was denied\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"\",\"Code\":\"denied_credentials\",\"Class\":\"refusal\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential provisioning was denied\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
   ]
 }

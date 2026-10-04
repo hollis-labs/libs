@@ -16,6 +16,7 @@ import (
 	"io"
 	"path"
 	"reflect"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
@@ -96,7 +97,7 @@ func ValidateComposition(ctx Context, claims []Claim, reserved []string) error {
 		if err != nil {
 			return err
 		}
-		reservedPaths = append(reservedPaths, normalized)
+		reservedPaths = append(reservedPaths, FoldPath(normalized))
 	}
 	seen := map[string]Claim{}
 	for _, c := range claims {
@@ -104,6 +105,7 @@ func ValidateComposition(ctx Context, claims []Claim, reserved []string) error {
 		if err != nil {
 			return err
 		}
+		normalized = FoldPath(normalized)
 		c.path = normalized
 		if !c.overlay && !c.owner.Valid() {
 			return ctx.Refuse(InvalidInput, "serializer owner must be an issued handle")
@@ -402,4 +404,18 @@ func ValidateDirectories(ctx Context, dirs []string) error {
 		}
 	}
 	return nil
+}
+
+// FoldPath returns a stable Unicode simple-case-fold comparison key. It does
+// not perform Unicode normalization; canonically equivalent spellings may differ.
+func FoldPath(value string) string {
+	return strings.Map(func(r rune) rune {
+		smallest := r
+		for next := unicode.SimpleFold(r); next != r; next = unicode.SimpleFold(next) {
+			if next < smallest {
+				smallest = next
+			}
+		}
+		return smallest
+	}, value)
 }

@@ -19,7 +19,8 @@
   {
     "path": "config.toml",
     "kind": "file",
-    "mode": "0600"
+    "mode": "0600",
+    "content": "approval_policy = \"on-request\"\nsandbox_mode = \"read-only\"\n"
   },
   {
     "path": "skills",

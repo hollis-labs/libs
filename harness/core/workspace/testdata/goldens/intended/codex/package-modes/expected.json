@@ -20,7 +20,7 @@
     "path": "config.toml",
     "kind": "file",
     "mode": "0600",
-    "content": "\n[mcp_servers.loopback]\nurl = \"http://127.0.0.1:23456/mcp\"\n\n[mcp_servers.mux]\ncommand = \"fixture-mcp\"\nargs = [\"--stdio\"]\n\n[mcp_servers.mux.env]\n\"FIXTURE\" = \"yes\"\n\n[mcp_servers.http]\nurl = \"http://127.0.0.1:23457/mcp\"\n\n[mcp_servers.stdio]\ncommand = \"fixture-server\"\nargs = [\"one\", \"two\"]\n\n[mcp_servers.stdio.env]\n\"FIXTURE\" = \"yes\"\n"
+    "content": "approval_policy = \"on-request\"\nsandbox_mode = \"read-only\"\n\n[mcp_servers.loopback]\nurl = \"http://127.0.0.1:23456/mcp\"\n\n[mcp_servers.mux]\ncommand = \"fixture-mcp\"\nargs = [\"--stdio\"]\n\n[mcp_servers.mux.env]\n\"FIXTURE\" = \"yes\"\n\n[mcp_servers.http]\nurl = \"http://127.0.0.1:23457/mcp\"\n\n[mcp_servers.stdio]\ncommand = \"fixture-server\"\nargs = [\"one\", \"two\"]\n\n[mcp_servers.stdio.env]\n\"FIXTURE\" = \"yes\"\n"
   },
   {
     "path": "skills",

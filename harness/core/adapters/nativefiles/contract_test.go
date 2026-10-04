@@ -67,3 +67,16 @@ func TestObjectMergesDisjointSlots(t *testing.T) {
 		t.Fatal("conflicting native slot accepted")
 	}
 }
+
+func TestCaseFoldComposition(t *testing.T) {
+	ctx := Context{Provider: "claude", Mode: "subprocess-per-turn", Concern: "composition"}
+	if err := ValidateComposition(ctx, []Claim{OverlayClaim(Overlay{Path: "CLAUDE.md"})}, []string{"claude.MD"}); err == nil {
+		t.Fatal("case alias")
+	}
+	if err := ValidateComposition(ctx, []Claim{OverlayClaim(Overlay{Path: "Ref.md"}), OverlayClaim(Overlay{Path: "ref.MD"})}, nil); err == nil {
+		t.Fatal("case collision")
+	}
+	if FoldPath("K/Σ/S") != FoldPath("K/ς/ſ") {
+		t.Fatal("Unicode simple fold")
+	}
+}

@@ -115,3 +115,25 @@ func TestExplicitCompositionAndExpandedCollisions(t *testing.T) {
 	b.Composition = "different"
 	code(t, Validate([]Row{a, b}), "path_collision")
 }
+
+func TestExportedCloneDetached(t *testing.T) {
+	in := Row{Locator: Locator{Argv: []string{"original"}, Env: map[string]Root{"ROOT": RootBoot}}, Evidence: Evidence{Observations: []string{"original"}}, Posture: &PostureReference{Mapper: "original"}}
+	out := in.Clone()
+	out.Locator.Argv[0] = "changed"
+	out.Locator.Env["ROOT"] = RootHome
+	out.Evidence.Observations[0] = "changed"
+	out.Posture.Mapper = "changed"
+	if in.Locator.Argv[0] != "original" || in.Locator.Env["ROOT"] != RootBoot || in.Evidence.Observations[0] != "original" || in.Posture.Mapper != "original" {
+		t.Fatal("Clone aliases")
+	}
+}
+func TestCredentialPredicateComponentsAndCase(t *testing.T) {
+	for _, p := range []string{"auth.json", ".Credentials.json/key", "nested/OAUTH_CREDS.JSON", "Auth.JSON/key", "a/.credentials.json/b"} {
+		if !IsCredentialDestination(p) {
+			t.Fatal(p)
+		}
+	}
+	if IsCredentialDestination("authentication.json") {
+		t.Fatal("false credential")
+	}
+}

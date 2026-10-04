@@ -16,10 +16,11 @@
     },
     "table": {},
     "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
-    "case_family": "native files and table bindings",
+    "case_family": "posture-reference",
+    "permission_evidence": "adapters/provider/bootdir_codex.go: native approval/sandbox vocabulary; adapters/registry/posture.go: measured per-mode native overrides",
     "root": ""
   },
   "diagnostics": [
-    "{\"Posture\":\"\",\"Code\":\"credential_write\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential destinations cannot be managed entries\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+    "{\"Posture\":\"\",\"Code\":\"credential_write\",\"Class\":\"refusal\",\"Provider\":\"codex\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"credentials\",\"Reason\":\"credential destinations cannot be managed entries\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
   ]
 }
