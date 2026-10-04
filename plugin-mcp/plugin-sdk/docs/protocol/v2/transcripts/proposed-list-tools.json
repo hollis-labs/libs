@@ -56,5 +56,6 @@
         }
       }
     }
-  ]
+  ],
+  "unavailable_owner": "SDK plugin tool-list proposal; manifest registration owner"
 }

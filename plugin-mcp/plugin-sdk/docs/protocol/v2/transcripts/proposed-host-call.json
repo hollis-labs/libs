@@ -1,7 +1,7 @@
 {
   "level": "normative",
   "status": "proposed",
-  "finding": "F1: no reverse RPC dispatcher in either Go Serve or plugin-host Conn; hypothetical host adapter required",
+  "finding": "F1: production reverse profile and pinned plugin-host interop are not yet available; internal fixture bypass is not negotiated conformance",
   "profile": "duplex",
   "steps": [
     {
@@ -62,5 +62,6 @@
         }
       }
     }
-  ]
+  ],
+  "unavailable_owner": "SDK 3j-reverse and plugin-host interop"
 }

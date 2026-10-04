@@ -1,3 +1,4 @@
+import {transcriptMetadata} from './corpus-metadata.js';
 import { parseJSONTokens } from '../dist/strict-json.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,15 +13,7 @@ const names = (await readdir(directory)).filter(name => name.endsWith('.json')).
 assert.ok(names.length, 'missing shared protocol corpus');
 for (const name of names) {
   const fixture = parseJSONTokens(await readFile(new URL(name, directory), 'utf8'));
-  // Status gates availability; level gates obligation. This v1 regression
-  // runner still asserts quirks, explicitly recording why it passes them.
-  assert.ok(['observed', 'proposed'].includes(fixture.status ?? 'observed'));
-  assert.ok(['normative', 'observed-quirk'].includes(fixture.level), `${name}: missing/invalid level`);
-  const levels = fixture.steps.map(step => step.level ?? fixture.level);
-  for (const [index, level] of levels.entries()) {
-    assert.ok(['normative', 'observed-quirk'].includes(level), `${name} step ${index + 1}: invalid level`);
-    if (level === 'observed-quirk') assert.ok((fixture.steps[index].preferred ?? fixture.preferred)?.trim(), `${name} step ${index + 1}: missing preferred note`);
-  }
+  const levels = transcriptMetadata(fixture);
   const quirks = levels.flatMap((level, index) => level === 'observed-quirk' ? [index + 1] : []);
   test(`shared protocol: ${name}${quirks.length ? ` [COPIED GO V1 QUIRKS: steps ${quirks.join(',')}]` : ' [NORMATIVE]'}`, { skip: fixture.status === 'proposed' ? fixture.finding : false, timeout: 10000 }, async t => {
     const input = new PassThrough();

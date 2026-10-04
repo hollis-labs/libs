@@ -53,6 +53,23 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
+      # Dedicated Go child matrix; ordinary go test has no Node dependency.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: install child parent dependencies
+        run: npm --prefix ts ci
+
+      - name: build child parent codecs
+        run: npm --prefix ts run build
+
+      - name: build Go fixture child
+        run: GOFLAGS=-p=2 go test -race -c ./subprocess -o "$RUNNER_TEMP/duplex-child"
+
+      - name: Go child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node ts/packages/plugin-sdk/test/child-replay.js go "$RUNNER_TEMP/duplex-child"
+
   ts:
     name: ts · typecheck · build · test · pack
     runs-on: ubuntu-latest
@@ -86,6 +103,9 @@ jobs:
       - name: test
         run: npm test
 
+      - name: real Node child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js node
+
       # The published file list is a property of the package, checked before a
       # human runs `npm publish`, not after.
       - name: pack (dry run)
@@ -117,6 +137,9 @@ jobs:
 
       - name: test
         run: npm test
+
+      - name: real Node child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js node
 
       - name: pack (dry run)
         run: npm pack --dry-run --workspaces
@@ -154,3 +177,6 @@ jobs:
 
       - name: shared transcript replay (Deno)
         run: deno test --cached-only --no-npm --no-check --allow-read --allow-env packages/plugin-sdk/test/transcripts.test.js
+
+      - name: real Deno child corpus replay (Node parent)
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js deno
