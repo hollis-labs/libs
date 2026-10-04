@@ -1389,6 +1389,12 @@ func TestPlanningCredentialEnvironmentNames(t *testing.T) {
 
 func TestPlanningBindingGuards(t *testing.T) {
 	for name, change := range map[string]fixturePlanMutation{
+		"empty environment key and value": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Environment = map[string]string{"": ""}
+		},
+		"unknown empty environment": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Environment = map[string]string{"FIXTURE_ROOT": ""}
+		},
 		"unknown environment": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
 			c.Rendered[0].Binding.Environment = map[string]string{"FIXTURE_ROOT": s.Boot.Candidate.Path}
 		},
@@ -1426,6 +1432,7 @@ func TestPlanningBindingGuards(t *testing.T) {
 		})
 	}
 	for name, project := range map[string]map[string]string{
+		"unknown empty parameter": {"other": ""},
 		"agent without directory": {"agent": "fixture"},
 		"directory without agent": {"directory": "/fixture/home"},
 		"invalid agent":           {"directory": "/fixture/home", "agent": "../fixture"},
