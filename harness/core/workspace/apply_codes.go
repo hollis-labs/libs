@@ -1,0 +1,32 @@
+package workspace
+
+// Apply refusal codes extend the stable planning conditions.
+const (
+	CodeArtifactOnlyExtraRoots     = "artifact_only_extra_roots"
+	CodeCandidateChanged           = "candidate_changed"
+	CodeCanonicalBaseUnavailable   = "canonical_base_unavailable"
+	CodeCanonicalRootChanged       = "canonical_root_changed"
+	CodeCommittedDigestMismatch    = "committed_digest_mismatch"
+	CodeCommittedKindMismatch      = "committed_kind_mismatch"
+	CodeCommittedManifestMismatch  = "committed_manifest_mismatch"
+	CodeCommittedModeMismatch      = "committed_mode_mismatch"
+	CodeCommittedRootModeMismatch  = "committed_root_mode_mismatch"
+	CodeDeferredApplyAction        = "deferred_apply_action"
+	CodeExpiredObservation         = "expired_observation"
+	CodeHostProofsPending          = "host_proofs_pending"
+	CodeIncompleteEngineResult     = "incomplete_engine_result"
+	CodeInvalidCommittedManifest   = "invalid_committed_manifest"
+	CodeInvalidHeldLock            = "invalid_held_lock"
+	CodeInvalidPlan                = "invalid_plan"
+	CodeLiveDiskMismatch           = "live_disk_mismatch"
+	CodeMissingApplyPort           = "missing_apply_port"
+	CodeMissingRootObservation     = "missing_root_observation"
+	CodeMissingRootResource        = "missing_root_resource"
+	CodeNoncanonicalRoot           = "noncanonical_root"
+	CodeOwnedDirectoryInvalid      = "owned_directory_invalid"
+	CodeOwnedDirectoryModeMismatch = "owned_directory_mode_mismatch"
+	CodeStaleIdentityFence         = "stale_identity_fence"
+	CodeSymlinkManagedPath         = "symlink_managed_path"
+	CodeUnsafeCandidateMode        = "unsafe_candidate_mode"
+	CodeUnsupportedEngineOperation = "unsupported_engine_operation"
+)

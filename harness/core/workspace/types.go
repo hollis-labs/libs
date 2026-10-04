@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"io/fs"
 	"time"
 
@@ -283,12 +285,31 @@ type ApplyResult struct {
 	Retained          []RootRef
 	Obligations       []Obligation
 	artifactsComplete bool
+	artifactSeal      [32]byte
+	launchComplete    bool
+	launchSeal        [32]byte
 }
 
 // ArtifactsComplete proves only managed-artifact application. It is deliberately
 // false for a hand-built result, including one with a committed-looking receipt.
 func (r ApplyResult) ArtifactsComplete() bool {
-	return r.artifactsComplete && r.Status == Partial && r.Receipt.Phase == ArtifactsCommitted
+	seal, ok := resultSeal(r)
+	return ok && r.artifactsComplete && r.Status == Partial && r.Receipt.Phase == ArtifactsCommitted && r.artifactSeal == seal
+}
+
+// LaunchReady requires an earned, unchanged result. Artifact-only application
+// never mints this proof; a caller-assigned Ready status cannot supply it.
+func (r ApplyResult) LaunchReady() bool {
+	seal, ok := resultSeal(r)
+	return ok && r.launchComplete && r.Status == Ready && r.launchSeal == seal
+}
+
+func resultSeal(r ApplyResult) ([32]byte, bool) {
+	encoded, err := json.Marshal(r)
+	if err != nil {
+		return [32]byte{}, false
+	}
+	return sha256.Sum256(append([]byte("workspace.apply.result.v1\x00"), encoded...)), true
 }
 
 // Ports contains no arbitrary managed-file writer. The concrete materialize
@@ -299,6 +320,7 @@ type Ports struct {
 	Host         Host
 	Locks        Locks
 	Observations Observer
+	ReceiptStore ReceiptStore
 }
 type Clock interface{ Now() time.Time }
 type IDs interface {
@@ -314,4 +336,12 @@ type Locks interface {
 type HeldLock interface{ Release() error }
 type Observer interface {
 	Observe(context.Context, Resources) (Observations, error)
+}
+
+// ReceiptStore persists control records outside every mutable workspace root.
+// Successful Record must durably persist the supplied record before returning.
+// Record must reject an operation ID bound to a different input digest. Records
+// carry paths, identities and digests; credential bytes never belong here.
+type ReceiptStore interface {
+	Record(context.Context, Receipt) error
 }
