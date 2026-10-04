@@ -198,6 +198,19 @@ func (i reviewInstance) Invoke(ctx context.Context, c Attempt) (Reply, error) {
 			r.Payload = c.Credential
 		}
 	}
+	if strings.HasPrefix(i.mode, "refusal issued ") && r.Failure != nil {
+		_, issued := i.Access()
+		if issued != c.Credential {
+			setLeakedSurface(&r, strings.TrimPrefix(i.mode, "refusal issued "), issued)
+		}
+	}
+	if strings.HasPrefix(i.mode, "refusal binding ") && r.Failure != nil {
+		binding, _ := i.Access()
+		setLeakedSurface(&r, strings.TrimPrefix(i.mode, "refusal binding "), binding)
+	}
+	if strings.HasPrefix(i.mode, "refusal broker ") && r.Failure != nil {
+		setLeakedSurface(&r, strings.TrimPrefix(i.mode, "refusal broker "), i.fixture.Secret)
+	}
 	if strings.HasPrefix(i.mode, "success binding ") && r.Failure == nil {
 		binding, _ := i.Access()
 		setLeakedSurface(&r, strings.TrimPrefix(i.mode, "success binding "), binding)
@@ -310,7 +323,7 @@ func TestRefusalReplyLeaks(t *testing.T) {
 				p := bridgeCredentialProbe("host/mcp/call_tool", problem)
 				err := runProbe(context.Background(), reviewAdapter{"refusal leak " + surface}, p.run)
 				// Require the leak detector, not error-data validation, to catch it.
-				if err == nil || safeReason(err) != "refusal reply credential leak" {
+				if err == nil || safeReason(err) != "refusal reply secret leak" {
 					t.Fatalf("leak not detected: %v", err)
 				}
 			})
@@ -321,11 +334,25 @@ func TestSuccessfulReplyFixtureSecrets(t *testing.T) {
 	for _, kind := range []string{"binding", "broker"} {
 		for _, surface := range []string{"Wire", "Data", "Payload"} {
 			t.Run(kind+"/"+surface, func(t *testing.T) {
-				f, c := basic(capability.MCPReach)
-				f.Secret = freshSecret()
-				err := withActive(context.Background(), reviewAdapter{"success " + kind + " " + surface}, f, c, func(i Instance, o *Observer, c Attempt) error { return allowed(context.Background(), i, o, c) })
+				p := findProbe(t, bridgeCredentialProbe("host/mcp/call_tool", "garbage").name)
+				err := runProbe(context.Background(), reviewAdapter{"success " + kind + " " + surface}, p.run)
 				if err == nil || safeReason(err) != "successful reply secret leak" {
 					t.Fatalf("success leak not detected: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestRefusalFixtureSecrets(t *testing.T) {
+	for _, kind := range []string{"issued", "binding", "broker"} {
+		for _, surface := range []string{"Wire", "Data", "Payload"} {
+			t.Run(kind+"/"+surface, func(t *testing.T) {
+				// Garbage differs from every issued credential/binding/fixture secret.
+				p := findProbe(t, bridgeCredentialProbe("host/mcp/call_tool", "garbage").name)
+				err := runProbe(context.Background(), reviewAdapter{"refusal " + kind + " " + surface}, p.run)
+				if err == nil || safeReason(err) != "refusal reply secret leak" {
+					t.Fatalf("refusal secret leak not detected: %v", err)
 				}
 			})
 		}

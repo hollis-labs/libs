@@ -88,10 +88,14 @@ arbitrary transformations, nested encodings and fragments shorter than eight
 bytes are outside this scanner. Secrets are distinct
 random fixture values. The reference sends configuration through Init and routes
 it through pattern-based output adapters; it also drives a backend diagnostic
-and scans received diagnostic reply bytes. Successful scoped replies are also
-scanned for the issued bearer credential, plugin binding and broker secret in
-their frame, data and payload. Refusal frames, data and payload are scanned for
-the presented bearer, including a stale bearer after replacement or stop.
+and scans received diagnostic reply bytes. Each bridge credential probe installs
+a broker secret through Init and first makes a successful scoped call before
+its refused call. This exercises successful frame/data/payload scans for the
+issued bearer, plugin binding and broker secret. Refusal frames, data and payload
+are scanned for the presented bearer, issued bearer, binding and broker secret,
+even when the presented credential differs from the issued credential. Hosts
+must not return binding IDs in any replies, including the caller's own binding;
+the successful-reply scan enforces that rule on plugin and bridge paths.
 Instrumentation is supplied by the host adapter:
 counts alone cannot prove a real output path was exercised. Review that wiring
 and the captured artifacts; counts or replies built from expected test outcomes

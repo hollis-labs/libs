@@ -922,8 +922,11 @@ func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want c
 		return reply, err
 	}
 	after := o.Snapshot()
-	if replyContainsSecret(reply, c.Credential) {
-		return reply, suiteError("refusal reply credential leak")
+	binding, token := i.Access()
+	for _, secret := range []string{c.Credential, token, binding, c.fixtureSecret} {
+		if replyContainsSecret(reply, secret) {
+			return reply, suiteError("refusal reply secret leak")
+		}
 	}
 	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.Contract != "host-rpc/1" || (want != "" && reply.Failure.Code != want) || reply.Failure.RequestID != c.Call.RequestID || reply.Failure.Retryable || reply.Failure.EffectState != capability.NotStarted {
 		if reply.Failure == nil {

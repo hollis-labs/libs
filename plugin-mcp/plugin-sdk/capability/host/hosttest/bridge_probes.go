@@ -189,6 +189,7 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter, reverse bool) error 
 func bridgeCredentialProbe(operation, problem string) probe {
 	return probe{"C07", "bridge credential " + operation + " " + problem, func(ctx context.Context, a Adapter) error {
 		f, c := basic(capability.MCPReach)
+		f.Secret = freshSecret() // Exercises successful and refused replies with broker configuration.
 		c.Call.Operation = operation
 		if operation == "host/mcp/cancel_call" {
 			c.CancelID = 99
