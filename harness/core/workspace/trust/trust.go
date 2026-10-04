@@ -7,6 +7,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 type Mechanism string
@@ -71,6 +72,11 @@ func lock(c effects.PreflightContext, id string) bool {
 	return false
 }
 func binding(r Request, c effects.PreflightContext) bool {
+	for _, v := range []string{r.Header.Version, r.Header.OperationID, r.Header.InputDigest, string(r.Mechanism), r.AuthorizationID, r.AuthorizationVersion, r.CandidateRootID, r.Config.ID, r.Config.Path, r.Config.AllowedBase, r.Config.Owner, r.Config.Provenance, r.Config.MutationIdentity, r.Target.LogicalPath, r.Target.CanonicalParent, r.Target.AllowedBase, r.Target.Provenance} {
+		if !utf8.ValidString(v) || strings.ContainsRune(v, 0) {
+			return false
+		}
+	}
 	return r.Header.Valid() && r.Header == c.Header && r.AuthorizationID != "" && r.AuthorizationVersion != "" && r.CandidateRootID != "" && r.Config.ID != "" && r.Config.Owner != "" && r.Config.Provenance != "" && absolute(r.Config.Path) && absolute(r.Config.AllowedBase) && under(r.Config.AllowedBase, r.Config.Path) && r.Config.MutationIdentity == r.Config.Path && r.Target.Stable && r.Target.Provenance != "" && absolute(r.Target.LogicalPath) && absolute(r.Target.CanonicalParent) && absolute(r.Target.AllowedBase) && under(r.Target.AllowedBase, r.Target.CanonicalParent) && r.Target.LogicalPath != r.Target.CanonicalParent && lock(c, r.Config.MutationIdentity) && lock(c, r.Target.CanonicalParent) && c.Validate != nil
 }
 func result(r Request, o effects.Outcome, code string) effects.Result {

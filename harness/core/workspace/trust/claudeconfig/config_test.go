@@ -224,3 +224,85 @@ func TestLockContentionAndRootSwapRetain(t *testing.T) {
 		t.Fatal("lost retained lock")
 	}
 }
+
+func TestInvalidEncodingRetained(t *testing.T) {
+	r := request(t)
+	path := filepath.Join(r.Config.Path, configName)
+	body := append([]byte(`{"unrelated":"`), 255)
+	body = append(body, []byte(`"}`)...)
+	os.WriteFile(path, body, 0600)
+	if _, e := New().Observe(context.Background(), r); e == nil {
+		t.Fatal("accepted lossy encoding")
+	}
+}
+
+func TestUnsafeModesRefused(t *testing.T) {
+	for _, rootMode := range []bool{true, false} {
+		r := request(t)
+		path := filepath.Join(r.Config.Path, configName)
+		os.WriteFile(path, []byte(`{}`), 0600)
+		if rootMode {
+			os.Chmod(r.Config.Path, 0777)
+		} else {
+			os.Chmod(path, 0666)
+		}
+		if _, e := New().Observe(context.Background(), r); e == nil {
+			t.Fatal("accepted writable resource")
+		}
+		if _, e := os.Stat(filepath.Join(r.Config.Path, lockName)); !os.IsNotExist(e) {
+			t.Fatal("mutated unsafe root")
+		}
+	}
+}
+func TestCancelledAndRevokedAuthorityNeverReplaces(t *testing.T) {
+	for _, cancel := range []bool{true, false} {
+		r := request(t)
+		p := New()
+		s, e := p.Begin(context.Background(), r)
+		if e != nil {
+			t.Fatal(e)
+		}
+		ctx, cancelContext := context.WithCancel(context.Background())
+		if cancel {
+			cancelContext()
+		}
+		_, changed, e := s.Apply(ctx, r, func(context.Context) error {
+			if !cancel {
+				return errors.New("revoked")
+			}
+			return nil
+		})
+		cancelContext()
+		if e == nil || changed {
+			t.Fatal("applied without authority")
+		}
+		if e = s.Close(); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = os.Stat(filepath.Join(r.Config.Path, configName)); !os.IsNotExist(e) {
+			t.Fatal("created config")
+		}
+	}
+}
+func TestPartialProjectFieldsPreserveMetadata(t *testing.T) {
+	r := request(t)
+	project := map[string]any{r.Target.LogicalPath: map[string]any{"hasTrustDialogAccepted": true, "hasCompletedProjectOnboarding": false, "custom": map[string]any{"nested": "kept"}}}
+	b, _ := json.Marshal(map[string]any{"projects": project})
+	path := filepath.Join(r.Config.Path, configName)
+	os.WriteFile(path, b, 0600)
+	s, e := New().Begin(context.Background(), r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, changed, e := s.Apply(context.Background(), r, func(context.Context) error { return nil })
+	if e != nil || !changed {
+		t.Fatal(changed, e)
+	}
+	if e = s.Close(); e != nil {
+		t.Fatal(e)
+	}
+	after, _ := os.ReadFile(path)
+	if !strings.Contains(string(after), `"nested": "kept"`) {
+		t.Fatal("lost project metadata")
+	}
+}

@@ -65,6 +65,14 @@ func TestBindingGuards(t *testing.T) {
 			t.Fatal(got)
 		}
 	}
+	for _, mutate := range []func(*Request, *effects.ApplyContext){func(r *Request, c *effects.ApplyContext) { r.AuthorizationVersion = "" }, func(r *Request, c *effects.ApplyContext) { r.Config.Owner = "" }, func(r *Request, c *effects.ApplyContext) { r.Config.AllowedBase = "/outside" }, func(r *Request, c *effects.ApplyContext) { r.Config.MutationIdentity = "/outside" }, func(r *Request, c *effects.ApplyContext) { r.Target.AllowedBase = "/outside" }, func(r *Request, c *effects.ApplyContext) { r.CandidateRootID = "" }, func(r *Request, c *effects.ApplyContext) { c.HeldLocks = c.HeldLocks[1:] }, func(r *Request, c *effects.ApplyContext) { c.HeldLocks[0].Namespace = r.Config.Path }, func(r *Request, c *effects.ApplyContext) { c.Validate = nil }} {
+		r, c := fixture()
+		mutate(&r, &c)
+		_, got := Preflight(context.Background(), r, c.PreflightContext, &fakePort{})
+		if got.Outcome != effects.Refused {
+			t.Fatal(got)
+		}
+	}
 }
 func TestApplyFailuresAndIdempotence(t *testing.T) {
 	for _, tc := range []struct {
@@ -177,5 +185,17 @@ func TestOptionalUnsupportedHasDurableOmission(t *testing.T) {
 	inspected := Inspect(context.Background(), prep, c.PreflightContext, p, got.Evidence)
 	if inspected.Outcome != effects.Omitted {
 		t.Fatal(inspected)
+	}
+}
+
+func TestInvalidTextRefusedBeforeConfigRead(t *testing.T) {
+	for _, mutate := range []func(*Request){func(r *Request) { r.AuthorizationID = string([]byte{255}) }, func(r *Request) { r.Header.OperationID = "invalid\x00" }, func(r *Request) { r.Target.LogicalPath = "/resource/runtime/" + string([]byte{255}) }} {
+		r, c := fixture()
+		mutate(&r)
+		c.Header = r.Header
+		_, got := Preflight(context.Background(), r, c.PreflightContext, &fakePort{})
+		if got.Outcome != effects.Refused {
+			t.Fatal(got)
+		}
 	}
 }

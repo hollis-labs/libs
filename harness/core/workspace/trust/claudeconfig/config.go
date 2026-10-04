@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"unicode/utf8"
 
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 )
@@ -151,6 +152,9 @@ func (s *session) read() (snapshot, error) {
 	return snapshot{bytes: b, info: st}, nil
 }
 func object(raw []byte) (map[string]json.RawMessage, error) {
+	if !utf8.Valid(raw) {
+		return nil, errConfig
+	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
 	if uniqueValue(decoder) != nil {
@@ -403,6 +407,9 @@ func (s *session) Close() error {
 	e := s.validate()
 	if e == nil && s.lockInfo != nil {
 		e = s.root.Remove(lockName)
+		if e == nil {
+			e = s.syncDirectory(s.root)
+		}
 	} else if s.lockInfo == nil {
 		e = errChanged
 	}
