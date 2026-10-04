@@ -17,7 +17,10 @@
 // obligation. Legacy callers may proceed on ArtifactsComplete, preserving their
 // existing artifact-only guarantee. New launch integrations must require LaunchReady,
 // which also requires effects, publication and an acknowledged use reservation.
-// No current operation in this package issues Ready. Apply records planned and
+// Completion proofs bind the full returned result and remain in-process; JSON
+// reconstruction carries evidence but loses completion authority. Caller edits
+// to exported result fields invalidate the proof. Remote attestation is outside
+// this contract. No current operation issues Ready. Apply records planned and
 // interrupted control receipts before mutation, then verifies engine manifests
 // and managed file digests/modes before recording artifact completion. Failures
 // retain affected roots and inspection obligations; no rollback is claimed.

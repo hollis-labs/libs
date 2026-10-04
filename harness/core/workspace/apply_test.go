@@ -2,6 +2,7 @@ package workspace_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"io/fs"
@@ -445,5 +446,31 @@ func TestMaterializeBoundsFreshHostEvidence(t *testing.T) {
 	}
 	if _, err := os.Stat(s.Home.Root.Path); !os.IsNotExist(err) {
 		t.Fatal("oversized evidence mutated directory", err)
+	}
+}
+
+func TestSerializedApplyResultDoesNotCarryCompletionAuthority(t *testing.T) {
+	p, f, _ := applyFixture(t)
+	earned, err := workspace.Materialize(context.Background(), p, f.ports())
+	if err != nil || !earned.ArtifactsComplete() {
+		t.Fatal("fixture did not earn completion", err)
+	}
+	data, err := json.Marshal(earned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reconstructed workspace.ApplyResult
+	if err := json.Unmarshal(data, &reconstructed); err != nil {
+		t.Fatal(err)
+	}
+	if reconstructed.ArtifactsComplete() || reconstructed.LaunchReady() {
+		t.Fatal("serialized evidence minted completion authority")
+	}
+	reconstructed.Status = workspace.Ready
+	if reconstructed.LaunchReady() {
+		t.Fatal("serialized status minted launch authority")
+	}
+	if !earned.ArtifactsComplete() {
+		t.Fatal("serialization changed the original proof")
 	}
 }
