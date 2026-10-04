@@ -38,6 +38,7 @@ type Action struct {
 type PlannedWorkspace struct {
 	spec              Spec
 	content           []renderSnapshot
+	renderRoots       map[layout.Root]string
 	resources         Resources
 	observed          Observations
 	digest            string
@@ -89,7 +90,7 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 	}{spec, content, resources, observed}); err != nil {
 		return PlannedWorkspace{}, refuse("invalid_frozen_input", "spec", Conflict)
 	}
-	p := PlannedWorkspace{spec: copyRecord(spec), resources: copyRecord(resources), observed: copyRecord(observed)}
+	p := PlannedWorkspace{spec: copyRecord(spec), resources: copyRecord(resources), observed: copyRecord(observed), renderRoots: copyRecord(content.Roots)}
 	p.observed.At = p.observed.At.UTC()
 	p.observed.ExpiresAt = p.observed.ExpiresAt.UTC()
 	for _, c := range append(slices.Clone(resources.Capabilities), observed.Capabilities...) {
@@ -218,6 +219,9 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 			return PlannedWorkspace{}, refuse("duplicate_render_target", "render", Conflict)
 		}
 		seenTargets[root.ID] = true
+		if err := validateRenderRoots(r, p.renderRoots, root, p.roots); err != nil {
+			return PlannedWorkspace{}, err
+		}
 		if r.Root == layout.RootBoot && r.RootMode != 0700 {
 			return PlannedWorkspace{}, refuse("unsafe_boot_root_mode", "render", Conflict)
 		}
@@ -311,11 +315,12 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 		return cmp.Compare(string(a.Kind)+"\x00"+a.RootID+"\x00"+a.AuthorizationID+"\x00"+a.Version, string(b.Kind)+"\x00"+b.RootID+"\x00"+b.AuthorizationID+"\x00"+b.Version)
 	})
 	encoded, err := json.Marshal(struct {
-		Spec      Spec
-		Content   []renderSnapshot
-		Resources Resources
-		Locks     []LockKey
-	}{p.spec, p.content, p.resources, p.locks})
+		Spec        Spec
+		Content     []renderSnapshot
+		RenderRoots map[layout.Root]string
+		Resources   Resources
+		Locks       []LockKey
+	}{p.spec, p.content, p.renderRoots, p.resources, p.locks})
 	if err != nil {
 		return PlannedWorkspace{}, refuse("invalid_frozen_input", "spec", Conflict)
 	}

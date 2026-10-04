@@ -1,7 +1,6 @@
 package workspace_test
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -27,8 +26,8 @@ func planInputs(t *testing.T) (workspace.Spec, workspace.ResolvedContent, worksp
 	for _, r := range resources.Roots {
 		observed.Roots = append(observed.Roots, workspace.RootObservation{RootID: r.ID, CanonicalPath: r.Path, CanonicalBase: r.AllowedBase, Owner: r.Owner})
 	}
-	rendered := render.Result{Root: layout.RootBoot, RootMode: 0700, Tree: tree("AGENTS.md"), Binding: render.Binding{Argv: []string{"--one", "two"}, Environment: map[string]string{"FIXTURE_ROOT": s.Boot.Candidate.Path}, BeforeResume: true}, Diagnostics: []render.Diagnostic{{Code: "fixture_omission", Reason: "fixture optional omission"}}}
-	return s, workspace.ResolvedContent{Rendered: []render.Result{rendered}}, resources, observed
+	rendered := render.Result{Provider: runtimes.Claude, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Root: layout.RootBoot, RootMode: 0700, Tree: tree("AGENTS.md"), Binding: render.Binding{Argv: []string{"--one", "two"}, Environment: map[string]string{"FIXTURE_ROOT": s.Boot.Candidate.Path}, BeforeResume: true}, Diagnostics: []render.Diagnostic{{Code: "fixture_omission", Class: render.ClassOmission, Reason: "fixture optional omission"}}}
+	return s, workspace.ResolvedContent{Rendered: []render.Result{rendered}, Roots: map[layout.Root]string{layout.RootBoot: s.Boot.Candidate.Path, layout.RootProject: s.Home.Root.Path}}, resources, observed
 }
 func planned(t *testing.T, s workspace.Spec, c workspace.ResolvedContent, r workspace.Resources, o workspace.Observations) workspace.PlannedWorkspace {
 	t.Helper()
@@ -169,6 +168,7 @@ func TestPlanEmptyTreeHasNoEngineRequestAndBootParentLockIsStable(t *testing.T) 
 		}
 	}
 	rootObservation(&o, s.Boot.Candidate.ID).CanonicalPath = s.Boot.Candidate.Path
+	c.Roots[layout.RootBoot] = s.Boot.Candidate.Path
 	if !reflect.DeepEqual(planned(t, s, c, r, o).LockKeys(), before) {
 		t.Fatal("candidate generation changed mutation lock")
 	}
@@ -233,13 +233,13 @@ func TestRealRenderOwnershipAndInstalledApplyDeferral(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := planned(t, s, workspace.ResolvedContent{Rendered: []render.Result{out}}, r, o)
+	p := planned(t, s, workspace.ResolvedContent{Rendered: []render.Result{out}, Roots: map[layout.Root]string{layout.RootBoot: s.Boot.Candidate.Path, layout.RootProject: s.Home.Root.Path}}, r, o)
 	a := treeAction(t, p)
 	ownershipFound := false
 	for _, entry := range out.Tree.Entries {
 		if entry.Path == ".claude/settings.json" {
-			var metadata render.DocumentOwnership
-			if json.Unmarshal([]byte(entry.Provenance.Note), &metadata) != nil || metadata.Schema != "native-key-ownership.v1" {
+			metadata, err := render.ParseOwnershipNote(entry.Provenance.Note)
+			if err != nil || metadata.Schema != render.OwnershipNoteSchema {
 				t.Fatal("native ownership schema absent")
 			}
 			ownershipFound = true
@@ -272,7 +272,7 @@ func TestRealRenderOwnershipAndInstalledApplyDeferral(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p = planned(t, s, workspace.ResolvedContent{Rendered: []render.Result{out}}, r, o)
+	p = planned(t, s, workspace.ResolvedContent{Rendered: []render.Result{out}, Roots: map[layout.Root]string{layout.RootHome: s.Home.Root.Path}}, r, o)
 	deferred := false
 	for _, action := range p.Actions() {
 		if action.Kind == workspace.DeferredAction {
@@ -285,4 +285,77 @@ func TestRealRenderOwnershipAndInstalledApplyDeferral(t *testing.T) {
 	if !deferred {
 		t.Fatal("installed merge requirement lost")
 	}
+}
+
+func TestPlanValidatesRecordedRenderContext(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		change     func(*render.Result)
+	}{
+		{"missing provider", "invalid_render_context", func(r *render.Result) { r.Provider = "" }},
+		{"wrong layer", "invalid_render_context", func(r *render.Result) { r.Layer = layout.Installed }},
+		{"wrong mode", "invalid_render_context", func(r *render.Result) { r.Mode = layout.InstallMode }},
+		{"wrong variant", "invalid_render_context", func(r *render.Result) { r.Variant = "unknown" }},
+		{"refusal result", "invalid_render_diagnostic", func(r *render.Result) { r.Diagnostics[0].Class = render.ClassRefusal }},
+		{"unknown class", "invalid_render_diagnostic", func(r *render.Result) { r.Diagnostics[0].Class = "unknown" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, c, r, o := planInputs(t)
+			tc.change(&c.Rendered[0])
+			_, err := workspace.Plan(s, c, r, o)
+			refusal(t, err, tc.code)
+		})
+	}
+}
+
+func TestPlanRefusesBrokenNativeOwnership(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	e := &c.Rendered[0].Tree.Entries[0]
+	e.Path = ".claude/settings.json"
+	e.Ownership.GroupID = "workspace.render:claude-settings"
+	e.Provenance.Note = `{"schema":"unknown","owned_key_paths":[],"reserved_slots":[]}`
+	_, err := workspace.Plan(s, c, r, o)
+	refusal(t, err, "invalid_render_ownership")
+}
+
+func TestPlanCannotRetargetRenderedBindings(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		s, c, r, o := planInputs(t)
+		if missing {
+			c.Roots = nil
+		} else {
+			c.Roots[layout.RootBoot] = s.Boot.Current.Path
+		}
+		_, err := workspace.Plan(s, c, r, o)
+		refusal(t, err, "render_root_mismatch")
+	}
+	s, c, r, o := planInputs(t)
+	c.Roots[layout.RootProject] = filepath.Join(s.Home.Root.AllowedBase, "unresolved-project")
+	_, err := workspace.Plan(s, c, r, o)
+	refusal(t, err, "unresolved_render_root")
+}
+
+func TestPlanPreservesTypedRenderRequirementsAndContext(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	c.Rendered[0].Preparations = []render.Preparation{{Provider: runtimes.Claude, Kind: render.PreparationCredentialAvailability}, {Provider: runtimes.Claude, Kind: render.PreparationCredentialLink, Destination: ".credentials.json", Policy: layout.LinkOnlyNeverWrite}}
+	before := planned(t, s, c, r, o)
+	found := false
+	for _, d := range before.Diagnostics() {
+		if d.Code == "preparation_pending" && d.Status == workspace.Unsupported {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("required preparation disappeared")
+	}
+	if got := before.RenderDiagnostics()[0]; got.Class != render.ClassOmission {
+		t.Fatal("render diagnostic class lost")
+	}
+	c.Rendered[0].Variant = layout.VariantBare
+	if planned(t, s, c, r, o).Digest() == before.Digest() {
+		t.Fatal("render variant lost from desired digest")
+	}
+	c.Rendered[0].Preparations[0].Provider = runtimes.Codex
+	_, err := workspace.Plan(s, c, r, o)
+	refusal(t, err, "unsupported_preparation")
 }

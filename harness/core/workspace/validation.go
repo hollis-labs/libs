@@ -3,7 +3,6 @@ package workspace
 import (
 	"encoding/hex"
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -268,13 +267,4 @@ func credentialCollision(entry, destination string, kind artifact.EntryKind) boo
 	return e == d || strings.HasPrefix(e, d+"/") || (kind == artifact.EntryFile && strings.HasPrefix(d, e+"/"))
 }
 
-func credentialPath(p string) bool {
-	// Check every component so a directory cannot conceal a protected basename.
-	for _, part := range strings.Split(p, "/") {
-		switch strings.ToLower(path.Base(part)) {
-		case "auth.json", ".credentials.json", "oauth_creds.json":
-			return true
-		}
-	}
-	return false
-}
+func credentialPath(p string) bool { return isCredentialDestination(p) }
