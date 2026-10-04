@@ -1,0 +1,4 @@
+github.com/hollis-labs/plugin-hooks v0.1.0 h1:eJOx3tCT5Eb4jOLWofna5M/Le4ZBMM/pGNq+TbWJeao=
+github.com/hollis-labs/plugin-hooks v0.1.0/go.mod h1:0VNhJ1NVNSuvSVOZ4tbiOaxoY/BUGlwf3Mq21Cqb8YM=
+github.com/hollis-labs/plugin-sdk v0.6.2-0.20261003235026-288a38aaa0c5 h1:pLUgc6VP8WSatr6FsxNAGSd9C33J0ScwNX4zqoje2MA=
+github.com/hollis-labs/plugin-sdk v0.6.2-0.20261003235026-288a38aaa0c5/go.mod h1:GW8/S59GT15wKNQu62XvGArq7yLsceNDEa5TA3wFud0=
