@@ -1190,7 +1190,9 @@ func TestPlanningValidityFlag(t *testing.T) {
 
 func TestPlanningArtifactsCompleteNeedsEveryTerm(t *testing.T) {
 	complete := func() ApplyResult {
-		return ApplyResult{Status: Partial, Receipt: Receipt{Phase: ArtifactsCommitted}, artifactsComplete: true}
+		r := ApplyResult{Status: Partial, Receipt: Receipt{Phase: ArtifactsCommitted}, artifactsComplete: true}
+		r.artifactSeal, _ = resultSeal(r)
+		return r
 	}
 	if !complete().ArtifactsComplete() {
 		t.Fatal("earned completion not reported")
