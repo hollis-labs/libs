@@ -2,6 +2,7 @@ package providerplant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/matrix"
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
@@ -51,43 +53,82 @@ func WithResolver(r AdapterResolver) Option {
 // Plant is the compatibility adapter that copies the same bindings back onto
 // PreparedLaunch.
 func ProjectExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (*agentlaunch.PreparedExecution, error) {
-	if prepared == nil {
-		return nil, ErrNilPrepared
-	}
-	if err := prepared.Validate(); err != nil {
-		return nil, fmt.Errorf("agentlaunch/providerplant: %w", err)
-	}
-	compiled := prepared.Compiled
-	if compiled == nil || compiled.Plan == nil {
-		return nil, ErrNilCompiled
+	if err := validateProjectionRequest(prepared); err != nil {
+		return nil, err
 	}
 	cfg := plantConfig{resolver: DefaultResolver}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	adapter, err := resolveAdapter(compiled, cfg)
+	return projectExecutionWithConfig(prepared, cfg)
+}
+
+func validateProjectionRequest(prepared *agentlaunch.PreparedLaunch) error {
+	if prepared == nil {
+		return ErrNilPrepared
+	}
+	if err := prepared.Validate(); err != nil {
+		return fmt.Errorf("agentlaunch/providerplant: %w", err)
+	}
+	if prepared.Compiled == nil || prepared.Compiled.Plan == nil {
+		return ErrNilCompiled
+	}
+	return nil
+}
+
+func projectExecutionWithConfig(prepared *agentlaunch.PreparedLaunch, cfg plantConfig) (*agentlaunch.PreparedExecution, error) {
+	adapter, err := resolveAdapter(prepared.Compiled, cfg)
 	if err != nil {
+		return nil, err
+	}
+	return projectPreparedExecution(prepared, adapter)
+}
+
+// PrepareExecution validates explicit authority before resolving or rendering
+// providers. The pure projection and late workspace apply checks stay separate.
+func PrepareExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (out *agentlaunch.PreparedExecution, err error) {
+	if err := validateProjectionRequest(prepared); err != nil {
+		return nil, err
+	}
+	cfg := plantConfig{resolver: DefaultResolver}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	if ctx == nil || cfg.authorize == nil {
+		return nil, &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	authority, err := cfg.authorize(ctx, prepared.PlantedBootDir)
+	if err != nil {
+		return nil, err
+	}
+	transferred := false
+	defer func() {
+		if !transferred && authority.Close != nil {
+			err = errors.Join(err, authority.Close())
+		}
+	}()
+	if err := agentlaunch.ValidateArtifactAuthority(ctx, authority, prepared.PlantedBootDir); err != nil {
+		return nil, err
+	}
+	adapter, err := resolveAdapter(prepared.Compiled, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	execution, err := projectPreparedExecution(prepared, adapter)
 	if err != nil {
 		return nil, err
 	}
-	return execution, nil
-}
-
-// PrepareExecution validates the pure projection before routing its artifacts
-// through the explicitly authorized workspace boundary.
-func PrepareExecution(ctx context.Context, prepared *agentlaunch.PreparedLaunch, opts ...Option) (*agentlaunch.PreparedExecution, error) {
-	execution, err := ProjectExecution(ctx, prepared, opts...)
-	if err != nil {
-		return nil, err
+	authorize := func(context.Context, string) (agentlaunch.ArtifactAuthority, error) {
+		transferred = true
+		return authority, nil
 	}
-	cfg := plantConfig{}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return materializeExecution(ctx, prepared, execution, cfg.authorize)
+	return materializeExecution(ctx, prepared, execution, authorize)
 }
 
 // Plant materializes provider-specific boot files into an already Prepared

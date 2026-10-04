@@ -93,6 +93,11 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 
 ### Fixed
 
+- Materializing BootSpec and provider planting now validate explicit authority
+  and cancellation before renderer/resolver callbacks, retain late apply
+  validation, and close each resolved authority once. Standalone provider
+  projection remains pure and does not require authority.
+
 - `adapters/wrapper`: Codex JSON-RPC stdio turns consume the session's typed terminal event, preserving stop reasons and failure diagnostics while emitting exactly one turn lifecycle. Removed the duplicate empty lifecycle and restored the previously skipped native turn-order test.
 
 - `sandbox`: the Linux loopback helper no longer fails with `operation not permitted` when bwrap has already brought `lo` up. With `--unshare-net`, bwrap 0.9.0 raises `lo` and then drops every capability from the sandboxed process, and the helper asked for the same change again, which needs `CAP_NET_ADMIN` even when nothing changes. It now writes the interface flags only when `lo` is down; the payload gets no new capability. The Linux sandbox tests had not run in CI before the CI workflow installed bubblewrap; five loopback tests failed for this reason.

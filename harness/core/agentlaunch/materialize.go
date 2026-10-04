@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
@@ -124,14 +125,14 @@ func (m *DefaultMaterializer) Replant(
 
 // reconcile is the shared body of Populate and Replant. It validates
 // inputs, resolves the effective input bag, selects the objects in scope,
-// and writes each one path-safely.
+// validates authority before rendering, then routes the selected artifacts.
 func (m *DefaultMaterializer) reconcile(
 	ctx context.Context,
 	bootDir string,
 	req MaterializeRequest,
 	sel ReplantSelector,
 	renderer ContractRenderer,
-) (*MaterializeResult, error) {
+) (out *MaterializeResult, err error) {
 	if req.Spec == nil {
 		return nil, ErrMaterializeMissingSpec
 	}
@@ -152,6 +153,41 @@ func (m *DefaultMaterializer) reconcile(
 		return nil, err
 	}
 
+	selected := false
+	for _, f := range req.Spec.Files {
+		selected = selected || scope.wantsFile(f)
+	}
+	for _, injection := range req.Spec.Injections {
+		selected = selected || scope.wantsInjection(injection)
+	}
+	if !selected {
+		return &MaterializeResult{Runtime: req.Spec.Runtime}, nil
+	}
+	if ctx == nil || m.opts.Authorize == nil {
+		return nil, &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	authority, err := m.opts.Authorize(ctx, bootRoot)
+	if err != nil {
+		return nil, err
+	}
+	transferred := false
+	defer func() {
+		if !transferred && authority.Close != nil {
+			err = errors.Join(err, authority.Close())
+		}
+	}()
+	if err := ValidateArtifactAuthority(ctx, authority, bootRoot); err != nil {
+		return nil, err
+	}
+	// The same frozen authority owns this render and the late apply checks.
+	authorize := func(context.Context, string) (ArtifactAuthority, error) {
+		transferred = true
+		return authority, nil
+	}
+
 	resolvedInputs := m.resolveInputs(req)
 	entries := []artifact.Entry{}
 	pathKind := map[string]string{}
@@ -163,6 +199,9 @@ func (m *DefaultMaterializer) reconcile(
 		f := req.Spec.Files[i]
 		if !scope.wantsFile(f) {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return result, err
 		}
 		content, slot, rerr := m.renderObject(ctx, req.Spec, f.Object, resolvedInputs, renderer)
 		if rerr != nil {
@@ -185,6 +224,9 @@ func (m *DefaultMaterializer) reconcile(
 		inj := req.Spec.Injections[i]
 		if !scope.wantsInjection(inj) {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return result, err
 		}
 		content, slot, rerr := m.renderObject(ctx, req.Spec, inj.Object, resolvedInputs, renderer)
 		if rerr != nil {
@@ -219,7 +261,7 @@ func (m *DefaultMaterializer) reconcile(
 		Artifacts:  artifact.Tree{Entries: normalized},
 		Operation:  materialize.OperationReconcile,
 		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
-		Authorize:  m.opts.Authorize,
+		Authorize:  authorize,
 	})
 	if err != nil {
 		return result, err

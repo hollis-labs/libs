@@ -35,6 +35,12 @@ receipt boundary. There is one concrete materialize engine; the legacy engine
 injection, directory-mode default and `bootdir.Writer.AtomicWrite` side writer
 are removed. `OnWritten` observes completed metadata only.
 
+Materializing `DefaultMaterializer.Populate`/`Replant` validate authority and
+context before slot callbacks. `providerplant.PrepareExecution`/`Plant` validate
+before provider resolution or projection. Each operation resolves authority once,
+closes its resources on render failure, and hands that same authority to late
+apply validation on success. Cancellation prevents further active callbacks.
+
 `providerplant.ProjectExecution` remains pure and returns rendered artifacts
 and spawn bindings without a materialization claim. `PrepareExecution` validates
 those bindings before routing artifacts. The historical Codex `auth.json`
