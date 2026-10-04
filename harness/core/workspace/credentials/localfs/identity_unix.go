@@ -9,6 +9,10 @@ import (
 	"syscall"
 )
 
+func openSourceReadOnly(root *os.Root, rel string) (*os.File, error) {
+	return root.OpenFile(rel, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+}
+
 func identity(st fs.FileInfo) string {
 	s, ok := st.Sys().(*syscall.Stat_t)
 	if !ok {

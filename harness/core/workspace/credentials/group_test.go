@@ -24,6 +24,9 @@ type fakePort struct {
 
 func (f *fakePort) Supported() bool { return !f.unsupported }
 func (f *fakePort) Source(_ context.Context, h ResolvedHome, p string) (SourceObservation, error) {
+	if !f.sources[p] {
+		return SourceObservation{}, ErrSourceAbsent
+	}
 	return SourceObservation{LogicalPath: filepath.Join(h.LogicalPath, p), CanonicalPath: filepath.Join(h.CanonicalPath, p), Accessible: f.sources[p]}, nil
 }
 func (f *fakePort) Destination(_ context.Context, _ effects.RootInput, p string) (LinkObservation, error) {

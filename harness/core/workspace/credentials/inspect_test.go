@@ -34,7 +34,11 @@ func TestInterruptedReceiptInspectionNeverReplays(t *testing.T) {
 			}
 			creates, removes := f.creates, f.removes
 			x := Inspect(context.Background(), g, e, c.PreflightContext, f)
-			if len(x.Inspections) != 3 || x.Inspections[0].State != want || (x.Outcome != effects.Partial && x.Outcome != effects.Conflict) || f.creates != creates || f.removes != removes {
+			wantOutcome := effects.Partial
+			if kind == "unrecorded" {
+				wantOutcome = effects.Conflict
+			}
+			if len(x.Inspections) != 3 || x.Inspections[0].State != want || x.Outcome != wantOutcome || f.creates != creates || f.removes != removes {
 				t.Fatalf("inspection failed: %+v", x)
 			}
 		})

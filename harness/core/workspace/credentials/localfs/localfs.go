@@ -18,17 +18,21 @@ import (
 	"github.com/hollis-labs/substrate/harness/sandbox/pathsafe"
 	"github.com/hollis-labs/substrate/harness/workspace/credentials"
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
 )
 
 var (
-	ErrUnsupported = errors.New("credential links: platform unsupported")
-	ErrSource      = errors.New("credential links: source unavailable or outside policy")
-	ErrCustody     = errors.New("credential links: candidate custody unproven")
-	ErrDestination = errors.New("credential links: destination unavailable or conflicting")
+	ErrUnsupported   = errors.New("credential links: platform unsupported")
+	ErrSource        = credentials.ErrSourceUnavailable
+	ErrSourceAbsent  = credentials.ErrSourceAbsent
+	ErrSourceEscaped = credentials.ErrSourceEscaped
+	ErrCustody       = errors.New("credential links: candidate custody unproven")
+	ErrDestination   = errors.New("credential links: destination unavailable or conflicting")
 )
 
-type Port struct{ platform string }
+type Port struct {
+	platform   string
+	openSource func(*os.Root, string) (*os.File, error)
+}
 
 func New() *Port                       { return &Port{platform: runtime.GOOS} }
 func supportedOS(platform string) bool { return platform == "linux" || platform == "darwin" }
@@ -43,20 +47,26 @@ func (p *Port) Source(ctx context.Context, h credentials.ResolvedHome, rel strin
 	if !p.Supported() {
 		return credentials.SourceObservation{}, ErrUnsupported
 	}
-	if ctx.Err() != nil || render.ValidateRelPath(rel) != nil {
+	if ctx.Err() != nil || credentials.ValidateRelPath(rel) != nil {
 		return credentials.SourceObservation{}, ErrSource
 	}
 	real, e := filepath.EvalSymlinks(h.LogicalPath)
-	if e != nil || real != h.CanonicalPath {
+	if e != nil {
+		if errors.Is(e, fs.ErrNotExist) {
+			return credentials.SourceObservation{}, ErrSourceAbsent
+		}
 		return credentials.SourceObservation{}, ErrSource
+	}
+	if real != h.CanonicalPath {
+		return credentials.SourceObservation{}, ErrSourceEscaped
 	}
 	resolved, e := pathsafe.ResolveUnder(h.LogicalPath, rel)
 	if e != nil || !contained(h.CanonicalPath, resolved) {
-		return credentials.SourceObservation{}, ErrSource
+		return credentials.SourceObservation{}, ErrSourceEscaped
 	}
 	for _, r := range h.PlantedRoots {
 		if contained(r, resolved) {
-			return credentials.SourceObservation{}, ErrSource
+			return credentials.SourceObservation{}, ErrSourceEscaped
 		}
 	}
 	root, e := os.OpenRoot(h.LogicalPath)
@@ -67,16 +77,23 @@ func (p *Port) Source(ctx context.Context, h credentials.ResolvedHome, rel strin
 	// Opening read-only proves local accessibility without reading a byte. Only
 	// regular files and directories are allowed, never devices or pipes.
 	st, e := root.Stat(rel)
+	if errors.Is(e, fs.ErrNotExist) {
+		return credentials.SourceObservation{}, ErrSourceAbsent
+	}
 	if e != nil || (!st.Mode().IsRegular() && !st.IsDir()) || st.Mode().Perm()&0444 == 0 {
 		return credentials.SourceObservation{}, ErrSource
 	}
-	f, e := root.Open(rel)
+	probe := p.openSource
+	if probe == nil {
+		probe = openSourceReadOnly
+	}
+	f, e := probe(root, rel)
 	if e != nil {
 		return credentials.SourceObservation{}, ErrSource
 	}
 	opened, e := f.Stat()
 	closeErr := f.Close()
-	if e != nil || closeErr != nil || !os.SameFile(st, opened) {
+	if e != nil || closeErr != nil || !os.SameFile(st, opened) || (!opened.Mode().IsRegular() && !opened.IsDir()) || opened.Mode().Perm()&0444 == 0 {
 		return credentials.SourceObservation{}, ErrSource
 	}
 	return credentials.SourceObservation{LogicalPath: filepath.Join(h.LogicalPath, filepath.FromSlash(rel)), CanonicalPath: resolved, Accessible: true}, nil
@@ -86,7 +103,7 @@ func (p *Port) Destination(ctx context.Context, r effects.RootInput, rel string)
 	if !p.Supported() {
 		return credentials.LinkObservation{}, ErrUnsupported
 	}
-	if render.ValidateRelPath(rel) != nil || ctx.Err() != nil {
+	if credentials.ValidateDestination(rel) != nil || ctx.Err() != nil {
 		return credentials.LinkObservation{}, ErrDestination
 	}
 	if _, e := os.Lstat(r.Path); errors.Is(e, fs.ErrNotExist) {
@@ -183,7 +200,7 @@ func (s *session) Validate(ctx context.Context) error {
 }
 
 func (s *session) parent(ctx context.Context, rel string) (*os.Root, string, string, error) {
-	if render.ValidateRelPath(rel) != nil || s.Validate(ctx) != nil {
+	if credentials.ValidateDestination(rel) != nil || s.Validate(ctx) != nil {
 		return nil, "", "", ErrCustody
 	}
 	dir := filepath.Dir(filepath.FromSlash(rel))
