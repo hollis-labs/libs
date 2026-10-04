@@ -2,6 +2,7 @@ package keymerge
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -37,5 +38,14 @@ func TestObserveRejectsAmbiguousOrUnreadableDocument(t *testing.T) {
 	}
 	if _, err := ObserveKeys("unknown", []byte("{}"), []KeyPath{{"a"}}); err == nil {
 		t.Fatal("guessed encoding")
+	}
+}
+
+func TestObserveDeepUnownedJSONKeepsExactLeaf(t *testing.T) {
+	raw := []byte(`{"owned":1,"operator":` + strings.Repeat(`[`, 3000) + `{"x":"preserved"}` + strings.Repeat(`]`, 3000) + `}`)
+	states, err := ObserveKeys("json", raw, []KeyPath{{"owned"}})
+	simple, simpleErr := ObserveKeys("json", []byte(`{"owned":1}`), []KeyPath{{"owned"}})
+	if err != nil || simpleErr != nil || !reflect.DeepEqual(states, simple) {
+		t.Fatal("unowned nested JSON changed leaf evidence", err)
 	}
 }

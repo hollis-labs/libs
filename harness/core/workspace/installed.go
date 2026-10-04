@@ -278,6 +278,9 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	if ctx == nil || ports.Host == nil || ports.Locks == nil || ports.Clock == nil || ports.Observations == nil || ports.ReceiptStore == nil {
 		return result, refuse(CodeMissingApplyPort, "installed", Unsupported)
 	}
+	if err = ctx.Err(); err != nil {
+		return result, err
+	}
 	store, ok := ports.ReceiptStore.(ControlledReceiptStore)
 	if !ok || store.ControlRoot() != p.spec.Installed.Control {
 		return result, refuse("installed_control_store_mismatch", "installed", Unsupported)
@@ -378,6 +381,9 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	}
 	live, err = ports.Observations.Observe(ctx, copyRecord(p.resources))
 	if err != nil {
+		return result, err
+	}
+	if err = validateFrozenValues(live); err != nil {
 		return result, err
 	}
 	if err = validate(); err != nil {

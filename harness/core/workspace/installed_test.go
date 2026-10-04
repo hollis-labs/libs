@@ -718,3 +718,18 @@ func TestInstalledBenignLateContentStillRequiresNewPlan(t *testing.T) {
 		t.Fatal("mutated unplanned existing state")
 	}
 }
+
+func TestInstalledMissingPhysicalObservationHasClosedRefusal(t *testing.T) {
+	for _, missing := range []string{"operator", "control", "locks"} {
+		t.Run(missing, func(t *testing.T) {
+			s, c, r, o, _ := installedInputs(t, runtimes.Claude)
+			o.Roots = slices.DeleteFunc(o.Roots, func(root workspace.RootObservation) bool { return root.RootID == missing })
+			_, err := workspace.Plan(s, c, r, o)
+			refusal(t, err, "installed_root_observation")
+			var typed *workspace.Refusal
+			if !errors.As(err, &typed) || typed.Status != workspace.Conflict {
+				t.Fatal("missing explicit observation lost structural classification")
+			}
+		})
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pelletier/go-toml/v2"
+	"io"
 	"unicode/utf8"
 )
 
@@ -86,33 +87,68 @@ func ObserveKeys(kind string, raw []byte, paths []KeyPath) ([]KeyState, error) {
 	return result, nil
 }
 
+// Walk tokens once instead of reparsing each nested raw subtree. Duplicate
+// validation covers unowned objects and objects inside arrays as well.
 func validateJSONObjects(raw []byte) error {
-	members, reason := readObject(raw)
-	if reason != "" {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	token, err := dec.Token()
+	if err != nil || token != json.Delim('{') {
 		return fmt.Errorf("keymerge: unreadable document")
 	}
-	for _, m := range members {
-		if err := validateJSONValue(m.value); err != nil {
-			return err
-		}
+	if err = validateJSONObjectTokens(dec, 1); err != nil {
+		return err
+	}
+	if _, err = dec.Token(); err != io.EOF {
+		return fmt.Errorf("keymerge: unreadable document")
 	}
 	return nil
 }
-func validateJSONValue(raw []byte) error {
-	raw = bytes.TrimSpace(raw)
-	if len(raw) > 0 && raw[0] == '{' {
-		return validateJSONObjects(raw)
+func validateJSONObjectTokens(dec *json.Decoder, depth int) error {
+	if depth > 10000 {
+		return fmt.Errorf("keymerge: unreadable document")
 	}
-	if len(raw) > 0 && raw[0] == '[' {
-		var values []json.RawMessage
-		if json.Unmarshal(raw, &values) != nil {
+	seen := map[string]bool{}
+	for dec.More() {
+		token, err := dec.Token()
+		key, ok := token.(string)
+		if err != nil || !ok || seen[key] {
 			return fmt.Errorf("keymerge: unreadable document")
 		}
-		for _, v := range values {
-			if err := validateJSONValue(v); err != nil {
+		seen[key] = true
+		if err = validateJSONTokenValue(dec, depth+1); err != nil {
+			return err
+		}
+	}
+	token, err := dec.Token()
+	if err != nil || token != json.Delim('}') {
+		return fmt.Errorf("keymerge: unreadable document")
+	}
+	return nil
+}
+func validateJSONTokenValue(dec *json.Decoder, depth int) error {
+	token, err := dec.Token()
+	if err != nil {
+		return fmt.Errorf("keymerge: unreadable document")
+	}
+	switch token {
+	case json.Delim('{'):
+		return validateJSONObjectTokens(dec, depth)
+	case json.Delim('['):
+		if depth > 10000 {
+			return fmt.Errorf("keymerge: unreadable document")
+		}
+		for dec.More() {
+			if err = validateJSONTokenValue(dec, depth+1); err != nil {
 				return err
 			}
 		}
+		token, err = dec.Token()
+		if err != nil || token != json.Delim(']') {
+			return fmt.Errorf("keymerge: unreadable document")
+		}
+	case json.Delim('}'), json.Delim(']'):
+		return fmt.Errorf("keymerge: unreadable document")
 	}
 	return nil
 }

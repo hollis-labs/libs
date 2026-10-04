@@ -49,3 +49,25 @@ func TestInstalledDefensiveOpenDoesNotFollowEvenConfinedLink(t *testing.T) {
 		t.Fatal("defensive open followed link")
 	}
 }
+
+func TestInstalledDefensiveOpenRejectsIntermediateLink(t *testing.T) {
+	dir, other := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(other, "ordinary"), []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, filepath.Join(dir, "parent")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	file, err := openInstalledRegular(root, "parent/ordinary")
+	if file != nil {
+		file.Close()
+	}
+	if err == nil {
+		t.Fatal("followed intermediate link outside pinned root")
+	}
+}
