@@ -10,6 +10,7 @@ const SchemaVersion = "effects.v1"
 type Kind string
 
 const CredentialLinks Kind = "credential_links"
+const Trust Kind = "trust"
 
 type Phase string
 
@@ -67,10 +68,19 @@ type Evidence struct {
 	Phase   Phase
 	Outcome Outcome
 	Links   []LinkEvidence
+	Trust   []TrustEvidence
+}
+
+// TrustEvidence contains only the authorized target and nonsecret trust state.
+type TrustEvidence struct {
+	Mechanism, Target, ConfigRootID, AuthorizationID, AuthorizationVersion string
+	Present                                                                bool
+	Outcome                                                                Outcome
 }
 
 func (e Evidence) Clone() Evidence {
 	e.Links = append([]LinkEvidence(nil), e.Links...)
+	e.Trust = append([]TrustEvidence(nil), e.Trust...)
 	return e
 }
 
