@@ -338,7 +338,9 @@ type Observer interface {
 }
 
 // ReceiptStore persists control records outside every mutable workspace root.
-// Record must reject an operation ID bound to a different input digest.
+// Successful Record must durably persist the supplied record before returning.
+// Record must reject an operation ID bound to a different input digest. Records
+// carry paths, identities and digests; credential bytes never belong here.
 type ReceiptStore interface {
 	Record(context.Context, Receipt) error
 }
