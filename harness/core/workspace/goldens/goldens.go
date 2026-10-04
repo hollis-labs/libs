@@ -101,13 +101,11 @@ func Cases(root string) ([]string, error) {
 	return out, err
 }
 
-// Sandbox creates the render root with private fixture homes under TMPDIR.
+// Sandbox creates a private render root with fixture homes and umask 022.
 // Tests using it must be serial because environment changes are process-wide.
 func Sandbox(t *testing.T) string {
 	t.Helper()
-	if os.Getenv("TMPDIR") == "" {
-		t.Fatal("golden tests require a private TMPDIR")
-	}
+	t.Cleanup(pinFixtureUmask())
 	root := t.TempDir()
 	for _, kv := range []struct{ k, p string }{{"HOME", "home"}, {"CODEX_HOME", "home/codex"}, {"OPENCODE_CONFIG_DIR", "home/opencode"}, {"XDG_CONFIG_HOME", "home/config"}} {
 		p := filepath.Join(root, kv.p)

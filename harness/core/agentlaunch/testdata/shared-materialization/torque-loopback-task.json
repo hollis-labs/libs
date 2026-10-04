@@ -2,7 +2,7 @@
   "fixture": "torque-loopback-task",
   "source": {
     "app": "torque",
-    "checkout": "/fixture-root/dev/hollis-labs/apps/torque",
+    "checkout": "/fixture-root/torque",
     "head": "1e33e28",
     "dirty": false,
     "paths": [

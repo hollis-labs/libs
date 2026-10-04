@@ -169,7 +169,7 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 		if err != nil {
 			return ev, err
 		}
-		ev.Diagnostics = append(ev.Diagnostics, "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior belongs to S4.")
+		ev.Diagnostics = append(ev.Diagnostics, "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior is a planned follow-up change.")
 	}
 	if in.Scenario == "refresh" {
 		unrelated(t, root)

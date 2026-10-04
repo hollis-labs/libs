@@ -99,7 +99,7 @@
     ]
   },
   "diagnostics": [
-    "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior belongs to S4."
+    "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior is a planned follow-up change."
   ],
   "ownership": [
     {

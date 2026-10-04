@@ -1,11 +1,15 @@
 package agentsessions
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+
 	"github.com/hollis-labs/substrate/harness/adapters/provider"
 	"github.com/hollis-labs/substrate/harness/workspace/goldens"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
-	"path/filepath"
-	"testing"
 )
 
 func TestGoldenSessionPlant(t *testing.T) {
@@ -36,7 +40,7 @@ func TestGoldenSessionPlant(t *testing.T) {
 			ev := goldens.Evidence{Writer: "agentsessions", Source: "legacy preparePlant (per-file Mode ignored)"}
 			if err != nil {
 				ev.Diagnostics = append(ev.Diagnostics, err.Error())
-				root = filepath.Join(scratch, "empty")
+				root = sessionGoldenRoot(root, opts.BootDirRoot, err)
 			} else {
 				ev.Bindings = struct {
 					CWD                            string
@@ -45,5 +49,45 @@ func TestGoldenSessionPlant(t *testing.T) {
 			}
 			goldens.Check(t, dir, root, ev, goldens.Roots(root, "<boot>", scratch, "<scratch>"))
 		})
+	}
+}
+
+func sessionGoldenRoot(root, parent string, err error) string {
+	if err != nil {
+		return parent
+	}
+	return root
+}
+func TestGoldenFailedPlantDetectsPartialLeftovers(t *testing.T) {
+	scratch := goldens.Sandbox(t)
+	parent := filepath.Join(scratch, "boots")
+	a := &fakeBootDirAdapter{name: "fixture", spec: provider.BootDirSpec{PlantedFiles: []provider.PlantedFile{
+		{RelPath: "AGENTS.md", Render: staticContent("partial")},
+		{RelPath: "settings.json", Render: func(provider.PlantContext) (string, error) { return "", errors.New("fixture render failure") }},
+	}}}
+	root, _, _, err := preparePlant(StartOptions{AutoPlantBootDir: true, BootDirRoot: parent}, a, "fixture")
+	if err == nil {
+		t.Fatal("expected fixture render failure")
+	}
+	observed := sessionGoldenRoot(root, parent, err)
+	before, e := goldens.Snapshot(observed, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Simulate a cleanup regression in the error path, after the real render
+	// failure. The consumer snapshot must expose a partially planted directory.
+	leftover := filepath.Join(parent, "partial-boot")
+	if e := os.Mkdir(leftover, 0700); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(leftover, "AGENTS.md"), []byte("partial"), 0644); e != nil {
+		t.Fatal(e)
+	}
+	after, e := goldens.Snapshot(observed, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if reflect.DeepEqual(before, after) {
+		t.Error("failed-plant consumer did not observe partial leftovers")
 	}
 }

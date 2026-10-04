@@ -9,6 +9,7 @@ import argparse
 import base64
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -82,7 +83,7 @@ def capture(binary, scratch, mode):
                     root.mkdir(mode=0o700)
                     tree = root
                     args += ["--root", str(root)]
-                result = subprocess.run(args, env=env, cwd=scope, capture_output=True, text=True)
+                result = subprocess.run(args, env=env, cwd=scope, capture_output=True, text=True, umask=0o022)
                 if scenario == "refresh" and result.returncode == 0:
                     (root / "operator.txt").write_text("Operator owned.\n")
                     (root / "operator.txt").chmod(0o640)
@@ -95,7 +96,7 @@ def capture(binary, scratch, mode):
                     else:
                         with config.open("a") as out:
                             out.write('\nfixture_operator = true\n')
-                    result = subprocess.run(args, env=env, cwd=scope, capture_output=True, text=True)
+                    result = subprocess.run(args, env=env, cwd=scope, capture_output=True, text=True, umask=0o022)
                 if result.returncode and not (provider == "opencode" and operation == "install"):
                     raise RuntimeError(result.stderr)
                 if not tree.exists():
@@ -106,7 +107,7 @@ def capture(binary, scratch, mode):
                 def normalize(text):
                     for old, new in pairs:
                         text = text.replace(old, new)
-                    return text
+                    return re.sub(r"CW-\d{8}-\d+", "<external-follow-up>", text)
                 binding = {}
                 if operation == "boot" and result.returncode == 0:
                     report = json.loads(result.stdout)
@@ -119,7 +120,7 @@ def capture(binary, scratch, mode):
                 write_diff(case / "expected.json", snapshot(tree, normalize), mode)
                 write_diff(case / "evidence.json", {
                     "writer": "cairn", "source_commit": COMMIT,
-                    "legacy_bundle_seed_commit": "6da0e3864698c75bf4e00b115b1bc264a614c8d2",
+                    "external_seed_bundle_revision": {"revision": "6da0e3864698c75bf4e00b115b1bc264a614c8d2", "publicly_resolvable": False},
                     "fixture": "neutral miniature bundle (not the legacy bundle)",
                     "bindings": binding, "exit_code": result.returncode,
                     "diagnostics": normalize(result.stderr).splitlines(),
@@ -141,15 +142,18 @@ def main():
     with tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"]) as temporary:
         scratch = Path(temporary)
         source = scratch / "source"
-        subprocess.run(["git", "-C", args.repo, "worktree", "add", "--detach", str(source), COMMIT], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        added = False
         try:
+            subprocess.run(["git", "-C", args.repo, "worktree", "add", "--detach", str(source), COMMIT], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            added = True
             binary = scratch / "cairn"
             env = dict(os.environ, GOFLAGS="-p=2", GOPROXY="off", GOSUMDB="off", GOWORK="off", GOTMPDIR=temporary)
             subprocess.run(["go", "build", "-o", str(binary), "./cmd/cairn"], cwd=source, env=env, check=True)
             capture(binary, scratch, "stage")
         finally:
-            subprocess.run(["git", "-C", args.repo, "worktree", "remove", str(source)], check=True)
+            if added:
+                subprocess.run(["git", "-C", args.repo, "worktree", "remove", str(source)], check=True)
 
 if __name__ == "__main__":
     main()

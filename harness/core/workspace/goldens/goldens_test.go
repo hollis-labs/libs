@@ -10,7 +10,7 @@ import (
 // Verify the comparison input catches the regressions the corpus protects:
 // byte changes, chmod-only changes, and removed empty directories.
 func TestSnapshotPreservesBytesModesAndEmptyDirectories(t *testing.T) {
-	root := t.TempDir()
+	root := Sandbox(t)
 	file := filepath.Join(root, "data.bin")
 	empty := filepath.Join(root, "empty")
 	if err := os.WriteFile(file, []byte{0, 255, 1}, 0600); err != nil {
@@ -51,11 +51,19 @@ func TestSnapshotPreservesBytesModesAndEmptyDirectories(t *testing.T) {
 	}
 }
 func TestSnapshotRefusesSymlinks(t *testing.T) {
-	root := t.TempDir()
+	root := Sandbox(t)
 	if err := os.Symlink("missing", filepath.Join(root, "link")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Snapshot(root, nil); err == nil {
 		t.Error("snapshot accepted an unsupported symlink")
+	}
+}
+
+func TestSandboxWithoutTMPDIR(t *testing.T) {
+	t.Setenv("TMPDIR", "")
+	root := Sandbox(t)
+	if info, err := os.Stat(root); err != nil || !info.IsDir() {
+		t.Fatalf("private sandbox unavailable: %v", err)
 	}
 }
