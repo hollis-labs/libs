@@ -299,7 +299,14 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 			mutationRoots = append(mutationRoots, r)
 		}
 	}
+	if err := repositoryInputs(p, obs); err != nil {
+		return PlannedWorkspace{}, err
+	}
 	p.locks, err = OrderedLockKeys(resources.LockNamespace, mutationRoots, lockObs)
+	if err != nil {
+		return PlannedWorkspace{}, err
+	}
+	p.locks, err = repositoryLockKeys(p)
 	if err != nil {
 		return PlannedWorkspace{}, err
 	}

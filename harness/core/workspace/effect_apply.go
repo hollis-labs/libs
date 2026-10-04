@@ -6,12 +6,14 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/workspace/credentials"
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 )
 
 type preparedEffects struct {
-	credentials []credentials.PreparedGroup
-	trust       []trust.Prepared
+	credentials  []credentials.PreparedGroup
+	repositories []repositories.Prepared
+	trust        []trust.Prepared
 }
 
 func effectContext(ctx context.Context, p PlannedWorkspace, ports Ports) effects.PreflightContext {
@@ -41,7 +43,7 @@ func effectStatus(o effects.Outcome) Status {
 	return Partial
 }
 
-func preflightEffects(ctx context.Context, p PlannedWorkspace, ports Ports) (preparedEffects, error) {
+func preflightEffects(ctx context.Context, p PlannedWorkspace, ports Ports, result *ApplyResult) (preparedEffects, error) {
 	var prepared preparedEffects
 	c := effectContext(ctx, p, ports)
 	for _, g := range p.effectInputs.Credentials {
@@ -51,8 +53,20 @@ func preflightEffects(ctx context.Context, p PlannedWorkspace, ports Ports) (pre
 		}
 		prepared.credentials = append(prepared.credentials, value)
 	}
-	// Repository requests remain explicitly deferred until the reviewed leaf is
-	// integrated. They cannot be bypassed by an optional port or empty group.
+	recovered, err := inspectRepositoryRecovery(ctx, p, ports, result)
+	if err != nil {
+		return prepared, err
+	}
+	for _, r := range p.effectInputs.Repositories {
+		if recovered[r.Path] {
+			continue
+		}
+		value, out := repositories.Preflight(ctx, r, c, ports.Repositories)
+		if !effectSuccess(out.Outcome) {
+			return prepared, refuse(out.Code, "repositories", effectStatus(out.Outcome))
+		}
+		prepared.repositories = append(prepared.repositories, value)
+	}
 	for _, r := range p.effectInputs.Trust {
 		value, out := trust.Preflight(ctx, r, c, ports.Trust)
 		if !effectSuccess(out.Outcome) {
@@ -91,14 +105,21 @@ func (s effectReceiptSink) Record(ctx context.Context, e effects.Evidence) error
 func (s effectReceiptSink) known(e effects.Evidence) bool {
 	if e.Kind == effects.CredentialLinks {
 		for _, g := range s.p.effectInputs.Credentials {
-			if e.RootID == g.Candidate.ID && len(e.Trust) == 0 {
+			if e.RootID == g.Candidate.ID && len(e.Trust) == 0 && len(e.Attachments) == 0 {
 				return true
 			}
 		}
 	}
 	if e.Kind == effects.Trust {
 		for _, r := range s.p.effectInputs.Trust {
-			if e.RootID == r.Config.ID && len(e.Links) == 0 {
+			if e.RootID == r.Config.ID && len(e.Links) == 0 && len(e.Attachments) == 0 {
+				return true
+			}
+		}
+	}
+	if e.Kind == effects.RepositoryAttachment {
+		for _, r := range s.p.effectInputs.Repositories {
+			if repositoryEvidenceBound(r, e) {
 				return true
 			}
 		}
@@ -140,6 +161,11 @@ func carryRecovery(result *ApplyResult, p PlannedWorkspace, live Observations) e
 			}
 			appendObligation(result, o)
 		}
+		for _, request := range r.RepositoryRequests {
+			if !slices.Contains(result.Receipt.RepositoryRequests, request) {
+				result.Receipt.RepositoryRequests = append(result.Receipt.RepositoryRequests, request)
+			}
+		}
 		result.Receipt.EffectEvidence = append(result.Receipt.EffectEvidence, copyRecord(r.EffectEvidence)...)
 		result.Receipt.Effects = append(result.Receipt.Effects, copyRecord(r.Effects)...)
 	}
@@ -148,7 +174,7 @@ func carryRecovery(result *ApplyResult, p PlannedWorkspace, live Observations) e
 }
 
 func applyEffects(ctx context.Context, p PlannedWorkspace, ports Ports, prepared preparedEffects, result *ApplyResult) error {
-	if len(prepared.credentials)+len(prepared.trust) == 0 {
+	if len(prepared.credentials)+len(prepared.repositories)+len(prepared.trust) == 0 {
 		return nil
 	}
 	generation := ""
@@ -166,6 +192,9 @@ func applyEffects(ctx context.Context, p PlannedWorkspace, ports Ports, prepared
 			appendObligation(result, Obligation{Kind: RecoveryInspectionRequired, RootID: o.RootID, Code: o.Code})
 		}
 		kind := CredentialLinkEffect
+		if out.Evidence.Kind == effects.RepositoryAttachment {
+			kind = RepositoryEffect
+		}
 		if out.Evidence.Kind == effects.Trust {
 			kind = TrustEffect
 		}
@@ -173,6 +202,13 @@ func applyEffects(ctx context.Context, p PlannedWorkspace, ports Ports, prepared
 		if out.Outcome == effects.Applied || out.Outcome == effects.Partial || len(out.Obligations) > 0 {
 			if root, ok := findRoot(p.roots, out.Evidence.RootID); ok {
 				result.Retained = appendRoot(result.Retained, root)
+			}
+		}
+		if out.Evidence.Kind == effects.RepositoryAttachment && (out.Outcome == effects.Applied || out.Outcome == effects.Partial || len(out.Obligations) > 0) {
+			for _, repo := range p.spec.Repos {
+				if len(out.Evidence.Attachments) == 1 && rootCanonicalPath(p, repo.DesiredRoot.ID) == out.Evidence.Attachments[0].Path {
+					result.Retained = appendRoot(result.Retained, repo.DesiredRoot)
+				}
 			}
 		}
 		result.Receipt.Obligations = slices.Clone(result.Obligations)
@@ -186,6 +222,14 @@ func applyEffects(ctx context.Context, p PlannedWorkspace, ports Ports, prepared
 			return err
 		}
 		if err := absorb(credentials.Apply(ctx, value, c, ports.Credentials)); err != nil {
+			return err
+		}
+	}
+	for _, value := range prepared.repositories {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := absorb(repositories.Apply(ctx, value, c, ports.Repositories)); err != nil {
 			return err
 		}
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 // Materialize prepares inactive artifacts under the full planned lock set.
-// Explicit credential and trust groups are preflighted under all locks before
+// Explicit credential, repository and trust groups are preflighted under all locks before
 // mutation and dispatched after verified artifact commit. Unknown/deferred
 // effects refuse before mutation. It never publishes current, retires roots or
 // issues Ready. Every failure returns observed partial accounting, not rollback.
@@ -136,12 +136,18 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 		return result, err
 	}
 	var prepared preparedEffects
-	prepared, err = preflightEffects(ctx, p, ports)
+	prepared, err = preflightEffects(ctx, p, ports, &result)
 	if err != nil {
 		return result, err
 	}
 	for _, g := range p.effectInputs.Credentials {
 		appendObligation(&result, Obligation{Kind: EffectPending, RootID: g.Candidate.ID, Code: "effect_dispatch_pending:" + p.spec.OperationID})
+	}
+	for _, r := range p.effectInputs.Repositories {
+		appendObligation(&result, Obligation{Kind: EffectPending, RootID: r.Base.ID, Code: "effect_dispatch_pending:" + p.spec.OperationID})
+		if !slices.Contains(result.Receipt.RepositoryRequests, r) {
+			result.Receipt.RepositoryRequests = append(result.Receipt.RepositoryRequests, r)
+		}
 	}
 	for _, r := range p.effectInputs.Trust {
 		appendObligation(&result, Obligation{Kind: EffectPending, RootID: r.Config.ID, Code: "effect_dispatch_pending:" + p.spec.OperationID})
@@ -228,7 +234,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	if err = applyEffects(ctx, p, ports, prepared, &result); err != nil {
 		return result, err
 	}
-	if len(prepared.credentials)+len(prepared.trust) > 0 {
+	if len(p.effectInputs.Credentials)+len(p.effectInputs.Repositories)+len(p.effectInputs.Trust) > 0 {
 		result.Obligations = slices.DeleteFunc(result.Obligations, func(o Obligation) bool {
 			return o.Kind == EffectPending && o.Code == "effect_dispatch_pending:"+p.spec.OperationID
 		})
@@ -331,7 +337,7 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 	for _, cap := range []struct {
 		enabled    bool
 		capability Capability
-	}{{len(p.effectInputs.Credentials) > 0, CredentialLinks}, {len(p.effectInputs.Trust) > 0, TrustHandling}} {
+	}{{len(p.effectInputs.Credentials) > 0, CredentialLinks}, {len(p.effectInputs.Trust) > 0, TrustHandling}, {len(p.effectInputs.Repositories) > 0, RepositoryAttachments}} {
 		if cap.enabled && !slices.Contains(o.Capabilities, cap.capability) {
 			return refuse(CodeRequiredCapabilityUnavailable, "effects", Unsupported)
 		}

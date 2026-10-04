@@ -2,9 +2,9 @@
 
 `Plan` freezes explicit resources, observations, rendered artifacts and host
 effect inputs. `Materialize` acquires the complete canonical lock set, validates
-fresh authority and disk evidence, and preflights every credential and trust
+fresh authority and disk evidence, and preflights every credential, repository and trust
 group before the first receipt or mutation. It commits and verifies artifacts,
-then applies credentials and finally trust through the same durable
+then applies credentials, repositories and finally trust through the same durable
 `Ports.ReceiptStore`. The leaves receive only its narrow `effects.ReceiptSink`
 view.
 
@@ -12,7 +12,7 @@ Callers supply empty effect headers; the planner binds version, operation ID and
 input digest. Credential inputs include an explicitly captured provider home,
 source-read grants and private inactive candidate custody. Trust inputs name an
 explicit configuration root and stable final target. Missing inputs, unknown
-or deferred effects, repository execution and unsupported host capabilities
+or deferred effects and unsupported host capabilities
 refuse before mutation. No default discovers a home or grants authority.
 
 `Resources.RecoveryReceipts` carries trusted earlier-operation evidence and
@@ -20,6 +20,23 @@ obligations into a retry. The root checks identity and declared roots, preserves
 obligations and evidence, and neither replays nor compensates earlier effects.
 Use a new operation ID for changed inputs. Uncertain staging and failed durable
 records retain affected roots and report Partial.
+
+Repository requests supply observed source/common/base identities and explicit
+ownership and authorization revisions. The planner freezes the concrete branch
+and base without interpreting templates, binds requests one-to-one to `RepoSpec`,
+and includes exact source/common/base keys in the complete lock union. Every lock
+namespace lies outside those roots. Missing inputs and private checkout creation
+refuse; user-owned writable attachments need a separate write grant, and readonly
+attachments need explicit enforcement evidence. There is no ambient discovery.
+
+`Receipt.RepositoryRequests` retains original operation-bound requests beside
+versioned attachment evidence. Resume inspection uses their original headers
+with fresh authority and complete locks. Completed attachments may have advanced
+HEAD or dirty work and skip creation. Intent or interrupted evidence remains
+Partial with retained attachment roots even when `Created` is false. Inspection
+never resets, removes or replays an attachment; earlier recovery obligations
+survive later successful attempts. Repository failures prevent subsequent trust.
+Retirement and runtime adoption remain separate.
 
 Successful preparation is artifact-only Partial with a pending launch
 reservation. `ArtifactsComplete()` requires the root's earned completion seal;

@@ -13,6 +13,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 )
 
@@ -189,8 +190,9 @@ type Spec struct {
 }
 
 type EffectInputs struct {
-	Credentials []credentials.Group
-	Trust       []trust.Request
+	Credentials  []credentials.Group
+	Repositories []repositories.Request `json:",omitempty"`
+	Trust        []trust.Request
 }
 
 type Capability string
@@ -277,14 +279,17 @@ type Receipt struct {
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
 	// receipts leave it empty and make no enrollment or continuity claim.
-	Identity       IdentitySpec
-	Phase          Phase
-	Roots          []RootReceipt
-	Attachments    []AttachmentReceipt
-	Effects        []EffectReceipt
-	EffectEvidence []effects.Evidence
-	Obligations    []Obligation
-	RecordedAt     time.Time
+	Identity    IdentitySpec
+	Phase       Phase
+	Roots       []RootReceipt
+	Attachments []AttachmentReceipt
+	Effects     []EffectReceipt
+	// RepositoryRequests preserves original trusted operation bindings for
+	// observational recovery; it never authorizes recreation or retirement.
+	RepositoryRequests []repositories.Request `json:",omitempty"`
+	EffectEvidence     []effects.Evidence
+	Obligations        []Obligation
+	RecordedAt         time.Time
 }
 
 type Diagnostic struct {
@@ -348,6 +353,7 @@ type Ports struct {
 	ReceiptStore ReceiptStore
 	Credentials  credentials.LinkPort
 	Trust        trust.Port
+	Repositories repositories.Port
 }
 type Clock interface{ Now() time.Time }
 type IDs interface {

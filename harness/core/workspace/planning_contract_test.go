@@ -575,11 +575,12 @@ func TestPlanningPlanContent(t *testing.T) {
 	_, err = Plan(s3, c3, r3, o3)
 	fixtureExpect(t, "empty observation with manifest", err, "inconsistent_root_observation")
 
-	// Host effects that no handler exists for yet are reported, not hidden.
+	// Unbound repository requests refuse; other deferred host effects remain visible.
+	sr, cr, rr, or := fixturePlanInputs(t)
+	sr.Repos = []RepoSpec{{ID: "r", Source: ResourceRef{ID: "s"}, DesiredRoot: sr.Home.Root, Mode: Worktree, Retention: Keep}}
+	_, repoErr := Plan(sr, cr, rr, or)
+	fixtureExpect(t, "unbound repository", repoErr, "repository_input_binding")
 	for name, mutate := range map[string]func(*Spec){
-		"repositories": func(s *Spec) {
-			s.Repos = []RepoSpec{{ID: "r", Source: ResourceRef{ID: "s"}, DesiredRoot: s.Home.Root, Mode: Worktree, Retention: Keep}}
-		},
 		"trust":    func(s *Spec) { s.Trust = []TrustSpec{{Mechanism: "m"}} },
 		"confined": func(s *Spec) { s.Sandbox.Policy.Mode = sandbox.ConfinementRequired },
 	} {
