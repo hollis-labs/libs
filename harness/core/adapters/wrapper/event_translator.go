@@ -1,6 +1,7 @@
 package wrapper
 
 import (
+	"context"
 	"time"
 
 	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
@@ -70,6 +71,26 @@ func translateStreamEvent(ev llmtypes.StreamEvent) (kind runtimeevents.EventKind
 		// downstream consumers don't see "agent.delta with no
 		// meaningful payload" frames for events the wrapper doesn't
 		// yet model.
+		return "", nil, false
+	}
+}
+
+// translateCodexTurnEnd consumes the JSON-RPC session's typed terminal,
+// including its final text, stop reason or failure diagnostic. Other runtimes
+// continue to take their terminals from the legacy stream.
+func (w *Wrapper) translateCodexTurnEnd(ctx context.Context, ev pevents.Event) (runtimeevents.EventKind, any, bool) {
+	switch e := ev.(type) {
+	case pevents.Done:
+		stream := w.filterStreamEvent(ctx, llmtypes.StreamEvent{Type: llmtypes.EventDone, Content: e.Text})
+		kind, payload, _ := translateStreamEvent(stream)
+		return kind, withStopReason(payload, &llmtypes.Usage{StopReason: e.StopReason}), true
+	case pevents.Error:
+		message := e.Message
+		if message == "" && e.Err != nil {
+			message = e.Err.Error()
+		}
+		return translateStreamEvent(llmtypes.StreamEvent{Type: llmtypes.EventError, Error: message})
+	default:
 		return "", nil, false
 	}
 }
