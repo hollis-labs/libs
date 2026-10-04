@@ -220,3 +220,35 @@ func TestActionOrderingUsesCanonicalPlacement(t *testing.T) {
 		t.Fatalf("canonical action order = %#v", actions)
 	}
 }
+
+func TestGrantTupleOrderingWithEmbeddedNul(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	for i, id := range []string{"x", "x\x00y"} {
+		ref := root([]string{"effect-one", "effect-two"}[i])
+		ref.ID = id
+		r.Roots = append(r.Roots, ref)
+		o.Roots = append(o.Roots, workspace.RootObservation{RootID: ref.ID, DeclaredPath: ref.Path, CanonicalPath: ref.Path, CanonicalBase: ref.AllowedBase, Owner: ref.Owner})
+		g := workspace.EffectGrant{Kind: workspace.TrustEffect, RootID: id, AuthorizationID: []string{"y\x00z", "z"}[i], Version: "1"}
+		s.Effects = append(s.Effects, g)
+		r.Grants = append(r.Grants, g)
+	}
+	p := planned(t, s, c, r, o)
+	slices.Reverse(s.Effects)
+	slices.Reverse(r.Grants)
+	if q := planned(t, s, c, r, o); q.Digest() != p.Digest() {
+		t.Fatal("grant set order changed digest")
+	}
+	for _, field := range []string{"authorization", "version"} {
+		s, c, r, o := planInputs(t)
+		base := planned(t, s, c, r, o).Digest()
+		if field == "authorization" {
+			s.Effects[0].AuthorizationID += "\x00other"
+		} else {
+			s.Effects[0].Version += "\x00other"
+		}
+		r.Grants = slices.Clone(s.Effects)
+		if planned(t, s, c, r, o).Digest() == base {
+			t.Fatalf("%s change omitted from digest", field)
+		}
+	}
+}

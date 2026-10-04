@@ -10,14 +10,24 @@ import (
 // semantic encoding change requires a new version and a reviewed golden.
 const DigestVersion = "workspace.plan.input.v1"
 
+func compareEffectGrants(a, b EffectGrant) int {
+	if n := cmp.Compare(a.Kind, b.Kind); n != 0 {
+		return n
+	}
+	if n := cmp.Compare(a.RootID, b.RootID); n != 0 {
+		return n
+	}
+	if n := cmp.Compare(a.AuthorizationID, b.AuthorizationID); n != 0 {
+		return n
+	}
+	return cmp.Compare(a.Version, b.Version)
+}
+
 func canonicalInputs(s Spec, r Resources) (Spec, Resources) {
 	s = copyRecord(s)
 	r = copyRecord(r)
-	effectLess := func(a, b EffectGrant) int {
-		return cmp.Compare(string(a.Kind)+"\x00"+a.RootID+"\x00"+a.AuthorizationID+"\x00"+a.Version, string(b.Kind)+"\x00"+b.RootID+"\x00"+b.AuthorizationID+"\x00"+b.Version)
-	}
-	slices.SortFunc(s.Effects, effectLess)
-	slices.SortFunc(r.Grants, effectLess)
+	slices.SortFunc(s.Effects, compareEffectGrants)
+	slices.SortFunc(r.Grants, compareEffectGrants)
 	r.Grants = slices.CompactFunc(r.Grants, func(a, b EffectGrant) bool { return a == b })
 	slices.Sort(r.Capabilities)
 	r.Capabilities = slices.Compact(r.Capabilities)

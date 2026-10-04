@@ -452,9 +452,7 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 	// retained in order. Evidence timestamps/disk snapshots are not desired input.
 	p.resources.Roots = slices.Clone(p.roots)
 	slices.Sort(p.resources.Capabilities)
-	slices.SortFunc(p.resources.Grants, func(a, b EffectGrant) int {
-		return cmp.Compare(string(a.Kind)+"\x00"+a.RootID+"\x00"+a.AuthorizationID+"\x00"+a.Version, string(b.Kind)+"\x00"+b.RootID+"\x00"+b.AuthorizationID+"\x00"+b.Version)
-	})
+	slices.SortFunc(p.resources.Grants, compareEffectGrants)
 	canonicalRoots := make([]RootObservation, 0, len(p.roots))
 	for _, root := range p.roots {
 		o := obs[root.ID]
