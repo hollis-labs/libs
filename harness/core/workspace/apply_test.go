@@ -22,7 +22,8 @@ type fixturePorts struct {
 	failPhase       workspace.Phase
 	failDirectory   string
 	cancel          context.CancelFunc
-	cancelAcquire   bool
+	cancelAcquireAt int
+	acquired        int
 	cancelPhase     workspace.Phase
 	cancelDirectory bool
 }
@@ -58,7 +59,8 @@ func (f *fixturePorts) Record(_ context.Context, r workspace.Receipt) error {
 }
 func (f *fixturePorts) Acquire(_ context.Context, k workspace.LockKey) (workspace.HeldLock, error) {
 	f.events = append(f.events, "acquire:"+filepath.Base(k.CanonicalID))
-	if f.cancelAcquire {
+	f.acquired++
+	if f.cancelAcquireAt == f.acquired {
 		f.cancel()
 	}
 	if f.failAcquire > 0 {
@@ -375,7 +377,7 @@ func TestCallerCannotMintLaunchReadiness(t *testing.T) {
 }
 
 func TestMaterializeCancellationAtMutationBoundaries(t *testing.T) {
-	for _, point := range []string{"acquired lock", "interrupted receipt", "created directory"} {
+	for _, point := range []string{"acquired lock", "complete lock set", "interrupted receipt", "created directory"} {
 		t.Run(point, func(t *testing.T) {
 			p, f, s := applyFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -383,7 +385,9 @@ func TestMaterializeCancellationAtMutationBoundaries(t *testing.T) {
 			f.cancel = cancel
 			switch point {
 			case "acquired lock":
-				f.cancelAcquire = true
+				f.cancelAcquireAt = 1
+			case "complete lock set":
+				f.cancelAcquireAt = len(p.LockKeys())
 			case "interrupted receipt":
 				f.cancelPhase = workspace.Interrupted
 			case "created directory":
@@ -402,6 +406,12 @@ func TestMaterializeCancellationAtMutationBoundaries(t *testing.T) {
 				}
 			} else if len(got.Retained) != 0 {
 				t.Fatal("cancelled preflight retained mutation")
+			}
+			if point == "acquired lock" && !reflect.DeepEqual(f.events, []string{"acquire:home", "release:home"}) {
+				t.Fatal("cancellation acquired another lock", f.events)
+			}
+			if point == "complete lock set" && !reflect.DeepEqual(f.events, []string{"acquire:home", "acquire:" + s.Identity.EncodedKey, "release:" + s.Identity.EncodedKey, "release:home"}) {
+				t.Fatal("cancellation crossed authority validation", f.events)
 			}
 			if f.events[len(f.events)-1] != "release:home" {
 				t.Fatal("cancelled apply leaked held lock", f.events)
