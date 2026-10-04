@@ -132,7 +132,7 @@ func validateBinding(r renderSnapshot, roots map[layout.Root]string) error {
 		return refuse(CodeInvalidRenderBinding, "render", Conflict)
 	}
 	if p := r.Binding.Posture; p != nil {
-		if p.Provider != r.Provider || p.Mapper != "adapters/registry.Descriptor.PostureFor" || !slices.Contains([]permission.Mode{permission.ModeDefault, permission.ModePlan, permission.ModeAcceptEdits, permission.ModeYolo}, p.Posture) {
+		if p.Provider != r.Provider || p.Mapper != "adapters/registry.Descriptor.PostureFor" || !slices.Contains([]permission.Mode{"", permission.ModeDefault, permission.ModePlan, permission.ModeAcceptEdits, permission.ModeYolo}, p.Posture) {
 			return refuse(CodeInvalidRenderBinding, "render", Conflict)
 		}
 	}
