@@ -89,6 +89,16 @@ func Inspect(ctx context.Context, g Group, e effects.Evidence, c effects.Preflig
 	if aborted && mutated {
 		return result(g, effects.Refused, "evidence_binding_refused")
 	}
+	if len(e.Trust) != 0 || len(e.Attachments) != 0 {
+		out := result(g, effects.Refused, "evidence_shape_refused")
+		out.Evidence = e.Clone()
+		out.Evidence.Trust = nil
+		out.Evidence.Attachments = nil
+		if mutated || inFlight || e.Phase == effects.InterruptedPhase {
+			out.Obligations = []effects.Obligation{{RootID: g.Candidate.ID, Code: "recovery_required"}}
+		}
+		return out
+	}
 	unavailable := func(o effects.Outcome, code string) effects.Result {
 		r := result(g, o, code)
 		r.Evidence = e.Clone()

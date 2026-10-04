@@ -14,6 +14,8 @@ type Kind string
 
 const CredentialLinks Kind = "credential_links"
 const Trust Kind = "trust"
+const RepositoryAttachment Kind = "repository_attachment"
+const RepositoryRetirement Kind = "repository_retirement"
 
 type Phase string
 
@@ -71,13 +73,14 @@ type LinkEvidence struct {
 }
 
 type Evidence struct {
-	Header  Header
-	Kind    Kind
-	RootID  string
-	Phase   Phase
-	Outcome Outcome
-	Links   []LinkEvidence
-	Trust   []TrustEvidence
+	Header      Header
+	Kind        Kind
+	RootID      string
+	Phase       Phase
+	Outcome     Outcome
+	Links       []LinkEvidence
+	Trust       []TrustEvidence
+	Attachments []AttachmentEvidence
 }
 
 // TrustEvidence contains only the authorized target and nonsecret trust state.
@@ -87,9 +90,27 @@ type TrustEvidence struct {
 	Outcome                                                                Outcome
 }
 
+// AttachmentEvidence binds nonsecret repository identity, ownership and provenance.
+// BaseCommit remains the original pinned base even when Head advances on resume.
+type AttachmentEvidence struct {
+	OriginHeader                                                                                   Header
+	ShippedProofID, ShippedProofRevision, UnusedProofID, UnusedProofRevision, RetirementProvenance string
+	SafetyComplete                                                                                 bool
+
+	Owner, UserWriteAuthorizationID, UserWriteAuthorizationVersion string
+	ReadonlyProofID, ReadonlyProofRevision, ReadonlyProvenance     string
+
+	Mode, Ownership, Path, SourcePath, CommonPath, RepositoryID string
+	SourceIdentity, CommonIdentity, Branch, BaseCommit, Head    string
+	AuthorizationID, AuthorizationVersion                       string
+	Created                                                     bool
+	Outcome                                                     Outcome
+}
+
 func (e Evidence) Clone() Evidence {
 	e.Links = append([]LinkEvidence(nil), e.Links...)
 	e.Trust = append([]TrustEvidence(nil), e.Trust...)
+	e.Attachments = append([]AttachmentEvidence(nil), e.Attachments...)
 	return e
 }
 
