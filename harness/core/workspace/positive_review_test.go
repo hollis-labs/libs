@@ -252,3 +252,19 @@ func TestGrantTupleOrderingWithEmbeddedNul(t *testing.T) {
 		}
 	}
 }
+
+func TestSeparateAllowedBaseRejectsGlobalCanonicalBase(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	s.Home.Root.AllowedBase, s.Home.Root.Path = "/alias", "/alias/home"
+	for i := range r.Roots {
+		if r.Roots[i].ID == s.Home.Root.ID {
+			r.Roots[i] = s.Home.Root
+		}
+	}
+	obs := rootObservation(&o, s.Home.Root.ID)
+	obs.DeclaredPath, obs.CanonicalBase, obs.CanonicalPath = s.Home.Root.Path, "/", "/home"
+	c.Roots[layout.RootProject] = s.Home.Root.Path
+	c.Rendered[0].Binding.Argv[1] = s.Home.Root.Path
+	_, err := workspace.Plan(s, c, r, o)
+	refusal(t, err, workspace.CodeObservationBaseMismatch)
+}
