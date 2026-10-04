@@ -2,7 +2,12 @@
 
 package localfs
 
-import "io/fs"
+import (
+	"io/fs"
+	"os"
+)
+
+func openSourceReadOnly(*os.Root, string) (*os.File, error) { return nil, ErrUnsupported }
 
 func identity(fs.FileInfo) string       { return "" }
 func safeDirectory(fs.FileInfo) bool    { return false }

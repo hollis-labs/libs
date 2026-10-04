@@ -3,7 +3,10 @@
 // checks do not provide cryptographic authenticity or launch readiness.
 package effects
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 const SchemaVersion = "effects.v1"
 
@@ -20,6 +23,7 @@ const (
 	LinkCreatedPhase Phase = "link_created"
 	CompletePhase    Phase = "complete"
 	InterruptedPhase Phase = "interrupted"
+	AbortedPhase     Phase = "aborted_before_mutation"
 )
 
 type Outcome string
@@ -33,6 +37,8 @@ const (
 	Conflict       Outcome = "conflict"
 	Omitted        Outcome = "omitted"
 	Pending        Outcome = "pending"
+	Prepared       Outcome = "prepared"
+	Removed        Outcome = "removed"
 )
 
 type Header struct {
@@ -57,7 +63,10 @@ type LinkEvidence struct {
 	Source, Destination, Target, ParentIdentity, LinkIdentity string
 	AuthorizationID, AuthorizationVersion                     string
 	Created                                                   bool
-	Outcome                                                   Outcome
+	// Uncertain identifies an unproved create result; it is never adopted or
+	// compensated without operation-owned file identity evidence.
+	Uncertain bool
+	Outcome   Outcome
 }
 
 type Evidence struct {
@@ -116,4 +125,7 @@ type ApplyContext struct {
 	ArtifactGeneration string
 	ArtifactRootID     string
 	Receipts           ReceiptSink
+	// CleanupTimeout may shorten the leaf's maximum cleanup budget. Host ports,
+	// authority callbacks and sinks must return when their context expires.
+	CleanupTimeout time.Duration
 }

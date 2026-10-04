@@ -5,8 +5,23 @@ package credentials
 
 import (
 	"context"
+	"errors"
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
 )
+
+var (
+	ErrSourceAbsent      = errors.New("credentials: source absent")
+	ErrSourceEscaped     = errors.New("credentials: source outside policy")
+	ErrSourceUnavailable = errors.New("credentials: source unavailable")
+)
+
+type Layer string
+
+const (
+	BootLayer      Layer = "boot"
+	InstalledLayer Layer = "installed"
+)
+const MaxBindings = 256
 
 type CapturedProviderHome struct {
 	Provider, Path, AllowedBase, Provenance, CaptureID, Revision string
@@ -36,7 +51,7 @@ type Binding struct {
 
 type Group struct {
 	Header    effects.Header
-	Layer     string
+	Layer     Layer
 	Candidate effects.RootInput
 	Home      ResolvedHome
 	Bindings  []Binding
@@ -63,6 +78,10 @@ type LinkPort interface {
 type CandidateSession interface {
 	Validate(context.Context) error
 	Inspect(context.Context, string) (LinkObservation, error)
+	// CreateExclusive never replaces an entry. With nil error it returns a
+	// complete observation of the newly created link; Exists=true asserts this
+	// operation created it. Any error requires reinspection: an entry observed
+	// only after an error is uncertain and must not be adopted or compensated.
 	CreateExclusive(context.Context, string, string) (LinkObservation, error)
 	RemoveIfMatches(context.Context, string, LinkObservation) error
 	Close() error

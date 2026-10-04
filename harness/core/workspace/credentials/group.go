@@ -5,12 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
 )
 
 func freeze(g Group) Group {
@@ -33,7 +34,7 @@ func binding(g Group, c effects.PreflightContext) string {
 	if !g.Header.Valid() || g.Header != c.Header {
 		return "invalid_binding"
 	}
-	if g.Layer != "boot" {
+	if g.Layer != BootLayer {
 		return "installed_links_refused"
 	}
 	if r.ID == "" || r.Owner == "" || r.Provenance == "" || !r.Inactive || !r.PrivateCustody || !absolute(r.Path) || !absolute(r.AllowedBase) || !under(r.AllowedBase, r.Path) || r.Path == r.AllowedBase || !absolute(r.MutationIdentity) || !under(r.MutationIdentity, r.Path) || r.Path == r.MutationIdentity {
@@ -59,11 +60,11 @@ func binding(g Group, c effects.PreflightContext) string {
 			return "home_refused"
 		}
 	}
-	if len(g.Bindings) == 0 || len(g.Bindings) > 4096 {
+	if len(g.Bindings) == 0 || len(g.Bindings) > MaxBindings {
 		return "invalid_group"
 	}
 	for n, b := range g.Bindings {
-		if render.ValidateRelPath(b.Source) != nil || render.ValidateRelPath(b.Destination) != nil || b.AuthorizationID == "" || b.AuthorizationVersion == "" || !b.SourceRead || (b.SourceWrite && (b.SourceWriteAuthorizationID == "" || b.SourceWriteAuthorizationVersion == "")) {
+		if ValidateRelPath(b.Source) != nil || ValidateDestination(b.Destination) != nil || b.AuthorizationID == "" || b.AuthorizationVersion == "" || !b.SourceRead || (b.SourceWrite && (b.SourceWriteAuthorizationID == "" || b.SourceWriteAuthorizationVersion == "")) {
 			return "binding_refused"
 		}
 		for _, prior := range g.Bindings[:n] {
@@ -77,18 +78,21 @@ func binding(g Group, c effects.PreflightContext) string {
 
 func inspectSource(ctx context.Context, g Group, b Binding, p LinkPort) (SourceObservation, bool, string) {
 	s, err := p.Source(ctx, g.Home, b.Source)
+	if errors.Is(err, ErrSourceEscaped) {
+		return s, false, "source_escape"
+	}
 	if err != nil || !s.Accessible {
-		if !b.Required {
+		if !b.Required && errors.Is(err, ErrSourceAbsent) {
 			return SourceObservation{}, true, ""
 		}
 		return s, false, "source_unavailable"
 	}
 	want := filepath.Join(g.Home.LogicalPath, filepath.FromSlash(b.Source))
-	if s.LogicalPath != want || !absolute(s.CanonicalPath) || !under(g.Home.CanonicalPath, s.CanonicalPath) || under(g.Candidate.MutationIdentity, s.CanonicalPath) {
+	if s.LogicalPath != want || !absolute(s.CanonicalPath) || !under(g.Home.CanonicalPath, s.CanonicalPath) || under(g.Candidate.MutationIdentity, s.CanonicalPath) || under(s.CanonicalPath, g.Candidate.MutationIdentity) || under(s.CanonicalPath, g.Candidate.Path) {
 		return s, false, "source_escape"
 	}
 	for _, r := range g.Home.PlantedRoots {
-		if under(r, s.CanonicalPath) {
+		if under(r, s.CanonicalPath) || under(s.CanonicalPath, r) {
 			return s, false, "source_escape"
 		}
 	}
@@ -124,7 +128,17 @@ func Preflight(ctx context.Context, g Group, c effects.PreflightContext, p LinkP
 			return PreparedGroup{}, result(g, effects.Conflict, "destination_conflict")
 		}
 	}
-	return PreparedGroup{group: g, digest: digest(g)}, result(g, effects.AlreadyPresent, "preflight_complete")
+	return PreparedGroup{group: g, digest: digest(g)}, result(g, effects.Prepared, "preflight_complete")
+}
+
+const DefaultCleanupTimeout = 5 * time.Second
+
+func cleanupContext(ctx context.Context, c effects.ApplyContext) (context.Context, context.CancelFunc) {
+	budget := c.CleanupTimeout
+	if budget <= 0 || budget > DefaultCleanupTimeout {
+		budget = DefaultCleanupTimeout
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), budget)
 }
 
 // Apply rechecks ALL sources and actual destinations before the first link.
@@ -134,7 +148,7 @@ func Apply(ctx context.Context, prepared PreparedGroup, c effects.ApplyContext, 
 	if prepared.digest == "" || prepared.digest != digest(g) {
 		return result(g, effects.Refused, "invalid_prepared_group")
 	}
-	if _, pre := Preflight(ctx, g, c.PreflightContext, p); pre.Code != "preflight_complete" {
+	if _, pre := Preflight(ctx, g, c.PreflightContext, p); pre.Outcome != effects.Prepared {
 		return pre
 	}
 	if c.Receipts == nil || c.ArtifactRootID != g.Candidate.ID || c.ArtifactGeneration == "" {
@@ -153,13 +167,15 @@ func Apply(ctx context.Context, prepared PreparedGroup, c effects.ApplyContext, 
 			out.Code = "candidate_close_failed"
 			out.Evidence.Outcome = effects.Partial
 			out.Evidence.Phase = "interrupted"
-			if c.Receipts.Record(context.WithoutCancel(ctx), out.Evidence.Clone()) != nil {
+			cleanupCtx, cancel := cleanupContext(ctx, c)
+			defer cancel()
+			if c.Receipts.Record(cleanupCtx, out.Evidence.Clone()) != nil {
 				out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "receipt_pending"})
 			}
 			out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "recovery_required"})
 		}
 	}()
-	out = result(g, effects.AlreadyPresent, "")
+	out = result(g, effects.Pending, "")
 	var sources []SourceObservation
 	var observed []LinkObservation
 	var omitted []bool
@@ -190,38 +206,56 @@ func Apply(ctx context.Context, prepared PreparedGroup, c effects.ApplyContext, 
 		}
 		out.Evidence.Links = append(out.Evidence.Links, effects.LinkEvidence{Source: sources[n].LogicalPath, Destination: b.Destination, Target: sources[n].LogicalPath, AuthorizationID: b.AuthorizationID, AuthorizationVersion: b.AuthorizationVersion, ParentIdentity: observed[n].ParentIdentity, LinkIdentity: observed[n].Identity, Outcome: state})
 	}
-	if c.Receipts.Record(ctx, out.Evidence.Clone()) != nil {
-		return result(g, effects.Refused, "receipt_failed_before_mutation")
-	}
 	mutated := false
+	abort := func(code string, o effects.Outcome) effects.Result {
+		out.Outcome = o
+		out.Code = code
+		out.Evidence.Outcome = o
+		out.Evidence.Phase = effects.AbortedPhase
+		cleanupCtx, cancel := cleanupContext(ctx, c)
+		defer cancel()
+		if c.Receipts.Record(cleanupCtx, out.Evidence.Clone()) != nil {
+			out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "receipt_pending"})
+		}
+		return out
+	}
+	if c.Receipts.Record(ctx, out.Evidence.Clone()) != nil {
+		return abort("receipt_failed_before_mutation", effects.Refused)
+	}
 	fail := func(code string) effects.Result {
 		if !mutated {
-			out.Outcome = effects.Conflict
-			out.Code = code
-			out.Evidence.Outcome = out.Outcome
-			return out
+			return abort(code, effects.Conflict)
 		}
 		out.Outcome = effects.Partial
 		out.Code = code
 		out.Evidence.Outcome = effects.Partial
 		out.Evidence.Phase = "interrupted"
-		cleanupCtx := context.WithoutCancel(ctx)
+		cleanupCtx, cancel := cleanupContext(ctx, c)
+		defer cancel()
 		for n := len(out.Evidence.Links) - 1; n >= 0; n-- {
 			e := &out.Evidence.Links[n]
+			if e.Uncertain && !e.Created {
+				e.Outcome = effects.Partial
+				out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "link_retained"})
+				continue
+			}
 			if !e.Created {
 				continue
 			}
 			want := LinkObservation{Exists: true, IsLink: true, Target: e.Target, Identity: e.LinkIdentity, ParentIdentity: e.ParentIdentity}
-			if c.Validate(cleanupCtx) != nil || session.Validate(cleanupCtx) != nil || session.RemoveIfMatches(cleanupCtx, e.Destination, want) != nil {
+			if cleanupCtx.Err() != nil || c.Validate(cleanupCtx) != nil || session.Validate(cleanupCtx) != nil || session.RemoveIfMatches(cleanupCtx, e.Destination, want) != nil {
 				e.Outcome = effects.Partial
 				out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "link_retained"})
 			} else {
-				e.Outcome = effects.Omitted
+				e.Outcome = effects.Removed
 			}
 		}
 		out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "recovery_required"})
 		if c.Receipts.Record(cleanupCtx, out.Evidence.Clone()) != nil {
 			out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "receipt_pending"})
+		}
+		if cleanupCtx.Err() != nil {
+			out.Obligations = append(out.Obligations, effects.Obligation{RootID: g.Candidate.ID, Code: "cleanup_deadline"})
 		}
 		return out
 	}
@@ -240,6 +274,14 @@ func Apply(ctx context.Context, prepared PreparedGroup, c effects.ApplyContext, 
 		if c.Receipts.Record(ctx, out.Evidence.Clone()) != nil {
 			return fail("receipt_failed")
 		}
+		// A host receipt callback may revoke authority or change a source. Refresh
+		// after the durable intent as well as before it, immediately before create.
+		if ctx.Err() != nil || c.Validate(ctx) != nil || session.Validate(ctx) != nil {
+			return fail("authority_or_candidate_changed")
+		}
+		if _, omit, code := inspectSource(ctx, g, b, p); code != "" || omit {
+			return fail("source_changed")
+		}
 		made, e := session.CreateExclusive(ctx, sources[n].LogicalPath, b.Destination)
 		if made.Exists {
 			mutated = true
@@ -250,6 +292,17 @@ func Apply(ctx context.Context, prepared PreparedGroup, c effects.ApplyContext, 
 			entry.Outcome = effects.Applied
 		}
 		if e != nil || !made.Exists || !made.IsLink || made.Target != sources[n].LogicalPath || made.Identity == "" || made.ParentIdentity == "" {
+			inspectCtx, cancel := cleanupContext(ctx, c)
+			observedError, inspectErr := session.Inspect(inspectCtx, b.Destination)
+			cancel()
+			if !made.Exists && (inspectErr != nil || observedError.Exists) {
+				mutated = true
+				entry := &out.Evidence.Links[n]
+				entry.Uncertain = true
+				entry.Outcome = effects.Partial
+				entry.LinkIdentity = observedError.Identity
+				entry.ParentIdentity = observedError.ParentIdentity
+			}
 			return fail("link_creation_failed")
 		}
 		out.Evidence.Phase = "link_created"
