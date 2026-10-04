@@ -1,0 +1,64 @@
+{
+  "corpus_version": 1,
+  "coverage": "Real base stdio children and internal fixture duplex. Reverse remains declined; this is not negotiated plugin-host interoperability.",
+  "base_profiles": [
+    "base",
+    "full",
+    "frame-output",
+    "lifecycle-error",
+    "health-error",
+    "lifecycle-shutdown"
+  ],
+  "duplex_source": "duplex-correlation.json",
+  "duplex_runtime_cases": ["pending-init-and-quiescing-cleanup"],
+  "lifecycle": [
+    {
+      "name": "host-eof-unloads-once",
+      "profile": "base",
+      "level": "normative",
+      "steps": [
+        { "op": "init" },
+        { "op": "close_stdin" },
+        { "op": "expect_exit", "effects": { "unload_attempts": 1 } }
+      ]
+    },
+    {
+      "name": "host-sigterm-aborts-handler-and-unloads-once",
+      "profile": "full",
+      "level": "normative",
+      "steps": [
+        { "op": "init" },
+        {
+          "op": "send_host",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "command/execute",
+            "params": { "name": "wait-for-abort", "args": "", "session_id": "" }
+          }
+        },
+        { "op": "barrier", "event": "handler_waiting" },
+        { "op": "signal", "signal": "SIGTERM" },
+        {
+          "op": "expect_plugin_response",
+          "expect": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": { "action": "noop" }
+          }
+        },
+        { "op": "expect_exit", "effects": { "unload_attempts": 1 } }
+      ]
+    }
+  ],
+  "pending_coverage": [
+    {
+      "feature": "Expanded duplex saturation/cancel/deadline/effect/hook composition",
+      "owner": "SDK 3k-2"
+    },
+    {
+      "feature": "Negotiated reverse profile and pinned real plugin-host replay",
+      "owner": "SDK reverse profile and the plugin-host interop adapter"
+    }
+  ]
+}

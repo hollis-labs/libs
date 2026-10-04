@@ -226,3 +226,8 @@ They do not acknowledge an optional reverse profile.
 `protocol/v2/fixtures/duplex-saturation.json` is a shared
 internal-engine recipe for lane saturation, terminal reservation and sustained
 control fairness at both endpoints. Its small queue limits are fixture-only.
+
+[Real child replay](children.md) describes the bounded Node parent, Go/Node/Deno
+fixture workers, shared manifest and dedicated gate. Base transport and the
+minimum internal duplex smoke are child evidence; reverse negotiation and real
+plugin-host interop remain separate gates.
