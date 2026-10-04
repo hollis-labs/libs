@@ -3,6 +3,7 @@ package subprocess
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +40,10 @@ type ServeOptions struct {
 // ServeWithOptions shares one shutdown path for unload, EOF and cancellation.
 // Only runtime-owned stdin/stdout may be closed to interrupt pending I/O.
 func ServeWithOptions(p Plugin, options ServeOptions) error {
+	return serveConnection(p, options, newCorrelation(false))
+}
+
+func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 	if p == nil {
 		return errors.New("subprocess: Serve called with nil plugin")
 	}
@@ -103,69 +108,36 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 		cancel()
 	}
 
-	// A single writer owns the transport. Producers stop enqueueing after Serve
-	// returns, including callbacks that ignored cancellation and finished late.
-	finished := make(chan struct{})
-	defer close(finished)
-	messages := make(chan []byte, 32)
-	writerDone := make(chan struct{})
-	var writerErr error
-	go func() {
-		defer close(writerDone)
-		for {
-			select {
-			case <-finished:
-				return
-			default:
-			}
-			select {
-			case <-finished:
-				return
-			case data, ok := <-messages:
-				if !ok {
-					return
-				}
-				result := make(chan error, 1)
-				go func() {
-					n, err := out.Write(data)
-					if err == nil && n != len(data) {
-						err = io.ErrShortWrite
-					}
-					result <- err
-				}()
-				timer := time.NewTimer(writeTimeout)
-				var err error
-				select {
-				case err = <-result:
-				case <-timer.C:
-					err = ErrWriteTimeout
-					if ownOutput {
-						_ = os.Stdout.Close()
-					}
-				}
-				timer.Stop()
-				if err != nil {
-					writerErr = fmt.Errorf("stdout: %w", err)
-					cancel()
-					return
-				}
-			}
+	// Physical writes retain 3d bounds/timeouts. Correlation owns publication receipts.
+	writer := newFrameWriter(out, writeTimeout, func() {
+		if ownOutput {
+			_ = os.Stdout.Close()
 		}
-	}()
+	})
+	writer.onFailure = func(err error) { core.close(err); srv.fence(err) }
+	defer func() { writer.abort(errConnectionClosed); core.close(errConnectionClosed) }()
+	core.encode = srv.encodeFrame
+	core.publish = writer.submit
 	srv.writeFrame = func(data []byte) {
-		select {
-		case <-finished:
-			return
-		case <-writerDone:
-			return
-		default:
-		}
-		select {
-		case messages <- data:
-		case <-finished:
-		case <-writerDone:
+		if err := writer.submit(data, nil); err != nil {
+			srv.fence(err)
 		}
 	}
+	srv.publishResponse = func(id RPCID, data []byte) {
+		err := writer.submit(data, func(err error) {
+			core.release(id)
+			if err != nil {
+				core.close(err)
+				srv.fence(err)
+			}
+		})
+		if err != nil {
+			core.release(id)
+			core.close(err)
+			srv.fence(err)
+		}
+	}
+	writerDone := writer.done
 	stopRead := make(chan struct{})
 	defer close(stopRead)
 	events := make(chan []byte)
@@ -190,10 +162,18 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 		}
 	}()
 	var pending sync.WaitGroup
+	callbackSlots := make(chan struct{}, coreCapacity)
 	run := func(call func()) <-chan struct{} {
 		done := make(chan struct{})
+		select {
+		case callbackSlots <- struct{}{}:
+		default:
+			srv.fence(errCorrelation)
+			close(done)
+			return done
+		}
 		pending.Add(1)
-		go func() { defer pending.Done(); defer close(done); call() }()
+		go func() { defer func() { <-callbackSlots }(); defer pending.Done(); defer close(done); call() }()
 		return done
 	}
 	dispatch := func(req RPCRequest) <-chan struct{} {
@@ -207,16 +187,14 @@ func ServeWithOptions(p Plugin, options ServeOptions) error {
 			srv.dispatch(ctx, req)
 		})
 	}
-	var initDone <-chan struct{}
+	initUsed := false
 	var terminal *RPCRequest
 	terminalReady := false
 	var inputErr error
 loop:
 	for {
 		input := events
-		if initDone != nil {
-			input = nil
-		}
+
 		select {
 		case <-ctx.Done():
 			select {
@@ -228,23 +206,44 @@ loop:
 			inputErr = failure
 			break loop
 		case <-writerDone:
+			inputErr = writer.failure()
 			break loop
 		case <-readerDone:
 			inputErr = readerErr
 			break loop
-		case <-initDone:
-			initDone = nil
 		case line := <-input:
 			req, fault := decodeEnvelope(line)
 			if fault != nil {
-				run(func() { srv.writeMessage(*fault) })
+				if core.directional && (!json.Valid(line) || replyCandidate(line)) {
+					inputErr = errCorrelation
+					break loop
+				}
+				data, err := srv.encodeFrame(*fault)
+				if err != nil {
+					inputErr = err
+					break loop
+				}
+				if err = writer.submit(data, nil); err != nil {
+					inputErr = err
+					break loop
+				}
 				continue
 			}
 			if req == nil {
+				if core.directional {
+					if err := core.reply(line); err != nil {
+						inputErr = err
+						break loop
+					}
+				}
 				continue
 			}
+			if err := core.admit(req.ID); err != nil {
+				inputErr = err
+				break loop
+			}
 			srv.initMu.Lock()
-			ready, attempted := srv.initialized, srv.initAttempted
+			ready := srv.initialized
 			srv.initMu.Unlock()
 			if req.Method == MethodUnload {
 				if _, err := validateRuntimeParams(req.Method, req.Params); err != nil {
@@ -263,10 +262,11 @@ loop:
 					run(func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID") })
 					continue
 				}
-				if attempted {
+				if initUsed {
 					run(func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted") })
 					continue
 				}
+				initUsed = true
 				if strictjson.Validate(line) != nil {
 					srv.initMu.Lock()
 					srv.initAttempted = true
@@ -274,16 +274,54 @@ loop:
 					run(func() { srv.writeInitError(req.ID, initInvalid("request")) })
 					continue
 				}
-				initDone = dispatch(*req)
+				dispatch(*req)
 			} else {
 				dispatch(*req)
 			}
 		}
 	}
+	// Explicit unload keeps demux alive for pending replies through drain/cleanup.
+	if terminal != nil {
+		go func() {
+			for {
+				select {
+				case line := <-events:
+					req, fault := decodeEnvelope(line)
+					if core.directional && fault != nil && (!json.Valid(line) || replyCandidate(line)) {
+						srv.fence(errCorrelation)
+						core.close(errCorrelation)
+						return
+					}
+					if req == nil && fault == nil && core.directional {
+						if err := core.reply(line); err != nil {
+							srv.fence(err)
+							core.close(err)
+							return
+						}
+					}
+				case <-readerDone:
+					if readerErr != nil {
+						srv.fence(readerErr)
+					}
+					core.close(errConnectionClosed)
+					return
+				case <-stopRead:
+					return
+				}
+			}
+		}()
+	} else {
+		core.close(inputErr)
+	}
 	cancel() // Fence is already closed; admitted callbacks receive cancellation.
-	if ownInput {
+	if ownInput && terminal == nil {
 		_ = os.Stdin.Close()
 	}
+	defer func() {
+		if ownInput {
+			_ = os.Stdin.Close()
+		}
+	}()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
 	defer shutdownCancel()
 	drained := make(chan struct{})
@@ -326,14 +364,14 @@ loop:
 			return fail()
 		}
 	}
-	close(messages) // All producers completed; writer flushes queued frames.
+	writer.seal() // All producers completed; writer flushes queued frames.
 	select {
 	case <-writerDone:
 	case <-shutdownCtx.Done():
 		return fail()
 	}
-	if writerErr != nil {
-		return writerErr
+	if err := writer.failure(); err != nil {
+		return err
 	}
 	if srv.unloadErr != nil && terminal == nil {
 		return srv.unloadErr

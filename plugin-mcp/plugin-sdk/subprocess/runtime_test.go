@@ -97,7 +97,8 @@ func TestHealthIntentionalUnhealthyAndPanic(t *testing.T) {
 		return HealthStatus{OK: false, Message: "maintenance"}, nil
 	}}
 	got := drive(t, p, []RPCRequest{{JSONRPC: "2.0", ID: NumberID(1), Method: MethodHealth}})
-	if got[0].Error != nil || string(got[0].Result) != `{"ok":false,"message":"maintenance"}` {
+	var result HealthResult
+	if got[0].Error != nil || json.Unmarshal(got[0].Result, &result) != nil || result.OK || result.Message != "maintenance" {
 		t.Fatalf("response=%+v", got[0])
 	}
 	p.healthFn = func(context.Context) (HealthStatus, error) { panic("health panic") }
@@ -191,8 +192,13 @@ func TestShutdownCancelsDrainsThenCleansOnce(t *testing.T) {
 			defer inW.Close()
 			var out bytes.Buffer
 			done := make(chan error, 1)
-			go func() { done <- ServeWithOptions(p, ServeOptions{Input: inR, Output: &out, Context: parent}) }()
-			io.WriteString(inW, initLine(t, 1)+`{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}`+"\n")
+			ack := make(chan RPCID, 1)
+			var mu sync.Mutex
+			writer := &syncWriter{buf: &out, mu: &mu, published: ack}
+			go func() { done <- ServeWithOptions(p, ServeOptions{Input: inR, Output: writer, Context: parent}) }()
+			io.WriteString(inW, initLine(t, 1))
+			<-ack
+			io.WriteString(inW, `{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}`+"\n")
 			<-started
 			if explicit {
 				io.WriteString(inW, `{"jsonrpc":"2.0","id":3,"method":"plugin/unload"}`+"\n")
@@ -226,12 +232,21 @@ func TestUnloadFailureAndPanicAreNotRetried(t *testing.T) {
 					}
 					return plugin.ErrConflict("cleanup failed")
 				}}
-				input := initLine(t, 1)
-				if explicit {
-					input += `{"jsonrpc":"2.0","id":2,"method":"plugin/unload"}` + "\n"
-				}
 				var out bytes.Buffer
-				err := serveWith(p, strings.NewReader(input), &out)
+				reader, feed := io.Pipe()
+				defer reader.Close()
+				ack := make(chan RPCID, 1)
+				var mu sync.Mutex
+				writer := &syncWriter{buf: &out, mu: &mu, published: ack}
+				go func() {
+					defer feed.Close()
+					io.WriteString(feed, initLine(t, 1))
+					<-ack
+					if explicit {
+						io.WriteString(feed, `{"jsonrpc":"2.0","id":2,"method":"plugin/unload"}`+"\n")
+					}
+				}()
+				err := serveWith(p, reader, writer)
 				if calls.Load() != 1 {
 					t.Fatalf("cleanup attempts=%d", calls.Load())
 				}
@@ -265,8 +280,17 @@ func TestShutdownTimeoutDoesNotClaimCleanup(t *testing.T) {
 	}, unloadFn: func(context.Context) error { attempts.Add(1); return nil }}
 	var out bytes.Buffer
 	var mu sync.Mutex
-	writer := &syncWriter{buf: &out, mu: &mu}
-	err := ServeWithOptions(p, ServeOptions{Input: strings.NewReader(initLine(t, 1) + `{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}` + "\n"), Output: writer, ShutdownTimeout: 20 * time.Millisecond})
+	ack := make(chan RPCID, 1)
+	writer := &syncWriter{buf: &out, mu: &mu, published: ack}
+	input, feed := io.Pipe()
+	defer input.Close()
+	go func() {
+		defer feed.Close()
+		io.WriteString(feed, initLine(t, 1))
+		<-ack
+		io.WriteString(feed, `{"jsonrpc":"2.0","id":2,"method":"command/execute","params":{"name":"test","args":"","session_id":""}}`+"\n")
+	}()
+	err := ServeWithOptions(p, ServeOptions{Input: input, Output: writer, ShutdownTimeout: 20 * time.Millisecond})
 	if !errors.Is(err, ErrShutdownTimeout) || attempts.Load() != 0 {
 		t.Fatalf("error=%v attempts=%d", err, attempts.Load())
 	}

@@ -9,6 +9,13 @@ A missing handler returns -32601 before its payload is decoded; an implemented
 handler's invalid params return -32602. Init retains its plugin-init/2 error data.
 Notifications suppress replies but still validate before invocation.
 
+Hosts must await the Init reply before sending ordinary requests. While Init is
+pending, ordinary requests receive -32600 (successful init required); they are
+not queued for later invocation. A live duplicate request ID fences the connection
+in base v2 too: no second callback or second reply executes for that ID. IDs stay
+live through the whole terminal reply write. Base IDs may be reused after that
+write completes; numeric zero and strings remain distinct IDs.
+
 | Method | Required fields | Optional fields and defaults |
 | --- | --- | --- |
 | plugin/init | Existing strict Init fields | identity, host_services, hooks_profile, context absent |

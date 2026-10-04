@@ -90,7 +90,8 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 
 	// Wrap out in a sync writer so Serve's writeMu + our reads don't
 	// race on the buffer.
-	outW := &syncWriter{buf: &out, mu: &outMu}
+	ack := make(chan RPCID, 1)
+	outW := &syncWriter{buf: &out, mu: &outMu, published: ack}
 
 	done := make(chan error, 1)
 	go func() {
@@ -106,6 +107,13 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 		line = append(line, '\n')
 		if _, err := inW.Write(line); err != nil {
 			t.Fatalf("write req: %v", err)
+		}
+		if r.Method == MethodInit {
+			for id := range ack {
+				if id == r.ID {
+					break
+				}
+			}
 		}
 	}
 	_ = inW.Close() // signals EOF → Serve returns
@@ -141,14 +149,25 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 }
 
 type syncWriter struct {
-	buf *bytes.Buffer
-	mu  *sync.Mutex
+	buf       *bytes.Buffer
+	mu        *sync.Mutex
+	published chan RPCID
 }
 
 func (w *syncWriter) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.buf.Write(b)
+	n, err := w.buf.Write(b)
+	if w.published != nil {
+		var reply RPCResponse
+		if json.Unmarshal(b, &reply) == nil {
+			select {
+			case w.published <- reply.ID:
+			default:
+			}
+		}
+	}
+	return n, err
 }
 
 // --- Tests ---
