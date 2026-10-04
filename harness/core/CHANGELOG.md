@@ -8,9 +8,7 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
-## v0.1.0 — 2026-10-03
-
-First release of the harness module: the packages of eleven former Hollis Labs modules, moved in with their git history at their final homes, and a stdio process shim library with its `cairn-shim` executable, written in this module. The old modules' release tags were not carried over. The module requires `llm-core` v0.1.0 and `mesh` v0.1.0 and builds with Go 1.26.6.
+The harness module contains the packages of eleven former Hollis Labs modules, moved in with their git history at their final homes, and a stdio process shim library with its `cairn-shim` executable, written in this module. The old modules' release tags were not carried over. The module requires `llm-core` v0.1.0 and `mesh` v0.1.0 and builds with Go 1.26.6. It has no released version and no tag yet. Its package layout is interim and will move again with the restructure.
 
 ### Known issues
 
