@@ -11,6 +11,7 @@ type LockKey struct{ Namespace, CanonicalID string }
 // OrderedLockKeys uses observations bound to declared paths for both resources
 // and the protected lock namespace. Alias spellings resolve to the same keys.
 // It performs no filesystem operations and grants no ownership or lock proof.
+// A successful empty root set returns an initialized empty slice.
 func OrderedLockKeys(namespace string, roots []RootRef, observed []RootObservation) ([]LockKey, error) {
 	if !cleanAbsolute(namespace) {
 		return nil, refuse(CodeUnsafeLockNamespace, "locks", Conflict)

@@ -168,3 +168,55 @@ func TestNamespaceAliasesUseOneCanonicalKey(t *testing.T) {
 		t.Fatal("namespace alias changed cooperating lock keys")
 	}
 }
+
+func TestEmptyBindingAndActionCollectionsAreInitialized(t *testing.T) {
+	var zero workspace.PlannedWorkspace
+	if zero.Actions() == nil || zero.Bindings() == nil {
+		t.Fatal("zero accessors returned nil")
+	}
+	s, c, r, o := planInputs(t)
+	c.Rendered[0].Binding.Argv = nil
+	p := planned(t, s, c, r, o)
+	for _, b := range p.Bindings() {
+		if b.Argv == nil || b.Environment == nil || b.RPCProject == nil {
+			t.Fatal("empty binding collections returned nil")
+		}
+	}
+	for _, a := range p.Actions() {
+		if a.Request.Artifacts.Entries == nil || a.Request.Selection.Groups == nil || a.Request.Selection.EntryIDs == nil || a.RequiredCapabilities == nil {
+			t.Fatal("empty action collections returned nil")
+		}
+	}
+}
+
+func TestCredentialSourcePathIsNotInferredFromRootID(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	s.Credentials = []workspace.CredentialSpec{{Source: workspace.ResourceRef{ID: s.Home.Root.ID, Path: "/fixture/source"}, Authorization: workspace.ResourceRef{ID: "link-authority"}, DestinationRootID: s.Boot.Candidate.ID, Destination: "private/token", Concern: "fixture"}}
+	p := planned(t, s, c, r, o)
+	access := p.Access()
+	last := access[len(access)-1]
+	if last.Resource.Path != "/fixture/source" || !slices.Equal(last.Access, []sandbox.AccessKind{sandbox.AccessSourceRead}) {
+		t.Fatalf("credential source was retargeted: %#v", last)
+	}
+}
+
+func TestActionOrderingUsesCanonicalPlacement(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	s.Home.Root.Path = "/aaa/home"
+	s.Home.Root.AllowedBase = "/aaa"
+	for i := range r.Roots {
+		if r.Roots[i].ID == s.Home.Root.ID {
+			r.Roots[i] = s.Home.Root
+		}
+	}
+	obs := rootObservation(&o, s.Home.Root.ID)
+	obs.DeclaredPath = s.Home.Root.Path
+	obs.CanonicalPath = "/zzz/home"
+	obs.CanonicalBase = "/zzz"
+	c.Roots[layout.RootProject] = s.Home.Root.Path
+	c.Rendered[0].Binding.Argv[1] = s.Home.Root.Path
+	actions := planned(t, s, c, r, o).Actions()
+	if len(actions) != 3 || actions[0].Root.ID != s.Boot.IdentityRoot.ID || actions[1].Root.ID != s.Boot.Candidate.ID || actions[2].Root.ID != s.Home.Root.ID {
+		t.Fatalf("canonical action order = %#v", actions)
+	}
+}

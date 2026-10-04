@@ -233,11 +233,11 @@ func (r RootRef) Validate() error {
 	if !cleanAbsolute(r.Path) || !cleanAbsolute(r.AllowedBase) || !within(r.AllowedBase, r.Path) {
 		return refuse(CodeUnsafeRoot, "root", Conflict)
 	}
-	if filepath.Dir(r.AllowedBase) == r.AllowedBase || r.Path == r.AllowedBase {
-		return refuse(CodeUnsafeAllowedBase, "root", Conflict)
-	}
 	if filepath.Dir(r.Path) == r.Path {
 		return refuse(CodeProtectedFilesystemRoot, "root", Conflict)
+	}
+	if filepath.Dir(r.AllowedBase) == r.AllowedBase || r.Path == r.AllowedBase {
+		return refuse(CodeUnsafeAllowedBase, "root", Conflict)
 	}
 	return nil
 }
@@ -310,6 +310,9 @@ func validateManagedEntries(entries []artifact.Entry, credentialDestinations []s
 			return refuse(CodeMissingArtifactOwnership, "artifacts", Conflict)
 		}
 		if e.Kind == artifact.EntryFile && e.Digest != (artifact.Digest{}) && e.Digest != artifact.DigestBytes(e.Bytes) {
+			return refuse(CodeArtifactDigestMismatch, "artifacts", Conflict)
+		}
+		if e.Kind == artifact.EntryDirectory && e.Digest != (artifact.Digest{}) {
 			return refuse(CodeArtifactDigestMismatch, "artifacts", Conflict)
 		}
 	}

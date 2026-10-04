@@ -55,12 +55,12 @@ func snapshotRendered(source render.Result) (renderSnapshot, error) {
 		}
 	}
 	for _, e := range r.Tree.Entries {
-		if e.Kind != artifact.EntryFile {
-			continue
-		}
 		for _, row := range rows {
 			if !strings.EqualFold(row.Path, e.Path) {
 				continue
+			}
+			if (row.Form == layout.File || row.Form == layout.Slot) && e.Kind != artifact.EntryFile {
+				return renderSnapshot{}, refuse(CodeUnsafeRenderEntry, "render", Conflict)
 			}
 			switch row.Field {
 			case layout.Settings, layout.Permissions, layout.Hooks, layout.MCP, layout.PlantingPlugin:

@@ -91,7 +91,7 @@ func validateBinding(r renderSnapshot, roots map[layout.Root]string) error {
 		}
 		// Resolve permits Claude's explicit exclusive-MCP request to append this
 		// backstop. It is not an arbitrary launch flag.
-		if row.Field == layout.MCP && row.ExclusiveMCP == layout.Supported && len(row.Locator.Argv) > 0 {
+		if row.Provider == "claude" && row.Field == layout.MCP && row.ExclusiveMCP == layout.Supported && len(row.Locator.Argv) > 0 {
 			groups["--strict-mcp-config"] = true
 		}
 	}

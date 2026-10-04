@@ -955,7 +955,7 @@ func TestPlanningSpecValidation(t *testing.T) {
 	fixtureExpect(t, "root CR", ref(func(r *RootRef) { r.Path = "/fixture/x\ry" }), "unsafe_root")
 	fixtureExpect(t, "root LF", ref(func(r *RootRef) { r.Path = "/fixture/x\ny" }), "unsafe_root")
 	fixtureExpect(t, "root above its base", ref(func(r *RootRef) { r.AllowedBase = "/fixture/b"; r.Path = "/fixture" }), "unsafe_root")
-	fixtureExpect(t, "filesystem root", ref(func(r *RootRef) { r.AllowedBase = "/"; r.Path = "/" }), "unsafe_allowed_base")
+	fixtureExpect(t, "filesystem root", ref(func(r *RootRef) { r.AllowedBase = "/"; r.Path = "/" }), "protected_filesystem_root")
 	fixtureExpect(t, "root equal to its base", ref(func(r *RootRef) { r.AllowedBase = "/fixture/x" }), "unsafe_allowed_base")
 }
 
@@ -1280,5 +1280,204 @@ func TestPlanningZeroValues(t *testing.T) {
 	c.Rendered, c.Roots = nil, nil
 	if got := len(fixturePlanned(t, s, c, r, o).Actions()); got != 2 {
 		t.Fatalf("actions without content = %d", got)
+	}
+}
+
+func TestPlanningCanonicalAccessKeepsDeclaredSpec(t *testing.T) {
+	s, c, r, o := fixtureRichInputs(t)
+	for i := range o.Roots {
+		o.Roots[i].CanonicalBase = "/physical/fixture"
+		o.Roots[i].CanonicalPath = strings.Replace(o.Roots[i].DeclaredPath, "/fixture", "/physical/fixture", 1)
+	}
+	p := fixturePlanned(t, s, c, r, o)
+	if p.spec.ExtraDirs[0].Resource.Path != "/fixture/x" || p.Access()[0].Resource.Path != "/physical/fixture/x" {
+		t.Fatal("canonical access rewrote declared semantic input")
+	}
+}
+
+func TestPlanningAdditionalSpecFieldValidation(t *testing.T) {
+	cases := []struct {
+		name, code string
+		change     func(*Spec)
+	}{
+		{"digest algorithm absent", "missing_input_digest", func(s *Spec) { s.Identity.SemanticDigest.Algorithm = "" }},
+		{"digest hex absent", "missing_input_digest", func(s *Spec) { s.Identity.SemanticDigest.Hex = "" }},
+		{"row id empty", "invalid_row_reference", func(s *Spec) { s.Boot.RowIDs = []string{""} }},
+		{"row id control", "invalid_row_reference", func(s *Spec) { s.Boot.RowIDs = []string{"row\x1b"} }},
+		{"cwd child relative", "unsafe_cwd", func(s *Spec) { s.CWD.Child = "relative" }},
+		{"cwd protocol relative", "unsafe_cwd", func(s *Spec) { s.CWD.ProtocolProject = "relative" }},
+		{"cleanup owned empty", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.OwnedRoots = []string{""} }},
+		{"cleanup owned control", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.OwnedRoots = []string{"root\x1b"} }},
+		{"cleanup id empty", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.ExpectedGenerations = map[string]string{"": "generation"} }},
+		{"cleanup id control", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.ExpectedGenerations = map[string]string{"root\x1b": "generation"} }},
+		{"cleanup generation empty", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.ExpectedGenerations = map[string]string{"home": ""} }},
+		{"cleanup generation control", "invalid_cleanup_reference", func(s *Spec) { s.Cleanup.ExpectedGenerations = map[string]string{"home": "generation\x1b"} }},
+		{"scratch assignment mismatch", "invalid_scratch", func(s *Spec) { s.Scratch[0].Assignment = "other" }},
+		{"scratch environment name", "invalid_scratch_environment", func(s *Spec) { s.Scratch[0].Environment = map[string]string{"a": "value"} }},
+		{"scratch credential environment", "invalid_scratch_environment", func(s *Spec) { s.Scratch[0].Environment = map[string]string{"SECRET": "value"} }},
+		{"scratch environment value", "invalid_scratch_environment", func(s *Spec) { s.Scratch[0].Environment = map[string]string{"A": "value\x1b"} }},
+		{"access path", "invalid_access_resource", func(s *Spec) { s.ExtraDirs[0].Resource.Path = "relative" }},
+		{"access id", "invalid_access_resource", func(s *Spec) { s.ExtraDirs[0].Resource.ID = "" }},
+		{"access provenance", "invalid_access_resource", func(s *Spec) { s.ExtraDirs[0].Resource.Provenance = "" }},
+		{"credential writable source", "invalid_credential_access", func(s *Spec) { s.Credentials[0].Access = []sandbox.AccessKind{sandbox.AccessWrite} }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _, _, _ := fixtureRichInputs(t)
+			tc.change(&s)
+			fixtureExpect(t, tc.name, s.Validate(), tc.code)
+		})
+	}
+	s, c, r, o := fixtureRichInputs(t)
+	s.Boot.RowIDs = []string{"fixture-row"}
+	s.CWD.Child = s.Home.Root.Path
+	s.CWD.ProtocolProject = s.Boot.Current.Path
+	s.Cleanup.OwnedRoots = []string{s.Home.Root.ID}
+	s.Cleanup.ExpectedGenerations = map[string]string{s.Home.Root.ID: "generation"}
+	_ = fixturePlanned(t, s, c, r, o)
+}
+
+func TestPlanningPathTextBoundaries(t *testing.T) {
+	for _, r := range []rune{0, 9, 27, 31, 127, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069} {
+		ref := fixtureRoot("x")
+		ref.Path += string(r)
+		fixtureExpect(t, "unsafe path text", ref.Validate(), "unsafe_root")
+		if safeValueText("value" + string(r)) {
+			t.Fatalf("unsafe metadata rune %x accepted", r)
+		}
+	}
+	for _, r := range []rune{32, 126, 128, 0x2029, 0x202f, 0x2065, 0x206a} {
+		ref := fixtureRoot("x")
+		ref.Path += string(r)
+		fixtureExpect(t, "safe path boundary", ref.Validate(), "")
+		if !safeValueText("value" + string(r)) {
+			t.Fatalf("safe metadata rune %x rejected", r)
+		}
+	}
+	if cleanAbsolute("/"+strings.Repeat("x", render.MaxPathBytes)) || cleanAbsolute("/fixture/"+strings.Repeat("x/", render.MaxTreeDepth)+"x") || cleanAbsolute("/fixture/"+string([]byte{255})) {
+		t.Fatal("unbounded or invalid root text accepted")
+	}
+}
+
+func TestPlanningDirectoryModeContract(t *testing.T) {
+	for _, mode := range []fs.FileMode{0, 0755, 0644, 0777} {
+		e := fixtureTree("directory").Entries[0]
+		e.Kind = artifact.EntryDirectory
+		e.Bytes = nil
+		e.Mode = mode
+		code := ""
+		if mode != 0 && mode != 0755 {
+			code = "unsafe_artifact_mode"
+		}
+		fixtureExpect(t, "directory mode", ValidateManagedTree(artifact.Tree{Entries: []artifact.Entry{e}}, nil), code)
+	}
+}
+
+func TestPlanningCredentialEnvironmentNames(t *testing.T) {
+	for _, name := range []string{"TOKEN", "SECRET", "PASSWORD", "API_KEY", "CREDENTIAL", "OPENAI_API_KEY"} {
+		s, _, _, _ := fixtureRichInputs(t)
+		s.Scratch[0].Environment = map[string]string{name: "fixture"}
+		fixtureExpect(t, name, s.Validate(), "invalid_scratch_environment")
+	}
+}
+
+func TestPlanningBindingGuards(t *testing.T) {
+	for name, change := range map[string]fixturePlanMutation{
+		"unknown environment": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Environment = map[string]string{"FIXTURE_ROOT": s.Boot.Candidate.Path}
+		},
+		"empty environment": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Provider = runtimes.Codex
+			c.Rendered[0].Binding.Argv = nil
+			c.Rendered[0].Binding.Environment = map[string]string{"CODEX_HOME": ""}
+		},
+		"resume position": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.BeforeResume = true
+		},
+		"posture provider": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Posture = &layout.PostureReference{Provider: runtimes.Codex, Mapper: "adapters/registry.Descriptor.PostureFor", Posture: "default"}
+		},
+		"posture mapper": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Posture = &layout.PostureReference{Provider: runtimes.Claude, Mapper: "other", Posture: "default"}
+		},
+		"posture mode": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Binding.Posture = &layout.PostureReference{Provider: runtimes.Claude, Mapper: "adapters/registry.Descriptor.PostureFor", Posture: "unknown"}
+		},
+		"empty root expansion": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			delete(c.Roots, layout.RootProject)
+			c.Rendered[0].Binding.Argv = []string{"--add-dir", ""}
+		},
+		"exclusive MCP on another provider": func(s *Spec, c *ResolvedContent, r *Resources, o *Observations) {
+			c.Rendered[0].Provider = runtimes.Codex
+			c.Rendered[0].Binding.Argv = []string{"--strict-mcp-config"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, c, r, o := fixturePlanInputs(t)
+			change(&s, &c, &r, &o)
+			_, err := Plan(s, c, r, o)
+			fixtureExpect(t, name, err, "invalid_render_binding")
+		})
+	}
+	for name, project := range map[string]map[string]string{
+		"agent without directory": {"agent": "fixture"},
+		"directory without agent": {"directory": "/fixture/home"},
+		"invalid agent":           {"directory": "/fixture/home", "agent": "../fixture"},
+		"directory retarget":      {"directory": "/fixture/other", "agent": "fixture"},
+		"unknown parameter":       {"directory": "/fixture/home", "agent": "fixture", "other": "fixture"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, c, r, o := fixturePlanInputs(t)
+			c.Rendered[0].Provider = runtimes.OpenCode
+			c.Rendered[0].Mode = runtimes.ModeHTTPSSE
+			c.Rendered[0].Binding = render.Binding{CWD: s.Home.Root.Path, RPCProject: project}
+			_, err := Plan(s, c, r, o)
+			fixtureExpect(t, name, err, "invalid_render_binding")
+		})
+	}
+	s, c, r, o := fixturePlanInputs(t)
+	c.Rendered[0].Provider = runtimes.OpenCode
+	c.Rendered[0].Binding = render.Binding{CWD: s.Home.Root.Path, Argv: []string{"run", "--agent", "fixture", "--dir", s.Home.Root.Path, "--agent", "fixture"}}
+	_ = fixturePlanned(t, s, c, r, o)
+}
+
+func TestPlanningFrozenValueLimits(t *testing.T) {
+	entry := fixtureTree("binary.dat").Entries[0]
+	entry.Bytes = make([]byte, 65536)
+	fixtureExpect(t, "bounded binary payload", ValidateManagedTree(artifact.Tree{Entries: []artifact.Entry{entry}}, nil), "")
+	leaves := make([]string, MaxCollectionItems)
+	for i := range leaves {
+		leaves[i] = strings.Repeat("x", render.MaxPathBytes)
+	}
+	nested := [][]string{leaves, leaves, leaves, leaves, leaves}
+	fixtureExpect(t, "aggregate textual bytes", validateFrozenValues(nested), "input_limit")
+	leaves = make([]string, MaxCollectionItems)
+	nested = make([][]string, 17)
+	for i := range nested {
+		nested[i] = leaves
+	}
+	fixtureExpect(t, "aggregate collection items", validateFrozenValues(nested), "input_limit")
+	fixtureExpect(t, "oversized text", validateFrozenValues(strings.Repeat("x", render.MaxPathBytes+1)), "input_limit")
+	fixtureExpect(t, "invalid map value", validateFrozenValues(map[string]string{"key": string([]byte{255})}), "invalid_utf8")
+	fixtureExpect(t, "invalid pointer field", validateFrozenValues(&ResourceRef{Revision: string([]byte{255})}), "invalid_utf8")
+	fixtureExpect(t, "oversized binary", validateFrozenValues(make([]byte, MaxFrozenBytes+1)), "input_limit")
+}
+
+func TestPlanningDirectoryMetadataAndNativePaths(t *testing.T) {
+	e := fixtureTree("directory").Entries[0]
+	e.Kind = artifact.EntryDirectory
+	e.Bytes = nil
+	e.Mode = 0755
+	e.Digest = artifact.DigestBytes(nil)
+	fixtureExpect(t, "directory digest has no byte meaning", ValidateManagedTree(artifact.Tree{Entries: []artifact.Entry{e}}, nil), "artifact_digest_mismatch")
+	s, c, r, o := fixturePlanInputs(t)
+	e.Path = ".claude/settings.json"
+	e.Digest = artifact.Digest{}
+	c.Rendered[0].Tree = artifact.Tree{Entries: []artifact.Entry{e}}
+	_, err := Plan(s, c, r, o)
+	fixtureExpect(t, "native document cannot be a directory", err, "unsafe_render_entry")
+	keys, err := OrderedLockKeys(r.LockNamespace, nil, []RootObservation{*fixtureObservation(&o, r.LockRoot.ID)})
+	if err != nil || keys == nil || len(keys) != 0 {
+		t.Fatalf("empty lock set = %#v, %v", keys, err)
 	}
 }

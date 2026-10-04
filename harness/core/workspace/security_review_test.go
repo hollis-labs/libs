@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/substrate/harness/sandbox"
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
@@ -263,4 +264,182 @@ func TestEffectCoverageOrderIndependent(t *testing.T) {
 	if err != nil || other.Digest() != p.Digest() {
 		t.Fatal("effect order changed acceptance or digest", err)
 	}
+}
+
+func TestCanonicalBootSiblingRelationship(t *testing.T) {
+	s, c, r, o := planInputs(t)
+	s.Boot.Current.AllowedBase = s.Boot.IdentityRoot.Path
+	for i := range r.Roots {
+		if r.Roots[i].ID == s.Boot.Current.ID {
+			r.Roots[i] = s.Boot.Current
+		}
+	}
+	obs := rootObservation(&o, s.Boot.Current.ID)
+	obs.CanonicalBase = "/other"
+	obs.CanonicalPath = "/other/current"
+	_, err := workspace.Plan(s, c, r, o)
+	refusal(t, err, "invalid_boot_siblings")
+}
+
+func TestAdditionalSemanticReferencesAndCapabilities(t *testing.T) {
+	for _, kind := range []string{"cleanup owned root", "cleanup generation root", "cwd child", "cwd protocol", "access root", "access provenance", "sandbox capability host", "cleanup capability host", "sandbox capability observation", "cleanup capability observation"} {
+		t.Run(kind, func(t *testing.T) {
+			s, c, r, o := planInputs(t)
+			code := ""
+			switch kind {
+			case "cleanup owned root":
+				s.Cleanup.OwnedRoots = []string{"missing"}
+				code = "invalid_cleanup_reference"
+			case "cleanup generation root":
+				s.Cleanup.ExpectedGenerations = map[string]string{"missing": "generation"}
+				code = "invalid_cleanup_reference"
+			case "cwd child":
+				s.CWD.Child = "/fixture/missing"
+				code = "unresolved_cwd"
+			case "cwd protocol":
+				s.CWD.ProtocolProject = "/fixture/missing"
+				code = "unresolved_cwd"
+			case "access root":
+				s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: "missing", Path: s.Home.Root.Path, Provenance: s.Home.Root.Provenance}}}
+				code = "unresolved_access_resource"
+			case "access provenance":
+				s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: s.Home.Root.ID, Path: s.Home.Root.Path, Provenance: "wrong"}}}
+				code = "unresolved_access_resource"
+			default:
+				if strings.HasPrefix(kind, "sandbox") {
+					s.Sandbox.RequiredCapabilities = []workspace.Capability{workspace.UseReservation}
+				} else {
+					s.Cleanup.RequiredProofs = []workspace.Capability{workspace.UseReservation}
+				}
+				if strings.HasSuffix(kind, "host") {
+					o.Capabilities = append(o.Capabilities, workspace.UseReservation)
+				} else {
+					r.Capabilities = append(r.Capabilities, workspace.UseReservation)
+				}
+				code = "required_capability_unavailable"
+			}
+			_, err := workspace.Plan(s, c, r, o)
+			refusal(t, err, code)
+		})
+	}
+	s, c, r, o := planInputs(t)
+	s.Cleanup.OwnedRoots = []string{s.Home.Root.ID}
+	s.Cleanup.ExpectedGenerations = map[string]string{s.Home.Root.ID: "generation"}
+	s.CWD.Child = s.Home.Root.Path
+	s.CWD.ProtocolProject = s.Boot.Current.Path
+	s.ExtraDirs = []workspace.AccessRef{{Resource: workspace.ResourceRef{ID: s.Home.Root.ID, Path: s.Home.Root.Path, Provenance: s.Home.Root.Provenance}, Access: []sandbox.AccessKind{sandbox.AccessRead}}}
+	s.Sandbox.RequiredCapabilities = []workspace.Capability{workspace.UseReservation}
+	s.Cleanup.RequiredProofs = []workspace.Capability{workspace.UseReservation}
+	r.Capabilities = append(r.Capabilities, workspace.UseReservation)
+	o.Capabilities = append(o.Capabilities, workspace.UseReservation)
+	_ = planned(t, s, c, r, o)
+}
+
+func TestObservationAndNamespaceBindings(t *testing.T) {
+	cases := []struct {
+		name, code string
+		change     func(*workspace.Spec, *workspace.Resources, *workspace.Observations)
+	}{
+		{"current declared path", "observation_root_mismatch", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			rootObservation(o, s.Boot.Current.ID).DeclaredPath = "/fixture/other"
+		}},
+		{"access alias", "ambiguous_root_alias", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			alias := s.Home.Root
+			alias.ID = "home-shadow"
+			r.Roots = append(r.Roots, alias)
+			obs := *rootObservation(o, s.Home.Root.ID)
+			obs.RootID = alias.ID
+			o.Roots = append(o.Roots, obs)
+		}},
+		{"global canonical base", "observation_base_mismatch", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			for i := range o.Roots {
+				o.Roots[i].CanonicalBase = "/"
+				o.Roots[i].CanonicalPath = strings.TrimPrefix(o.Roots[i].DeclaredPath, "/fixture")
+			}
+		}},
+		{"lock missing provenance", "missing_root_ownership", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) { r.LockRoot.Provenance = "" }},
+		{"lock missing ownership", "missing_root_ownership", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) { r.LockRoot.Owner = "" }},
+		{"lock roster name", "unknown_lock_namespace", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) { r.LockRoot.ID = "missing" }},
+		{"lock owner observation", "unknown_lock_namespace", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			rootObservation(o, r.LockRoot.ID).Owner = "wrong"
+		}},
+		{"lock declared observation", "unknown_lock_namespace", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			rootObservation(o, r.LockRoot.ID).DeclaredPath = "/fixture/wrong"
+		}},
+		{"lock declared namespace", "unknown_lock_namespace", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			r.LockNamespace = "/fixture/wrong"
+		}},
+		{"lock relative mapping", "observation_base_mismatch", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			rootObservation(o, r.LockRoot.ID).CanonicalPath = "/fixture/wrong"
+		}},
+		{"host provenance differs", "missing_host_root", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			for i := range r.Roots {
+				if r.Roots[i].ID == s.Home.Root.ID {
+					r.Roots[i].Provenance = "different"
+				}
+			}
+		}},
+		{"lock global base", "observation_base_mismatch", func(s *workspace.Spec, r *workspace.Resources, o *workspace.Observations) {
+			r.LockRoot.AllowedBase = "/alias"
+			r.LockRoot.Path = "/alias/locks"
+			r.LockNamespace = r.LockRoot.Path
+			obs := rootObservation(o, r.LockRoot.ID)
+			obs.DeclaredPath = r.LockRoot.Path
+			obs.CanonicalBase = "/"
+			obs.CanonicalPath = "/locks"
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, c, r, o := planInputs(t)
+			tc.change(&s, &r, &o)
+			_, err := workspace.Plan(s, c, r, o)
+			refusal(t, err, tc.code)
+		})
+	}
+}
+
+func TestStandaloneLockNamespaceEvidence(t *testing.T) {
+	ref := root("home")
+	namespace := "/fixture/locks"
+	observed := func() []workspace.RootObservation {
+		return []workspace.RootObservation{{RootID: ref.ID, DeclaredPath: ref.Path, CanonicalPath: ref.Path, CanonicalBase: ref.AllowedBase, Owner: ref.Owner}, {RootID: "locks", DeclaredPath: namespace, CanonicalPath: namespace, CanonicalBase: "/fixture", Owner: ref.Owner, Exists: true, Directory: true}}
+	}
+	for _, change := range []func(*workspace.RootObservation){
+		func(o *workspace.RootObservation) { o.Uncertainty = "unknown" },
+		func(o *workspace.RootObservation) { o.Exists = false },
+		func(o *workspace.RootObservation) { o.Directory = false },
+		func(o *workspace.RootObservation) { o.CanonicalPath = "relative" },
+		func(o *workspace.RootObservation) { o.CanonicalBase = "relative" },
+		func(o *workspace.RootObservation) { o.CanonicalBase = "/elsewhere" },
+		func(o *workspace.RootObservation) { o.CanonicalPath = o.CanonicalBase },
+	} {
+		obs := observed()
+		change(&obs[1])
+		_, err := workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, obs)
+		refusal(t, err, "unknown_lock_namespace")
+	}
+	_, err := workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, observed()[:1])
+	refusal(t, err, "unknown_lock_namespace")
+	obs := observed()
+	obs[0].DeclaredPath = "/fixture/other"
+	_, err = workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, obs)
+	refusal(t, err, "observation_root_mismatch")
+	obs = observed()
+	extra := obs[1]
+	extra.RootID = "locks-shadow"
+	extra.CanonicalPath = "/fixture/other-locks"
+	obs = append(obs, extra)
+	_, err = workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, obs)
+	refusal(t, err, "ambiguous_lock_namespace")
+	extra.CanonicalPath = namespace
+	obs[len(obs)-1] = extra
+	keys, err := workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, obs)
+	if err != nil || len(keys) != 1 || keys[0].Namespace != namespace {
+		t.Fatalf("equal namespace observations changed keys: %v", err)
+	}
+	obs = observed()
+	obs[0].Uncertainty = string([]byte{255})
+	_, err = workspace.OrderedLockKeys(namespace, []workspace.RootRef{ref}, obs)
+	refusal(t, err, "invalid_utf8")
 }
