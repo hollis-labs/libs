@@ -65,13 +65,17 @@ func RunProfile(t TestReporter, a Adapter, profile Profile) {
 	if dt, ok := t.(interface{ Deadline() (time.Time, bool) }); ok {
 		if deadline, ok := dt.Deadline(); ok {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithDeadline(ctx, deadline)
+			margin := max(time.Duration(0), time.Until(deadline)/10)
+			if margin > 100*time.Millisecond {
+				margin = 100 * time.Millisecond
+			}
+			ctx, cancel = context.WithDeadline(ctx, deadline.Add(-margin))
 			defer cancel()
 		}
 	}
 	report := Evaluate(ctx, a, profile)
 	for _, r := range report.Requirements {
-		t.Logf("%s: %s", r.ID, r.Status)
+		t.Logf("%s: %s %s", r.ID, r.Status, r.Reason)
 	}
 	for _, d := range report.Descriptors {
 		t.Logf("%s: %s", d.Name, d.Status)
@@ -257,6 +261,19 @@ type observedFailure struct {
 
 func (e *observedFailure) Error() string { return "observed refusal mismatch" }
 
+// invoke scans every successful entry-point reply, including discovery and
+// asynchronous cancellation calls that do not use the allowed helper.
+func invoke(ctx context.Context, i Instance, c Attempt) (reply Reply, err error) {
+	reply, err = i.Invoke(ctx, c)
+	if err == nil && reply.Failure == nil {
+		_, token := i.Access()
+		if ContainsSecret(string(reply.Wire), token) || ContainsSecret(string(reply.Data), token) || ContainsSecret(reply.Payload, token) {
+			return reply, suiteError("successful reply credential leak")
+		}
+	}
+	return reply, err
+}
+
 // invokeAsync contains panics in every suite-created invocation goroutine.
 func invokeAsync(ctx context.Context, i Instance, c Attempt) (reply Reply, err error) {
 	defer func() {
@@ -264,7 +281,7 @@ func invokeAsync(ctx context.Context, i Instance, c Attempt) (reply Reply, err e
 			err = errProbePanic
 		}
 	}()
-	return i.Invoke(ctx, c)
+	return invoke(ctx, i, c)
 }
 
 func runProbe(ctx context.Context, a Adapter, fn func(context.Context, Adapter) error) (err error) {
@@ -570,7 +587,7 @@ func probes(supported []capability.Descriptor) []probe {
 		f, c := basic(capability.MCPReach)
 		c.Call.Operation = "host/mcp/list_tools"
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
-			reply, err := i.Invoke(ctx, c)
+			reply, err := invoke(ctx, i, c)
 			if err != nil {
 				return err
 			}
@@ -588,7 +605,7 @@ func probes(supported []capability.Descriptor) []probe {
 		f, c := basic(core)
 		f.FailAfterCommit = true
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
-			reply, err := i.Invoke(ctx, c)
+			reply, err := invoke(ctx, i, c)
 			if err != nil {
 				return err
 			}
@@ -637,12 +654,19 @@ func probes(supported []capability.Descriptor) []probe {
 				var err error
 				if problem == "redirect" {
 					before := o.Snapshot()
-					r, e := i.Invoke(ctx, c)
+					r, e := invoke(ctx, i, c)
 					if e != nil {
 						return e
 					}
 					if err := validateFailure(r, c.Call.RequestID); err != nil {
 						return err
+					}
+					settle := time.NewTimer(10 * time.Millisecond)
+					defer settle.Stop()
+					select {
+					case <-settle.C:
+					case <-ctx.Done():
+						return ctx.Err()
 					}
 					after := o.Snapshot()
 					if r.HTTPStatus != 302 || r.Failure.Code != capability.ScopeDenied || r.Failure.EffectState != capability.NotStarted || after.RedirectResponses != before.RedirectResponses+1 || after.Executions != before.Executions || after.Reserved-after.Released != before.Reserved-before.Released {
@@ -652,7 +676,7 @@ func probes(supported []capability.Descriptor) []probe {
 					err = allowed(ctx, i, o, c)
 				} else if problem == "output" {
 					before := o.Snapshot()
-					r, e := i.Invoke(ctx, c)
+					r, e := invoke(ctx, i, c)
 					if e != nil {
 						return e
 					}
@@ -870,7 +894,7 @@ func withActive(ctx context.Context, a Adapter, f Fixture, c Attempt, fn func(In
 }
 func allowed(ctx context.Context, i Instance, o *Observer, c Attempt) error {
 	before := o.Snapshot()
-	reply, err := i.Invoke(ctx, c)
+	reply, err := invoke(ctx, i, c)
 	if err != nil {
 		return err
 	}
@@ -886,7 +910,7 @@ func denied(ctx context.Context, i Instance, o *Observer, c Attempt, want capabi
 }
 func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want capability.Code) (Reply, error) {
 	before := o.Snapshot()
-	reply, err := i.Invoke(ctx, c)
+	reply, err := invoke(ctx, i, c)
 	if err != nil {
 		return reply, err
 	}
@@ -1177,7 +1201,7 @@ func concurrencyProbe(ctx context.Context, a Adapter) error {
 		second := c
 		second.Call.RequestID = 2
 		// A refusal must return while the first worker still owns its reservation.
-		reply, err := i.Invoke(ctx, second)
+		reply, err := invoke(ctx, i, second)
 		if err != nil {
 			return err
 		}

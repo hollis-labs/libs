@@ -8,6 +8,9 @@ import (
 
 func bridgeProbes() []probe {
 	out := []probe{}
+	for _, problem := range []string{"absent", "garbage", "plugin binding", "replaced generation", "stopped owner"} {
+		out = append(out, bridgeCredentialProbe(problem))
+	}
 	for _, op := range []string{"host/mcp/list_tools", "host/mcp/call_tool"} {
 		out = append(out, probe{"C07", "bridge admitted " + op, func(ctx context.Context, a Adapter) error {
 			f, c := basic(capability.MCPReach)
@@ -21,7 +24,8 @@ func bridgeProbes() []probe {
 		}})
 	}
 	out = append(out, probe{"C07", "cancel_call leaves concurrent request running", bridgeCancelCall})
-	out = append(out, probe{"C07", "cancel_call cannot cross actors", bridgeCrossActorCancel})
+	out = append(out, probe{"C07", "cancel_call cannot cross actors", func(ctx context.Context, a Adapter) error { return bridgeCrossActorCancel(ctx, a, false) }})
+	out = append(out, probe{"C07", "bridge cancel_call cannot cancel plugin", func(ctx context.Context, a Adapter) error { return bridgeCrossActorCancel(ctx, a, true) }})
 	return out
 }
 func bridgeCancelCall(ctx context.Context, a Adapter) error {
@@ -69,7 +73,7 @@ func bridgeCancelCall(ctx context.Context, a Adapter) error {
 		cancel.Call.Operation = "host/mcp/cancel_call"
 		cancel.CancelID = 1
 		before := o.Snapshot()
-		r, err := i.Invoke(ctx, cancel)
+		r, err := invoke(ctx, i, cancel)
 		if err != nil {
 			return err
 		}
@@ -122,7 +126,7 @@ func bridgeCancelCall(ctx context.Context, a Adapter) error {
 	})
 }
 
-func bridgeCrossActorCancel(ctx context.Context, a Adapter) error {
+func bridgeCrossActorCancel(ctx context.Context, a Adapter, reverse bool) error {
 	f, c := basic(capability.MCPReach)
 	f.Gate = NewGate()
 	defer f.Gate.Release()
@@ -136,7 +140,11 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter) error {
 			e error
 		}
 		done := make(chan result, 1)
-		go func() { r, e := invokeAsync(ctx, i, session); done <- result{r, e} }()
+		running, cancelling := session, plugin
+		if reverse {
+			running, cancelling = plugin, session
+		}
+		go func() { r, e := invokeAsync(ctx, i, running); done <- result{r, e} }()
 		select {
 		case <-f.Gate.Entered:
 		case <-done:
@@ -144,10 +152,10 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-		cancel := plugin
+		cancel := cancelling
 		cancel.Call.RequestID = 9
 		cancel.Call.Operation = "host/mcp/cancel_call"
-		cancel.CancelID = session.Call.RequestID
+		cancel.CancelID = running.Call.RequestID
 		if err := allowed(ctx, i, o, cancel); err != nil {
 			return err
 		}
@@ -158,7 +166,7 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter) error {
 				return got.e
 			}
 			if got.r.Failure != nil {
-				return suiteError("another actor cancelled session call")
+				return suiteError("another actor cancelled running call")
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -174,4 +182,40 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter) error {
 		}
 		return nil
 	})
+}
+
+func bridgeCredentialProbe(problem string) probe {
+	return probe{"C07", "bridge credential " + problem, func(ctx context.Context, a Adapter) error {
+		f, c := basic(capability.MCPReach)
+		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
+			binding, token := i.Access()
+			if len(token) < 16 || binding == "" || binding == token {
+				return suiteError("credential probe has no issued token")
+			}
+			c.BindingID = ""
+			c.Bridge = true
+			c.Credential = token
+			if err := allowed(ctx, i, o, c); err != nil {
+				return err
+			}
+			c.Call.RequestID = 2
+			switch problem {
+			case "absent":
+				c.Credential = ""
+			case "garbage":
+				c.Credential = "never-issued-" + freshSecret()
+			case "plugin binding":
+				c.Credential = binding
+			case "replaced generation":
+				if err := i.Change(ctx, Change{ReplaceGeneration, ""}); err != nil {
+					return err
+				}
+			case "stopped owner":
+				if err := i.Change(ctx, Change{Stop, ""}); err != nil {
+					return err
+				}
+			}
+			return denied(ctx, i, o, c, capability.Unauthenticated)
+		})
+	}}
 }

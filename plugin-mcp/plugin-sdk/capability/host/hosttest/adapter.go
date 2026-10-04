@@ -247,6 +247,20 @@ func ContainsSecret(output, secret string) bool {
 		return false
 	}
 	for start := 0; start+8 <= len(secret); start++ {
+		// Embedded base64 may start at any byte alignment. Keep only complete
+		// sextets determined by the secret, omitting unknown prefix/suffix bits.
+		rawWindow := secret[start : start+8]
+		for align := 0; align < 3; align++ {
+			encodedRaw := strings.Repeat("x", align) + rawWindow
+			begin := (align*8 + 5) / 6
+			end := len(encodedRaw) * 8 / 6
+			for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.URLEncoding} {
+				fragment := enc.EncodeToString([]byte(encodedRaw))[begin:end]
+				if strings.Contains(output, fragment) {
+					return true
+				}
+			}
+		}
 		// Check every suffix and every eight-byte window. Complete encodings of
 		// suffixes catch leaks whose encoder started at an arbitrary offset.
 		for _, raw := range []string{secret[start : start+8], secret[start:], "Bearer " + secret[start:]} {

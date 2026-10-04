@@ -413,6 +413,7 @@ func (r *referenceInstance) Change(ctx context.Context, c Change) error {
 			r.grants[index].OwnerGeneration++
 		}
 	case "replace generation":
+		r.credentials.RevokeOwner(r.fixture.Runtime)
 		r.generation++
 		r.cancel()
 		r.lease, r.cancel = context.WithCancel(context.Background())
@@ -882,6 +883,16 @@ func (r *referenceInstance) authority(ctx context.Context, c host.Call, a Attemp
 	if bridge {
 		base.Audience = "loopback"
 	}
+	// Authenticate bridge credentials even when the target has stopped.
+	var verified host.CredentialLease
+	if bridge {
+		token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+		var err error
+		verified, err = r.credentials.Verify(token, host.Subject{Kind: host.SessionClient, ID: "session-client"}, r.fixture.Runtime, "loopback")
+		if err != nil {
+			return base, err
+		}
+	}
 	if !r.active {
 		return base, nil
 	}
@@ -1016,11 +1027,6 @@ func (r *referenceInstance) authority(ctx context.Context, c host.Call, a Attemp
 		}
 	}
 	if bridge {
-		token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-		verified, err := r.credentials.Verify(token, host.Subject{Kind: host.SessionClient, ID: "session-client"}, r.fixture.Runtime, "loopback")
-		if err != nil {
-			return base, err
-		}
 		base.Background = false
 		base.Actor = verified.Claims.Subject
 		base.InitiatingCaller = &verified.Claims.Subject

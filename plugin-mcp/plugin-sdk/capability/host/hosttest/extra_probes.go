@@ -174,7 +174,7 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 		c.Call.Operation = "host/mcp/list_tools"
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
 			before := o.Snapshot()
-			r, err := i.Invoke(ctx, c)
+			r, err := invoke(ctx, i, c)
 			if err != nil {
 				return err
 			}
@@ -196,7 +196,7 @@ func secretDiagnosticProbe(descriptor capability.Descriptor) probe {
 		f.FailAfterCommit = true
 		c.Call.TraceID = f.Secret
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
-			r, err := i.Invoke(ctx, c)
+			r, err := invoke(ctx, i, c)
 			if err != nil {
 				return err
 			}
@@ -253,11 +253,18 @@ func unsupportedProbes(supported []capability.Descriptor) []probe {
 		out = append(out, probe{"C10", d.Name + " declared unsupported refuses", func(ctx context.Context, a Adapter) error {
 			f, c := descriptorFixture(d)
 			f.Catalog = append([]capability.Descriptor{}, supported...)
-			f.Grants = capability.GrantSet{}
-			// No installed grant can authorize an unsupported descriptor.
+			// A valid grant isolates catalog refusal from missing authority.
+			// Even installed authority cannot add a declared-unsupported route.
 			return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
 				c.Direct = true
-				return denied(ctx, i, o, c, "")
+				r, err := deniedReply(ctx, i, o, c, "")
+				if err != nil {
+					return err
+				}
+				if r.Failure.Code == capability.InternalError {
+					return suiteError("internal error does not prove unsupported refusal")
+				}
+				return nil
 			})
 		}})
 	}

@@ -238,16 +238,59 @@ func (a deadlineAdapter) Open(ctx context.Context, _ Fixture, _ *Observer) (Inst
 	return nil, errors.New("deadline inspection adapter")
 }
 func TestRunProfileUsesTestDeadline(t *testing.T) {
-	deadline := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	observed := make(chan context.Context, 256)
+	deadline := time.Now().Add(500 * time.Millisecond)
+	observed := make(chan context.Context, 1)
+	release := make(chan struct{})
+	done := make(chan struct{})
+	defer func() { close(release); <-done }()
 	tb := deadlineTB{&recordingTB{TB: t}, deadline}
-	RunProfile(tb, deadlineAdapter{observed}, Profile{Timeout: time.Hour})
+	RunProfile(tb, nearDeadlineAdapter{observed, release, done}, Profile{Timeout: time.Hour})
 	ctx := <-observed
 	actual, ok := ctx.Deadline()
-	if !ok || !actual.Equal(deadline) {
-		t.Fatalf("watchdog deadline=%v; want test deadline=%v", actual, deadline)
+	if !ok || !actual.Before(deadline) || deadline.Sub(actual) > 100*time.Millisecond {
+		t.Fatalf("watchdog deadline=%v; want margin before=%v", actual, deadline)
+	}
+	if !time.Now().Before(deadline) {
+		t.Fatal("watchdog exhausted the test deadline")
 	}
 	if len(tb.failures) == 0 {
 		t.Fatal("deadline did not fail consumer")
+	}
+	found := false
+	for _, line := range tb.logs {
+		if strings.Contains(line, "not_run") && strings.Contains(line, "remaining probes not run") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("unfinished requirement reason missing from consumer logs")
+	}
+}
+
+type nearDeadlineAdapter struct {
+	observed chan context.Context
+	release  chan struct{}
+	done     chan struct{}
+}
+
+func (a nearDeadlineAdapter) Open(ctx context.Context, _ Fixture, _ *Observer) (Instance, error) {
+	defer close(a.done)
+	a.observed <- ctx
+	<-a.release // Deliberately uncooperative, but joined by test cleanup.
+	return nil, errors.New("fixture closed")
+}
+
+func TestEmbeddedBase64Alignments(t *testing.T) {
+	secret := "K8zV3mP9aR2xQ7cN5uT4bL6yW1dF0sHj"
+	for pad := 0; pad < 3; pad++ {
+		for start := 0; start+8 <= len(secret); start++ {
+			// Include only eight secret bytes, surrounded by unrelated bytes.
+			line := strings.Repeat("p", pad) + secret[start:start+8] + " trailing-text"
+			for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+				if !ContainsSecret(enc.EncodeToString([]byte(line)), secret) {
+					t.Fatalf("missed alignment=%d offset=%d", pad, start)
+				}
+			}
+		}
 	}
 }

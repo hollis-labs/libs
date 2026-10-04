@@ -12,15 +12,18 @@ hosttest.RunProfile(t, applicationTestAdapter{}, profile)
 
 `Profile.Supported` is a visible supported subset, never a per-probe waiver.
 An explicit empty slice declares no capabilities and **fails** with
-`no supported descriptor declared`; an all-unsupported host cannot obtain a
-passing report. Host-wide raw admission, forged identity, lifecycle/commit and
+`no supported descriptor declared`; a host declaring neither shared nor
+extension descriptors cannot obtain a passing report. A nonempty extension-only
+catalog can pass. Host-wide raw admission, forged identity, lifecycle/commit and
 secret-output probes still run. They use a declared supported descriptor, or a
 baseline fixture when none is declared. Storage writes and other proposed
 descriptors are optional for nonempty supported profiles. MCP and extension
 probes run only when declared. Every absent shared descriptor receives an actual
-raw call that must return a closed typed refusal with `not_started`, no retry
+raw call with a valid installed grant for that descriptor. It must return a
+closed typed refusal with `not_started`, no retry
 and zero effects. The code may be `unsupported_capability`, `capability_denied`,
-`target_unavailable`, or another validated refusal: a grant-first SDK Enforcer
+`target_unavailable`, or another validated refusal except `internal_error`:
+a grant-first SDK Enforcer
 need not report the same code as a catalog-first host.
 Both the returned report and `Report.String()` list these descriptors as
 `declared_unsupported`. Extension-only profiles are supported; duplicate or
@@ -80,10 +83,15 @@ delivery, plugin-received caller identity, proxy hops and actual fixture redirec
 actual logs, registry, browser, audit, reply and error artifacts. `SecretInput`
 counts sensitive input at real output adaptation boundaries without retaining
 it; probes require recorded inputs and scan raw, base64 and hex substrings of
-at least eight bytes of the secret and issued credential. Secrets are distinct
+at least eight bytes of the secret and issued credential. Base64 fragments are
+checked at all three byte alignments, including within a larger encoded line;
+arbitrary transformations, nested encodings and fragments shorter than eight
+bytes are outside this scanner. Secrets are distinct
 random fixture values. The reference sends configuration through Init and routes
 it through pattern-based output adapters; it also drives a backend diagnostic
-and scans received reply bytes. Instrumentation is supplied by the host adapter:
+and scans received diagnostic reply bytes. Successful scoped replies are also
+scanned for the issued bearer credential in their frame, data and payload.
+Instrumentation is supplied by the host adapter:
 counts alone cannot prove a real output path was exercised. Review that wiring
 and the captured artifacts; counts or replies built from expected test outcomes
 cannot establish host behavior.
@@ -99,7 +107,9 @@ requirements are `not_run` with a truncation reason and the run fails. No later
 requirement is certified by that run. Go cannot terminate an uncooperative callback, so
 its host adapter still owns cleanup. Suite invocation goroutines recover panics.
 `RunProfile` derives the watchdog context from the calling test's deadline
-when the reporter exposes `Deadline()`, so a longer probe timeout cannot extend it.
+when the reporter exposes `Deadline()`, reserving ten percent of the remaining
+time (at most 100 milliseconds) for reporting before the test-binary timeout.
+It logs truncation reasons as well as statuses.
 
 | Result | Probed behavior |
 | --- | --- |
@@ -109,7 +119,7 @@ when the reporter exposes `Deadline()`, so a longer probe timeout cannot extend 
 | C04 | Forged caller claims in allowed calls cannot change delivered or audited identity; narrowed callers, forged session/agent dimensions, proxy credentials in plugin calls and old-generation replay fail; reconnect restores legitimate access. |
 | C05 | MCP list/call admission, caller filtering, pinned definitions, effect, cycle/depth, byte/rate/concurrency limits; discovery after stop, expiry or revocation refuses. |
 | C06 | Disable/stop/reload/disconnect cancel admitted work and refuse new work; running reservations remain held; definite commits survive withdrawal and ambiguous writes never retry. |
-| C07 | Non-plugin MCP list/call/cancel, origin and proxy probes, refusal to follow an actual fixture 302, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
+| C07 | Non-plugin MCP list/call/cancel; missing, garbage, plugin-binding and stale credentials refuse unauthenticated without effects or leaked reservations; origin and proxy probes, adapter-instrumented refusal to follow a fixture 302, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
 | C08 | Unsafe installation cannot widen scope dimensions or activated grants; sensitive input instrumentation and captured output/received reply scans. |
 | C09 | Host-owned workflow subsystem bindings: **not covered** by this package. |
 | C10 | Scoped positive/raw bypass checks for published descriptors, canonical shared definitions and audit-independent decisions. |
@@ -118,7 +128,11 @@ when the reporter exposes `Deadline()`, so a longer probe timeout cannot extend 
 C07 exercises only the MCP bridge methods. Its redirect fixture sends a real
 302 to a separate endpoint that records an execution if reached. The client
 must report a refusal to follow with the observed 302, and the probe requires
-one independently observed redirect response and zero target executions.
+one adapter-instrumented redirect response and zero target executions,
+including a bounded settle re-check. Those counts certify the adapter
+instrumentation supplied to the suite. A never-issued 302, an uninstrumented
+target or a follow after the settle window can defeat that instrumentation;
+review the real fixture/client wiring.
 The reference normalizes this observed client-side refusal as `scope_denied`;
 this is distinct from its server's received application-error data. The reference
 measures the fixture input payload rather than the entire HTTP envelope. Its output limit uses actual
@@ -127,7 +141,8 @@ read may reject oversized output after reading with `not_committed`; it must not
 emit the oversized data or retry. These probes do not supply a production
 listener/client, a complete origin/redirect/address/proxy matrix, full streaming
 or HTTP framing limits, or production authentication. Cancellation ownership is
-probed between a plugin connection and a session-client credential; hosts must
+probed in both directions between a plugin connection and a session-client
+credential; hosts must
 test their other actor and connection classes.
 Hosts implement and test those boundaries through their real adapters.
 
