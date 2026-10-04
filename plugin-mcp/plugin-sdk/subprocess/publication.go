@@ -33,9 +33,12 @@ func queueLimits(v QueueLimits) (QueueLimits, error) {
 }
 
 type publication struct {
-	frame   []byte
-	receipt func(error)
-	credit  *terminalCredit
+	frame    []byte
+	receipt  func(error)
+	credit   *terminalCredit
+	ticket   *publicationTicket
+	selected func()
+	prepare  func() ([]byte, error)
 }
 type writerLane struct {
 	queue                                []publication
@@ -72,6 +75,7 @@ type frameWriter struct {
 	limits            QueueLimits
 	burst             int
 	activeBytes       int
+	activeTicket      *publicationTicket
 	wake              chan struct{}
 	done, aborted     chan struct{}
 	sealed            bool
@@ -95,6 +99,50 @@ func newFrameWriterWithLimits(out io.Writer, timeout time.Duration, interrupt fu
 				<-w.wake
 				continue
 			}
+			var prepareErr error
+			if item.prepare != nil {
+				initial := len(item.frame)
+				item.frame, prepareErr = item.prepare()
+				if prepareErr == nil && len(item.frame) > initial {
+					prepareErr = errPublicationFull
+				}
+			}
+			if prepareErr == nil && item.ticket != nil {
+				prepareErr = requestContextFailure(item.ticket.ctx)
+			}
+			if prepareErr != nil {
+				w.mu.Lock()
+				w.activeBytes = 0
+				w.activeTicket = nil
+				w.mu.Unlock()
+				if item.receipt != nil {
+					item.receipt(prepareErr)
+				}
+				continue
+			}
+			w.mu.Lock()
+			prepareErr = w.err
+			if prepareErr == nil && item.ticket != nil {
+				prepareErr = requestContextFailure(item.ticket.ctx)
+			}
+			if prepareErr == nil {
+				w.activeBytes = len(item.frame)
+				w.activeTicket = item.ticket
+				if item.selected != nil {
+					item.selected()
+				}
+			}
+			w.mu.Unlock()
+			if prepareErr != nil {
+				if item.receipt != nil {
+					item.receipt(prepareErr)
+				}
+				w.mu.Lock()
+				w.activeBytes = 0
+				w.mu.Unlock()
+				continue
+			}
+
 			result := make(chan error, 1)
 			go func() {
 				n, err := out.Write(item.frame)
@@ -124,6 +172,7 @@ func newFrameWriterWithLimits(out io.Writer, timeout time.Duration, interrupt fu
 			}
 			w.mu.Lock()
 			w.activeBytes = 0
+			w.activeTicket = nil
 			if item.credit != nil {
 				item.credit.state = 2
 			}
@@ -163,6 +212,7 @@ func (w *frameWriter) take() (publication, bool, bool) {
 		w.burst = 0
 	}
 	w.activeBytes = len(item.frame)
+	w.activeTicket = nil
 	return item, true, false
 }
 func (w *frameWriter) reserveTerminal(bytes int) (*terminalCredit, error) {
@@ -220,7 +270,7 @@ func (w *frameWriter) enqueue(frame []byte, receipt func(error), control bool, c
 		lane.reservedBytes -= credit.bytes
 		credit.state = 1
 	}
-	lane.queue = append(lane.queue, publication{frame, receipt, credit})
+	lane.queue = append(lane.queue, publication{frame: frame, receipt: receipt, credit: credit})
 	lane.bytes += len(frame)
 	w.notify()
 	return nil

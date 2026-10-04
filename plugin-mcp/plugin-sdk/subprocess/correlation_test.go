@@ -31,7 +31,7 @@ func TestDuplexSharedCoreVectors(t *testing.T) {
 				t.Fatal("case")
 			}
 			t.Run(v.Name, func(t *testing.T) {
-				c := newCorrelation(v.Directional)
+				c := newFixtureCorrelation(v.Directional)
 				defer c.close(nil)
 				s := server{}
 				c.encode = s.encodeFrame
@@ -146,9 +146,9 @@ func TestDuplexSharedCoreVectors(t *testing.T) {
 	}
 }
 func TestCorrelationPublicationFailureAndExhaustion(t *testing.T) {
-	params := json.RawMessage(`{"grant_id":"g","context":{"binding_id":"b","timeout_ms":1,"parent_call":{"request_owner":"host","id":1}},"level":"info","message":"ready"}`)
+	params := json.RawMessage(`{"grant_id":"g","context":{"binding_id":"b","timeout_ms":10000,"parent_call":{"request_owner":"host","id":1}},"level":"info","message":"ready"}`)
 	for _, encodeFail := range []bool{false, true} {
-		c := newCorrelation(true)
+		c := newFixtureCorrelation(true)
 		s := server{}
 		c.encode = s.encodeFrame
 		if encodeFail {
@@ -173,7 +173,7 @@ func TestCorrelationPublicationFailureAndExhaustion(t *testing.T) {
 }
 
 func TestReplyCloseRaceCompletesOnce(t *testing.T) {
-	c := newCorrelation(true)
+	c := newFixtureCorrelation(true)
 	s := server{}
 	c.encode = s.encodeFrame
 	c.publish = func([]byte, func(error)) error { return nil }
@@ -203,7 +203,7 @@ func TestReplyCloseRaceCompletesOnce(t *testing.T) {
 	}
 }
 func TestPublicationFailureFailsOtherPending(t *testing.T) {
-	c := newCorrelation(true)
+	c := newFixtureCorrelation(true)
 	s := server{}
 	c.encode = s.encodeFrame
 	output := receiptTestWriter{make(chan struct{}), make(chan struct{})}
@@ -226,4 +226,14 @@ func TestPublicationFailureFailsOtherPending(t *testing.T) {
 		}
 	}
 	<-writer.done
+}
+
+// Fixture-only offer values keep engine recipes independent of host policy.
+func newFixtureCorrelation(directional bool) *correlation {
+	c := newCorrelation(directional)
+	c.methodTimeoutMS = map[string]uint32{}
+	for method := range hostMethods {
+		c.methodTimeoutMS[method] = 10000
+	}
+	return c
 }

@@ -148,11 +148,11 @@
     {"send":{"jsonrpc":"2.0","id":142,"method":"command/execute","params":{"name":"echo","session_id":"","args":""}},"expect":{"jsonrpc":"2.0","id":142,"result":{"action":"message","envelopes":[{"type":"fixture.echo","data":{"name":"echo","identity":null}}]}}},
     {"raw":"{\"jsonrpc\":\"2.0\",\"id\":143,\"method\":\"crud/create\",\"params\":{\"resource_type\":\"notes\",\"data\":{\"a\":1,\"\\\\\\\\\":2}}}","expect":{"jsonrpc":"2.0","id":143,"result":{"data":{"a":1,"\\\\":2}}}},
     {"raw":"{\"jsonrpc\":\"2.0\",\"id\":144,\"method\":\"crud/create\",\"params\":{\"resource_type\":\"notes\",\"data\":{\"a\":1,\"\\\\\\\"\":3}}}","expect":{"jsonrpc":"2.0","id":144,"result":{"data":{"a":1,"\\\"":3}}}},
-    {"send":{"jsonrpc":"2.0","id":145,"method":"command/execute","params":{"name":"echo-context","session_id":"","args":"","context":{"binding_id":"binding","timeout_ms":10}}},"expect":{"jsonrpc":"2.0","id":145,"result":{"action":"message","content":"binding:10"}}},
+    {"send":{"jsonrpc":"2.0","id":145,"method":"command/execute","params":{"name":"echo-context","session_id":"","args":"","context":{"binding_id":"binding","timeout_ms":10000}}},"expect":{"jsonrpc":"2.0","id":145,"result":{"action":"message","content":"binding:10000"}}},
     {"send":{"jsonrpc":"2.0","id":146,"method":"command/execute","params":{"name":"echo-context","session_id":"","args":""}},"expect":{"jsonrpc":"2.0","id":146,"result":{"action":"message","content":"absent"}}},
-    {"send":{"jsonrpc":"2.0","id":147,"method":"plugin/health","params":{"context":{"timeout_ms":1}}},"expect":{"jsonrpc":"2.0","id":147,"result":{"ok":true}}},
+    {"send":{"jsonrpc":"2.0","id":147,"method":"plugin/health","params":{"context":{"timeout_ms":30000}}},"expect":{"jsonrpc":"2.0","id":147,"result":{"ok":true}}},
     {"raw":"{\"jsonrpc\":\"2.0\",\"id\":900,\"method\":\"command/execute\",\"params\":{\"name\":\"echo\",\"session_id\":\"\",\"args\":\"\",\"identity\":{\"n\":1e309}}}","expect":{"jsonrpc":"2.0","id":900,"error":{"code":-32602}},"message_prefix":"decode params:"},
     {"raw":"{\"jsonrpc\":\"2.0\",\"id\":901,\"method\":\"command/execute\",\"params\":{\"name\":\"echo\",\"session_id\":\"\",\"args\":\"\",\"identity\":{\"a\":1,\"a\":2}}}","expect":{"jsonrpc":"2.0","id":901,"error":{"code":-32602}},"message_prefix":"decode params:"},
-    {"send":{"jsonrpc":"2.0","id":148,"method":"plugin/unload","params":{"context":{"timeout_ms":1}}},"expect":{"jsonrpc":"2.0","id":148,"result":{"ok":true}}}
+    {"send":{"jsonrpc":"2.0","id":148,"method":"plugin/unload","params":{"context":{"timeout_ms":40000}}},"expect":{"jsonrpc":"2.0","id":148,"result":{"ok":true}}}
   ]
 }

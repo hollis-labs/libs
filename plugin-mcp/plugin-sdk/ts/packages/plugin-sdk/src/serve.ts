@@ -1,5 +1,8 @@
+import { Admission, RequestScope, admissionLimits, linkRequestScope } from "./admission.js";
+import { decodeRPCControlDTO, requestFailureResponse } from "./request-control.js";
+import { requestParamsJSON } from "./payload.js";
 import { hookResponseJSON } from './hooks-dispatch.js';
-import {Correlation, CorrelationError, CORE_CAPACITY, replyCandidate} from './correlation.js';
+import {Correlation, CorrelationError, replyCandidate} from './correlation.js';
 import {FrameWriter, queueLimits} from './publication.js';
 import type {QueueLimits} from './publication.js';
 import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, encodeBoundedJSON, frameLimit } from './frame-codec.js';
@@ -19,6 +22,7 @@ import type { RPCResponse } from './wire.js';
 export const MAX_INPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export const MAX_OUTPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export interface ServeOptions {
+  admissionLimits?: import('./admission.js').AdmissionLimits;
   queueLimits?: QueueLimits;
   inputFrameBytes?: number;
   outputFrameBytes?: number;
@@ -115,6 +119,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
 export async function serveConnection(plugin: ServerPlugin, options: ServeOptions, core: Correlation): Promise<void> {
   if (!plugin || typeof plugin.init !== 'function' || typeof plugin.load !== 'function' || typeof plugin.unload !== 'function') throw new Error('serve requires init, load and unload');
   const queues = queueLimits(options.queueLimits);
+  const admissionPolicy=admissionLimits(options.admissionLimits);core.reverseSlots=admissionPolicy.reverseSlots;
   const inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
   const writeTimeout = options.writeTimeoutMs ?? 5000;
   if (!Number.isFinite(writeTimeout) || writeTimeout <= 0 || writeTimeout > 2147483647) throw new Error('writeTimeoutMs must be positive and at most 2147483647');
@@ -146,6 +151,8 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   const writer=new FrameWriter(output,writeTimeout,onOutputError,queues);
   core.encode=value=>encodeBoundedJSON(value,outputLimit-1)+'\n';
   core.publish=frame=>writer.publish(frame);
+  core.publishCall=(frame,signal,onStart,beforeStart,prepare)=>writer.publish(frame,'ordinary',undefined,{signal,onStart,beforeStart,prepare});
+  core.publishControl=frame=>writer.publish(frame,'control');
   const write = (response: RPCResponse, admitted=true): Promise<void> => {
     let line: string;
     try { line = (hookResponseJSON(response,outputLimit - 1) ?? encodeBoundedJSON(response, outputLimit - 1)) + '\n'; }
@@ -157,7 +164,8 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
     void receipt.then(()=>{if(admitted)core.release(response.id);},error=>{if(admitted)core.release(response.id);core.close(error);onOutputError(error as Error);});
     return receipt;
   };
-  const send = (response:RPCResponse):void=>{void write(response).catch(()=>{});};
+  const admission=new Admission(writer,core,response=>(hookResponseJSON(response,outputLimit-1)??encodeBoundedJSON(response,outputLimit-1))+'\n',onOutputError,admissionPolicy);
+  const send = (response:RPCResponse,scope?:RequestScope):void=>{if(scope)scope.reply(response);else void write(response).catch(()=>{});};
   const track = (task: Promise<void>): void => {
     pending.add(task);
     void task.then(() => pending.delete(task), error => { pending.delete(task); inputError ??= error; stop(); });
@@ -165,35 +173,44 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   let quiescing=false;
   let terminal: import('./wire.js').RPCRequest | undefined;
   let terminalReady=false;
+  let terminalScope:RequestScope|undefined;
   const pump = (async () => {
     try {
       for await (const line of frames(input,reader.signal,inputLimit)) {
+        const received=performance.now();
         if (reader.signal.aborted) break;
         try {
           const request = decodeRequest(line);
           if (!request) {if(core.directional)core.reply(line);continue;}
+          if(request.method==='rpc/cancel') {
+           if(request.id!==undefined){core.admit(request.id);send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'rpc/cancel requires a notification'}});continue;}
+           try{admission.cancel(decodeRPCControlDTO('CancelParams',requestParamsJSON(request)??'null',core.directional));}catch{/* Invalid notifications have no effect or reply. */}
+           continue;
+          }
           if(quiescing)continue;
           core.admit(request.id);
+          const scope=admission.begin(request.method==='plugin/unload'?{...dispatcher.context,signal:new AbortController().signal}:dispatcher.context,request,received);
+          if(!scope){if(request.id!==undefined)send(requestFailureResponse(request.id,'rate_limited','not_started'));continue;}
+          const refuse=(response:RPCResponse)=>{scope.reply(response);scope.finish();};
           if (request.method === 'plugin/unload') {
             try { decodeRuntimeParams(request); }
             catch(error) {
               if(!(error instanceof PayloadError)) throw error;
-              if(request.id!==undefined) send({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});
+              if(request.id!==undefined) refuse({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});else scope.finish();
               continue;
             }
-            terminalReady=dispatcher.ready;terminal = request; quiescing=true;controller.abort();stoppedResolve();continue;
+            terminalReady=dispatcher.ready;terminal = request;terminalScope=scope; quiescing=true;controller.abort();stoppedResolve();continue;
           }
           if(request.method==='plugin/init') {
             if(typeof request.id!=='number'||!Number.isSafeInteger(request.id)||request.id<=0) {
-              if(request.id!==undefined)send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init requires a positive safe integer id'}});continue;
+              if(request.id!==undefined)refuse({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init requires a positive safe integer id'}});else scope.finish();continue;
             }
-            if(initUsed){send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init already attempted'}});continue;}
+            if(initUsed){refuse({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init already attempted'}});continue;}
             initUsed=true;
           } else if(!dispatcher.ready) {
-            if(request.id!==undefined)send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'successful init required'}});continue;
+            if(request.id!==undefined)refuse({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'successful init required'}});else scope.finish();continue;
           }
-          if(pending.size>=CORE_CAPACITY)throw new CorrelationError();
-          const task=dispatcher.dispatch(request).then(response=>{if(response)send(response);});
+          const task=(async()=>{try{if(scope.start()){const response=await dispatcher.dispatch(request,scope.ctx);if(response)send(response,scope);}}finally{scope.finish();await scope.executionDone;}})();
           track(task);
         } catch (error) {
           if (!(error instanceof EnvelopeFault)) throw error;
@@ -220,12 +237,15 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
       if (closed) throw new ShutdownTimeoutError();
       const forwardContext = terminal && terminalReady ? decodeRuntimeParams<{context?: import('./host-rpc.js').ForwardContext}>(terminal).context : undefined;
       const cleanupContext = {...dispatcher.context,forwardContext,signal:cleanupController.signal};
+      const terminalCancel=()=>cleanupController.abort(terminalScope?.controller.signal.reason);
+      terminalScope?.controller.signal.addEventListener('abort',terminalCancel,{once:true});if(terminalScope?.controller.signal.aborted)terminalCancel();
+      if(terminalScope){if(!terminalScope.start())throw new ShutdownTimeoutError();linkRequestScope(terminalScope.ctx,cleanupController.signal,{deadline:Math.min(terminalScope.deadline??Infinity,performance.now()+timeout),binding:terminalScope.binding});}
       let cleanupError: unknown, cleanupFailed = false;
       try { await dispatcher.shutdown(cleanupContext); } catch (error) { cleanupError = error; cleanupFailed = true; }
       if (closed) throw new ShutdownTimeoutError();
       if (terminal) {
-        const response = terminalReady ? await dispatcher.dispatch(terminal) : terminal.id === undefined ? undefined : {jsonrpc:'2.0' as const,id:terminal.id,error:{code:-32600,message:'successful init required'}}; // Reuses recorded cleanup.
-        if (response) await write(response);
+        const response = terminalReady ? await dispatcher.dispatch(terminal,terminalScope?.ctx) : terminal.id === undefined ? undefined : {jsonrpc:'2.0' as const,id:terminal.id,error:{code:-32600,message:'successful init required'}}; // Reuses recorded cleanup.
+        if(response&&terminalScope){terminalScope.reply(response);terminalScope.finish();await terminalScope.executionDone;}
       }
       await writer.flush();
       if (transportError) throw transportError;

@@ -238,3 +238,31 @@ func TestWriterReceiptsSettleOnceOnAbort(t *testing.T) {
 		}
 	}
 }
+
+func TestWriterFullByteCeilingsBothLanesAndActiveFrame(t *testing.T) {
+	out := &gatedWriter{started: make(chan string, 1), release: make(chan struct{})}
+	w := newFrameWriter(out, time.Second, func() {})
+	frame := []byte(`"` + strings.Repeat("x", DefaultQueuedWriteBytes-3) + "\"\n")
+	if err := w.submit(frame, nil); err != nil {
+		t.Fatal(err)
+	}
+	<-out.started
+	if err := w.submit(frame, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.submitControl(frame, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(w.submit([]byte("\n"), nil), errPublicationFull) || !errors.Is(w.submitControl([]byte("\n"), nil), errPublicationFull) {
+		t.Fatal("byte ceiling bypassed")
+	}
+	w.mu.Lock()
+	total := w.ordinary.bytes + w.control.bytes + w.activeBytes
+	w.mu.Unlock()
+	if total != 3*DefaultQueuedWriteBytes {
+		t.Fatal("per-lane plus active accounting")
+	}
+	w.abort(errConnectionClosed)
+	close(out.release)
+	<-w.done
+}

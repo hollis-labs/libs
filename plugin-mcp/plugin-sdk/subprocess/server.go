@@ -123,14 +123,14 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		ready := s.initialized
 		s.initMu.Unlock()
 		if !ready {
-			s.writeError(req.ID, ErrCodeInvalidRequest, "successful init required")
+			s.writeError(req.ID, ErrCodeInvalidRequest, "successful init required", scopeFromContext(ctx))
 			return
 		}
 	}
 	if req.Method != MethodInit && s.supportsMethod(req.Method) {
 		forward, err := validateRuntimeParams(req.Method, req.Params)
 		if err != nil {
-			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			return
 		}
 		ctx = withForwardContext(ctx, forward)
@@ -140,24 +140,24 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		s.dispatchHook(ctx, req)
 	case MethodInit:
 		if !req.ID.positiveInteger() {
-			s.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID")
+			s.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID", scopeFromContext(ctx))
 			return
 		}
 		s.initMu.Lock()
 		if s.initAttempted {
 			s.initMu.Unlock()
-			s.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted")
+			s.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted", scopeFromContext(ctx))
 			return
 		}
 		s.initAttempted = true
 		s.initMu.Unlock()
 		var params InitParams
 		if err := decodeParams(req.Params, &params); err != nil {
-			s.writeInitError(req.ID, err)
+			s.writeInitError(req.ID, err, scopeFromContext(ctx))
 			return
 		}
 		if err := params.Validate(); err != nil {
-			s.writeInitError(req.ID, err)
+			s.writeInitError(req.ID, err, scopeFromContext(ctx))
 			return
 		}
 		ctx = withForwardContext(ctx, params.Context)
@@ -165,7 +165,11 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		hooksEnabled := params.HooksProfile != nil && params.HooksProfile.HooksProfileVersion == HooksProfileVersion && hookHandler
 		res, err := s.plugin.Init(ctx, params)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
+			return
+		}
+		if scope := scopeFromContext(ctx); scope != nil && !scope.acceptsResult() {
+			scope.failContext()
 			return
 		}
 		// Hooks negotiate independently; reverse callbacks remain unavailable.
@@ -176,7 +180,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			res.HooksProfileVersion = &version
 		}
 		if err := ValidateInitResult(params, res); err != nil {
-			s.writeInitError(req.ID, err)
+			s.writeInitError(req.ID, err, scopeFromContext(ctx))
 			return
 		}
 		s.notifyIdentity(ctx, params.Identity)
@@ -185,44 +189,44 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		s.hooksIncarnation = params.Incarnation
 		s.initialized = true
 		s.initMu.Unlock()
-		s.writeResult(req.ID, res)
+		s.writeResult(req.ID, res, scopeFromContext(ctx))
 
 	case MethodLoad:
 		res, err := s.plugin.Load(ctx)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, res)
+		s.writeResult(req.ID, res, scopeFromContext(ctx))
 
 	case MethodUnload:
 		if err := s.unload(ctx); err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, map[string]bool{"ok": true})
+		s.writeResult(req.ID, map[string]bool{"ok": true}, scopeFromContext(ctx))
 
 	case MethodHealth:
 		if s.asHealth == nil {
 			// Default: healthy.
-			s.writeResult(req.ID, HealthResult{OK: true})
+			s.writeResult(req.ID, HealthResult{OK: true}, scopeFromContext(ctx))
 			return
 		}
 		status, err := s.asHealth.Health(ctx)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, HealthResult{OK: status.OK, Message: status.Message})
+		s.writeResult(req.ID, HealthResult{OK: status.OK, Message: status.Message}, scopeFromContext(ctx))
 
 	case MethodCommandExecute:
 		if s.asCommand == nil {
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement CommandHandler")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement CommandHandler", scopeFromContext(ctx))
 			return
 		}
 		var params CommandExecParams
 		if err := decodeParams(req.Params, &params); err != nil {
-			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			return
 		}
 		s.notifyIdentity(ctx, params.Identity)
@@ -233,10 +237,10 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			Identity:  params.Identity,
 		})
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, CommandExecResult{Action: res.Action, Content: res.Content, Envelopes: res.Envelopes})
+		s.writeResult(req.ID, CommandExecResult{Action: res.Action, Content: res.Content, Envelopes: res.Envelopes}, scopeFromContext(ctx))
 
 	case MethodEventHandle:
 		if s.asEvent == nil {
@@ -245,13 +249,13 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			if req.ID == (RPCID{}) {
 				return
 			}
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement EventHandler")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement EventHandler", scopeFromContext(ctx))
 			return
 		}
 		var params EventHandleParams
 		if err := decodeParams(req.Params, &params); err != nil {
 			if req.ID != (RPCID{}) {
-				s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+				s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			}
 			return
 		}
@@ -268,79 +272,79 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			return // notification — drop response
 		}
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, EventHandleResult{Cancel: res.Cancel, Reason: res.Reason, Envelopes: res.Envelopes})
+		s.writeResult(req.ID, EventHandleResult{Cancel: res.Cancel, Reason: res.Reason, Envelopes: res.Envelopes}, scopeFromContext(ctx))
 
 	case MethodCRUDCreate, MethodCRUDRead, MethodCRUDUpdate, MethodCRUDDelete, MethodCRUDList:
 		if s.asCRUD == nil {
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement CRUDHandler")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement CRUDHandler", scopeFromContext(ctx))
 			return
 		}
 		s.dispatchCRUD(ctx, req)
 
 	case MethodMCPCallTool:
 		if s.asMCP == nil {
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement MCPHandler")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement MCPHandler", scopeFromContext(ctx))
 			return
 		}
 		var params MCPCallRequest
 		if err := decodeParams(req.Params, &params); err != nil {
-			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			return
 		}
 		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asMCP.MCPCallTool(ctx, params)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, res)
+		s.writeResult(req.ID, res, scopeFromContext(ctx))
 
 	case MethodHTTPHandle:
 		if s.asHTTP == nil {
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement HTTPHandler")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement HTTPHandler", scopeFromContext(ctx))
 			return
 		}
 		var params HTTPRequest
 		if err := decodeParams(req.Params, &params); err != nil {
-			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			return
 		}
 		s.notifyIdentity(ctx, params.Identity)
 		res, err := s.asHTTP.HTTPHandle(ctx, params)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, res)
+		s.writeResult(req.ID, res, scopeFromContext(ctx))
 
 	case MethodMigrate:
 		if s.asMigrate == nil {
-			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement Migrator")
+			s.writeError(req.ID, ErrCodeMethodNotFound, "plugin does not implement Migrator", scopeFromContext(ctx))
 			return
 		}
 		var params MigrateParams
 		if err := decodeParams(req.Params, &params); err != nil {
-			s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+			s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 			return
 		}
 		if err := s.asMigrate.Migrate(ctx, params.FromVersion, params.ToVersion); err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, MigrateResult{})
+		s.writeResult(req.ID, MigrateResult{}, scopeFromContext(ctx))
 
 	default:
-		s.writeError(req.ID, ErrCodeMethodNotFound, fmt.Sprintf("unknown method %q", req.Method))
+		s.writeError(req.ID, ErrCodeMethodNotFound, fmt.Sprintf("unknown method %q", req.Method), scopeFromContext(ctx))
 	}
 }
 
 func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 	var params CRUDParams
 	if err := decodeParams(req.Params, &params); err != nil {
-		s.writeError(req.ID, ErrCodeInvalidParams, err.Error())
+		s.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scopeFromContext(ctx))
 		return
 	}
 	if req.Method == MethodCRUDList && params.Filters == nil {
@@ -350,52 +354,54 @@ func (s *server) dispatchCRUD(ctx context.Context, req RPCRequest) {
 	case MethodCRUDCreate:
 		out, err := s.asCRUD.Create(ctx, params.ResourceType, params.Data)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{}, scopeFromContext(ctx))
 	case MethodCRUDRead:
 		out, err := s.asCRUD.Read(ctx, params.ResourceType, params.ID)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{}, scopeFromContext(ctx))
 	case MethodCRUDUpdate:
 		out, err := s.asCRUD.Update(ctx, params.ResourceType, params.ID, params.Data)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{})
+		s.writeResultShape(req.ID, map[string]any{"data": out}, CRUDResult{}, scopeFromContext(ctx))
 	case MethodCRUDDelete:
 		if err := s.asCRUD.Delete(ctx, params.ResourceType, params.ID); err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.writeResult(req.ID, map[string]bool{"ok": true})
+		s.writeResult(req.ID, map[string]bool{"ok": true}, scopeFromContext(ctx))
 	case MethodCRUDList:
 		items, err := s.asCRUD.List(ctx, params.ResourceType, params.Filters)
 		if err != nil {
-			s.writeErrorFromPluginErr(req.ID, err)
+			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
 		if items == nil {
 			items = []map[string]interface{}{}
 		}
-		s.writeResultShape(req.ID, map[string]any{"items": items}, CRUDListResult{})
+		s.writeResultShape(req.ID, map[string]any{"items": items}, CRUDListResult{}, scopeFromContext(ctx))
 	}
 }
 
 // writeResult encodes and writes a successful JSON-RPC response.
 // Writes are suppressed for notifications (absent ID).
-func (s *server) writeResult(id RPCID, result any) { s.writeResultShape(id, result, result) }
-func (s *server) writeResultShape(id RPCID, result, shape any) {
+func (s *server) writeResult(id RPCID, result any, scopes ...*requestScope) {
+	s.writeResultShape(id, result, result, scopes...)
+}
+func (s *server) writeResultShape(id RPCID, result, shape any, scopes ...*requestScope) {
 	if id == (RPCID{}) {
 		return
 	}
 	if err := payloadResultSource(result); err != nil {
-		s.writeError(id, ErrCodeInternal, "marshal result: invalid JSON value")
+		s.writeError(id, ErrCodeInternal, "marshal result: invalid JSON value", scopes...)
 		return
 	}
 	payload, err := marshalBounded(result, s.frameOutputLimit()-1)
@@ -403,15 +409,20 @@ func (s *server) writeResultShape(id RPCID, result, shape any) {
 		err = validateRuntimeResult(shape, payload)
 	}
 	if err != nil {
-		s.writeError(id, ErrCodeInternal, "outbound response rejected")
+		var sizeError *FrameTooLargeError
+		if len(scopes) > 0 && scopes[0] != nil && errors.As(err, &sizeError) {
+			scopes[0].reply(requestFailureResponse(id, capability.BudgetExceeded, capability.Committed))
+		} else {
+			s.writeError(id, ErrCodeInternal, "outbound response rejected", scopes...)
+		}
 		return
 	}
 	resp := RPCResponse{JSONRPC: "2.0", ID: id, Result: payload}
-	s.writeMessage(resp)
+	s.writeMessage(resp, scopes...)
 }
 
 // writeError encodes and writes a JSON-RPC error response.
-func (s *server) writeError(id RPCID, code int, message string) {
+func (s *server) writeError(id RPCID, code int, message string, scopes ...*requestScope) {
 	if id == (RPCID{}) {
 		return
 	}
@@ -420,11 +431,11 @@ func (s *server) writeError(id RPCID, code int, message string) {
 		ID:      id,
 		Error:   &RPCError{Code: code, Message: message},
 	}
-	s.writeMessage(resp)
+	s.writeMessage(resp, scopes...)
 }
 
 // writeInitError preserves the typed structural cause across the wire.
-func (s *server) writeInitError(id RPCID, err error) {
+func (s *server) writeInitError(id RPCID, err error, scopes ...*requestScope) {
 	if id == (RPCID{}) {
 		return
 	}
@@ -432,40 +443,44 @@ func (s *server) writeInitError(id RPCID, err error) {
 	if !errors.As(err, &failure) {
 		failure = &InitError{Code: InitInvalid, Field: "params"}
 	}
-	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: id, Error: &RPCError{Code: ErrCodeInvalidParams, Message: failure.Error(), Data: failure.RPCData()}})
+	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: id, Error: &RPCError{Code: ErrCodeInvalidParams, Message: failure.Error(), Data: failure.RPCData()}}, scopes...)
 }
 
 // writeErrorFromPluginErr maps a plugin.Error (with HTTP-style code) to
 // the appropriate JSON-RPC application-level error code. Unknown error
 // types fall back to ErrCodeInternal.
-func (s *server) writeErrorFromPluginErr(id RPCID, err error) {
+func (s *server) writeErrorFromPluginErr(id RPCID, err error, scopes ...*requestScope) {
 	if id == (RPCID{}) {
 		return
 	}
 	if errors.Is(err, plugin.ErrCancelled) {
-		s.writeError(id, ErrCodeCancelled, err.Error())
+		s.writeError(id, ErrCodeCancelled, err.Error(), scopes...)
 		return
 	}
 	var pe *plugin.Error
 	if errors.As(err, &pe) {
 		switch pe.Code {
 		case 404:
-			s.writeError(id, ErrCodeNotFound, pe.Message)
+			s.writeError(id, ErrCodeNotFound, pe.Message, scopes...)
 		case 409:
-			s.writeError(id, ErrCodeConflict, pe.Message)
+			s.writeError(id, ErrCodeConflict, pe.Message, scopes...)
 		case 422:
-			s.writeError(id, ErrCodeValidation, pe.Message)
+			s.writeError(id, ErrCodeValidation, pe.Message, scopes...)
 		default:
-			s.writeError(id, ErrCodeInternal, pe.Message)
+			s.writeError(id, ErrCodeInternal, pe.Message, scopes...)
 		}
 		return
 	}
-	s.writeError(id, ErrCodeInternal, err.Error())
+	s.writeError(id, ErrCodeInternal, err.Error(), scopes...)
 }
 
 // writeMessage serializes a response and writes it followed by a
 // newline. The runtime writer serializes frames from concurrent handlers.
-func (s *server) writeMessage(resp RPCResponse) {
+func (s *server) writeMessage(resp RPCResponse, scopes ...*requestScope) {
+	if len(scopes) > 0 && scopes[0] != nil {
+		scopes[0].reply(resp)
+		return
+	}
 	data, err := s.encodeFrame(resp)
 	if err != nil {
 		fallback := RPCResponse{JSONRPC: "2.0", ID: resp.ID, Error: &RPCError{Code: ErrCodeInternal, Message: "outbound response rejected"}}

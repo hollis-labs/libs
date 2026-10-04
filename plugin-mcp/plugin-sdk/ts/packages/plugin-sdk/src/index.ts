@@ -18,3 +18,6 @@ export * from './hooks.js';
 export type { HookHandler } from './types.js';
 
 export type { QueueLimits } from './publication.js';
+
+export { TransportCancelledError, DeadlineExceededError, RPCTransportError } from './request-control.js';
+export type { AdmissionLimits } from './admission.js';

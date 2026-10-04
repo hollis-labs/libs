@@ -37,7 +37,7 @@ func HookRPCError(code int, cause string, field string) (*RPCError, error) {
 	}
 	return &RPCError{Code: code, Message: "hook request rejected", Data: data}, nil
 }
-func (s *server) writeHookError(id RPCID, code int, cause string, err error) {
+func (s *server) writeHookError(id RPCID, code int, cause string, err error, scopes ...*requestScope) {
 	field := ""
 	var failure *HookValidationError
 	if errors.As(err, &failure) {
@@ -48,5 +48,5 @@ func (s *server) writeHookError(id RPCID, code int, cause string, err error) {
 		s.logger.Warn("hook notification rejected", "code", cause, "field", field)
 		return
 	}
-	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: id, Error: rpc})
+	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: id, Error: rpc}, scopes...)
 }

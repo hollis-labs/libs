@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hollis-labs/plugin-sdk/capability"
 	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
 )
 
@@ -35,6 +36,7 @@ type ServeOptions struct {
 	ShutdownTimeout time.Duration
 	FrameLimits     FrameLimits
 	QueueLimits     QueueLimits
+	AdmissionLimits AdmissionLimits
 	WriteTimeout    time.Duration
 }
 
@@ -56,6 +58,11 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 	if err != nil {
 		return err
 	}
+	admissionPolicy, err := admissionLimits(options.AdmissionLimits)
+	if err != nil {
+		return err
+	}
+	core.reversePermits = make(chan struct{}, admissionPolicy.Reverse)
 	timeout := options.ShutdownTimeout
 	if timeout == 0 {
 		timeout = DefaultShutdownTimeout
@@ -123,6 +130,8 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 	defer func() { writer.abort(errConnectionClosed); core.close(errConnectionClosed) }()
 	core.encode = srv.encodeFrame
 	core.publish = writer.submit
+	core.publishCall = writer.submitCancellable
+	core.publishControl = writer.submitControl
 	srv.writeFrame = func(data []byte) {
 		if err := writer.submitControl(data, nil); err != nil {
 			srv.fence(err)
@@ -142,10 +151,16 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 			srv.fence(err)
 		}
 	}
+	admissions := newAdmission(writer, core, srv)
+	admissions.limits = admissionPolicy
 	writerDone := writer.done
 	stopRead := make(chan struct{})
 	defer close(stopRead)
-	events := make(chan []byte)
+	type arrival struct {
+		raw      []byte
+		received time.Time
+	}
+	events := make(chan arrival)
 	readerDone := make(chan struct{})
 	var readerErr error
 	go func() {
@@ -160,40 +175,40 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 				return
 			}
 			select {
-			case events <- line:
+			case events <- arrival{line, time.Now()}:
 			case <-stopRead:
 				return
 			}
 		}
 	}()
 	var pending sync.WaitGroup
-	callbackSlots := make(chan struct{}, coreCapacity)
-	run := func(call func()) <-chan struct{} {
+	run := func(scope *requestScope, call func()) <-chan struct{} {
 		done := make(chan struct{})
-		select {
-		case callbackSlots <- struct{}{}:
-		default:
-			srv.fence(errCorrelation)
-			close(done)
-			return done
-		}
 		pending.Add(1)
-		go func() { defer func() { <-callbackSlots }(); defer pending.Done(); defer close(done); call() }()
+		go func() {
+			defer pending.Done()
+			defer close(done)
+			defer func() { scope.finish(); <-scope.executionDone }()
+			if scope.start() {
+				call()
+			}
+		}()
 		return done
 	}
-	dispatch := func(req RPCRequest) <-chan struct{} {
-		return run(func() {
+	dispatch := func(req RPCRequest, scope *requestScope) <-chan struct{} {
+		return run(scope, func() {
 			defer func() {
 				if r := recover(); r != nil {
 					logger.Error("subprocess: panic in handler", "method", req.Method, "stack", string(debug.Stack()))
-					srv.writeError(req.ID, ErrCodeInternal, fmt.Sprintf("panic: %v", r))
+					srv.writeError(req.ID, ErrCodeInternal, fmt.Sprintf("panic: %v", r), scope)
 				}
 			}()
-			srv.dispatch(ctx, req)
+			srv.dispatch(scope.ctx, req)
 		})
 	}
 	initUsed := false
 	var terminal *RPCRequest
+	var terminalScope *requestScope
 	terminalReady := false
 	var inputErr error
 loop:
@@ -216,7 +231,8 @@ loop:
 		case <-readerDone:
 			inputErr = readerErr
 			break loop
-		case line := <-input:
+		case event := <-input:
+			line := event.raw
 			req, fault := decodeEnvelope(line)
 			if fault != nil {
 				if core.directional && (!json.Valid(line) || replyCandidate(line)) {
@@ -243,32 +259,76 @@ loop:
 				}
 				continue
 			}
+			if req.Method == "rpc/cancel" {
+				if req.ID != (RPCID{}) {
+					if err := core.admit(req.ID); err != nil {
+						inputErr = err
+						break loop
+					}
+					srv.writeError(req.ID, ErrCodeInvalidRequest, "rpc/cancel requires a notification")
+					continue
+				}
+				raw, err := paramsJSON(req.Params)
+				if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directional) == nil {
+					var p CancelParams
+					_ = json.Unmarshal(raw, &p)
+					admissions.cancelRequest(p)
+				}
+				continue
+			}
 			if err := core.admit(req.ID); err != nil {
 				inputErr = err
 				break loop
+			}
+			scopeParent := ctx
+			if req.Method == MethodUnload {
+				scopeParent = context.Background()
+			}
+			scope, admitErr := admissions.begin(scopeParent, *req, event.received)
+			if admitErr != nil {
+				if req.ID != (RPCID{}) {
+					data, err := srv.encodeFrame(requestFailureResponse(req.ID, capability.RateLimited, capability.NotStarted))
+					if err != nil {
+						inputErr = err
+						break loop
+					}
+					id := req.ID
+					if err = writer.submitControl(data, func(err error) {
+						core.release(id)
+						if err != nil {
+							srv.fence(err)
+						}
+					}); err != nil {
+						inputErr = err
+						break loop
+					}
+				}
+				continue
 			}
 			srv.initMu.Lock()
 			ready := srv.initialized
 			srv.initMu.Unlock()
 			if req.Method == MethodUnload {
 				if _, err := validateRuntimeParams(req.Method, req.Params); err != nil {
-					run(func() { srv.writeError(req.ID, ErrCodeInvalidParams, err.Error()) })
+					run(scope, func() { srv.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scope) })
 					continue
 				}
-				terminal, terminalReady = req, ready
+				terminal, terminalReady, terminalScope = req, ready, scope
 				break loop
 			}
 			if req.Method != MethodInit && !ready {
-				run(func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "successful init required") })
+				run(scope, func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "successful init required", scope) })
 				continue
 			}
 			if req.Method == MethodInit {
 				if !req.ID.positiveInteger() {
-					run(func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID") })
+					run(scope, func() {
+						srv.writeError(req.ID, ErrCodeInvalidRequest, "init requires a positive safe request ID", scope)
+					})
 					continue
 				}
 				if initUsed {
-					run(func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted") })
+					run(scope, func() { srv.writeError(req.ID, ErrCodeInvalidRequest, "init already attempted", scope) })
 					continue
 				}
 				initUsed = true
@@ -276,12 +336,12 @@ loop:
 					srv.initMu.Lock()
 					srv.initAttempted = true
 					srv.initMu.Unlock()
-					run(func() { srv.writeInitError(req.ID, initInvalid("request")) })
+					run(scope, func() { srv.writeInitError(req.ID, initInvalid("request"), scope) })
 					continue
 				}
-				dispatch(*req)
+				dispatch(*req, scope)
 			} else {
-				dispatch(*req)
+				dispatch(*req, scope)
 			}
 		}
 	}
@@ -290,8 +350,17 @@ loop:
 		go func() {
 			for {
 				select {
-				case line := <-events:
+				case event := <-events:
+					line := event.raw
 					req, fault := decodeEnvelope(line)
+					if req != nil && fault == nil && req.Method == "rpc/cancel" && req.ID == (RPCID{}) {
+						raw, err := paramsJSON(req.Params)
+						if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directional) == nil {
+							var p CancelParams
+							_ = json.Unmarshal(raw, &p)
+							admissions.cancelRequest(p)
+						}
+					}
 					if core.directional && fault != nil && (!json.Valid(line) || replyCandidate(line)) {
 						srv.fence(errCorrelation)
 						core.close(errCorrelation)
@@ -327,7 +396,24 @@ loop:
 			_ = os.Stdin.Close()
 		}
 	}()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
+	shutdownBudget := timeout
+	if terminalScope != nil {
+		if end, ok := terminalScope.ctx.Deadline(); ok && time.Until(end) < shutdownBudget {
+			shutdownBudget = time.Until(end)
+		}
+	}
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownBudget)
+	if terminalScope != nil {
+		stop := context.AfterFunc(terminalScope.ctx, func() {
+			cause := context.Cause(terminalScope.ctx)
+			var cancelled *TransportCancelledError
+			var expired *DeadlineExceededError
+			if errors.As(cause, &cancelled) || errors.As(cause, &expired) || errors.Is(cause, context.DeadlineExceeded) {
+				shutdownCancel()
+			}
+		})
+		defer stop()
+	}
 	defer shutdownCancel()
 	drained := make(chan struct{})
 	go func() { pending.Wait(); close(drained) }()
@@ -346,6 +432,15 @@ loop:
 		forward, _ := validateRuntimeParams(terminal.Method, terminal.Params)
 		shutdownCtx = withForwardContext(shutdownCtx, forward)
 	}
+	if shutdownCtx.Err() != nil {
+		return fail()
+	}
+	if terminalScope != nil {
+		if !terminalScope.start() {
+			return fail()
+		}
+		shutdownCtx = context.WithValue(shutdownCtx, requestScopeKey{}, terminalScope)
+	}
 	cleanup := srv.beginUnload(shutdownCtx)
 	select {
 	case <-cleanup:
@@ -354,13 +449,13 @@ loop:
 	}
 	if terminal != nil {
 		// Enqueue the only terminal response after drain and the one cleanup attempt.
-		done := run(func() {
+		done := run(terminalScope, func() {
 			if !terminalReady {
-				srv.writeError(terminal.ID, ErrCodeInvalidRequest, "successful init required")
+				srv.writeError(terminal.ID, ErrCodeInvalidRequest, "successful init required", terminalScope)
 			} else if srv.unloadErr != nil {
-				srv.writeErrorFromPluginErr(terminal.ID, srv.unloadErr)
+				srv.writeErrorFromPluginErr(terminal.ID, srv.unloadErr, terminalScope)
 			} else {
-				srv.writeResult(terminal.ID, map[string]bool{"ok": true})
+				srv.writeResult(terminal.ID, map[string]bool{"ok": true}, terminalScope)
 			}
 		})
 		select {

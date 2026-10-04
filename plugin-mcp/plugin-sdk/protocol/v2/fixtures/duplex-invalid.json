@@ -171,6 +171,31 @@
           "id": 3
         }
       ]
+    },
+    {
+      "name": "escaped-base-contract-stays-closed",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32603,\"message\":\"overloaded\",\"data\":{\"contract\":\"plugin-rpc\\u002f2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":false,\"extra\":1}}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
     }
   ]
 }

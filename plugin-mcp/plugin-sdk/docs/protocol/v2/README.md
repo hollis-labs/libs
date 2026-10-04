@@ -203,9 +203,8 @@ opposite-direction id=1, immediate/out-of-order replies and invalid correlated
 results/errors. Runtime fixtures separately prove replies during pending Init
 and cleanup. These are engine evidence, not negotiated reverse support or child
 interoperability evidence. Production still declines reverse acknowledgement;
-there is no public arbitrary-method host caller. Admission scheduling,
-cancellation/deadline policy, author helpers and negotiated activation belong to
-later slices.
+there is no public arbitrary-method host caller. Author helpers and negotiated
+activation belong to later slices.
 
 The writer has separate ordinary and reply/control lanes. Each defaults to
 32 queued frames AND 8 MiB queued bytes, including frame delimiters. Total
@@ -220,9 +219,10 @@ served before an eligible ordinary frame.
 Internal terminal credits reserve one frame and 1,024 bytes before handler
 execution. A terminal publication atomically replaces its credit with actual
 bytes; a too-large replacement keeps the credit available for a bounded
-classified fallback. The credit cannot be published twice. The next admission
-slice wires these credits to the 16/8/2 handler limits, request cancellation and
-deadlines; this writer slice alone does not advertise those policies or an
-optional profile. `protocol/v2/fixtures/duplex-saturation.json` is a shared
+classified fallback. The credit cannot be published twice. Credits are wired to the 16/8/2 admission
+limits, cancellation and explicit
+budgets, as described in [Admission, cancellation and deadlines](control.md).
+They do not acknowledge an optional reverse profile.
+`protocol/v2/fixtures/duplex-saturation.json` is a shared
 internal-engine recipe for lane saturation, terminal reservation and sustained
 control fairness at both endpoints. Its small queue limits are fixture-only.

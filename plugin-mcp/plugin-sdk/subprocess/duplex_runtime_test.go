@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const duplexLogParams = `{"grant_id":"g","context":{"binding_id":"b","timeout_ms":1,"parent_call":{"request_owner":"host","id":1}},"level":"info","message":"ready"}`
+const duplexLogParams = `{"grant_id":"g","context":{"binding_id":"b","timeout_ms":10000,"parent_call":{"request_owner":"host","id":1}},"level":"info","message":"ready"}`
 
 type duplexRig struct {
 	send  func(string)
@@ -70,7 +70,7 @@ func TestSharedDuplexRuntimeRecipe(t *testing.T) {
 	}
 	for _, v := range corpus.Runtime {
 		t.Run(v.Name, func(t *testing.T) {
-			c := newCorrelation(v.Directional)
+			c := newFixtureCorrelation(v.Directional)
 			p := &shutdownPlugin{}
 			var initialized atomic.Bool
 			var healths, unloads atomic.Int32
@@ -156,7 +156,7 @@ func assertJSONSubset(t *testing.T, actualRaw, expectedRaw []byte) {
 	}
 }
 func TestDuplexEOFCompletesPending(t *testing.T) {
-	c := newCorrelation(true)
+	c := newFixtureCorrelation(true)
 	completed := make(chan error, 1)
 	p := &shutdownPlugin{initFn: func(context.Context, InitParams) (InitResult, error) {
 		ch, err := c.call("host/log", json.RawMessage(duplexLogParams))
@@ -187,7 +187,7 @@ func TestBaseDuplicateLiveRequestFences(t *testing.T) {
 		<-ctx.Done()
 		return CommandResult{}, ctx.Err()
 	}}
-	r := newDuplexRig(t, p, newCorrelation(false))
+	r := newDuplexRig(t, p, newFixtureCorrelation(false))
 	r.send(initLine(t, 8000))
 	r.read()
 	request := `{"jsonrpc":"2.0","id":"live","method":"command/execute","params":{"name":"hold","args":"","session_id":""}}`
@@ -218,7 +218,7 @@ func TestPublicationReceiptOwnsInboundLifetime(t *testing.T) {
 	output := receiptTestWriter{make(chan struct{}), make(chan struct{})}
 	w := newFrameWriter(output, time.Second, func() {})
 	defer w.abort(errConnectionClosed)
-	c := newCorrelation(false)
+	c := newFixtureCorrelation(false)
 	if err := c.admit(StringID("held")); err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestUnloadKeepsAdmissionSnapshotWhileInitFinishes(t *testing.T) {
 		return p.basePlugin.Init(ctx, v)
 	}
 	p.unloadFn = func(context.Context) error { unloads.Add(1); return nil }
-	r := newDuplexRig(t, p, newCorrelation(false))
+	r := newDuplexRig(t, p, newFixtureCorrelation(false))
 	r.send(initLine(t, 1))
 	<-started
 	r.send(`{"jsonrpc":"2.0","id":2,"method":"plugin/unload"}`)
