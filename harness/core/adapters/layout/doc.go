@@ -1,6 +1,6 @@
 // Package layout retains the legacy discovery table during migration.
 // The final authored provider layout plan-field table lives permanently in
-// adapters/layout/plan. At S7 this root table is deleted; the root retains
+// adapters/layout/plan. At the planned removal of the legacy table this root table is deleted; the root retains
 // the generator and generated exports and may re-export the new API.
 // Existing generated files continue to describe legacy behavior until cutover.
 //

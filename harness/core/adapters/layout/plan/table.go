@@ -1,13 +1,12 @@
 package plan
 
 import (
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 const discovery = "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv"
 const exclusive = "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv"
-const adr = "ADR 0056"
+const placementEvidence = "adapters/layout/plan/doc.go"
 
 // rows is the sole authored plan-field placement table. Helper constructors
 // fill mechanical defaults only; every path and semantic selector is here.
@@ -16,14 +15,14 @@ var rows = buildTable()
 func buildTable() []Row {
 	var out []Row
 	add := func(p runtimes.ID, l Layer, f Field, c, path, renderer string, form Form, bits uint32, e Evidence) {
-		root := layout.RootBoot
+		root := RootBoot
 		if l == Installed {
-			root = layout.RootHome
+			root = RootHome
 		}
 		out = append(out, Row{Provider: p, Layer: l, Field: f, Concern: c, Root: root, Path: path, Form: form, ModeBits: bits, Renderer: renderer, Capability: Supported, Evidence: e, Locator: locator(p, l)})
 	}
 	obs := func(ids ...string) Evidence { return Evidence{Reference: discovery, Observations: ids} }
-	source := func(note string) Evidence { return Evidence{Reference: adr, Note: note} }
+	source := func(note string) Evidence { return Evidence{Reference: placementEvidence, Note: note} }
 	claude := runtimes.Claude
 	codex := runtimes.Codex
 	oc := runtimes.OpenCode
@@ -51,7 +50,7 @@ func buildTable() []Row {
 			}
 		}
 		r.Mode = runtimes.ModeSubprocessPerTurn
-		r.Variant = layout.VariantBare
+		r.Variant = VariantBare
 		switch f {
 		case Instructions:
 			r.Locator.Argv = []string{"--append-system-prompt-file", "{path}", "--add-dir", "{P}"}
@@ -134,7 +133,7 @@ func buildTable() []Row {
 		}
 		if r.Provider == oc {
 			r.Mode = runtimes.ModeSubprocessPerTurn
-			r.Locator.Argv = []string{"--agent", "{agent}", "--dir", "{P}"}
+			r.Locator.Argv = []string{"run", "--agent", "{agent}", "--dir", "{P}"}
 			out = append(out, r.clone())
 			r.Mode = runtimes.ModeHTTPSSE
 			r.Locator.Argv = []string{"serve", "--hostname", "127.0.0.1"}
@@ -143,6 +142,16 @@ func buildTable() []Row {
 		}
 	}
 	for i := range out {
+		if out[i].Form == Link || out[i].Form == RuntimeBinding {
+			out[i].Locator = Locator{}
+		}
+		if out[i].Concern == "native-config" || out[i].Form == Slot {
+			out[i].Composition = out[i].Renderer
+		}
+		if out[i].Field == Commands || out[i].Field == Prompts {
+			out[i].Composition = "claude-command-pack"
+		}
+
 		if out[i].Form == Link {
 			out[i].CredentialPolicy = LinkOnlyNeverWrite
 		}
@@ -161,12 +170,59 @@ func locator(p runtimes.ID, l Layer) Locator {
 	}
 	switch p {
 	case runtimes.Claude:
-		return Locator{CWD: layout.RootBoot, Argv: []string{"--add-dir", "{P}"}}
+		return Locator{CWD: RootBoot, Argv: []string{"--add-dir", "{P}"}}
 	case runtimes.Codex:
-		return Locator{CWD: layout.RootBoot, Env: map[string]layout.Root{"CODEX_HOME": layout.RootBoot}}
+		return Locator{CWD: RootBoot, Env: map[string]Root{"CODEX_HOME": RootBoot}}
 	case runtimes.OpenCode:
-		return Locator{CWD: layout.RootProject, Env: map[string]layout.Root{"OPENCODE_CONFIG_DIR": layout.RootBoot}}
+		return Locator{CWD: RootProject, Env: map[string]Root{"OPENCODE_CONFIG_DIR": RootBoot}}
 	default:
-		return Locator{CWD: layout.RootBoot, Argv: []string{"--add-dir", "{P}"}}
+		return Locator{CWD: RootBoot, Argv: []string{"--add-dir", "{P}"}}
 	}
+}
+
+// The support and refusal selectors are authored beside the placement rows.
+// Empty refusal selectors match any value; ordered explicit refusals precede
+// positive shape lookup. Generic unknown-shape reasons are data here too.
+type shapeSupport struct {
+	Provider runtimes.ID
+	Layer    Layer
+	Mode     runtimes.Mode
+	Variant  Variant
+}
+
+var supportedShapes = []shapeSupport{
+	{runtimes.Claude, Boot, runtimes.ModeStreamingStdio, ""},
+	{runtimes.Claude, Boot, runtimes.ModeSubprocessPerTurn, ""},
+	{runtimes.Claude, Boot, runtimes.ModePTY, ""},
+	{runtimes.Claude, Boot, runtimes.ModeSubprocessPerTurn, VariantBare},
+	{runtimes.Codex, Boot, runtimes.ModeSubprocessPerTurn, ""},
+	{runtimes.Codex, Boot, runtimes.ModeJSONRPCStdio, ""},
+	{runtimes.OpenCode, Boot, runtimes.ModeSubprocessPerTurn, ""},
+	{runtimes.OpenCode, Boot, runtimes.ModeHTTPSSE, ""},
+	{runtimes.Antigravity, Boot, runtimes.ModeSubprocessPerTurn, ""},
+	{runtimes.Claude, Installed, InstallMode, ""},
+	{runtimes.Codex, Installed, InstallMode, ""},
+}
+
+type refusalRow struct {
+	Provider     runtimes.ID
+	Layer        Layer
+	Mode         runtimes.Mode
+	Code, Reason string
+}
+
+var refusals = []refusalRow{
+	{Mode: runtimes.ModeACPStdio, Code: "unsupported_runtime", Reason: "ACP transport projection is deferred"},
+	{Mode: runtimes.ModeACPTCP, Code: "unsupported_runtime", Reason: "ACP transport projection is deferred"},
+	{Provider: runtimes.Copilot, Code: "unsupported_runtime", Reason: "this runtime is ACP-only; ACP projection is deferred"},
+	{Provider: runtimes.Pi, Code: "unsupported_runtime", Reason: "this runtime is ACP-only; ACP projection is deferred"},
+	{Provider: "gemini", Code: "unsupported_provider", Reason: "Gemini is unsupported and is not an Antigravity alias"},
+	{Provider: runtimes.OpenCode, Layer: Installed, Code: "unsupported_layer", Reason: "OpenCode installation is deferred"},
+	{Provider: runtimes.Antigravity, Layer: Installed, Code: "unsupported_layer", Reason: "Antigravity installation is deferred"},
+}
+var refusalReasons = map[string]string{
+	"unsupported_provider": "provider has no authored projection rows",
+	"unsupported_layer":    "layer has no authored support for this provider",
+	"unsupported_runtime":  "transport has no authored support for this provider and layer",
+	"unsupported_variant":  "variant has no authored support in this transport",
 }

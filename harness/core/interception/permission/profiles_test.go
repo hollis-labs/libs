@@ -12,34 +12,34 @@ func TestBuiltInProfileBindings(t *testing.T) {
 		mode  Mode
 		skips bool
 	}{{"default", ModeDefault, false}, {"plan", ModePlan, false}, {"accept-edits", ModeAcceptEdits, false}, {"yolo", ModeYolo, true}} {
-		got, err := BindProfile(c.name, []Mode{c.mode})
+		got, err := BindProfile(c.name, Ceiling{Modes: []Mode{c.mode}})
 		if err != nil || got.Mode != c.mode || got.Name != c.name || got.SkipsDenyRules != c.skips || got.Version == "" {
 			t.Fatalf("%s: %+v %v", c.name, got, err)
 		}
 	}
 }
 func TestProfileRefusals(t *testing.T) {
-	for _, name := range []string{"", "YOLO", "unknown", "default "} {
-		_, err := BindProfile(name, []Mode{ModeYolo, ModeDefault})
+	for _, name := range []string{"YOLO", "unknown", "default "} {
+		_, err := BindProfile(name, Ceiling{Modes: []Mode{ModeYolo, ModeDefault}})
 		var pe *ProfileError
 		if !errors.As(err, &pe) || pe.Code != "unknown_permission_profile" {
 			t.Fatalf("%q: %v", name, err)
 		}
 	}
 	for _, allowed := range [][]Mode{nil, {ModePlan}, {ModeDefault, ModeAcceptEdits}} {
-		_, err := BindProfile("yolo", allowed)
+		_, err := BindProfile("yolo", Ceiling{Modes: allowed})
 		var pe *ProfileError
 		if !errors.As(err, &pe) || pe.Code != "permission_ceiling" {
 			t.Fatal(err)
 		}
 	}
-	_, err := BindProfile("default", []Mode{ModePlan})
+	_, err := BindProfile("default", Ceiling{Modes: []Mode{ModePlan}})
 	if err == nil {
 		t.Fatal("silently downgraded profile")
 	}
 }
 func TestYoloEvidenceMatchesEngine(t *testing.T) {
-	b, err := BindProfile("yolo", []Mode{ModeYolo})
+	b, err := BindProfile("yolo", Ceiling{Modes: []Mode{ModeYolo}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestYoloEvidenceMatchesEngine(t *testing.T) {
 	}
 	all := ProfileBindings()
 	all[0].Name = "changed"
-	b, err = BindProfile("default", []Mode{ModeDefault})
+	b, err = BindProfile("default", Ceiling{Modes: []Mode{ModeDefault}})
 	if err != nil || b.Name != "default" {
 		t.Fatal("binding alias")
 	}

@@ -2,11 +2,11 @@ package plan
 
 import (
 	"fmt"
+	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"path"
 	"regexp"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
@@ -26,7 +26,7 @@ func Find(k Key) (Row, error) { return FindIn(rows, k) }
 // FindIn supports validation and lookup of explicitly authored table extensions.
 // Call Validate before accepting such a table. Lookup still rejects ambiguities.
 func FindIn(table []Row, k Key) (Row, error) {
-	if err := validateKey(k); err != nil {
+	if err := validateKey(table, k); err != nil {
 		return Row{}, err
 	}
 	best := -1
@@ -66,9 +66,9 @@ func FindIn(table []Row, k Key) (Row, error) {
 
 // For selects every concern for a supported provider/layer/shape. Unsupported
 // rows remain visible to Resolve; this is not an assertion of feature support.
-func For(provider runtimes.ID, layer Layer, mode runtimes.Mode, variant layout.Variant) ([]Row, error) {
+func For(provider runtimes.ID, layer Layer, mode runtimes.Mode, variant Variant) ([]Row, error) {
 	k := Key{Provider: provider, Layer: layer, Mode: mode, Variant: variant, Field: Instructions}
-	if err := validateKey(k); err != nil {
+	if err := validateKey(rows, k); err != nil {
 		return nil, err
 	}
 	var out []Row
@@ -87,62 +87,74 @@ func For(provider runtimes.ID, layer Layer, mode runtimes.Mode, variant layout.V
 	}
 	return out, nil
 }
-func validateKey(k Key) error {
-	switch k.Provider {
-	case runtimes.Claude, runtimes.Codex, runtimes.OpenCode, runtimes.Antigravity:
-	default:
-		return diagnostic(k, "unsupported_provider", "provider is outside Wave 1 (Gemini is not Antigravity)")
+func validateKey(table []Row, k Key) error {
+	for _, r := range refusals {
+		if (r.Provider == "" || r.Provider == k.Provider) && (r.Layer == "" || r.Layer == k.Layer) && (r.Mode == "" || r.Mode == k.Mode) {
+			return diagnostic(k, r.Code, r.Reason)
+		}
 	}
-	if k.Mode.ACP() {
-		return diagnostic(k, "unsupported_runtime", "ACP is deferred")
+	provider, layer, mode, variant := false, false, false, false
+	for _, r := range table {
+		if r.Provider == k.Provider {
+			provider = true
+			break
+		}
 	}
-	if k.Layer == Installed {
-		if k.Provider != runtimes.Claude && k.Provider != runtimes.Codex {
-			return diagnostic(k, "unsupported_layer", "installed projection is unsupported")
+	if !provider {
+		return refusal(k, "unsupported_provider")
+	}
+	for _, s := range supportedShapes {
+		if s.Provider != k.Provider {
+			continue
 		}
-		if k.Mode != InstallMode || k.Variant != "" {
-			return diagnostic(k, "unsupported_runtime", "installed rows require the install operation")
+		if s.Layer != k.Layer {
+			continue
 		}
-	} else if k.Layer == Boot {
-		valid := false
-		switch k.Provider {
-		case runtimes.Claude:
-			valid = k.Mode == runtimes.ModeStreamingStdio || k.Mode == runtimes.ModeSubprocessPerTurn || k.Mode == runtimes.ModePTY
-		case runtimes.Codex:
-			valid = k.Mode == runtimes.ModeSubprocessPerTurn || k.Mode == runtimes.ModeJSONRPCStdio
-		case runtimes.OpenCode:
-			valid = k.Mode == runtimes.ModeSubprocessPerTurn || k.Mode == runtimes.ModeHTTPSSE
-		case runtimes.Antigravity:
-			valid = k.Mode == runtimes.ModeSubprocessPerTurn
+		layer = true
+		if s.Mode != k.Mode {
+			continue
 		}
-		if !valid {
-			return diagnostic(k, "unsupported_runtime", "provider does not support this Wave-1 transport")
+		mode = true
+		if s.Variant == k.Variant {
+			variant = true
 		}
-		if k.Variant != "" && !(k.Provider == runtimes.Claude && k.Mode == runtimes.ModeSubprocessPerTurn && k.Variant == layout.VariantBare) {
-			return diagnostic(k, "unsupported_variant", "variant is not supported in this transport")
-		}
-	} else {
-		return diagnostic(k, "unsupported_layer", "unknown layout layer")
+	}
+	if !layer {
+		return refusal(k, "unsupported_layer")
+	}
+	if !mode {
+		return refusal(k, "unsupported_runtime")
+	}
+	if !variant {
+		return refusal(k, "unsupported_variant")
 	}
 	if _, ok := Sources(k.Field); !ok {
 		return diagnostic(k, "unknown_plan_field", "plan field is not registered")
 	}
 	return nil
 }
+func refusal(k Key, code string) error { return diagnostic(k, code, refusalReasons[code]) }
 
-// Request distinguishes optional content from hard requirements. Permission
-// requests refuse an unmapped posture; optional mappings yield a named omission.
-// Required MCP exclusivity always refuses where unsupported, never downgrades.
 // PostureLookup is injected by the compiler (normally registry PostureFor).
 // It checks representability without making this leaf depend on the registry.
 // It must return an error for an unmapped explicit posture, never cast strings.
-type PostureLookup func(runtimes.ID, string, runtimes.Mode) error
+type PostureLookup func(runtimes.ID, permission.Mode, runtimes.Mode) error
 
+// Requirement makes optionality explicit; the zero value is invalid.
+type Requirement string
+
+const (
+	Required Requirement = "required"
+	Optional Requirement = "optional"
+)
+
+// Request requires explicit optionality. Unmapped required posture refuses;
+// optional mappings yield named omissions. MCP exclusivity never downgrades.
 type Request struct {
-	PostureID     string
+	Posture       permission.Mode
 	LookupPosture PostureLookup
 	Key           Key
-	Required      bool
+	Requirement   Requirement
 	ExclusiveMCP  bool
 	Components    map[string]string
 }
@@ -154,6 +166,9 @@ type Resolution struct {
 }
 
 func Resolve(req Request) (Resolution, error) {
+	if req.Requirement != Required && req.Requirement != Optional {
+		return Resolution{}, diagnostic(req.Key, "invalid_request", "requirement must be explicitly required or optional")
+	}
 	r, err := Find(req.Key)
 	if err != nil {
 		d, ok := err.(*Diagnostic)
@@ -177,12 +192,12 @@ func Resolve(req Request) (Resolution, error) {
 		}
 	}
 	if r.Posture != nil {
-		r.Posture.PostureID = req.PostureID
-		if req.PostureID != "" {
+		r.Posture.Posture = req.Posture
+		if req.Posture != "" {
 			if req.LookupPosture == nil {
 				return Resolution{}, diagnostic(req.Key, "unresolved_runtime_binding", "explicit posture needs a registry lookup")
 			}
-			if err := req.LookupPosture(r.Provider, req.PostureID, req.Key.Mode); err != nil {
+			if err := req.LookupPosture(r.Provider, req.Posture, req.Key.Mode); err != nil {
 				return unavailable(req, "runtime posture is not mapped by the registry")
 			}
 		}
@@ -201,7 +216,7 @@ func unavailable(req Request, reason string) (Resolution, error) {
 	if reason == "" {
 		reason = "feature is not projected"
 	}
-	if req.Required || req.ExclusiveMCP {
+	if req.Requirement == Required || req.ExclusiveMCP {
 		return Resolution{}, diagnostic(req.Key, "unsupported_feature", reason)
 	}
 	return Resolution{Omission: diagnostic(req.Key, "omitted_"+string(req.Key.Field), reason)}, nil
@@ -256,6 +271,7 @@ func validatePattern(p string) error {
 // levels, so equal specificity overlaps necessarily duplicate the same key.
 func Validate(table []Row) error {
 	seen := map[Key]bool{}
+	var checked []Row
 	for _, r := range table {
 		k := Key{r.Provider, r.Layer, r.Mode, r.Variant, r.Field}
 		if seen[k] {
@@ -275,10 +291,10 @@ func Validate(table []Row) error {
 		}
 		check := k
 		check.Mode = mode
-		if err := validateKey(check); err != nil {
+		if err := validateKey(table, check); err != nil {
 			return err
 		}
-		if r.Root != layout.RootBoot && r.Root != layout.RootHome && r.Root != layout.RootProject {
+		if r.Root != RootBoot && r.Root != RootHome && r.Root != RootProject {
 			return diagnostic(k, "invalid_layout", "unknown placement root")
 		}
 		if err := validatePattern(r.Path); err != nil {
@@ -307,18 +323,27 @@ func Validate(table []Row) error {
 		if r.Form == RuntimeBinding && (r.Path != "" || r.ModeBits != 0 || r.Renderer != "" || r.Posture == nil) {
 			return diagnostic(k, "invalid_layout", "runtime binding has no native file or renderer")
 		}
-		if r.Posture != nil && (r.Posture.Provider != r.Provider || r.Posture.Mapper != "adapters/registry.Descriptor.PostureFor" || r.Posture.PostureID != "") {
+		if r.Posture != nil && (r.Posture.Provider != r.Provider || r.Posture.Mapper != "adapters/registry.Descriptor.PostureFor" || r.Posture.Posture != "") {
 			return diagnostic(k, "invalid_layout", "invalid authored runtime posture reference")
 		}
 		if r.Form == Slot && r.DocumentSlot == "" {
 			return diagnostic(k, "invalid_layout", "document slot required")
 		}
-		if (r.Field == MCP || r.Field == Credentials || r.Concern == "native-config" && r.Field != PlantingPlugin) && r.ModeBits != 0600 {
+		if (r.Field == MCP || r.Field == Credentials || credentialPath(r.Path) || r.Concern == "native-config" && r.Field != PlantingPlugin) && r.ModeBits != 0600 {
 			return diagnostic(k, "invalid_layout", "config carrying MCP or credentials requires 0600")
 		}
-		if r.Field == Credentials && (r.Form != Link || r.CredentialPolicy != LinkOnlyNeverWrite) {
+		if (r.Field == Credentials || credentialPath(r.Path)) && (r.Form != Link || r.CredentialPolicy != LinkOnlyNeverWrite) {
 			return diagnostic(k, "invalid_layout", "credentials must be link effects")
 		}
+		if (r.Form == Link || r.Form == RuntimeBinding) && !emptyLocator(r.Locator) {
+			return diagnostic(k, "invalid_layout", "link and runtime-binding rows cannot carry launch locators")
+		}
+		for _, prior := range checked {
+			if sameDestination(prior, r) && prior.Field != r.Field && (prior.Composition == "" || prior.Composition != r.Composition || prior.Renderer != r.Renderer || prior.ModeBits != r.ModeBits) {
+				return diagnostic(k, "path_collision", "shared destination requires explicit serializer composition")
+			}
+		}
+		checked = append(checked, r)
 		if r.Locator.CWD != "" && !validRoot(r.Locator.CWD) {
 			return diagnostic(k, "invalid_layout", "invalid cwd root")
 		}
@@ -345,8 +370,8 @@ func Validate(table []Row) error {
 var envName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 var literalToken = regexp.MustCompile(`^[A-Za-z0-9_./:=+-]+$`)
 
-func validRoot(r layout.Root) bool {
-	return r == layout.RootBoot || r == layout.RootHome || r == layout.RootProject
+func validRoot(r Root) bool {
+	return r == RootBoot || r == RootHome || r == RootProject
 }
 func validToken(s string) bool {
 	switch s {
@@ -354,4 +379,18 @@ func validToken(s string) bool {
 		return true
 	}
 	return literalToken.MatchString(s)
+}
+
+func credentialPath(p string) bool {
+	switch path.Base(p) {
+	case "auth.json", ".credentials.json", "oauth_creds.json":
+		return true
+	}
+	return false
+}
+func emptyLocator(l Locator) bool {
+	return len(l.Argv) == 0 && len(l.Env) == 0 && l.CWD == "" && l.RPCProject == "" && !l.BeforeResume
+}
+func sameDestination(a, b Row) bool {
+	return a.Path != "" && a.Provider == b.Provider && a.Layer == b.Layer && a.Root == b.Root && a.Path == b.Path && (a.Mode == "" || b.Mode == "" || a.Mode == b.Mode) && (a.Variant == "" || b.Variant == "" || a.Variant == b.Variant)
 }

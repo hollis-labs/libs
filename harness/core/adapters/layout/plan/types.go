@@ -2,12 +2,27 @@ package plan
 
 import (
 	"fmt"
+	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"maps"
 	"slices"
+	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
+
+// Root is a logical placement root, resolved by the host.
+type Root string
+
+const (
+	RootBoot    Root = "boot"
+	RootProject Root = "project"
+	RootHome    Root = "home"
+)
+
+// Variant is a discovery-changing launch option within one transport.
+type Variant string
+
+const VariantBare Variant = "bare"
 
 type Layer string
 
@@ -42,7 +57,9 @@ const (
 
 // Sources maps semantic inputs to the closed agentdef v2 content channels once.
 // Empty means host input. Content registrations use pinned resources, not fields
-// added to agentdef. Returned slices can be changed by the caller.
+// added to agentdef. MCP sources name requested tool capabilities only; actual
+// MCP endpoints, commands and secrets come from explicit host bindings.
+// Returned slices can be changed by the caller.
 func Sources(f Field) ([]string, bool) {
 	s, ok := fieldSources[f]
 	return slices.Clone(s), ok
@@ -86,19 +103,19 @@ const (
 // Locator carries tokens only. B/P/H and {path}/{agent} remain typed templates
 // for the launch binder. RPC project parameters must never become spawn flags.
 type Locator struct {
-	Argv         []string               `json:"argv,omitempty"`
-	Env          map[string]layout.Root `json:"env,omitempty"`
-	CWD          layout.Root            `json:"cwd,omitempty"`
-	RPCProject   string                 `json:"rpc_project,omitempty"`
-	BeforeResume bool                   `json:"before_resume,omitempty"`
+	Argv         []string        `json:"argv,omitempty"`
+	Env          map[string]Root `json:"env,omitempty"`
+	CWD          Root            `json:"cwd,omitempty"`
+	RPCProject   string          `json:"rpc_project,omitempty"`
+	BeforeResume bool            `json:"before_resume,omitempty"`
 }
 
 // PostureReference names the existing runtime mapper, without owning its argv/env.
-// PostureID is supplied explicitly after D4 binding; empty means absent.
+// Posture is supplied explicitly after profile binding; empty means absent.
 type PostureReference struct {
-	Provider  runtimes.ID
-	Mapper    string
-	PostureID string
+	Provider runtimes.ID
+	Mapper   string
+	Posture  permission.Mode
 }
 
 type Evidence struct {
@@ -115,15 +132,17 @@ type CredentialPolicy string
 const LinkOnlyNeverWrite CredentialPolicy = "link-only-never-write"
 
 type Row struct {
+	// Composition explicitly authorizes concerns to share one serializer-owned document.
+	Composition      string            `json:"composition,omitempty"`
 	CredentialPolicy CredentialPolicy  `json:"credential_policy,omitempty"`
 	Posture          *PostureReference `json:"posture,omitempty"`
 	Provider         runtimes.ID       `json:"provider"`
 	Layer            Layer             `json:"layer"`
 	Mode             runtimes.Mode     `json:"mode,omitempty"`
-	Variant          layout.Variant    `json:"variant,omitempty"`
+	Variant          Variant           `json:"variant,omitempty"`
 	Field            Field             `json:"field"`
 	Concern          string            `json:"concern"`
-	Root             layout.Root       `json:"root"`
+	Root             Root              `json:"root"`
 	Path             string            `json:"path,omitempty"`
 	Form             Form              `json:"form"`
 	ModeBits         uint32            `json:"mode_bits"`
@@ -151,7 +170,7 @@ type Key struct {
 	Provider runtimes.ID
 	Layer    Layer
 	Mode     runtimes.Mode
-	Variant  layout.Variant
+	Variant  Variant
 	Field    Field
 }
 
@@ -174,8 +193,10 @@ func diagnostic(k Key, code, reason string) *Diagnostic {
 }
 
 // NormalizeProvider is called once by the plan compiler. Lookup requires the
-// canonical ID and deliberately does not normalize again.
+// canonical ID and deliberately does not normalize again. Aliases also live in
+// the registry until their planned unification.
 func NormalizeProvider(id runtimes.ID) runtimes.ID {
+	id = runtimes.ID(strings.ToLower(strings.TrimSpace(string(id))))
 	switch id {
 	case "agy":
 		return runtimes.Antigravity

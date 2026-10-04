@@ -2,7 +2,8 @@ package plan
 
 import (
 	"errors"
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/substrate/harness/interception/permission"
+
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	"testing"
 )
@@ -91,9 +92,9 @@ func TestWaveOnePlacements(t *testing.T) {
 			if r.Path != c.path || r.Form != c.form || r.ModeBits != c.bits || r.DocumentSlot != c.slot {
 				t.Fatalf("unexpected row: %+v", r)
 			}
-			root := layout.RootBoot
+			root := RootBoot
 			if c.l == Installed {
-				root = layout.RootHome
+				root = RootHome
 			}
 			if r.Root != root {
 				t.Fatalf("root %s", r.Root)
@@ -110,7 +111,7 @@ func TestWaveOnePlacements(t *testing.T) {
 func TestLocators(t *testing.T) {
 	k := key(runtimes.Codex, Settings)
 	r, _ := Find(k)
-	if r.Locator.Argv[0] != "--cd" || !r.Locator.BeforeResume || r.Locator.Env["CODEX_HOME"] != layout.RootBoot {
+	if r.Locator.Argv[0] != "--cd" || !r.Locator.BeforeResume || r.Locator.Env["CODEX_HOME"] != RootBoot {
 		t.Fatalf("exec: %+v", r)
 	}
 	k.Mode = runtimes.ModeJSONRPCStdio
@@ -120,7 +121,7 @@ func TestLocators(t *testing.T) {
 	}
 	k = key(runtimes.OpenCode, Instructions)
 	r, _ = Find(k)
-	if r.Locator.CWD != layout.RootProject || r.Locator.Argv[0] != "--agent" || r.Locator.Env["OPENCODE_CONFIG_DIR"] != layout.RootBoot {
+	if r.Locator.CWD != RootProject || r.Locator.Argv[0] != "run" || r.Locator.Env["OPENCODE_CONFIG_DIR"] != RootBoot {
 		t.Fatalf("OpenCode %+v", r)
 	}
 	k.Mode = runtimes.ModeHTTPSSE
@@ -130,7 +131,7 @@ func TestLocators(t *testing.T) {
 	}
 	for _, f := range []Field{Instructions, Settings, Skills} {
 		k = key(runtimes.Claude, f)
-		k.Variant = layout.VariantBare
+		k.Variant = VariantBare
 		r, err := Find(k)
 		if err != nil || len(r.Locator.Argv) == 0 {
 			t.Fatalf("bare %s: %+v %v", f, r, err)
@@ -145,7 +146,7 @@ func TestPrecedenceAndAmbiguity(t *testing.T) {
 	mode.Mode = runtimes.ModeSubprocessPerTurn
 	mode.Renderer = "mode"
 	variant := mode
-	variant.Variant = layout.VariantBare
+	variant.Variant = VariantBare
 	variant.Renderer = "variant"
 	table := []Row{base, mode, variant}
 	k := key(runtimes.Claude, Instructions)
@@ -153,7 +154,7 @@ func TestPrecedenceAndAmbiguity(t *testing.T) {
 	if err != nil || got.Renderer != "mode" {
 		t.Fatal(got, err)
 	}
-	k.Variant = layout.VariantBare
+	k.Variant = VariantBare
 	got, err = FindIn(table, k)
 	if err != nil || got.Renderer != "variant" {
 		t.Fatal(got, err)
@@ -166,7 +167,7 @@ func TestPrecedenceAndAmbiguity(t *testing.T) {
 	}
 	code(t, Validate(append(table, variant)), "duplicate_layout")
 	k.Mode = runtimes.ModeSubprocessPerTurn
-	k.Variant = layout.VariantBare
+	k.Variant = VariantBare
 	_, err = FindIn(append(table, variant), k)
 	code(t, err, "ambiguous_layout")
 	got, err = FindIn([]Row{base, base, variant}, k)
@@ -189,11 +190,11 @@ func TestRefusals(t *testing.T) {
 		{Key{runtimes.Claude, "other", runtimes.ModeSubprocessPerTurn, "", Instructions}, "unsupported_layer"},
 		{Key{runtimes.Codex, Installed, runtimes.ModeSubprocessPerTurn, "", Instructions}, "unsupported_runtime"},
 		{Key{runtimes.Claude, Boot, runtimes.ModeJSONRPCStdio, "", Instructions}, "unsupported_runtime"},
-		{Key{runtimes.Claude, Boot, runtimes.ModeStreamingStdio, layout.VariantBare, Instructions}, "unsupported_variant"},
+		{Key{runtimes.Claude, Boot, runtimes.ModeStreamingStdio, VariantBare, Instructions}, "unsupported_variant"},
 		{key(runtimes.Claude, "invented"), "unknown_plan_field"},
 	}
 	for _, c := range cases {
-		_, err := Resolve(Request{Key: c.k})
+		_, err := Resolve(Request{Requirement: Optional, Key: c.k})
 		code(t, err, c.c)
 		var d *Diagnostic
 		errors.As(err, &d)
@@ -206,27 +207,27 @@ func TestRefusals(t *testing.T) {
 	}
 	for _, f := range []Field{Hooks, Subagents, Prompts, Resources} {
 		k := key(runtimes.Codex, f)
-		_, err := Resolve(Request{Key: k, Required: true})
+		_, err := Resolve(Request{Key: k, Requirement: Required})
 		code(t, err, "unsupported_feature")
-		res, err := Resolve(Request{Key: k})
+		res, err := Resolve(Request{Requirement: Optional, Key: k})
 		if err != nil || res.Omission == nil || res.Omission.Code != "omitted_"+string(f) {
 			t.Fatal(res, err)
 		}
 	}
-	_, err := Resolve(Request{Key: key(runtimes.Antigravity, Permissions), Required: true, PostureID: "unknown", LookupPosture: func(runtimes.ID, string, runtimes.Mode) error { return errors.New("unmapped") }})
+	_, err := Resolve(Request{Key: key(runtimes.Antigravity, Permissions), Requirement: Required, Posture: "unknown", LookupPosture: func(runtimes.ID, permission.Mode, runtimes.Mode) error { return errors.New("unmapped") }})
 	code(t, err, "unsupported_feature")
 	for _, p := range []runtimes.ID{runtimes.OpenCode, runtimes.Antigravity} {
-		_, err := Resolve(Request{Key: key(p, MCP), ExclusiveMCP: true})
+		_, err := Resolve(Request{Requirement: Optional, Key: key(p, MCP), ExclusiveMCP: true})
 		code(t, err, "unsupported_mcp_exclusivity")
 	}
-	_, err = Resolve(Request{Key: key(runtimes.Claude, Settings), ExclusiveMCP: true})
+	_, err = Resolve(Request{Requirement: Optional, Key: key(runtimes.Claude, Settings), ExclusiveMCP: true})
 	code(t, err, "invalid_request")
-	res, err := Resolve(Request{Key: key(runtimes.Claude, MCP), ExclusiveMCP: true})
+	res, err := Resolve(Request{Requirement: Optional, Key: key(runtimes.Claude, MCP), ExclusiveMCP: true})
 	if err != nil || res.Row.Locator.Argv[len(res.Row.Locator.Argv)-1] != "--strict-mcp-config" {
 		t.Fatal(res, err)
 	}
-	res, err = Resolve(Request{Key: key(runtimes.Codex, MCP), ExclusiveMCP: true})
-	if err != nil || res.Row.Locator.Env["CODEX_HOME"] != layout.RootBoot {
+	res, err = Resolve(Request{Requirement: Optional, Key: key(runtimes.Codex, MCP), ExclusiveMCP: true})
+	if err != nil || res.Row.Locator.Env["CODEX_HOME"] != RootBoot {
 		t.Fatal(res, err)
 	}
 }
@@ -247,9 +248,9 @@ func TestPathSafety(t *testing.T) {
 	if err != nil || got != "agents/worker.md" {
 		t.Fatal(got, err)
 	}
-	_, err = Resolve(Request{Key: key(runtimes.Codex, Skills), Components: map[string]string{"name": "../escape"}})
+	_, err = Resolve(Request{Requirement: Optional, Key: key(runtimes.Codex, Skills), Components: map[string]string{"name": "../escape"}})
 	code(t, err, "invalid_component")
-	res, err := Resolve(Request{Key: key(runtimes.Codex, Skills), Components: map[string]string{"name": "safe"}})
+	res, err := Resolve(Request{Requirement: Optional, Key: key(runtimes.Codex, Skills), Components: map[string]string{"name": "safe"}})
 	if err != nil || res.Row.Path != "skills/safe/SKILL.md" {
 		t.Fatal(res, err)
 	}
@@ -259,16 +260,16 @@ func TestDetachedTableAndSources(t *testing.T) {
 	for i := range a {
 		a[i].Path = "changed"
 		if a[i].Locator.Env != nil {
-			a[i].Locator.Env["CODEX_HOME"] = layout.RootProject
+			a[i].Locator.Env["CODEX_HOME"] = RootProject
 		}
 		if len(a[i].Locator.Argv) > 0 {
 			a[i].Locator.Argv[0] = "changed"
 		}
 	}
 	r, _ := Find(key(runtimes.Codex, Settings))
-	r.Locator.Env["CODEX_HOME"] = layout.RootProject
+	r.Locator.Env["CODEX_HOME"] = RootProject
 	again, _ := Find(key(runtimes.Codex, Settings))
-	if again.Path != "config.toml" || again.Locator.Env["CODEX_HOME"] != layout.RootBoot {
+	if again.Path != "config.toml" || again.Locator.Env["CODEX_HOME"] != RootBoot {
 		t.Fatal("aliasing")
 	}
 	for _, f := range []Field{Commands, Subagents, Prompts} {
@@ -315,8 +316,8 @@ func TestInvalidRows(t *testing.T) {
 		{"shell-string", func(r *Row) { r.Locator.Argv = []string{"--mcp-config file; command"} }},
 		{"shell-expansion", func(r *Row) { r.Locator.Argv = []string{"$(command)"} }},
 		{"unknown-token", func(r *Row) { r.Locator.Argv = []string{"{unknown}"} }},
-		{"env-root", func(r *Row) { r.Locator.Env = map[string]layout.Root{"CONFIG": "other"} }},
-		{"env-name", func(r *Row) { r.Locator.Env = map[string]layout.Root{"bad name": layout.RootBoot} }},
+		{"env-root", func(r *Row) { r.Locator.Env = map[string]Root{"CONFIG": "other"} }},
+		{"env-name", func(r *Row) { r.Locator.Env = map[string]Root{"bad name": RootBoot} }},
 		{"cwd", func(r *Row) { r.Locator.CWD = "other" }},
 	}
 	for _, c := range cases {
@@ -327,20 +328,20 @@ func TestInvalidRows(t *testing.T) {
 func TestRuntimePermissionBindings(t *testing.T) {
 	for _, p := range []runtimes.ID{runtimes.Claude, runtimes.Codex, runtimes.OpenCode, runtimes.Antigravity} {
 		k := key(p, Permissions)
-		missing, err := Resolve(Request{Key: k})
-		if err != nil || missing.Row.Posture == nil || missing.Row.Posture.PostureID != "" {
+		missing, err := Resolve(Request{Requirement: Optional, Key: k})
+		if err != nil || missing.Row.Posture == nil || missing.Row.Posture.Posture != "" {
 			t.Fatal(missing, err)
 		}
 		calls := 0
-		lookup := func(provider runtimes.ID, posture string, mode runtimes.Mode) error {
+		lookup := func(provider runtimes.ID, posture permission.Mode, mode runtimes.Mode) error {
 			calls++
 			if provider != p || mode != k.Mode || posture != "plan" {
 				return errors.New("unmapped")
 			}
 			return nil
 		}
-		res, err := Resolve(Request{Key: k, Required: true, PostureID: "plan", LookupPosture: lookup})
-		if err != nil || calls != 1 || res.Row.Posture.PostureID != "plan" {
+		res, err := Resolve(Request{Key: k, Requirement: Required, Posture: "plan", LookupPosture: lookup})
+		if err != nil || calls != 1 || res.Row.Posture.Posture != "plan" {
 			t.Fatal(res, err)
 		}
 		if p == runtimes.Antigravity && (res.Row.Path != "" || res.Row.ModeBits != 0 || res.Row.Form != RuntimeBinding) {
@@ -349,13 +350,13 @@ func TestRuntimePermissionBindings(t *testing.T) {
 		if p == runtimes.OpenCode && (res.Row.Path != "opencode.json" || res.Row.DocumentSlot != "permission") {
 			t.Fatal(res)
 		}
-		_, err = Resolve(Request{Key: k, PostureID: "unknown", Required: true, LookupPosture: lookup})
+		_, err = Resolve(Request{Key: k, Posture: "unknown", Requirement: Required, LookupPosture: lookup})
 		code(t, err, "unsupported_feature")
-		res, err = Resolve(Request{Key: k, PostureID: "unknown", LookupPosture: lookup})
+		res, err = Resolve(Request{Requirement: Optional, Key: k, Posture: "unknown", LookupPosture: lookup})
 		if err != nil || res.Omission == nil || res.Omission.Code != "omitted_permissions" {
 			t.Fatal(res, err)
 		}
-		_, err = Resolve(Request{Key: k, PostureID: "plan"})
+		_, err = Resolve(Request{Requirement: Optional, Key: k, Posture: "plan"})
 		code(t, err, "unresolved_runtime_binding")
 	}
 }
@@ -370,7 +371,7 @@ func TestCredentialDestinationsNeverWrite(t *testing.T) {
 	for _, mode := range []runtimes.Mode{runtimes.ModeSubprocessPerTurn, runtimes.ModeJSONRPCStdio} {
 		k := key(runtimes.Codex, Credentials)
 		k.Mode = mode
-		res, err := Resolve(Request{Key: k, Required: true})
+		res, err := Resolve(Request{Key: k, Requirement: Required})
 		if err != nil {
 			t.Fatal(err)
 		}
