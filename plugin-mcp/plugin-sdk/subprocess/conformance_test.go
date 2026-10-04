@@ -21,14 +21,19 @@ import (
 // These fixtures exercise the real reader, dispatcher and writer. The fixture
 // plugin is deliberately deterministic and has the same recipe for every SDK.
 type transcript struct {
-	Status      string           `json:"status,omitempty"`
-	Finding     string           `json:"finding,omitempty"`
-	Profile     string           `json:"profile"`
-	Steps       []transcriptStep `json:"steps"`
-	Effects     map[string]int   `json:"effects,omitempty"`
-	Termination string           `json:"termination,omitempty"`
+	Level            string           `json:"level"`
+	Preferred        string           `json:"preferred,omitempty"`
+	UnavailableOwner string           `json:"unavailable_owner,omitempty"`
+	Status           string           `json:"status,omitempty"`
+	Finding          string           `json:"finding,omitempty"`
+	Profile          string           `json:"profile"`
+	Steps            []transcriptStep `json:"steps"`
+	Effects          map[string]int   `json:"effects,omitempty"`
+	Termination      string           `json:"termination,omitempty"`
 }
 type transcriptStep struct {
+	Level          string          `json:"level,omitempty"`
+	Preferred      string          `json:"preferred,omitempty"`
 	ExpectContains string          `json:"expect_contains,omitempty"`
 	CRLF           bool            `json:"crlf,omitempty"`
 	PadBytes       int             `json:"pad_bytes,omitempty"`
@@ -57,14 +62,14 @@ func TestProtocolTranscripts(t *testing.T) {
 			if err := json.Unmarshal(b, &fixture); err != nil {
 				t.Fatal(err)
 			}
-			if fixture.Status != "" && fixture.Status != "observed" && fixture.Status != "proposed" {
-				t.Fatalf("unknown status %q", fixture.Status)
+			if err := validateTranscriptMetadata(fixture); err != nil {
+				t.Fatal(err)
 			}
 			if fixture.Termination != "" && fixture.Termination != "frame-too-large" {
 				t.Fatalf("unknown termination %q", fixture.Termination)
 			}
 			if fixture.Status == "proposed" {
-				t.Skip("proposed, not v1-normative: " + fixture.Finding)
+				t.Skip(fixture.UnavailableOwner + ": " + fixture.Finding)
 			}
 			var p Plugin
 			switch fixture.Profile {
