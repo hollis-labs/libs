@@ -73,6 +73,8 @@ type frameWriter struct {
 	mu                sync.Mutex
 	ordinary, control writerLane
 	limits            QueueLimits
+	timeout           time.Duration
+	frameLimit        int
 	burst             int
 	activeBytes       int
 	activeTicket      *publicationTicket
@@ -87,7 +89,7 @@ func newFrameWriter(out io.Writer, timeout time.Duration, interrupt func()) *fra
 	return newFrameWriterWithLimits(out, timeout, interrupt, QueueLimits{DefaultQueueFrames, DefaultQueuedWriteBytes})
 }
 func newFrameWriterWithLimits(out io.Writer, timeout time.Duration, interrupt func(), limits QueueLimits) *frameWriter {
-	w := &frameWriter{limits: limits, wake: make(chan struct{}, 1), done: make(chan struct{}), aborted: make(chan struct{})}
+	w := &frameWriter{limits: limits, timeout: timeout, frameLimit: DefaultFrameBytes, wake: make(chan struct{}, 1), done: make(chan struct{}), aborted: make(chan struct{})}
 	go func() {
 		defer close(w.done)
 		for {
@@ -122,6 +124,10 @@ func newFrameWriterWithLimits(out io.Writer, timeout time.Duration, interrupt fu
 			}
 			w.mu.Lock()
 			prepareErr = w.err
+			if prepareErr == nil && len(item.frame) > w.frameLimit {
+				prepareErr = &FrameTooLargeError{Direction: "output", Limit: w.frameLimit}
+			}
+			writeTimeout := w.timeout
 			if prepareErr == nil && item.ticket != nil {
 				prepareErr = requestContextFailure(item.ticket.ctx)
 			}
@@ -151,7 +157,7 @@ func newFrameWriterWithLimits(out io.Writer, timeout time.Duration, interrupt fu
 				}
 				result <- err
 			}()
-			timer := time.NewTimer(timeout)
+			timer := time.NewTimer(writeTimeout)
 			var err error
 			select {
 			case err = <-result:
@@ -242,6 +248,9 @@ func (w *frameWriter) submitTerminal(frame []byte, credit *terminalCredit, recei
 	return w.enqueue(frame, receipt, true, credit)
 }
 func (w *frameWriter) enqueue(frame []byte, receipt func(error), control bool, credit *terminalCredit) error {
+	return w.enqueueObserved(frame, receipt, control, credit, nil)
+}
+func (w *frameWriter) enqueueObserved(frame []byte, receipt func(error), control bool, credit *terminalCredit, selected func()) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.err != nil {
@@ -270,7 +279,7 @@ func (w *frameWriter) enqueue(frame []byte, receipt func(error), control bool, c
 		lane.reservedBytes -= credit.bytes
 		credit.state = 1
 	}
-	lane.queue = append(lane.queue, publication{frame: frame, receipt: receipt, credit: credit})
+	lane.queue = append(lane.queue, publication{frame: frame, receipt: receipt, credit: credit, selected: selected})
 	lane.bytes += len(frame)
 	w.notify()
 	return nil

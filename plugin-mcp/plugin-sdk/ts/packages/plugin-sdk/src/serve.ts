@@ -1,3 +1,4 @@
+import { ReverseNegotiation } from './negotiation.js';
 import { Admission, RequestScope, admissionLimits, linkRequestScope } from "./admission.js";
 import { decodeRPCControlDTO, requestFailureResponse } from "./request-control.js";
 import { requestParamsJSON } from "./payload.js";
@@ -22,6 +23,8 @@ import type { RPCResponse } from './wire.js';
 export const MAX_INPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export const MAX_OUTPUT_FRAME_BYTES = DEFAULT_FRAME_BYTES;
 export interface ServeOptions {
+  /** Explicitly opt into a valid offered reverse/1 profile; default false. */
+  reverseRPC?: boolean;
   admissionLimits?: import('./admission.js').AdmissionLimits;
   queueLimits?: QueueLimits;
   inputFrameBytes?: number;
@@ -37,9 +40,9 @@ export interface ServeOptions {
   /** Default true only when using process stdin. Injectable streams own their signals. */
   handleSignals?: boolean;
 }
-async function* frames(input: Readable, signal: AbortSignal, limit: number): AsyncGenerator<string> {
+async function* frames(input: Readable, signal: AbortSignal, limit: ()=>number): AsyncGenerator<{line:string;bytes:number}> {
   let parts: Buffer[] = [];
-  let length = 0;
+  let length = 0, cap=limit();
   for await (const chunk of byteChunks(input, signal)) {
     const bytes = chunk;
     let offset = 0;
@@ -47,13 +50,13 @@ async function* frames(input: Readable, signal: AbortSignal, limit: number): Asy
       const end = bytes.indexOf(10, offset);
       const part = bytes.subarray(offset, end < 0 ? bytes.length : end);
       length += part.length;
-      if (length >= limit) throw new FrameTooLargeError('input', limit);
+      if (length >= cap) throw new FrameTooLargeError('input', cap);
       parts.push(Buffer.from(part));
       if (end < 0) break;
       const line = Buffer.concat(parts, length);
-      try { yield new TextDecoder('utf-8', {fatal:true,ignoreBOM:true}).decode(line.subarray(0, line.at(-1) === 13 ? line.length - 1 : line.length)); }
+      try { yield {line:new TextDecoder('utf-8', {fatal:true,ignoreBOM:true}).decode(line.subarray(0, line.at(-1) === 13 ? line.length - 1 : line.length)),bytes:length+1}; }
       catch { throw new FrameUTF8Error(); }
-      parts = []; length = 0; offset = end + 1;
+      parts = []; length = 0; cap=limit(); offset = end + 1;
     }
   }
   if (length && !signal.aborted) throw new TruncatedFrameError();
@@ -120,7 +123,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   if (!plugin || typeof plugin.init !== 'function' || typeof plugin.load !== 'function' || typeof plugin.unload !== 'function') throw new Error('serve requires init, load and unload');
   const queues = queueLimits(options.queueLimits);
   const admissionPolicy=admissionLimits(options.admissionLimits);core.reverseSlots=admissionPolicy.reverseSlots;
-  const inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
+  let inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
   const writeTimeout = options.writeTimeoutMs ?? 5000;
   if (!Number.isFinite(writeTimeout) || writeTimeout <= 0 || writeTimeout > 2147483647) throw new Error('writeTimeoutMs must be positive and at most 2147483647');
   const timeout = options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
@@ -131,7 +134,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   const controller = new AbortController(), reader = new AbortController();
   const secrets = new SecretTracker();
   const logger = createLogger({secrets,write: line => { (options.stderr ?? process.stderr).write(line); }});
-  const dispatcher = new Dispatcher(plugin, {signal: controller.signal, logger, config: new ConfigReader({},secrets)}, secrets, outputLimit);
+  const dispatcher = new Dispatcher(plugin, {signal: controller.signal, logger, config: new ConfigReader({},secrets)}, secrets, ()=>outputLimit);
   const pending = new Set<Promise<void>>();
   let initUsed=false;
   let transportError: unknown, inputError: unknown;
@@ -148,7 +151,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   options.signal?.addEventListener('abort',stop,{once:true});
   output.on('error',onOutputError);
   if (options.signal?.aborted) stop();
-  const writer=new FrameWriter(output,writeTimeout,onOutputError,queues);
+  const writer=new FrameWriter(output,writeTimeout,onOutputError,queues,outputLimit);
   core.encode=value=>encodeBoundedJSON(value,outputLimit-1)+'\n';
   core.publish=frame=>writer.publish(frame);
   core.publishCall=(frame,signal,onStart,beforeStart,prepare)=>writer.publish(frame,'ordinary',undefined,{signal,onStart,beforeStart,prepare});
@@ -165,6 +168,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
     return receipt;
   };
   const admission=new Admission(writer,core,response=>(hookResponseJSON(response,outputLimit-1)??encodeBoundedJSON(response,outputLimit-1))+'\n',onOutputError,admissionPolicy);
+  dispatcher.reverse=new ReverseNegotiation(options.reverseRPC??false,core,writer,admission,secrets,frame=>{inputLimit=Math.min(inputLimit,frame);outputLimit=Math.min(outputLimit,frame);});
   const send = (response:RPCResponse,scope?:RequestScope):void=>{if(scope)scope.reply(response);else void write(response).catch(()=>{});};
   const track = (task: Promise<void>): void => {
     pending.add(task);
@@ -176,12 +180,14 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   let terminalScope:RequestScope|undefined;
   const pump = (async () => {
     try {
-      for await (const line of frames(input,reader.signal,inputLimit)) {
+      for await (const event of frames(input,reader.signal,()=>inputLimit)) {
+        const {line,bytes}=event;
+        if(bytes>inputLimit)throw new FrameTooLargeError('input',inputLimit);
         const received=performance.now();
         if (reader.signal.aborted) break;
         try {
           const request = decodeRequest(line);
-          if (!request) {if(core.directional)core.reply(line);continue;}
+          if (!request) {if(core.readsReplies)core.reply(line);continue;}
           if(request.method==='rpc/cancel') {
            if(request.id!==undefined){core.admit(request.id);send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'rpc/cancel requires a notification'}});continue;}
            try{admission.cancel(decodeRPCControlDTO('CancelParams',requestParamsJSON(request)??'null',core.directional));}catch{/* Invalid notifications have no effect or reply. */}
@@ -214,7 +220,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
           track(task);
         } catch (error) {
           if (!(error instanceof EnvelopeFault)) throw error;
-          if(core.directional&&(error.code===-32700||replyCandidate(line)))throw new CorrelationError();
+          if(core.readsReplies&&(error.code===-32700||replyCandidate(line)))throw new CorrelationError();
           if(!quiescing)void write({jsonrpc:'2.0',id:error.id,error:{code:error.code,message:error.message}},false).catch(()=>{});
         }
       }
@@ -236,10 +242,11 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
       await Promise.all([...pending]);
       if (closed) throw new ShutdownTimeoutError();
       const forwardContext = terminal && terminalReady ? decodeRuntimeParams<{context?: import('./host-rpc.js').ForwardContext}>(terminal).context : undefined;
-      const cleanupContext = {...dispatcher.context,forwardContext,signal:cleanupController.signal};
+      let cleanupContext:import('./types.js').Context = {...dispatcher.context,forwardContext,signal:cleanupController.signal};
       const terminalCancel=()=>cleanupController.abort(terminalScope?.controller.signal.reason);
       terminalScope?.controller.signal.addEventListener('abort',terminalCancel,{once:true});if(terminalScope?.controller.signal.aborted)terminalCancel();
       if(terminalScope){if(!terminalScope.start())throw new ShutdownTimeoutError();linkRequestScope(terminalScope.ctx,cleanupController.signal,{deadline:Math.min(terminalScope.deadline??Infinity,performance.now()+timeout),binding:terminalScope.binding});}
+      if(terminalScope)cleanupContext=dispatcher.reverse?.context(cleanupContext)??cleanupContext;
       let cleanupError: unknown, cleanupFailed = false;
       try { await dispatcher.shutdown(cleanupContext); } catch (error) { cleanupError = error; cleanupFailed = true; }
       if (closed) throw new ShutdownTimeoutError();

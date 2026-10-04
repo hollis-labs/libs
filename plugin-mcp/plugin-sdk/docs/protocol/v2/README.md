@@ -53,8 +53,11 @@ is present and the plugin implements Go HookHandler or TS hookHandle; the runtim
 owns that acknowledgement and enables hook dispatch for that connection. Missing
 offers or handlers omit it. Wrong hooks versions retain the typed Init rejection.
 See [hooks/1](hooks.md) for single/batch dispatch and shared negotiation transcripts.
-Reverse offers remain declined: reverse_rpc_version is omitted, hook handlers get
-no host client, and no plugin-originated callbacks or HTTP fallback are supplied.
+Reverse acknowledgement requires explicit Go ServeOptions.ReverseRPC / TS
+reverseRPC opt-in plus a valid offer and successful Init publication. Bound
+ordinary callbacks then receive the fixed host client; hook handlers still get
+none. See [reverse negotiation](reverse.md), including the held real-child and
+plugin-host interoperability merge gate. No HTTP fallback is supplied.
 A host requiring an unacknowledged profile must fail before activation.
 Application host errors -32010 and contract `host-rpc/1` belong to the later
 reverse profile, not Init errors.
@@ -202,7 +205,7 @@ run in Go and TS. Their normative base cases cover duplicate IDs and ID reuse;
 opposite-direction id=1, immediate/out-of-order replies and invalid correlated
 results/errors. Runtime fixtures separately prove replies during pending Init
 and cleanup. These are engine evidence, not negotiated reverse support or child
-interoperability evidence. Production still declines reverse acknowledgement;
+interoperability evidence. Default Serve still declines reverse acknowledgement;
 there is no public arbitrary-method host caller. Author helpers and negotiated
 activation belong to later slices.
 

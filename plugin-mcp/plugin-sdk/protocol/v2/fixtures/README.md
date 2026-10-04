@@ -11,3 +11,8 @@ helper corpus with resource/server echoes, opaque cursors/tool bindings, tool
 outcomes versus authority failures, SDK-owned cancellation references and
 same-binding renewal. Correlated reply time anchors verified lease/budget state;
 renewal never extends existing calls or forward request deadlines.
+
+`negotiation.json` uses normal Go/TS Serve opt-in and Init offers, checking
+acknowledgement, strict rejections and actual callback client availability.
+Negotiated child replay and pinned plugin-host interop remain the activation merge gate;
+private helper recipes alone do not satisfy it.

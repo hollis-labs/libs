@@ -38,6 +38,9 @@ export class RequestScope {
     private children = 0;
     private released = false;
     private started = false;
+    private observer?:(response:RPCResponse)=>void;
+    observeReply(fn:(response:RPCResponse)=>void):boolean{if(this.terminal)return false;this.observer=fn;return true;}
+    selected(response:RPCResponse):void{this.observer?.(response);}
     readonly deadline?: number;
     readonly binding?: string;
     readonly received: number;
@@ -170,7 +173,7 @@ export class Admission {
             this.active.delete(scope.request.id!);
             this.core.release(scope.request.id);
         } scope.terminalResolve(); };
-        const send = (value: RPCResponse) => this.writer.publish(this.encode(value), 'control', scope.credit);
+        const send = (value: RPCResponse) => this.writer.publish(this.encode(value), 'control', scope.credit,undefined,()=>scope.selected(value));
         // Capacity rejection is synchronous in the writer; failed replacement keeps
         // the terminal reservation available for a bounded classified response.
         let promise: Promise<void>;

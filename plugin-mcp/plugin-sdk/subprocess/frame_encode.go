@@ -412,10 +412,7 @@ func (e *frameEncoder) fields(v reflect.Value, depth int, first *bool) error {
 // A complete JSON value is staged before it is submitted to the writer.
 // The writer never sees bytes belonging to a rejected oversized response.
 func (s *server) encodeFrame(value any) ([]byte, error) {
-	limit := s.outputLimit
-	if limit == 0 {
-		limit = DefaultFrameBytes
-	}
+	limit := s.frameOutputLimit()
 	data, err := marshalBounded(value, limit-1)
 	if err != nil {
 		var large *FrameTooLargeError

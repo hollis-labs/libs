@@ -17,11 +17,13 @@ malformed, null or unknown fields retain existing Init errors. Before successful
 Init, base lifecycle admission rules apply. The internal conformance seam remains
 for tests that need to bypass negotiation; negotiated transcripts use normal Init.
 
-Hooks are acknowledged independently of reverse RPC. Even when `host_services`
-is offered alongside hooks, `reverse_rpc_version` remains absent. Hook handlers
-receive the ordinary context and no host client, so this profile supplies no
-plugin-originated callbacks. Reverse services await their own conformance and
-negotiation gate.
+Hooks are acknowledged independently of reverse RPC. Reverse acknowledgement
+requires its own explicit Serve opt-in and valid host_services offer. Hook
+handlers receive the ordinary context and no host client, so this profile
+supplies no plugin-originated callbacks. Hook-originated reverse calls remain
+unavailable even with both acknowledgements;
+SDK hook-context and plugin-hooks adapter maintainers own a separate per-item scope/client design. See
+[reverse negotiation](reverse.md) for the child/interop merge gate.
 
 `hooks.schema.json` defines flat DTOs. `generate.py` generates a separate
 `hooks-wire.ts`; existing wire.ts and historical v1 files do not change. The

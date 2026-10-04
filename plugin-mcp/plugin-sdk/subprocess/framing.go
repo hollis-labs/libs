@@ -47,11 +47,16 @@ func frameLimits(limits FrameLimits) (FrameLimits, error) {
 // supplied oversized line or treat EOF as a delimiter. The buffered reader has
 // fixed read-ahead; only bounded frame bytes are retained.
 func readFrame(reader *bufio.Reader, limit int) ([]byte, error) {
+	line, _, err := readFrameCount(reader, limit)
+	return line, err
+}
+
+func readFrameCount(reader *bufio.Reader, limit int) ([]byte, int, error) {
 	var frame []byte
 	for {
 		part, err := reader.ReadSlice('\n')
 		if len(part) > limit-len(frame) || (len(part) == limit-len(frame) && (len(part) == 0 || part[len(part)-1] != '\n')) {
-			return nil, &FrameTooLargeError{Direction: "input", Limit: limit}
+			return nil, 0, &FrameTooLargeError{Direction: "input", Limit: limit}
 		}
 		frame = append(frame, part...)
 		if err == nil {
@@ -60,20 +65,20 @@ func readFrame(reader *bufio.Reader, limit int) ([]byte, error) {
 				line = line[:len(line)-1]
 			}
 			if !utf8.Valid(line) {
-				return nil, ErrFrameUTF8
+				return nil, 0, ErrFrameUTF8
 			}
-			return line, nil
+			return line, len(frame), nil
 		}
 		if errors.Is(err, bufio.ErrBufferFull) {
 			continue
 		}
 		if errors.Is(err, io.EOF) {
 			if len(frame) > 0 {
-				return nil, ErrTruncatedFrame
+				return nil, 0, ErrTruncatedFrame
 			}
-			return nil, io.EOF
+			return nil, 0, io.EOF
 		}
-		return nil, err
+		return nil, 0, err
 	}
 }
 

@@ -1,8 +1,9 @@
 # Admission, cancellation and deadlines
 
-The Go and TypeScript stdio engines enforce these connection-local limits. The
-reverse engine remains internal until negotiated activation and typed helpers
-are added; this does not acknowledge a reverse offer during Init.
+The Go and TypeScript stdio engines enforce these connection-local limits.
+Default Serve declines reverse. Explicit opt-in and validated Init acknowledgement
+activate its fixed scoped clients; [reverse negotiation](reverse.md) records
+accepted limits and the held child/interop merge gate.
 
 | Resource | Limit |
 | --- | ---: |

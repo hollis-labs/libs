@@ -209,8 +209,8 @@
     {
       "name": "hook-duplex",
       "status": "proposed",
-      "owner": "SDK reverse-profile and hook-context client maintainers",
-      "reason": "Hook handlers have no request-scoped host client until the reverse profile is negotiated.",
+      "owner": "SDK hook-context and plugin-hooks adapter maintainers (separate per-item scope/client design)",
+      "reason": "Hook helpers remain unavailable even with both profiles negotiated; per-item binding/client composition requires a separate approved design.",
       "level": "normative"
     }
   ]
