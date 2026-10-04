@@ -90,7 +90,7 @@ func TestServeInitAdmission(t *testing.T) {
 			if len(lines) != len(c.codes) {
 				t.Fatalf("replies %s", out.String())
 			}
-			for i, line := range lines {
+			for _, line := range lines {
 				var r RPCResponse
 				if json.Unmarshal([]byte(line), &r) != nil {
 					t.Fatal(line)
@@ -99,7 +99,8 @@ func TestServeInitAdmission(t *testing.T) {
 				if r.Error != nil {
 					code = r.Error.Code
 				}
-				if code != c.codes[i] {
+				n, _ := r.ID.Integer()
+				if code != c.codes[n-1] {
 					t.Fatalf("reply=%s", line)
 				}
 			}
@@ -144,40 +145,40 @@ func (p *barrierInitPlugin) Load(context.Context) (LoadResult, error) {
 func TestServeInitBarrierAndProfileDecline(t *testing.T) {
 	p := &barrierInitPlugin{started: make(chan struct{}), release: make(chan struct{}), handled: make(chan struct{})}
 	in, inW := io.Pipe()
-	var out bytes.Buffer
+	out, outW := io.Pipe()
+	defer in.Close()
+	defer inW.Close()
+	defer out.Close()
+	defer outW.Close()
 	done := make(chan error, 1)
-	go func() { done <- serveWith(p, in, &out) }()
+	go func() { done <- serveWith(p, in, outW) }()
 	params := validInitParams()
 	params.HooksProfile = &HooksProfile{HooksProfileVersion: 1}
 	b, err := json.Marshal(RPCRequest{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: params})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = inW.Write(append(b, '\n')); err != nil {
+	go func() { _, _ = inW.Write(append(b, '\n')) }()
+	<-p.started
+	go func() { _, _ = io.WriteString(inW, `{"jsonrpc":"2.0","id":2,"method":"plugin/load"}`+"\n") }()
+	decoder := json.NewDecoder(out)
+	var response RPCResponse
+	response = RPCResponse{}
+	if err := decoder.Decode(&response); err != nil {
 		t.Fatal(err)
 	}
-	<-p.started
-	sent := make(chan struct{})
-	go func() {
-		_, _ = inW.Write([]byte("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"plugin/load\"}\n"))
-		close(sent)
-	}()
+	if response.ID != NumberID(2) || response.Error == nil || response.Error.Code != -32600 {
+		t.Fatalf("refusal=%+v", response)
+	}
 	select {
 	case <-p.handled:
-		t.Fatal("load admitted before Init completed")
+		t.Fatal("load invoked during Init")
 	default:
 	}
 	close(p.release)
-	<-sent
-	_ = inW.Close()
-	if err := <-done; err != nil {
+	response = RPCResponse{}
+	if err := decoder.Decode(&response); err != nil {
 		t.Fatal(err)
-	}
-	<-p.handled
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	var response RPCResponse
-	if len(lines) != 2 || json.Unmarshal([]byte(lines[0]), &response) != nil {
-		t.Fatal(out.String())
 	}
 	var result InitResult
 	if err := json.Unmarshal(response.Result, &result); err != nil {
@@ -185,5 +186,18 @@ func TestServeInitBarrierAndProfileDecline(t *testing.T) {
 	}
 	if result.HooksProfileVersion != nil || result.ReverseRPCVersion != nil {
 		t.Fatal("unimplemented profiles advertised")
+	}
+	go func() { _, _ = io.WriteString(inW, `{"jsonrpc":"2.0","id":3,"method":"plugin/load"}`+"\n") }()
+	response = RPCResponse{}
+	if err := decoder.Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error != nil {
+		t.Fatal(response.Error)
+	}
+	<-p.handled
+	_ = inW.Close()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

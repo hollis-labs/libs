@@ -1,0 +1,409 @@
+{
+  "coverage": "Internal engine evidence; normative base cases do not activate reverse profiles. No scheduling or child interoperability claim.",
+  "cases": [
+    {
+      "name": "opposite-direction-one-and-out-of-order",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "admit",
+          "id": 1
+        },
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "expect_frame",
+          "id": 2
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"accepted\":false}}"
+        },
+        {
+          "op": "expect_result",
+          "id": 2,
+          "result": {
+            "accepted": false
+          }
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"accepted\":true}}"
+        },
+        {
+          "op": "expect_result",
+          "id": 1,
+          "result": {
+            "accepted": true
+          }
+        },
+        {
+          "op": "assert_inbound",
+          "id": 1
+        },
+        {
+          "op": "release",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "registration-before-immediate-reply",
+      "directional": true,
+      "level": "internal-core",
+      "immediate": true,
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "expect_result",
+          "id": 1,
+          "result": {
+            "accepted": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "unknown-late-duplicate-replies",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":90,\"result\":{\"anything\":true}}"
+        },
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"accepted\":true}}"
+        },
+        {
+          "op": "expect_result",
+          "id": 1,
+          "result": {
+            "accepted": true
+          }
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"accepted\":true}}"
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":99,\"result\":{\"accepted\":false}}"
+        }
+      ]
+    },
+    {
+      "name": "base-live-duplicates-fence",
+      "directional": false,
+      "level": "normative",
+      "operations": [
+        {
+          "op": "admit",
+          "id": "live"
+        },
+        {
+          "op": "admit",
+          "id": "live",
+          "fault": true
+        }
+      ]
+    },
+    {
+      "name": "base-sequential-reuse-zero-and-string",
+      "directional": false,
+      "level": "normative",
+      "operations": [
+        {
+          "op": "admit",
+          "id": 0
+        },
+        {
+          "op": "release",
+          "id": 0
+        },
+        {
+          "op": "admit",
+          "id": 0
+        },
+        {
+          "op": "admit",
+          "id": "0"
+        },
+        {
+          "op": "admit",
+          "id": -1
+        }
+      ]
+    },
+    {
+      "name": "profile-consumed-highwater",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "admit",
+          "id": 2
+        },
+        {
+          "op": "release",
+          "id": 2
+        },
+        {
+          "op": "admit",
+          "id": 1,
+          "fault": true
+        }
+      ]
+    },
+    {
+      "name": "escaped-result-keys",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"\\u0061ccepted\":true}}"
+        },
+        {
+          "op": "expect_result",
+          "id": 1,
+          "result": {
+            "accepted": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "standard-error-preserved",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"unavailable\"}}"
+        },
+        {
+          "op": "expect_error",
+          "id": 1,
+          "code": -32601
+        }
+      ]
+    },
+    {
+      "name": "close-fails-pending-once",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "close"
+        },
+        {
+          "op": "close"
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    }
+  ],
+  "runtime": [
+    {
+      "name": "pending-init-and-quiescing-cleanup",
+      "level": "internal-core",
+      "directional": true,
+      "steps": [
+        {
+          "op": "send_host",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "plugin/init",
+            "params": {
+              "plugin_dir": "/fixture",
+              "data_dir": "/fixture/data",
+              "cache_dir": "/fixture/cache",
+              "config": {
+                "key": "value"
+              },
+              "log_level": "info",
+              "host_info": {
+                "version": "fixture",
+                "protocol": 2
+              },
+              "capability_contract": 1,
+              "incarnation": {
+                "host_instance": "fixture-host",
+                "owner_id": "fixture",
+                "owner_generation": 1
+              },
+              "grants": [],
+              "identity": {
+                "subject": "caller"
+              }
+            }
+          }
+        },
+        {
+          "op": "expect_plugin_request",
+          "expect": {
+            "id": 1,
+            "method": "host/log"
+          }
+        },
+        {
+          "op": "send_host",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "plugin/load"
+          }
+        },
+        {
+          "op": "expect_plugin_response",
+          "expect": {
+            "id": 2,
+            "error": {
+              "code": -32600,
+              "message": "successful init required"
+            }
+          }
+        },
+        {
+          "op": "barrier",
+          "effects": {
+            "initialized": false,
+            "health_calls": 0
+          }
+        },
+        {
+          "op": "send_host_response",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "accepted": true
+            }
+          }
+        },
+        {
+          "op": "expect_plugin_response",
+          "expect": {
+            "id": 1,
+            "result": {
+              "protocol": 2
+            }
+          }
+        },
+        {
+          "op": "send_host",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "plugin/unload"
+          }
+        },
+        {
+          "op": "expect_plugin_request",
+          "expect": {
+            "id": 2,
+            "method": "host/log"
+          }
+        },
+        {
+          "op": "send_host",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "plugin/health"
+          }
+        },
+        {
+          "op": "send_host_response",
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "accepted": true
+            }
+          }
+        },
+        {
+          "op": "expect_plugin_response",
+          "expect": {
+            "id": 3,
+            "result": {
+              "ok": true
+            }
+          }
+        },
+        {
+          "op": "expect_exit",
+          "effects": {
+            "initialized": true,
+            "health_calls": 0,
+            "unload_attempts": 1
+          }
+        }
+      ]
+    }
+  ]
+}

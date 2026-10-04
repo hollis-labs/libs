@@ -1,4 +1,4 @@
-import { inspectEnvelope, validateJSON } from './strict-json.js';
+import { inspectEnvelope, validateJSON, parseJSONTokens } from './strict-json.js';
 import type { RPCID, RPCRequest } from './wire.js';
 
 export class EnvelopeFault extends Error {
@@ -39,7 +39,7 @@ export function decodeEnvelope(line: string): RPCRequest | undefined {
   if (method === undefined && raw !== undefined && hasResult !== hasError) {
     if (fields.has('params') || (hasResult && id === null)) return invalid(id);
     if (hasError) {
-      const error: unknown = JSON.parse(fields.get('error')!);
+      const error: unknown = parseJSONTokens(fields.get('error')!);
       if (!error || typeof error !== 'object' || Array.isArray(error)) return invalid(id);
       const fault = error as Record<string,unknown>;
       if (!Number.isSafeInteger(fault.code) || typeof fault.message !== 'string') return invalid(id);

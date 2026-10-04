@@ -1,0 +1,176 @@
+{
+  "coverage": "Directional fault fencing is internal evidence; base recovery remains normative.",
+  "cases": [
+    {
+      "name": "wrong-result",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"accepted\":\"yes\"}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "duplicate-result-field",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"accepted\":true,\"accepted\":false}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "mixed-request-reply",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"plugin/health\",\"result\":{}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "syntax",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "duplicate-error-key",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"code\":-32603,\"message\":\"bad\"}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "wrong-application-error-id",
+      "directional": true,
+      "level": "internal-core",
+      "operations": [
+        {
+          "op": "call",
+          "method": "host/log",
+          "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}"
+        },
+        {
+          "op": "expect_frame",
+          "id": 1
+        },
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32010,\"message\":\"denied\",\"data\":{\"contract\":\"host-rpc/1\",\"code\":\"scope_denied\",\"request_id\":2,\"effect_state\":\"not_started\",\"retryable\":false}}}",
+          "fault": true
+        },
+        {
+          "op": "expect_error",
+          "id": 1
+        }
+      ]
+    },
+    {
+      "name": "base-malformed-reply-recovers",
+      "directional": false,
+      "level": "normative",
+      "operations": [
+        {
+          "op": "receive",
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":null,\"error\":{}}",
+          "recover": -32600
+        },
+        {
+          "op": "receive",
+          "raw": "{",
+          "recover": -32700
+        },
+        {
+          "op": "admit",
+          "id": 3
+        }
+      ]
+    }
+  ]
+}

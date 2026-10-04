@@ -111,8 +111,8 @@ func (r *RPCRequest) UnmarshalJSON(data []byte) error {
 }
 
 // decodeEnvelope separates JSON syntax, envelope structure and method payloads.
-// A nil request and nil fault is an unsolicited valid response, with no waiter
-// in today's one-way runtime. Method payload validation remains method-owned.
+// A nil request and nil fault identifies a valid response. The correlation
+// engine consumes its raw fields separately. Payload validation remains method-owned.
 func decodeEnvelope(data []byte) (*RPCRequest, *RPCResponse) {
 	fail := func(id RPCID, code int, message string) (*RPCRequest, *RPCResponse) {
 		return nil, &RPCResponse{JSONRPC: "2.0", ID: id, Error: &RPCError{Code: code, Message: message}}
@@ -196,4 +196,25 @@ func decodeEnvelope(data []byte) (*RPCRequest, *RPCResponse) {
 		params = raw
 	}
 	return &RPCRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params}, nil
+}
+
+// Exact decoded top-level keys classify faults without examining business data.
+func replyCandidate(raw []byte) bool {
+	if !json.Valid(raw) {
+		return false
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	token, err := d.Token()
+	if err != nil || token != json.Delim('{') {
+		return false
+	}
+	for d.More() {
+		key, _ := d.Token()
+		var value json.RawMessage
+		_ = d.Decode(&value)
+		if key == "result" || key == "error" {
+			return true
+		}
+	}
+	return false
 }

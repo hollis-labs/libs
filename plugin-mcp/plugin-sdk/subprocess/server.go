@@ -56,6 +56,7 @@ type server struct {
 	initialized         bool
 	plugin              Plugin
 	writeFrame          func([]byte)
+	publishResponse     func(RPCID, []byte)
 	outputLimit         int
 	fence               func(error)
 	unloadOnce          sync.Once
@@ -468,7 +469,11 @@ func (s *server) writeMessage(resp RPCResponse) {
 			return
 		}
 	}
-	s.emit(data)
+	if s.publishResponse != nil {
+		s.publishResponse(resp.ID, data)
+	} else {
+		s.emit(data)
+	}
 }
 func (s *server) frameOutputLimit() int {
 	if s.outputLimit == 0 {

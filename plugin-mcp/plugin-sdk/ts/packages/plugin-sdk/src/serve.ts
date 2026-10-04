@@ -1,5 +1,7 @@
 import { hookResponseJSON } from './hooks-dispatch.js';
-import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError, encodeBoundedJSON, frameLimit } from './frame-codec.js';
+import {Correlation, CorrelationError, CORE_CAPACITY, replyCandidate} from './correlation.js';
+import {FrameWriter} from './publication.js';
+import { DEFAULT_FRAME_BYTES, FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, encodeBoundedJSON, frameLimit } from './frame-codec.js';
 export { FrameTooLargeError, TruncatedFrameError, FrameUTF8Error, WriteTimeoutError } from './frame-codec.js';
 import { decodeRuntimeParams, PayloadError } from './payload.js';
 import { Buffer } from 'node:buffer';
@@ -104,6 +106,11 @@ async function* chunks(input: Readable, signal: AbortSignal): AsyncGenerator<Buf
 
 /** Injected input/output/stderr stay caller-owned; only runtime I/O is interrupted. */
 export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): Promise<void> {
+ return serveConnection(plugin,options,new Correlation());
+}
+
+/** Internal fixture seam; not exported from the author entry points. */
+export async function serveConnection(plugin: ServerPlugin, options: ServeOptions, core: Correlation): Promise<void> {
   if (!plugin || typeof plugin.init !== 'function' || typeof plugin.load !== 'function' || typeof plugin.unload !== 'function') throw new Error('serve requires init, load and unload');
   const inputLimit = frameLimit(options.inputFrameBytes), outputLimit = frameLimit(options.outputFrameBytes);
   const writeTimeout = options.writeTimeoutMs ?? 5000;
@@ -118,7 +125,7 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
   const logger = createLogger({secrets,write: line => { (options.stderr ?? process.stderr).write(line); }});
   const dispatcher = new Dispatcher(plugin, {signal: controller.signal, logger, config: new ConfigReader({},secrets)}, secrets, outputLimit);
   const pending = new Set<Promise<void>>();
-  let writeTail = Promise.resolve(), barrier = Promise.resolve();
+  let initUsed=false;
   let transportError: unknown, inputError: unknown;
   let closed = false;
   let stoppedResolve!: () => void;
@@ -127,67 +134,78 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
     controller.abort(); reader.abort(); stoppedResolve();
     if (options.input === undefined) input.destroy();
   };
-  const onOutputError = (error: Error): void => { transportError ??= error; stop(); };
+  const onOutputError = (error: unknown): void => { transportError ??= error; writer.abort(error); core.close(error); stop(); };
   const signals = options.handleSignals ?? options.input === undefined;
   if (signals) { process.on('SIGTERM',stop); process.on('SIGINT',stop); }
   options.signal?.addEventListener('abort',stop,{once:true});
   output.on('error',onOutputError);
   if (options.signal?.aborted) stop();
-  const write = (response: RPCResponse): Promise<void> => {
-    if (closed || transportError) return Promise.resolve();
+  const writer=new FrameWriter(output,writeTimeout,onOutputError);
+  core.encode=value=>encodeBoundedJSON(value,outputLimit-1)+'\n';
+  core.publish=frame=>writer.publish(frame);
+  const write = (response: RPCResponse, admitted=true): Promise<void> => {
     let line: string;
     try { line = (hookResponseJSON(response,outputLimit - 1) ?? encodeBoundedJSON(response, outputLimit - 1)) + '\n'; }
     catch {
-      try { line = encodeBoundedJSON({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:'outbound response rejected'}}, outputLimit - 1) + '\n'; }
-      catch (error) { transportError ??= error; stop(); return Promise.resolve(); }
+      try { line = core.encode({jsonrpc:'2.0',id:response.id,error:{code:-32603,message:'outbound response rejected'}}); }
+      catch (error) { onOutputError(error as Error); core.close(error); return Promise.reject(error); }
     }
-    writeTail = writeTail.then(() => {
-      if (closed || transportError) return;
-      return new Promise<void>((resolve,reject) => {
-        const timer = setTimeout(() => reject(new WriteTimeoutError()), writeTimeout);
-        try { output.write(line, error => { clearTimeout(timer); error ? reject(error) : resolve(); }); }
-        catch (error) { clearTimeout(timer); reject(error); }
-      });
-    }).catch(error => { transportError ??= error; stop(); });
-    return writeTail;
+    const receipt=writer.publish(line);
+    void receipt.then(()=>{if(admitted)core.release(response.id);},error=>{if(admitted)core.release(response.id);core.close(error);onOutputError(error as Error);});
+    return receipt;
   };
+  const send = (response:RPCResponse):void=>{void write(response).catch(()=>{});};
   const track = (task: Promise<void>): void => {
     pending.add(task);
     void task.then(() => pending.delete(task), error => { pending.delete(task); inputError ??= error; stop(); });
   };
+  let quiescing=false;
   let terminal: import('./wire.js').RPCRequest | undefined;
+  let terminalReady=false;
   const pump = (async () => {
     try {
       for await (const line of frames(input,reader.signal,inputLimit)) {
         if (reader.signal.aborted) break;
         try {
           const request = decodeRequest(line);
-          if (!request) continue;
+          if (!request) {if(core.directional)core.reply(line);continue;}
+          if(quiescing)continue;
+          core.admit(request.id);
           if (request.method === 'plugin/unload') {
             try { decodeRuntimeParams(request); }
             catch(error) {
               if(!(error instanceof PayloadError)) throw error;
-              if(request.id!==undefined) void write({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});
+              if(request.id!==undefined) send({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});
               continue;
             }
-            terminal = request; break;
+            terminalReady=dispatcher.ready;terminal = request; quiescing=true;controller.abort();stoppedResolve();continue;
           }
-          // Keep Init admission ordered without blocking reader EOF/cancellation.
-          const task = barrier.then(() => dispatcher.dispatch(request)).then(response => { if (response) void write(response); });
+          if(request.method==='plugin/init') {
+            if(typeof request.id!=='number'||!Number.isSafeInteger(request.id)||request.id<=0) {
+              if(request.id!==undefined)send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init requires a positive safe integer id'}});continue;
+            }
+            if(initUsed){send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'init already attempted'}});continue;}
+            initUsed=true;
+          } else if(!dispatcher.ready) {
+            if(request.id!==undefined)send({jsonrpc:'2.0',id:request.id,error:{code:-32600,message:'successful init required'}});continue;
+          }
+          if(pending.size>=CORE_CAPACITY)throw new CorrelationError();
+          const task=dispatcher.dispatch(request).then(response=>{if(response)send(response);});
           track(task);
-          if (request.method === 'plugin/init') barrier = task;
         } catch (error) {
           if (!(error instanceof EnvelopeFault)) throw error;
-          void write({jsonrpc:'2.0',id:error.id,error:{code:error.code,message:error.message}});
+          if(core.directional&&(error.code===-32700||replyCandidate(line)))throw new CorrelationError();
+          if(!quiescing)void write({jsonrpc:'2.0',id:error.id,error:{code:error.code,message:error.message}},false).catch(()=>{});
         }
       }
     } catch (error) { if (!reader.signal.aborted) inputError = error; }
+    finally {core.close(inputError??transportError);if(inputError)stop();}
   })();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const cleanupController = new AbortController();
   try {
     await Promise.race([pump,stopped]);
-    stop();
+    if(!terminal){stop();core.close(inputError??transportError);}
     const deadline = new Promise<never>((_resolve,reject) => {
       timer = setTimeout(() => {
         const failure = new ShutdownTimeoutError();
@@ -197,22 +215,23 @@ export async function serve(plugin: ServerPlugin, options: ServeOptions = {}): P
     const shutdown = (async () => {
       await Promise.all([...pending]);
       if (closed) throw new ShutdownTimeoutError();
-      const forwardContext = terminal && dispatcher.ready ? decodeRuntimeParams<{context?: import('./host-rpc.js').ForwardContext}>(terminal).context : undefined;
+      const forwardContext = terminal && terminalReady ? decodeRuntimeParams<{context?: import('./host-rpc.js').ForwardContext}>(terminal).context : undefined;
       const cleanupContext = {...dispatcher.context,forwardContext,signal:cleanupController.signal};
       let cleanupError: unknown, cleanupFailed = false;
       try { await dispatcher.shutdown(cleanupContext); } catch (error) { cleanupError = error; cleanupFailed = true; }
       if (closed) throw new ShutdownTimeoutError();
       if (terminal) {
-        const response = await dispatcher.dispatch(terminal); // Reuses recorded cleanup.
+        const response = terminalReady ? await dispatcher.dispatch(terminal) : terminal.id === undefined ? undefined : {jsonrpc:'2.0' as const,id:terminal.id,error:{code:-32600,message:'successful init required'}}; // Reuses recorded cleanup.
         if (response) await write(response);
       }
-      await writeTail;
+      await writer.flush();
       if (transportError) throw transportError;
       if (inputError) throw inputError;
       if (cleanupFailed && !terminal) throw cleanupError;
     })();
     await Promise.race([shutdown,deadline]);
   } finally {
+    core.close(transportError??inputError);writer.abort(transportError??inputError??new Error('connection closed'));
     closed = true; reader.abort(); controller.abort(); cleanupController.abort();
     if (timer !== undefined) clearTimeout(timer);
     if (options.input === undefined) input.destroy();

@@ -172,3 +172,32 @@ tests cover malformed UTF-8, truncated EOF, blocked writes, partial writes,
 base64 expansion and an error that cannot fit the output budget.
 
 [Reserved hooks/1 wire and host codecs](hooks.md) describe the independently gated hook methods and shared hook conformance fixtures.
+
+## Reader and correlation foundation
+
+Hosts must await the Init reply before sending other ordinary requests. Requests
+pipelined while Init runs are refused with -32600 (successful init required),
+without invoking their callbacks. A live duplicate request ID fences the base
+connection without a second callback or reply. An ID remains live until its
+terminal reply has completely written; later base reuse is permitted, and string
+IDs and safe integer IDs (including zero) retain their identity.
+
+The internal duplex engine has separate incoming and outgoing ID tables and
+registers pending calls before publication. It uses the bounded frame encoder and
+one physical writer with whole-write receipts. During terminal unload it keeps
+reading pending replies while draining and running once-only cleanup. EOF,
+write failure and final closure complete pending calls once. Directional state
+fences malformed reply candidates; base syntax/structure faults retain the
+-32700/-32600 recovery contract. Valid unknown/late/duplicate replies cause no
+response loop.
+
+Shared `protocol/v2/fixtures/duplex-correlation.json` and `duplex-invalid.json`
+run in Go and TS. Their normative base cases cover duplicate IDs and ID reuse;
+`internal-core` cases exercise explicit fixture directional state, including
+opposite-direction id=1, immediate/out-of-order replies and invalid correlated
+results/errors. Runtime fixtures separately prove replies during pending Init
+and cleanup. These are engine evidence, not negotiated reverse support or child
+interoperability evidence. Production still declines reverse acknowledgement;
+there is no public arbitrary-method host caller. Admission scheduling,
+cancellation/deadline policy, author helpers and negotiated activation belong to
+later slices.

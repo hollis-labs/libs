@@ -170,14 +170,14 @@ test('Init validation and lifecycle ordering precede plugin code', {timeout:5000
  r.send(4,'plugin/init',initParams());assert.equal((await r.reply()).error.code,-32600);
  assert.equal(calls,0);r.input.end();await r.done;
 });
-test('Init is an admission barrier for pipelined handlers; optional offers are declined', {timeout:5000}, async t => {
+test('Init refuses pipelined handlers; optional offers are declined', {timeout:5000}, async t => {
  const started=deferred(),release=deferred();t.after(()=>release.resolve());let handled=false;
  const p={...fixturePlugin('base'),async init(){started.resolve();await release.promise;return {...fixturePlugin('base').init(),hooks_profile_version:1};},load(){handled=true;return {};}};
  const r=await rig(t,p,{initialize:false});
  r.send(1,'plugin/init',initParams({hooks_profile:{hooks_profile_version:1}}));await started.promise;
- r.send(2,'plugin/load');await nextTurn();assert.equal(handled,false);
+ r.send(2,'plugin/load');assert.equal((await r.reply()).error.message,'successful init required');assert.equal(handled,false);
  release.resolve();const ack=await r.reply();assert.equal(ack.result.protocol,2);assert.equal(ack.result.hooks_profile_version,undefined);
- assert.equal((await r.reply()).id,2);assert.equal(handled,true);
+ r.send(4,'plugin/load');assert.equal((await r.reply()).id,4);assert.equal(handled,true);
  r.send(3,'plugin/init',initParams());assert.equal((await r.reply()).error.code,-32600);
  r.input.end();await r.done;
 });
