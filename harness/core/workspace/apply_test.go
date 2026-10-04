@@ -13,14 +13,18 @@ import (
 )
 
 type fixturePorts struct {
-	observed      workspace.Observations
-	events        []string
-	failAcquire   int
-	failRelease   bool
-	failRecord    bool
-	validateErr   error
-	failPhase     workspace.Phase
-	failDirectory string
+	observed        workspace.Observations
+	events          []string
+	failAcquire     int
+	failRelease     bool
+	failRecord      bool
+	validateErr     error
+	failPhase       workspace.Phase
+	failDirectory   string
+	cancel          context.CancelFunc
+	cancelAcquire   bool
+	cancelPhase     workspace.Phase
+	cancelDirectory bool
 }
 
 func (f *fixturePorts) Now() time.Time { return f.observed.At.Add(time.Second) }
@@ -30,6 +34,9 @@ func (f *fixturePorts) Validate(context.Context, workspace.Spec, workspace.Resou
 }
 func (f *fixturePorts) EnsureOwnedDirectory(_ context.Context, r workspace.RootRef, m fs.FileMode) error {
 	f.events = append(f.events, "directory:"+r.ID)
+	if f.cancelDirectory {
+		f.cancel()
+	}
 	if f.failDirectory == r.ID {
 		return errors.New("fixture directory")
 	}
@@ -41,6 +48,9 @@ func (f *fixturePorts) Observe(context.Context, workspace.Resources) (workspace.
 }
 func (f *fixturePorts) Record(_ context.Context, r workspace.Receipt) error {
 	f.events = append(f.events, "record:"+string(r.Phase))
+	if f.cancel != nil && r.Phase == f.cancelPhase {
+		f.cancel()
+	}
 	if f.failRecord || f.failPhase == r.Phase {
 		return errors.New("fixture record")
 	}
@@ -48,6 +58,9 @@ func (f *fixturePorts) Record(_ context.Context, r workspace.Receipt) error {
 }
 func (f *fixturePorts) Acquire(_ context.Context, k workspace.LockKey) (workspace.HeldLock, error) {
 	f.events = append(f.events, "acquire:"+filepath.Base(k.CanonicalID))
+	if f.cancelAcquire {
+		f.cancel()
+	}
 	if f.failAcquire > 0 {
 		f.failAcquire--
 		if f.failAcquire == 0 {
@@ -353,5 +366,41 @@ func TestCallerCannotMintLaunchReadiness(t *testing.T) {
 	result.Status = workspace.Ready
 	if result.LaunchReady() || result.ArtifactsComplete() {
 		t.Fatal("status mutation minted a proof")
+	}
+}
+
+func TestMaterializeCancellationAtMutationBoundaries(t *testing.T) {
+	for _, point := range []string{"acquired lock", "interrupted receipt", "created directory"} {
+		t.Run(point, func(t *testing.T) {
+			p, f, s := applyFixture(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f.cancel = cancel
+			switch point {
+			case "acquired lock":
+				f.cancelAcquire = true
+			case "interrupted receipt":
+				f.cancelPhase = workspace.Interrupted
+			case "created directory":
+				f.cancelDirectory = true
+			}
+			got, err := workspace.Materialize(ctx, p, f.ports())
+			if !errors.Is(err, context.Canceled) || got.ArtifactsComplete() {
+				t.Fatal("cancelled apply completed", err)
+			}
+			if _, err := os.Stat(s.Boot.Candidate.Path); !os.IsNotExist(err) {
+				t.Fatal("cancelled apply created candidate", err)
+			}
+			if point == "created directory" {
+				if _, err := os.Stat(s.Home.Root.Path); err != nil || len(got.Retained) == 0 || got.Receipt.Phase != workspace.Interrupted {
+					t.Fatal("cancelled partial work lost", err)
+				}
+			} else if len(got.Retained) != 0 {
+				t.Fatal("cancelled preflight retained mutation")
+			}
+			if f.events[len(f.events)-1] != "release:home" {
+				t.Fatal("cancelled apply leaked held lock", f.events)
+			}
+		})
 	}
 }
