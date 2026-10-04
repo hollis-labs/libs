@@ -10,9 +10,9 @@ Init waits for a typed `host/log` reply, refusal of pipelined ordinary work,
 reader progress during Unload's reverse log, once-only cleanup, terminal reply
 and actual child exit. Its fixture installs internal directional correlation;
 Init still declines reverse. This is engine evidence, not negotiated reverse
-support or plugin-host interoperability. Expanded saturation/cancel/deadline/
-effect and hook composition child cases remain with the next corpus slice;
-the existing focused shared vectors continue to cover those engine behaviors.
+support or plugin-host interoperability. Expanded shared child cases exercise saturation, cancellation, deadlines,
+writer capacity/fairness and effects. Hook composition stays explicitly
+unavailable until reverse negotiation attaches clients to hook contexts.
 
 The parent also requests actual stdin EOF and SIGTERM during an awaiting
 handler, then checks graceful exit, stdout exhaustion and unload effects.
@@ -78,3 +78,22 @@ child replay and pinned host interop must pass before reverse acknowledgement;
 internal fixture bypass cannot satisfy that gate.
 
 The dedicated child matrix targets POSIX systems (Linux in CI); it relies on inherited pipes and SIGTERM/SIGKILL. These harness controls are test-only.
+
+Expanded cases use private callback activation of the merged request-scoped
+HostClient helpers, with valid fixture-owned offers and grants. The fake typed
+host validates request/result DTOs, maintains operation-key receipts keyed by
+owner/method/target/operation_key, records generation inside the receipt, and proves no
+SDK retry after a classified unknown outcome. Receipt replay after a changed
+owner generation executes the fake mutation once. This table is harness
+behavior, not evidence about production backend durability or authorization.
+
+Controlled callback and physical-write barriers cover 16 ordinary handlers,
+eight pending reverse calls, two lifecycle permits, overload without a callback,
+retained permits and base ID reuse, parent descendants versus siblings, absent
+forward deadlines, queue-inclusive reverse clipping, frame/byte admission, terminal
+credit arithmetic and committed overflow. Both writer directions face sustained
+control traffic and assert ordinary progress within four control frames. The
+fake host uses the same bounded writer over the real parent pipe. Cleanup
+failure/panic, hung callbacks/cleanup and disconnect observe actual child exit.
+The 200 ms shutdown and short forward budgets in fault recipes are fixture-only
+safety/test values; they never change SDK defaults.

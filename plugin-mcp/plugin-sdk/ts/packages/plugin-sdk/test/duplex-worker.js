@@ -29,9 +29,11 @@ if (profile?.startsWith("fault:")) {
   }
 } else {
   const releases = new Map();
+  let fixtureRelease;
   const stop = fixtureControl((value) => {
     fixtureEvent({ kind: "control_received", seq: value.seq });
     releases.get(value.gate)?.();
+    fixtureRelease?.(value.gate);
   });
   fixtureEvent({ kind: "ready" });
   if (profile === "control-only") {
@@ -40,9 +42,16 @@ if (profile?.startsWith("fault:")) {
     const { fixturePlugin } = await import("./fixtures.js");
     const { serveConnection } = await import("../dist/serve.js");
     const { Correlation } = await import("../dist/correlation.js");
-    const core = new Correlation(profile === "duplex-smoke");
+    const core = new Correlation(
+      profile === "duplex-smoke" ||
+        (profile.startsWith("expanded") && profile !== "expanded-base"),
+    );
     core.methodTimeoutMS = { "host/log": 10000 }; // Fixture-only offer, never a SDK fallback.
-    let plugin = fixturePlugin(profile === "duplex-smoke" ? "base" : profile),
+    let plugin = fixturePlugin(
+        profile === "duplex-smoke" || profile.startsWith("expanded")
+          ? "base"
+          : profile,
+      ),
       unloads = 0;
     if (profile === "full") {
       const command = plugin.command;
@@ -104,6 +113,14 @@ if (profile?.startsWith("fault:")) {
         health_calls: healths,
       });
     }
+    let options = {};
+    if (profile.startsWith("expanded")) {
+      const { childCases } = await import("./child-cases-worker.js");
+      const fixture = childCases(profile, core, fixtureEvent, releases);
+      plugin = fixture.plugin;
+      options = fixture.options;
+      fixtureRelease = fixture.release;
+    }
     releases.set("snapshot", () =>
       fixtureEvent({
         kind: "snapshot",
@@ -111,7 +128,7 @@ if (profile?.startsWith("fault:")) {
       }),
     );
     try {
-      await serveConnection(plugin, {}, core);
+      await serveConnection(plugin, options, core);
       fixtureEvent({
         kind: "finished",
         effects: plugin.effects?.() ?? { unload_attempts: unloads },
@@ -120,7 +137,7 @@ if (profile?.startsWith("fault:")) {
     } catch (error) {
       fixtureEvent({
         kind: "finished",
-        effects: { unload_attempts: unloads },
+        effects: plugin.effects?.() ?? { unload_attempts: unloads },
         transport_error: error.name,
       });
       process.exitCode = 1;
