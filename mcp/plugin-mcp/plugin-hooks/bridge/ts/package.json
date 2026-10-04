@@ -1,0 +1,13 @@
+{
+  "name": "@hollis-labs/plugin-hooks-sdk-bridge-reference",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}
