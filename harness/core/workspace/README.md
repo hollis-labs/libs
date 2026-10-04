@@ -70,9 +70,11 @@ encoding and input binding; this is independent of the provider renderer corpus.
 Before the first harness tag, `adapters/wrapper.Config.MaterializationEngine`
 and `agentlaunch.WithMaterializationEngine` are removed. Their replacements are
 `ArtifactAuthorization` and `WithArtifactAuthorization`, both using
-`agentlaunch.ArtifactAuthorizer`, rather than `materialize.Engine`. The
-`Engine` fields on legacy planters, the `Now` artifact override,
-`DefaultMaterializer.DirMode` and `bootdir.Writer.AtomicWrite` are also removed.
+`agentlaunch.ArtifactAuthorizer`, rather than `materialize.Engine`. The removed fields are `agentlaunch.SharedPrepareOptions.Engine`,
+`agentlaunch.ArtifactMaterializationRequest.Engine` and `.Now`,
+`plant.SharedPlanter.Engine`, `agentlaunch.MaterializerOptions.DirMode` and
+`bootdir.Writer.AtomicWrite`. Their replacements supply explicit authorization;
+`bootdir.Writer.OnWritten` observes committed metadata only.
 No compatibility adapter converts an engine or a path into authority.
 
 `ArtifactAuthority` supplies explicit inactive/private custody attestations,

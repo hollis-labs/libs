@@ -31,9 +31,10 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - Pre-first-tag API break: wrapper `Config.MaterializationEngine` and
   `WithMaterializationEngine` are replaced by `ArtifactAuthorization` and
   `WithArtifactAuthorization`, using `agentlaunch.ArtifactAuthorizer` instead
-  of `materialize.Engine`. Legacy planter `Engine`, artifact `Now`,
-  `DefaultMaterializer.DirMode` and `bootdir.Writer.AtomicWrite` overrides are
-  removed without a compatibility authority adapter.
+  of `materialize.Engine`. Removed fields are `SharedPrepareOptions.Engine`,
+  `ArtifactMaterializationRequest.Engine` and `.Now`, `plant.SharedPlanter.Engine`,
+  `MaterializerOptions.DirMode` and `bootdir.Writer.AtomicWrite`, without a
+  compatibility authority adapter.
 - All five session start paths require explicit inactive/private artifact
   custody through `StartOptions.ArtifactRoot` and `ArtifactAuthorization`.
   Missing/invalid authority refuses before rendering or mutation. Verified
