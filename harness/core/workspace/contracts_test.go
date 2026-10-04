@@ -87,6 +87,8 @@ func TestCredentialAndControlSlotsNeverManaged(t *testing.T) {
 	if err := workspace.ValidateManagedTree(artifact.Tree{}, nil); err != nil {
 		t.Fatal("empty tree must be an explicit no-op:", err)
 	}
+	refusal(t, workspace.ValidateManagedTree(artifact.Tree{}, []string{"../escape"}), "invalid_credential_destination")
+	refusal(t, workspace.ValidateManagedManifest(materialize.Manifest{}, []string{"../escape"}), "invalid_credential_destination")
 	manifest := materialize.Manifest{Entries: []materialize.ManifestEntry{{Path: "auth.json", Kind: artifact.EntryFile}}}
 	refusal(t, workspace.ValidateManagedManifest(manifest, nil), "credential_owned_invalid")
 	bad := tree("AGENTS.md")

@@ -175,6 +175,9 @@ func (r RootRef) Validate() error {
 	if !cleanAbsolute(r.Path) || !cleanAbsolute(r.AllowedBase) || !within(r.AllowedBase, r.Path) {
 		return refuse("unsafe_root", "root", Conflict)
 	}
+	if filepath.Dir(r.Path) == r.Path {
+		return refuse("protected_filesystem_root", "root", Conflict)
+	}
 	return nil
 }
 func cleanAbsolute(p string) bool {
@@ -189,6 +192,11 @@ func within(base, target string) bool {
 // claimed owner/concern. Explicit additional credential destinations are also
 // excluded, including descendants and ancestors that would remove them.
 func ValidateManagedTree(tree artifact.Tree, credentialDestinations []string) error {
+	for _, dest := range credentialDestinations {
+		if artifact.ValidateRelPath(dest) != nil {
+			return refuse("invalid_credential_destination", "credentials", Conflict)
+		}
+	}
 	entries, err := artifact.Normalize(tree.Entries)
 	if err != nil {
 		return refuse("invalid_artifact_tree", "artifacts", Conflict)
@@ -222,8 +230,14 @@ func ValidateManagedTree(tree artifact.Tree, credentialDestinations []string) er
 // ValidateManagedManifest prevents legacy credential claims from entering an
 // apply or removal plan. It does not bootstrap ownership from desired content.
 func ValidateManagedManifest(manifest materialize.Manifest, credentialDestinations []string) error {
+	for _, dest := range credentialDestinations {
+		if artifact.ValidateRelPath(dest) != nil {
+			return refuse("invalid_credential_destination", "credentials", Conflict)
+		}
+	}
 	for _, e := range manifest.Entries {
-		if artifact.ValidateRelPath(e.Path) != nil || credentialPath(e.Path) {
+		folded := strings.ToLower(e.Path)
+		if artifact.ValidateRelPath(e.Path) != nil || credentialPath(e.Path) || folded == ".materialize" || strings.HasPrefix(folded, ".materialize/") {
 			return refuse("credential_owned_invalid", "manifest", Conflict)
 		}
 		for _, dest := range credentialDestinations {
