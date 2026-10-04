@@ -167,3 +167,74 @@ func TestFrameServeCannotFitError(t *testing.T) {
 		t.Fatalf("%v %s", err, output.Bytes())
 	}
 }
+
+func TestBoundedEncodingDeterministicBytes(t *testing.T) {
+	type Inner struct {
+		Shadow string `json:"shadow"`
+		First  string `json:"first"`
+		N      int    `json:"n,string"`
+	}
+	type Outer struct {
+		Start string `json:"start"`
+		Inner
+		Last   string `json:"last"`
+		Shadow string `json:"shadow"`
+		Empty  string `json:"empty,omitempty"`
+	}
+	type Left struct {
+		Clash string
+		L     int `json:"left"`
+	}
+	type Right struct {
+		Clash string
+		R     int `json:"right"`
+	}
+	type Ambiguous struct {
+		Left
+		Right
+		Tail string `json:"tail"`
+	}
+	cases := []struct {
+		name  string
+		value any
+	}{
+		{"embedded and dominant index", Outer{Start: "a", Inner: Inner{Shadow: "hidden", First: "b", N: 3}, Last: "c", Shadow: "selected"}},
+		{"ambiguous embedded fields", Ambiguous{Left: Left{"hidden", 1}, Right: Right{"hidden", 2}, Tail: "end"}},
+		{"nil embedded pointer", struct {
+			Before int `json:"before"`
+			*Inner
+			After int `json:"after"`
+		}{Before: 1, After: 2}},
+		{"string maps", map[string]any{"z": 3, "a": map[string]any{"y": true, "b": "text"}, "m": []any{2, 1}}},
+		{"integer maps", map[int]string{2: "two", 10: "ten", -1: "negative", 0: "zero"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			want, err := json.Marshal(tc.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 100; i++ {
+				got, err := marshalBounded(tc.value, 4096)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(got, want) {
+					t.Fatalf("iteration %d: got %s want %s", i, got, want)
+				}
+			}
+		})
+	}
+	// The allowed HTML/line-separator escaping difference is still repeatable.
+	value := map[string]any{"z": "<>&\u2028\u2029", "a": "first"}
+	want, err := marshalBounded(value, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 100; i++ {
+		got, err := marshalBounded(value, 4096)
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("iteration %d: %s %v", i, got, err)
+		}
+	}
+}

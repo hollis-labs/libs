@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -219,7 +220,16 @@ func (e *frameEncoder) value(v reflect.Value, depth int) error {
 		if err := e.text("{"); err != nil {
 			return err
 		}
-		first := true
+		// Every entry needs at least five bytes (key, colon, value and
+		// delimiter). Reject impossible maps before allocating sorting metadata.
+		if v.Len() > (e.limit-len(e.data))/5 {
+			return &FrameTooLargeError{Direction: "output", Limit: e.limit + 1}
+		}
+		type mapEntry struct {
+			name  string
+			value reflect.Value
+		}
+		entries := make([]mapEntry, 0, v.Len())
 		iter := v.MapRange()
 		for iter.Next() {
 			key := iter.Key()
@@ -234,19 +244,22 @@ func (e *frameEncoder) value(v reflect.Value, depth int) error {
 			default:
 				return errors.New("unsupported JSON map key")
 			}
-			if !first {
+			entries = append(entries, mapEntry{name: name, value: iter.Value()})
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].name < entries[j].name })
+		for i, entry := range entries {
+			if i > 0 {
 				if err := e.text(","); err != nil {
 					return err
 				}
 			}
-			first = false
-			if err := e.quoted(name); err != nil {
+			if err := e.quoted(entry.name); err != nil {
 				return err
 			}
 			if err := e.text(":"); err != nil {
 				return err
 			}
-			if err := e.value(iter.Value(), depth+1); err != nil {
+			if err := e.value(entry.value, depth+1); err != nil {
 				return err
 			}
 		}
@@ -277,12 +290,13 @@ func emptyJSON(v reflect.Value) bool {
 type frameField struct {
 	value                reflect.Value
 	name                 string
-	depth                int
+	depth, order         int
 	tagged, omit, quoted bool
 }
 
 func (e *frameEncoder) fields(v reflect.Value, depth int, first *bool) error {
 	fields := make(map[string][]frameField)
+	order := 0
 	var collect func(reflect.Value, int) error
 	collect = func(obj reflect.Value, level int) error {
 		if level+depth > 128 {
@@ -315,19 +329,21 @@ func (e *frameEncoder) fields(v reflect.Value, depth int, first *bool) error {
 			if name == "" {
 				name = f.Name
 			}
-			item := frameField{value: value, name: name, depth: level, tagged: tag[0] != ""}
+			item := frameField{value: value, name: name, depth: level, order: order, tagged: tag[0] != ""}
 			for _, option := range tag[1:] {
 				item.omit = item.omit || option == "omitempty"
 				item.quoted = item.quoted || option == "string"
 			}
 			fields[name] = append(fields[name], item)
+			order++
 		}
 		return nil
 	}
 	if err := collect(v, 0); err != nil {
 		return err
 	}
-	for name, candidates := range fields {
+	selected := make([]frameField, 0, len(fields))
+	for _, candidates := range fields {
 		min := candidates[0].depth
 		for _, f := range candidates {
 			if f.depth < min {
@@ -350,7 +366,13 @@ func (e *frameEncoder) fields(v reflect.Value, depth int, first *bool) error {
 		if len(matches) != 1 {
 			continue
 		}
-		f := matches[0]
+		selected = append(selected, matches[0])
+	}
+	// Declaration/index order is determined by the winning field, not the
+	// first occurrence of a name that may later be shadowed.
+	sort.Slice(selected, func(i, j int) bool { return selected[i].order < selected[j].order })
+	for _, f := range selected {
+		name := f.name
 		value := f.value
 		if f.omit && emptyJSON(value) {
 			continue
