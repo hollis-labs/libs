@@ -1,0 +1,67 @@
+{
+  "level": "normative",
+  "profile": "hooks-negotiated",
+  "purpose": "Wrong version retains strict typed Init rejection and never enables hooks.",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": [],
+          "hooks_profile": {
+            "hooks_profile_version": 2
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "error": {
+          "code": -32602,
+          "message": "subprocess init: profile_mismatch (hooks_profile.hooks_profile_version)",
+          "data": {
+            "contract": "plugin-init/2",
+            "code": "profile_mismatch",
+            "field": "hooks_profile.hooks_profile_version",
+            "expected": 1,
+            "received": 2
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "hook/handle",
+        "params": {}
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32600,
+          "message": "successful init required"
+        }
+      }
+    }
+  ]
+}

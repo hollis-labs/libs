@@ -1,6 +1,6 @@
 {
   "level": "normative",
-  "profile": "hooks-fixture",
+  "profile": "hooks-negotiated",
   "steps": [
     {
       "level": "normative",
@@ -39,7 +39,8 @@
           "version": "1.0.0",
           "description": "conformance",
           "protocol": 2,
-          "capability_contract": 1
+          "capability_contract": 1,
+          "hooks_profile_version": 1
         }
       }
     },

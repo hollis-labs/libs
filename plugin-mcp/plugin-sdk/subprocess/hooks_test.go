@@ -26,12 +26,25 @@ func enableHookFixture(t *testing.T) {
 
 type hookTranscriptPlugin struct{ transcriptFull }
 
-func (p *hookTranscriptPlugin) Init(ctx context.Context, params InitParams) (InitResult, error) {
-	r, err := p.transcriptFull.Init(ctx, params)
+// This plugin authors profile fields without implementing HookHandler. The
+// runtime must not let authored acknowledgements enable a connection.
+type hookDeclinedPlugin struct{ transcriptBase }
+
+func (p *hookDeclinedPlugin) Init(ctx context.Context, params InitParams) (InitResult, error) {
+	r, err := p.transcriptBase.Init(ctx, params)
 	v := 1
 	r.HooksProfileVersion = &v
+	r.ReverseRPCVersion = &v
 	return r, err
 }
+
+func hookTranscriptFor(profile string) Plugin {
+	if profile == "hooks-declined" {
+		return &hookDeclinedPlugin{}
+	}
+	return &hookTranscriptPlugin{}
+}
+
 func (p *hookTranscriptPlugin) HookHandle(ctx context.Context, r HookHandleParams) (HookHandleResult, error) {
 	directive := r.Metadata["fixture"]
 	switch {
@@ -220,7 +233,7 @@ func TestHookLeaseIncludesBatchQueueAndCancellation(t *testing.T) {
 	}
 }
 
-// Child enablement exists only in the test binary, never an installed plugin.
+// Only the legacy fixture profile bypasses negotiation in this test binary.
 func TestHookChild(t *testing.T) {
 	profile := os.Getenv("HOOK_TEST_CHILD")
 	if profile == "" {
@@ -232,7 +245,7 @@ func TestHookChild(t *testing.T) {
 	// The programmable raw lane is a NON-SDK fake-reply test double. The
 	// request still enters Serve, but the output wrapper replaces only named replies.
 	raw := &hookFixtureRaw{replies: map[string]json.RawMessage{}}
-	if err := ServeWithOptions(&hookTranscriptPlugin{}, ServeOptions{Input: raw.input(os.Stdin), Output: raw}); err != nil {
+	if err := ServeWithOptions(hookTranscriptFor(profile), ServeOptions{Input: raw.input(os.Stdin), Output: raw}); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -516,6 +529,59 @@ func TestHookBridgeFixtureDirectives(t *testing.T) {
 		}
 		if err == nil {
 			t.Fatalf("raw fake reply %s unexpectedly valid", name)
+		}
+	}
+}
+
+// Reusing one author object across connections must not carry negotiation state.
+func TestHookNegotiationIsConnectionLocal(t *testing.T) {
+	p := &hookTranscriptPlugin{}
+	hook := hookTestParams(t)
+	for _, offered := range []bool{true, false} {
+		var frames [][]byte
+		s := &server{plugin: p, logger: newStderrLogger(newSecretTracker()), writeFrame: func(b []byte) { frames = append(frames, b) }}
+		params := validInitParams()
+		params.Incarnation = hook.Scope.Incarnation
+		if offered {
+			params.HooksProfile = &HooksProfile{HooksProfileVersion: 1}
+		}
+		s.dispatch(context.Background(), RPCRequest{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: params})
+		var init RPCResponse
+		if err := json.Unmarshal(frames[0], &init); err != nil {
+			t.Fatal(err)
+		}
+		if init.Error != nil {
+			t.Fatal(init.Error)
+		}
+		var result InitResult
+		if err := json.Unmarshal(init.Result, &result); err != nil {
+			t.Fatal(err)
+		}
+		if offered {
+			if result.HooksProfileVersion == nil || *result.HooksProfileVersion != 1 {
+				t.Fatalf("missing ack: %+v", result)
+			}
+		} else if result.HooksProfileVersion != nil {
+			t.Fatal("negotiation leaked across connections")
+		}
+		s.dispatch(context.Background(), RPCRequest{JSONRPC: "2.0", ID: NumberID(2), Method: MethodHookHandle, Params: hook})
+		var reply RPCResponse
+		if err := json.Unmarshal(frames[1], &reply); err != nil {
+			t.Fatal(err)
+		}
+		if offered {
+			if reply.Error != nil {
+				t.Fatal(reply.Error)
+			}
+			var r HookHandleResult
+			if err := json.Unmarshal(reply.Result, &r); err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "ok" {
+				t.Fatalf("unexpected hook result: %+v", r)
+			}
+		} else if reply.Error == nil || reply.Error.Code != -32601 {
+			t.Fatalf("hook allowed without offer: %+v", reply)
 		}
 	}
 }

@@ -77,7 +77,10 @@ func hookContextFailure(ctx context.Context, p HookHandleParams) HookHandleResul
 }
 func (s *server) dispatchHook(ctx context.Context, req RPCRequest) {
 	received := time.Now()
-	if !s.hooksFixtureEnabled {
+	s.initMu.Lock()
+	enabled := s.hooksEnabled || s.hooksFixtureEnabled
+	s.initMu.Unlock()
+	if !enabled {
 		s.writeHookError(req.ID, ErrCodeMethodNotFound, "profile_unavailable", nil)
 		return
 	}

@@ -48,9 +48,14 @@ Optional `host_services` offers reverse profile version 1, a matching incarnatio
 closed shared method inventory and finite uint32 limits. Optional `hooks_profile`
 offers `{ "hooks_profile_version": 1 }` independently. Result acknowledgements
 are `reverse_rpc_version:1` and `hooks_profile_version:1`; an acknowledgement
-without its offer fails. Current Serve implementations validate offers and omit
-both acknowledgements, visibly declining them. Hosts requiring either profile
-fail before activation. No reverse RPC, hook dispatch or HTTP fallback is supplied.
+without its offer fails. Serve acknowledges hooks/1 only when the valid offer
+is present and the plugin implements Go HookHandler or TS hookHandle; the runtime
+owns that acknowledgement and enables hook dispatch for that connection. Missing
+offers or handlers omit it. Wrong hooks versions retain the typed Init rejection.
+See [hooks/1](hooks.md) for single/batch dispatch and shared negotiation transcripts.
+Reverse offers remain declined: reverse_rpc_version is omitted, hook handlers get
+no host client, and no plugin-originated callbacks or HTTP fallback are supplied.
+A host requiring an unacknowledged profile must fail before activation.
 Application host errors -32010 and contract `host-rpc/1` belong to the later
 reverse profile, not Init errors.
 

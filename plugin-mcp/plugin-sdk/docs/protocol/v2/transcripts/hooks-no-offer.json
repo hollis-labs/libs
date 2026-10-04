@@ -1,6 +1,6 @@
 {
   "level": "normative",
-  "profile": "hooks-declined",
+  "profile": "hooks-negotiated",
   "steps": [
     {
       "level": "normative",
@@ -24,10 +24,7 @@
             "owner_id": "fixture",
             "owner_generation": 1
           },
-          "grants": [],
-          "hooks_profile": {
-            "hooks_profile_version": 1
-          }
+          "grants": []
         }
       },
       "expect": {
@@ -126,5 +123,5 @@
       }
     }
   ],
-  "purpose": "A valid offer without HookHandler declines even if the plugin authors profile acknowledgements."
+  "purpose": "A handler without a host offer does not enable hooks; profile acknowledgements are absent."
 }

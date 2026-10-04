@@ -182,7 +182,11 @@ Protocol 2 requires the strict Init contract described in
 [the handshake](../../../docs/protocol/v2/README.md). Harness options `grants`
 and `incarnation` replace the old name-only grant option; default grants are
 empty and the harness supplies a test incarnation. Results acknowledge both
-`protocol:2` and `capability_contract:1`. Optional reverse/hook offers are
-validated and declined by the current runtime; their transports are not implemented.
+`protocol:2` and `capability_contract:1`. A valid hooks/1 offer
+is acknowledged only when the plugin implements `hookHandle`; hook methods then
+route for that connection. The runtime owns the acknowledgement. Missing offers
+or handlers leave it absent, while invalid versions retain typed Init errors.
+Reverse offers stay declined, and hook contexts provide no host client or
+plugin-originated callbacks. See [hooks/1](../../../docs/protocol/v2/hooks.md).
 
 Runtime params require the fields in the protocol-2 [payload matrix](../../../docs/protocol/v2/payloads.md). Optional `context` reuses the closed `ForwardContext` DTO; callbacks read `context.forwardContext`. It carries metadata only; this runtime does not authorize bindings or enforce its timeout. Invalid params return -32602 before invocation, and unrepresentable or malformed results return -32603.

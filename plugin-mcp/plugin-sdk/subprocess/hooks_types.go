@@ -6,7 +6,7 @@ import (
 	"github.com/hollis-labs/plugin-sdk/capability"
 )
 
-// HooksProfileVersion is reserved; Serve still declines this profile.
+// HooksProfileVersion is acknowledged when Init offers it and the plugin implements HookHandler.
 const HooksProfileVersion = 1
 const MaxHookBatchItems = 64
 const MaxHookDTOBytes = 1 << 20
@@ -63,8 +63,8 @@ type HookHandleBatchResult struct {
 	Items []HookHandleResult `json:"items"`
 }
 
-// HookHandler is a reserved author interface. Implementing it does not enable
-// the hooks profile or acknowledge its Init offer.
+// HookHandler opts into hooks/1 when the host offers it during Init.
+// Hook calls receive no host client; reverse callbacks are negotiated separately.
 type HookHandler interface {
 	HookHandle(context.Context, HookHandleParams) (HookHandleResult, error)
 }

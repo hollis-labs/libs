@@ -43,6 +43,7 @@ export class Dispatcher {
   get ready(): boolean { return this.initialized; }
   private attempted = false;
   private initialized = false;
+  private hooksEnabled = false;
   private hookIncarnation?: Wire.RuntimeIdentity;
   private unloadAttempt?: Promise<void>;
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker, outputLimit = DEFAULT_FRAME_BYTES) { this.outputLimit = outputLimit; this.plugin = plugin; this.context = context; this.secrets = secrets; }
@@ -50,7 +51,7 @@ export class Dispatcher {
   async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
     const id = req.id;
     try {
-      if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,this.context,req,this.hookIncarnation,hooksFixtureEnabled(this.plugin));
+      if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,this.context,req,this.hookIncarnation,this.hooksEnabled || hooksFixtureEnabled(this.plugin));
       const result = await this.call(req);
       if(req.method !== "plugin/init") validateRuntimeResult(req.method,result,this.outputLimit - 1);
       return id === undefined ? undefined : { jsonrpc: '2.0', id, result };
@@ -88,12 +89,15 @@ export class Dispatcher {
           } else input = decodeInitParams(JSON.stringify(req.params));
         } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
         this.context = { ...ctx, forwardContext:input.context, config: new ConfigReader(input.config, this.secrets) };
+        // Capture the host's offer before author code can mutate its input.
+        const hooksEnabled = input.hooks_profile?.hooks_profile_version === 1 && typeof p.hookHandle === 'function';
         const authored = await p.init(this.context, input);
         encodeBoundedJSON(authored, this.outputLimit - 1);
         const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
-        const result = decodeInitResult(encodeInitResult(base));
+        const result = decodeInitResult(encodeInitResult({...base,...(hooksEnabled ? {hooks_profile_version:1 as const} : {})}));
         validateInitResult(input,result);
         await this.identity(input.identity,this.context);
+        this.hooksEnabled = hooksEnabled;
         this.hookIncarnation = input.incarnation;
         this.initialized = true;
         return result;
