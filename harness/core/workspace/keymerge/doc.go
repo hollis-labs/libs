@@ -71,11 +71,12 @@
 // is returned byte for byte; the same document laid out any other way comes
 // back in this layout.
 //
-// A member of the found document that the desired document declares, and that
-// holds an object naming a key twice, cannot be merged member by member: the
-// declared value is written, with a Note of type_conflict. Only the top-level
-// object is refused for duplicates. A declared member whose own object names a
-// key twice cannot be walked either and is copied as written.
+// Only the top-level object is refused for duplicates. A member the desired
+// document declares and the caller owns, whose object in the found document
+// names a key twice, cannot be merged member by member: the declared value is
+// written, with a Note of type_conflict. (A found member the caller does not own
+// stands as it is, duplicates and all.) A declared member whose own object names
+// a key twice cannot be walked either and is copied as written.
 //
 // # Documents that cannot be read
 //
@@ -125,9 +126,9 @@
 // removed key, a respelled number, a duplicate key or an unreadable document is
 // not. For TOML both sides are normalized with the encoder (NormalizeTOML),
 // which forgives what the encoder moves. A key the desired document does not
-// declare, and a declared key the caller does not own, are not compared. An
-// unreadable document is a verdict, not an error: it never matches, and the
-// Outcome and Reason say why.
+// declare, and a declared key the caller does not own, are not compared. A
+// document that cannot be read is a verdict, not an error: against a readable
+// desired document it never matches, and the Outcome and Reason say why.
 //
 // # Notes
 //
