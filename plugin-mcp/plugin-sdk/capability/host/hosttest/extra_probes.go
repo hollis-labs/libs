@@ -45,7 +45,7 @@ func extraProbes(descriptor capability.Descriptor) []probe {
 			return err
 		}
 		defer i.Close()
-		_, _, err = i.Activate(ctx, initJSON(f), []host.Request{{Name: core, SchemaVersion: 7, Scope: f.Policy}})
+		_, _, err = i.Activate(ctx, initJSON(f), []host.Request{{Name: core, SchemaVersion: differentVersion(descriptor.SchemaVersion), Scope: f.Policy}})
 		if err == nil || o.Snapshot().Activations != 0 {
 			return suiteError("version mismatch activated")
 		}
@@ -257,7 +257,7 @@ func unsupportedProbes(supported []capability.Descriptor) []probe {
 			// No installed grant can authorize an unsupported descriptor.
 			return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
 				c.Direct = true
-				return denied(ctx, i, o, c, capability.UnsupportedCapability)
+				return denied(ctx, i, o, c, "")
 			})
 		}})
 	}

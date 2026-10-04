@@ -95,12 +95,35 @@ func Evaluate(ctx context.Context, a Adapter, profile Profile) Report {
 			supported = append(supported, f.Catalog[0])
 		}
 	}
+	seen := map[string]bool{}
+	sharedNames := map[string]bool{}
+	for _, d := range capability.SharedDescriptors() {
+		sharedNames[d.Name] = true
+	}
+	selected := []string{}
+	extensions := []capability.Descriptor{}
+	profileFailure := func(reason string) Report {
+		v := Violation{"C02", "profile", reason}
+		return Report{Violations: []Violation{v}, Requirements: []RequirementResult{{ID: "C02", Status: Failed, Violations: []Violation{v}}, {ID: "C09", Status: HostOwned}}}
+	}
 	for _, d := range supported {
+		if seen[d.Name] {
+			return profileFailure("duplicate descriptor name")
+		}
+		seen[d.Name] = true
 		if d.SchemaVersion < 1 || uint64(d.SchemaVersion) > uint64(^uint32(0)) {
-			v := Violation{"C02", "profile", "invalid descriptor version"}
-			return Report{Violations: []Violation{v}, Requirements: []RequirementResult{{ID: "C02", Status: Failed, Violations: []Violation{v}}, {ID: "C09", Status: HostOwned}}}
+			return profileFailure("invalid descriptor version")
+		}
+		if sharedNames[d.Name] {
+			selected = append(selected, d.Name)
+		} else {
+			extensions = append(extensions, d)
 		}
 	}
+	if _, err := capability.NewCatalog(selected, extensions); err != nil {
+		return profileFailure("invalid descriptor name or definition")
+	}
+
 	names := map[string]bool{}
 	for _, d := range supported {
 		names[d.Name] = true
@@ -361,7 +384,7 @@ func probes(supported []capability.Descriptor) []probe {
 				f.Grants[0].Name = "host.example.unknown"
 				c.Call.Capability = f.Grants[0].Name
 			case "version":
-				f.Grants[0].SchemaVersion = uint32(coreDescriptor.SchemaVersion + 1)
+				f.Grants[0].SchemaVersion = differentVersion(coreDescriptor.SchemaVersion)
 			case "scope":
 				var s capability.Scope
 				json.Unmarshal(f.Grants[0].Scope, &s)
@@ -383,9 +406,9 @@ func probes(supported []capability.Descriptor) []probe {
 	}
 	add("C02", "shared descriptor cannot be overwritten", func(ctx context.Context, a Adapter) error {
 		f, _ := basic(core)
-		d := f.Catalog[0]
-		d.Name = core
-		d.EffectCeiling = capability.Read
+		shared := capability.SharedDescriptors()[0]
+		d := shared
+		d.Description = "attempted shared descriptor replacement"
 		f.Overrides = []capability.Descriptor{d}
 		o := new(Observer)
 		i, err := a.Open(ctx, f, o)
@@ -398,7 +421,7 @@ func probes(supported []capability.Descriptor) []probe {
 		if o.Snapshot().Activations != 0 || o.Snapshot().Executions != 0 {
 			return suiteError("override caused activation/effect")
 		}
-		return namedFailure(err, capability.UnsupportedCapability, core)
+		return namedFailure(err, capability.UnsupportedCapability, shared.Name)
 	})
 	for _, problem := range []string{"absent binding", "revoked", "expired", "audience", "owner", "generation", "host epoch", "target"} {
 		add("C03", "direct "+problem, func(ctx context.Context, a Adapter) error {
@@ -444,12 +467,12 @@ func probes(supported []capability.Descriptor) []probe {
 			second.Call.Dimensions = cloneMap(c.Call.Dimensions)
 			second.Call.GrantID = "other-grant"
 			second.Call.RequestID = 2
-			second.Call.Dimensions[resourceKey(f.Policy)] = "other"
+			setResource(&second.Call, resourceKey(f.Policy), "other")
 			if err := allowed(ctx, i, o, second); err != nil {
 				return err
 			}
 			c.Call.RequestID = 3
-			c.Call.Dimensions[resourceKey(f.Policy)] = "other"
+			setResource(&c.Call, resourceKey(f.Policy), "other")
 			return denied(ctx, i, o, c, capability.ScopeDenied)
 		})
 	})
@@ -622,7 +645,7 @@ func probes(supported []capability.Descriptor) []probe {
 						return err
 					}
 					after := o.Snapshot()
-					if r.Failure.Code != capability.ScopeDenied || r.Failure.EffectState != capability.NotStarted || after.Executions != before.Executions || after.Reserved-after.Released != before.Reserved-before.Released {
+					if r.HTTPStatus != 302 || r.Failure.Code != capability.ScopeDenied || r.Failure.EffectState != capability.NotStarted || after.RedirectResponses != before.RedirectResponses+1 || after.Executions != before.Executions || after.Reserved-after.Released != before.Reserved-before.Released {
 						return suiteError("redirect followed or not refused")
 					}
 				} else if problem == "proxy" {
@@ -868,7 +891,7 @@ func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want c
 		return reply, err
 	}
 	after := o.Snapshot()
-	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.Contract != "host-rpc/1" || reply.Failure.Code != want || reply.Failure.RequestID != c.Call.RequestID || reply.Failure.Retryable || reply.Failure.EffectState != capability.NotStarted {
+	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.Contract != "host-rpc/1" || (want != "" && reply.Failure.Code != want) || reply.Failure.RequestID != c.Call.RequestID || reply.Failure.Retryable || reply.Failure.EffectState != capability.NotStarted {
 		if reply.Failure == nil {
 			return reply, suiteError("missing application refusal")
 		}
@@ -1183,4 +1206,21 @@ func freshSecret() string {
 		panic(err)
 	}
 	return hex.EncodeToString(raw[:])
+}
+
+// Profile versions have already passed the uint32 range check.
+func differentVersion(version int) uint32 {
+	v := uint32(version)
+	if v == ^uint32(0) {
+		return v - 1
+	}
+	return v + 1
+}
+
+func setResource(call *host.Call, key, value string) {
+	if key == "targets" {
+		call.Target = value
+	} else {
+		call.Dimensions[key] = value
+	}
 }

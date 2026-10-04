@@ -67,7 +67,7 @@ type Reply struct {
 	Payload    string
 	Wire       json.RawMessage `json:"-"`
 	WireBytes  int64           `json:"-"`
-	Data       json.RawMessage `json:"-"` // Received application error.data bytes. Local synthesized refusals cannot establish conformance.
+	Data       json.RawMessage `json:"-"` // Received application error.data bytes. Local synthesized refusals cannot establish host admission; the redirect probe separately checks observed 302 delivery and target effects.
 	Failure    *capability.RPCErrorData
 	Tools      []string
 }
@@ -159,6 +159,7 @@ func (g *Gate) Release() {
 type Observation struct {
 	Executions         int
 	ProxyRequests      int
+	RedirectResponses  int
 	Activations        int
 	Reserved, Released int
 	Audits             []host.AuditEvent
@@ -275,3 +276,7 @@ func (o *Observer) SecretInput(surface, value string) {
 		o.state.SensitiveInputs[surface]++
 	}
 }
+
+// RedirectResponse records an actual fixture 302, independently of the client's
+// classification. Its destination must instrument execution when followed.
+func (o *Observer) RedirectResponse() { o.mu.Lock(); defer o.mu.Unlock(); o.state.RedirectResponses++ }

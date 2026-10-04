@@ -44,6 +44,7 @@ type referenceInstance struct {
 	observer               *Observer
 	catalog                *capability.Catalog
 	server                 *httptest.Server
+	redirectTarget         *httptest.Server
 	plugin                 *httptest.Server
 	proxy                  *httptest.Server
 	client                 *http.Client
@@ -54,6 +55,7 @@ type referenceInstance struct {
 	rateUsed               int64
 	graph                  map[string][]string
 	tools                  map[string]toolDefinition
+	nativeEffects          map[string]capability.Effect
 	generation             uint64
 	audience, wrongOwner   string
 	policy                 capability.Scope
@@ -99,6 +101,12 @@ func (a referenceAdapter) Open(ctx context.Context, f Fixture, o *Observer) (Ins
 	}
 	lease, cancel := context.WithCancel(context.Background())
 	r := &referenceInstance{fixture: f, observer: o, catalog: catalog, client: &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 4 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, broken: a.broken, generation: 1, audience: "stdio", policy: cloneScope(f.Policy), grants: append(capability.GrantSet{}, f.Grants...), lease: lease, cancel: cancel, requests: map[requestKey]context.CancelFunc{}, graph: map[string][]string{}, tools: map[string]toolDefinition{"server/tool": {"1", capability.Write}}, store: map[string]int{}, artifacts: map[string]string{}}
+	r.nativeEffects = map[string]capability.Effect{}
+	for _, d := range extensions {
+		for _, op := range d.Operations {
+			r.nativeEffects[op] = d.EffectCeiling
+		}
+	}
 	r.bindingScopes = map[string]capability.Scope{}
 	for _, g := range f.Grants {
 		var scope capability.Scope
@@ -150,7 +158,14 @@ func (a referenceAdapter) Open(ctx context.Context, f Fixture, o *Observer) (Ins
 		r.observer.ReceivedCaller(caller)
 		w.WriteHeader(http.StatusNoContent)
 	}))
+	r.redirectTarget = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.execute(host.Call{Capability: capability.MCPReach, Operation: req.URL.Query().Get("operation"), Target: "owner", Effect: capability.Write, RequestID: 1})
+		r.writeReply(w, Reply{})
+	}))
 	r.server = httptest.NewServer(http.HandlerFunc(r.serve))
+	if r.broken == "follow redirects" || r.broken == "redirect executes" || r.broken == "redirect hides execution" {
+		r.client.CheckRedirect = nil
+	}
 	r.proxy = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		r.observer.ProxyRequest()
 		forward := req.Clone(req.Context())
@@ -188,6 +203,9 @@ func (r *referenceInstance) Close() error {
 	}
 	if r.plugin != nil {
 		r.plugin.Close()
+	}
+	if r.redirectTarget != nil {
+		r.redirectTarget.Close()
 	}
 	if r.proxy != nil {
 		r.proxy.Close()
@@ -279,8 +297,23 @@ func (r *referenceInstance) Invoke(ctx context.Context, a Attempt) (Reply, error
 		return Reply{}, err
 	}
 	defer response.Body.Close()
+	if a.Redirect && r.broken == "redirect hides execution" {
+		refusal := application(capability.ScopeDenied, a.Call.RequestID, "")
+		refusal.HTTPStatus = http.StatusFound
+		return refusal, nil
+	}
 	if response.StatusCode >= 300 && response.StatusCode < 400 {
-		return Reply{HTTPStatus: response.StatusCode}, nil
+		// Normalize an observed HTTP redirect as a client-side refusal. A client
+		// that follows it reaches the separately instrumented execution endpoint.
+		refusal := application(capability.ScopeDenied, a.Call.RequestID, "")
+		if r.broken == "redirect wrong refusal" {
+			refusal = application(capability.Conflict, a.Call.RequestID, "")
+		}
+		refusal.HTTPStatus = response.StatusCode
+		if r.broken == "redirect wrong status" {
+			refusal.HTTPStatus = http.StatusOK
+		}
+		return refusal, nil
 	}
 	raw, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -468,13 +501,17 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	}
 	if strings.HasPrefix(req.URL.Path, "/redirect/") {
 		var input struct{ Attempt Attempt }
-		json.NewDecoder(req.Body).Decode(&input)
-		if r.broken == "redirect executes" {
-			r.execute(input.Attempt.Call)
+		if json.NewDecoder(req.Body).Decode(&input) != nil {
+			http.Error(w, "invalid", 400)
+			return
 		}
-		r.writeReply(w, application(capability.ScopeDenied, input.Attempt.Call.RequestID, ""))
+		if r.broken != "redirect unobserved" {
+			r.observer.RedirectResponse()
+		}
+		http.Redirect(w, req, r.redirectTarget.URL+"/?operation="+url.QueryEscape(input.Attempt.Call.Operation), http.StatusFound)
 		return
 	}
+
 	var envelope struct {
 		Attempt Attempt
 		Payload string
@@ -489,22 +526,23 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	// relabel a write as a read. Client usage is replaced by measured byte demand.
 	op := strings.TrimPrefix(strings.TrimPrefix(req.URL.Path, "/rpc/"), "/bridge/")
 	a.Call.Operation = op
-	if r.broken != "skip enforcement" {
+	// Negative variant admits a route absent from the installed catalog.
+	if r.broken == "unsupported accepted" {
 		if _, err := r.catalog.Lookup(a.Call.Capability, 1); err != nil {
-			if r.broken == "unsupported accepted" {
-				r.execute(a.Call)
-				r.writeReply(w, Reply{})
-				return
-			}
-			r.writeReply(w, application(capability.UnsupportedCapability, a.Call.RequestID, ""))
+			r.execute(a.Call)
+			r.writeReply(w, Reply{})
 			return
 		}
 	}
+
 	if r.broken == "catalog overclaim" && op == "unimplemented/read" {
 		r.writeReply(w, application(capability.UnsupportedCapability, a.Call.RequestID, ""))
 		return
 	}
 	effect := capability.Write
+	if reviewed, ok := r.nativeEffects[op]; ok {
+		effect = reviewed
+	}
 	switch op {
 	case "host/readonly/query", "register", "retrieve", "host/storage/get", "host/mcp/list_tools":
 		effect = capability.Read
@@ -705,7 +743,7 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 		}
 		return nil
 	})
-	if r.broken == "cancel all" && a.Call.RequestID == 3 && err != nil {
+	if r.broken == "cancel all" && r.fixture.SecondGate != nil && a.Call.RequestID == 3 && a.Call.Operation == "host/mcp/call_tool" && err != nil {
 		r.execute(a.Call)
 		err = nil
 	}
@@ -720,6 +758,11 @@ func (r *referenceInstance) serve(w http.ResponseWriter, req *http.Request) {
 	}
 	reply := Reply{Payload: strings.Repeat("x", int(max(1, r.fixture.OutputBytes)))}
 	if err != nil {
+		if r.broken == "unsupported side effect" {
+			if _, err := r.catalog.Lookup(a.Call.Capability, 1); err != nil {
+				r.execute(a.Call)
+			}
+		}
 		if r.broken == "denial after effect" {
 			r.execute(a.Call)
 		}
@@ -1157,6 +1200,12 @@ func TestBrokenAdaptersMustFail(t *testing.T) {
 		"owner ignored":              {"C03", "direct owner"},
 		"reconnect broken":           {"C04", "replayed generation binding is fenced"},
 		"list expiry ignored":        {"C05", "discovery after expired"},
+		"redirect hides execution":   {"C07", "bridge redirect"},
+		"redirect wrong status":      {"C07", "bridge redirect"},
+		"redirect unobserved":        {"C07", "bridge redirect"},
+		"unsupported side effect":    {"C10", capability.StorageRead + " declared unsupported refuses"},
+		"follow redirects":           {"C07", "bridge redirect"},
+		"redirect wrong refusal":     {"C07", "bridge redirect"},
 		"redirect executes":          {"C07", "bridge redirect"},
 		"activation receipt changed": {"C03", "direct absent binding"},
 		"cancel ignored":             {"C07", "cancel_call leaves concurrent request running"},
@@ -1474,7 +1523,7 @@ func (r *referenceInstance) publishConfiguration(secret string) {
 		fmt.Fprintln(&logs, r.token, secret)
 	}
 	if r.broken == "encoded leak" {
-		fmt.Fprintln(&logs, "auth", base64.StdEncoding.EncodeToString([]byte("Bearer "+r.token)), "cfg", base64.StdEncoding.EncodeToString([]byte(secret)), "prefix", r.token[:24])
+		fmt.Fprintln(&logs, "auth", base64.StdEncoding.EncodeToString([]byte("Bearer "+r.token)), "cfg", base64.StdEncoding.EncodeToString([]byte(secret)), "prefix", r.token[:min(24, len(r.token))])
 	}
 	registry, _ := json.Marshal(map[string]any{"credential": r.adaptOutput("registry", "credential="+r.token), "capability": "fixture", "config": r.adaptOutput("registry", "broker="+secret)})
 	browser, _ := json.Marshal(map[string]any{"credential": r.adaptOutput("browser", "credential="+r.token), "ui": "fixture", "config": r.adaptOutput("browser", "broker="+secret)})

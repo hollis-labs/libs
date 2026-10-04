@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hollis-labs/plugin-sdk/capability"
 )
@@ -174,5 +176,78 @@ func TestUnsupportedCallEnforcement(t *testing.T) {
 		if d.Name != capability.ReadonlyQuery {
 			requireViolation(t, r, "C10", d.Name+" declared unsupported refuses")
 		}
+	}
+}
+
+func extensionDescriptor(version int) capability.Descriptor {
+	return capability.Descriptor{Name: "host.example.toy", SchemaVersion: version, Description: "Reviewed fixture read", EffectCeiling: capability.Read, Operations: []string{"toy/read"}, ScopeSchema: capability.ScopeSchema{Allowlists: []string{"operations", "targets", "effects"}}}
+}
+func TestExtensionOnlyProfile(t *testing.T) {
+	for _, version := range []int{1, 7} {
+		r := Evaluate(context.Background(), referenceAdapter{}, Profile{Supported: []capability.Descriptor{extensionDescriptor(version)}})
+		if len(r.Violations) != 0 {
+			t.Fatalf("extension-only version %d failed:\n%s", version, r.String())
+		}
+		requireStatus(t, r, "C02", Passed)
+	}
+}
+func TestProfileNamesRejectedBeforeAdapter(t *testing.T) {
+	d := extensionDescriptor(1)
+	for _, name := range []string{"", "bad", "host.example.*", "host.example.Toy", "host.example.toy\n"} {
+		bad := d
+		bad.Name = name
+		r := Evaluate(context.Background(), panicAdapter{}, Profile{Supported: []capability.Descriptor{bad}})
+		requireViolation(t, r, "C02", "profile")
+		if r.Violations[0].Reason != "invalid descriptor name or definition" {
+			t.Fatalf("invalid name reached adapter: %s", r.String())
+		}
+	}
+	for _, descriptors := range [][]capability.Descriptor{{d, d}, func() []capability.Descriptor {
+		f, _ := basic(capability.ReadonlyQuery)
+		return []capability.Descriptor{f.Catalog[0], f.Catalog[0]}
+	}()} {
+		r := Evaluate(context.Background(), panicAdapter{}, Profile{Supported: descriptors})
+		requireViolation(t, r, "C02", "profile")
+		if r.Violations[0].Reason != "duplicate descriptor name" {
+			t.Fatal("duplicate profile reached adapter")
+		}
+	}
+}
+func TestSDKEnforcerUnsupportedRefusals(t *testing.T) {
+	f, _ := basic(capability.ReadonlyQuery)
+	// The ordinary reference dispatcher invokes the SDK Enforcer with no
+	// catalog-before-grant shim. Its grant-first denials must be accepted.
+	for _, p := range unsupportedProbes(f.Catalog) {
+		if err := runProbe(context.Background(), referenceAdapter{}, p.run); err != nil {
+			t.Fatalf("%s: %s", p.name, safeReason(err))
+		}
+	}
+}
+
+type deadlineTB struct {
+	*recordingTB
+	deadline time.Time
+}
+
+func (d deadlineTB) Deadline() (time.Time, bool) { return d.deadline, true }
+
+type deadlineAdapter struct{ observed chan context.Context }
+
+func (a deadlineAdapter) Open(ctx context.Context, _ Fixture, _ *Observer) (Instance, error) {
+	a.observed <- ctx
+	return nil, errors.New("deadline inspection adapter")
+}
+func TestRunProfileUsesTestDeadline(t *testing.T) {
+	deadline := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	observed := make(chan context.Context, 256)
+	tb := deadlineTB{&recordingTB{TB: t}, deadline}
+	RunProfile(tb, deadlineAdapter{observed}, Profile{Timeout: time.Hour})
+	ctx := <-observed
+	actual, ok := ctx.Deadline()
+	if !ok || !actual.Equal(deadline) {
+		t.Fatalf("watchdog deadline=%v; want test deadline=%v", actual, deadline)
+	}
+	if len(tb.failures) == 0 {
+		t.Fatal("deadline did not fail consumer")
 	}
 }

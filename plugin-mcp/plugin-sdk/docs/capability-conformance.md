@@ -18,10 +18,14 @@ secret-output probes still run. They use a declared supported descriptor, or a
 baseline fixture when none is declared. Storage writes and other proposed
 descriptors are optional for nonempty supported profiles. MCP and extension
 probes run only when declared. Every absent shared descriptor receives an actual
-raw call that must refuse with `unsupported_capability` and zero effects.
+raw call that must return a closed typed refusal with `not_started`, no retry
+and zero effects. The code may be `unsupported_capability`, `capability_denied`,
+`target_unavailable`, or another validated refusal: a grant-first SDK Enforcer
+need not report the same code as a catalog-first host.
 Both the returned report and `Report.String()` list these descriptors as
-`declared_unsupported`. Native descriptors receive scoped positive and bypass
-checks. Published shared descriptors must equal their canonical definitions,
+`declared_unsupported`. Extension-only profiles are supported; duplicate or
+invalid profile names/definitions fail before calling the adapter. Native
+descriptors receive scoped positive and bypass checks. Published shared descriptors must equal their canonical definitions,
 including descriptions, operations and proposed status.
 
 `Evaluate` returns results for each requirement and descriptor. `Check` is the
@@ -71,7 +75,8 @@ owner and its credentials live. Lifecycle controls cancel owned work; `HostUnava
 service availability without stopping the owner. Other controls need no value.
 
 Instrument execution, activation, reservation acquisition/release, actual audit
-delivery, plugin-received caller identity and proxy hops with `Observer`. Capture
+delivery, plugin-received caller identity, proxy hops and actual fixture redirects with
+`Observer`. Capture
 actual logs, registry, browser, audit, reply and error artifacts. `SecretInput`
 counts sensitive input at real output adaptation boundaries without retaining
 it; probes require recorded inputs and scan raw, base64 and hex substrings of
@@ -93,7 +98,8 @@ A watchdog reports a violation and stops using an adapter that hangs; unfinished
 requirements are `not_run` with a truncation reason and the run fails. No later
 requirement is certified by that run. Go cannot terminate an uncooperative callback, so
 its host adapter still owns cleanup. Suite invocation goroutines recover panics.
-`RunProfile` also uses the calling test's deadline.
+`RunProfile` derives the watchdog context from the calling test's deadline
+when the reporter exposes `Deadline()`, so a longer probe timeout cannot extend it.
 
 | Result | Probed behavior |
 | --- | --- |
@@ -103,14 +109,19 @@ its host adapter still owns cleanup. Suite invocation goroutines recover panics.
 | C04 | Forged caller claims in allowed calls cannot change delivered or audited identity; narrowed callers, forged session/agent dimensions, proxy credentials in plugin calls and old-generation replay fail; reconnect restores legitimate access. |
 | C05 | MCP list/call admission, caller filtering, pinned definitions, effect, cycle/depth, byte/rate/concurrency limits; discovery after stop, expiry or revocation refuses. |
 | C06 | Disable/stop/reload/disconnect cancel admitted work and refuse new work; running reservations remain held; definite commits survive withdrawal and ambiguous writes never retry. |
-| C07 | Non-plugin MCP list/call/cancel, origin/redirect/proxy constraints, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
+| C07 | Non-plugin MCP list/call/cancel, origin and proxy probes, refusal to follow an actual fixture 302, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
 | C08 | Unsafe installation cannot widen scope dimensions or activated grants; sensitive input instrumentation and captured output/received reply scans. |
 | C09 | Host-owned workflow subsystem bindings: **not covered** by this package. |
 | C10 | Scoped positive/raw bypass checks for published descriptors, canonical shared definitions and audit-independent decisions. |
 | S09 | Exact supplied extension dimensions named provider/run/step/attempt/fork, effect, declared deadline/byte demand, grant expiry and revocation. These are scope-intersection checks, not ADR item 9. |
 
-C07 exercises only the MCP bridge methods. The reference measures the fixture
-input payload rather than the entire HTTP envelope. Its output limit uses actual
+C07 exercises only the MCP bridge methods. Its redirect fixture sends a real
+302 to a separate endpoint that records an execution if reached. The client
+must report a refusal to follow with the observed 302, and the probe requires
+one independently observed redirect response and zero target executions.
+The reference normalizes this observed client-side refusal as `scope_denied`;
+this is distinct from its server's received application-error data. The reference
+measures the fixture input payload rather than the entire HTTP envelope. Its output limit uses actual
 serialized fixture output, ignoring the client's `ResponseBytes` hint. A bounded
 read may reject oversized output after reading with `not_committed`; it must not
 emit the oversized data or retry. These probes do not supply a production
