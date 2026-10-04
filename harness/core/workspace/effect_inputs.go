@@ -21,7 +21,7 @@ func effectRoot(ref RootRef, o RootObservation, identity string) effects.RootInp
 // grants. Leaf preflight still refreshes custody/authority under held locks.
 func freezeEffects(p *PlannedWorkspace, obs map[string]RootObservation) error {
 	in := copyRecord(p.spec.EffectInputs)
-	if len(in.Credentials)+len(in.Trust) > 0 {
+	if len(in.Credentials)+len(in.Repositories)+len(in.Trust) > 0 {
 		artifactAction := false
 		for _, a := range p.actions {
 			if a.Kind == TreeAction && a.Root.ID == p.spec.Boot.Candidate.ID {
@@ -34,7 +34,7 @@ func freezeEffects(p *PlannedWorkspace, obs map[string]RootObservation) error {
 		for _, cap := range []struct {
 			enabled    bool
 			capability Capability
-		}{{len(in.Credentials) > 0, CredentialLinks}, {len(in.Trust) > 0, TrustHandling}} {
+		}{{len(in.Credentials) > 0, CredentialLinks}, {len(in.Trust) > 0, TrustHandling}, {len(in.Repositories) > 0, RepositoryAttachments}} {
 			if cap.enabled && (!slices.Contains(p.resources.Capabilities, cap.capability) || !slices.Contains(p.observed.Capabilities, cap.capability)) {
 				return refuse(CodeRequiredCapabilityUnavailable, "effects", Unsupported)
 			}
@@ -125,6 +125,9 @@ func freezeEffects(p *PlannedWorkspace, obs map[string]RootObservation) error {
 	if len(in.Trust) > 0 && len(seenTrust) != len(p.spec.Trust) {
 		return refuse("effect_input_binding", "trust", Conflict)
 	}
+	for i := range in.Repositories {
+		in.Repositories[i].Header = effectHeader(*p)
+	}
 	p.effectInputs = in
 	for i := range p.diagnostics {
 		if handledEffectDiagnostic(*p, p.diagnostics[i]) {
@@ -152,7 +155,24 @@ func handledEffectDiagnostic(p PlannedWorkspace, d Diagnostic) bool {
 			}
 			return false
 		}
-		return d.Concern == "effects" && len(p.spec.Repos) == 0 && len(p.spec.Trust) == len(p.effectInputs.Trust) && p.spec.Sandbox.Policy.Mode == sandbox.ConfinementDisabled
+		if d.Concern == string(RepositoryEffect) {
+			for _, r := range p.effectInputs.Repositories {
+				if r.Base.ID == d.RootID || r.Existing && r.Path == rootCanonicalPath(p, d.RootID) {
+					return true
+				}
+			}
+			return false
+		}
+		return d.Concern == "effects" && len(p.spec.Repos) == len(p.effectInputs.Repositories) && len(p.spec.Trust) == len(p.effectInputs.Trust) && p.spec.Sandbox.Policy.Mode == sandbox.ConfinementDisabled
 	}
 	return false
+}
+
+func rootCanonicalPath(p PlannedWorkspace, id string) string {
+	for _, o := range p.observed.Roots {
+		if o.RootID == id {
+			return o.CanonicalPath
+		}
+	}
+	return ""
 }
