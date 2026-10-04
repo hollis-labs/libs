@@ -77,8 +77,9 @@ func (p *crudPlugin) List(ctx context.Context, rt string, f map[string]interface
 // drive runs serveWith against a scripted list of RPCRequest values
 // written to an in-memory pipe, and returns the collected responses.
 // It closes the input writer after all requests are written so Serve
-// exits cleanly.
-func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
+// exits cleanly. An optional true flag waits for every reply when the test
+// exercises metadata rather than concurrent admission.
+func drive(t *testing.T, p Plugin, reqs []RPCRequest, sequential ...bool) []RPCResponse {
 	t.Helper()
 	autoInit := len(reqs) > 0 && reqs[0].Method != MethodInit
 	if autoInit {
@@ -108,7 +109,7 @@ func drive(t *testing.T, p Plugin, reqs []RPCRequest) []RPCResponse {
 		if _, err := inW.Write(line); err != nil {
 			t.Fatalf("write req: %v", err)
 		}
-		if r.Method == MethodInit {
+		if r.Method == MethodInit || len(sequential) > 0 && sequential[0] {
 			for id := range ack {
 				if id == r.ID {
 					break

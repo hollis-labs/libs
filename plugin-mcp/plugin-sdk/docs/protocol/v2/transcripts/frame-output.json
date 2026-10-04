@@ -50,8 +50,15 @@
         "jsonrpc": "2.0",
         "id": 1,
         "error": {
-          "code": -32603,
-          "message": "outbound response rejected"
+          "code": -32010,
+          "message": "budget_exceeded",
+          "data": {
+            "contract": "host-rpc/1",
+            "code": "budget_exceeded",
+            "request_id": 1,
+            "effect_state": "committed",
+            "retryable": false
+          }
         }
       }
     }

@@ -267,14 +267,15 @@ test('unload before successful Init is a terminal refusal with one final cleanup
 test('forward metadata is per invocation, including Init and terminal cleanup', {timeout:5000}, async t => {
   const seen=[];
   const p={...fixturePlugin('base'),init(ctx){seen.push(ctx.forwardContext);return fixturePlugin('base').init();},load(ctx){seen.push(ctx.forwardContext);return {};},command(ctx){seen.push(ctx.forwardContext);return {action:'noop'};},unload(ctx){seen.push(ctx.forwardContext);}};
-  const r=await rig(t,p,{initParams:{context:{timeout_ms:20}}});
-  r.send(1,'command/execute',{name:'echo',args:'',session_id:'',context:{timeout_ms:10}});await r.reply();
+  // Fixture-only budgets exercise metadata, not expiration scheduling.
+  const r=await rig(t,p,{initParams:{context:{timeout_ms:20000}}});
+  r.send(1,'command/execute',{name:'echo',args:'',session_id:'',context:{timeout_ms:10000}});await r.reply();
   r.send(2,'command/execute',{name:'echo',args:'',session_id:''});await r.reply();
   r.send(3,'command/execute',{name:'echo',args:'',session_id:'',context:{timeout_ms:1,parent_call:{}}});assert.equal((await r.reply()).error.code,-32602);
-  r.send(4,'plugin/load',{context:{timeout_ms:3}});await r.reply();
+  r.send(4,'plugin/load',{context:{timeout_ms:30000}});await r.reply();
   r.send(5,'plugin/unload',null);assert.equal((await r.reply()).error.code,-32602);
-  r.send(6,'plugin/unload',{context:{timeout_ms:4}});assert.equal((await r.reply()).result.ok,true);await r.done;
-  assert.deepEqual(seen,[{timeout_ms:20},{timeout_ms:10},undefined,{timeout_ms:3},{timeout_ms:4}]);
+  r.send(6,'plugin/unload',{context:{timeout_ms:40000}});assert.equal((await r.reply()).result.ok,true);await r.done;
+  assert.deepEqual(seen,[{timeout_ms:20000},{timeout_ms:10000},undefined,{timeout_ms:30000},{timeout_ms:40000}]);
 });
 
 test('required result fields and non-JSON nested values fail without poisoning later calls', {timeout:5000}, async t => {

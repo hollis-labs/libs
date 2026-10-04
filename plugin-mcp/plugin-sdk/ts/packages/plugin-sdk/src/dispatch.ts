@@ -1,3 +1,5 @@
+import { requestScope } from "./admission.js";
+import { requestFailureResponse } from "./request-control.js";
 import { dispatchHook } from './hooks-dispatch.js';
 import { hooksFixtureEnabled } from './hooks-fixture.js';
 import { encodeBoundedJSON, DEFAULT_FRAME_BYTES, FrameTooLargeError } from './frame-codec.js';
@@ -48,15 +50,16 @@ export class Dispatcher {
   private unloadAttempt?: Promise<void>;
   constructor(plugin: ServerPlugin, context: Context, secrets: SecretTracker, outputLimit = DEFAULT_FRAME_BYTES) { this.outputLimit = outputLimit; this.plugin = plugin; this.context = context; this.secrets = secrets; }
   private async identity(value: unknown, ctx: Context = this.context): Promise<void> { if (value !== undefined) await this.plugin.identity?.(ctx, value); }
-  async dispatch(req: Wire.RPCRequest): Promise<Wire.RPCResponse | undefined> {
+  async dispatch(req: Wire.RPCRequest, requestContext: Context = this.context): Promise<Wire.RPCResponse | undefined> {
     const id = req.id;
     try {
-      if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,this.context,req,this.hookIncarnation,this.hooksEnabled || hooksFixtureEnabled(this.plugin));
-      const result = await this.call(req);
+      if((req.method==='hook/handle'||req.method==='hook/handle_batch') && this.initialized) return dispatchHook(this.plugin,requestContext,req,this.hookIncarnation,this.hooksEnabled || hooksFixtureEnabled(this.plugin));
+      const result = await this.call(req,requestContext);
       if(req.method !== "plugin/init") validateRuntimeResult(req.method,result,this.outputLimit - 1);
       return id === undefined ? undefined : { jsonrpc: '2.0', id, result };
     } catch (error) {
       if (id === undefined) return undefined;
+      if(error instanceof FrameTooLargeError)return requestFailureResponse(id,'budget_exceeded','committed');
       const fault = error instanceof FrameTooLargeError ? {code:-32603,message:'outbound response rejected'} : error instanceof InitError ? {code:-32602,message:error.message,data:error.rpcData()} : error instanceof PayloadError ? {code:-32602,message:error.message} : error instanceof RPCFault ? {code: error.code, message: error.message} : pluginError(error);
       return {jsonrpc: '2.0', id, error: fault};
     }
@@ -65,9 +68,9 @@ export class Dispatcher {
   shutdown(context: Context): Promise<void> {
     return this.unloadAttempt ??= Promise.resolve().then(() => this.plugin.unload(context));
   }
-  private async call(req: Wire.RPCRequest): Promise<unknown> {
+  private async call(req: Wire.RPCRequest, requestContext: Context): Promise<unknown> {
     const p = this.plugin;
-    let ctx: Context = {...this.context,forwardContext:undefined};
+    let ctx: Context = {...requestContext,config:this.context.config,forwardContext:undefined};
     if(req.method !== 'plugin/init' && !this.initialized) throw new RPCFault(-32600,'successful init required');
     let decoded: Record<string,unknown> | undefined;
     const supported = req.method === 'plugin/load' || req.method === 'plugin/unload' || req.method === 'plugin/health' || req.method === 'command/execute' && p.command || req.method === 'event/handle' && p.eventHandle || ['crud/create','crud/read','crud/update','crud/delete','crud/list'].includes(req.method) && p.create && p.read && p.update && p.delete && p.list || req.method === 'mcp/call_tool' && p.mcpCallTool || req.method === 'http/handle' && p.httpHandle || req.method === 'plugin/migrate' && p.migrate;
@@ -88,15 +91,17 @@ export class Dispatcher {
             input = decodeInitParams(f.get('params') ?? 'null');
           } else input = decodeInitParams(JSON.stringify(req.params));
         } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
-        this.context = { ...ctx, forwardContext:input.context, config: new ConfigReader(input.config, this.secrets) };
+        ctx = {...ctx,forwardContext:input.context,config:new ConfigReader(input.config,this.secrets)};
+        this.context = {...this.context,config:ctx.config};
         // Capture the host's offer before author code can mutate its input.
         const hooksEnabled = input.hooks_profile?.hooks_profile_version === 1 && typeof p.hookHandle === 'function';
-        const authored = await p.init(this.context, input);
+        const authored = await p.init(ctx, input);
+        if(requestScope(ctx)?.acceptsResult()===false)throw ctx.signal.reason??new Error('initialization budget expired');
         encodeBoundedJSON(authored, this.outputLimit - 1);
         const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
         const result = decodeInitResult(encodeInitResult({...base,...(hooksEnabled ? {hooks_profile_version:1 as const} : {})}));
         validateInitResult(input,result);
-        await this.identity(input.identity,this.context);
+        await this.identity(input.identity,ctx);
         this.hooksEnabled = hooksEnabled;
         this.hookIncarnation = input.incarnation;
         this.initialized = true;

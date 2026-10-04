@@ -45,21 +45,22 @@ func (p *payloadProbe) Command(ctx context.Context, v CommandRequest) (CommandRe
 	return CommandResult{Action: "noop"}, nil
 }
 func TestPayloadValidationFencesInvocationAndMetadata(t *testing.T) {
+	// Fixture-only budgets exercise metadata, not expiration scheduling.
 	p := &payloadProbe{}
-	c := json.RawMessage(`{"timeout_ms":20}`)
+	c := json.RawMessage(`{"timeout_ms":20000}`)
 	init := validInitParams()
 	if err := json.Unmarshal(c, &init.Context); err != nil {
 		t.Fatal(err)
 	}
 	replies := drive(t, p, []RPCRequest{
 		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: init},
-		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodCommandExecute, Params: json.RawMessage(`{"name":"echo","args":"","session_id":"","context":{"timeout_ms":10}}`)},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodCommandExecute, Params: json.RawMessage(`{"name":"echo","args":"","session_id":"","context":{"timeout_ms":10000}}`)},
 		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodCommandExecute, Params: json.RawMessage(`{"name":"echo","args":"","session_id":""}`)},
 		{JSONRPC: "2.0", ID: NumberID(4), Method: MethodCommandExecute, Params: json.RawMessage(`{"name":"echo","args":"","session_id":"","context":{"timeout_ms":1,"parent_call":{}}}`)},
-		{JSONRPC: "2.0", ID: NumberID(5), Method: MethodLoad, Params: json.RawMessage(`{"context":{"timeout_ms":3}}`)},
+		{JSONRPC: "2.0", ID: NumberID(5), Method: MethodLoad, Params: json.RawMessage(`{"context":{"timeout_ms":30000}}`)},
 		{JSONRPC: "2.0", ID: NumberID(6), Method: MethodUnload, Params: json.RawMessage(`null`)},
-		{JSONRPC: "2.0", ID: NumberID(7), Method: MethodUnload, Params: json.RawMessage(`{"context":{"timeout_ms":4}}`)},
-	})
+		{JSONRPC: "2.0", ID: NumberID(7), Method: MethodUnload, Params: json.RawMessage(`{"context":{"timeout_ms":40000}}`)},
+	}, true)
 	for _, i := range []int{3, 5} {
 		if replies[i].Error == nil || replies[i].Error.Code != ErrCodeInvalidParams {
 			t.Fatalf("reply %d: %+v", i, replies[i])
@@ -68,7 +69,7 @@ func TestPayloadValidationFencesInvocationAndMetadata(t *testing.T) {
 	if p.calls != 2 {
 		t.Fatalf("invalid params invoked callback: calls=%d", p.calls)
 	}
-	want := []string{`{"timeout_ms":20}`, `{"timeout_ms":10}`, "absent", `{"timeout_ms":3}`, `{"timeout_ms":4}`}
+	want := []string{`{"timeout_ms":20000}`, `{"timeout_ms":10000}`, "absent", `{"timeout_ms":30000}`, `{"timeout_ms":40000}`}
 	if len(p.contexts) != len(want) {
 		t.Fatalf("contexts %v", p.contexts)
 	}

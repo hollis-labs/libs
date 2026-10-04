@@ -1,3 +1,4 @@
+import { retainRequestWork, linkRequestScope, requestScope } from "./admission.js";
 import { preserveFrameJSON,encodeBoundedJSON,DEFAULT_FRAME_BYTES } from './frame-codec.js';
 import { parseJSONTokens } from './strict-json.js';
 import { requestParamsJSON } from './payload.js';
@@ -23,18 +24,21 @@ function lease(ctx: Context,p: HookRequest,started: number): {ctx: Context; clos
   const tick=()=>{const remaining=ms-(performance.now()-started);if(remaining<=0){controller.abort(new Error('deadline'));}else timer=setTimeout(tick,Math.min(remaining,2147483647));};
   tick();
   const expired=()=>{if(performance.now()-started>=ms){clearTimeout(timer);controller.abort(new Error('deadline'));}return controller.signal.aborted;};
+  linkRequestScope(ctx,controller.signal,{deadline:started+ms,binding:p.context.binding_id});
   return {expired,ctx:{...ctx,signal:controller.signal,forwardContext:p.context},close:()=>{clearTimeout(timer);ctx.signal.removeEventListener('abort',cancel);}};
 }
 async function invoke(ctx: Context,plugin: ServerPlugin,p: HookRequest): Promise<HookResult> {
   if(!plugin.hookHandle) return failure(p,'profile_unavailable','unavailable');
   let result: HookResult;
+  const release=retainRequestWork(ctx);
   try {result=await plugin.hookHandle(ctx,p);}
   catch(error){return failure(p,error instanceof Error?'handler_error':'handler_panic');}
+  finally {release();}
   try {validateHookResultFor(p,result);return decodeHookHandleResult(encodeHookHandleResult(result));}
   catch{return failure(p,'invalid_output');}
 }
 export async function dispatchHook(plugin: ServerPlugin,ctx: Context,request: RPCRequest,incarnation: RuntimeIdentity | undefined,enabled: boolean): Promise<RPCResponse | undefined> {
-  const received=performance.now();
+  const received=requestScope(ctx)?.received??performance.now();
   const notification=request.id===undefined;
   const reject=(code: number,cause: 'invalid_params'|'profile_unavailable'|'method_not_found'|'invalid_request',field?: string): RPCResponse | undefined=>{
     const error=hookRPCError(code,cause,field);

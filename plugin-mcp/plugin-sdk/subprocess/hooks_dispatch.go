@@ -57,7 +57,8 @@ func hookAwait(ctx context.Context, h HookHandler, p HookHandleParams) HookHandl
 		return hookContextFailure(ctx, p)
 	}
 	done := make(chan HookHandleResult, 1)
-	go func() { done <- hookInvoke(ctx, h, p) }()
+	release := retainRequestWork(ctx)
+	go func() { defer release(); done <- hookInvoke(ctx, h, p) }()
 	select {
 	case <-ctx.Done():
 		return hookContextFailure(ctx, p)
@@ -77,26 +78,29 @@ func hookContextFailure(ctx context.Context, p HookHandleParams) HookHandleResul
 }
 func (s *server) dispatchHook(ctx context.Context, req RPCRequest) {
 	received := time.Now()
+	if scope := scopeFromContext(ctx); scope != nil {
+		received = scope.arrivedAt
+	}
 	s.initMu.Lock()
 	enabled := s.hooksEnabled || s.hooksFixtureEnabled
 	s.initMu.Unlock()
 	if !enabled {
-		s.writeHookError(req.ID, ErrCodeMethodNotFound, "profile_unavailable", nil)
+		s.writeHookError(req.ID, ErrCodeMethodNotFound, "profile_unavailable", nil, scopeFromContext(ctx))
 		return
 	}
 	h, ok := s.plugin.(HookHandler)
 	if !ok {
-		s.writeHookError(req.ID, ErrCodeMethodNotFound, "method_not_found", nil)
+		s.writeHookError(req.ID, ErrCodeMethodNotFound, "method_not_found", nil, scopeFromContext(ctx))
 		return
 	}
 	notification := req.ID == (RPCID{})
 	if !notification && !req.ID.positiveInteger() {
-		s.writeHookError(req.ID, ErrCodeInvalidRequest, "invalid_request", nil)
+		s.writeHookError(req.ID, ErrCodeInvalidRequest, "invalid_request", nil, scopeFromContext(ctx))
 		return
 	}
 	raw, err := paramsJSON(req.Params)
 	if err != nil {
-		s.writeHookError(req.ID, ErrCodeInvalidParams, "invalid_params", hookInvalid("params", "invalid params"))
+		s.writeHookError(req.ID, ErrCodeInvalidParams, "invalid_params", hookInvalid("params", "invalid params"), scopeFromContext(ctx))
 		return
 	}
 	var items []HookHandleParams
@@ -116,7 +120,7 @@ func (s *server) dispatchHook(ctx context.Context, req RPCRequest) {
 		items = p.Items
 	}
 	if err != nil {
-		s.writeHookError(req.ID, ErrCodeInvalidParams, "invalid_params", hookInvalid("params", "invalid params"))
+		s.writeHookError(req.ID, ErrCodeInvalidParams, "invalid_params", hookInvalid("params", "invalid params"), scopeFromContext(ctx))
 		return
 	}
 	// All item shapes are checked before any handler starts. Leases begin before
@@ -152,10 +156,10 @@ func (s *server) dispatchHook(ctx context.Context, req RPCRequest) {
 		payload, err = itemsResultJSON(HookHandleBatchResult{Items: results})
 	}
 	if err != nil {
-		s.writeError(req.ID, ErrCodeInternal, "invalid hook output")
+		s.writeError(req.ID, ErrCodeInternal, "invalid hook output", scopeFromContext(ctx))
 		return
 	}
-	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: req.ID, Result: payload})
+	s.writeMessage(RPCResponse{JSONRPC: "2.0", ID: req.ID, Result: payload}, scopeFromContext(ctx))
 }
 func itemsResultJSON(v any) ([]byte, error) {
 	switch r := v.(type) {
