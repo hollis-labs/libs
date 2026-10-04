@@ -20,11 +20,10 @@ baseline fixture when none is declared. Storage writes and other proposed
 descriptors are optional for nonempty supported profiles. MCP and extension
 probes run only when declared. Every absent shared descriptor receives an actual
 raw call with a valid installed grant for that descriptor. It must return a
-closed typed refusal with `not_started`, no retry
-and zero effects. The code may be `unsupported_capability`, `capability_denied`,
-`target_unavailable`, or another validated refusal except `internal_error`:
-a grant-first SDK Enforcer
-need not report the same code as a catalog-first host.
+closed typed refusal with `not_started`, no retry and zero effects. Only
+`unsupported_capability`, `capability_denied` and `target_unavailable` qualify:
+a grant-first SDK Enforcer need not report the same code as a catalog-first host.
+Cancellation, rate-limit, deadline and internal errors do not establish catalog refusal.
 Both the returned report and `Report.String()` list these descriptors as
 `declared_unsupported`. Extension-only profiles are supported; duplicate or
 invalid profile names/definitions fail before calling the adapter. Native
@@ -90,7 +89,9 @@ bytes are outside this scanner. Secrets are distinct
 random fixture values. The reference sends configuration through Init and routes
 it through pattern-based output adapters; it also drives a backend diagnostic
 and scans received diagnostic reply bytes. Successful scoped replies are also
-scanned for the issued bearer credential in their frame, data and payload.
+scanned for the issued bearer credential, plugin binding and broker secret in
+their frame, data and payload. Refusal frames, data and payload are scanned for
+the presented bearer, including a stale bearer after replacement or stop.
 Instrumentation is supplied by the host adapter:
 counts alone cannot prove a real output path was exercised. Review that wiring
 and the captured artifacts; counts or replies built from expected test outcomes
@@ -119,8 +120,8 @@ It logs truncation reasons as well as statuses.
 | C04 | Forged caller claims in allowed calls cannot change delivered or audited identity; narrowed callers, forged session/agent dimensions, proxy credentials in plugin calls and old-generation replay fail; reconnect restores legitimate access. |
 | C05 | MCP list/call admission, caller filtering, pinned definitions, effect, cycle/depth, byte/rate/concurrency limits; discovery after stop, expiry or revocation refuses. |
 | C06 | Disable/stop/reload/disconnect cancel admitted work and refuse new work; running reservations remain held; definite commits survive withdrawal and ambiguous writes never retry. |
-| C07 | Non-plugin MCP list/call/cancel; missing, garbage, plugin-binding and stale credentials refuse unauthenticated without effects or leaked reservations; origin and proxy probes, adapter-instrumented refusal to follow a fixture 302, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
-| C08 | Unsafe installation cannot widen scope dimensions or activated grants; sensitive input instrumentation and captured output/received reply scans. |
+| C07 | Non-plugin MCP `call_tool`, `list_tools` and `cancel_call` each carry missing, garbage, plugin-binding and stale credential probes requiring unauthenticated refusal without effects or leaked reservations; origin and proxy probes, adapter-instrumented refusal to follow a fixture 302, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request and actor, with credential reuse. |
+| C08 | Unsafe installation cannot widen scope dimensions or activated grants; sensitive input instrumentation and captured output, successful reply and refusal frame/data/payload scans. |
 | C09 | Host-owned workflow subsystem bindings: **not covered** by this package. |
 | C10 | Scoped positive/raw bypass checks for published descriptors, canonical shared definitions and audit-independent decisions. |
 | S09 | Exact supplied extension dimensions named provider/run/step/attempt/fork, effect, declared deadline/byte demand, grant expiry and revocation. These are scope-intersection checks, not ADR item 9. |

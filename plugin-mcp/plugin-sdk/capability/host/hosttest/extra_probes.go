@@ -261,8 +261,10 @@ func unsupportedProbes(supported []capability.Descriptor) []probe {
 				if err != nil {
 					return err
 				}
-				if r.Failure.Code == capability.InternalError {
-					return suiteError("internal error does not prove unsupported refusal")
+				switch r.Failure.Code {
+				case capability.UnsupportedCapability, capability.CapabilityDenied, capability.TargetUnavailable:
+				default:
+					return suiteError("classification does not prove unsupported refusal")
 				}
 				return nil
 			})

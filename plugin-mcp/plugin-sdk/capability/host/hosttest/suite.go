@@ -266,12 +266,18 @@ func (e *observedFailure) Error() string { return "observed refusal mismatch" }
 func invoke(ctx context.Context, i Instance, c Attempt) (reply Reply, err error) {
 	reply, err = i.Invoke(ctx, c)
 	if err == nil && reply.Failure == nil {
-		_, token := i.Access()
-		if ContainsSecret(string(reply.Wire), token) || ContainsSecret(string(reply.Data), token) || ContainsSecret(reply.Payload, token) {
-			return reply, suiteError("successful reply credential leak")
+		binding, token := i.Access()
+		for _, secret := range []string{token, binding, c.fixtureSecret} {
+			if replyContainsSecret(reply, secret) {
+				return reply, suiteError("successful reply secret leak")
+			}
 		}
 	}
 	return reply, err
+}
+
+func replyContainsSecret(reply Reply, secret string) bool {
+	return ContainsSecret(string(reply.Wire), secret) || ContainsSecret(string(reply.Data), secret) || ContainsSecret(reply.Payload, secret)
 }
 
 // invokeAsync contains panics in every suite-created invocation goroutine.
@@ -890,6 +896,7 @@ func withActive(ctx context.Context, a Adapter, f Fixture, c Attempt, fn func(In
 		return suiteError("fixture did not activate through host")
 	}
 	c.BindingID, _ = i.Access()
+	c.fixtureSecret = f.Secret
 	return fn(i, o, c)
 }
 func allowed(ctx context.Context, i Instance, o *Observer, c Attempt) error {
@@ -915,6 +922,9 @@ func deniedReply(ctx context.Context, i Instance, o *Observer, c Attempt, want c
 		return reply, err
 	}
 	after := o.Snapshot()
+	if replyContainsSecret(reply, c.Credential) {
+		return reply, suiteError("refusal reply credential leak")
+	}
 	if reply.Failure == nil || reply.RPCCode != capability.HostRPCErrorCode || reply.Failure.Contract != "host-rpc/1" || (want != "" && reply.Failure.Code != want) || reply.Failure.RequestID != c.Call.RequestID || reply.Failure.Retryable || reply.Failure.EffectState != capability.NotStarted {
 		if reply.Failure == nil {
 			return reply, suiteError("missing application refusal")

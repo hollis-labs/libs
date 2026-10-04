@@ -8,8 +8,10 @@ import (
 
 func bridgeProbes() []probe {
 	out := []probe{}
-	for _, problem := range []string{"absent", "garbage", "plugin binding", "replaced generation", "stopped owner"} {
-		out = append(out, bridgeCredentialProbe(problem))
+	for _, operation := range []string{"host/mcp/call_tool", "host/mcp/list_tools", "host/mcp/cancel_call"} {
+		for _, problem := range []string{"absent", "garbage", "plugin binding", "replaced generation", "stopped owner"} {
+			out = append(out, bridgeCredentialProbe(operation, problem))
+		}
 	}
 	for _, op := range []string{"host/mcp/list_tools", "host/mcp/call_tool"} {
 		out = append(out, probe{"C07", "bridge admitted " + op, func(ctx context.Context, a Adapter) error {
@@ -184,9 +186,13 @@ func bridgeCrossActorCancel(ctx context.Context, a Adapter, reverse bool) error 
 	})
 }
 
-func bridgeCredentialProbe(problem string) probe {
-	return probe{"C07", "bridge credential " + problem, func(ctx context.Context, a Adapter) error {
+func bridgeCredentialProbe(operation, problem string) probe {
+	return probe{"C07", "bridge credential " + operation + " " + problem, func(ctx context.Context, a Adapter) error {
 		f, c := basic(capability.MCPReach)
+		c.Call.Operation = operation
+		if operation == "host/mcp/cancel_call" {
+			c.CancelID = 99
+		}
 		return withActive(ctx, a, f, c, func(i Instance, o *Observer, c Attempt) error {
 			binding, token := i.Access()
 			if len(token) < 16 || binding == "" || binding == token {

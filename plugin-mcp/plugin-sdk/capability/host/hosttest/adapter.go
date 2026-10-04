@@ -45,6 +45,7 @@ type Fixture struct {
 // without an SDK client helper. Bridge reaches the non-plugin loopback bridge.
 // ClaimedCaller and EffectHint must not manufacture permission.
 type Attempt struct {
+	fixtureSecret   string // Trusted suite scan value; never serialized on the request wire.
 	Call            host.Call
 	BindingID       string
 	Credential      string

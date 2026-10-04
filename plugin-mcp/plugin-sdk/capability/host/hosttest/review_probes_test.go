@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -70,7 +71,7 @@ func (i reviewInstance) Activate(ctx context.Context, raw json.RawMessage, reqs 
 }
 func (i reviewInstance) Invoke(ctx context.Context, c Attempt) (Reply, error) {
 	callIndex := i.calls.Add(1)
-	if i.mode == "bridge credentials ignored" && c.Bridge {
+	if (i.mode == "bridge credentials ignored" || i.mode == "bridge credentials ignored "+c.Call.Operation) && c.Bridge {
 		r := i.Instance.(*referenceInstance)
 		_, err := r.credentials.Verify(c.Credential, host.Subject{Kind: host.SessionClient, ID: "session-client"}, i.fixture.Runtime, "loopback")
 		if err != nil {
@@ -148,6 +149,18 @@ func (i reviewInstance) Invoke(ctx context.Context, c Attempt) (Reply, error) {
 			r.Failure.EffectState = capability.NotStarted
 			r.Data, _ = json.Marshal(r.Failure)
 		}
+	case "unsupported cancelled", "unsupported rate", "unsupported deadline":
+		if r.Failure != nil {
+			switch i.mode {
+			case "unsupported cancelled":
+				r.Failure.Code = capability.Cancelled
+			case "unsupported rate":
+				r.Failure.Code = capability.RateLimited
+			case "unsupported deadline":
+				r.Failure.Code = capability.DeadlineExceeded
+			}
+			r.Data, _ = json.Marshal(r.Failure)
+		}
 	case "unsupported internal":
 		if r.Failure != nil {
 			r.Failure.Code = capability.InternalError
@@ -174,7 +187,35 @@ func (i reviewInstance) Invoke(ctx context.Context, c Attempt) (Reply, error) {
 			r.Payload = base64.StdEncoding.EncodeToString([]byte("Authorization: Bearer " + token + " tail"))
 		}
 	}
+	// Leak only one surface, preserving a valid classification on refusals.
+	if strings.HasPrefix(i.mode, "refusal leak ") && r.Failure != nil && c.Credential != "" {
+		switch strings.TrimPrefix(i.mode, "refusal leak ") {
+		case "Wire":
+			r.Wire = json.RawMessage(`{"bearer":"` + c.Credential + `"}`)
+		case "Data":
+			r.Data = json.RawMessage(`{"bearer":"` + c.Credential + `"}`)
+		case "Payload":
+			r.Payload = c.Credential
+		}
+	}
+	if strings.HasPrefix(i.mode, "success binding ") && r.Failure == nil {
+		binding, _ := i.Access()
+		setLeakedSurface(&r, strings.TrimPrefix(i.mode, "success binding "), binding)
+	}
+	if strings.HasPrefix(i.mode, "success broker ") && r.Failure == nil {
+		setLeakedSurface(&r, strings.TrimPrefix(i.mode, "success broker "), i.fixture.Secret)
+	}
 	return r, err
+}
+func setLeakedSurface(r *Reply, surface, secret string) {
+	switch surface {
+	case "Wire":
+		r.Wire = json.RawMessage(`{"secret":"` + secret + `"}`)
+	case "Data":
+		r.Data = json.RawMessage(`{"secret":"` + secret + `"}`)
+	case "Payload":
+		r.Payload = secret
+	}
 }
 
 func findProbe(t *testing.T, name string) probe {
@@ -231,13 +272,29 @@ func TestReviewBoundaryMutants(t *testing.T) {
 	})
 }
 func TestBridgeCredentialRefusals(t *testing.T) {
-	for _, problem := range []string{"absent", "garbage", "plugin binding", "replaced generation", "stopped owner"} {
-		t.Run(problem, func(t *testing.T) {
-			p := bridgeCredentialProbe(problem)
-			if err := runProbe(context.Background(), referenceAdapter{}, p.run); err != nil {
-				t.Fatalf("reference: %s", safeReason(err))
-			}
-			for _, mode := range []string{"bridge credentials ignored", "bridge credential wrong code", "bridge credential effects", "bridge credential reservation"} {
+	for _, operation := range []string{"host/mcp/call_tool", "host/mcp/list_tools", "host/mcp/cancel_call"} {
+		for _, problem := range []string{"absent", "garbage", "plugin binding", "replaced generation", "stopped owner"} {
+			t.Run(operation+"/"+problem, func(t *testing.T) {
+				p := bridgeCredentialProbe(operation, problem)
+				// Use the registered probe so removing an operation from the suite fails.
+				p = findProbe(t, p.name)
+				if err := runProbe(context.Background(), referenceAdapter{}, p.run); err != nil {
+					t.Fatalf("reference: %s", safeReason(err))
+				}
+				for _, mode := range []string{"bridge credentials ignored " + operation, "bridge credential wrong code", "bridge credential effects", "bridge credential reservation"} {
+					if err := runProbe(context.Background(), reviewAdapter{mode}, p.run); err == nil {
+						t.Fatalf("%s passed", mode)
+					}
+				}
+			})
+		}
+	}
+}
+func TestUnsupportedValidGrantAndRefusal(t *testing.T) {
+	f, _ := basic(capability.ReadonlyQuery)
+	for _, p := range unsupportedProbes(f.Catalog) {
+		t.Run(p.name, func(t *testing.T) {
+			for _, mode := range []string{"unsupported undeclared support", "unsupported internal", "unsupported cancelled", "unsupported rate", "unsupported deadline"} {
 				if err := runProbe(context.Background(), reviewAdapter{mode}, p.run); err == nil {
 					t.Fatalf("%s passed", mode)
 				}
@@ -245,15 +302,32 @@ func TestBridgeCredentialRefusals(t *testing.T) {
 		})
 	}
 }
-func TestUnsupportedValidGrantAndRefusal(t *testing.T) {
-	f, _ := basic(capability.ReadonlyQuery)
-	for _, p := range unsupportedProbes(f.Catalog) {
-		t.Run(p.name, func(t *testing.T) {
-			for _, mode := range []string{"unsupported undeclared support", "unsupported internal"} {
-				if err := runProbe(context.Background(), reviewAdapter{mode}, p.run); err == nil {
-					t.Fatalf("%s passed", mode)
+
+func TestRefusalReplyLeaks(t *testing.T) {
+	for _, surface := range []string{"Wire", "Data", "Payload"} {
+		for _, problem := range []string{"garbage", "replaced generation", "stopped owner"} {
+			t.Run(surface+"/"+problem, func(t *testing.T) {
+				p := bridgeCredentialProbe("host/mcp/call_tool", problem)
+				err := runProbe(context.Background(), reviewAdapter{"refusal leak " + surface}, p.run)
+				// Require the leak detector, not error-data validation, to catch it.
+				if err == nil || safeReason(err) != "refusal reply credential leak" {
+					t.Fatalf("leak not detected: %v", err)
 				}
-			}
-		})
+			})
+		}
+	}
+}
+func TestSuccessfulReplyFixtureSecrets(t *testing.T) {
+	for _, kind := range []string{"binding", "broker"} {
+		for _, surface := range []string{"Wire", "Data", "Payload"} {
+			t.Run(kind+"/"+surface, func(t *testing.T) {
+				f, c := basic(capability.MCPReach)
+				f.Secret = freshSecret()
+				err := withActive(context.Background(), reviewAdapter{"success " + kind + " " + surface}, f, c, func(i Instance, o *Observer, c Attempt) error { return allowed(context.Background(), i, o, c) })
+				if err == nil || safeReason(err) != "successful reply secret leak" {
+					t.Fatalf("success leak not detected: %v", err)
+				}
+			})
+		}
 	}
 }
