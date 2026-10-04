@@ -24,6 +24,14 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - Installed Codex encoding preserves literal strings and explicit parent MCP
   tables; installed instruction markers retain their format and use the resolved
   definition identifier.
+- Pure owned-key merge of JSON and TOML documents under `workspace/keymerge`,
+  with typed outcomes and notes and a comparison for drift checks. A declared key
+  is written only where the caller owns it, every other key of the document found
+  stands as found (JSON keeps its order and its raw bytes), and a declared key the
+  caller does not own is never overwritten or added. Owning every declared leaf
+  reproduces the archived installer's merge byte for byte.
+- Requirement: `github.com/pelletier/go-toml/v2` v2.2.4, imported only by
+  `workspace/keymerge`.
 
 - The packages of six former Hollis Labs modules, moved in with their git history at their final homes: `sandbox/atomicfile` and `sandbox/pathsafe` (from `go-safefs`), `interception/permission` with `pathgrants` and `summary` (from `go-permission`), `workspace/materialize` with `artifact` (from `go-materialize`), `interception/filters/{classify,directive,event,normalize,repair}` (from `go-harness-filters`), `interception/egress` (from `go-egress-proxy`) and `adapters/runtimeevents` (from `go-runtime-events`). No package clause or symbol was renamed. Each unit's README, AGENTS.md, CHANGELOG.md, LICENSE and docs are under `docs/units/<old-name>/`, with a `MIGRATION.md` listing old and new import paths. The old modules' release tags were not carried over.
 - Requirement: `gopkg.in/yaml.v3` v3.0.1 (from `go-permission`).
