@@ -11,16 +11,16 @@ import (
 )
 
 func TestResolvePreparation_ResolvedCompositionInstallsDocumentsAndArtifacts(t *testing.T) {
-	bootRoot := t.TempDir()
+	bootRoot := fixturePrivateDir(t)
 	comp := agentcontext.ResolvedComposition{
 		ID:        "resolved",
 		Documents: []agentcontext.Document{{ID: "instructions", Path: "AGENTS.md", Sections: []agentcontext.Section{{ID: "base", Content: "base instructions"}}}},
 		Artifacts: artifact.Tree{Entries: []artifact.Entry{{Path: "bin/tool", Kind: artifact.EntryFile, Mode: 0o755, Bytes: []byte{0, 1, 2}}}},
 	}
-	prepared, err := ResolvePreparation(context.Background(), PrepareRequest{
+	prepared, err := resolveWithAuthority(t, context.Background(), PrepareRequest{
 		Kind:        PrepareInputResolvedComposition,
 		Composition: &comp,
-		Roots:       ExecutionRoots{BootRoot: bootRoot, CWD: bootRoot, ProjectRoot: t.TempDir()},
+		Roots:       ExecutionRoots{BootRoot: bootRoot, CWD: bootRoot, ProjectRoot: fixturePrivateDir(t)},
 		Access:      AccessRequirements{Mode: AccessRequired, Host: ExecutionHostLocal},
 	})
 	if err != nil {
@@ -41,11 +41,11 @@ func TestResolvePreparation_ResolvedCompositionInstallsDocumentsAndArtifacts(t *
 }
 
 func TestResolvePreparation_AuthoredRecipeAndRawArtifactsUseSameMaterializer(t *testing.T) {
-	bootRoot := t.TempDir()
+	bootRoot := fixturePrivateDir(t)
 	recipe := agentcontext.AuthoredRecipe{ID: "recipe", Documents: []agentcontext.Document{{ID: "doc", Path: "doc.md", Content: "hello"}}}
-	prepared, err := ResolvePreparation(context.Background(), PrepareRequest{Kind: PrepareInputAuthoredRecipe, Recipe: &recipe, Roots: ExecutionRoots{BootRoot: bootRoot, CWD: bootRoot}})
+	prepared, err := resolveWithAuthority(t, context.Background(), PrepareRequest{Kind: PrepareInputAuthoredRecipe, Recipe: &recipe, Roots: ExecutionRoots{BootRoot: bootRoot, CWD: bootRoot}})
 	if err != nil {
-		t.Fatalf("ResolvePreparation(authored): %v", err)
+		t.Fatalf("resolveWithAuthority(t, authored): %v", err)
 	}
 	if prepared.Materialization == nil {
 		t.Fatal("authored recipe did not materialize")
@@ -54,11 +54,11 @@ func TestResolvePreparation_AuthoredRecipeAndRawArtifactsUseSameMaterializer(t *
 		t.Fatalf("doc.md = %q err=%v", got, err)
 	}
 
-	rawRoot := t.TempDir()
+	rawRoot := fixturePrivateDir(t)
 	raw := artifact.Tree{Entries: []artifact.Entry{{Path: "raw.bin", Kind: artifact.EntryFile, Mode: 0o600, Bytes: []byte{9, 8, 7}}}}
-	rawPrepared, err := ResolvePreparation(context.Background(), PrepareRequest{Kind: PrepareInputArtifacts, Artifacts: &raw, Roots: ExecutionRoots{BootRoot: rawRoot, CWD: rawRoot}})
+	rawPrepared, err := resolveWithAuthority(t, context.Background(), PrepareRequest{Kind: PrepareInputArtifacts, Artifacts: &raw, Roots: ExecutionRoots{BootRoot: rawRoot, CWD: rawRoot}})
 	if err != nil {
-		t.Fatalf("ResolvePreparation(raw): %v", err)
+		t.Fatalf("resolveWithAuthority(t, raw): %v", err)
 	}
 	if rawPrepared.Materialization == nil {
 		t.Fatal("raw artifacts did not materialize")

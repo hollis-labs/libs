@@ -10,6 +10,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/provider"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/substrate/harness/workspace"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
@@ -629,47 +630,24 @@ type StartOptions struct {
 	// Added in v0.9.5.
 	JsonRpcRequestHook func(method string, params json.RawMessage) (result any, rpcErr *JsonRpcError)
 
-	// AutoPlantBootDir, when true AND the adapter implements
-	// provider.BootDirProvider, instructs the runtime to materialize the
-	// adapter's BootDirSpec into a per-session tempdir on Start and remove
-	// it on terminal state. The lib:
-	//   - creates a tempdir under BootDirRoot (or WorkspaceDir+"/boot/",
-	//     or os.TempDir() if both are empty)
-	//   - walks BootDirSpec.PlantedFiles, calls each Render(plantCtx), and
-	//     writes the content (mode 0o600 for .mcp.json / settings.json,
-	//     0o644 default; PlantedFile.Mode overrides when non-zero)
-	//   - substitutes `{{.BootDir}}` / `{{.ProjectDir}}` in
-	//     BootDirSpec.EnvAmendments and appends to Env
-	//   - substitutes the same tokens in BootDirSpec.ProjectDirArg and
-	//     appends to ExtraArgs (which the runtime splices into argv after
-	//     adapter.BuildArgs); a codex exec adapter instead gets the project
-	//     in a per-session clone's ProjectDir, so its --cd stays in front of
-	//     a resume turn's `resume <id>` (v0.20.4)
-	//   - sets Workdir to BootDirSpec.SpawnWorkdir(bootDir, originalWorkdir)
-	//   - for Claude bare-mode adapters, applies BareInjectionPaths and
-	//     mutates a per-session clone of the adapter so the planted paths
-	//     thread into BuildArgs
-	//   - emits OnBootDirPlanted (when set) once on successful plant
-	//   - calls os.RemoveAll(bootDir) once on terminal state regardless of
-	//     exit cause; cleanup failures are logged but never surface as
-	//     session errors
-	//
-	// Default false preserves v0.8.0 behavior exactly — no filesystem
-	// activity, no opts mutation. When true on an adapter that does NOT
-	// implement BootDirProvider (or whose BootDirSpec has no PlantedFiles),
-	// the runtime no-ops without error so generic consumers can leave the
-	// flag on across heterogeneous adapter fleets.
-	//
-	// Added in v0.9.0.
+	// AutoPlantBootDir requests BootDirSpec preparation only with explicit
+	// ArtifactRoot and ArtifactAuthorization. False, non-provider and empty-spec
+	// requests are no-ops. The runtime creates no implicit temporary root or
+	// parent, and removes no engine-owned root on failure, exit or Stop.
+	// Bindings and callbacks are updated only after a verified artifact commit.
 	AutoPlantBootDir bool
 
-	// BootDirRoot overrides the parent directory under which AutoPlantBootDir
-	// creates the per-session tempdir. Default ordering when empty:
-	// WorkspaceDir+"/boot/" if WorkspaceDir is set, otherwise os.TempDir().
-	// When non-empty, the runtime MkdirAll's it (mode 0o750) before
-	// MkdirTemp. Ignored when AutoPlantBootDir is false.
-	//
-	// Added in v0.9.0.
+	// ArtifactRoot is the exact host-selected inactive candidate. BootDirRoot,
+	// WorkspaceDir and temporary-directory defaults confer no authority.
+	ArtifactRoot          string
+	ArtifactAuthorization agentlaunch.ArtifactAuthorizer
+	// OnArtifactPrepared observes verified artifact-only root accounting before
+	// OnBootDirPlanted. Failure accounting is returned in ArtifactPreparationError.
+	OnArtifactPrepared  func(workspace.ApplyResult)
+	artifactPreparation *workspace.ApplyResult
+
+	// BootDirRoot is retained only as legacy request metadata. It does not
+	// choose a candidate, create parents or grant authority; use ArtifactRoot.
 	BootDirRoot string
 
 	// OnBootDirPlanted, when non-nil, is invoked once on successful

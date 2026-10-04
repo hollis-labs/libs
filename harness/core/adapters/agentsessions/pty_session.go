@@ -57,8 +57,7 @@ func (r *ptyRuntime) Prepare(_ context.Context) error {
 	return nil
 }
 
-func (r *ptyRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
-	var err error
+func (r *ptyRuntime) Start(ctx context.Context, opts StartOptions) (session Session, err error) {
 	opts, err = normalizeStartOptions(opts)
 	if err != nil {
 		return nil, err
@@ -67,20 +66,19 @@ func (r *ptyRuntime) Start(ctx context.Context, opts StartOptions) (Session, err
 		return nil, errors.New("agentsessions: StartOptions.Workdir is required for pty runtime")
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	bootDir, planted, sessionAdapter, err := preparePlant(ctx, opts, r.cfg.Adapter, r.cfg.ID)
 	if err != nil {
 		return nil, err
 	}
 	opts = planted
+	defer func() { err = retainPreparationOnStartFailure(opts, err) }()
 
 	logPath, err := resolvePTYLogPath(opts)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 	logF, err := openSessionLog(logPath)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, fmt.Errorf("agentsessions: open log: %w", err)
 	}
 
@@ -107,7 +105,6 @@ func (r *ptyRuntime) Start(ctx context.Context, opts StartOptions) (Session, err
 	cmd, ptmx, attemptCleanup, err := s.spawnAttempt(0)
 	if err != nil {
 		_ = logF.Close()
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 
@@ -191,9 +188,9 @@ type ptySession struct {
 	// runtime.cfg.Adapter, but a per-session clone when AutoPlantBootDir
 	// fired bare-mode injection. Always non-nil after Start.
 	adapter provider.CLIAdapter
-	// bootDir is the absolute path of the AutoPlantBootDir-planted tempdir,
-	// or "" when no plant happened. Cleaned up exactly once at terminal
-	// state via cleanupBootDir.
+	// bootDir is the explicitly authorized, engine-owned artifact root,
+	// or "" when no plant happened. Retained at terminal state; retirement
+	// requires a separate custody protocol.
 	bootDir string
 	opts    StartOptions
 
@@ -475,7 +472,6 @@ func (s *ptySession) spawnWaiterLegacy(ptmx *os.File, cmd *exec.Cmd) {
 		if s.legacyCleanup != nil {
 			s.legacyCleanup()
 		}
-		cleanupBootDir(s.bootDir)
 	}()
 }
 
@@ -529,7 +525,6 @@ func (s *ptySession) runSupervised(ctx context.Context, firstCmd *exec.Cmd, firs
 			}
 			close(s.done)
 		})
-		cleanupBootDir(s.bootDir)
 	}()
 
 	for attempt := 0; attempt <= maxRestarts; attempt++ {

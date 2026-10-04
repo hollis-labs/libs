@@ -8,16 +8,15 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
 func TestPlant_RepeatedCallsStableAndPreserveSpacePaths(t *testing.T) {
 	isolateHome(t)
-	projectRoot := t.TempDir() + "/Project With Spaces"
-	workspaceRoot := t.TempDir() + "/Workspace With Spaces"
-	compiled := compiledFor(t, "codex", runtimes.ModeSubprocessPerTurn)
+	projectRoot := fixturePrivateDir(t) + "/Project With Spaces"
+	workspaceRoot := fixturePrivateDir(t) + "/Workspace With Spaces"
+	compiled := compiledFor(t, "claude", runtimes.ModeSubprocessPerTurn)
 	compiled.Plan.Project.Root = projectRoot
 	compiled.Plan.Workspace.WorkspaceDir = workspaceRoot
 	compiled.Plan.Workspace.Workdir = projectRoot
@@ -29,7 +28,7 @@ func TestPlant_RepeatedCallsStableAndPreserveSpacePaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("first plant: %v", err)
 	}
 	firstArgv := slices.Clone(prepared.Argv)
@@ -40,7 +39,7 @@ func TestPlant_RepeatedCallsStableAndPreserveSpacePaths(t *testing.T) {
 	}
 	assertFileMode(t, prepared.PlantedBootDir, "bin/tool.sh", 0o755)
 
-	if err := Plant(context.Background(), prepared); err != nil {
+	if err := plantWithAuthority(t, context.Background(), prepared); err != nil {
 		t.Fatalf("second plant: %v", err)
 	}
 	if !reflect.DeepEqual(prepared.Argv, firstArgv) {
@@ -60,16 +59,14 @@ func TestPrepareExecution_CarriesProviderEffectsDiagnosticsAndMaterialization(t 
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	execution, err := PrepareExecution(context.Background(), prepared)
+	execution, err := projectionForTest(t, context.Background(), prepared)
 	if err != nil {
 		t.Fatalf("PrepareExecution: %v", err)
 	}
-	if execution.Materialization == nil || !execution.Materialization.Report.Complete {
-		t.Fatalf("materialization incomplete: %#v", execution.Materialization)
+	if execution.Materialization != nil {
+		t.Fatal("pure projection minted materialization")
 	}
-	if execution.Materialization.Report.Operation != materialize.OperationReconcile {
-		t.Fatalf("operation = %q, want reconcile", execution.Materialization.Report.Operation)
-	}
+	requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared))
 	var foundCredential bool
 	for _, effect := range execution.Effects {
 		if effect.ProviderEffect == "codex-auth-json" && effect.Destination == "auth.json" && effect.Redacted {
@@ -97,9 +94,9 @@ func TestPrepareExecution_ProviderDiagnosticsSurvive(t *testing.T) {
 		Kind:       agentlaunch.PrepareInputArtifacts,
 		Artifacts:  &tree,
 		Projection: proj,
-		Roots:      agentlaunch.ExecutionRoots{BootRoot: t.TempDir(), CWD: t.TempDir()},
+		Roots:      agentlaunch.ExecutionRoots{BootRoot: fixturePrivateDir(t), CWD: fixturePrivateDir(t)},
 	}
-	prepared, err := agentlaunch.ResolvePreparation(context.Background(), req)
+	prepared, err := resolveWithAuthority(t, context.Background(), req)
 	if err != nil {
 		t.Fatalf("ResolvePreparation: %v", err)
 	}

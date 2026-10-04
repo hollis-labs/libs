@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -61,9 +59,9 @@ type WriteResult struct {
 type NativeResolver func(agentlaunch.NativeFile) (File, error)
 
 type Writer struct {
-	// AtomicWrite overrides the default temp-file + rename writer. It is called
-	// after the parent directory has been created.
-	AtomicWrite func(path string, data []byte, mode fs.FileMode) error
+	Authorize agentlaunch.ArtifactAuthorizer
+	// OnWritten observes completed file metadata; it is not a writer port.
+	OnWritten func(WrittenFile)
 }
 
 type WriteOptions struct {
@@ -181,17 +179,7 @@ func (w Writer) writePlannedFiles(bootDir string, files []plannedFile) (WriteRes
 		})
 		result.Files = append(result.Files, WrittenFile{RelPath: planned.file.RelPath, Mode: planned.file.Mode, Source: planned.source})
 	}
-	if w.AtomicWrite != nil {
-		for _, planned := range files {
-			target := filepath.Join(bootDir, filepath.FromSlash(planned.file.RelPath))
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return WriteResult{}, fmt.Errorf("bootdir: plant %q: mkdir: %w", planned.file.RelPath, err)
-			}
-			if err := w.AtomicWrite(target, []byte(planned.file.Content), planned.file.Mode); err != nil {
-				return WriteResult{}, fmt.Errorf("bootdir: plant %q: %w", planned.file.RelPath, err)
-			}
-		}
-	}
+
 	normalized, err := artifact.Normalize(entries)
 	if err != nil {
 		return WriteResult{}, err
@@ -200,10 +188,16 @@ func (w Writer) writePlannedFiles(bootDir string, files []plannedFile) (WriteRes
 		TargetRoot: bootDir,
 		Roots:      agentlaunch.ExecutionRoots{BootRoot: bootDir},
 		Artifacts:  artifact.Tree{Entries: normalized},
+		Authorize:  w.Authorize,
 		Operation:  materialize.OperationReconcile,
-		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictOverwrite},
+		Reconcile:  materialize.ReconcilePolicy{Conflict: materialize.ConflictReport},
 	}); err != nil {
 		return WriteResult{}, fmt.Errorf("bootdir: materialize: %w", err)
+	}
+	if w.OnWritten != nil {
+		for _, file := range result.Files {
+			w.OnWritten(file)
+		}
 	}
 	return result, nil
 }

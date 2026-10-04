@@ -52,8 +52,7 @@ func (r *streamingStdioRuntime) Prepare(_ context.Context) error {
 	return nil
 }
 
-func (r *streamingStdioRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
-	var err error
+func (r *streamingStdioRuntime) Start(ctx context.Context, opts StartOptions) (session Session, err error) {
 	opts, err = normalizeStartOptions(opts)
 	if err != nil {
 		return nil, err
@@ -62,20 +61,19 @@ func (r *streamingStdioRuntime) Start(ctx context.Context, opts StartOptions) (S
 		return nil, errors.New("agentsessions: StartOptions.Workdir is required for streaming-stdio runtime")
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	bootDir, planted, sessionAdapter, err := preparePlant(ctx, opts, r.cfg.Adapter, r.cfg.ID)
 	if err != nil {
 		return nil, err
 	}
 	opts = planted
+	defer func() { err = retainPreparationOnStartFailure(opts, err) }()
 
 	logPath, err := resolveStreamingStdioLogPath(opts)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 	logF, err := openSessionLog(logPath)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, fmt.Errorf("agentsessions: open log: %w", err)
 	}
 
@@ -101,7 +99,6 @@ func (r *streamingStdioRuntime) Start(ctx context.Context, opts StartOptions) (S
 	cmd, stdin, stdout, attemptCleanup, err := s.spawnAttempt(0)
 	if err != nil {
 		_ = logF.Close()
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 
@@ -151,9 +148,9 @@ type streamingStdioSession struct {
 	// runtime.cfg.Adapter, but a per-session clone when AutoPlantBootDir
 	// fired bare-mode injection. Always non-nil after Start.
 	adapter provider.CLIAdapter
-	// bootDir is the absolute path of the AutoPlantBootDir-planted tempdir,
-	// or "" when no plant happened. Cleaned up exactly once at terminal
-	// state via cleanupBootDir.
+	// bootDir is the explicitly authorized, engine-owned artifact root,
+	// or "" when no plant happened. Retained at terminal state; retirement
+	// requires a separate custody protocol.
 	bootDir string
 	opts    StartOptions
 
@@ -533,7 +530,6 @@ func (s *streamingStdioSession) spawnWaiterLegacy(cmd *exec.Cmd, stdin io.WriteC
 		if s.legacyCleanup != nil {
 			s.legacyCleanup()
 		}
-		cleanupBootDir(s.bootDir)
 	}()
 }
 
@@ -571,7 +567,6 @@ func (s *streamingStdioSession) runSupervised(ctx context.Context, firstCmd *exe
 			}
 			close(s.done)
 		})
-		cleanupBootDir(s.bootDir)
 	}()
 
 	for attempt := 0; attempt <= maxRestarts; attempt++ {

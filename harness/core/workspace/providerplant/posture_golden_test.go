@@ -46,7 +46,7 @@ func TestPrepareExecution_EmptyPostureMatchesV0_16_0(t *testing.T) {
 	}
 	got := map[string]emptyPostureGolden{}
 	for _, c := range cases {
-		home := t.TempDir()
+		home := fixturePrivateDir(t)
 		t.Setenv("HOME", home)
 		t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
 		compiled := compiledWith(t, c.provider, c.mode, agentlaunch.InjectionSpec{Args: []string{"--injected"}})
@@ -55,7 +55,7 @@ func TestPrepareExecution_EmptyPostureMatchesV0_16_0(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s/%s: prepare: %v", c.provider, c.mode, err)
 		}
-		exec, err := PrepareExecution(context.Background(), prepared)
+		exec, err := projectionForTest(t, context.Background(), prepared)
 		if err != nil {
 			t.Fatalf("%s/%s: PrepareExecution: %v", c.provider, c.mode, err)
 		}

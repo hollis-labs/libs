@@ -2,74 +2,154 @@ package agentlaunch
 
 import (
 	"context"
+	"errors"
 	"os"
-	"time"
+	"path/filepath"
+	"slices"
 
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
-// ArtifactMaterializationRequest is the shared bridge from launch-facing
-// compatibility adapters to the neutral materialization engine.
-type ArtifactMaterializationRequest struct {
-	TargetRoot string
-	Roots      ExecutionRoots
-	Artifacts  artifact.Tree
-
-	Operation          materialize.Operation
-	Generation         string
-	ExpectedGeneration string
-	Selection          materialize.Selection
-	Reconcile          materialize.ReconcilePolicy
-	Engine             materialize.Engine
-	Now                func() time.Time
+// ArtifactAuthority is explicit host authorization for one inactive artifact
+// operation. Close releases host-port resources after apply releases all locks.
+type ArtifactAuthority struct {
+	// Explicit host attestations; neither paths nor AutoPlant flags grant custody.
+	Inactive, PrivateCustody bool
+	Input                    workspace.TreeRequest
+	Ports                    workspace.Ports
+	Close                    func() error
 }
 
-// MaterializeArtifacts applies an artifact tree through materialize.Engine.
-// Existing directories use reconcile semantics by default so callers with a
-// precreated bootdir can install or refresh without appending launch state or
-// reimplementing the writer loop.
-func MaterializeArtifacts(ctx context.Context, req ArtifactMaterializationRequest) (*materialize.Handle, error) {
-	operation := req.Operation
-	if operation == "" {
-		operation = materialize.OperationReconcile
+// ArtifactAuthorizer resolves authority and fresh observations without granting
+// it from a pathname. No default implementation discovers a home or identity.
+type ArtifactAuthorizer func(context.Context, string) (ArtifactAuthority, error)
+
+type ArtifactMaterializationRequest struct {
+	TargetRoot                     string
+	Roots                          ExecutionRoots
+	Artifacts                      artifact.Tree
+	Operation                      materialize.Operation
+	Generation, ExpectedGeneration string
+	Selection                      materialize.Selection
+	Reconcile                      materialize.ReconcilePolicy
+	Authorize                      ArtifactAuthorizer
+}
+
+// ValidateArtifactAuthority checks explicit host inputs before a caller renders
+// provider content. Apply refreshes authority and observations under all locks.
+func ValidateArtifactAuthority(ctx context.Context, a ArtifactAuthority, target string) error {
+	if ctx == nil {
+		return &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
 	}
-	engine := req.Engine
-	if engine == nil {
-		engine = materialize.NewEngine(materialize.EngineOptions{Now: req.Now})
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	mreq := materialize.Request{
-		Operation:          operation,
-		TargetRoot:         req.TargetRoot,
-		Roots:              materializeRoots(req.Roots),
-		Artifacts:          req.Artifacts,
-		Generation:         req.Generation,
-		ExpectedGeneration: req.ExpectedGeneration,
-		Selection:          req.Selection,
-		Reconcile:          req.Reconcile,
+	if !a.Inactive || !a.PrivateCustody || a.Input.Root.Path != target || a.Input.OperationID == "" || a.Ports.Clock == nil || a.Ports.Host == nil || a.Ports.Locks == nil || a.Ports.Observations == nil || a.Ports.ReceiptStore == nil {
+		return &workspace.Refusal{Code: "invalid_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
 	}
-	if mreq.Reconcile.Conflict == "" {
-		mreq.Reconcile.Conflict = materialize.ConflictOverwrite
+	if err := workspace.ValidateTreeAuthority(a.Input); err != nil {
+		return errors.Join(&workspace.Refusal{Code: "invalid_artifact_authority", Concern: "authority", Status: workspace.Unsupported}, err)
 	}
-	if operation == materialize.OperationReconcile || operation == materialize.OperationRefresh {
-		if err := os.MkdirAll(req.TargetRoot, 0o755); err != nil {
-			return nil, err
+	now := a.Ports.Clock.Now()
+	if now.Before(a.Input.Observed.At) || !now.Before(a.Input.Observed.ExpiresAt) {
+		return &workspace.Refusal{Code: "expired_artifact_authority", Concern: "observations", Status: workspace.Unsupported}
+	}
+	// Read-only preflight prevents rendering for a statically unsafe candidate.
+	// Apply repeats physical custody checks under the complete mutation locks.
+	if info, err := os.Lstat(target); err == nil {
+		if !info.IsDir() || info.Mode().Perm() != 0700 || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+			return &workspace.Refusal{Code: "invalid_artifact_custody", Concern: "roots", Status: workspace.Unsupported}
 		}
-		manifest, err := materialize.LoadManifest(req.TargetRoot)
-		if err == nil {
-			mreq.CurrentManifest = &manifest
-		} else if os.IsNotExist(err) {
-			bootstrap := bootstrapManifest(req.TargetRoot, req.Roots, req.Artifacts, req.Generation, req.Now)
-			mreq.CurrentManifest = &bootstrap
-		} else {
-			return nil, err
-		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(&workspace.Refusal{Code: "invalid_artifact_custody", Concern: "roots", Status: workspace.Unsupported}, err)
 	}
-	handle, err := engine.Apply(ctx, mreq)
+	if err := a.Ports.Host.Validate(ctx, workspace.Spec{SchemaVersion: workspace.SchemaVersion, OperationID: a.Input.OperationID, Operation: workspace.Prepare}, a.Input.Resources); err != nil {
+		return errors.Join(&workspace.Refusal{Code: "invalid_artifact_authority", Concern: "authority", Status: workspace.Unsupported}, err)
+	}
+	return ctx.Err()
+}
+
+// MaterializeArtifactsResult returns root evidence and retained obligations on
+// failures as well as successes. It never compensates or removes a root.
+func MaterializeArtifactsResult(ctx context.Context, req ArtifactMaterializationRequest) (result workspace.ApplyResult, err error) {
+	defer func() {
+		if err != nil && result.Status == "" {
+			result.Status = workspace.Conflict
+			var refusal *workspace.Refusal
+			if errors.As(err, &refusal) {
+				result.Status = refusal.Status
+			}
+		}
+	}()
+	if ctx == nil || req.Authorize == nil {
+		return result, &workspace.Refusal{Code: "missing_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
+	if !filepath.IsAbs(req.TargetRoot) || filepath.Clean(req.TargetRoot) != req.TargetRoot {
+		return result, &workspace.Refusal{Code: "unresolved_artifact_root", Concern: "roots", Status: workspace.Conflict}
+	}
+	if req.Reconcile.RemoveOwned || (req.Reconcile.Conflict != "" && req.Reconcile.Conflict != materialize.ConflictReport) {
+		return result, &workspace.Refusal{Code: "legacy_reconcile_policy_unsupported", Concern: "artifacts", Status: workspace.Unsupported}
+	}
+	authority, err := req.Authorize(ctx, req.TargetRoot)
 	if err != nil {
-		return &handle, err
+		return result, err
 	}
-	return &handle, nil
+	if authority.Close != nil {
+		defer func() {
+			closeErr := authority.Close()
+			if closeErr != nil {
+				err = errors.Join(err, closeErr)
+				result.Status = workspace.Partial
+				result.Diagnostics = append(result.Diagnostics, workspace.Diagnostic{Code: "artifact_authority_close_failed", Concern: "ports", Status: workspace.Partial})
+				if len(result.Handles) > 0 {
+					result.Retained = append(result.Retained, authority.Input.Root)
+					result.Obligations = append(result.Obligations, workspace.Obligation{Kind: workspace.RecoveryInspectionRequired, RootID: authority.Input.Root.ID})
+				}
+			}
+		}()
+	}
+	if err := ValidateArtifactAuthority(ctx, authority, req.TargetRoot); err != nil {
+		return result, err
+	}
+	input := authority.Input
+	input.Tree = req.Artifacts
+	input.Tree.Entries = artifact.CloneEntries(req.Artifacts.Entries)
+	// Stable metadata names this adapter's desired entries, never prior disk content.
+	for i := range input.Tree.Entries {
+		e := &input.Tree.Entries[i]
+		if e.Ownership.EntryID == "" && e.Ownership.GroupID == "" {
+			e.Ownership = artifact.Ownership{EntryID: "agentlaunch.artifacts:" + e.Path, GroupID: "agentlaunch.artifacts"}
+		}
+		if e.Provenance.Source == "" {
+			e.Provenance.Source = "agentlaunch.artifacts"
+		}
+	}
+	input.Generation = req.Generation
+	input.Operation = req.Operation
+	input.TargetRoots = materializeRoots(req.Roots)
+	input.Selection = req.Selection
+	if req.ExpectedGeneration != "" {
+		input.ExpectedGeneration = req.ExpectedGeneration
+	}
+	result, err = workspace.ApplyTree(ctx, input, authority.Ports)
+	if err == nil && !result.ArtifactsComplete() {
+		err = &workspace.Refusal{Code: "artifact_completion_unproved", Concern: "artifacts", Status: workspace.Partial}
+	}
+	return result, err
+}
+
+func MaterializeArtifacts(ctx context.Context, req ArtifactMaterializationRequest) (*materialize.Handle, error) {
+	result, err := MaterializeArtifactsResult(ctx, req)
+	if len(result.Handles) == 0 {
+		return nil, err
+	}
+	handle := slices.Clone(result.Handles)[len(result.Handles)-1]
+	return &handle, err
 }
 
 func materializeRoots(roots ExecutionRoots) materialize.TargetRoots {
@@ -79,49 +159,4 @@ func materializeRoots(roots ExecutionRoots) materialize.TargetRoots {
 		StateRoot:   roots.StateRoot,
 		ScratchRoot: roots.ScratchRoot,
 	}
-}
-
-func bootstrapManifest(_ string, roots ExecutionRoots, tree artifact.Tree, generation string, now func() time.Time) materialize.Manifest {
-	created := time.Now().UTC()
-	if now != nil {
-		created = now().UTC()
-	}
-	entries := make([]materialize.ManifestEntry, 0, len(tree.Entries))
-	for _, entry := range tree.Entries {
-		entries = append(entries, materialize.ManifestEntry{
-			Path:       entry.Path,
-			Kind:       entry.Kind,
-			Mode:       uint32(artifactMode(entry)),
-			Digest:     artifactDigest(entry),
-			Ownership:  entry.Ownership,
-			Provenance: entry.Provenance,
-		})
-	}
-	return materialize.Manifest{
-		SchemaVersion: "agentkit.materialize.v1",
-		Generation:    generation,
-		Roots:         materializeRoots(roots),
-		Entries:       entries,
-		CreatedAt:     created,
-	}
-}
-
-func artifactMode(entry artifact.Entry) os.FileMode {
-	if entry.Mode != 0 {
-		return entry.Mode.Perm()
-	}
-	if entry.Kind == artifact.EntryDirectory {
-		return 0o755
-	}
-	return 0o644
-}
-
-func artifactDigest(entry artifact.Entry) artifact.Digest {
-	if entry.Digest.Algorithm != "" || entry.Digest.Hex != "" {
-		return entry.Digest
-	}
-	if entry.Kind == artifact.EntryFile && entry.Bytes != nil {
-		return artifact.DigestBytes(entry.Bytes)
-	}
-	return artifact.Digest{}
 }

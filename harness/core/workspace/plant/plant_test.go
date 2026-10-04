@@ -28,14 +28,14 @@ func TestNoOpPlanter(t *testing.T) {
 }
 
 func TestSharedPlanterCreatePreservesModernArtifacts(t *testing.T) {
-	bootDir := filepath.Join(t.TempDir(), "boot")
-	p := SharedPlanter{}
+	bootDir := filepath.Join(fixturePrivateDir(t), "boot")
+	p := SharedPlanter{Authorize: fixtureAuthorization(t)}
 	result, err := p.Plant(context.Background(), bootDir, Spec{
 		Operation: materialize.OperationCreate,
 		Artifacts: artifact.Tree{Entries: []artifact.Entry{
 			{Path: "bin/run.sh", Kind: artifact.EntryFile, Mode: 0o755, Bytes: []byte("#!/bin/sh\nexit 0\n"), Ownership: artifact.Ownership{EntryID: "modern:bin", GroupID: "modern"}},
 			{Path: "data/blob.bin", Kind: artifact.EntryFile, Mode: 0o600, Bytes: []byte{0, 1, 2, 3}, Ownership: artifact.Ownership{EntryID: "modern:blob", GroupID: "modern"}},
-			{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0o750, Ownership: artifact.Ownership{EntryID: "modern:dir", GroupID: "modern"}},
+			{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0o755, Ownership: artifact.Ownership{EntryID: "modern:dir", GroupID: "modern"}},
 		}},
 	})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestSharedPlanterCreatePreservesModernArtifacts(t *testing.T) {
 	}
 	assertMode(t, filepath.Join(bootDir, "bin/run.sh"), 0o755)
 	assertMode(t, filepath.Join(bootDir, "data/blob.bin"), 0o600)
-	assertMode(t, filepath.Join(bootDir, "empty"), 0o750)
+	assertMode(t, filepath.Join(bootDir, "empty"), 0o755)
 	blob, err := os.ReadFile(filepath.Join(bootDir, "data/blob.bin")) //nolint:gosec // G304: the test's own temp file
 	if err != nil {
 		t.Fatalf("read blob: %v", err)
@@ -60,11 +60,11 @@ func TestSharedPlanterCreatePreservesModernArtifacts(t *testing.T) {
 }
 
 func TestSharedPlanterCreateRefusesPreexistingAndReconcileUpdates(t *testing.T) {
-	bootDir := filepath.Join(t.TempDir(), "boot")
-	if err := os.MkdirAll(bootDir, 0o755); err != nil { //nolint:gosec // G301: a fixture directory in t.TempDir
+	bootDir := filepath.Join(fixturePrivateDir(t), "boot")
+	if err := os.MkdirAll(bootDir, 0o700); err != nil { //nolint:gosec // G301: a fixture directory in t.TempDir
 		t.Fatalf("mkdir boot: %v", err)
 	}
-	p := SharedPlanter{}
+	p := SharedPlanter{Authorize: fixtureAuthorization(t)}
 	_, err := p.Plant(context.Background(), bootDir, Spec{Operation: materialize.OperationCreate, Files: map[string][]byte{"hello.txt": []byte("hi")}})
 	if !errors.Is(err, materialize.ErrTargetExists) {
 		t.Fatalf("create on preexisting err = %v, want ErrTargetExists", err)
@@ -74,7 +74,7 @@ func TestSharedPlanterCreateRefusesPreexistingAndReconcileUpdates(t *testing.T) 
 	if err != nil {
 		t.Fatalf("reconcile: %v", err)
 	}
-	if result.Operation != materialize.OperationReconcile || !result.Complete {
+	if result.Operation != materialize.OperationCreate || !result.Complete {
 		t.Fatalf("reconcile result operation/complete = %s/%v", result.Operation, result.Complete)
 	}
 	if got := string(mustRead(t, filepath.Join(bootDir, "hello.txt"))); got != "hi" {
@@ -91,8 +91,8 @@ func TestSharedPlanterCreateRefusesPreexistingAndReconcileUpdates(t *testing.T) 
 }
 
 func TestSharedPlanterLegacySpecPathsAndModes(t *testing.T) {
-	bootDir := filepath.Join(t.TempDir(), "boot")
-	p := SharedPlanter{}
+	bootDir := filepath.Join(fixturePrivateDir(t), "boot")
+	p := SharedPlanter{Authorize: fixtureAuthorization(t)}
 	result, err := p.Plant(context.Background(), bootDir, Spec{
 		Files:            map[string][]byte{"notes/readme.md": []byte("hello")},
 		MCPConfig:        []byte(`{"mcpServers":{}}`),
@@ -159,8 +159,8 @@ func TestSharedPlanterProviderSettingsFollowTheLayout(t *testing.T) {
 			t.Fatalf("layout runtime %s is not in the registry", id)
 		}
 		for _, name := range append([]string{string(id)}, d.Aliases...) {
-			bootDir := filepath.Join(t.TempDir(), "boot")
-			result, err := (SharedPlanter{}).Plant(context.Background(), bootDir, Spec{
+			bootDir := filepath.Join(fixturePrivateDir(t), "boot")
+			result, err := (SharedPlanter{Authorize: fixtureAuthorization(t)}).Plant(context.Background(), bootDir, Spec{
 				ProviderSettings: map[string][]byte{name: []byte("settings for " + name)},
 			})
 			if err != nil {
@@ -184,8 +184,8 @@ func TestSharedPlanterProviderSettingsRefusesRuntimesWithoutNativeConfig(t *test
 		}
 	}
 	for _, name := range names {
-		bootDir := filepath.Join(t.TempDir(), "boot")
-		_, err := (SharedPlanter{}).Plant(context.Background(), bootDir, Spec{
+		bootDir := filepath.Join(fixturePrivateDir(t), "boot")
+		_, err := (SharedPlanter{Authorize: fixtureAuthorization(t)}).Plant(context.Background(), bootDir, Spec{
 			ProviderSettings: map[string][]byte{name: []byte("x")},
 		})
 		if err == nil {

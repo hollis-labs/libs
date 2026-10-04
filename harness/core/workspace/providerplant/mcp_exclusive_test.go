@@ -37,7 +37,7 @@ func prepareMCP(t *testing.T, providerID string, mode runtimes.Mode, exclusive b
 	if err != nil {
 		t.Fatalf("%s/%s: prepare: %v", providerID, mode, err)
 	}
-	return PrepareExecution(context.Background(), prepared, opts...)
+	return projectionForTest(t, context.Background(), prepared, opts...)
 }
 
 // shape renders what a prepared launch is, with the per-run directories
@@ -325,7 +325,7 @@ func TestPrepareExecution_MCPExclusiveRequiresPlantedConfigInArgv(t *testing.T) 
 					if err != nil {
 						t.Fatal(err)
 					}
-					_, err = PrepareExecution(context.Background(), prepared, WithAdapter(dropsMCPConfig{adapter.(*provider.ClaudeAdapter)}))
+					_, err = projectionForTest(t, context.Background(), prepared, WithAdapter(dropsMCPConfig{adapter.(*provider.ClaudeAdapter)}))
 					if exclusive && source != "none" {
 						if !errors.Is(err, agentlaunch.ErrMCPExclusiveUnsupported) {
 							t.Fatalf("missing MCP config: %v", err)
@@ -385,7 +385,7 @@ func TestPrepareExecution_MCPExclusiveRejectsPlanCodexHome(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
-						execution, err := PrepareExecution(context.Background(), prepared)
+						execution, err := projectionForTest(t, context.Background(), prepared)
 						if exclusive {
 							if !errors.Is(err, agentlaunch.ErrMCPExclusiveUnsupported) || !strings.Contains(err.Error(), "CODEX_HOME") {
 								t.Fatalf("contradictory plan: %v", err)

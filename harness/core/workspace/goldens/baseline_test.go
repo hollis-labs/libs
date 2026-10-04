@@ -2,10 +2,12 @@ package goldens_test
 
 import (
 	"context"
+	"errors"
 	"github.com/hollis-labs/substrate/harness/adapters/provider"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
 	"github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/bootdir"
 	"github.com/hollis-labs/substrate/harness/workspace/goldens"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
@@ -18,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestGoldenBaseline(t *testing.T) {
+func TestHistoricalBaselineWithActiveRouting(t *testing.T) {
 	for _, writer := range []string{"plant", "providerplant", "bootdir", "agentlaunch"} {
 		dirs, err := goldens.Cases(filepath.Join("..", "testdata", "goldens", "baseline", writer))
 		if err != nil {
@@ -33,13 +35,14 @@ func TestGoldenBaseline(t *testing.T) {
 				scratch := goldens.Sandbox(t)
 				root := filepath.Join(scratch, "boot")
 				normalize := goldens.Roots(root, "<boot>", scratch, "<scratch>")
+				var projection *agentlaunch.PreparedExecution
 				ev := goldens.Evidence{Writer: writer, Source: "substrate legacy planting baseline"}
 				switch writer {
 				case "providerplant":
-					ev, err = renderProvider(t, in, root)
+					ev, projection, err = renderProvider(t, in, root)
 				case "plant":
 					spec := plant.Spec{Files: map[string][]byte{"AGENTS.md": []byte("Fixture instructions.\n")}, MCPConfig: []byte("{\"mcpServers\":{}}\n"), ProviderSettings: map[string][]byte{in.Provider: []byte("fixture settings\n")}, Hooks: []plant.Hook{{Provider: in.Provider, Name: "start.sh", Payload: []byte("#!/bin/sh\nexit 0\n")}}, RecoveryPrompt: "Fixture recovery.\n", Artifacts: fixtureArtifacts(), Generation: "fixture-v1", Operation: materialize.OperationCreate}
-					p := plant.SharedPlanter{}
+					p := plant.SharedPlanter{Authorize: fixtureAuthorization(t)}
 					var res plant.Result
 					res, err = p.Plant(context.Background(), root, spec)
 					if err == nil && in.Scenario == "refresh" {
@@ -56,13 +59,10 @@ func TestGoldenBaseline(t *testing.T) {
 					}
 				case "bootdir":
 					var writes []string
-					w := bootdir.Writer{}
+					w := bootdir.Writer{Authorize: fixtureAuthorization(t)}
 					if in.Scenario == "atomic" {
-						w.AtomicWrite = func(p string, b []byte, m os.FileMode) error {
-							rel, _ := filepath.Rel(root, p)
-							writes = append(writes, filepath.ToSlash(rel))
-							return os.WriteFile(p, b, m)
-						}
+						w.OnWritten = func(f bootdir.WrittenFile) { writes = append(writes, f.RelPath) }
+						t.Log("delta sole-engine: AtomicWrite side writer replaced by metadata observer")
 					}
 					spec := agentlaunch.InjectionSpec{NativeFiles: []agentlaunch.NativeFile{{Kind: agentlaunch.NativeFileRaw, RelPath: "skills/sample/scripts/run.sh", Content: "#!/bin/sh\nexit 0\n", Mode: 0751}}, BootDirOverlay: map[string]string{"AGENTS.md": "Fixture instructions.\n", "notes/empty.txt": ""}}
 					var res bootdir.WriteResult
@@ -81,7 +81,7 @@ func TestGoldenBaseline(t *testing.T) {
 						ev, err = renderBootSpec(t, in, root)
 						break
 					}
-					req := agentlaunch.ArtifactMaterializationRequest{TargetRoot: root, Roots: agentlaunch.ExecutionRoots{BootRoot: root}, Artifacts: fixtureArtifacts(), Operation: materialize.OperationCreate, Generation: "fixture-v1"}
+					req := agentlaunch.ArtifactMaterializationRequest{TargetRoot: root, Roots: agentlaunch.ExecutionRoots{BootRoot: root}, Artifacts: fixtureArtifacts(), Operation: materialize.OperationCreate, Generation: "fixture-v1", Authorize: fixtureAuthorization(t)}
 					var h *materialize.Handle
 					h, err = agentlaunch.MaterializeArtifacts(context.Background(), req)
 					if err == nil && in.Scenario == "refresh" {
@@ -105,7 +105,20 @@ func TestGoldenBaseline(t *testing.T) {
 						ev.Ownership = m.Entries
 					}
 				}
-				goldens.Check(t, dir, root, ev, normalize)
+				if writer == "providerplant" && in.Provider == "codex" && projection != nil {
+					goldens.CheckProjectionArchive(t, dir, projection.Artifacts, ev, normalize)
+					var refusal *workspace.Refusal
+					if !errors.As(err, &refusal) || refusal.Code != workspace.CodeReservedArtifactPath {
+						t.Fatalf("legacy credential placeholder did not refuse: %v", err)
+					}
+					tree, e := goldens.Snapshot(root, normalize)
+					if e != nil || len(tree) != 0 {
+						t.Fatalf("credential refusal mutated root: %v %v", tree, e)
+					}
+					t.Log("delta reserved-credential: archived placeholder rendered unchanged; active apply refuses before mutation")
+				} else {
+					goldens.CheckRouting(t, dir, root, ev, normalize, goldens.RoutingDeltas{PrivateRoot: true, DeclaredDirectory: writer == "plant" || writer == "agentlaunch", DesiredProvenance: true, CommittedGeneration: true})
+				}
 			})
 		}
 	}
@@ -115,7 +128,7 @@ func fixtureArtifacts() artifact.Tree {
 		{Path: "skills/sample/SKILL.md", Kind: artifact.EntryFile, Mode: 0640, Bytes: []byte("---\nname: sample\n---\nFixture skill.\n"), Ownership: artifact.Ownership{EntryID: "fixture:skill", GroupID: "fixture"}, Provenance: artifact.Provenance{Source: "fixture"}},
 		{Path: "skills/sample/scripts/run.sh", Kind: artifact.EntryFile, Mode: 0751, Bytes: []byte("#!/bin/sh\nexit 0\n"), Ownership: artifact.Ownership{EntryID: "fixture:script", GroupID: "fixture"}},
 		{Path: "skills/sample/data.bin", Kind: artifact.EntryFile, Mode: 0600, Bytes: []byte{0, 255, 1}, Ownership: artifact.Ownership{EntryID: "fixture:data", GroupID: "fixture"}},
-		{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0750, Ownership: artifact.Ownership{EntryID: "fixture:empty", GroupID: "fixture"}},
+		{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0755, Ownership: artifact.Ownership{EntryID: "fixture:empty", GroupID: "fixture"}},
 	}}
 }
 func unrelated(t *testing.T, root string) {
@@ -124,14 +137,14 @@ func unrelated(t *testing.T, root string) {
 		t.Fatal(err)
 	}
 }
-func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Evidence, error) {
+func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Evidence, *agentlaunch.PreparedExecution, error) {
 	t.Helper()
 	ev := goldens.Evidence{Writer: "providerplant", Source: "substrate legacy provider projection"}
 	mode := runtimes.Mode(in.Runtime)
 	plan := agentlaunch.LaunchPlan{Project: agentlaunch.ProjectSpec{ID: "fixture-project", Root: "/fixture/project"}, Agent: agentlaunch.AgentSpec{ID: "fixture-agent", Name: "fixture"}, Provider: agentlaunch.ProviderSpec{ID: in.Provider, Permission: permission.Mode(in.Posture)}, Runtime: mode, Workspace: agentlaunch.WorkspaceSpec{Mode: agentlaunch.WorkspaceShared, WorkspaceDir: "/fixture/state", Workdir: "/fixture/project"}, BootProfile: agentlaunch.BootProfileRef{Inline: &agentlaunch.BootProfileInline{BootPrompt: "Fixture instructions.\n", BootContent: "Fixture kickoff.\n", BootMode: agentlaunch.BootModePlanted}}, Mode: agentlaunch.LaunchInteractive}
 	compiled, err := launcher.Compile(context.Background(), plan)
 	if err != nil {
-		return ev, err
+		return ev, nil, err
 	}
 	compiled.Provenance.PlanHash = "fixture-plan"
 	prepared := &agentlaunch.PreparedLaunch{Compiled: compiled, PlantedBootDir: root, WorkspaceDir: "/fixture/state", Workdir: "/fixture/project", Argv: []string{in.Provider}, BootPrompt: "Fixture instructions.\n", BootContent: "Fixture kickoff.\n", PlantContext: agentlaunch.PreparedPlantContext{AgentName: "fixture", MCPLoopbackURL: "http://127.0.0.1:23456/mcp", SelfMCPCommand: "fixture-mcp", SelfMCPArgs: []string{"--stdio"}, SelfMCPEnv: map[string]string{"FIXTURE": "yes"}}}
@@ -146,62 +159,71 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 	}
 	skillPath, err := agentlaunch.SkillRelPath(in.Provider, mode, "sample")
 	if err != nil {
-		return ev, err
+		return ev, nil, err
 	}
 	compiled.Plan.Injection.NativeFiles = []agentlaunch.NativeFile{{Kind: agentlaunch.NativeFileSkill, ID: "sample", Content: "Fixture skill.\n", Mode: 0640}, {Kind: agentlaunch.NativeFileRaw, RelPath: filepath.ToSlash(filepath.Join(filepath.Dir(skillPath), "scripts/run.sh")), Content: "#!/bin/sh\nexit 0\n", Mode: 0751}}
 	a, err := provider.NewAdapter(runtimes.ID(in.Provider), mode)
 	if err != nil {
-		return ev, err
+		return ev, nil, err
 	}
 	if c, ok := a.(*provider.ClaudeAdapter); ok && in.Variant == "bare" {
 		c.Bare = true
 	}
-	ex, err := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+	ex, err := providerplant.ProjectExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
 	if err != nil {
-		return ev, err
+		return ev, nil, err
 	}
-	if in.Scenario == "credential-clobber" {
-		// Dummy sentinel only: pin the legacy bug, never read ambient credentials.
-		if err := os.WriteFile(filepath.Join(root, "auth.json"), []byte("DUMMY-CREDENTIAL-SENTINEL"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		ex, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+	authorize := fixtureAuthorization(t)
+	var routed *agentlaunch.PreparedExecution
+	if in.Provider != "codex" {
+		routed, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
 		if err != nil {
-			return ev, err
+			return ev, nil, err
 		}
-		ev.Diagnostics = append(ev.Diagnostics, "KNOWN BUG: providerplant overwrites a filled auth.json with its empty placeholder on replant; input was a dummy sentinel. Credentials must be link-only. Corrected behavior is a planned follow-up change.")
 	}
 	if in.Scenario == "refresh" {
-		unrelated(t, root)
+		if in.Provider != "codex" {
+			unrelated(t, root)
+		}
 		prepared.BootPrompt = "Refreshed instructions.\n"
-		ex, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+		ex, err = providerplant.ProjectExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
 		if err != nil {
-			return ev, err
+			return ev, nil, err
 		}
 	}
 	var first, resumed []string
 	if ex.Bindings.Launch != nil {
 		first, err = ex.Bindings.Launch.TurnArgv(provider.TurnInput{Prompt: "Fixture turn.", SystemPrompt: "Fixture instructions."})
 		if err != nil {
-			return ev, err
+			return ev, nil, err
 		}
 		resumed, err = ex.Bindings.Launch.TurnArgv(provider.TurnInput{Prompt: "Fixture next turn.", SystemPrompt: "Fixture instructions.", ResumeID: "fixture-session"})
 		if err != nil {
-			return ev, err
+			return ev, nil, err
 		}
 	}
 	ev.Bindings = struct {
 		Bindings       agentlaunch.ExecutionBindings
 		First, Resumed []string
 	}{ex.Bindings, first, resumed}
-	ev.Ownership = ex.Materialization.Manifest.Entries
-	return ev, nil
+	if in.Provider == "codex" {
+		_, refusal := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
+		return ev, ex, refusal
+	}
+	if in.Scenario == "refresh" {
+		routed, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
+		if err != nil {
+			return ev, nil, err
+		}
+	}
+	ev.Ownership = routed.Materialization.Manifest.Entries
+	return ev, ex, nil
 }
 
 func renderBootSpec(t *testing.T, in goldens.Input, root string) (goldens.Evidence, error) {
 	ev := goldens.Evidence{Writer: "agentlaunch.DefaultMaterializer", Source: "legacy BootSpec Populate/Replant"}
 	spec := &agentlaunch.BootSpec{Runtime: agentlaunch.RuntimeBinding{Provider: in.Provider, RuntimeKind: runtimes.ModeSubprocessPerTurn}, Files: []agentlaunch.BootFileSpec{{ID: "instructions", RelPath: "AGENTS.md", Mode: 0640, Object: agentlaunch.ContractObject{Kind: agentlaunch.ContractObjectLiteral, Text: "Fixture instructions.\n"}}}, Injections: []agentlaunch.BootInjectionSpec{{ID: "skill", Kind: agentlaunch.NativeFileSkill, Name: "sample", Mode: 0640, Object: agentlaunch.ContractObject{Kind: agentlaunch.ContractObjectLiteral, Text: "Fixture skill.\n"}}, {ID: "support", Kind: agentlaunch.NativeFileRaw, RelPath: "support/run.sh", Mode: 0751, Object: agentlaunch.ContractObject{Kind: agentlaunch.ContractObjectLiteral, Text: "#!/bin/sh\nexit 0\n"}}}}
-	m := agentlaunch.NewDefaultMaterializer(agentlaunch.MaterializerOptions{})
+	m := agentlaunch.NewDefaultMaterializer(agentlaunch.MaterializerOptions{Authorize: fixtureAuthorization(t)})
 	req := agentlaunch.MaterializeRequest{Spec: spec}
 	res, err := m.Populate(context.Background(), root, req, nil)
 	if err == nil && in.Scenario == "replant" {

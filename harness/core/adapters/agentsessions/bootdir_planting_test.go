@@ -51,7 +51,7 @@ func TestPreparePlant_Disabled_NoFilesystemActivity(t *testing.T) {
 		BootDirRoot:      root,
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, adapter, "test")
+	bootDir, planted, sessionAdapter, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestPreparePlant_AdapterWithoutBootDirProvider_NoOp(t *testing.T) {
 		BootDirRoot:      root,
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, fakePlainAdapter{}, "test")
+	bootDir, planted, sessionAdapter, err := testPreparePlant(t, opts, fakePlainAdapter{}, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestPreparePlant_EmptyPlantedFiles_NoOp(t *testing.T) {
 		BootDirRoot:      root,
 		Workdir:          "/tmp/proj",
 	}
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
@@ -132,15 +132,15 @@ func TestPreparePlant_PlantedFilesWritten(t *testing.T) {
 		BootPrompt:       "boot content",
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "claudestream")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "claudestream")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
 	if bootDir == "" {
 		t.Fatal("bootDir empty")
 	}
-	if !strings.Contains(filepath.Base(bootDir), "claudestream") {
-		t.Errorf("bootDir basename %q should embed runtime ID", filepath.Base(bootDir))
+	if bootDir != filepath.Join(root, "candidate") {
+		t.Fatalf("host candidate not honored: %s", bootDir)
 	}
 
 	for _, tc := range []struct {
@@ -173,9 +173,9 @@ func TestPreparePlant_PlantedFilesWritten(t *testing.T) {
 	if _, err := os.Stat(bootDir); err != nil {
 		t.Errorf("bootDir should exist after plant: %v", err)
 	}
-	cleanupBootDir(bootDir)
-	if _, err := os.Stat(bootDir); !os.IsNotExist(err) {
-		t.Errorf("cleanupBootDir should remove bootDir; stat err = %v", err)
+
+	if _, err := os.Stat(bootDir); err != nil {
+		t.Fatalf("committed root not retained: %v", err)
 	}
 }
 
@@ -201,11 +201,10 @@ func TestPreparePlant_EnvAmendmentsApplied(t *testing.T) {
 		Env:              []string{"PRESET=1"},
 	}
 
-	bootDir, planted, _, err := preparePlant(opts, adapter, "test")
+	bootDir, planted, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	want := []string{
 		"PRESET=1",
@@ -244,11 +243,10 @@ func TestPreparePlant_ProjectDirArgThreaded(t *testing.T) {
 		ExtraArgs:        []string{"--preset"},
 	}
 
-	bootDir, planted, _, err := preparePlant(opts, adapter, "test")
+	_, planted, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	want := []string{"--preset", "--add-dir", "/tmp/proj"}
 	if len(planted.ExtraArgs) != len(want) {
@@ -275,11 +273,11 @@ func TestPreparePlant_ProjectDirArg_EmptyProjectDir_NoSplice(t *testing.T) {
 		AutoPlantBootDir: true,
 		BootDirRoot:      root,
 	}
-	bootDir, planted, _, err := preparePlant(opts, adapter, "test")
+	_, planted, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
+
 	if len(planted.ExtraArgs) != 0 {
 		t.Errorf("planted.ExtraArgs = %v, want empty (no project)", planted.ExtraArgs)
 	}
@@ -299,11 +297,11 @@ func TestPreparePlant_SpawnCwdSet_BootDir(t *testing.T) {
 		AutoPlantBootDir: true,
 		BootDirRoot:      root,
 	}
-	bootDir, planted, _, err := preparePlant(opts, adapter, "test")
+	bootDir, planted, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
+
 	if planted.Workdir != bootDir {
 		t.Errorf("planted.Workdir = %q, want %q (bootDir for CwdBootDir)", planted.Workdir, bootDir)
 	}
@@ -323,11 +321,11 @@ func TestPreparePlant_SpawnCwdSet_ProjectDir(t *testing.T) {
 		AutoPlantBootDir: true,
 		BootDirRoot:      root,
 	}
-	bootDir, planted, _, err := preparePlant(opts, adapter, "test")
+	_, planted, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
+
 	if planted.Workdir != "/tmp/proj" {
 		t.Errorf("planted.Workdir = %q, want /tmp/proj (CwdProjectDir)", planted.Workdir)
 	}
@@ -351,7 +349,7 @@ func TestPreparePlant_RenderFailure_CleansUp(t *testing.T) {
 		BootDirRoot:      root,
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("err = %v, want wrap of %v", err, errBoom)
 	}
@@ -380,11 +378,11 @@ func TestPreparePlant_OnBootDirPlantedFires(t *testing.T) {
 		BootDirRoot:      root,
 		OnBootDirPlanted: func(p string) { seen = p },
 	}
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
+
 	if seen != bootDir {
 		t.Errorf("OnBootDirPlanted saw %q, want %q", seen, bootDir)
 	}
@@ -402,11 +400,10 @@ func TestPreparePlant_BareModeInjection_ClaudeAdapter(t *testing.T) {
 	}
 	t.Setenv("HOME", t.TempDir())
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, adapter, "claude")
+	bootDir, planted, sessionAdapter, err := testPreparePlant(t, opts, adapter, "claude")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	// Clone identity: sessionAdapter must not be the input adapter
 	// (mutating in place would race across concurrent sessions).
@@ -441,42 +438,6 @@ func TestPreparePlant_BareModeInjection_ClaudeAdapter(t *testing.T) {
 	// Verify the original adapter wasn't mutated.
 	if adapter.MCPConfigPath != "" || adapter.AppendSystemPromptFile != "" || adapter.SettingsPath != "" || adapter.ProjectDir != "" {
 		t.Errorf("runtime-level adapter was mutated; clone identity broken")
-	}
-}
-
-func TestResolveBootDirRoot_Explicit(t *testing.T) {
-	want := t.TempDir()
-	got, err := resolveBootDirRoot(want, "/should/be/ignored")
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestResolveBootDirRoot_WorkspaceFallback(t *testing.T) {
-	ws := t.TempDir()
-	got, err := resolveBootDirRoot("", ws)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	want := filepath.Join(ws, "boot")
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-	if _, err := os.Stat(want); err != nil {
-		t.Errorf("boot dir was not created: %v", err)
-	}
-}
-
-func TestResolveBootDirRoot_TmpFallback(t *testing.T) {
-	got, err := resolveBootDirRoot("", "")
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if got != os.TempDir() {
-		t.Errorf("got %q, want os.TempDir() %q", got, os.TempDir())
 	}
 }
 
@@ -535,11 +496,10 @@ func TestPreparePlant_BootContent_Distinct_FromBootPrompt(t *testing.T) {
 		BootContent:      "per-task-kickoff",
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	_, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	if len(captured) != 2 {
 		t.Fatalf("captured %d contexts, want 2", len(captured))
@@ -578,11 +538,10 @@ func TestPreparePlant_BootContent_Empty_FallsBack_To_BootPrompt(t *testing.T) {
 		// BootContent intentionally unset.
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	_, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	if len(captured) != 1 {
 		t.Fatalf("captured %d contexts, want 1", len(captured))
@@ -621,11 +580,10 @@ func TestPreparePlant_PlantContextOverlay_FlowsThrough_To_Renderer(t *testing.T)
 		},
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	_, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	if len(captured) != 1 {
 		t.Fatalf("captured %d contexts, want 1", len(captured))
@@ -673,11 +631,10 @@ func TestPreparePlant_PlantContextOverlay_LibFieldsOverridden(t *testing.T) {
 		},
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	if len(captured) != 1 {
 		t.Fatalf("captured %d contexts, want 1", len(captured))
@@ -715,11 +672,10 @@ func TestPreparePlant_PlantContextOverlay_Empty_NoChange(t *testing.T) {
 		BootPrompt:       "single-conflated-prompt",
 	}
 
-	bootDir, _, _, err := preparePlant(opts, adapter, "test")
+	bootDir, _, _, err := testPreparePlant(t, opts, adapter, "test")
 	if err != nil {
 		t.Fatalf("preparePlant err: %v", err)
 	}
-	defer cleanupBootDir(bootDir)
 
 	if len(captured) != 1 {
 		t.Fatalf("captured %d contexts, want 1", len(captured))

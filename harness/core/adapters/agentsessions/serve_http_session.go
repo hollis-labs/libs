@@ -50,8 +50,7 @@ func (r *serveHTTPRuntime) Prepare(_ context.Context) error {
 	return nil
 }
 
-func (r *serveHTTPRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
-	var err error
+func (r *serveHTTPRuntime) Start(ctx context.Context, opts StartOptions) (session Session, err error) {
 	opts, err = normalizeStartOptions(opts)
 	if err != nil {
 		return nil, err
@@ -60,20 +59,19 @@ func (r *serveHTTPRuntime) Start(ctx context.Context, opts StartOptions) (Sessio
 		return nil, errors.New("agentsessions: StartOptions.Workdir is required for serve-http runtime")
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	bootDir, planted, sessionAdapter, err := preparePlant(ctx, opts, r.cfg.Adapter, r.cfg.ID)
 	if err != nil {
 		return nil, err
 	}
 	opts = planted
+	defer func() { err = retainPreparationOnStartFailure(opts, err) }()
 
 	logPath, err := resolveServeHTTPLogPath(opts)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 	logF, err := openSessionLog(logPath)
 	if err != nil {
-		cleanupBootDir(bootDir)
 		return nil, fmt.Errorf("agentsessions: open log: %w", err)
 	}
 
@@ -95,7 +93,6 @@ func (r *serveHTTPRuntime) Start(ctx context.Context, opts StartOptions) (Sessio
 
 	if err := s.spawn(); err != nil {
 		_ = logF.Close()
-		cleanupBootDir(bootDir)
 		return nil, err
 	}
 	go s.finishOnProcessExit()
@@ -818,7 +815,6 @@ func (s *serveHTTPSession) finishOnProcessExit() {
 			s.waitErr.Store(exitErr)
 		}
 		_ = s.logFile.Close()
-		cleanupBootDir(s.bootDir)
 		if exitErr == nil {
 			s.done <- nil
 		} else {

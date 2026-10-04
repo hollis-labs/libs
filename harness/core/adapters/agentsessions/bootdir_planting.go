@@ -1,34 +1,35 @@
 package agentsessions
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
-// preparePlant materializes the adapter's BootDirSpec into a per-session
-// tempdir when opts.AutoPlantBootDir is true and adapter implements
-// provider.BootDirProvider. Returns:
-//
-//   - bootDir: absolute path of the planted dir, or "" if no plant happened.
-//   - planted: opts with Workdir / Env / ExtraArgs rewired to the planted
-//     layout. When no plant happens, planted == opts unchanged.
-//   - sessionAdapter: per-session adapter (a clone with bare-mode paths
-//     injected) to use for BuildArgs and downstream calls. When no plant or
-//     no mutation is required, returns the input adapter unchanged.
-//   - err: a render or filesystem error; the planted dir (if any) is
-//     cleaned up before returning.
-//
-// Callers are responsible for cleanupBootDir(bootDir) at terminal state.
-// runtimeID is folded into the tempdir name for diagnostic readability.
-func preparePlant(opts StartOptions, adapter provider.CLIAdapter, runtimeID string) (bootDir string, planted StartOptions, sessionAdapter provider.CLIAdapter, err error) {
-	planted = opts
-	sessionAdapter = adapter
+// ArtifactPreparationError exposes trusted root accounting without cleanup.
+type ArtifactPreparationError struct {
+	Result workspace.ApplyResult
+	Err    error
+}
 
+func (e *ArtifactPreparationError) Error() string {
+	return "agentsessions: artifact preparation: " + e.Err.Error()
+}
+func (e *ArtifactPreparationError) Unwrap() error { return e.Err }
+
+// preparePlant renders a pure BootDirSpec only after explicit host authority
+// preflight, then applies through the sole workspace engine. Failures preserve
+// the original options/adapter and expose retained root evidence; callbacks and
+// binding clones follow verified commit. It creates no implicit root or parent.
+func preparePlant(ctx context.Context, opts StartOptions, adapter provider.CLIAdapter, runtimeID string) (bootDir string, planted StartOptions, sessionAdapter provider.CLIAdapter, err error) {
+	planted, sessionAdapter = opts, adapter
 	if !opts.AutoPlantBootDir {
 		return "", planted, sessionAdapter, nil
 	}
@@ -40,62 +41,70 @@ func preparePlant(opts StartOptions, adapter provider.CLIAdapter, runtimeID stri
 	if len(spec.PlantedFiles) == 0 {
 		return "", planted, sessionAdapter, nil
 	}
-
-	bootRoot, err := resolveBootDirRoot(opts.BootDirRoot, opts.WorkspaceDir)
-	if err != nil {
+	if opts.ArtifactAuthorization == nil || opts.ArtifactRoot == "" {
+		return "", opts, adapter, &workspace.Refusal{Code: "automatic_plant_authority_pending", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if ctx == nil {
+		return "", opts, adapter, &workspace.Refusal{Code: "invalid_artifact_authority", Concern: "authority", Status: workspace.Unsupported}
+	}
+	if err := ctx.Err(); err != nil {
 		return "", opts, adapter, err
 	}
-	dir, err := os.MkdirTemp(bootRoot, fmt.Sprintf("agent-sessions-boot-%s-*", sanitizeBootDirID(runtimeID)))
+	authority, err := opts.ArtifactAuthorization(ctx, opts.ArtifactRoot)
 	if err != nil {
-		return "", opts, adapter, fmt.Errorf("agentsessions: create boot dir: %w", err)
+		return "", opts, adapter, errors.Join(&workspace.Refusal{Code: "invalid_artifact_authority", Concern: "authority", Status: workspace.Unsupported}, err)
 	}
-
-	projectDir := opts.Workdir
-	bootContent := opts.BootContent
-	if bootContent == "" {
-		// Back-compat with v0.9.0–v0.9.2 callers that set only BootPrompt:
-		// fall back so renderers receive the same value for both fields,
-		// preserving the conflated behavior. Consumers that distinguish
-		// agent persona from per-task kickoff set BootContent explicitly.
-		bootContent = opts.BootPrompt
+	closeInvalid := func(err error) error {
+		if authority.Close != nil {
+			return errors.Join(err, authority.Close())
+		}
+		return err
 	}
+	if err := agentlaunch.ValidateArtifactAuthority(ctx, authority, opts.ArtifactRoot); err != nil {
+		return "", opts, adapter, closeInvalid(err)
+	}
+	if opts.PlantContext.LegacyAllowHostEffects {
+		return "", opts, adapter, closeInvalid(&workspace.Refusal{Code: "legacy_render_effects_unsupported", Concern: "effects", Status: workspace.Unsupported})
+	}
+	dir, projectDir := authority.Input.Root.Path, opts.Workdir
 	plantCtx := opts.PlantContext
 	plantCtx.SystemPrompt = opts.BootPrompt
-	plantCtx.BootContent = bootContent
-	plantCtx.ProjectDir = projectDir
-	plantCtx.BootDir = dir
-
+	plantCtx.BootContent = opts.BootContent
+	if plantCtx.BootContent == "" {
+		plantCtx.BootContent = opts.BootPrompt
+	}
+	plantCtx.ProjectDir, plantCtx.BootDir = projectDir, dir
+	entries := []artifact.Entry{}
 	for _, pf := range spec.PlantedFiles {
-		path := filepath.Join(dir, pf.RelPath)
-		if mkErr := os.MkdirAll(filepath.Dir(path), 0o750); mkErr != nil {
-			_ = os.RemoveAll(dir)
-			return "", opts, adapter, fmt.Errorf("agentsessions: plant %s: mkdir: %w", pf.RelPath, mkErr)
+		if err := ctx.Err(); err != nil {
+			return "", opts, adapter, closeInvalid(err)
 		}
 		if pf.Render == nil {
 			continue
 		}
-		content, rerr := pf.Render(plantCtx)
-		if rerr != nil {
-			_ = os.RemoveAll(dir)
-			return "", opts, adapter, fmt.Errorf("agentsessions: plant %s: render: %w", pf.RelPath, rerr)
+		content, err := pf.Render(plantCtx)
+		if err != nil {
+			return "", opts, adapter, closeInvalid(fmt.Errorf("agentsessions: plant %s: render: %w", pf.RelPath, err))
 		}
-		mode := plantedFileMode(pf)
-		if werr := os.WriteFile(path, []byte(content), mode); werr != nil {
-			_ = os.RemoveAll(dir)
-			return "", opts, adapter, fmt.Errorf("agentsessions: plant %s: write: %w", pf.RelPath, werr)
+		mode := pf.Mode
+		if mode == 0 {
+			mode = plantedFileMode(pf)
 		}
+		entries = append(entries, artifact.Entry{Path: pf.RelPath, Kind: artifact.EntryFile, Mode: mode, Bytes: []byte(content), Ownership: artifact.Ownership{EntryID: "agentsessions.bootdir:" + pf.RelPath, GroupID: "agentsessions.bootdir"}, Provenance: artifact.Provenance{Source: "agentsessions.bootdir"}})
 	}
-
+	result, err := agentlaunch.MaterializeArtifactsResult(ctx, agentlaunch.ArtifactMaterializationRequest{TargetRoot: dir, Roots: agentlaunch.ExecutionRoots{BootRoot: dir, ProjectRoot: projectDir}, Artifacts: artifact.Tree{Entries: entries}, Authorize: func(context.Context, string) (agentlaunch.ArtifactAuthority, error) { return authority, nil }})
+	if err != nil {
+		return "", opts, adapter, &ArtifactPreparationError{Result: result, Err: err}
+	}
+	if err := ctx.Err(); err != nil {
+		return "", opts, adapter, &ArtifactPreparationError{Result: result, Err: err}
+	}
 	envAmend := substituteTemplates(spec.EnvAmendments, dir, projectDir)
 	projectDirArg := substituteArgTokens(spec.ProjectDirArg, dir, projectDir)
-
-	// Apply bare-mode injection for Claude adapters. Mutating the runtime-
-	// level adapter would race across concurrent sessions, so clone first
-	// and surface the cloned adapter back to the caller. Non-Claude or
-	// non-bare adapters need no mutation; the original adapter is returned.
 	sessionAdapter, projectDirArg = applyBareInjection(adapter, dir, projectDir, projectDirArg)
 	sessionAdapter, projectDirArg = applyCodexProjectDir(sessionAdapter, projectDir, projectDirArg)
-
+	snapshot := result.Clone()
+	planted.artifactPreparation = &snapshot
 	planted.Workdir = spec.SpawnWorkdir(dir, projectDir)
 	if len(envAmend) > 0 {
 		planted.Env = append(append([]string(nil), opts.Env...), envAmend...)
@@ -103,43 +112,23 @@ func preparePlant(opts StartOptions, adapter provider.CLIAdapter, runtimeID stri
 	if len(projectDirArg) > 0 {
 		planted.ExtraArgs = append(append([]string(nil), opts.ExtraArgs...), projectDirArg...)
 	}
-
+	if opts.OnArtifactPrepared != nil {
+		opts.OnArtifactPrepared(result.Clone())
+	}
 	if opts.OnBootDirPlanted != nil {
 		opts.OnBootDirPlanted(dir)
 	}
-
 	return dir, planted, sessionAdapter, nil
 }
 
-// cleanupBootDir removes a planted bootdir. Best-effort: failures are
-// logged via the standard logger and never returned. Safe with empty
-// input — the no-plant path passes "" and we no-op.
-func cleanupBootDir(bootDir string) {
-	if bootDir == "" {
-		return
+func retainPreparationOnStartFailure(opts StartOptions, err error) error {
+	if err == nil || opts.artifactPreparation == nil {
+		return err
 	}
-	if err := os.RemoveAll(bootDir); err != nil {
-		log.Printf("agentsessions: boot dir cleanup %s: %v", bootDir, err)
-	}
-}
-
-// resolveBootDirRoot picks the parent directory for the per-session
-// tempdir. Order: explicit BootDirRoot → WorkspaceDir+"/boot/" → os.TempDir().
-// MkdirAll's the chosen root before returning (0o750).
-func resolveBootDirRoot(explicit, workspaceDir string) (string, error) {
-	var root string
-	switch {
-	case explicit != "":
-		root = explicit
-	case workspaceDir != "":
-		root = filepath.Join(workspaceDir, "boot")
-	default:
-		return os.TempDir(), nil
-	}
-	if err := os.MkdirAll(root, 0o750); err != nil {
-		return "", fmt.Errorf("agentsessions: ensure boot root %s: %w", root, err)
-	}
-	return root, nil
+	result := opts.artifactPreparation.Clone()
+	result.Status = workspace.Partial
+	result.Diagnostics = append(result.Diagnostics, workspace.Diagnostic{Code: "session_start_failed", Concern: "launch", Status: workspace.Partial})
+	return &ArtifactPreparationError{Result: result, Err: err}
 }
 
 // plantedFileMode picks the file mode for a planted file. .mcp.json and

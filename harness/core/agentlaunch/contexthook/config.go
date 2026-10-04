@@ -45,4 +45,7 @@ type Config struct {
 	// applies before planting, so a truncated slot is planted at its
 	// truncated length.
 	PlantArtifacts bool
+
+	// Authorize supplies explicit private inactive-root authority when planting.
+	Authorize agentlaunch.ArtifactAuthorizer
 }

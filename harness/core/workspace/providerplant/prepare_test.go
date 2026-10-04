@@ -16,7 +16,7 @@ import (
 
 func TestPrepareAndPlant(t *testing.T) {
 	isolateHome(t)
-	prepared, err := PrepareAndPlant(context.Background(), compiledFor(t, "claude", runtimes.ModePTY))
+	prepared, err := prepareWithAuthority(t, context.Background(), compiledFor(t, "claude", runtimes.ModePTY))
 	if err != nil {
 		t.Fatalf("PrepareAndPlant: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestPrepareAndPlant_WithContextHook(t *testing.T) {
 	hook := func(_ context.Context, _ string, _ *agentlaunch.CompiledLaunch) (string, error) {
 		return "CONTEXT-HOOK-PROMPT", nil
 	}
-	prepared, err := PrepareAndPlant(
+	prepared, err := prepareWithAuthority(t,
 		context.Background(),
 		compiledFor(t, "claude", runtimes.ModePTY),
 		WithPrepareOption(launcher.WithContextHook(hook)),
@@ -51,15 +51,14 @@ func TestPrepareAndPlant_WithContextHook(t *testing.T) {
 // through PrepareAndPlant.
 func TestPrepareAndPlant_WithPlantOption(t *testing.T) {
 	isolateHome(t)
-	prepared, err := PrepareAndPlant(
+	_, err := prepareWithAuthority(t,
 		context.Background(),
 		compiledFor(t, "codex", runtimes.ModeSubprocessPerTurn),
 		WithPlantOption(WithAdapter(provider.NewCodexAdapter())),
 	)
-	if err != nil {
-		t.Fatalf("PrepareAndPlant: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "reserved_artifact_path") {
+		t.Fatalf("plant option did not select reserved Codex projection: %v", err)
 	}
-	assertExists(t, prepared.PlantedBootDir, "config.toml")
 }
 
 // The projected Claude argv carries --add-dir <project> itself
@@ -76,7 +75,7 @@ func TestPrepareExecution_ClaudeProjectDirOnce(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: prepare: %v", mode, err)
 		}
-		exec, err := PrepareExecution(context.Background(), prepared)
+		exec, err := projectionForTest(t, context.Background(), prepared)
 		if err != nil {
 			t.Fatalf("%s: PrepareExecution: %v", mode, err)
 		}
@@ -124,7 +123,7 @@ func TestPrepareExecution_NoPositionalAfterProjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if _, err := PrepareExecution(context.Background(), prepared); !errors.Is(err, ErrPositionalAfterProjection) {
+	if _, err := projectionForTest(t, context.Background(), prepared); !errors.Is(err, ErrPositionalAfterProjection) {
 		t.Fatalf("PrepareExecution = %v, want ErrPositionalAfterProjection", err)
 	}
 
@@ -133,7 +132,7 @@ func TestPrepareExecution_NoPositionalAfterProjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	exec, err := PrepareExecution(context.Background(), prepared)
+	exec, err := projectionForTest(t, context.Background(), prepared)
 	if err != nil {
 		t.Fatalf("PrepareExecution with a leading option: %v", err)
 	}
@@ -185,7 +184,7 @@ func TestPrepareExecution_LaunchFlagsPrecedeDashDash(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s/%s: prepare: %v", c.provider, c.mode, err)
 		}
-		exec, err := PrepareExecution(context.Background(), prepared)
+		exec, err := projectionForTest(t, context.Background(), prepared)
 		if err != nil {
 			t.Fatalf("%s/%s: PrepareExecution: %v", c.provider, c.mode, err)
 		}

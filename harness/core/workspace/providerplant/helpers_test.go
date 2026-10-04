@@ -22,11 +22,11 @@ func compiledFor(t *testing.T, providerID string, runtime runtimes.Mode) *agentl
 func compiledWith(t *testing.T, providerID string, runtime runtimes.Mode, inj agentlaunch.InjectionSpec) *agentlaunch.CompiledLaunch {
 	t.Helper()
 	plan := agentlaunch.LaunchPlan{
-		Project:   agentlaunch.ProjectSpec{ID: "proj", Name: "Project", Root: t.TempDir()},
+		Project:   agentlaunch.ProjectSpec{ID: "proj", Name: "Project", Root: fixturePrivateDir(t)},
 		Agent:     agentlaunch.AgentSpec{ID: "agent-id", Name: "agent-name"},
 		Provider:  agentlaunch.ProviderSpec{ID: providerID},
 		Runtime:   runtime,
-		Workspace: agentlaunch.WorkspaceSpec{Mode: agentlaunch.WorkspaceTemp, TempPrefix: t.TempDir()},
+		Workspace: agentlaunch.WorkspaceSpec{Mode: agentlaunch.WorkspaceTemp, TempPrefix: fixturePrivateDir(t)},
 		BootProfile: agentlaunch.BootProfileRef{
 			Inline: &agentlaunch.BootProfileInline{
 				BootPrompt:  "PERSONA-PROMPT",
@@ -59,8 +59,8 @@ func preparedFor(t *testing.T, providerID string, runtime runtimes.Mode) *agentl
 // the developer's real dotfiles during a test.
 func isolateHome(t *testing.T) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("HOME", fixturePrivateDir(t))
+	t.Setenv("CODEX_HOME", fixturePrivateDir(t))
 }
 
 // readFile reads a planted file relative to a bootdir, failing the test

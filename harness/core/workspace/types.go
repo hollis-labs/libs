@@ -306,6 +306,15 @@ type ApplyResult struct {
 	launchSeal        [32]byte
 }
 
+// Clone detaches public evidence while preserving only proofs already earned
+// by this result. It cannot confer completion on a caller-built result.
+func (r ApplyResult) Clone() ApplyResult {
+	out := copyRecord(r)
+	out.artifactsComplete, out.artifactSeal = r.artifactsComplete, r.artifactSeal
+	out.launchComplete, out.launchSeal = r.launchComplete, r.launchSeal
+	return out
+}
+
 // ArtifactsComplete proves only managed-artifact application. It is deliberately
 // false for a hand-built result, including one with a committed-looking receipt.
 func (r ApplyResult) ArtifactsComplete() bool {

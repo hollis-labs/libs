@@ -123,11 +123,12 @@ func TestPlant_WithAdapterOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if err := Plant(context.Background(), prepared, WithAdapter(provider.NewCodexAdapter())); err != nil {
-		t.Fatalf("plant: %v", err)
+	requireCredentialRefusal(t, prepared, plantWithAuthority(t, context.Background(), prepared, WithAdapter(provider.NewCodexAdapter())))
+	projection, err := projectionForTest(t, context.Background(), prepared, WithAdapter(provider.NewCodexAdapter()))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// The codex adapter's BootDirSpec was planted despite the claude plan.
-	assertExists(t, prepared.PlantedBootDir, "config.toml")
+	_ = projectedFile(t, projection, "config.toml")
 }
 
 func modeOf(a provider.BootDirProvider) string {

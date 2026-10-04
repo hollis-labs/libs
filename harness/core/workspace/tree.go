@@ -34,6 +34,20 @@ type TreeRequest struct {
 // TreeDigestVersion pins the artifact-only input domain and JSON encoding.
 const TreeDigestVersion = "workspace.tree.input.v2"
 
+// ValidateTreeAuthority validates the artifact-independent host contract.
+// It does not acquire locks, render content or confer authority from a path.
+func ValidateTreeAuthority(input TreeRequest) error {
+	input.Tree = artifact.Tree{}
+	p, err := planTree(input)
+	if err != nil {
+		return err
+	}
+	if len(p.spec.Effects) != 1 {
+		return refuse(CodeMissingEffectGrant, "effects", Unsupported)
+	}
+	return nil
+}
+
 // ApplyTree is the narrow legacy preparation entry. It preserves the same
 // authority, lock, manifest and receipt boundary as Materialize without making
 // up an identity or choosing a temporary root for its caller.

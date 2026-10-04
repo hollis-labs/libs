@@ -64,7 +64,7 @@ func (w *Wrapper) resolvePreparedExecution(ctx context.Context, bootDir string) 
 	if req.Projection.Bindings.CWD == "" {
 		req.Projection.Bindings.CWD = req.Roots.CWD
 	}
-	prepared, err := agentlaunch.ResolvePreparation(ctx, req, agentlaunch.WithMaterializationEngine(w.cfg.MaterializationEngine))
+	prepared, err := agentlaunch.ResolvePreparation(ctx, req, agentlaunch.WithArtifactAuthorization(w.cfg.ArtifactAuthorization))
 	if err != nil {
 		return nil, fmt.Errorf("wrapper: resolve preparation: %w", err)
 	}

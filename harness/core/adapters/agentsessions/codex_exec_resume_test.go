@@ -32,7 +32,7 @@ func codexResumeTailOK(tail []string) bool {
 	return true
 }
 
-// An auto-planted codex exec session resumes its thread on turn 2 with
+// Pure Codex project binding followed by a fake exec session resumes turn 2 with
 // `exec … --cd <project> resume <id> -- <prompt>`: --cd and the session's
 // ExtraArgs in front of the subcommand, where codex takes exec options, and
 // nothing after `resume <id>` that codex refuses there. Before agentkit
@@ -40,7 +40,7 @@ func codexResumeTailOK(tail []string) bool {
 // (CW-20261001-0194); until CW-20261001-0197 so were StartOptions.ExtraArgs,
 // so an exec-only flag such as -s broke turn 2. Turn 1's argv without extras
 // is unchanged.
-func TestAutoPlantedCodexExecResumesWithCdBeforeResume(t *testing.T) {
+func TestProjectedCodexExecResumesWithCdBeforeResume(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		extra []string
@@ -56,17 +56,21 @@ func TestAutoPlantedCodexExecResumesWithCdBeforeResume(t *testing.T) {
 				providertest.Replay("codex/exec_turn2_resume"))
 			adapter := provider.NewCodexAdapter()
 			adapter.Binary = fake.Path
-			rt, err := NewFromAdapter(AdapterRuntimeConfig{ID: "codex-exec-resume", Kind: "cli", Adapter: adapter, Caps: Capabilities{ProviderSessionID: true}})
+			dir, project := t.TempDir(), t.TempDir()
+			// The pure projection preserves argv coverage. Active Codex automatic
+			// planting separately refuses its reserved credential placeholder.
+			bound, extra := applyCodexProjectDir(adapter, project, substituteArgTokens(adapter.BootDirSpec().ProjectDirArg, dir, project))
+			if len(extra) != 0 || adapter.ProjectDir != "" {
+				t.Fatal("binding mutated caller")
+			}
+			rt, err := NewFromAdapter(AdapterRuntimeConfig{ID: "codex-exec-resume", Kind: "cli", Adapter: bound, Caps: Capabilities{ProviderSessionID: true}})
 			if err != nil {
 				t.Fatal(err)
 			}
-			dir, project := t.TempDir(), t.TempDir()
 			sess, err := rt.Start(context.Background(), StartOptions{
-				Workdir:          project,
-				LogPath:          filepath.Join(dir, "session.log"),
-				AutoPlantBootDir: true,
-				BootDirRoot:      dir,
-				ExtraArgs:        c.extra,
+				Workdir:   project,
+				LogPath:   filepath.Join(dir, "session.log"),
+				ExtraArgs: c.extra,
 			})
 			if err != nil {
 				t.Fatalf("Start: %v", err)

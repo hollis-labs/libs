@@ -135,8 +135,7 @@ func (r *adapterRuntime) Prepare(ctx context.Context) error {
 	return nil
 }
 
-func (r *adapterRuntime) Start(ctx context.Context, opts StartOptions) (Session, error) {
-	var err error
+func (r *adapterRuntime) Start(ctx context.Context, opts StartOptions) (session Session, err error) {
 	opts, err = normalizeStartOptions(opts)
 	if err != nil {
 		return nil, err
@@ -145,11 +144,12 @@ func (r *adapterRuntime) Start(ctx context.Context, opts StartOptions) (Session,
 		return nil, errors.New("agentsessions: StartOptions.Workdir is required for adapter runtime")
 	}
 
-	bootDir, planted, sessionAdapter, err := preparePlant(opts, r.cfg.Adapter, r.cfg.ID)
+	bootDir, planted, sessionAdapter, err := preparePlant(ctx, opts, r.cfg.Adapter, r.cfg.ID)
 	if err != nil {
 		return nil, err
 	}
 	opts = planted
+	defer func() { err = retainPreparationOnStartFailure(opts, err) }()
 
 	s := &adapterSession{
 		runtime:   r,
@@ -233,9 +233,9 @@ type adapterSession struct {
 	// runtime.cfg.Adapter, but a per-session clone when AutoPlantBootDir
 	// fired bare-mode injection. Always non-nil after Start.
 	adapter provider.CLIAdapter
-	// bootDir is the absolute path of the AutoPlantBootDir-planted tempdir,
-	// or "" when no plant happened. Cleaned up exactly once at terminal
-	// state (Stop) via cleanupBootDir.
+	// bootDir is the explicitly authorized, engine-owned artifact root,
+	// or "" when no plant happened. Retained at terminal state; retirement
+	// requires a separate custody protocol.
 	bootDir   string
 	opts      StartOptions
 	buildArgs func(prompt, sessionID string) []string
@@ -324,7 +324,6 @@ func (s *adapterSession) Stop(ctx context.Context) error {
 	// the runner's context observes.
 	s.doneOnce.Do(func() {
 		close(s.done)
-		cleanupBootDir(s.bootDir)
 	})
 	return nil
 }

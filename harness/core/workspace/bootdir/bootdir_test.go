@@ -35,12 +35,9 @@ func TestBuildInjectionNativeFiles(t *testing.T) {
 }
 
 func TestWriteInjectionSpecOrderAndOverlayWins(t *testing.T) {
-	dir := t.TempDir()
+	dir := fixturePrivateDir(t)
 	var calls []string
-	w := Writer{AtomicWrite: func(path string, data []byte, mode fs.FileMode) error {
-		calls = append(calls, filepath.Base(path)+":"+string(data))
-		return os.WriteFile(path, data, mode)
-	}}
+	w := Writer{Authorize: fixtureAuthorization(t), OnWritten: func(file WrittenFile) { calls = append(calls, file.RelPath+":"+file.Source) }}
 	spec := agentlaunch.InjectionSpec{
 		NativeFiles: []agentlaunch.NativeFile{
 			raw("same.md", "native", 0),
@@ -66,10 +63,10 @@ func TestWriteInjectionSpecOrderAndOverlayWins(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{
 		"same.md:native",
-		"native-only.md:native-only",
-		"a.md:a",
+		"native-only.md:native",
+		"a.md:overlay",
 		"same.md:overlay",
-		"z.md:z",
+		"z.md:overlay",
 	}) {
 		t.Fatalf("atomic calls = %v", calls)
 	}
@@ -87,7 +84,7 @@ func TestPlanInjectionSpecMatchesActualWriteOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := (Writer{}).WriteInjectionSpec(t.TempDir(), spec, WriteOptions{})
+	result, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteInjectionSpec(fixturePrivateDir(t), spec, WriteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,14 +120,14 @@ func TestWriteRejectsUnsafeAndEmptyPaths(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := (Writer{}).WriteInjectionSpec(t.TempDir(), tc.spec, WriteOptions{})
+			_, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteInjectionSpec(fixturePrivateDir(t), tc.spec, WriteOptions{})
 			if !errors.Is(err, tc.err) {
 				t.Fatalf("err = %v, want %v", err, tc.err)
 			}
 		})
 	}
 
-	_, err := (Writer{}).WriteFiles(t.TempDir(), []File{{RelPath: ".git/config", Content: "x"}})
+	_, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteFiles(fixturePrivateDir(t), []File{{RelPath: ".git/config", Content: "x"}})
 	if !errors.Is(err, ErrUnsafePath) {
 		t.Fatalf("partial unsafe err = %v, want ErrUnsafePath", err)
 	}
@@ -141,13 +138,13 @@ func TestUnsupportedNativeKindAndResolverHook(t *testing.T) {
 		Kind: agentlaunch.NativeFileSkill,
 		ID:   "review",
 	}}}
-	_, err := (Writer{}).WriteInjectionSpec(t.TempDir(), spec, WriteOptions{})
+	_, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteInjectionSpec(fixturePrivateDir(t), spec, WriteOptions{})
 	if !errors.Is(err, ErrUnsupportedNativeKind) {
 		t.Fatalf("err = %v, want ErrUnsupportedNativeKind", err)
 	}
 
-	dir := t.TempDir()
-	_, err = (Writer{}).WriteInjectionSpec(dir, spec, WriteOptions{
+	dir := fixturePrivateDir(t)
+	_, err = (Writer{Authorize: fixtureAuthorization(t)}).WriteInjectionSpec(dir, spec, WriteOptions{
 		NativeResolver: func(nf agentlaunch.NativeFile) (File, error) {
 			return File{RelPath: "skills/" + nf.ID + ".md", Content: "skill"}, nil
 		},
@@ -161,8 +158,8 @@ func TestUnsupportedNativeKindAndResolverHook(t *testing.T) {
 }
 
 func TestModesDefaultAndExplicitPreserved(t *testing.T) {
-	dir := t.TempDir()
-	result, err := (Writer{}).WriteInjectionSpec(dir, agentlaunch.InjectionSpec{
+	dir := fixturePrivateDir(t)
+	result, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteInjectionSpec(dir, agentlaunch.InjectionSpec{
 		NativeFiles: []agentlaunch.NativeFile{
 			raw("default.md", "x", 0),
 			raw("private.md", "x", 0o600),
@@ -183,14 +180,15 @@ func TestModesDefaultAndExplicitPreserved(t *testing.T) {
 }
 
 func TestWriteFilesRewritesOnlySpecifiedFiles(t *testing.T) {
-	dir := t.TempDir()
+	dir := fixturePrivateDir(t)
+
+	if _, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteFiles(dir, []File{{RelPath: "slot.md", Content: "v1"}}); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "sibling.md"), []byte("keep"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Writer{}).WriteFiles(dir, []File{{RelPath: "slot.md", Content: "v1"}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (Writer{}).WriteFiles(dir, []File{{RelPath: "slot.md", Content: "v2"}}); err != nil {
+	if _, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteFiles(dir, []File{{RelPath: "slot.md", Content: "v2"}}); err != nil {
 		t.Fatal(err)
 	}
 	if string(mustRead(t, filepath.Join(dir, "slot.md"))) != "v2" {
@@ -202,7 +200,7 @@ func TestWriteFilesRewritesOnlySpecifiedFiles(t *testing.T) {
 }
 
 func TestEmptyBootDirRejected(t *testing.T) {
-	_, err := (Writer{}).WriteFiles("", []File{{RelPath: "x.md", Content: "x"}})
+	_, err := (Writer{Authorize: fixtureAuthorization(t)}).WriteFiles("", []File{{RelPath: "x.md", Content: "x"}})
 	if !errors.Is(err, ErrEmptyBootDir) {
 		t.Fatalf("err = %v, want ErrEmptyBootDir", err)
 	}

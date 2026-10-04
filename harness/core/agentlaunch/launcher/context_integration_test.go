@@ -109,7 +109,7 @@ Skill body.
 		}, nil
 	}
 
-	hook := contexthook.New(provider, contexthook.Config{
+	hook := contexthook.New(provider, contexthook.Config{Authorize: fixtureAuthorization(t),
 		SlotExtractor:  extractor,
 		PlantArtifacts: true,
 	})
