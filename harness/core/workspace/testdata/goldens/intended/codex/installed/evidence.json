@@ -1,0 +1,127 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "installed_skill_evidence": "authored installed package row and declared-mode contract; archived installed seed supplies no installed skills; no installed-skill seed parity claimed",
+    "installed_apply_acceptance": {
+      "check_normalization": "reproduce settings comparison after owned-key merge and Codex TOML normalization",
+      "found_json_key_order": "preserve existing JSON key order (Claude permissions before fixture_operator)",
+      "source_seed": "seeds/cairn/codex/install-refresh must pass byte-for-byte at installed apply; these pure fixtures do not perform a merge",
+      "unknown_nested_leaves": "preserve unknown operator leaves inside owned objects/tables, including Codex fixture_operator inside mcp_servers.fixture, without dropping or reordering",
+      "unowned_values": "never overwrite keys the installer does not own"
+    },
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {},
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": "home"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".agents",
+      "ownership": {
+        "entry_id": "workspace.render:.agents",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/SKILL.md",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": ".codex",
+      "ownership": {
+        "entry_id": "workspace.render:.codex",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".codex/AGENTS.md",
+      "ownership": {
+        "entry_id": "workspace.render:.codex/AGENTS.md",
+        "group_id": "workspace.render:instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      }
+    },
+    {
+      "path": ".codex/config.toml",
+      "ownership": {
+        "entry_id": "workspace.render:.codex/config.toml",
+        "group_id": "workspace.render:codex-config"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcp_servers\",\"http\",\"url\"],[\"mcp_servers\",\"loopback\",\"url\"],[\"mcp_servers\",\"mux\",\"args\"],[\"mcp_servers\",\"mux\",\"command\"],[\"mcp_servers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcp_servers\",\"stdio\",\"args\"],[\"mcp_servers\",\"stdio\",\"command\"],[\"mcp_servers\",\"stdio\",\"env\",\"FIXTURE\"]],\"reserved_slots\":[\"mcp_servers\"]}"
+      }
+    }
+  ]
+}

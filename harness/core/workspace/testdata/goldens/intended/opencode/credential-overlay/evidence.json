@@ -1,0 +1,25 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {},
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": ""
+  },
+  "diagnostics": [
+    "{\"Posture\":\"\",\"Code\":\"reserved_destination\",\"Provider\":\"opencode\",\"Mode\":\"subprocess-per-turn\",\"Concern\":\"resources\",\"Reason\":\"overlay claims a native or credential destination\",\"Entry\":\"\",\"Declared\":0,\"Applied\":0}"
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "--add-dir",
+        "/fixture/project"
+      ],
+      "cwd": "<boot>",
+      "posture": {
+        "Provider": "antigravity",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      }
+    },
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": "boot",
+    "preparation": [
+      {
+        "Provider": "antigravity",
+        "Kind": "credential-availability",
+        "Destination": "",
+        "Policy": ""
+      }
+    ]
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".agents",
+      "ownership": {
+        "entry_id": "workspace.render:.agents",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/plugins",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/plugins/tether",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/plugins/tether/mcp_config.json",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether/mcp_config.json",
+        "group_id": "workspace.render:antigravity-mcp"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcpServers\",\"http\",\"serverUrl\"],[\"mcpServers\",\"loopback\",\"serverUrl\"],[\"mcpServers\",\"mux\",\"args\"],[\"mcpServers\",\"mux\",\"command\"],[\"mcpServers\",\"mux\",\"env\",\"FIXTURE\"],[\"mcpServers\",\"stdio\",\"args\"],[\"mcpServers\",\"stdio\",\"command\"],[\"mcpServers\",\"stdio\",\"env\",\"FIXTURE\"]],\"reserved_slots\":[]}"
+      }
+    },
+    {
+      "path": ".agents/plugins/tether/plugin.json",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether/plugin.json",
+        "group_id": "workspace.render:antigravity-plugin"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"name\"]],\"reserved_slots\":[]}"
+      }
+    },
+    {
+      "path": ".agents/skills",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/SKILL.md",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "ownership": {
+        "entry_id": "workspace.render:AGENTS.md",
+        "group_id": "workspace.render:instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      }
+    }
+  ]
+}

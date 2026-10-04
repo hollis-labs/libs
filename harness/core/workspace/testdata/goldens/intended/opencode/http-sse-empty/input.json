@@ -1,0 +1,6 @@
+{
+  "provider": "opencode",
+  "runtime": "http-sse",
+  "posture": "",
+  "scenario": "native"
+}

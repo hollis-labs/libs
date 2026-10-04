@@ -1,0 +1,140 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "serve",
+        "--hostname",
+        "127.0.0.1"
+      ],
+      "environment": {
+        "OPENCODE_CONFIG_DIR": "<boot>"
+      },
+      "cwd": "/fixture/project",
+      "rpc_project": {
+        "agent": "fixture",
+        "directory": "/fixture/project"
+      },
+      "posture": {
+        "Provider": "opencode",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": "yolo"
+      }
+    },
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "posture-reference",
+    "permission_evidence": "adapters/registry/posture.go: OPENCODE_PERMISSION config object per mode; https://opencode.ai/docs/permissions/: native permission keys and actions",
+    "root": "boot"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "agents",
+      "ownership": {
+        "entry_id": "workspace.render:agents",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": "agents/fixture.md",
+      "ownership": {
+        "entry_id": "workspace.render:agents/fixture.md",
+        "group_id": "workspace.render:opencode-agent"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      }
+    },
+    {
+      "path": "opencode.json",
+      "ownership": {
+        "entry_id": "workspace.render:opencode.json",
+        "group_id": "workspace.render:opencode-config"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"mcp\",\"http\",\"enabled\"],[\"mcp\",\"http\",\"type\"],[\"mcp\",\"http\",\"url\"],[\"mcp\",\"loopback\",\"enabled\"],[\"mcp\",\"loopback\",\"type\"],[\"mcp\",\"loopback\",\"url\"],[\"mcp\",\"mux\",\"command\"],[\"mcp\",\"mux\",\"enabled\"],[\"mcp\",\"mux\",\"environment\",\"FIXTURE\"],[\"mcp\",\"mux\",\"type\"],[\"mcp\",\"stdio\",\"command\"],[\"mcp\",\"stdio\",\"enabled\"],[\"mcp\",\"stdio\",\"environment\",\"FIXTURE\"],[\"mcp\",\"stdio\",\"type\"],[\"permission\",\"bash\"],[\"permission\",\"doom_loop\"],[\"permission\",\"edit\"],[\"permission\",\"external_directory\"],[\"permission\",\"webfetch\"]],\"reserved_slots\":[\"mcp\",\"permission\"]}"
+      }
+    },
+    {
+      "path": "skills",
+      "ownership": {
+        "entry_id": "workspace.render:skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": "skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/SKILL.md",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    },
+    {
+      "path": "skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      }
+    }
+  ]
+}

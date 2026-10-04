@@ -1,0 +1,6 @@
+{
+  "provider": "codex",
+  "runtime": "subprocess-per-turn",
+  "variant": "",
+  "scenario": "credential-package"
+}

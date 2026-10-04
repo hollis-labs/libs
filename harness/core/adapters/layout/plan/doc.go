@@ -2,15 +2,22 @@
 // It is distinct from workspace.Plan or a launch plan. This is the final home:
 // the legacy adapters/layout table will be removed while this package stays.
 // The root retains the generator and generated exports and may re-export.
-// The new table has no generated export yet. Existing root exports describe
-// the legacy table until cutover.
+// The plan-fields.json and docs/PLAN-FIELDS.md exports describe this table.
+// Existing layout.json and docs/LAYOUT.md exports describe the legacy table
+// until cutover.
 // It is pure: no writes, credential reads, pin resolution or process launches.
 // The parent layout package temporarily retains its legacy table to preserve
 // existing projections. Cutover follows serializer and workspace integration;
 // the planned removal of the legacy table follows that cutover.
 //
 // Intended deltas from legacy output, applied only at cutover:
-//   - Instruction bodies are the resolved definition text: Codex and Antigravity
+//   - Absent Codex posture drops implicit never/workspace-write native defaults.
+//     Headless operation then uses runtime defaults; a declared host default
+//     can explicitly retain the former native settings. Render diagnoses absence.
+//   - Explicit postures add Claude defaultMode, posture-derived Codex approval
+//     and sandbox settings, and evidenced OpenCode permission config. The bound
+//     mode also drives the runtime reference; Antigravity diagnoses native absence.
+//   - Boot instruction bodies are the resolved definition text: Codex and Antigravity
 //     drop synthetic YAML front matter and H1 titles; Claude, Codex and Antigravity
 //     drop synthetic MCP sections and endpoint URLs from instruction documents.
 //   - OpenCode keeps its native primary-agent front matter and drops the
@@ -25,6 +32,13 @@
 //   - Codex config.toml and Antigravity mcp_config.json are explicitly 0600;
 //     Codex auth.json is a credential link effect, never an empty planted file.
 //   - Unread MCP mirrors, OpenCode agents.json and .opencode/skills are dropped.
+//
+// Installed encodings retain the generated-by banner (the resolved definition
+// identifier replaces the profile identifier) and Codex literal-string/parent
+// MCP tables so human-run drift checks retain their content semantics. Installed
+// Claude settings narrow 0644 to 0600 at explicit installed apply; no mode is
+// widened. Existing-document reads and recursive owned-key merge belong to that
+// apply edge, not render; render supplies the leaf-key ownership contract.
 //
 // OpenCode and Antigravity installation are explicitly unsupported. Follow-up: design and
 // measure an authorized installed-layer layout before enabling it, as for

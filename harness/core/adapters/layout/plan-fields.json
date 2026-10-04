@@ -1,0 +1,2064 @@
+{
+  "schema": "provider-plan-fields.v1",
+  "rows": [
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "CLAUDE.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-instructions",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "model-visible discovery; direct body or explicit pointer"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "neutral-instructions",
+      "concern": "neutral-body",
+      "root": "boot",
+      "path": "AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "optional content body; not a second discovery claim"
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "posture": {
+        "Provider": "claude",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "claude",
+      "layer": "boot",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG1",
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "boot",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG1",
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "boot",
+      "field": "hooks",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG1",
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": ".mcp.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-mcp",
+      "locator": {
+        "argv": [
+          "--mcp-config",
+          "{path}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP2",
+          "MCP6",
+          "MCP8",
+          "MCP10"
+        ],
+        "note": "strict covers measured config sources only"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": ".claude/skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "C1",
+          "C2",
+          "C3"
+        ]
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "subagents",
+      "concern": "subagents",
+      "root": "boot",
+      "path": ".claude/agents/{name}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-subagent",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "resolved pinned content registration"
+      }
+    },
+    {
+      "composition": "claude-command-pack",
+      "provider": "claude",
+      "layer": "boot",
+      "field": "commands",
+      "concern": "prompts",
+      "root": "boot",
+      "path": ".claude/commands/boot/{name}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-command",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "boot command namespace; resolved pinned content registration"
+      }
+    },
+    {
+      "composition": "claude-command-pack",
+      "provider": "claude",
+      "layer": "boot",
+      "field": "prompts",
+      "concern": "prompts",
+      "root": "boot",
+      "path": ".claude/commands/boot/{name}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-command",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "boot command namespace; resolved pinned content registration"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "variant": "bare",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "CLAUDE.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-instructions",
+      "locator": {
+        "argv": [
+          "--append-system-prompt-file",
+          "{path}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "model-visible discovery; direct body or explicit pointer"
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "posture": {
+        "Provider": "claude",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "claude",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "variant": "bare",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--settings",
+          "{path}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "variant": "bare",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--settings",
+          "{path}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "variant": "bare",
+      "field": "hooks",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {
+        "argv": [
+          "--settings",
+          "{path}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "variant": "bare",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": ".claude/skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{B}",
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "C4",
+          "C5"
+        ]
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "posture": {
+        "Provider": "codex",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "codex",
+      "layer": "boot",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "document_slot": "mcp_servers",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP2",
+          "MCP3",
+          "MCP6",
+          "MCP8"
+        ],
+        "note": "exclusivity depends on CODEX_HOME binding"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    },
+    {
+      "credential_policy": "link-only-never-write",
+      "provider": "codex",
+      "layer": "boot",
+      "field": "credentials",
+      "concern": "credentials",
+      "root": "boot",
+      "path": "auth.json",
+      "form": "link-effect",
+      "mode_bits": 384,
+      "renderer": "credential-link",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "explicit real-provider-home link; no rendering or ambient read"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "field": "hooks",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks.json",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "field": "resources",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "agents/{agent}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "opencode-agent",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "primary agent front matter; ID must match launch selection"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "posture": {
+        "Provider": "opencode",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "permission",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "native permission slot plus runtime posture mapping"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "mcp",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "unsupported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP1",
+          "MCP2",
+          "MCP3",
+          "MCP4"
+        ],
+        "note": "no measured MCP-only isolation"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "O2"
+        ]
+      }
+    },
+    {
+      "posture": {
+        "Provider": "antigravity",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "permissions",
+      "concern": "runtime-permissions",
+      "root": "boot",
+      "form": "runtime-binding",
+      "mode_bits": 0,
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "adapters/registry/posture.go: agy permission mapping is runtime-only; no native permission file; agy 1.2.14 accepts flags, behavior is not fully measured"
+      }
+    },
+    {
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
+        "note": "agy 1.2.7 live transcript; model-visible, separate from the archived probe"
+      }
+    },
+    {
+      "composition": "antigravity-plugin",
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "planting-plugin",
+      "concern": "native-config",
+      "root": "boot",
+      "path": ".agents/plugins/tether/plugin.json",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "antigravity-plugin",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
+        "note": "agy 1.2.7: stable tether marker"
+      }
+    },
+    {
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": ".agents/plugins/tether/mcp_config.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "antigravity-mcp",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "unmeasured",
+      "evidence": {
+        "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
+        "note": "agy 1.2.7 live plugin discovery; isolation unmeasured"
+      }
+    },
+    {
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": ".agents/skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
+        "note": "agy 1.2.7 live workspace skill discovery"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "boot",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "antigravity",
+      "layer": "boot",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "argv": [
+          "--add-dir",
+          "{P}"
+        ],
+        "cwd": "boot"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "installed",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "home",
+      "path": ".claude/AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn installed instruction body"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "installed",
+      "field": "instruction-pointer",
+      "concern": "pointer",
+      "root": "home",
+      "path": ".claude/CLAUDE.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "claude-pointer",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "explicit @AGENTS.md pointer"
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "installed",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key JSON merge preserves operator settings"
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "installed",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key JSON merge preserves operator settings"
+      }
+    },
+    {
+      "composition": "claude-settings",
+      "provider": "claude",
+      "layer": "installed",
+      "field": "hooks",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".claude/settings.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "claude-settings",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key JSON merge preserves operator settings"
+      }
+    },
+    {
+      "provider": "claude",
+      "layer": "installed",
+      "field": "skills",
+      "concern": "skills",
+      "root": "home",
+      "path": ".claude/skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn installed skill ownership"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "installed",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "home",
+      "path": ".codex/AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn installed instructions"
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "installed",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".codex/config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key TOML merge preserves operator settings"
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "installed",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".codex/config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key TOML merge preserves operator settings"
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "installed",
+      "field": "mcp",
+      "concern": "native-config",
+      "root": "home",
+      "path": ".codex/config.toml",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "document_slot": "mcp_servers",
+      "locator": {},
+      "capability": "supported",
+      "exclusive_mcp": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "owned-key TOML merge preserves operator settings"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "installed",
+      "field": "skills",
+      "concern": "skills",
+      "root": "home",
+      "path": ".agents/skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "installed skill path deliberately differs from isolated boot"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "AGENTS.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "instructions",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "posture": {
+        "Provider": "codex",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "posture": {
+        "Provider": "codex",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2",
+          "CFG3"
+        ]
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "document_slot": "mcp_servers",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "exclusive_mcp": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP2",
+          "MCP3",
+          "MCP6",
+          "MCP8"
+        ],
+        "note": "exclusivity depends on CODEX_HOME binding"
+      }
+    },
+    {
+      "composition": "codex-config",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "config.toml",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "codex-config",
+      "document_slot": "mcp_servers",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP2",
+          "MCP3",
+          "MCP6",
+          "MCP8"
+        ],
+        "note": "exclusivity depends on CODEX_HOME binding"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    },
+    {
+      "credential_policy": "link-only-never-write",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "credentials",
+      "concern": "credentials",
+      "root": "boot",
+      "path": "auth.json",
+      "form": "link-effect",
+      "mode_bits": 384,
+      "renderer": "credential-link",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "explicit real-provider-home link; no rendering or ambient read"
+      }
+    },
+    {
+      "credential_policy": "link-only-never-write",
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "credentials",
+      "concern": "credentials",
+      "root": "boot",
+      "path": "auth.json",
+      "form": "link-effect",
+      "mode_bits": 384,
+      "renderer": "credential-link",
+      "locator": {},
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "explicit real-provider-home link; no rendering or ambient read"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "hooks",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks.json",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "hooks",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks.json",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "resources",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "resources",
+      "concern": "home-resource",
+      "root": "boot",
+      "path": "hooks",
+      "form": "resource-request",
+      "mode_bits": 420,
+      "renderer": "resource-request",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "unsupported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "Cairn resource declaration is not hook support"
+      },
+      "reason": "requires a declared resource implementation; no native hook projection in this cut"
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "agents/{agent}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "opencode-agent",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "primary agent front matter; ID must match launch selection"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "instructions",
+      "concern": "instructions",
+      "root": "boot",
+      "path": "agents/{agent}.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "opencode-agent",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "primary agent front matter; ID must match launch selection"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "posture": {
+        "Provider": "opencode",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "permission",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "native permission slot plus runtime posture mapping"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "posture": {
+        "Provider": "opencode",
+        "Mapper": "adapters/registry.Descriptor.PostureFor",
+        "Posture": ""
+      },
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "permissions",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "permission",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "native permission slot plus runtime posture mapping"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "settings",
+      "concern": "native-config",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "file",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "CFG2"
+        ]
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "mcp",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "unsupported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP1",
+          "MCP2",
+          "MCP3",
+          "MCP4"
+        ],
+        "note": "no measured MCP-only isolation"
+      }
+    },
+    {
+      "composition": "opencode-config",
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "mcp",
+      "concern": "mcp",
+      "root": "boot",
+      "path": "opencode.json",
+      "form": "document-slot",
+      "mode_bits": 384,
+      "renderer": "opencode-config",
+      "document_slot": "mcp",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "exclusive_mcp": "unsupported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/mcp-exclusive/2026-10-01-claude-2.1.286-codex-0.159.3-opencode-1.18.33.tsv",
+        "observations": [
+          "MCP1",
+          "MCP2",
+          "MCP3",
+          "MCP4"
+        ],
+        "note": "no measured MCP-only isolation"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "O2"
+        ]
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "skills",
+      "concern": "skills",
+      "root": "boot",
+      "path": "skills/{name}/SKILL.md",
+      "form": "skill-package",
+      "mode_bits": 420,
+      "renderer": "skill-package",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv",
+        "observations": [
+          "O2"
+        ]
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "argv": [
+          "--cd",
+          "{P}"
+        ],
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "before_resume": true
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "codex",
+      "layer": "boot",
+      "mode": "jsonrpc-stdio",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "env": {
+          "CODEX_HOME": "boot"
+        },
+        "cwd": "boot",
+        "rpc_project": "thread.cwd"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "subprocess-per-turn",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "argv": [
+          "run",
+          "--agent",
+          "{agent}",
+          "--dir",
+          "{P}"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    },
+    {
+      "provider": "opencode",
+      "layer": "boot",
+      "mode": "http-sse",
+      "field": "kickoff",
+      "concern": "kickoff",
+      "root": "boot",
+      "path": "boot.md",
+      "form": "file",
+      "mode_bits": 420,
+      "renderer": "kickoff",
+      "locator": {
+        "argv": [
+          "serve",
+          "--hostname",
+          "127.0.0.1"
+        ],
+        "env": {
+          "OPENCODE_CONFIG_DIR": "boot"
+        },
+        "cwd": "project",
+        "rpc_project": "directory/agent"
+      },
+      "capability": "supported",
+      "evidence": {
+        "reference": "adapters/layout/plan/doc.go",
+        "note": "launcher-read artifact, distinct from persona"
+      }
+    }
+  ]
+}

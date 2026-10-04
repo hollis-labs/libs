@@ -1,0 +1,73 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": ".agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether/mcp_config.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"mux\": {\n      \"args\": [],\n      \"command\": \"fixture-mcp\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": ".agents/plugins/tether/plugin.json",
+    "kind": "file",
+    "mode": "0644",
+    "content": "{\"name\":\"tether\"}\n"
+  },
+  {
+    "path": ".agents/skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": ".agents/skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture instructions.\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  }
+]

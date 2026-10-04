@@ -38,9 +38,15 @@ type SettingsInput struct {
 
 // Settings encodes one settings document, refusing colliding native leaves.
 func Settings(in SettingsInput) ([]byte, error) {
+	doc, err := SettingsDocument(in)
+	return doc.Bytes, err
+}
+
+// SettingsDocument also returns declared leaf ownership for installed apply.
+func SettingsDocument(in SettingsInput) (contract.Document, error) {
 	ctx := contract.Context{Provider: "claude", Mode: in.Mode, Concern: "settings"}
 	if err := contract.ValidateValue(ctx, in.APIKeyHelper); err != nil {
-		return nil, err
+		return contract.Document{}, err
 	}
 	generated := []contract.Slot{}
 	if in.APIKeyHelper != "" {
@@ -48,7 +54,7 @@ func Settings(in SettingsInput) ([]byte, error) {
 	}
 	if p := in.Permission; p != nil {
 		if err := contract.ValidateDirectories(ctx, p.AdditionalDirectories); err != nil {
-			return nil, err
+			return contract.Document{}, err
 		}
 		doc := map[string]any{}
 		switch p.DefaultMode {
@@ -56,7 +62,7 @@ func Settings(in SettingsInput) ([]byte, error) {
 		case "default", "acceptEdits", "plan", "bypassPermissions":
 			doc["defaultMode"] = p.DefaultMode
 		default:
-			return nil, ctx.Refuse(contract.InvalidInput, "unknown native permission mode")
+			return contract.Document{}, ctx.Refuse(contract.InvalidInput, "unknown native permission mode")
 		}
 		if len(p.AdditionalDirectories) > 0 {
 			doc["additionalDirectories"] = p.AdditionalDirectories
@@ -67,32 +73,32 @@ func Settings(in SettingsInput) ([]byte, error) {
 	}
 	doc, err := contract.Object(ctx, in.Slots, generated)
 	if err != nil {
-		return nil, err
+		return contract.Document{}, err
 	}
 	if section, ok := doc["permissions"].(map[string]any); ok {
 		if grants, present := section["additionalDirectories"]; present {
 			values, ok := grants.([]any)
 			if !ok {
-				return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be an array of strings")
+				return contract.Document{}, ctx.Refuse(contract.InvalidInput, "directory grants must be an array of strings")
 			}
 			dirs := make([]string, len(values))
 			for i, v := range values {
 				dir, ok := v.(string)
 				if !ok {
-					return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be strings")
+					return contract.Document{}, ctx.Refuse(contract.InvalidInput, "directory grants must be strings")
 				}
 				dirs[i] = dir
 			}
 			if err := contract.ValidateDirectories(ctx, dirs); err != nil {
-				return nil, err
+				return contract.Document{}, err
 			}
 		}
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return nil, ctx.Refuse(contract.InvalidInput, "settings cannot be encoded")
+		return contract.Document{}, ctx.Refuse(contract.InvalidInput, "settings cannot be encoded")
 	}
-	return append(out, '\n'), nil
+	return contract.Document{Bytes: append(out, '\n'), KeyPaths: contract.ObjectKeyPaths(doc)}, nil
 }
 
 // MCPInput carries host bindings and their resolved transport mode.
