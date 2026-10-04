@@ -50,9 +50,7 @@ func Agent(in AgentInput) ([]byte, error) {
 	var out bytes.Buffer
 	out.WriteString("---\ndescription: ")
 	out.Write(scalar)
-	out.WriteString("\nmode: primary\n---\n\n# ")
-	out.WriteString(in.Name)
-	out.WriteString("\n\n")
+	out.WriteString("\nmode: primary\n---\n\n")
 	out.Write(in.Body)
 	if len(in.Body) > 0 && !bytes.HasSuffix(in.Body, []byte("\n")) {
 		out.WriteByte('\n')

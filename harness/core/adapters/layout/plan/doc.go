@@ -13,6 +13,8 @@
 //   - Instruction bodies are the resolved definition text: Codex and Antigravity
 //     drop synthetic YAML front matter and H1 titles; Claude, Codex and Antigravity
 //     drop synthetic MCP sections and endpoint URLs from instruction documents.
+//   - OpenCode keeps its native primary-agent front matter and drops the
+//     synthetic H1 title and MCP endpoint tail from the resolved prompt body.
 //   - MCP server names have no reserved names; a server named mux has the same
 //     environment-omission behavior as every other stdio server.
 //   - Native directory grants reject relative and traversal-bearing paths.

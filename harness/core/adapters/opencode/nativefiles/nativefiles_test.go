@@ -26,3 +26,11 @@ func TestDocuments(t *testing.T) {
 		t.Fatal("duplicate MCP owner")
 	}
 }
+
+func TestAgentContainsOnlyNativeHeaderAndResolvedBody(t *testing.T) {
+	out, err := Agent(AgentInput{Name: "fixture", Body: []byte("Resolved instructions.\n")})
+	want := "---\ndescription: Launch agent fixture\nmode: primary\n---\n\nResolved instructions.\n"
+	if err != nil || string(out) != want {
+		t.Fatalf("unapproved instruction decoration: %s %v", out, err)
+	}
+}
