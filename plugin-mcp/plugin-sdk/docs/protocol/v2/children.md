@@ -12,7 +12,7 @@ and actual child exit. Its fixture installs internal directional correlation;
 Init still declines reverse. This is engine evidence, not negotiated reverse
 support or plugin-host interoperability. Expanded shared child cases exercise saturation, cancellation, deadlines,
 writer capacity/fairness and effects. Hook composition stays explicitly
-unavailable until reverse negotiation attaches clients to hook contexts.
+unavailable even with reverse active; a separate per-item scope/client design is required.
 
 The parent also requests actual stdin EOF and SIGTERM during an awaiting
 handler, then checks graceful exit, stdout exhaustion and unload effects.
@@ -48,7 +48,7 @@ stdout, stderr flood, blocked stdin, missing barriers and failed spawn.
 Availability and obligation are separate. Both Go and TS validate file/step
 levels, preferred notes for historical quirks, and finding/owner metadata
 before skipping proposed cases. Implemented normative cases fail on an
-assertion. The two deliberately unavailable proposals report their exact
+assertion. Unavailable proposals report their exact
 owner; they do not count as passed. Historical v1 files are untouched.
 
 From the pinned source checkout, after building the TS workspace:
@@ -74,7 +74,7 @@ first pin follows this driver slice. That adapter must exercise its real
 Conn/spawn/cancel/dispose and typed backends with the same raw vectors. The
 SDK fake host cannot certify authorization, bindings, host-global limits,
 backend effects or durable operation-key receipts. Real Go/Node negotiated
-child replay and pinned host interop must pass before reverse acknowledgement;
+child replay and pinned host interop must pass before reverse activation merges;
 internal fixture bypass cannot satisfy that gate.
 
 The dedicated child matrix targets POSIX systems (Linux in CI); it relies on inherited pipes and SIGTERM/SIGKILL. These harness controls are test-only.

@@ -1,6 +1,6 @@
 {
   "corpus_version": 1,
-  "coverage": "Real stdio base, lifecycle and expanded client/admission/writer/effect cases with private fixture activation. Reverse remains declined; this is not negotiated plugin-host interoperability.",
+  "coverage": "Real stdio base, lifecycle, internal-engine and normal-Serve negotiated client/admission/writer/effect cases. Negotiated children use delivered clients and real Init offers. SDK fake-host transport evidence does not certify plugin-host authorization or durability.",
   "base_profiles": [
     "base",
     "full",
@@ -213,7 +213,6 @@
       "status": "proposed",
       "owner": "SDK hook-context and plugin-hooks adapter maintainers (separate per-item scope/client design)",
       "reason": "Hook helpers remain unavailable even with both profiles negotiated; per-item binding/client composition requires a separate approved design.",
-
       "level": "normative"
     }
   ],
