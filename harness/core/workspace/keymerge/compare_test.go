@@ -11,7 +11,8 @@ import (
 // when it is what a merge would write once both are laid out the same way, so a
 // document laid out differently, or with a declared key moved, is the same
 // document; every changed value, removed key, respelled number, duplicate key
-// and unreadable document is a mismatch.
+// and ordinary unreadable document is a mismatch. The outer-white-space
+// exception is pinned separately below.
 func TestCompareJSONForgivesLayoutAndMovedKeysAndNothingElse(t *testing.T) {
 	owned := []keymerge.KeyPath{p("fixture-model"), p("fixture-perms", "mode")}
 	const desired = `{"fixture-model":"opus","fixture-perms":{"mode":"auto"}}`
@@ -53,6 +54,33 @@ func TestCompareJSONForgivesLayoutAndMovedKeysAndNothingElse(t *testing.T) {
 			merged := mergeJSON(t, desired, tc.existing, owned...)
 			if got.WriteLen != len(merged.Document) {
 				t.Errorf("WriteLen = %d, want the %d bytes a merge writes", got.WriteLen, len(merged.Document))
+			}
+		})
+	}
+}
+
+// TestCompareJSONReportsOuterUnicodeSpaceAsUnreadableEvenWhenLayoutMatches
+// pins the inherited comparison rule: layout trims some outer Unicode space
+// that the JSON grammar rejects. The unreadable verdict remains observable even
+// when the laid-out bytes match; a byte-order mark is not trimmed and does not
+// get the same exception.
+func TestCompareJSONReportsOuterUnicodeSpaceAsUnreadableEvenWhenLayoutMatches(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		existing string
+		match    bool
+	}{
+		{"non-breaking space", "\u00a0{}\u00a0", true},
+		{"em space", "\u2003{}\u2003", true},
+		{"byte-order mark", "\ufeff{}\ufeff", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := keymerge.CompareJSON([]byte(`{}`), []byte(tc.existing), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Match != tc.match || got.Outcome != keymerge.OutcomeExistingUnreadable || got.Reason != keymerge.ReasonNotJSON {
+				t.Errorf("CompareJSON = %+v, want match %v with existing_unreadable/not_json", got, tc.match)
 			}
 		})
 	}
