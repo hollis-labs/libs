@@ -130,9 +130,9 @@ node ts/packages/plugin-sdk/test/negotiated-replay.js deno
 The normal child-replay entry point includes both matrices in existing CI legs.
 All children share the bounded parent, private control channel and guaranteed
 reaping. A proposal is reported as unavailable, never a pass. Hook helpers stay
-unconditionally unavailable, owned by the reverse-profile and Team F hook-context
+unconditionally unavailable, owned by the SDK hook-context and plugin-hooks adapter
 maintainers pending a separate per-item composition design.
 
 These are SDK fake-host transport proofs. Real plugin-host authority, binding
 ledgers, commit-time revocation, host-global admission, trusted depth and durable
-receipts still require a pinned Team E integration run before activation merges.
+receipts still require a pinned plugin-host integration run before activation merges.

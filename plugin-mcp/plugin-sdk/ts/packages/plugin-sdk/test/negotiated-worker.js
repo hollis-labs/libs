@@ -1,4 +1,5 @@
 // Normal public Serve only. Host clients/grants/correlation are delivered by Init.
+// Policy mode only observes internal limits; it never mutates them.
 import {requestScope} from '../dist/admission.js';
 import { serve } from '../dist/serve.js';
 import { fixtureControl, fixtureEvent as event } from './child-control.js';

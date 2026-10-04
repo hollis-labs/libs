@@ -84,7 +84,7 @@
   "pending_coverage": [
     {
       "feature": "Pinned real plugin-host replay, authorization and durable receipts",
-      "owner": "Team E plugin-host interop adapter"
+      "owner": "plugin-host interoperability adapter"
     }
   ],
   "expanded": [
@@ -238,7 +238,7 @@
     "unavailable": [
       {
         "feature": "hook-duplex",
-        "owner": "orch-jsts and Team F hook-context maintainers",
+        "owner": "SDK hook-context and plugin-hooks adapter maintainers",
         "reason": "Hooks unconditionally receive no helper client; per-item composition requires a separate design."
       }
     ]
