@@ -1,0 +1,9 @@
+{
+  "status": "internal-engine",
+  "description": "Writer-only recipes, no reverse-profile activation. Small queue/byte numbers are fixture-only; production defaults remain 32 frames and 8 MiB per lane.",
+  "directions": ["host", "plugin"],
+  "fairness": {"control_burst": 4, "ordinary_frames": 4, "control_seed_frames": 8},
+  "frame_saturation": {"frames": 2, "bytes": 64, "frame_bytes": 8},
+  "byte_saturation": {"frames": 32, "bytes": 64, "frame_bytes": 32, "active_frame_bytes": 8},
+  "terminal_reservation": {"forward": 16, "reverse": 8, "control": 2, "credit_bytes": 1024, "lane_frames": 32, "lane_bytes": 8388608}
+}

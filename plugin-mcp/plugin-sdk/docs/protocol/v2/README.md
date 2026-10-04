@@ -206,3 +206,23 @@ interoperability evidence. Production still declines reverse acknowledgement;
 there is no public arbitrary-method host caller. Admission scheduling,
 cancellation/deadline policy, author helpers and negotiated activation belong to
 later slices.
+
+The writer has separate ordinary and reply/control lanes. Each defaults to
+32 queued frames AND 8 MiB queued bytes, including frame delimiters. Total
+queued bytes can reach twice the per-lane ceiling plus one bounded in-progress
+frame. Go `ServeOptions.QueueLimits` and TS `ServeOptions.queueLimits` narrow
+these ceilings (Go zero fields / TS omitted fields use defaults). No admission
+waiter queue is added. Refusals, terminal replies and control frames use the
+reply/control lane; outgoing ordinary requests use the ordinary lane. FIFO
+order within each lane is preserved; at most four reply/control frames are
+served before an eligible ordinary frame.
+
+Internal terminal credits reserve one frame and 1,024 bytes before handler
+execution. A terminal publication atomically replaces its credit with actual
+bytes; a too-large replacement keeps the credit available for a bounded
+classified fallback. The credit cannot be published twice. The next admission
+slice wires these credits to the 16/8/2 handler limits, request cancellation and
+deadlines; this writer slice alone does not advertise those policies or an
+optional profile. `protocol/v2/fixtures/duplex-saturation.json` is a shared
+internal-engine recipe for lane saturation, terminal reservation and sustained
+control fairness at both endpoints. Its small queue limits are fixture-only.
