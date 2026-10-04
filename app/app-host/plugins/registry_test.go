@@ -104,3 +104,21 @@ func TestSlowDeliveryCannotBlockRevoke(t *testing.T) {
 		t.Fatal("slow writer blocks revocation")
 	}
 }
+
+func TestGenerationIntegritySeparatesScriptAndStylesheetBytes(t *testing.T) {
+	r, b := fixtureRegistry("g1", 1, []byte("ab"))
+	p := r.Plugins["ops"]
+	p.StylesheetURL = "/plugins/ops/g1/style.css"
+	r.Plugins["ops"] = p
+	b["ops"] = Bundle{JavaScript: []byte("ab"), Stylesheet: []byte("c")}
+	d, err := NewDelivery(r, b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Revision = 2
+	p.BundleVersion = registry.BundleDigest([]byte("a"))
+	r.Plugins["ops"] = p
+	if err := d.Replace(r, map[string]Bundle{"ops": {JavaScript: []byte("a"), Stylesheet: []byte("bc")}}, nil); err == nil {
+		t.Fatal("accepted changed artifacts with identical concatenated bytes")
+	}
+}
