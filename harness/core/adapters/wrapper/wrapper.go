@@ -554,6 +554,9 @@ func (w *Wrapper) Run(ctx context.Context) error {
 	// Codex app-server reports its authoritative turn end through the typed
 	// callback. ParseLine and the session may both mirror that end onto the
 	// legacy stream, so only the typed terminal closes this runtime's turn.
+	// The session synthesizes typed Codex notifications only for a CLI adapter
+	// named "codex" (reportCodexNotification); protocol and transport alone do
+	// not guarantee typed terminals for a compatible custom adapter.
 	codexTypedEnd := desc.Protocol == adapters.ProtocolCodexAppServer &&
 		desc.Transport == adapters.TransportStdio && cliAdapter.Name() == "codex"
 

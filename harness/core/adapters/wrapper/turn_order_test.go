@@ -456,6 +456,42 @@ func TestCodexJSONRPCStdio_OneLifecyclePerTurn(t *testing.T) {
 	}
 }
 
+type compatibleAppServerCLI struct{ codexAppServerShapeCLI }
+
+func (compatibleAppServerCLI) Name() string { return "compatible-app-server" }
+
+type compatibleAppServerAdapter struct{ codexAppServerShapeAdapter }
+
+func (a compatibleAppServerAdapter) CLIAdapter() provider.CLIAdapter {
+	return compatibleAppServerCLI{a.cli}
+}
+
+// A compatible custom CLI can advertise the Codex app-server protocol while
+// reporting terminals only through ParseLine. The session synthesizes typed
+// Codex terminals only for the "codex" CLI name, so this adapter must retain
+// the legacy turn-end path until that session contract becomes capability based.
+func TestCodexJSONRPCStdio_CustomCLIUsesLegacyTerminal(t *testing.T) {
+	skipUnlessSh(t)
+	dir := t.TempDir()
+	script := writeShellFixtureLauncher(t, dir, "fake-compatible-app-server", []byte(`#!/bin/sh
+IFS= read -r line
+printf '%s\n' '{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello"}}'
+printf '%s\n' '{"jsonrpc":"2.0","method":"turn/completed","params":{"turn":{"status":"completed"}}}'
+while IFS= read -r line; do :; done
+`))
+	evs := runToExit(t, Config{
+		App:               "test-turn-order",
+		Adapter:           compatibleAppServerAdapter{codexAppServerShapeAdapter{cli: codexAppServerShapeCLI{script: script}}},
+		Workdir:           dir,
+		AutoFireFirstTurn: true,
+		FirstTurnPayload:  "hi",
+	}, func(w *Wrapper, sink *capturingSink) {
+		sink.waitFor(t, runtimeevents.KindAgentDelta, 5*time.Second)
+		_ = w.Stop(context.Background())
+	})
+	assertOneTurn(t, evs, runtimeevents.KindTurnCompleted)
+}
+
 // A child that exits with a turn open and no terminal event: the turn is
 // flushed as one tagged turn.failed carrying the usage it reported, then
 // idle, before process.exited. The child reports usage before its delta, so
