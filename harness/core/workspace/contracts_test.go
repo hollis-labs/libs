@@ -25,6 +25,7 @@ func spec(t *testing.T) workspace.Spec {
 	}
 	d := artifact.DigestBytes([]byte("fixture"))
 	boot := root("boot")
+	boot.Path = filepath.Join(boot.AllowedBase, key)
 	current, candidate := root("current"), root("candidate")
 	current.Path = filepath.Join(boot.Path, "current")
 	candidate.Path = filepath.Join(boot.Path, "candidate")
@@ -105,8 +106,9 @@ func TestCredentialAndControlSlotsNeverManaged(t *testing.T) {
 
 func TestLockOrderUsesPhysicalIdentityAndRejectsAmbiguity(t *testing.T) {
 	a, b := root("z"), root("a")
-	obs := []workspace.RootObservation{{RootID: a.ID, CanonicalPath: a.Path, CanonicalBase: a.AllowedBase, Owner: a.Owner}, {RootID: b.ID, CanonicalPath: b.Path, CanonicalBase: b.AllowedBase, Owner: b.Owner}}
+	obs := []workspace.RootObservation{{RootID: a.ID, DeclaredPath: a.Path, CanonicalPath: a.Path, CanonicalBase: a.AllowedBase, Owner: a.Owner}, {RootID: b.ID, DeclaredPath: b.Path, CanonicalPath: b.Path, CanonicalBase: b.AllowedBase, Owner: b.Owner}}
 	ns := filepath.Join(a.AllowedBase, "locks")
+	obs = append(obs, workspace.RootObservation{RootID: "locks", DeclaredPath: ns, CanonicalPath: ns, CanonicalBase: a.AllowedBase, Owner: a.Owner, Exists: true, Directory: true})
 	got, err := workspace.OrderedLockKeys(ns, []workspace.RootRef{a, b, a}, obs)
 	if err != nil {
 		t.Fatal(err)
@@ -122,16 +124,16 @@ func TestLockOrderUsesPhysicalIdentityAndRejectsAmbiguity(t *testing.T) {
 	obs[1].CanonicalPath = obs[0].CanonicalPath
 	_, err = workspace.OrderedLockKeys(ns, []workspace.RootRef{a, b}, obs)
 	refusal(t, err, "ambiguous_root_alias")
-	_, err = workspace.OrderedLockKeys(a.Path, []workspace.RootRef{a}, obs[:1])
+	_, err = workspace.OrderedLockKeys(filepath.Join(a.Path, "locks"), []workspace.RootRef{a}, append(obs[:1:1], workspace.RootObservation{RootID: "lock-overlap", DeclaredPath: filepath.Join(a.Path, "locks"), CanonicalPath: filepath.Join(a.Path, "locks"), CanonicalBase: a.AllowedBase, Owner: a.Owner, Exists: true, Directory: true}))
 	refusal(t, err, "lock_namespace_inside_root")
-	_, err = workspace.OrderedLockKeys(a.AllowedBase, []workspace.RootRef{a}, obs[:1])
+	_, err = workspace.OrderedLockKeys(a.AllowedBase, []workspace.RootRef{a}, append(obs[:1:1], workspace.RootObservation{RootID: "lock-overlap", DeclaredPath: a.AllowedBase, CanonicalPath: a.AllowedBase, CanonicalBase: filepath.Dir(a.AllowedBase), Owner: a.Owner, Exists: true, Directory: true}))
 	refusal(t, err, "lock_namespace_inside_root")
 	alias := a
 	alias.Path = filepath.Join(a.AllowedBase, "alias")
-	_, err = workspace.OrderedLockKeys(ns, []workspace.RootRef{a, alias}, obs[:1])
+	_, err = workspace.OrderedLockKeys(ns, []workspace.RootRef{a, alias}, append(obs[:1:1], obs[2]))
 	refusal(t, err, "ambiguous_root_reference")
 	obs[0].Uncertainty = "fixture uncertainty"
-	_, err = workspace.OrderedLockKeys(ns, []workspace.RootRef{a}, obs[:1])
+	_, err = workspace.OrderedLockKeys(ns, []workspace.RootRef{a}, append(obs[:1:1], obs[2]))
 	refusal(t, err, "unknown_canonical_root")
 }
 

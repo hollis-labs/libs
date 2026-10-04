@@ -201,6 +201,7 @@ type Resources struct {
 	Grants        []EffectGrant
 	Capabilities  []Capability
 	LockNamespace string
+	LockRoot      RootRef
 }
 
 // Observations are snapshots, not proof that an apply will succeed. The host
@@ -213,12 +214,12 @@ type Observations struct {
 	FenceVersion  string
 }
 type RootObservation struct {
-	RootID, CanonicalPath, CanonicalBase, Owner string
-	Exists, Empty                               bool
-	Directory                                   bool
-	Manifest                                    *materialize.Manifest
-	Disk                                        []materialize.ManifestEntry
-	Uncertainty                                 string
+	RootID, DeclaredPath, CanonicalPath, CanonicalBase, Owner string
+	Exists, Empty                                             bool
+	Directory                                                 bool
+	Manifest                                                  *materialize.Manifest
+	Disk                                                      []materialize.ManifestEntry
+	Uncertainty                                               string
 }
 
 type Phase string
