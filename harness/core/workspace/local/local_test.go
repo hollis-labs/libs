@@ -23,14 +23,18 @@ func fixture(t *testing.T) (local.Options, workspace.TreeRequest) {
 		t.Fatal(err)
 	}
 	root := workspace.RootRef{ID: "candidate", Path: filepath.Join(base, "candidate"), AllowedBase: base, Owner: "fixture", Provenance: "fixture"}
-	resources := workspace.Resources{Roots: []workspace.RootRef{root}, LockNamespace: control.Path, Capabilities: []workspace.Capability{workspace.CanonicalRoots, workspace.MutationLocks}, Grants: []workspace.EffectGrant{{Kind: workspace.ArtifactEffect, RootID: root.ID, AuthorizationID: "fixture", Version: "1"}}}
+	resources := workspace.Resources{Roots: []workspace.RootRef{root}, LockRoot: control, LockNamespace: control.Path, Capabilities: []workspace.Capability{workspace.CanonicalRoots, workspace.MutationLocks}, Grants: []workspace.EffectGrant{{Kind: workspace.ArtifactEffect, RootID: root.ID, AuthorizationID: "fixture", Version: "1"}}}
 	now := time.Now().UTC()
 	observed := workspace.Observations{At: now, ExpiresAt: now.Add(time.Minute), Capabilities: resources.Capabilities}
 	o, err := workspace.InspectRoot(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	observed.Roots = []workspace.RootObservation{o}
+	lock, err := workspace.InspectRoot(control)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed.Roots = []workspace.RootObservation{o, lock}
 	options := local.Options{OperationID: "fixture-operation", ControlRoot: control, Resources: resources, LocalFilesystem: true, ValidateAuthority: func(context.Context, workspace.Spec, workspace.Resources) error { return nil }, Evidence: func(context.Context) (workspace.Observations, error) { return observed, nil }}
 	request := workspace.TreeRequest{OperationID: options.OperationID, Root: root, RootMode: 0700, Resources: resources, Observed: observed, Tree: artifact.Tree{Entries: []artifact.Entry{{Path: "AGENTS.md", Kind: artifact.EntryFile, Mode: 0644, Bytes: []byte("fixture"), Ownership: artifact.Ownership{EntryID: "fixture", GroupID: "fixture"}, Provenance: artifact.Provenance{Source: "fixture"}}}}}
 	return options, request
@@ -63,7 +67,7 @@ func TestOptInLocalApplyAndCredentialPreservingRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.Observed.Roots = []workspace.RootObservation{o}
+	request.Observed.Roots[0] = o
 	ports, closeNew, err := local.New(options)
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +176,7 @@ func TestRefreshRefusesManagedSymlinkAndStaleGeneration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			request.Observed.Roots = []workspace.RootObservation{o}
+			request.Observed.Roots[0] = o
 			ports, closeNew, err := local.New(options)
 			if err != nil {
 				t.Fatal(err)
@@ -223,5 +227,31 @@ func TestExplicitCredentialDestinationCannotBecomeArtifact(t *testing.T) {
 	}
 	if _, err := os.Stat(request.Root.Path); !os.IsNotExist(err) {
 		t.Fatal("credential exclusion mutated root", err)
+	}
+}
+
+func TestArtifactOnlyInputBindingRefusesBeforeMutation(t *testing.T) {
+	for name, change := range map[string]func(*workspace.TreeRequest){
+		"invalid utf8 operation":   func(r *workspace.TreeRequest) { r.OperationID = string([]byte{0xff}) },
+		"invalid lock owner":       func(r *workspace.TreeRequest) { r.Resources.LockRoot.Owner = "other" },
+		"invalid lock declaration": func(r *workspace.TreeRequest) { r.Resources.LockRoot.Path += "-other" },
+		"invalid root declaration": func(r *workspace.TreeRequest) { r.Observed.Roots[0].DeclaredPath += "-other" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			options, request := fixture(t)
+			ports, closePorts, err := local.New(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer closePorts()
+			change(&request)
+			got, err := workspace.ApplyTree(context.Background(), request, ports)
+			if err == nil || got.ArtifactsComplete() {
+				t.Fatal("invalid bound input accepted")
+			}
+			if _, err := os.Stat(request.Root.Path); !os.IsNotExist(err) {
+				t.Fatal("invalid input mutated artifact root", err)
+			}
+		})
 	}
 }

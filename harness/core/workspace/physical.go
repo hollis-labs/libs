@@ -29,7 +29,7 @@ func InspectRoot(ref RootRef) (RootObservation, error) {
 	if err != nil || !within(base, canonical) || canonical != ref.Path || base != ref.AllowedBase {
 		return RootObservation{}, refuse("noncanonical_root", "roots", Conflict)
 	}
-	o := RootObservation{RootID: ref.ID, CanonicalPath: canonical, CanonicalBase: base, Owner: ref.Owner}
+	o := RootObservation{RootID: ref.ID, DeclaredPath: ref.Path, CanonicalPath: canonical, CanonicalBase: base, Owner: ref.Owner}
 	info, err := os.Lstat(ref.Path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return o, nil

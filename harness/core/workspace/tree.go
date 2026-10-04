@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"path/filepath"
 	"slices"
 
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
@@ -43,6 +44,11 @@ func ApplyTree(ctx context.Context, input TreeRequest, ports Ports) (ApplyResult
 	return apply(ctx, p, ports)
 }
 func planTree(input TreeRequest) (PlannedWorkspace, error) {
+	if err := validateFrozenValues(input); err != nil {
+		return PlannedWorkspace{}, err
+	}
+	input = copyRecord(input)
+	_, input.Resources = canonicalInputs(Spec{}, input.Resources)
 	if input.OperationID == "" {
 		return PlannedWorkspace{}, refuse("missing_operation_id", "spec", Conflict)
 	}
@@ -51,6 +57,36 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	}
 	if input.RootMode != 0700 {
 		return PlannedWorkspace{}, refuse("unsafe_boot_root_mode", "artifacts", Conflict)
+	}
+	if err := input.Resources.LockRoot.Validate(); err != nil {
+		return PlannedWorkspace{}, err
+	}
+	if input.Resources.LockRoot.Path != input.Resources.LockNamespace {
+		return PlannedWorkspace{}, refuse(CodeUnknownLockNamespace, "locks", Unsupported)
+	}
+	for _, ref := range []RootRef{input.Root, input.Resources.LockRoot} {
+		var observation *RootObservation
+		for i := range input.Observed.Roots {
+			if input.Observed.Roots[i].RootID == ref.ID {
+				observation = &input.Observed.Roots[i]
+			}
+		}
+		if observation == nil || observation.DeclaredPath != ref.Path || observation.Owner != ref.Owner {
+			return PlannedWorkspace{}, refuse(CodeObservationRootMismatch, "roots", Conflict)
+		}
+		declaredRel, _ := filepath.Rel(ref.AllowedBase, ref.Path)
+		canonicalRel, _ := filepath.Rel(observation.CanonicalBase, observation.CanonicalPath)
+		if !cleanAbsolute(observation.CanonicalBase) || filepath.Dir(observation.CanonicalBase) == observation.CanonicalBase || declaredRel != canonicalRel {
+			return PlannedWorkspace{}, refuse(CodeObservationBaseMismatch, "roots", Conflict)
+		}
+		if observation.Exists && (!observation.Directory || observation.Empty && observation.Manifest != nil) || !observation.Exists && (observation.Empty || observation.Manifest != nil || len(observation.Disk) > 0) {
+			return PlannedWorkspace{}, refuse(CodeInconsistentRootObservation, "roots", Conflict)
+		}
+		if observation.Manifest != nil {
+			if err := ValidateManagedManifest(*observation.Manifest, input.CredentialDestinations); err != nil {
+				return PlannedWorkspace{}, err
+			}
+		}
 	}
 	for _, entry := range input.Tree.Entries {
 		if entry.Mode&^entry.Mode.Perm() != 0 {
@@ -85,7 +121,7 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 			grants = append(grants, g)
 		}
 	}
-	if len(input.Tree.Entries) > 0 && len(grants) == 0 {
+	if len(input.Tree.Entries) > 0 && len(grants) != 1 {
 		return PlannedWorkspace{}, refuse("missing_effect_grant", "effects", Conflict)
 	}
 	keys, err := OrderedLockKeys(input.Resources.LockNamespace, []RootRef{input.Root}, input.Observed.Roots)
@@ -107,11 +143,14 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	}
 	digestInput := input
 	digestInput.Observed = Observations{}
-	data, err := json.Marshal(digestInput)
+	data, err := json.Marshal(struct {
+		Input TreeRequest
+		Locks []LockKey
+	}{digestInput, keys})
 	if err != nil {
 		return PlannedWorkspace{}, err
 	}
-	sum := sha256.Sum256(data)
+	sum := sha256.Sum256(append([]byte("workspace.tree.input.v1\x00"), data...))
 	p.digest = hex.EncodeToString(sum[:])
 	if len(input.Tree.Entries) == 0 {
 		return p, nil
@@ -126,6 +165,7 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	if observed == nil {
 		return PlannedWorkspace{}, refuse("missing_root_observation", "roots", Conflict)
 	}
+	request.TargetRoot = observed.CanonicalPath
 	if observed.Exists {
 		if observed.Empty && observed.Manifest == nil {
 			request.ExistingTarget = materialize.ExistingTargetAllowEmpty
@@ -141,6 +181,6 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 			request.ExpectedGeneration = input.ExpectedGeneration
 		}
 	}
-	p.actions = []Action{{Kind: TreeAction, Root: input.Root, RootMode: input.RootMode, Request: request, RequiredCapabilities: []Capability{CanonicalRoots, MutationLocks}}}
+	p.actions = []Action{{Kind: TreeAction, Root: input.Root, CanonicalPath: observed.CanonicalPath, Grant: grants[0], RootMode: input.RootMode, Request: request, RequiredCapabilities: []Capability{CanonicalRoots, MutationLocks}}}
 	return p, nil
 }

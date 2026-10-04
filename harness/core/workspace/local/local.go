@@ -69,7 +69,7 @@ func New(options Options) (workspace.Ports, func() error, error) {
 	if info.Mode().Perm() != 0700 {
 		return workspace.Ports{}, nil, errors.New("local: control directory must be private")
 	}
-	if options.Resources.LockNamespace != options.ControlRoot.Path {
+	if options.Resources.LockNamespace != options.ControlRoot.Path || options.Resources.LockRoot != options.ControlRoot {
 		return workspace.Ports{}, nil, errors.New("local: lock namespace must be control root")
 	}
 	for _, r := range options.Resources.Roots {
@@ -176,7 +176,7 @@ func (p *ports) Observe(ctx context.Context, r workspace.Resources) (workspace.O
 		return o, err
 	}
 	o.Roots = nil
-	for _, root := range r.Roots {
+	for _, root := range append(slices.Clone(r.Roots), r.LockRoot) {
 		if err := ctx.Err(); err != nil {
 			return o, err
 		}

@@ -100,7 +100,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	// Independently inspect the concrete filesystem. Host observations supply
 	// authority, not permission to substitute an invented committed manifest.
 	physical := map[string]RootObservation{}
-	for _, r := range p.roots {
+	for _, r := range append(slices.Clone(p.roots), p.resources.LockRoot) {
 		var o RootObservation
 		o, err = InspectRoot(r)
 		if err != nil {
@@ -113,7 +113,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 				expected = e
 			}
 		}
-		if o.CanonicalPath != expected.CanonicalPath || o.CanonicalBase != expected.CanonicalBase || o.Exists != expected.Exists || o.Directory != expected.Directory || o.Empty != expected.Empty || !reflect.DeepEqual(o.Manifest, expected.Manifest) {
+		if o.DeclaredPath != expected.DeclaredPath || o.CanonicalPath != expected.CanonicalPath || o.CanonicalBase != expected.CanonicalBase || o.Exists != expected.Exists || o.Directory != expected.Directory || o.Empty != expected.Empty || !reflect.DeepEqual(o.Manifest, expected.Manifest) {
 			return result, refuse("live_disk_mismatch", "roots", Conflict)
 		}
 	}
@@ -264,7 +264,7 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 		}
 		seen[live.RootID] = true
 	}
-	for _, r := range p.roots {
+	for _, r := range append(slices.Clone(p.roots), p.resources.LockRoot) {
 		var old, live *RootObservation
 		for i := range p.observed.Roots {
 			if p.observed.Roots[i].RootID == r.ID {
@@ -276,8 +276,11 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 				live = &o.Roots[i]
 			}
 		}
-		if old == nil || live == nil || live.Uncertainty != "" || live.CanonicalPath != old.CanonicalPath || live.CanonicalBase != old.CanonicalBase || live.Owner != r.Owner {
+		if old == nil || live == nil || live.Uncertainty != "" || live.DeclaredPath != r.Path || live.CanonicalPath != old.CanonicalPath || live.CanonicalBase != old.CanonicalBase || live.Owner != r.Owner {
 			return refuse("canonical_root_changed", "roots", Conflict)
+		}
+		if r.ID == p.resources.LockRoot.ID && (!live.Exists || !live.Directory) {
+			return refuse(CodeUnknownLockNamespace, "locks", Unsupported)
 		}
 	}
 	for _, a := range p.actions {

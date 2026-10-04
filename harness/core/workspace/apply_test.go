@@ -84,9 +84,11 @@ func applyFixture(t *testing.T) (workspace.PlannedWorkspace, *fixturePorts, work
 	}
 	r.Roots = []workspace.RootRef{s.Home.Root, s.Boot.IdentityRoot, s.Boot.Current, s.Boot.Candidate}
 	r.LockNamespace = filepath.Join(base, "locks")
+	r.LockRoot.Path, r.LockRoot.AllowedBase = r.LockNamespace, base
 	for i := range o.Roots {
-		for _, ref := range r.Roots {
+		for _, ref := range append(r.Roots, r.LockRoot) {
 			if o.Roots[i].RootID == ref.ID {
+				o.Roots[i].DeclaredPath = ref.Path
 				o.Roots[i].CanonicalPath = ref.Path
 				o.Roots[i].CanonicalBase = base
 			}
@@ -96,7 +98,12 @@ func applyFixture(t *testing.T) (workspace.PlannedWorkspace, *fixturePorts, work
 		rel, _ := filepath.Rel(filepath.Join(string(filepath.Separator), "fixture"), v)
 		c.Roots[k] = filepath.Join(base, rel)
 	}
-	c.Rendered[0].Binding.Environment["FIXTURE_ROOT"] = s.Boot.Candidate.Path
+	c.Rendered[0].Binding.Argv = []string{"--add-dir", s.Home.Root.Path}
+	c.Rendered[0].Binding.CWD = s.Boot.Candidate.Path
+	if err := os.Mkdir(r.LockRoot.Path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	o.Roots[len(o.Roots)-1].Empty = true
 	return planned(t, s, c, r, o), &fixturePorts{observed: o}, s
 }
 func TestMaterializeCommitsRealManifestWithoutReady(t *testing.T) {
@@ -120,19 +127,19 @@ func TestMaterializeCommitsRealManifestWithoutReady(t *testing.T) {
 	}
 }
 func TestMaterializeReleasesPartialAcquisition(t *testing.T) {
-	p, f, _ := applyFixture(t)
+	p, f, s := applyFixture(t)
 	f.failAcquire = 2
 	got, err := workspace.Materialize(context.Background(), p, f.ports())
 	if err == nil || got.ArtifactsComplete() {
 		t.Fatal("acquisition failure completed")
 	}
-	want := []string{"acquire:boot", "acquire:home", "release:boot"}
+	want := []string{"acquire:home", "acquire:" + s.Identity.EncodedKey, "release:home"}
 	if !reflect.DeepEqual(f.events, want) {
 		t.Fatalf("events=%v", f.events)
 	}
 }
 func TestMaterializeRefusesBeforeMutation(t *testing.T) {
-	for _, kind := range []string{"expired", "changed canonical", "authority", "record", "release"} {
+	for _, kind := range []string{"expired", "changed canonical", "changed declared", "changed lock owner", "missing lock directory", "authority", "record", "release"} {
 		t.Run(kind, func(t *testing.T) {
 			p, f, s := applyFixture(t)
 			switch kind {
@@ -140,6 +147,14 @@ func TestMaterializeRefusesBeforeMutation(t *testing.T) {
 				f.observed.ExpiresAt = f.Now()
 			case "changed canonical":
 				f.observed.Roots[0].CanonicalPath = filepath.Join(s.Home.Root.AllowedBase, "other")
+			case "changed declared":
+				f.observed.Roots[0].DeclaredPath = filepath.Join(s.Home.Root.AllowedBase, "other")
+			case "changed lock owner":
+				f.observed.Roots[len(f.observed.Roots)-1].Owner = "other"
+			case "missing lock directory":
+				if err := os.Remove(p.LockKeys()[0].Namespace); err != nil {
+					t.Fatal(err)
+				}
 			case "authority":
 				f.validateErr = errors.New("fixture authority")
 			case "record":
@@ -196,12 +211,12 @@ func TestMaterializeReceiptFailureBoundaries(t *testing.T) {
 }
 func TestMaterializePartialDirectoryFailureRetains(t *testing.T) {
 	p, f, s := applyFixture(t)
-	f.failDirectory = s.Home.Root.ID
+	f.failDirectory = s.Boot.IdentityRoot.ID
 	got, err := workspace.Materialize(context.Background(), p, f.ports())
 	if err == nil || got.ArtifactsComplete() || got.Status != workspace.Partial || len(got.Retained) == 0 {
 		t.Fatal("partial directory failure not accounted")
 	}
-	if _, err := os.Stat(s.Boot.IdentityRoot.Path); err != nil {
+	if _, err := os.Stat(s.Home.Root.Path); err != nil {
 		t.Fatal("earlier successful directory disappeared")
 	}
 }
@@ -292,13 +307,13 @@ func TestInspectRootRefusesCredentialOwnedAndSymlinkManifests(t *testing.T) {
 }
 
 func TestMaterializeReleasesCompleteLockSetInReverse(t *testing.T) {
-	p, f, _ := applyFixture(t)
+	p, f, s := applyFixture(t)
 	_, err := workspace.Materialize(context.Background(), p, f.ports())
 	if err != nil {
 		t.Fatal(err)
 	}
 	events := f.events[len(f.events)-2:]
-	want := []string{"release:home", "release:boot"}
+	want := []string{"release:" + s.Identity.EncodedKey, "release:home"}
 	if !reflect.DeepEqual(events, want) {
 		t.Fatal("release order", events)
 	}
