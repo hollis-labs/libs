@@ -117,8 +117,17 @@ func sameResources(a, b workspace.Resources) bool {
 		slices.SortFunc(r.Grants, func(a, b workspace.EffectGrant) int {
 			return compare(string(a.Kind)+"\x00"+a.RootID+"\x00"+a.AuthorizationID+"\x00"+a.Version, string(b.Kind)+"\x00"+b.RootID+"\x00"+b.AuthorizationID+"\x00"+b.Version)
 		})
+		r.Grants = slices.Compact(r.Grants)
 		r.Capabilities = slices.Clone(r.Capabilities)
 		slices.Sort(r.Capabilities)
+		r.Capabilities = slices.Compact(r.Capabilities)
+		r.ProviderHomes = slices.Clone(r.ProviderHomes)
+		slices.SortFunc(r.ProviderHomes, func(a, b workspace.ResourceRef) int {
+			aa, _ := json.Marshal(a)
+			bb, _ := json.Marshal(b)
+			return compare(string(aa), string(bb))
+		})
+		r.ProviderHomes = slices.Compact(r.ProviderHomes)
 		return r
 	}
 	return reflect.DeepEqual(norm(a), norm(b))
