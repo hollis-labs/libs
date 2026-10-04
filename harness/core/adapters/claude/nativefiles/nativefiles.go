@@ -1,13 +1,20 @@
 // Package nativefiles encodes Claude native documents from resolved inputs.
-// It performs no I/O and never renders credential material.
+// It performs no I/O and never renders credential material. Modes come from
+// the plan table: native config and MCP documents require 0600.
 package nativefiles
 
 import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 )
+
+var serializerOwner = owner.New("claude")
+
+// Owner returns the immutable serializer handle; it cannot mint another owner.
+func Owner() contract.Owner { return serializerOwner }
 
 // Instructions copies the already composed instruction body without adding bindings.
 func Instructions(body []byte) []byte { return bytes.Clone(body) }
@@ -32,11 +39,17 @@ type SettingsInput struct {
 // Settings encodes one settings document, refusing colliding native leaves.
 func Settings(in SettingsInput) ([]byte, error) {
 	ctx := contract.Context{Provider: "claude", Mode: in.Mode, Concern: "settings"}
+	if err := contract.ValidateValue(ctx, in.APIKeyHelper); err != nil {
+		return nil, err
+	}
 	generated := []contract.Slot{}
 	if in.APIKeyHelper != "" {
 		generated = append(generated, contract.Slot{Key: "apiKeyHelper", Value: in.APIKeyHelper})
 	}
 	if p := in.Permission; p != nil {
+		if err := contract.ValidateDirectories(ctx, p.AdditionalDirectories); err != nil {
+			return nil, err
+		}
 		doc := map[string]any{}
 		switch p.DefaultMode {
 		case "":
@@ -55,6 +68,25 @@ func Settings(in SettingsInput) ([]byte, error) {
 	doc, err := contract.Object(ctx, in.Slots, generated)
 	if err != nil {
 		return nil, err
+	}
+	if section, ok := doc["permissions"].(map[string]any); ok {
+		if grants, present := section["additionalDirectories"]; present {
+			values, ok := grants.([]any)
+			if !ok {
+				return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be an array of strings")
+			}
+			dirs := make([]string, len(values))
+			for i, v := range values {
+				dir, ok := v.(string)
+				if !ok {
+					return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be strings")
+				}
+				dirs[i] = dir
+			}
+			if err := contract.ValidateDirectories(ctx, dirs); err != nil {
+				return nil, err
+			}
+		}
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -87,7 +119,7 @@ func MCP(in MCPInput) ([]byte, error) {
 			args = []string{}
 		}
 		entry := map[string]any{"type": "stdio", "command": s.Command, "args": args}
-		if len(s.Env) > 0 || s.Name == "mux" {
+		if len(s.Env) > 0 {
 			env := map[string]string{}
 			for _, v := range s.Env {
 				env[v.Name] = v.Value

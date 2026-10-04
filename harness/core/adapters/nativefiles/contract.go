@@ -1,6 +1,12 @@
 // Package nativefiles is a contract/helper leaf for native serializers.
 // It validates typed inputs and explicit composition without owning provider
 // paths or encodings. It does not read files, credentials or ambient state.
+// Provider leaves return bytes only. File modes come from the plan table;
+// native config and MCP documents require 0600 except the stable plugin marker.
+// Credential destinations are 0600 link effects, never serializer output.
+// Pinned package modes preserve declared bits after removing special bits and
+// group/other write; absent modes use the table default. Mode diagnostics and
+// directory assembly belong to the renderer, rather than these byte encoders.
 package nativefiles
 
 import (
@@ -8,6 +14,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
+	"reflect"
+	"unicode/utf8"
+
+	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
 	"sort"
 	"strings"
 )
@@ -52,24 +63,88 @@ type Slot struct {
 	Value any
 }
 
-// Claim associates a destination with its sole serializer owner. Shared paths
-// require the same nonempty owner and explicit nonempty composition name.
-type Claim struct{ Path, Owner, Composition string }
+// Owner is an opaque serializer handle. Only the restricted adapters internal
+// package can mint it; applications receive handles from provider leaves.
+type Owner = owner.Owner
 
-func ValidateComposition(ctx Context, claims []Claim) error {
+// Claim is sealed: its origin cannot be changed by an overlay caller.
+type Claim struct {
+	path        string
+	owner       Owner
+	composition string
+	overlay     bool
+}
+
+// Overlay is application-supplied claim data. Owner is never trusted.
+type Overlay struct {
+	Path  string
+	Owner Owner
+}
+
+func OverlayClaim(in Overlay) Claim { return Claim{path: in.Path, owner: in.Owner, overlay: true} }
+func SerializerClaim(path string, owner Owner, composition string) Claim {
+	return Claim{path: path, owner: owner, composition: composition}
+}
+
+// ValidateComposition canonicalizes relative destinations before comparison.
+// Reserved native destinations reject overlays even with no emitted document.
+// Overlay origins never compose with serializer origins or acquire ownership.
+func ValidateComposition(ctx Context, claims []Claim, reserved []string) error {
+	reservedPaths := []string{}
+	for _, rel := range reserved {
+		normalized, err := claimPath(ctx, rel)
+		if err != nil {
+			return err
+		}
+		reservedPaths = append(reservedPaths, normalized)
+	}
 	seen := map[string]Claim{}
 	for _, c := range claims {
-		if c.Path == "" || c.Owner == "" {
-			return ctx.Refuse(InvalidInput, "destination and owner must be explicit")
+		normalized, err := claimPath(ctx, c.path)
+		if err != nil {
+			return err
 		}
-		if old, ok := seen[c.Path]; ok && (c.Composition == "" || old.Composition != c.Composition || old.Owner != c.Owner) {
+		c.path = normalized
+		if !c.overlay && !c.owner.Valid() {
+			return ctx.Refuse(InvalidInput, "serializer owner must be an issued handle")
+		}
+		if c.overlay {
+			for _, rel := range reservedPaths {
+				if normalized == rel || strings.HasPrefix(normalized, rel+"/") {
+					return ctx.Refuse(PathCollision, "overlay claims a reserved native destination")
+				}
+			}
+		}
+		if old, ok := seen[normalized]; ok && (c.overlay || old.overlay || c.composition == "" || old.composition != c.composition || old.owner != c.owner) {
 			return ctx.Refuse(PathCollision, "destination has conflicting serializer claims")
 		}
-		seen[c.Path] = c
+		seen[normalized] = c
 	}
 	return nil
 }
+func claimPath(ctx Context, rel string) (string, error) {
+	if err := ValidateValue(ctx, rel); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(rel) == "" || path.IsAbs(rel) || strings.ContainsAny(rel, "\\:\x00\r\n") {
+		return "", ctx.Refuse(InvalidInput, "claim destination must be a safe relative path")
+	}
+	for _, part := range strings.Split(rel, "/") {
+		if part == ".." {
+			return "", ctx.Refuse(InvalidInput, "claim destination cannot contain traversal")
+		}
+	}
+	normalized := path.Clean(rel)
+	if normalized == "." {
+		return "", ctx.Refuse(InvalidInput, "claim destination must name an entry")
+	}
+	return normalized, nil
+}
+
 func ValidateServers(ctx Context, servers []Server) error {
+	if err := ValidateValue(ctx, servers); err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	for _, s := range servers {
 		if !identifier(s.Name) {
@@ -118,6 +193,12 @@ func Object(ctx Context, groups ...[]Slot) (map[string]any, error) {
 	for _, slots := range groups {
 		next := map[string]any{}
 		for _, s := range slots {
+			if err := ValidateValue(ctx, s.Key); err != nil {
+				return nil, err
+			}
+			if err := ValidateValue(ctx, s.Value); err != nil {
+				return nil, err
+			}
 			if s.Key == "" {
 				return nil, ctx.Refuse(InvalidInput, "native slot key is empty")
 			}
@@ -127,6 +208,9 @@ func Object(ctx Context, groups ...[]Slot) (map[string]any, error) {
 			raw, err := json.Marshal(s.Value)
 			if err != nil {
 				return nil, ctx.Refuse(InvalidInput, "native slot value is not JSON representable")
+			}
+			if !utf8.Valid(raw) {
+				return nil, ctx.Refuse(InvalidInput, "native slot contains invalid UTF-8")
 			}
 			dec := json.NewDecoder(bytes.NewReader(raw))
 			dec.UseNumber()
@@ -215,6 +299,100 @@ func merge(ctx Context, dst, src map[string]any) error {
 			}
 		} else {
 			dst[k] = v
+		}
+	}
+	return nil
+}
+
+// ValidateValue rejects invalid UTF-8 before JSON encoders can silently replace
+// it. It checks nested keys and values, including raw JSON, without printing them.
+func ValidateValue(ctx Context, value any) error {
+	type visit struct {
+		kind reflect.Kind
+		ptr  uintptr
+	}
+	seen := map[visit]bool{}
+	var valid func(reflect.Value) bool
+	valid = func(v reflect.Value) bool {
+		if !v.IsValid() {
+			return true
+		}
+		if v.Type() == reflect.TypeFor[json.RawMessage]() {
+			return utf8.Valid(v.Bytes())
+		}
+		switch v.Kind() {
+		case reflect.String:
+			return utf8.ValidString(v.String())
+		case reflect.Interface:
+			if v.IsNil() {
+				return true
+			}
+			return valid(v.Elem())
+		case reflect.Pointer, reflect.Map, reflect.Slice:
+			if v.IsNil() {
+				return true
+			}
+			id := visit{v.Kind(), v.Pointer()}
+			if seen[id] {
+				return true
+			}
+			seen[id] = true
+			if v.Kind() == reflect.Pointer {
+				return valid(v.Elem())
+			}
+			if v.Kind() == reflect.Map {
+				iter := v.MapRange()
+				for iter.Next() {
+					if !valid(iter.Key()) || !valid(iter.Value()) {
+						return false
+					}
+				}
+				return true
+			}
+			for i := 0; i < v.Len(); i++ {
+				if !valid(v.Index(i)) {
+					return false
+				}
+			}
+			return true
+		case reflect.Array:
+			for i := 0; i < v.Len(); i++ {
+				if !valid(v.Index(i)) {
+					return false
+				}
+			}
+			return true
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				f := v.Type().Field(i)
+				if f.PkgPath == "" && f.Tag.Get("json") != "-" && !valid(v.Field(i)) {
+					return false
+				}
+			}
+			return true
+		}
+		return true
+	}
+	if !valid(reflect.ValueOf(value)) {
+		return ctx.Refuse(InvalidInput, "native input contains invalid UTF-8")
+	}
+	return nil
+}
+
+// ValidateDirectories refuses relative or traversal-bearing native grants.
+// Filesystem existence and authorization are the caller's preparation concern.
+func ValidateDirectories(ctx Context, dirs []string) error {
+	if err := ValidateValue(ctx, dirs); err != nil {
+		return err
+	}
+	for _, dir := range dirs {
+		if !path.IsAbs(dir) || strings.ContainsAny(dir, "\\\x00\r\n") {
+			return ctx.Refuse(InvalidInput, "directory grants must be absolute")
+		}
+		for _, part := range strings.Split(dir, "/") {
+			if part == ".." {
+				return ctx.Refuse(InvalidInput, "directory grants cannot contain traversal")
+			}
 		}
 	}
 	return nil

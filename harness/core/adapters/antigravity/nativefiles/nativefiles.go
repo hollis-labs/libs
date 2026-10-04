@@ -6,8 +6,14 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 )
+
+var serializerOwner = owner.New("antigravity")
+
+// Owner returns the immutable serializer handle; it cannot mint another owner.
+func Owner() contract.Owner { return serializerOwner }
 
 // Instructions copies the already composed instruction body without adding bindings.
 func Instructions(body []byte) []byte { return bytes.Clone(body) }
@@ -24,7 +30,7 @@ type MCPInput struct {
 // MCP encodes the plugin HTTP and stdio MCP transports.
 func MCP(in MCPInput) ([]byte, error) {
 	servers := in.Servers
-	ctx := contract.Context{Provider: "agy", Mode: in.Mode, Concern: "mcp"}
+	ctx := contract.Context{Provider: "antigravity", Mode: in.Mode, Concern: "mcp"}
 	if err := contract.ValidateServers(ctx, servers); err != nil {
 		return nil, err
 	}

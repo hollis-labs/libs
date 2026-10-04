@@ -10,8 +10,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 )
+
+var serializerOwner = owner.New("codex")
+
+// Owner returns the immutable serializer handle; it cannot mint another owner.
+func Owner() contract.Owner { return serializerOwner }
 
 // Instructions copies the already composed instruction body without adding bindings.
 func Instructions(body []byte) []byte { return bytes.Clone(body) }
@@ -28,6 +34,9 @@ type ConfigInput struct {
 // Config encodes one TOML document; MCP belongs to Servers, never raw slots.
 func Config(in ConfigInput) ([]byte, error) {
 	ctx := contract.Context{Provider: "codex", Mode: in.Mode, Concern: "settings"}
+	if err := contract.ValidateDirectories(ctx, in.WritableRoots); err != nil {
+		return nil, err
+	}
 	switch in.ApprovalPolicy {
 	case "", "on-failure", "on-request", "never":
 	default:
@@ -38,7 +47,7 @@ func Config(in ConfigInput) ([]byte, error) {
 	default:
 		return nil, ctx.Refuse(contract.InvalidInput, "unknown native sandbox mode")
 	}
-	if err := contract.ValidateServers(ctx, in.Servers); err != nil {
+	if err := contract.ValidateServers(contract.Context{Provider: ctx.Provider, Mode: ctx.Mode, Concern: "mcp"}, in.Servers); err != nil {
 		return nil, err
 	}
 	for _, slot := range in.Slots {
@@ -84,6 +93,25 @@ func Config(in ConfigInput) ([]byte, error) {
 	doc, err := contract.Object(ctx, in.Slots, generated)
 	if err != nil {
 		return nil, err
+	}
+	if section, ok := doc["sandbox_workspace_write"].(map[string]any); ok {
+		if grants, present := section["writable_roots"]; present {
+			values, ok := grants.([]any)
+			if !ok {
+				return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be an array of strings")
+			}
+			dirs := make([]string, len(values))
+			for i, v := range values {
+				dir, ok := v.(string)
+				if !ok {
+					return nil, ctx.Refuse(contract.InvalidInput, "directory grants must be strings")
+				}
+				dirs[i] = dir
+			}
+			if err := contract.ValidateDirectories(ctx, dirs); err != nil {
+				return nil, err
+			}
+		}
 	}
 	var out strings.Builder
 	// Preserve the native policy header ordering used by the existing projection.
@@ -149,7 +177,13 @@ func key(s string) string {
 	}
 	return quoted(s)
 }
-func quoted(s string) string { out, _ := json.Marshal(s); return string(out) }
+func quoted(s string) string {
+	var b bytes.Buffer
+	encoder := json.NewEncoder(&b)
+	encoder.SetEscapeHTML(false)
+	_ = encoder.Encode(s)
+	return strings.ReplaceAll(strings.TrimSuffix(b.String(), "\n"), string(rune(0x7f)), `\u007f`)
+}
 func table(ctx contract.Context, b *strings.Builder, path []string, doc map[string]any, orders map[string][]string) error {
 	all := []string{}
 	seen := map[string]bool{}

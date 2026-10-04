@@ -10,6 +10,12 @@
 // the planned removal of the legacy table follows that cutover.
 //
 // Intended deltas from legacy output, applied only at cutover:
+//   - Instruction bodies are the resolved definition text: Codex and Antigravity
+//     drop synthetic YAML front matter and H1 titles; Claude, Codex and Antigravity
+//     drop synthetic MCP sections and endpoint URLs from instruction documents.
+//   - MCP server names have no reserved names; a server named mux has the same
+//     environment-omission behavior as every other stdio server.
+//   - Native directory grants reject relative and traversal-bearing paths.
 //   - Codex boot skills use skills, rather than Cairn's .agents/skills, because
 //     the measured --cd probe loses the latter. Installed skills retain .agents/skills.
 //   - OpenCode instructions use agents/{agent}.md plus opencode.json.
@@ -29,7 +35,9 @@
 // Workspace apply owns authorized initial linking and overwrite refusal.
 //
 // Files default to 0644, directories to 0755 inside a private 0700 boot root.
-// Skill support files retain their declared modes; filenames never select modes.
+// Pinned skill entries, including SKILL.md, preserve declared modes after
+// removing special bits and group/other write. Changed modes produce a named
+// diagnostic. Absent modes use the row default; filenames never add executability.
 // Commands, subagents and prompts are pinned content registrations, not new
 // agentdef fields or extensions.
 package plan

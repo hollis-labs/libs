@@ -1,13 +1,20 @@
 // Package nativefiles encodes OpenCode native documents from resolved inputs.
-// It performs no I/O and never renders credential material.
+// It performs no I/O and never renders credential material. Modes come from
+// the plan table: native config and MCP documents require 0600.
 package nativefiles
 
 import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
 	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
 )
+
+var serializerOwner = owner.New("opencode")
+
+// Owner returns the immutable serializer handle; it cannot mint another owner.
+func Owner() contract.Owner { return serializerOwner }
 
 // AgentInput contains resolved identity and instruction content.
 type AgentInput struct {
@@ -19,6 +26,9 @@ type AgentInput struct {
 // Agent encodes a primary agent document with safe front matter.
 func Agent(in AgentInput) ([]byte, error) {
 	ctx := contract.Context{Provider: "opencode", Mode: in.Mode, Concern: "instructions"}
+	if err := contract.ValidateValue(ctx, []string{in.Name, in.Description}); err != nil {
+		return nil, err
+	}
 	if in.Name == "" {
 		return nil, ctx.Refuse(contract.InvalidInput, "agent name is empty")
 	}
