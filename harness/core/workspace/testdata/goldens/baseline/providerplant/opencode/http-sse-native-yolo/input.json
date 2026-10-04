@@ -1,0 +1,7 @@
+{
+  "provider": "opencode",
+  "runtime": "http-sse",
+  "variant": "native",
+  "posture": "yolo",
+  "scenario": "create"
+}

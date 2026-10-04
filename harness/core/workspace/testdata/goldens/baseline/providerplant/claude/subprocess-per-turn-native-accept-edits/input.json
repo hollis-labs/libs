@@ -1,0 +1,7 @@
+{
+  "provider": "claude",
+  "runtime": "subprocess-per-turn",
+  "variant": "native",
+  "posture": "accept-edits",
+  "scenario": "create"
+}

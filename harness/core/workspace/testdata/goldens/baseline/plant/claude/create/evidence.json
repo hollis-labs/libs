@@ -1,0 +1,277 @@
+{
+  "writer": "plant",
+  "source": "substrate legacy planting baseline",
+  "bindings": {
+    "operation": "create",
+    "changes": [
+      {
+        "path": ".claude/settings.json",
+        "kind": "create",
+        "entry_id": "wrapper:legacy:provider-settings:claude",
+        "group_id": "wrapper:legacy",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "38ba31d528b12919a05b0594abfdf1240318d7d2ada3483b94903fd84dea8dd2"
+        }
+      },
+      {
+        "path": ".mcp.json",
+        "kind": "create",
+        "entry_id": "wrapper:legacy:mcp",
+        "group_id": "wrapper:legacy",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b"
+        }
+      },
+      {
+        "path": "AGENTS.md",
+        "kind": "create",
+        "entry_id": "wrapper:legacy:file:AGENTS.md",
+        "group_id": "wrapper:legacy",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
+        }
+      },
+      {
+        "path": "empty",
+        "kind": "create",
+        "entry_id": "fixture:empty",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "",
+          "hex": ""
+        }
+      },
+      {
+        "path": "hooks/claude/start.sh",
+        "kind": "create",
+        "entry_id": "wrapper:legacy:hook:claude:start.sh",
+        "group_id": "wrapper:legacy",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        }
+      },
+      {
+        "path": "recovery.md",
+        "kind": "create",
+        "entry_id": "wrapper:legacy:recovery",
+        "group_id": "wrapper:legacy",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "48f8c37c2ff594240c55fa0eac4e207a7a6498b864dd28026fc5a44a17f98e7c"
+        }
+      },
+      {
+        "path": "skills/sample/SKILL.md",
+        "kind": "create",
+        "entry_id": "fixture:skill",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "046c899b2417d0ebc75adb230fd77e6aba2b8ecc59b867339bff6e95284e6fea"
+        }
+      },
+      {
+        "path": "skills/sample/data.bin",
+        "kind": "create",
+        "entry_id": "fixture:data",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
+        }
+      },
+      {
+        "path": "skills/sample/scripts/run.sh",
+        "kind": "create",
+        "entry_id": "fixture:script",
+        "group_id": "fixture",
+        "before": {
+          "algorithm": "",
+          "hex": ""
+        },
+        "after": {
+          "algorithm": "sha256",
+          "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        }
+      }
+    ],
+    "complete": true
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".claude/settings.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "38ba31d528b12919a05b0594abfdf1240318d7d2ada3483b94903fd84dea8dd2"
+      },
+      "ownership": {
+        "entry_id": "wrapper:legacy:provider-settings:claude",
+        "group_id": "wrapper:legacy"
+      },
+      "provenance": {
+        "source": "go-agent-wrapper.plant.Spec"
+      }
+    },
+    {
+      "path": ".mcp.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b"
+      },
+      "ownership": {
+        "entry_id": "wrapper:legacy:mcp",
+        "group_id": "wrapper:legacy"
+      },
+      "provenance": {
+        "source": "go-agent-wrapper.plant.Spec"
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
+      },
+      "ownership": {
+        "entry_id": "wrapper:legacy:file:AGENTS.md",
+        "group_id": "wrapper:legacy"
+      },
+      "provenance": {
+        "source": "go-agent-wrapper.plant.Spec"
+      }
+    },
+    {
+      "path": "empty",
+      "kind": "directory",
+      "mode": 488,
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      },
+      "ownership": {
+        "entry_id": "fixture:empty",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    },
+    {
+      "path": "hooks/claude/start.sh",
+      "kind": "file",
+      "mode": 448,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "wrapper:legacy:hook:claude:start.sh",
+        "group_id": "wrapper:legacy"
+      },
+      "provenance": {
+        "source": "go-agent-wrapper.plant.Spec"
+      }
+    },
+    {
+      "path": "recovery.md",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "48f8c37c2ff594240c55fa0eac4e207a7a6498b864dd28026fc5a44a17f98e7c"
+      },
+      "ownership": {
+        "entry_id": "wrapper:legacy:recovery",
+        "group_id": "wrapper:legacy"
+      },
+      "provenance": {
+        "source": "go-agent-wrapper.plant.Spec"
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "046c899b2417d0ebc75adb230fd77e6aba2b8ecc59b867339bff6e95284e6fea"
+      },
+      "ownership": {
+        "entry_id": "fixture:skill",
+        "group_id": "fixture"
+      },
+      "provenance": {
+        "source": "fixture"
+      }
+    },
+    {
+      "path": "skills/sample/data.bin",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123"
+      },
+      "ownership": {
+        "entry_id": "fixture:data",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "fixture:script",
+        "group_id": "fixture"
+      },
+      "provenance": {}
+    }
+  ]
+}

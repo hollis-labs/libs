@@ -2,7 +2,7 @@
   "fixture": "tether-multi-task-tree",
   "source": {
     "app": "tether",
-    "checkout": "/Users/chrispian/dev/hollis-labs/apps/tether",
+    "checkout": "/fixture-root/tether",
     "head": "5406114",
     "dirty": true,
     "dirty_note": "untracked planning/docs/materialization-planting-review.md present at M01 inspection",

@@ -1,0 +1,18 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "<boot>",
+    "Env": [
+      "CODEX_HOME=<boot>"
+    ],
+    "ExtraArgs": null,
+    "First": [
+      "app-server"
+    ],
+    "Resumed": [
+      "app-server"
+    ]
+  },
+  "diagnostics": []
+}

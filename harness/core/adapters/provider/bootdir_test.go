@@ -203,7 +203,7 @@ func TestClaudeSettingsStub_AdditionalDirectories(t *testing.T) {
 	// AdditionalDirectories alone (no PermissionMode) still emits a
 	// permissions block carrying just additionalDirectories.
 	a := NewClaudeAdapter()
-	a.AdditionalDirectories = []string{"/Users/x/dev", "/tmp/work"}
+	a.AdditionalDirectories = []string{"/fixture-root/dev", "/tmp/work"}
 	settings, err := a.BootDirSpec().PlantedFiles[2].Render(PlantContext{})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -217,8 +217,8 @@ func TestClaudeSettingsStub_AdditionalDirectories(t *testing.T) {
 		t.Fatalf("want a permissions block, got:\n%s", settings)
 	}
 	dirs, ok := perms["additionalDirectories"].([]any)
-	if !ok || len(dirs) != 2 || dirs[0] != "/Users/x/dev" || dirs[1] != "/tmp/work" {
-		t.Errorf("want additionalDirectories=[/Users/x/dev /tmp/work], got:\n%s", settings)
+	if !ok || len(dirs) != 2 || dirs[0] != "/fixture-root/dev" || dirs[1] != "/tmp/work" {
+		t.Errorf("want additionalDirectories=[/fixture-root/dev /tmp/work], got:\n%s", settings)
 	}
 	if _, hasMode := perms["defaultMode"]; hasMode {
 		t.Errorf("no PermissionMode set — defaultMode must be absent, got:\n%s", settings)
@@ -853,12 +853,12 @@ func TestRenderCodexConfigTOML(t *testing.T) {
 // writableRoots is non-empty, omitted entirely when empty.
 func TestRenderCodexConfigTOML_WritableRoots(t *testing.T) {
 	got := renderCodexConfigTOML("never", "workspace-write",
-		[]string{"/Users/x/dev", "/tmp/work"}, "http://127.0.0.1:65535/mcp", muxEntry{})
+		[]string{"/fixture-root/dev", "/tmp/work"}, "http://127.0.0.1:65535/mcp", muxEntry{})
 	want := `approval_policy = "never"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
-writable_roots = ["/Users/x/dev", "/tmp/work"]
+writable_roots = ["/fixture-root/dev", "/tmp/work"]
 
 [mcp_servers.loopback]
 url = "http://127.0.0.1:65535/mcp"
@@ -1148,7 +1148,7 @@ func TestClaudeBootDirSpec_MuxEntry(t *testing.T) {
 		SystemPrompt:   "you are an orchestrator",
 		BootContent:    "boot",
 		MCPLoopbackURL: "http://127.0.0.1:9000/mcp",
-		MuxCommand:     "/Users/chrispian/go/bin/mux",
+		MuxCommand:     "/fixture-root/go/bin/mux",
 		MuxArgs: []string{
 			"mcp", "--proxy",
 			"--servers", "vanta,clockwork,cerberus",
@@ -1175,7 +1175,7 @@ func TestClaudeBootDirSpec_MuxEntry(t *testing.T) {
 	if !strings.Contains(mcpJSON, `"type": "stdio"`) {
 		t.Error("mux entry should declare type:stdio")
 	}
-	if !strings.Contains(mcpJSON, `"command": "/Users/chrispian/go/bin/mux"`) {
+	if !strings.Contains(mcpJSON, `"command": "/fixture-root/go/bin/mux"`) {
 		t.Error("mux command missing")
 	}
 	if !strings.Contains(mcpJSON, `"vanta,clockwork,cerberus"`) {
@@ -1191,7 +1191,7 @@ func TestClaudeBootDirSpec_MuxEntry(t *testing.T) {
 	if !strings.Contains(claudeMD, "http://127.0.0.1:9000/mcp") {
 		t.Error("CLAUDE.md should reference loopback URL")
 	}
-	if !strings.Contains(claudeMD, "/Users/chrispian/go/bin/mux") {
+	if !strings.Contains(claudeMD, "/fixture-root/go/bin/mux") {
 		t.Error("CLAUDE.md should reference Mux command when MuxCommand is set")
 	}
 }
@@ -1249,7 +1249,7 @@ func TestOpencodeBootDirSpec_MuxEntry(t *testing.T) {
 	pctx := PlantContext{
 		AgentName:      "executor",
 		MCPLoopbackURL: "http://127.0.0.1:65500/mcp",
-		MuxCommand:     "/Users/chrispian/go/bin/mux",
+		MuxCommand:     "/fixture-root/go/bin/mux",
 		MuxArgs: []string{
 			"mcp", "--proxy",
 			"--servers", "vanta,clockwork,cerberus",
@@ -1277,7 +1277,7 @@ func TestOpencodeBootDirSpec_MuxEntry(t *testing.T) {
 		t.Error("mux entry should declare type:local (opencode's stdio keyword)")
 	}
 	// command is a single array — argv[0] is the binary path.
-	if !strings.Contains(opencodeJSON, `"/Users/chrispian/go/bin/mux"`) {
+	if !strings.Contains(opencodeJSON, `"/fixture-root/go/bin/mux"`) {
 		t.Error("mux command (binary path) missing")
 	}
 	if !strings.Contains(opencodeJSON, `"--proxy"`) {
@@ -1306,7 +1306,7 @@ func TestOpencodeBootDirSpec_MuxEntry(t *testing.T) {
 	if len(cmd) < 1 {
 		t.Fatal("mux.command array empty")
 	}
-	if cmd[0] != "/Users/chrispian/go/bin/mux" {
+	if cmd[0] != "/fixture-root/go/bin/mux" {
 		t.Errorf("mux.command[0]: want binary path, got %v", cmd[0])
 	}
 }
@@ -1381,7 +1381,7 @@ func TestClaudeSettingsDocument_MatchesPlantedFile(t *testing.T) {
 		"bare":        NewClaudeAdapterBare(),
 		"api helper":  {ApiKeyHelperPath: "/tmp/akh"},
 		"permissions": {PermissionMode: "acceptEdits"},
-		"add dirs":    {AdditionalDirectories: []string{"/Users/x/dev", "/tmp/work"}},
+		"add dirs":    {AdditionalDirectories: []string{"/fixture-root/dev", "/tmp/work"}},
 		"everything": {
 			ApiKeyHelperPath:      "/tmp/akh",
 			PermissionMode:        "plan",
@@ -1416,7 +1416,7 @@ func TestClaudeSettingsDocument_MatchesPlantedFile(t *testing.T) {
 // its presence in the map is the contract, not an implementation
 // detail of the JSON encoding.
 func TestClaudeSettingsDocument_AdditionalDirectories(t *testing.T) {
-	a := &ClaudeAdapter{AdditionalDirectories: []string{"/Users/x/dev", "/tmp/work"}}
+	a := &ClaudeAdapter{AdditionalDirectories: []string{"/fixture-root/dev", "/tmp/work"}}
 	doc, err := a.SettingsDocument()
 	if err != nil {
 		t.Fatalf("SettingsDocument: %v", err)
@@ -1426,7 +1426,7 @@ func TestClaudeSettingsDocument_AdditionalDirectories(t *testing.T) {
 		t.Fatalf("want a permissions block, got %#v", doc)
 	}
 	dirs, ok := perms["additionalDirectories"].([]string)
-	if !ok || len(dirs) != 2 || dirs[0] != "/Users/x/dev" || dirs[1] != "/tmp/work" {
+	if !ok || len(dirs) != 2 || dirs[0] != "/fixture-root/dev" || dirs[1] != "/tmp/work" {
 		t.Errorf("additionalDirectories: got %#v", perms["additionalDirectories"])
 	}
 	if _, present := perms["defaultMode"]; present {
@@ -1446,7 +1446,7 @@ func TestClaudeSettingsDocument_MutationIsCallerLocal(t *testing.T) {
 	setHomeForTest(t, t.TempDir())
 	a := &ClaudeAdapter{
 		PermissionMode:        "plan",
-		AdditionalDirectories: []string{"/Users/x/dev", "/tmp/work"},
+		AdditionalDirectories: []string{"/fixture-root/dev", "/tmp/work"},
 	}
 	first, err := a.SettingsDocument()
 	if err != nil {
@@ -1477,14 +1477,14 @@ func TestClaudeSettingsDocument_MutationIsCallerLocal(t *testing.T) {
 	}
 	dirs := third["permissions"].(map[string]any)["additionalDirectories"].([]string)
 	dirs[0] = "/etc"
-	if a.AdditionalDirectories[0] != "/Users/x/dev" {
+	if a.AdditionalDirectories[0] != "/fixture-root/dev" {
 		t.Errorf("write through the returned slice reached the adapter: %v", a.AdditionalDirectories)
 	}
 	fourth, err := a.SettingsDocument()
 	if err != nil {
 		t.Fatalf("SettingsDocument: %v", err)
 	}
-	if got := fourth["permissions"].(map[string]any)["additionalDirectories"].([]string); got[0] != "/Users/x/dev" {
+	if got := fourth["permissions"].(map[string]any)["additionalDirectories"].([]string); got[0] != "/fixture-root/dev" {
 		t.Errorf("a later document inherited the earlier caller's write: %v", got)
 	}
 
@@ -1544,13 +1544,13 @@ sandbox_mode = "workspace-write"
 		},
 		{
 			name: "writable roots",
-			a:    &CodexAdapter{WritableRoots: []string{"/Users/x/dev/proj", "/tmp/work"}},
+			a:    &CodexAdapter{WritableRoots: []string{"/fixture-root/dev/proj", "/tmp/work"}},
 			ctx:  PlantContext{},
 			want: `approval_policy = "never"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
-writable_roots = ["/Users/x/dev/proj", "/tmp/work"]
+writable_roots = ["/fixture-root/dev/proj", "/tmp/work"]
 `,
 		},
 		{

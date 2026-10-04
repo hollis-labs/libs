@@ -1,0 +1,25 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "<boot>",
+    "Env": null,
+    "ExtraArgs": [
+      "--add-dir",
+      "/fixture/project"
+    ],
+    "First": [
+      "--output-format",
+      "stream-json",
+      "-p=System: Fixture instructions.\n\nFixture turn."
+    ],
+    "Resumed": [
+      "--output-format",
+      "stream-json",
+      "--conversation",
+      "fixture-session",
+      "-p=System: Fixture instructions.\n\nFixture next turn."
+    ]
+  },
+  "diagnostics": []
+}
