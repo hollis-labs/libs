@@ -28,6 +28,9 @@ type TreeRequest struct {
 	CredentialDestinations []string
 }
 
+// TreeDigestVersion pins the artifact-only input domain and JSON encoding.
+const TreeDigestVersion = "workspace.tree.input.v1"
+
 // ApplyTree is the narrow legacy preparation entry. It preserves the same
 // authority, lock, manifest and receipt boundary as Materialize without making
 // up an identity or choosing a temporary root for its caller.
@@ -150,7 +153,7 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	if err != nil {
 		return PlannedWorkspace{}, err
 	}
-	sum := sha256.Sum256(append([]byte("workspace.tree.input.v1\x00"), data...))
+	sum := sha256.Sum256(append([]byte(TreeDigestVersion+"\x00"), data...))
 	p.digest = hex.EncodeToString(sum[:])
 	if len(input.Tree.Entries) == 0 {
 		return p, nil
