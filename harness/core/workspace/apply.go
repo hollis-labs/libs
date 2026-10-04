@@ -251,6 +251,9 @@ func validateTarget(a Action, o RootObservation, destinations []string) error {
 	return nil
 }
 func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
+	if err := validateFrozenValues(o); err != nil {
+		return err
+	}
 	if now.Before(o.At) || !now.Before(o.ExpiresAt) || now.Before(p.observed.At) || !now.Before(p.observed.ExpiresAt) || !o.ExpiresAt.After(o.At) {
 		return refuse(CodeExpiredObservation, "observations", Conflict)
 	}

@@ -420,3 +420,20 @@ func TestMaterializeTypedEffectsStayUnsupportedBeforeMutation(t *testing.T) {
 		t.Fatal("unsupported effect mutated directory", err)
 	}
 }
+
+func TestMaterializeBoundsFreshHostEvidence(t *testing.T) {
+	p, f, s := applyFixture(t)
+	f.observed.Capabilities = make([]workspace.Capability, workspace.MaxCollectionItems+1)
+	for i := range f.observed.Capabilities {
+		f.observed.Capabilities[i] = workspace.CanonicalRoots
+	}
+	f.observed.Capabilities[0] = workspace.MutationLocks
+	got, err := workspace.Materialize(context.Background(), p, f.ports())
+	refusal(t, err, workspace.CodeInputLimit)
+	if got.ArtifactsComplete() {
+		t.Fatal("oversized live evidence completed")
+	}
+	if _, err := os.Stat(s.Home.Root.Path); !os.IsNotExist(err) {
+		t.Fatal("oversized evidence mutated directory", err)
+	}
+}
