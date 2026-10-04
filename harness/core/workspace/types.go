@@ -73,12 +73,18 @@ type HomeSpec struct {
 }
 
 type BootSpec struct {
+	// IdentityRoot is the explicitly owned stable parent of current/candidates
+	// and supplies their shared canonical mutation-lock identity.
+	IdentityRoot       RootRef
 	Current, Candidate RootRef
 	RowIDs             []string
 	ExpectedGeneration string
-	Selection          materialize.Selection
-	Reconcile          materialize.ReconcilePolicy
-	Retention          RetentionPolicy
+	// CandidateGeneration explicitly authorizes reconcile of an inactive owned
+	// candidate. It is distinct from the expected stable current generation.
+	CandidateGeneration string
+	Selection           materialize.Selection
+	Reconcile           materialize.ReconcilePolicy
+	Retention           RetentionPolicy
 }
 
 type ScratchSpec struct {
@@ -209,6 +215,7 @@ type Observations struct {
 type RootObservation struct {
 	RootID, CanonicalPath, CanonicalBase, Owner string
 	Exists, Empty                               bool
+	Directory                                   bool
 	Manifest                                    *materialize.Manifest
 	Disk                                        []materialize.ManifestEntry
 	Uncertainty                                 string
@@ -250,12 +257,15 @@ type EffectReceipt struct {
 }
 type Receipt struct {
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
-	Phase                                                Phase
-	Roots                                                []RootReceipt
-	Attachments                                          []AttachmentReceipt
-	Effects                                              []EffectReceipt
-	Obligations                                          []Obligation
-	RecordedAt                                           time.Time
+	// Identity records originating pins for new-path recovery. Artifact-only
+	// receipts leave it empty and make no enrollment or continuity claim.
+	Identity    IdentitySpec
+	Phase       Phase
+	Roots       []RootReceipt
+	Attachments []AttachmentReceipt
+	Effects     []EffectReceipt
+	Obligations []Obligation
+	RecordedAt  time.Time
 }
 
 type Diagnostic struct {

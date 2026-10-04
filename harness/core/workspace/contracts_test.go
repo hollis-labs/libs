@@ -24,11 +24,15 @@ func spec(t *testing.T) workspace.Spec {
 		t.Fatal(err)
 	}
 	d := artifact.DigestBytes([]byte("fixture"))
+	boot := root("boot")
+	current, candidate := root("current"), root("candidate")
+	current.Path = filepath.Join(boot.Path, "current")
+	candidate.Path = filepath.Join(boot.Path, "candidate")
 	return workspace.Spec{
 		SchemaVersion: workspace.SchemaVersion, OperationID: "fixture-operation", Operation: workspace.Prepare,
 		Identity: workspace.IdentitySpec{AgentURN: "urn:fixture:agent:one", EncodedKey: key, Session: "fixture-session", DefinitionRevision: "fixture-revision", SemanticDigest: d, ArtifactDigest: d, DependencyDigest: d, Fence: workspace.ResourceRef{ID: "fixture-fence", Revision: "1"}},
 		Home:     workspace.HomeSpec{Root: root("home"), Layout: workspace.FullHome, Continuity: workspace.Durable, Retention: workspace.Keep},
-		Boot:     workspace.BootSpec{Current: root("current"), Candidate: root("candidate"), Retention: workspace.RetainForRecovery},
+		Boot:     workspace.BootSpec{IdentityRoot: boot, Current: current, Candidate: candidate, Retention: workspace.RetainForRecovery},
 		CWD:      workspace.CWDSpec{RootID: "home", Relative: "."},
 		Sandbox:  workspace.SandboxSpec{Policy: sandbox.ResolvedAccessPolicy{Mode: sandbox.ConfinementDisabled}},
 		Cleanup:  workspace.CleanupPolicy{Retention: workspace.Keep},

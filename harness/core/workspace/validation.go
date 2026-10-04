@@ -62,13 +62,18 @@ func (s Spec) Validate() error {
 	if !validRetention(s.Home.Retention) || !validRetention(s.Boot.Retention) || !validRetention(s.Cleanup.Retention) {
 		return refuse("unsupported_retention", "retention", Unsupported)
 	}
-	for _, r := range []RootRef{s.Home.Root, s.Boot.Current, s.Boot.Candidate} {
+	for _, r := range []RootRef{s.Home.Root, s.Boot.IdentityRoot, s.Boot.Current, s.Boot.Candidate} {
 		if err := r.Validate(); err != nil {
 			return err
 		}
 	}
 	if s.Boot.Candidate.Path == s.Boot.Current.Path {
 		return refuse("candidate_is_current", "boot", Conflict)
+	}
+	for _, r := range []RootRef{s.Boot.Current, s.Boot.Candidate} {
+		if filepath.Dir(r.Path) != s.Boot.IdentityRoot.Path || r.Owner != s.Boot.IdentityRoot.Owner {
+			return refuse("invalid_boot_siblings", "boot", Conflict)
+		}
 	}
 	if s.Boot.ExpectedGeneration == "" && s.Operation == Resume {
 		return refuse("missing_expected_generation", "boot", Conflict)
@@ -77,7 +82,7 @@ func (s Spec) Validate() error {
 		return refuse("unsupported_confinement", "sandbox", Unsupported)
 	}
 	if s.CWD.Relative != "" && s.CWD.Relative != "." {
-		if err := artifact.ValidateRelPath(s.CWD.Relative); err != nil {
+		if err := validateArtifactPath(s.CWD.Relative); err != nil {
 			return refuse("unsafe_cwd", "cwd", Conflict)
 		}
 	}
@@ -104,7 +109,7 @@ func (s Spec) Validate() error {
 		}
 	}
 	for _, c := range s.Credentials {
-		if c.Source.ID == "" || c.Authorization.ID == "" || c.DestinationRootID == "" || c.Concern == "" || artifact.ValidateRelPath(c.Destination) != nil {
+		if c.Source.ID == "" || c.Authorization.ID == "" || c.DestinationRootID == "" || c.Concern == "" || validateArtifactPath(c.Destination) != nil {
 			return refuse("invalid_credential_reference", "credentials", Conflict)
 		}
 		if err := validateAccess(c.Access); err != nil {
@@ -205,6 +210,9 @@ func ValidateManagedTree(tree artifact.Tree, credentialDestinations []string) er
 		folded := strings.ToLower(e.Path)
 		if credentialPath(e.Path) || folded == ".materialize" || strings.HasPrefix(folded, ".materialize/") {
 			return refuse("reserved_artifact_path", "artifacts", Conflict)
+		}
+		if validateArtifactPath(e.Path) != nil {
+			return refuse("unsafe_artifact_path", "artifacts", Conflict)
 		}
 		for _, dest := range credentialDestinations {
 			if artifact.ValidateRelPath(dest) != nil {
