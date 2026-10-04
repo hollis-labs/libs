@@ -41,30 +41,32 @@ type renderSnapshot struct {
 type preparationRequirement struct{ Kind, Destination string }
 
 func snapshotRendered(source render.Result) (renderSnapshot, error) {
+	entries := source.Tree.Entries
+	source.Tree.Entries = nil
 	r := copyRecord(source)
-	r.Tree.Entries = artifact.CloneEntries(source.Tree.Entries)
+	r.Tree.Entries = entries
 	rows, err := layout.For(r.Provider, r.Layer, r.Mode, r.Variant)
 	if err != nil || (r.Layer == layout.Boot && r.Root != layout.RootBoot) || (r.Layer == layout.Installed && r.Root != layout.RootHome) {
-		return renderSnapshot{}, refuse("invalid_render_context", "render", Conflict)
+		return renderSnapshot{}, refuse(CodeInvalidRenderContext, "render", Conflict)
 	}
 	for _, d := range r.Diagnostics {
 		if d.Code == "" || (d.Class != render.ClassInformational && d.Class != render.ClassOmission) || d.Provider != "" && d.Provider != r.Provider || d.Mode != "" && d.Mode != r.Mode {
-			return renderSnapshot{}, refuse("invalid_render_diagnostic", "render", Conflict)
+			return renderSnapshot{}, refuse(CodeInvalidRenderDiagnostic, "render", Conflict)
 		}
 	}
 	for _, e := range r.Tree.Entries {
-		if e.Kind != artifact.EntryFile {
-			continue
-		}
 		for _, row := range rows {
 			if !strings.EqualFold(row.Path, e.Path) {
 				continue
+			}
+			if (row.Form == layout.File || row.Form == layout.Slot) && e.Kind != artifact.EntryFile {
+				return renderSnapshot{}, refuse(CodeUnsafeRenderEntry, "render", Conflict)
 			}
 			switch row.Field {
 			case layout.Settings, layout.Permissions, layout.Hooks, layout.MCP, layout.PlantingPlugin:
 				if row.Form == layout.File || row.Form == layout.Slot {
 					if _, err := render.ParseOwnershipNote(e.Provenance.Note); err != nil {
-						return renderSnapshot{}, refuse("invalid_render_ownership", "render", Conflict)
+						return renderSnapshot{}, refuse(CodeInvalidRenderOwnership, "render", Conflict)
 					}
 				}
 			}
@@ -72,41 +74,41 @@ func snapshotRendered(source render.Result) (renderSnapshot, error) {
 	}
 	for _, e := range r.Tree.Entries {
 		if render.ValidateRelPath(e.Path) != nil || e.Mode&^fs.ModePerm != 0 {
-			return renderSnapshot{}, refuse("unsafe_render_entry", "render", Conflict)
+			return renderSnapshot{}, refuse(CodeUnsafeRenderEntry, "render", Conflict)
 		}
 	}
-	entries, err := artifact.Normalize(r.Tree.Entries)
+	entries, err = artifact.Normalize(r.Tree.Entries)
 	if err != nil {
-		return renderSnapshot{}, refuse("invalid_artifact_tree", "render", Conflict)
+		return renderSnapshot{}, refuse(CodeInvalidArtifactTree, "render", Conflict)
 	}
 	r.Tree.Entries = entries
 	for _, effect := range r.Effects {
-		if effect.Form != layout.Link || effect.CredentialPolicy != layout.LinkOnlyNeverWrite || render.ValidateRelPath(effect.Path) != nil || len(effect.Locator.Argv) > 0 || len(effect.Locator.Env) > 0 || effect.Locator.CWD != "" || effect.Locator.RPCProject != "" || effect.Locator.BeforeResume {
-			return renderSnapshot{}, refuse("unsupported_render_effect", "effects", Unsupported)
+		if effect.Form != layout.Link || effect.CredentialPolicy != layout.LinkOnlyNeverWrite || render.ValidateRelPath(effect.Path) != nil || !render.IsCredentialDestination(effect.Path) || len(effect.Locator.Argv) > 0 || len(effect.Locator.Env) > 0 || effect.Locator.CWD != "" || effect.Locator.RPCProject != "" || effect.Locator.BeforeResume {
+			return renderSnapshot{}, refuse(CodeUnsupportedRenderEffect, "effects", Unsupported)
 		}
 	}
 	out := renderSnapshot{Provider: r.Provider, Layer: r.Layer, Mode: r.Mode, Variant: r.Variant, Tree: r.Tree, Root: r.Root, RootMode: r.RootMode, Binding: r.Binding, Effects: r.Effects, Diagnostics: r.Diagnostics}
 	for _, prep := range r.Preparations {
 		if prep.Provider != r.Provider {
-			return renderSnapshot{}, refuse("unsupported_preparation", "effects", Unsupported)
+			return renderSnapshot{}, refuse(CodeUnsupportedPreparation, "effects", Unsupported)
 		}
 		switch prep.Kind {
 		case render.PreparationCredentialLink:
-			if prep.Policy != layout.LinkOnlyNeverWrite || render.ValidateRelPath(prep.Destination) != nil {
-				return renderSnapshot{}, refuse("unsupported_preparation", "effects", Unsupported)
+			if prep.Policy != layout.LinkOnlyNeverWrite || render.ValidateRelPath(prep.Destination) != nil || !render.IsCredentialDestination(prep.Destination) {
+				return renderSnapshot{}, refuse(CodeUnsupportedPreparation, "effects", Unsupported)
 			}
 		case render.PreparationCredentialAvailability:
 			if prep.Destination != "" {
-				return renderSnapshot{}, refuse("unsupported_preparation", "effects", Unsupported)
+				return renderSnapshot{}, refuse(CodeUnsupportedPreparation, "effects", Unsupported)
 			}
 		default:
-			return renderSnapshot{}, refuse("unsupported_preparation", "effects", Unsupported)
+			return renderSnapshot{}, refuse(CodeUnsupportedPreparation, "effects", Unsupported)
 		}
 		out.Preparations = append(out.Preparations, preparationRequirement{string(prep.Kind), prep.Destination})
 	}
 	encoded, err := json.Marshal(r)
 	if err != nil {
-		return renderSnapshot{}, refuse("invalid_frozen_input", "render", Conflict)
+		return renderSnapshot{}, refuse(CodeInvalidFrozenInput, "render", Conflict)
 	}
 	out.SourceDigest = artifact.DigestBytes(encoded)
 	return out, nil
@@ -118,11 +120,11 @@ func isCredentialDestination(p string) bool { return render.IsCredentialDestinat
 
 func validateRenderRoots(r renderSnapshot, roots map[layout.Root]string, target RootRef, resolved []RootRef) error {
 	if roots[r.Root] != target.Path {
-		return refuse("render_root_mismatch", "render", Conflict)
+		return refuse(CodeRenderRootMismatch, "render", Conflict)
 	}
 	for logical, path := range roots {
 		if logical != layout.RootBoot && logical != layout.RootHome && logical != layout.RootProject {
-			return refuse("unresolved_render_root", "render", Conflict)
+			return refuse(CodeUnresolvedRenderRoot, "render", Conflict)
 		}
 		found := false
 		for _, ref := range resolved {
@@ -132,8 +134,8 @@ func validateRenderRoots(r renderSnapshot, roots map[layout.Root]string, target 
 			}
 		}
 		if !found {
-			return refuse("unresolved_render_root", "render", Conflict)
+			return refuse(CodeUnresolvedRenderRoot, "render", Conflict)
 		}
 	}
-	return nil
+	return validateBinding(r, roots)
 }

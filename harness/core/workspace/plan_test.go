@@ -20,13 +20,15 @@ func planInputs(t *testing.T) (workspace.Spec, workspace.ResolvedContent, worksp
 	s := spec(t)
 	s.Effects = []workspace.EffectGrant{{Kind: workspace.DirectoryEffect, RootID: s.Home.Root.ID, AuthorizationID: "fixture-authority", Version: "1"}, {Kind: workspace.DirectoryEffect, RootID: s.Boot.IdentityRoot.ID, AuthorizationID: "fixture-authority", Version: "1"}, {Kind: workspace.ArtifactEffect, RootID: s.Boot.Candidate.ID, AuthorizationID: "fixture-authority", Version: "1"}}
 	resources := workspace.Resources{Roots: []workspace.RootRef{s.Home.Root, s.Boot.IdentityRoot, s.Boot.Current, s.Boot.Candidate}, LockNamespace: filepath.Join(s.Home.Root.AllowedBase, "locks"), Capabilities: []workspace.Capability{workspace.CanonicalRoots, workspace.MutationLocks}}
+	resources.LockRoot = root("locks")
 	resources.Grants = slices.Clone(s.Effects)
 	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	observed := workspace.Observations{At: at, ExpiresAt: at.Add(time.Minute), FenceVersion: s.Identity.Fence.Revision, Capabilities: slices.Clone(resources.Capabilities)}
 	for _, r := range resources.Roots {
-		observed.Roots = append(observed.Roots, workspace.RootObservation{RootID: r.ID, CanonicalPath: r.Path, CanonicalBase: r.AllowedBase, Owner: r.Owner})
+		observed.Roots = append(observed.Roots, workspace.RootObservation{RootID: r.ID, DeclaredPath: r.Path, CanonicalPath: r.Path, CanonicalBase: r.AllowedBase, Owner: r.Owner})
 	}
-	rendered := render.Result{Provider: runtimes.Claude, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Root: layout.RootBoot, RootMode: 0700, Tree: tree("AGENTS.md"), Binding: render.Binding{Argv: []string{"--one", "two"}, Environment: map[string]string{"FIXTURE_ROOT": s.Boot.Candidate.Path}, BeforeResume: true}, Diagnostics: []render.Diagnostic{{Code: "fixture_omission", Class: render.ClassOmission, Reason: "fixture optional omission"}}}
+	observed.Roots = append(observed.Roots, workspace.RootObservation{RootID: resources.LockRoot.ID, DeclaredPath: resources.LockRoot.Path, CanonicalPath: resources.LockRoot.Path, CanonicalBase: resources.LockRoot.AllowedBase, Owner: resources.LockRoot.Owner, Exists: true, Directory: true})
+	rendered := render.Result{Provider: runtimes.Claude, Layer: layout.Boot, Mode: runtimes.ModeSubprocessPerTurn, Root: layout.RootBoot, RootMode: 0700, Tree: tree("AGENTS.md"), Binding: render.Binding{Argv: []string{"--add-dir", s.Home.Root.Path}, CWD: s.Boot.Candidate.Path}, Diagnostics: []render.Diagnostic{{Code: "fixture_omission", Class: render.ClassOmission, Reason: "fixture optional omission"}}}
 	return s, workspace.ResolvedContent{Rendered: []render.Result{rendered}, Roots: map[layout.Root]string{layout.RootBoot: s.Boot.Candidate.Path, layout.RootProject: s.Home.Root.Path}}, resources, observed
 }
 func planned(t *testing.T, s workspace.Spec, c workspace.ResolvedContent, r workspace.Resources, o workspace.Observations) workspace.PlannedWorkspace {
@@ -60,12 +62,13 @@ func TestPlanIsFrozenAndKeepsOrderedBindings(t *testing.T) {
 	s, c, r, o := planInputs(t)
 	empty := tree("empty.txt").Entries[0]
 	empty.Bytes = []byte{}
+	empty.Ownership.EntryID = "fixture-empty"
 	c.Rendered[0].Tree.Entries = append(c.Rendered[0].Tree.Entries, empty)
 	p := planned(t, s, c, r, o)
 	before := treeAction(t, p)
 	bindings := p.Bindings()
 	bindings[0].Argv[0] = "changed"
-	bindings[0].Environment["FIXTURE_ROOT"] = "changed"
+	bindings[0].CWD = "changed"
 	actions := p.Actions()
 	for i := range actions {
 		if actions[i].Kind == workspace.TreeAction {
@@ -79,7 +82,7 @@ func TestPlanIsFrozenAndKeepsOrderedBindings(t *testing.T) {
 	if !reflect.DeepEqual(treeAction(t, p), before) {
 		t.Fatal("mutation escaped a frozen tree")
 	}
-	if got := p.Bindings()[0]; got.Argv[0] != "--one" || got.Environment["FIXTURE_ROOT"] != s.Boot.Candidate.Path || !got.BeforeResume {
+	if got := p.Bindings()[0]; got.Argv[0] != "--add-dir" || got.Argv[1] != s.Home.Root.Path || got.CWD != s.Boot.Candidate.Path {
 		t.Fatal("binding order or copy changed")
 	}
 	for _, e := range before.Request.Artifacts.Entries {
@@ -102,6 +105,7 @@ func TestPlanIsFrozenAndKeepsOrderedBindings(t *testing.T) {
 
 func TestDesiredDigestExcludesSnapshotTimeButIncludesBytesAndArgv(t *testing.T) {
 	s, c, r, o := planInputs(t)
+	c.Rendered[0].Binding.Argv = []string{"--strict-mcp-config", "--add-dir", s.Home.Root.Path}
 	p := planned(t, s, c, r, o)
 	o.At = o.At.Add(time.Hour)
 	o.ExpiresAt = o.ExpiresAt.Add(time.Hour)
@@ -111,11 +115,11 @@ func TestDesiredDigestExcludesSnapshotTimeButIncludesBytesAndArgv(t *testing.T) 
 	if other := planned(t, s, c, r, o); other.Digest() != p.Digest() || !reflect.DeepEqual(other.LockKeys(), p.LockKeys()) {
 		t.Fatal("set order or evidence time changed desired digest")
 	}
-	slices.Reverse(c.Rendered[0].Binding.Argv)
+	c.Rendered[0].Binding.Argv = []string{"--add-dir", s.Home.Root.Path, "--strict-mcp-config"}
 	if other := planned(t, s, c, r, o); other.Digest() == p.Digest() {
 		t.Fatal("argv order missing from digest")
 	}
-	slices.Reverse(c.Rendered[0].Binding.Argv)
+	c.Rendered[0].Binding.Argv = []string{"--strict-mcp-config", "--add-dir", s.Home.Root.Path}
 	c.Rendered[0].Tree.Entries[0].Bytes = []byte("different")
 	if other := planned(t, s, c, r, o); other.Digest() == p.Digest() {
 		t.Fatal("bytes missing from digest")
@@ -167,6 +171,8 @@ func TestPlanEmptyTreeHasNoEngineRequestAndBootParentLockIsStable(t *testing.T) 
 			r.Roots[i] = s.Boot.Candidate
 		}
 	}
+	c.Rendered[0].Binding.CWD = s.Boot.Candidate.Path
+	rootObservation(&o, s.Boot.Candidate.ID).DeclaredPath = s.Boot.Candidate.Path
 	rootObservation(&o, s.Boot.Candidate.ID).CanonicalPath = s.Boot.Candidate.Path
 	c.Roots[layout.RootBoot] = s.Boot.Candidate.Path
 	if !reflect.DeepEqual(planned(t, s, c, r, o).LockKeys(), before) {
@@ -191,7 +197,7 @@ func TestPlanRejectsUncertainRootsAndUnknownRendererEffects(t *testing.T) {
 		{"unknown", "unknown_canonical_root", func(s *workspace.Spec, c *workspace.ResolvedContent, r *workspace.Resources, o *workspace.Observations) {
 			o.Roots = nil
 		}},
-		{"alias", "ambiguous_root_alias", func(s *workspace.Spec, c *workspace.ResolvedContent, r *workspace.Resources, o *workspace.Observations) {
+		{"alias", "observation_base_mismatch", func(s *workspace.Spec, c *workspace.ResolvedContent, r *workspace.Resources, o *workspace.Observations) {
 			rootObservation(o, s.Home.Root.ID).CanonicalPath = s.Boot.Current.Path
 		}},
 		{"credential", "reserved_artifact_path", func(s *workspace.Spec, c *workspace.ResolvedContent, r *workspace.Resources, o *workspace.Observations) {

@@ -33,4 +33,21 @@
 // sessions. Fresh homes require a separately enrolled ephemeral identity. The
 // artifact-only legacy entry makes no identity or continuity claim. Neither
 // planning nor apply may silently select a global temporary root.
+// Every semantic root must match the host's declared roster. Observations bind
+// its declared path and preserve its suffix relative to an owned allowed base;
+// aliases of that base share one canonical base. The observed lock namespace
+// uses the same binding, so canonical action paths and lock keys agree.
+//
+// DigestVersion pins SHA-256 over its NUL-terminated domain followed by JSON of
+// the frozen input record. Set-valued grants, capabilities and provider homes
+// are sorted and deduplicated; ordered launch arguments retain their order.
+// Changing the record encoding requires a new version and golden. Identity-root
+// basenames use the persisted bootkey; a bootkey.Version change requires an
+// explicit identity migration, and old keys otherwise fail closed.
+//
+// CurrentManifest in a planned engine request is advisory snapshot evidence.
+// Apply must reload the committed manifest under locks before reconciliation.
+// Purity is a property of Plan's calls, rather than the imported package graph.
+// Windows trailing-dot and trailing-space aliases are not supported by this
+// lexical contract; hosts must refuse them during physical validation.
 package workspace
