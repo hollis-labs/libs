@@ -1,92 +1,113 @@
-# Behavioral capability conformance
+# Behavioral capability adapter checks
 
-`capability/host/hosttest` exercises host entry points against the capability
-contract. A host supplies an `Adapter`; each probe opens a fresh, isolated
-`Instance` with a real policy ledger, connection binding, credential store,
-backend and audit sink. The suite returns a violation for each failed probe.
-It has no skip or waiver mechanism.
+`capability/host/hosttest` runs capability probes through host adapters. Hosts
+provide their published supported catalog and a test adapter that opens isolated
+instances using the real dispatcher, policy ledger, credential issuer, backend
+and audit sink:
 
 ```go
-func TestHostCapabilities(t *testing.T) {
-    hosttest.Run(t, applicationTestAdapter{})
+profile := hosttest.Profile{Supported: publishedHostDescriptors}
+hosttest.RunProfile(t, applicationTestAdapter{}, profile)
+```
+
+`Profile.Supported` is a visible supported subset, never a per-probe waiver.
+An explicit empty slice declares no capabilities and still tests the handshake.
+Storage writes and other proposed descriptors are optional. Capability-specific
+probes run only for declared descriptors; common admission and lifecycle checks
+use a supported descriptor. The report lists absent shared descriptors as
+`declared_unsupported`. Native descriptors receive scoped positive and bypass
+checks. Published shared descriptors must equal their canonical definitions,
+including descriptions, operations and proposed status.
+
+`Evaluate` returns results for each requirement and descriptor. `Check` is the
+violation-only convenience view; it does not establish complete ADR coverage.
+Check the intended requirement when proving a deliberately broken adapter fails:
+
+```go
+report := hosttest.Evaluate(ctx, brokenAdapter, profile)
+for _, result := range report.Requirements {
+    if result.ID == "C04" && result.Status != hosttest.Failed {
+        t.Fatal("forged caller adapter passed caller verification")
+    }
 }
 ```
 
-The adapter must send `Attempt` through the application's actual dispatcher or
-HTTP bridge. Calling `Enforcer` directly in `Invoke`, constructing expected
-replies in the adapter, or counting attempted requests as backend executions
-cannot establish host conformance. `Direct` selects raw host operations without
-SDK client admission. `Bridge` selects the non-plugin loopback client path.
-Preserve actual application error data bytes in `Reply.Data`, including unknown
-fields; the suite checks the closed error object before accepting a refusal.
-Transport failures are failures of the probe, not evidence of authorization.
+Results distinguish `passed`, `failed`, `declared_unsupported`, `not_run` and
+`host_owned_not_covered`. ADR item 9 is always reported as host-owned and **not
+covered**. `S09` is a separate extension-scope check, described below.
 
-`Fixture` and `Change` are trusted test controls. Provision their canonical
-resource names in an isolated application store, publish the selected supported
-descriptors, and issue bindings and credentials through the real host issuer.
-Map policy, caller, tool revision, lifecycle and expiry changes onto the real
-ledger. A test control must change authority, not replace a future response.
-`Attempt.Call`, `ClaimedCaller`, `EffectHint` and supplied usage are untrusted.
-Determine operations, effects, actual I/O demand and verified callers at the
-host boundary. `InitIdentity` is an identity courier and grants no authority.
+Adapters must submit `Attempt` to actual entry points. `Direct` bypasses SDK
+client admission; `Bridge` selects the non-plugin MCP loopback path. Local
+synthesized refusals cannot prove host enforcement. Preserve received application
+error bytes in `Reply.Data`, the received frame in `Wire`, and measured transport
+output in `WireBytes`.
+A transport error fails the probe. Closed errors, observed code/effect state,
+request correlation, retry safety and actual backend/budget observations are
+checked independently. Adapter error and panic text is withheld from violations.
 
-Instrument actual execution and activation boundaries with `Observer`. Record
-reservations when the budget acquires them and release when work finishes.
-Record audit delivery at the sink and caller identity at the fixture plugin
-receiver, independently of the host's audit metadata. Capture actual log,
-registry and browser artifacts through `Artifacts`; return the issued fixture
-credential through `Access` so the suite can detect its appearance in output.
-Observers copy mutable metadata and support concurrent calls.
+`Fixture` and typed `ChangeKind` controls are trusted test setup, never plugin
+input. Provision canonical test resources, policy and bindings in isolated real
+stores. Change ledger state, not future replies. Expiry advances grant time
+without revoking a lease; restoring expiry must make it usable again. Revocation
+removes authority independently. Tool revision/effect and callback graph changes
+operate on the host's reviewed definitions and binding ledger. `WidenBinding`
+uses `Value` as `grantID/dimension`; `ToolRevision` and `ToolEffect` use the new
+reviewed value. `Reconnect` authenticates a new plugin connection for the current
+generation. `HostAvailable` restores service availability while keeping the
+owner and its credentials live. Lifecycle controls cancel owned work; `HostUnavailable` changes
+service availability without stopping the owner. Other controls need no value.
 
-`Gate` pauses actual work before a commit or after a definite commit. A worker
-calls `Gate.Wait` with its admitted context; it acknowledges cancellation but
-keeps running until the probe releases it. This lets the suite detect premature
-budget release, execution after withdrawal and loss of a definite write. The
-adapter must serialize the final authority check with its commit boundary.
-All methods must honor their contexts. `Close` must release barriers and join
-fixture workers, even after failure. Probes have five-second contexts; the
-calling test's timeout also bounds a broken adapter that ignores cancellation.
+Instrument execution, activation, reservation acquisition/release, actual audit
+delivery, plugin-received caller identity and proxy hops with `Observer`. Capture
+actual logs, registry, browser, audit, reply and error artifacts. `SecretInput`
+counts sensitive input at real output adaptation boundaries without retaining
+it; probes require these paths to be exercised and scan raw, base64, hex and
+meaningful prefixes of the secret and issued credential. Counts or replies built
+from expected test outcomes cannot establish host behavior.
 
-| Requirement | Executed behavior |
+`Gate` pauses actual work before or after commit. It acknowledges cancellation
+but retains the worker until released, exposing premature reservation release.
+`SecondGate` separates concurrent requests for cancel-call checks. A host must
+serialize its final authority check with the actual commit boundary. Methods
+must honor contexts; `Close` must release barriers and join fixture workers.
+`Profile.Timeout` bounds each probe (one second by default), including cleanup.
+A watchdog reports a violation and stops using an adapter that hangs; unfinished
+requirements are `not_run`. Go cannot terminate an uncooperative callback, so
+its host adapter still owns cleanup. Suite invocation goroutines recover panics.
+`RunProfile` also uses the calling test's deadline.
+
+| Result | Probed behavior |
 | --- | --- |
-| C01 | Missing, null or wrong grant contract refuses activation; empty grants deny; a required unsupported request fails by name, while an optional request yields a named notice and preserves unrelated authority. |
-| C02 | Unknown capability/version/scope and wider transport bindings deny; extension descriptors cannot overwrite shared ownership. |
-| C03 | Raw operations deny missing, revoked, expired, wrong-audience, wrong-owner, stale-generation/host-epoch and out-of-scope bindings; one grant cannot borrow another grant's scope. |
-| C04 | Forged user/session/agent identity and plugin use of proxy credentials deny; replaced generations are fenced; a verified caller reaches both the plugin and audit with the plugin actor retained. |
-| C05 | MCP server/tool allowlists, effect ceiling, pinned revision, caller policy, cycles, depth, byte, rate and concurrency budgets apply at execution; discovery filters tools and a read hint cannot relabel a write. |
-| C06 | Disable, stop, reload and disconnect cancel admitted work before commit and block new work; reservations remain held until workers finish; a definite commit survives late withdrawal and an ambiguous write never retries. |
-| C07 | The loopback bridge rejects unrelated origins, redirects, proxies, excessive I/O and unavailable targets with typed errors; cancellation of one request leaves the credential usable for another. |
-| C08 | Unsafe installation cannot widen grants; raw credentials and fixture secrets never appear in captured logs, registry or browser output. |
-| C09 | Workflow calls bind provider/run/step/attempt/fork, effect, deadline and byte budget, and refuse expired/revoked grants. |
-| C10 | Scoped positive and raw bypass calls run for each published descriptor, including native extensions; audit sink failure cannot change admission. |
+| C01 | Missing/null/wrong grant contract refuses activation; empty grants deny; required unsupported requests fail by name; optional refusals produce named notices without losing unrelated authority. |
+| C02 | Unknown capability/version/scope and wider bindings deny; planning rejects wrong versions and visibly narrows requests to policy; shared ownership cannot be overwritten. |
+| C03 | Raw operations reject absent/revoked/expired/wrong-audience/wrong-owner/stale bindings and other targets; expiry and revocation have separate restoration controls; grants cannot borrow scope. |
+| C04 | Forged caller claims in allowed calls cannot change delivered or audited identity; narrowed callers, forged session/agent dimensions, proxy credentials in plugin calls and old-generation replay fail; reconnect restores legitimate access. |
+| C05 | MCP list/call admission, caller filtering, pinned definitions, effect, cycle/depth, byte/rate/concurrency limits; discovery after stop, expiry or revocation refuses. |
+| C06 | Disable/stop/reload/disconnect cancel admitted work and refuse new work; running reservations remain held; definite commits survive withdrawal and ambiguous writes never retry. |
+| C07 | Non-plugin MCP list/call/cancel, origin/redirect/proxy constraints, fixture input and measured output limits, unavailable service and cancellation scoped to one concurrent request with credential reuse. |
+| C08 | Unsafe installation cannot widen scope dimensions or activated grants; actual sensitive output paths are exercised and scanned. |
+| C09 | Host-owned workflow subsystem bindings: **not covered** by this package. |
+| C10 | Scoped positive/raw bypass checks for published descriptors, canonical shared definitions and audit-independent decisions. |
+| S09 | Exact supplied extension dimensions named provider/run/step/attempt/fork, effect, declared deadline/byte demand, grant expiry and revocation. These are scope-intersection checks, not ADR item 9. |
 
-C10 asks the host for its published inventory and probes every returned
-descriptor in a fresh fixture. A published descriptor must have working
-operations and its own scope schema. The baseline fixtures cover the shared
-seed operations, storage, MCP and a workflow extension. Hosts can support
-different deployment subsets, but this library suite does not waive behaviors
-or silently skip fixture features. Run it against a test host configured for
-the complete fixture contract; deployment-specific supported sets and negative
-unsupported-name checks remain the host's responsibility.
+C07 exercises only the MCP bridge methods. The reference measures the fixture
+input payload rather than the entire HTTP envelope. Its output limit uses actual
+serialized fixture output, ignoring the client's `ResponseBytes` hint. A bounded
+read may reject oversized output after reading with `not_committed`; it must not
+emit the oversized data or retry. These probes do not supply a production
+listener/client, a complete origin/redirect/address/proxy matrix, full streaming
+or HTTP framing limits, or production authentication and cancellation ownership.
+Hosts implement and test those boundaries through their real adapters.
 
-The SDK's tests contain an HTTP dispatcher with the real shared Init decoder,
-credential store, enforcement helper, budget and mutable backend. Separate
-HTTP servers observe plugin identity delivery and attempted proxy hops.
-Deliberately broken variants bypass admission, union grants, trust identity or
-effect hints, replay bindings, leak errors/secrets, lose reservations, retry
-ambiguous writes or publish unimplemented operations. The same `Check` suite
-must reject each variant at its relevant requirement. Consumers should include
-their own broken adapters to verify the suite reaches their enforcement seam:
+S09 submits supplied scope dimensions against a fixture grant. It does not
+verify identity derived from a workflow scheduler, issue run/step/attempt/fork
+leases, verify fork or retry lineage, enforce a running-job wall-clock deadline,
+or cancel workflow jobs. Hosts implement those ADR item 9 behaviors and provide
+their own binding-ledger and lifecycle acceptance tests.
 
-```go
-failures := hosttest.Check(ctx, applicationTestAdapter{disableScopeChecks: true})
-if len(failures) == 0 {
-    t.Fatal("broken admission adapter passed conformance")
-}
-```
-
-A passing SDK reference adapter proves the harness exercises these behaviors.
-A consumer claim requires running its own real adapter. This suite does not
-certify stdio framing, duplex transport profiles, every MCP registration
-surface, browser isolation, or an OS sandbox. Those boundaries have their own
-transport, registry and application checks.
+The reference tests use loopback HTTP servers, the shared Init decoder, a
+credential store, live ledger snapshots, enforcement, mutable backend, budget,
+plugin receiver and proxy receiver. Broken variants must fail their intended
+requirement/probe. They help expose harness blind spots; their passing reference
+counterpart does not certify a consumer, complete ADR coverage, stdio/duplex
+profiles, MCP registration surfaces, browser isolation or an OS sandbox.

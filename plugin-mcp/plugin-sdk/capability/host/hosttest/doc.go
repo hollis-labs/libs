@@ -5,7 +5,8 @@
 // untrusted transport inputs; they must reach the real entry point, not call
 // Enforcer directly from the test adapter. A host maps the fixture's canonical
 // test resources onto its own reviewed resources and observes actual backend
-// calls and audit delivery. The suite has no skipped requirements or waivers.
-// Passing the SDK's reference test adapter validates the suite, not a consumer
-// host, its transport profile, MCP registration surfaces or OS sandbox.
+// calls and audit delivery. The suite has no per-probe waivers. Declared unsupported descriptors are
+// visible; ADR workflow subsystem bindings remain explicitly host-owned.
+// Reference fixtures do not certify a consumer host, complete ADR coverage,
+// transport profiles, MCP registration surfaces or an OS sandbox.
 package hosttest

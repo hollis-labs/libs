@@ -2,7 +2,10 @@ package hosttest
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,7 +35,9 @@ type Fixture struct {
 	AfterCommit     bool
 	FailAfterCommit bool
 	AuditFailure    bool
+	SecondGate      *Gate
 	Secret          string
+	OutputBytes     int64
 	InitIdentity    json.RawMessage
 }
 
@@ -40,31 +45,66 @@ type Fixture struct {
 // without an SDK client helper. Bridge reaches the non-plugin loopback bridge.
 // ClaimedCaller and EffectHint must not manufacture permission.
 type Attempt struct {
-	Call                     host.Call
-	BindingID                string
-	Credential               string
-	Direct, Bridge           bool
-	ClaimedCaller            string
-	EffectHint               capability.Effect
-	Origin                   string
-	Redirect, Proxy          bool
-	BodyBytes, ResponseBytes int64
+	Call            host.Call
+	BindingID       string
+	Credential      string
+	Direct, Bridge  bool
+	ClaimedCaller   string
+	EffectHint      capability.Effect
+	Origin          string
+	Redirect, Proxy bool
+	BodyBytes       int64
+	ResponseBytes   int64                // Untrusted hint; output limits use actual returned bytes.
+	CancelID        capability.RequestID `json:",omitempty"`
 }
 
 // Reply retains the application error's outer code/data as observed on the
 // actual entry point. A denied application call returns Failure, not Go error.
 // Go errors mean the adapter/transport itself failed and cannot prove refusal.
 type Reply struct {
-	RPCCode int
-	Data    json.RawMessage `json:"-"` // Received error.data bytes, or serialization of a local pre-send refusal.
-	Failure *capability.RPCErrorData
-	Tools   []string
+	RPCCode    int
+	HTTPStatus int
+	Payload    string
+	Wire       json.RawMessage `json:"-"`
+	WireBytes  int64           `json:"-"`
+	Data       json.RawMessage `json:"-"` // Received application error.data bytes. Local synthesized refusals cannot establish conformance.
+	Failure    *capability.RPCErrorData
+	Tools      []string
 }
 
 // Change is a trusted host control operation used between or during calls.
 // It must act on the real ledger/lifecycle/policy, not alter a canned reply.
+type ChangeKind string
+
+// ChangeKind names trusted ledger/lifecycle controls; none represents a desired reply.
+const (
+	Revoke            ChangeKind = "revoked"
+	Expire            ChangeKind = "expired"
+	RestoreExpiry     ChangeKind = "restore expiry"
+	RestoreRevocation ChangeKind = "restore revocation"
+	ChangeAudience    ChangeKind = "audience"
+	ChangeOwner       ChangeKind = "owner"
+	ChangeGeneration  ChangeKind = "generation"
+	ChangeHostEpoch   ChangeKind = "host epoch"
+	ReplaceGeneration ChangeKind = "replace generation"
+	Reconnect         ChangeKind = "reconnect"
+	WidenBinding      ChangeKind = "widen binding"
+	DenyCaller        ChangeKind = "deny caller"
+	ToolRevision      ChangeKind = "tool revision"
+	ToolEffect        ChangeKind = "tool effect"
+	CreateCycle       ChangeKind = "cycle"
+	IncreaseDepth     ChangeKind = "depth"
+	SpendRate         ChangeKind = "rate exhausted"
+	Disable           ChangeKind = "disable"
+	Stop              ChangeKind = "stop"
+	Reload            ChangeKind = "reload"
+	Disconnect        ChangeKind = "disconnect"
+	HostUnavailable   ChangeKind = "host unavailable"
+	HostAvailable     ChangeKind = "host available"
+)
+
 type Change struct {
-	Kind  string
+	Kind  ChangeKind
 	Value string
 }
 
@@ -124,11 +164,13 @@ type Observation struct {
 	Audits             []host.AuditEvent
 	Calls              []host.Call
 	DeliveredCallers   []host.Subject
+	SensitiveInputs    map[string]int
 }
 
 type Observer struct {
-	mu    sync.Mutex
-	state Observation
+	mu          sync.Mutex
+	state       Observation
+	secretCheck func(string) bool
 }
 
 func (o *Observer) Execute(c host.Call) {
@@ -155,6 +197,7 @@ func (o *Observer) Snapshot() Observation {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	s := o.state
+	s.SensitiveInputs = cloneMap(s.SensitiveInputs)
 	s.DeliveredCallers = append([]host.Subject(nil), s.DeliveredCallers...)
 	s.Audits = append([]host.AuditEvent(nil), s.Audits...)
 	s.Calls = append([]host.Call(nil), s.Calls...)
@@ -195,3 +238,37 @@ func (o *Observer) ReceivedCaller(caller host.Subject) {
 
 // ProxyRequest instruments an attempted proxy hop, independently of its result.
 func (o *Observer) ProxyRequest() { o.mu.Lock(); defer o.mu.Unlock(); o.state.ProxyRequests++ }
+
+// ContainsSecret recognizes raw and common encoded representations, including
+// meaningful prefixes. Test secrets must be at least sixteen bytes long.
+func ContainsSecret(output, secret string) bool {
+	if len(secret) < 16 {
+		return false
+	}
+	forms := []string{secret, "Bearer " + secret}
+	for _, raw := range forms {
+		for _, encoded := range []string{raw, base64.StdEncoding.EncodeToString([]byte(raw)), base64.RawStdEncoding.EncodeToString([]byte(raw)), base64.RawURLEncoding.EncodeToString([]byte(raw)), hex.EncodeToString([]byte(raw)), strings.ToUpper(hex.EncodeToString([]byte(raw)))} {
+			if strings.Contains(output, encoded) || strings.Contains(output, encoded[:min(16, len(encoded))]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (o *Observer) trackSecret(secret string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.secretCheck = func(value string) bool { return ContainsSecret(value, secret) }
+	o.state.SensitiveInputs = map[string]int{}
+}
+
+// SecretInput instruments raw diagnostic/configuration inputs at actual output
+// adaptation boundaries. Only a count is retained; the input is never retained.
+func (o *Observer) SecretInput(surface, value string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.secretCheck != nil && o.secretCheck(value) {
+		o.state.SensitiveInputs[surface]++
+	}
+}
