@@ -33,7 +33,7 @@
 // NFC/NFD aliases. Fresh apply exclusive staging must fail closed; refresh
 // canonical-equivalence checks belong to apply. Destinations are bounded to
 // 255 bytes per component, 4096 bytes total, depth 64 and 4096 expanded entries.
-// Control and bidirectional override/isolate characters are refused.
+// C0, DEL and bidirectional override/isolate characters are refused.
 // Installed apply must never chmod, conflict on, or remove pre-existing user
 // directories, even when this tree declares owned parents at 0755.
 // Boot Codex preserves the supplied Native.Servers and server Env order;
@@ -43,9 +43,12 @@
 // *nativefiles.Refusal for native inputs and composition.
 // Package modes preserve declared bits, including SKILL.md, after stripping
 // special bits and group/other write. A changed mode produces a named diagnostic.
-// A clamp leaving zero permission bits uses an explicit 0644 minimum.
+// A clamp leaving zero permission bits uses the explicit file default:
+// 0644 for overlays, the authored row mode for package files.
 // Absent file modes use the table default, without inventing executability.
-// Directories are 0755 inside a private 0700 boot root. Credential destinations
+// Directories are 0755 inside a private 0700 boot root. Directory mode 0
+// means that default; ModeDir is descriptive and produces no diagnostic when
+// the permission bits already equal 0755. Credential destinations
 // remain link-only effects and replant preserves them; no credential bytes enter
 // this package. Legacy validators stay until their callers migrate to this rule.
 // Baseline launch fields outside this contract: executable and first/resumed
@@ -142,19 +145,28 @@ type Request struct {
 	// InstructionPointer explicitly selects Claude boot's @AGENTS.md option.
 	// A resolved NeutralInstructions row supplies the body; no implicit mirror.
 	InstructionPointer bool
-	Provider           runtimes.ID
-	Layer              layout.Layer
-	Mode               runtimes.Mode
-	Variant            layout.Variant
-	// Agent is required only by a selected row path containing its placeholder.
+	// Provider is the canonical provider ID; aliases are resolved by the caller.
+	Provider runtimes.ID
+	// Layer selects boot or installed assembly.
+	Layer layout.Layer
+	// Mode selects a supported transport or installation operation.
+	Mode runtimes.Mode
+	// Variant selects an optional discovery-changing launch shape.
+	Variant layout.Variant
+	// Agent is required by any selected path, argv or RPC locator that uses it.
 	Agent string
 	// DefinitionName supplies the installed marker identifier; no profile lookup.
 	DefinitionName string
-	Roots          map[layout.Root]string
-	Inputs         []Input
-	Native         NativeInputs
-	Overlays       []artifact.Entry
-	Credentials    CredentialAvailability
+	// Roots supplies explicit canonical absolute placement and project directories.
+	Roots map[layout.Root]string
+	// Inputs supplies resolved table rows and already-resolved content.
+	Inputs []Input
+	// Native supplies typed native slots and explicit MCP bindings.
+	Native NativeInputs
+	// Overlays supplies resolved application entries outside reserved native destinations.
+	Overlays []artifact.Entry
+	// Credentials declares availability; absence produces a preparation requirement.
+	Credentials CredentialAvailability
 }
 
 // Binding contains table-derived launch deltas, not an executable or transport
@@ -175,10 +187,14 @@ type Binding struct {
 	Posture *layout.PostureReference `json:"posture,omitempty"`
 }
 type Preparation struct {
-	Provider    runtimes.ID
-	Kind        PreparationKind
+	// Provider identifies the credential handler target.
+	Provider runtimes.ID
+	// Kind identifies availability checking or initial link provisioning.
+	Kind PreparationKind
+	// Destination is the relative link target; empty for availability checks.
 	Destination string
-	Policy      layout.CredentialPolicy
+	// Policy prevents creation or replacement of managed credential content.
+	Policy layout.CredentialPolicy
 }
 
 // Result is a detached render result for the recorded target and concrete roots.
@@ -213,18 +229,30 @@ type Result struct {
 // Diagnostic contains no file bytes, credential values or concrete root paths.
 // Mode changes identify the relative entry and both exact modes.
 type Diagnostic struct {
-	Posture           permission.Mode
-	Code              DiagnosticCode
-	Class             DiagnosticClass
-	Provider          runtimes.ID
-	Mode              runtimes.Mode
-	Concern           layout.Field
-	Reason            string
-	Entry             string
+	// Posture records the bound mode when the diagnostic concerns native policy.
+	Posture permission.Mode
+	// Code identifies the condition without parsing prose.
+	Code DiagnosticCode
+	// Class distinguishes informational changes, optional omissions and refusals.
+	Class DiagnosticClass
+	// Provider identifies the rendering target.
+	Provider runtimes.ID
+	// Mode identifies the selected runtime transport.
+	Mode runtimes.Mode
+	// Concern identifies the semantic input field.
+	Concern layout.Field
+	// Reason is static explanatory text without content or credentials.
+	Reason string
+	// Entry is the relative destination for mode changes or type refusals.
+	Entry string
+	// Declared and Applied record exact file modes before and after normalization.
 	Declared, Applied fs.FileMode
 }
 
 func (d *Diagnostic) Error() string {
+	if d.Entry != "" && d.Class == ClassRefusal {
+		return fmt.Sprintf("%s: provider=%s mode=%s concern=%s entry=%s: %s", d.Code, d.Provider, d.Mode, d.Concern, d.Entry, d.Reason)
+	}
 	return fmt.Sprintf("%s: provider=%s mode=%s concern=%s: %s", d.Code, d.Provider, d.Mode, d.Concern, d.Reason)
 }
 func refuse(req Request, field layout.Field, code, reason string) error {
