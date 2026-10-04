@@ -24,7 +24,16 @@
 // interrupted control receipts before mutation, then verifies engine manifests
 // and managed file digests/modes before recording artifact completion. Failures
 // retain affected roots and inspection obligations; no rollback is claimed.
-// Installed merges and host effects refuse before mutation. Locks coordinate
+// Explicit credential groups and trust requests carry frozen host attestations;
+// root-generated headers bind their operation and input digest. All groups are
+// preflighted under the complete lock set before artifact mutation. Credentials
+// run after verified durable artifact commit, and shared trust runs last. Leaf
+// evidence uses a narrow view over the single ReceiptStore. Binding checks trust
+// host evidence; they do not establish cryptographic authenticity. Explicit
+// earlier-operation recovery receipts retain obligations across retries without
+// authorizing replay or cleanup. Unknown effects and repository requests remain
+// unsupported before mutation until their reviewed handler is integrated.
+// Installed merges refuse before mutation. Locks coordinate
 // cooperating local writers only; there is no launch pin, crash-safe publication
 // or protection promise against a noncooperating ancestor replacement.
 // Pre-existing directories are never chmodded or removed by directory ensure.

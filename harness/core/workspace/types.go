@@ -9,8 +9,11 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/substrate/harness/workspace/credentials"
+	"github.com/hollis-labs/substrate/harness/workspace/effects"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/trust"
 )
 
 const SchemaVersion = "workspace.v1"
@@ -180,6 +183,14 @@ type Spec struct {
 	Sandbox                    SandboxSpec
 	Effects                    []EffectGrant
 	Cleanup                    CleanupPolicy
+	// EffectInputs carries resolved host attestations, never ambient discovery.
+	// Headers must be empty on input; Plan binds them to its frozen digest.
+	EffectInputs EffectInputs
+}
+
+type EffectInputs struct {
+	Credentials []credentials.Group
+	Trust       []trust.Request
 }
 
 type Capability string
@@ -204,6 +215,9 @@ type Resources struct {
 	Capabilities  []Capability
 	LockNamespace string
 	LockRoot      RootRef
+	// RecoveryReceipts are explicit trusted earlier-operation evidence. Their
+	// retained obligations survive a retry; this input does not authorize replay.
+	RecoveryReceipts []Receipt
 }
 
 // Observations are snapshots, not proof that an apply will succeed. The host
@@ -243,6 +257,7 @@ const (
 type Obligation struct {
 	Kind   ObligationKind
 	RootID string
+	Code   string
 }
 type RootReceipt struct {
 	Root       RootRef
@@ -262,13 +277,14 @@ type Receipt struct {
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
 	// receipts leave it empty and make no enrollment or continuity claim.
-	Identity    IdentitySpec
-	Phase       Phase
-	Roots       []RootReceipt
-	Attachments []AttachmentReceipt
-	Effects     []EffectReceipt
-	Obligations []Obligation
-	RecordedAt  time.Time
+	Identity       IdentitySpec
+	Phase          Phase
+	Roots          []RootReceipt
+	Attachments    []AttachmentReceipt
+	Effects        []EffectReceipt
+	EffectEvidence []effects.Evidence
+	Obligations    []Obligation
+	RecordedAt     time.Time
 }
 
 type Diagnostic struct {
@@ -321,6 +337,8 @@ type Ports struct {
 	Locks        Locks
 	Observations Observer
 	ReceiptStore ReceiptStore
+	Credentials  credentials.LinkPort
+	Trust        trust.Port
 }
 type Clock interface{ Now() time.Time }
 type IDs interface {

@@ -8,7 +8,7 @@ import (
 
 // DigestVersion pins the domain and encoding of receipt input digests. Any
 // semantic encoding change requires a new version and a reviewed golden.
-const DigestVersion = "workspace.plan.input.v1"
+const DigestVersion = "workspace.plan.input.v2"
 
 func compareEffectGrants(a, b EffectGrant) int {
 	if n := cmp.Compare(a.Kind, b.Kind); n != 0 {

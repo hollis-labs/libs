@@ -18,6 +18,9 @@ import (
 // enrollment, continuity or launch-readiness claim. Its root must be inactive.
 type TreeRequest struct {
 	OperationID            string
+	Generation             string
+	Operation              materialize.Operation
+	TargetRoots            materialize.TargetRoots
 	Root                   RootRef
 	RootMode               fs.FileMode
 	Tree                   artifact.Tree
@@ -29,7 +32,7 @@ type TreeRequest struct {
 }
 
 // TreeDigestVersion pins the artifact-only input domain and JSON encoding.
-const TreeDigestVersion = "workspace.tree.input.v1"
+const TreeDigestVersion = "workspace.tree.input.v2"
 
 // ApplyTree is the narrow legacy preparation entry. It preserves the same
 // authority, lock, manifest and receipt boundary as Materialize without making
@@ -50,10 +53,17 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	if err := validateFrozenValues(input); err != nil {
 		return PlannedWorkspace{}, err
 	}
+	// Artifact JSON omits empty bytes. Preserve authored empty files across the
+	// detached value-record copy rather than turning them into unresolved files.
+	entries := artifact.CloneEntries(input.Tree.Entries)
 	input = copyRecord(input)
+	input.Tree.Entries = entries
 	_, input.Resources = canonicalInputs(Spec{}, input.Resources)
 	if input.OperationID == "" {
 		return PlannedWorkspace{}, refuse(CodeMissingOperationId, "spec", Conflict)
+	}
+	if input.Operation != "" && input.Operation != materialize.OperationCreate && input.Operation != materialize.OperationReconcile && input.Operation != materialize.OperationRefresh {
+		return PlannedWorkspace{}, refuse(CodeUnsupportedEngineOperation, "artifacts", Unsupported)
 	}
 	if err := input.Root.Validate(); err != nil {
 		return PlannedWorkspace{}, err
@@ -158,7 +168,10 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	if len(input.Tree.Entries) == 0 {
 		return p, nil
 	}
-	request := materialize.Request{Operation: materialize.OperationCreate, TargetRoot: input.Root.Path, Artifacts: artifact.Tree{Entries: artifact.CloneEntries(input.Tree.Entries)}, ExistingTarget: materialize.ExistingTargetRefuse, Generation: p.digest, Selection: copyRecord(input.Selection), Reconcile: materialize.ReconcilePolicy{Conflict: materialize.ConflictReport}}
+	request := materialize.Request{Operation: materialize.OperationCreate, TargetRoot: input.Root.Path, Artifacts: artifact.Tree{Entries: artifact.CloneEntries(input.Tree.Entries)}, ExistingTarget: materialize.ExistingTargetRefuse, Generation: input.Generation, Roots: input.TargetRoots, Selection: copyRecord(input.Selection), Reconcile: materialize.ReconcilePolicy{Conflict: materialize.ConflictReport}}
+	if request.Generation == "" {
+		request.Generation = p.digest
+	}
 	var observed *RootObservation
 	for i := range input.Observed.Roots {
 		if input.Observed.Roots[i].RootID == input.Root.ID {
@@ -169,7 +182,16 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 		return PlannedWorkspace{}, refuse(CodeMissingRootObservation, "roots", Conflict)
 	}
 	request.TargetRoot = observed.CanonicalPath
+	if request.Roots.BootRoot != "" && request.Roots.BootRoot != input.Root.Path && request.Roots.BootRoot != observed.CanonicalPath {
+		return PlannedWorkspace{}, refuse(CodeInvalidRenderContext, "roots", Conflict)
+	}
+	if request.Roots.BootRoot != "" {
+		request.Roots.BootRoot = observed.CanonicalPath
+	}
 	if observed.Exists {
+		if input.Operation == materialize.OperationCreate {
+			return PlannedWorkspace{}, errors.Join(refuse(CodeOwnedDirectoryInvalid, "artifacts", Conflict), materialize.ErrTargetExists)
+		}
 		if observed.Empty && observed.Manifest == nil {
 			request.ExistingTarget = materialize.ExistingTargetAllowEmpty
 		} else {
@@ -180,6 +202,9 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 				return PlannedWorkspace{}, refuse(CodeStaleCandidateGeneration, "artifacts", Conflict)
 			}
 			request.Operation = materialize.OperationReconcile
+			if input.Operation == materialize.OperationRefresh {
+				request.Operation = materialize.OperationRefresh
+			}
 			request.CurrentManifest = copyRecord(observed.Manifest)
 			request.ExpectedGeneration = input.ExpectedGeneration
 		}
