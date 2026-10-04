@@ -405,3 +405,10 @@ func TestReceiptInspectionRequiresCurrentHostBinding(t *testing.T) {
 		})
 	}
 }
+func TestZeroPreparedGroupHasTypedRefusal(t *testing.T) {
+	_, c, f, _ := fixture()
+	r := Apply(context.Background(), PreparedGroup{}, c, f)
+	if r.Outcome != effects.Refused || r.Code != "invalid_prepared_group" || f.creates != 0 {
+		t.Fatal(r)
+	}
+}

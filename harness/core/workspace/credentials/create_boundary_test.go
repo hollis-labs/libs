@@ -41,7 +41,11 @@ func (s *createBoundarySession) Inspect(ctx context.Context, rel string) (LinkOb
 			return LinkObservation{}, fixtureErr
 		}
 	}
-	return s.fakePort.Inspect(ctx, rel)
+	o, e := s.fakePort.Inspect(ctx, rel)
+	if s.mode == "verification-error" && s.creates == 3 {
+		return o, fixtureErr
+	}
+	return o, e
 }
 func TestUnprovedCreateAlwaysReobservedAndRetained(t *testing.T) {
 	for _, mode := range []string{"no-link-identity", "no-parent-identity", "inspect-error"} {
@@ -53,7 +57,7 @@ func TestUnprovedCreateAlwaysReobservedAndRetained(t *testing.T) {
 				t.Fatal(pre)
 			}
 			r := Apply(context.Background(), prep, c, p)
-			if !p.reinspected || r.Outcome != effects.Partial || !hasCode(r, "recovery_required") || !hasCode(r, "link_retained") {
+			if f.creates != 1 || !p.reinspected || r.Outcome != effects.Partial || !hasCode(r, "recovery_required") || !hasCode(r, "link_retained") {
 				t.Fatal(r, p.reinspected)
 			}
 			if mode == "inspect-error" && (!r.Evidence.Links[0].Uncertain || r.Evidence.Links[0].Created || f.removes != 0) {
@@ -92,5 +96,18 @@ func TestLastDurableCreationStillRequiresAuthority(t *testing.T) {
 				t.Fatal(r)
 			}
 		})
+	}
+}
+
+func TestFinalVerificationRejectsErroredMatchingObservation(t *testing.T) {
+	g, c, f, _ := fixture()
+	p := &createBoundaryPort{fakePort: f, mode: "verification-error"}
+	prep, pre := Preflight(context.Background(), g, c.PreflightContext, p)
+	if pre.Outcome != effects.Prepared {
+		t.Fatal(pre)
+	}
+	r := Apply(context.Background(), prep, c, p)
+	if r.Outcome != effects.Partial || r.Code != "verification_failed" || f.creates != 3 || f.removes != 3 || !hasCode(r, "recovery_required") {
+		t.Fatal(r)
 	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func TestSourceObservationBoundaries(t *testing.T) {
-	for _, mode := range []string{"cancel", "invalid-path", "missing-home", "loop-home", "canonical-mismatch", "planted-source", "directory", "probe-error", "closed-probe", "opened-unreadable"} {
+	for _, mode := range []string{"cancel", "invalid-path", "missing-home", "missing-resource", "loop-resource", "loop-home", "canonical-mismatch", "planted-source", "directory", "probe-error", "closed-probe", "opened-unreadable"} {
 		t.Run(mode, func(t *testing.T) {
 			g, _, p, _ := realFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -26,6 +26,20 @@ func TestSourceObservationBoundaries(t *testing.T) {
 				if e := os.WriteFile(filepath.Join(g.Home.LogicalPath, rel), nil, 0600); e != nil {
 					t.Fatal(e)
 				}
+			case "missing-resource":
+				if e := os.Remove(filepath.Join(g.Home.LogicalPath, "a")); e != nil {
+					t.Fatal(e)
+				}
+				want = ErrSourceAbsent
+			case "loop-resource":
+				path := filepath.Join(g.Home.LogicalPath, "a")
+				if e := os.Remove(path); e != nil {
+					t.Fatal(e)
+				}
+				if e := os.Symlink("a", path); e != nil {
+					t.Fatal(e)
+				}
+				want = ErrSourceEscaped
 			case "missing-home":
 				g.Home.LogicalPath = filepath.Join(t.TempDir(), "absent")
 				want = ErrSourceAbsent
