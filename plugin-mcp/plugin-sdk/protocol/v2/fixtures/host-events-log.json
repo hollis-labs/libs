@@ -1,0 +1,104 @@
+{
+  "init": {"plugin_dir":"/fixture","data_dir":"/fixture/data","cache_dir":"/fixture/cache","config":{},"log_level":"info","host_info":{"version":"fixture","protocol":2},"capability_contract":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"grants":[{"grant_id":"g-StorageGet","name":"storage.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StoragePut","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StorageDelete","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-SecretsGet","name":"secrets.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EgressRequest","name":"egress.request","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EventsPublish","name":"events.publish","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-Log","name":"log.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"}],"host_services":{"reverse_rpc_version":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"methods":["host/storage/get","host/storage/put","host/storage/delete","host/secrets/get","host/egress/request","host/events/publish","host/log"],"limits":{"host_to_plugin_inflight":16,"plugin_to_host_inflight":8,"host_global_inflight":64,"control_slots":2,"max_frame_bytes":8388608,"max_queued_write_bytes":16777216,"write_timeout_ms":1000,"max_depth":8,"method_timeout_ms":{"host/storage/get":1000,"host/storage/put":1000,"host/storage/delete":1000,"host/secrets/get":1000,"host/egress/request":1000,"host/events/publish":1000,"host/log":1000}}}},
+  "cases": [
+    {
+      "name": "EventsPublish",
+      "helper": "eventsPublish",
+      "method": "host/events/publish",
+      "args": {
+        "grant_id": "g-EventsPublish",
+        "event_name": "example.changed",
+        "payload": {
+          "value": 1
+        },
+        "operation_key": "event-1"
+      },
+      "result": {
+        "operation_key": "event-1",
+        "accepted": true,
+        "event_id": "event-1"
+      }
+    },
+    {
+      "name": "EventsPublish-unknown-grant",
+      "helper": "eventsPublish",
+      "method": "host/events/publish",
+      "args": {
+        "grant_id": "missing",
+        "event_name": "example.changed",
+        "payload": {
+          "value": 1
+        },
+        "operation_key": "event-1"
+      },
+      "result": {
+        "operation_key": "event-1",
+        "accepted": true,
+        "event_id": "event-1"
+      },
+      "expected_error": "capability_denied"
+    },
+    {
+      "name": "EventsPublish-receipt-mismatch",
+      "helper": "eventsPublish",
+      "method": "host/events/publish",
+      "args": {
+        "grant_id": "g-EventsPublish",
+        "event_name": "example.changed",
+        "payload": {
+          "value": 1
+        },
+        "operation_key": "event-1"
+      },
+      "result": {
+        "operation_key": "different",
+        "accepted": true,
+        "event_id": "event-1"
+      },
+      "expected_error": "unknown_outcome"
+    },
+    {
+      "name": "Log",
+      "helper": "log",
+      "method": "host/log",
+      "args": {
+        "grant_id": "g-Log",
+        "level": "info",
+        "message": "ready",
+        "fields": []
+      },
+      "result": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "Log-unknown-grant",
+      "helper": "log",
+      "method": "host/log",
+      "args": {
+        "grant_id": "missing",
+        "level": "info",
+        "message": "ready",
+        "fields": []
+      },
+      "result": {
+        "accepted": true
+      },
+      "expected_error": "capability_denied"
+    },
+    {
+      "name": "log-explicit-drop",
+      "helper": "log",
+      "method": "host/log",
+      "args": {
+        "grant_id": "g-Log",
+        "level": "info",
+        "message": "ready",
+        "fields": []
+      },
+      "result": {
+        "accepted": false
+      }
+    }
+  ]
+}

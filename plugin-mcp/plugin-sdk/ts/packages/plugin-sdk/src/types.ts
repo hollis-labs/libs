@@ -1,9 +1,12 @@
+import type { HostClient } from './host-client.js';
 import type { ForwardContext } from './host-rpc.js';
 import type * as Wire from './wire.js';
 import type { ConfigReader } from './config.js';
 import type { Logger } from './log.js';
 export type Awaitable<T> = T | Promise<T>;
 export interface Context {
+  /** SDK-owned; absent in base and hooks-only production connections. */
+  readonly host?: HostClient | undefined;
   readonly forwardContext?: ForwardContext | undefined;
   readonly signal: AbortSignal;
   readonly logger: Logger;
