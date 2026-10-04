@@ -36,8 +36,11 @@ identity, type, ownership and mode before reading. The output limit includes
 the final newline and refuses oversized results before replacement. It sets `hasTrustDialogAccepted` and
 `hasCompletedProjectOnboarding` for the canonical final cwd. Already-present
 trust does not rewrite the configuration. Replacement uses an exclusive private
-temporary file, fsync, root-relative rename, and directory fsync. Errors after
-replacement report `Partial`, even when the trust fields are visible.
+temporary file, fsync, root-relative rename, and directory fsync. Its descriptor
+pins the temporary inode until replacement or conditional cleanup finishes.
+Both operations recheck the entry identity and root custody; an unproved
+entry remains in place and reports `Partial`. Errors after replacement also
+report `Partial`, even when the trust fields are visible.
 
 Confinement assumes cooperating mutators hold the declared mutation locks.
 Rechecks detect supported configuration, root and lock changes; descriptor

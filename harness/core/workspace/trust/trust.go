@@ -48,7 +48,8 @@ type Port interface {
 type Session interface {
 	// Apply reobserves config under its lock, preserves unrelated fields, and
 	// refreshes host authority immediately before replacement. The bool means
-	// actual OR uncertain config mutation, including errors after replacement.
+	// actual OR uncertain config mutation, including retained staging entries
+	// and errors after replacement.
 	Apply(context.Context, Request, func(context.Context) error) (Observation, bool, error)
 	Close() error
 }

@@ -406,12 +406,38 @@ func (s *session) Apply(ctx context.Context, r trust.Request, validate func(cont
 	if e != nil {
 		return observed, false, errConfig
 	}
+	// Keep the inode pinned until replacement or conditional cleanup finishes.
+	// A filename alone does not prove custody of a temporary entry.
+	tempInfo, statErr := f.Stat()
+	renamed := false
+	checkTemp := func() error {
+		if statErr != nil || !safeFile(tempInfo) || s.validate() != nil {
+			return errChanged
+		}
+		current, err := s.root.Lstat(temp)
+		if err != nil || !safeFile(current) || !os.SameFile(tempInfo, current) {
+			return errChanged
+		}
+		return nil
+	}
 	defer func() {
-		if e := s.root.Remove(temp); e != nil && !os.IsNotExist(e) {
+		if !renamed {
+			if checkTemp() != nil {
+				mutated = true
+				retErr = errChanged
+			} else if e := s.root.Remove(temp); e != nil {
+				mutated = true
+				retErr = errChanged
+			}
+		}
+		if f.Close() != nil {
 			mutated = true
-			retErr = errChanged
+			retErr = errConfig
 		}
 	}()
+	if statErr != nil || !safeFile(tempInfo) {
+		return observed, true, errChanged
+	}
 	n, e := f.Write(body)
 	if e == nil && n != len(body) {
 		e = io.ErrShortWrite
@@ -419,8 +445,7 @@ func (s *session) Apply(ctx context.Context, r trust.Request, validate func(cont
 	if e == nil {
 		e = f.Sync()
 	}
-	ce := f.Close()
-	if e != nil || ce != nil {
+	if e != nil {
 		return observed, false, errConfig
 	}
 	// Recheck the complete config privately; neither its bytes nor a content hash
@@ -440,9 +465,13 @@ func (s *session) Apply(ctx context.Context, r trust.Request, validate func(cont
 	if e = s.validate(); e != nil {
 		return observed, false, e
 	}
+	if checkTemp() != nil {
+		return observed, true, errChanged
+	}
 	if e = s.root.Rename(temp, configName); e != nil {
 		return observed, true, errConfig
 	}
+	renamed = true
 	// Any failure after rename means the effect may already be visible.
 	observed.Present = true
 	if s.syncDirectory(s.root) != nil {
