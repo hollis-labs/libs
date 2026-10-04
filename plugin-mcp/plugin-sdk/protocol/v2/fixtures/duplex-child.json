@@ -58,7 +58,7 @@
     },
     {
       "feature": "Negotiated reverse profile and pinned real plugin-host replay",
-      "owner": "SDK 3j-reverse and orch-pp0 interop adapter"
+      "owner": "SDK reverse profile and the plugin-host interop adapter"
     }
   ]
 }

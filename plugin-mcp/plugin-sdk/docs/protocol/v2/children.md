@@ -69,7 +69,7 @@ pass or named unavailability and a bounded failure classification.
 For plugin-host interop, pin the full SDK source commit/pseudo-version and
 corpus version, build these test-only assets, and record the corresponding
 plugin-host commit and runtime versions. The npm tarball does not ship test
-recipes/workers. Orch-pp0 designates and reports the real host adapter; its
+recipes/workers. The plugin-host maintainers designate and report the real host adapter; its
 first pin follows this driver slice. That adapter must exercise its real
 Conn/spawn/cancel/dispose and typed backends with the same raw vectors. The
 SDK fake host cannot certify authorization, bindings, host-global limits,
