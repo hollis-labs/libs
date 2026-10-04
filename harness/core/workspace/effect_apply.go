@@ -161,6 +161,13 @@ func carryRecovery(result *ApplyResult, p PlannedWorkspace, live Observations) e
 			}
 			appendObligation(result, o)
 		}
+		origins, originErr := admitRepositoryOrigins(r)
+		if originErr != nil {
+			return originErr
+		}
+		for _, origin := range origins {
+			result.Receipt.RepositoryOrigins = mergeRepositoryOrigin(result.Receipt.RepositoryOrigins, origin)
+		}
 		for _, request := range r.RepositoryRequests {
 			if !slices.Contains(result.Receipt.RepositoryRequests, request) {
 				result.Receipt.RepositoryRequests = append(result.Receipt.RepositoryRequests, request)

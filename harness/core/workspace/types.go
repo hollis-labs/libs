@@ -275,6 +275,16 @@ type EffectReceipt struct {
 	RootID string
 	Status Status
 }
+
+// RepositoryOrigin preserves independently trusted originating receipt pins and
+// their repository members across aggregate retry receipts. It is host evidence,
+// not a cryptographic proof or authority to replay an attachment.
+type RepositoryOrigin struct {
+	SchemaVersion, OperationID, InputDigest, IdentityKey string
+	Requests                                             []repositories.Request
+	Evidence                                             []effects.Evidence
+}
+
 type Receipt struct {
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
@@ -287,6 +297,7 @@ type Receipt struct {
 	// RepositoryRequests preserves original trusted operation bindings for
 	// observational recovery; it never authorizes recreation or retirement.
 	RepositoryRequests []repositories.Request `json:",omitempty"`
+	RepositoryOrigins  []RepositoryOrigin     `json:",omitempty"`
 	EffectEvidence     []effects.Evidence
 	Obligations        []Obligation
 	RecordedAt         time.Time

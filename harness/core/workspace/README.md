@@ -30,8 +30,13 @@ refuse; user-owned writable attachments need a separate write grant, and readonl
 attachments need explicit enforcement evidence. There is no ambient discovery.
 
 `Receipt.RepositoryRequests` retains original operation-bound requests beside
-versioned attachment evidence. Resume inspection uses their original headers
-with fresh authority and complete locks. Completed attachments may have advanced
+versioned attachment evidence. `Receipt.RepositoryOrigins` preserves the trusted
+originating receipt pins and repository members across aggregate retries. Admission
+binds fresh members to their own receipt and inherited members to those preserved
+origins before flattening or inspection; matching foreign inner headers cannot
+substitute an originating operation or digest. This is trusted host evidence,
+not cryptographic authentication. Resume inspection uses original headers with
+fresh authority and complete locks. Completed attachments may have advanced
 HEAD or dirty work and skip creation. Intent or interrupted evidence remains
 Partial with retained attachment roots even when `Created` is false. Inspection
 never resets, removes or replays an attachment; earlier recovery obligations
