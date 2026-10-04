@@ -3,6 +3,7 @@ package wrapper
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -329,7 +330,6 @@ func (a codexAppServerShapeAdapter) CLIAdapter() provider.CLIAdapter { return a.
 // notification before turn/completed, and the long-lived child keeps running
 // after the turn.
 func TestNativeTurnOrder_CodexJSONRPCStdio(t *testing.T) {
-	t.Skip("known issue: since agentkit v0.23.0 (commit 433cd74) both this wrapper's own turn lifecycle derivation and agentkit's Manager end a Codex JSON-RPC turn, so the test sees a second, empty turn lifecycle; see harness/docs/units/go-agent-wrapper/MIGRATION.md")
 	skipUnlessSh(t)
 	dir := t.TempDir()
 	script := writeShellFixtureLauncher(t, dir, "fake-codex-app-server", []byte(`#!/bin/sh
@@ -350,9 +350,109 @@ while IFS= read -r line; do :; done
 	}, stopWhenIdle(t))
 
 	done := assertOneTurn(t, evs, runtimeevents.KindTurnCompleted)
-	want := llmtypes.Usage{InputTokens: 30, OutputTokens: 6, CacheReadTokens: 4}
+	want := llmtypes.Usage{InputTokens: 30, OutputTokens: 6, CacheReadTokens: 4, StopReason: llmtypes.StopReasonEndTurn}
 	if got := terminalUsage(t, done); got != want {
 		t.Errorf("turn.completed usage = %+v, want %+v", got, want)
+	}
+}
+
+// Each app-server notification has both a legacy terminal and a typed
+// terminal. Even an empty turn must close exactly once, and a later empty
+// turn must get its own lifecycle rather than being mistaken for a duplicate.
+func TestCodexJSONRPCStdio_OneLifecyclePerTurn(t *testing.T) {
+	skipUnlessSh(t)
+	for _, status := range []string{"completed", "failed", "interrupted"} {
+		for _, body := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/body=%t", status, body), func(t *testing.T) {
+				dir := t.TempDir()
+				steps := []providertest.Step{providertest.RecvLine()}
+				if body {
+					steps = append(steps, providertest.Stdout(`{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello"}}`))
+				}
+				end := fmt.Sprintf(`{"jsonrpc":"2.0","method":"turn/completed","params":{"turn":{"status":%q,"error":{"message":"turn refused"}}}}`, status)
+				steps = append(steps, providertest.Stdout(end), providertest.RecvLine(), providertest.Stdout(end), providertest.AwaitEOF())
+				fake := providertest.New(t, runtimes.Codex, providertest.Script(steps...))
+				evs := runToExit(t, Config{
+					App:               "test-turn-order",
+					Adapter:           codexAppServerShapeAdapter{cli: codexAppServerShapeCLI{script: fake.Path}},
+					Workdir:           dir,
+					AutoFireFirstTurn: true,
+					FirstTurnPayload:  `{"jsonrpc":"2.0","id":1,"method":"turn/start","params":{}}`,
+				}, func(w *Wrapper, sink *capturingSink) {
+					// Wait for each idle in emission order. snapshot-based waitFor would
+					// return immediately on the first idle when waiting for the second.
+					for i := 0; i < 2; i++ {
+						deadline := time.After(5 * time.Second)
+						waiting := true
+						for waiting {
+							select {
+							case kind := <-sink.sigCh:
+								waiting = kind != runtimeevents.KindSessionIdle
+							case <-deadline:
+								t.Fatalf("turn %d did not go idle: %v", i, sink.kinds())
+							}
+						}
+						if i == 0 {
+							if err := w.SendInput(context.Background(), []byte(`{"jsonrpc":"2.0","id":2,"method":"turn/start","params":{}}`)); err != nil {
+								t.Fatalf("second turn: %v", err)
+							}
+						}
+					}
+					_ = w.Stop(context.Background())
+				})
+				got := turnLifecycle(evs)
+				terminal := runtimeevents.KindTurnCompleted
+				if status == "failed" {
+					terminal = runtimeevents.KindTurnFailed
+				}
+				var want []turnStep
+				var ids []string
+				for _, ev := range evs {
+					if ev.Kind == runtimeevents.KindTurnStarted {
+						ids = append(ids, ev.TurnID)
+					}
+				}
+				if len(ids) != 2 || ids[0] == "" || ids[1] == "" || ids[0] == ids[1] {
+					t.Fatalf("want two distinct tagged turns, lifecycle = %+v", got)
+				}
+				for _, ev := range evs {
+					if ev.Kind == terminal {
+						var p struct {
+							StopReason string `json:"stop_reason"`
+							Error      string `json:"error"`
+						}
+						if err := json.Unmarshal(ev.Payload, &p); err != nil {
+							t.Fatal(err)
+						}
+						if status == "failed" {
+							if p.Error != "turn refused" {
+								t.Errorf("error = %q", p.Error)
+							}
+						} else {
+							stop := llmtypes.StopReasonEndTurn
+							if status == "interrupted" {
+								stop = llmtypes.StopReasonCancelled
+							}
+							if p.StopReason != stop {
+								t.Errorf("stop_reason = %q, want %q", p.StopReason, stop)
+							}
+						}
+					}
+				}
+
+				for i, id := range ids {
+					want = append(want, turnStep{runtimeevents.KindTurnStarted, id}, turnStep{runtimeevents.KindSessionProcessing, id})
+					if i == 0 && body {
+						want = append(want, turnStep{runtimeevents.KindAgentDelta, id})
+					}
+					want = append(want, turnStep{terminal, id}, turnStep{runtimeevents.KindSessionIdle, id})
+				}
+				want = append(want, turnStep{runtimeevents.KindProcessExited, ""})
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("lifecycle =\n%+v\nwant\n%+v", got, want)
+				}
+			})
+		}
 	}
 }
 

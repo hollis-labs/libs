@@ -551,6 +551,12 @@ func (w *Wrapper) Run(ctx context.Context) error {
 		return fmt.Errorf("wrapper: runtime.Prepare: %w", err)
 	}
 
+	// Codex app-server reports its authoritative turn end through the typed
+	// callback. ParseLine and the session may both mirror that end onto the
+	// legacy stream, so only the typed terminal closes this runtime's turn.
+	codexTypedEnd := desc.Protocol == adapters.ProtocolCodexAppServer &&
+		desc.Transport == adapters.TransportStdio && cliAdapter.Name() == "codex"
+
 	fanout := make(chan llmtypes.StreamEvent, 128)
 	// typed carries the typed events of the session in the order the stream
 	// events arrive in; see typedQueue.
@@ -736,6 +742,19 @@ func (w *Wrapper) Run(ctx context.Context) error {
 			emitSandboxOutcome(ctx, w.cfg.Activity, source, out)
 		},
 		TypedEventCallback: func(ev pevents.Event) {
+			if codexTypedEnd {
+				switch ev.(type) {
+				case pevents.Done, pevents.Error:
+					emit := func() {
+						kind, payload, _ := w.translateCodexTurnEnd(ctx, ev)
+						emitObserved(kind, payload, llmtypes.StreamEvent{})
+					}
+					if !typed.enqueue(emit) {
+						emit()
+					}
+					return
+				}
+			}
 			kind, payload, mapped := translateProviderEvent(ev)
 			if !mapped {
 				return
@@ -838,6 +857,9 @@ func (w *Wrapper) Run(ctx context.Context) error {
 			}
 			if ev.Type == llmtypes.EventUsage {
 				addTurnUsage(ev.Usage)
+				continue
+			}
+			if codexTypedEnd && (ev.Type == llmtypes.EventDone || ev.Type == llmtypes.EventError) {
 				continue
 			}
 			ev = w.filterStreamEvent(ctx, ev)

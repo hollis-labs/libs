@@ -12,7 +12,6 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 
 ### Known issues
 
-- `TestNativeTurnOrder_CodexJSONRPCStdio` (`adapters/wrapper`) is skipped. Since agentkit v0.23.0 (commit 433cd74) both the wrapper's own turn lifecycle derivation and agentkit's Manager end a Codex JSON-RPC turn, so the test sees a second, empty turn lifecycle. The wrapper passes it against agentkit v0.21.0, the version it pinned, so a consumer that pins go-agent-wrapper v0.28.0 together with an older agentkit does not see the problem. Fixing it is part of the restructure that puts the wrapper on sessions.
 - `TestSandbox_OutsideWorkspaceReadBlocked` (`sandbox`) is skipped unconditionally on Linux: the skip says the test needs additional bind configuration, and it has said so since the sandbox was first extracted, before this move. So the test suite does not verify that a sandboxed process on Linux cannot read a denied path outside its workspace. That is not known to be broken; it is not verified. On macOS the same test runs only when `~/.ssh` exists. The other Linux sandbox isolation tests run and pass in CI: network isolation, loopback, protected paths and the filesystem-allowlist parity tests.
 
 ### Added
@@ -37,6 +36,8 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - `go-agent-wrapper`'s code, which pinned `agentkit` v0.21.0 and `go-runtime-events` v0.2.1 and the other sibling modules at tags, builds against their packages in this module: `agentkit` v0.26.1, `go-runtime-events` v0.2.2, the rest at their old repositories' `main`; its llm-core requirements are `llm-core` v0.1.0.
 
 ### Fixed
+
+- `adapters/wrapper`: Codex JSON-RPC stdio turns consume the session's typed terminal event, preserving stop reasons and failure diagnostics while emitting exactly one turn lifecycle. Removed the duplicate empty lifecycle and restored the previously skipped native turn-order test.
 
 - `sandbox`: the Linux loopback helper no longer fails with `operation not permitted` when bwrap has already brought `lo` up. With `--unshare-net`, bwrap 0.9.0 raises `lo` and then drops every capability from the sandboxed process, and the helper asked for the same change again, which needs `CAP_NET_ADMIN` even when nothing changes. It now writes the interface flags only when `lo` is down; the payload gets no new capability. The Linux sandbox tests had not run in CI before the CI workflow installed bubblewrap; five loopback tests failed for this reason.
 - Pull replay beyond bounded client queues without dropping healthy readers;
