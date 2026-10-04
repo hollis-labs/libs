@@ -122,3 +122,22 @@ func TestGenerationIntegritySeparatesScriptAndStylesheetBytes(t *testing.T) {
 		t.Fatal("accepted changed artifacts with identical concatenated bytes")
 	}
 }
+
+func TestDotSegmentGenerationCannotBeAdmitted(t *testing.T) {
+	for _, generation := range []string{".", ".."} {
+		r, b := fixtureRegistry(generation, 1, []byte("fixture"))
+		if _, err := NewDelivery(r, b, nil); err == nil {
+			t.Fatalf("accepted dot segment generation %q", generation)
+		}
+	}
+	r, b := fixtureRegistry("g1", 1, []byte("fixture"))
+	p := r.Plugins["ops"]
+	p.BundleURL = "/plugins/../g1/bundle.js"
+	r.Plugins = map[string]registry.Plugin{"..": p}
+	c := r.Contributions["widget"]["ops/summary"]
+	c.OwnerID = ".."
+	r.Contributions = map[string]map[string]registry.Contribution{"widget": {"../summary": c}}
+	if _, err := NewDelivery(r, map[string]Bundle{"..": b["ops"]}, nil); err == nil {
+		t.Fatal("accepted dot segment owner")
+	}
+}

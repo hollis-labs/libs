@@ -70,7 +70,7 @@ func (d *Delivery) Replace(response registry.Response, bundles map[string]Bundle
 			}
 			continue
 		}
-		if !regexp.MustCompile(`^[A-Za-z0-9_.-]+$`).MatchString(p.OwnerGeneration) {
+		if owner == "." || owner == ".." || p.OwnerGeneration == "." || p.OwnerGeneration == ".." || !regexp.MustCompile(`^[A-Za-z0-9_.-]+$`).MatchString(p.OwnerGeneration) {
 			return fmt.Errorf("plugins: unsafe generation")
 		}
 		generations[owner+"/"+p.OwnerGeneration] = registry.BundleDigest(bundle.JavaScript) + ":" + registry.BundleDigest(bundle.Stylesheet)
