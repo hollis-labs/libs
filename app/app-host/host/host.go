@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -37,6 +38,14 @@ func New(cfg Config) (*Host, error) {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 5 * time.Second
 	}
+	base := "/" + strings.Trim(cfg.BasePath, "/")
+	if path.Clean(base) != base || strings.ContainsAny(base, "{}?#\\") {
+		return nil, fmt.Errorf("host: invalid base path")
+	}
+	if base == "/api" || strings.HasPrefix(base, "/api/") || base == "/plugins" || strings.HasPrefix(base, "/plugins/") || base == "/healthz" {
+		return nil, fmt.Errorf("host: reserved base path")
+	}
+	cfg.BasePath = base
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -52,7 +61,6 @@ func New(cfg Config) (*Host, error) {
 		plugins = http.NotFoundHandler()
 	}
 	mux.Handle("/plugins/", plugins)
-	base := "/" + strings.Trim(cfg.BasePath, "/")
 	if base != "/" {
 		base += "/"
 	}
@@ -78,7 +86,9 @@ func (h *Host) Serve(ctx context.Context, listener net.Listener) error {
 		_ = server.Close()
 	}
 	if h.cfg.Stop != nil {
-		shutdownErr = errors.Join(shutdownErr, h.cfg.Stop(shutdownCtx))
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), h.cfg.ShutdownTimeout)
+		defer stopCancel()
+		shutdownErr = errors.Join(shutdownErr, h.cfg.Stop(stopCtx))
 	}
 	if errors.Is(serveErr, http.ErrServerClosed) {
 		serveErr = nil
