@@ -15,6 +15,11 @@ import (
 func request(t *testing.T) trust.Request {
 	t.Helper()
 	base := t.TempDir()
+	var e error
+	base, e = filepath.EvalSymlinks(base)
+	if e != nil {
+		t.Fatal(e)
+	}
 	home := filepath.Join(base, "provider")
 	parent := filepath.Join(base, "runtime")
 	for _, p := range []string{home, parent} {

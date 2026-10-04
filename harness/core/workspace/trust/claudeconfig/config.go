@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
@@ -23,11 +24,15 @@ import (
 const configName = ".claude.json"
 const lockName = configName + ".lock"
 const maxConfig = 4 << 20
+const maxJSONDepth = 10000
 
 var errConfig = errors.New("trust configuration refused")
 var errChanged = errors.New("trust resource changed")
 
-type Port struct{ platform string }
+type Port struct {
+	platform   string
+	openConfig func(*os.Root, string) (*os.File, error)
+}
 
 func New() *Port { return &Port{platform: runtime.GOOS} }
 func (p *Port) Supported(m trust.Mechanism) bool {
@@ -42,6 +47,7 @@ type session struct {
 	closed             bool
 	// Per-session durability seam; production defaults to directory fsync.
 	syncDirectory func(*os.Root) error
+	openConfig    func(*os.Root, string) (*os.File, error)
 }
 
 func target(r trust.Request) (string, error) {
@@ -131,12 +137,16 @@ func (s *session) read() (snapshot, error) {
 	if e != nil || !safeFile(st) || st.Size() > maxConfig {
 		return snapshot{}, errConfig
 	}
-	f, e := s.root.Open(configName)
+	probe := s.openConfig
+	if probe == nil {
+		probe = openConfigReadOnly
+	}
+	f, e := probe(s.root, configName)
 	if e != nil {
 		return snapshot{}, errConfig
 	}
 	actual, e := f.Stat()
-	if e != nil || !os.SameFile(st, actual) {
+	if e != nil || !safeFile(actual) || actual.Size() > maxConfig || !os.SameFile(st, actual) {
 		f.Close()
 		return snapshot{}, errChanged
 	}
@@ -151,8 +161,53 @@ func (s *session) read() (snapshot, error) {
 	}
 	return snapshot{bytes: b, info: st}, nil
 }
+
+// Reject unpaired surrogate escapes before decoding can normalize unrelated
+// keys. Valid pairs and literal escaped backslashes retain their meaning.
+func validUnicodeEscapes(raw []byte) bool {
+	quoted := false
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '"' {
+			quoted = !quoted
+			continue
+		}
+		if !quoted || raw[i] != '\\' {
+			continue
+		}
+		i++
+		if i >= len(raw) {
+			return false
+		}
+		if raw[i] != 'u' {
+			continue
+		}
+		if i+4 >= len(raw) {
+			return false
+		}
+		value, err := strconv.ParseUint(string(raw[i+1:i+5]), 16, 16)
+		if err != nil {
+			return false
+		}
+		i += 4
+		if value >= 0xdc00 && value <= 0xdfff {
+			return false
+		}
+		if value >= 0xd800 && value <= 0xdbff {
+			if i+6 >= len(raw) || raw[i+1] != '\\' || raw[i+2] != 'u' {
+				return false
+			}
+			low, err := strconv.ParseUint(string(raw[i+3:i+7]), 16, 16)
+			if err != nil || low < 0xdc00 || low > 0xdfff {
+				return false
+			}
+			i += 6
+		}
+	}
+	return !quoted
+}
+
 func object(raw []byte) (map[string]json.RawMessage, error) {
-	if !utf8.Valid(raw) {
+	if !utf8.Valid(raw) || !validUnicodeEscapes(raw) {
 		return nil, errConfig
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -171,7 +226,9 @@ func object(raw []byte) (map[string]json.RawMessage, error) {
 }
 
 // Reject duplicate object keys rather than silently discard unrelated values.
-func uniqueValue(d *json.Decoder) error {
+func uniqueValue(d *json.Decoder) error { return walkJSON(d, 0) }
+
+func walkJSON(d *json.Decoder, depth int) error {
 	token, e := d.Token()
 	if e != nil {
 		return errConfig
@@ -179,6 +236,9 @@ func uniqueValue(d *json.Decoder) error {
 	delim, ok := token.(json.Delim)
 	if !ok {
 		return nil
+	}
+	if depth >= maxJSONDepth {
+		return errConfig
 	}
 	switch delim {
 	case '{':
@@ -193,13 +253,13 @@ func uniqueValue(d *json.Decoder) error {
 				return errConfig
 			}
 			seen[key] = true
-			if uniqueValue(d) != nil {
+			if walkJSON(d, depth+1) != nil {
 				return errConfig
 			}
 		}
 	case '[':
 		for d.More() {
-			if uniqueValue(d) != nil {
+			if walkJSON(d, depth+1) != nil {
 				return errConfig
 			}
 		}
@@ -265,6 +325,7 @@ func (p *Port) Observe(ctx context.Context, r trust.Request) (trust.Observation,
 		return trust.Observation{}, e
 	}
 	defer s.root.Close()
+	s.openConfig = p.openConfig
 	snap, e := s.read()
 	if e != nil {
 		return trust.Observation{}, e
@@ -280,6 +341,7 @@ func (p *Port) Begin(ctx context.Context, r trust.Request) (trust.Session, error
 	if e != nil {
 		return nil, e
 	}
+	s.openConfig = p.openConfig
 	f, e := s.root.OpenFile(lockName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if e != nil {
 		s.root.Close()
@@ -328,10 +390,13 @@ func (s *session) Apply(ctx context.Context, r trust.Request, validate func(cont
 	}
 	obj["projects"] = raw
 	body, e := json.MarshalIndent(obj, "", "  ")
-	if e != nil || len(body) > maxConfig {
+	if e != nil {
 		return observed, false, errConfig
 	}
 	body = append(body, '\n')
+	if len(body) > maxConfig {
+		return observed, false, errConfig
+	}
 	nonce := make([]byte, 16)
 	if _, e = rand.Read(nonce); e != nil {
 		return observed, false, errConfig

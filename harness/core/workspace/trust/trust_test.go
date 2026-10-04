@@ -123,9 +123,11 @@ func TestInspectionBindingAndNoReplay(t *testing.T) {
 	}
 	intent := interrupted.Clone()
 	intent.Phase = effects.IntentPhase
+	intent.Outcome = effects.Pending
+	intent.Trust[0].Outcome = effects.Pending
 	intent.Trust[0].Present = false
 	got = Inspect(context.Background(), prep, c.PreflightContext, p, intent)
-	if got.Outcome != effects.Conflict || got.Inspections[0].State != effects.Divergent {
+	if got.Outcome != effects.Partial || got.Inspections[0].State != effects.Divergent {
 		t.Fatal(got)
 	}
 	for _, mutate := range []func(*effects.Evidence){func(e *effects.Evidence) { e.Header.OperationID = "other" }, func(e *effects.Evidence) { e.Header.InputDigest = "other" }, func(e *effects.Evidence) { e.Header.Version = "unknown" }, func(e *effects.Evidence) { e.RootID = "other" }, func(e *effects.Evidence) { e.Trust[0].Target = "/resource/other" }, func(e *effects.Evidence) { e.Trust[0].AuthorizationVersion = "other" }, func(e *effects.Evidence) { e.Trust[0].Present = false }, func(e *effects.Evidence) { e.Phase = "unknown" }} {
@@ -138,7 +140,7 @@ func TestInspectionBindingAndNoReplay(t *testing.T) {
 	}
 	p.present = false
 	got = Inspect(context.Background(), prep, c.PreflightContext, p, applied.Evidence)
-	if got.Outcome != effects.Conflict || got.Inspections[0].State != effects.Missing {
+	if got.Outcome != effects.Partial || got.Inspections[0].State != effects.Missing {
 		t.Fatal(got)
 	}
 }
