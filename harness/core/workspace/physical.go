@@ -23,11 +23,11 @@ func InspectRoot(ref RootRef) (RootObservation, error) {
 	}
 	base, err := filepath.EvalSymlinks(ref.AllowedBase)
 	if err != nil {
-		return RootObservation{}, refuse("canonical_base_unavailable", "roots", Unsupported)
+		return RootObservation{}, refuse(CodeCanonicalBaseUnavailable, "roots", Unsupported)
 	}
 	canonical, err := canonicalMissing(ref.Path)
 	if err != nil || !within(base, canonical) || canonical != ref.Path || base != ref.AllowedBase {
-		return RootObservation{}, refuse("noncanonical_root", "roots", Conflict)
+		return RootObservation{}, refuse(CodeNoncanonicalRoot, "roots", Conflict)
 	}
 	o := RootObservation{RootID: ref.ID, DeclaredPath: ref.Path, CanonicalPath: canonical, CanonicalBase: base, Owner: ref.Owner}
 	info, err := os.Lstat(ref.Path)
@@ -40,7 +40,7 @@ func InspectRoot(ref RootRef) (RootObservation, error) {
 	o.Exists = true
 	o.Directory = info.IsDir() && info.Mode()&os.ModeSymlink == 0
 	if !o.Directory {
-		return o, refuse("root_not_directory", "roots", Conflict)
+		return o, refuse(CodeRootNotDirectory, "roots", Conflict)
 	}
 	root, err := os.OpenRoot(ref.Path)
 	if err != nil {
@@ -103,7 +103,7 @@ func noSymlinks(root *os.Root, rel string) error {
 			return err
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			return refuse("symlink_managed_path", "artifacts", Conflict)
+			return refuse(CodeSymlinkManagedPath, "artifacts", Conflict)
 		}
 	}
 	return nil
@@ -122,24 +122,24 @@ func readManifest(root *os.Root) (materialize.Manifest, error) {
 		return materialize.Manifest{}, err
 	}
 	if !info.Mode().IsRegular() || info.Size() > 16<<20 {
-		return materialize.Manifest{}, refuse("invalid_committed_manifest", "manifest", Conflict)
+		return materialize.Manifest{}, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
 	}
 	var m materialize.Manifest
 	decoder := json.NewDecoder(io.LimitReader(file, (16<<20)+1))
 	if err := decoder.Decode(&m); err != nil {
-		return m, refuse("invalid_committed_manifest", "manifest", Conflict)
+		return m, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != io.EOF {
-		return m, refuse("invalid_committed_manifest", "manifest", Conflict)
+		return m, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
 	}
 	if m.SchemaVersion != "materialize.v1" || m.Generation == "" {
-		return m, refuse("invalid_committed_manifest", "manifest", Conflict)
+		return m, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
 	}
 	seen := map[string]bool{}
 	for _, e := range m.Entries {
 		if !e.Kind.Valid() || e.Ownership.EntryID == "" || e.Ownership.GroupID == "" || e.Provenance.Source == "" || seen[e.Path] || e.Mode > 0777 {
-			return m, refuse("invalid_committed_manifest", "manifest", Conflict)
+			return m, refuse(CodeInvalidCommittedManifest, "manifest", Conflict)
 		}
 		seen[e.Path] = true
 	}
@@ -150,14 +150,14 @@ func readManifest(root *os.Root) (materialize.Manifest, error) {
 }
 func verifyHandle(a Action, h materialize.Handle, destinations []string) (materialize.Manifest, error) {
 	if !h.Report.Complete || h.TargetRoot != a.Root.Path {
-		return materialize.Manifest{}, refuse("incomplete_engine_result", "artifacts", Partial)
+		return materialize.Manifest{}, refuse(CodeIncompleteEngineResult, "artifacts", Partial)
 	}
 	info, err := os.Lstat(a.Root.Path)
 	if err != nil {
 		return materialize.Manifest{}, err
 	}
 	if !info.IsDir() || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 || info.Mode().Perm() != a.RootMode.Perm() {
-		return materialize.Manifest{}, refuse("committed_root_mode_mismatch", "roots", Partial)
+		return materialize.Manifest{}, refuse(CodeCommittedRootModeMismatch, "roots", Partial)
 	}
 	root, err := os.OpenRoot(a.Root.Path)
 	if err != nil {
@@ -169,7 +169,7 @@ func verifyHandle(a Action, h materialize.Handle, destinations []string) (materi
 		return m, err
 	}
 	if !reflect.DeepEqual(m, h.Manifest) || m.Generation != a.Request.Generation {
-		return m, refuse("committed_manifest_mismatch", "manifest", Partial)
+		return m, refuse(CodeCommittedManifestMismatch, "manifest", Partial)
 	}
 	if err := ValidateManagedManifest(m, destinations); err != nil {
 		return m, err
@@ -183,16 +183,16 @@ func verifyHandle(a Action, h materialize.Handle, destinations []string) (materi
 			return m, err
 		}
 		if info.Mode().Perm() != fs.FileMode(entry.Mode) || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
-			return m, refuse("committed_mode_mismatch", "artifacts", Partial)
+			return m, refuse(CodeCommittedModeMismatch, "artifacts", Partial)
 		}
 		if entry.Kind == artifact.EntryDirectory {
 			if !info.IsDir() {
-				return m, refuse("committed_kind_mismatch", "artifacts", Partial)
+				return m, refuse(CodeCommittedKindMismatch, "artifacts", Partial)
 			}
 			continue
 		}
 		if !info.Mode().IsRegular() {
-			return m, refuse("committed_kind_mismatch", "artifacts", Partial)
+			return m, refuse(CodeCommittedKindMismatch, "artifacts", Partial)
 		}
 		// Compare to frozen desired bytes when available; retained unselected files
 		// are checked by their committed digest without reading credential slots.
@@ -209,7 +209,7 @@ func verifyHandle(a Action, h materialize.Handle, destinations []string) (materi
 			return m, closeErr
 		}
 		if info.Size() > 64<<20 || artifact.DigestBytes(data) != entry.Digest {
-			return m, refuse("committed_digest_mismatch", "artifacts", Partial)
+			return m, refuse(CodeCommittedDigestMismatch, "artifacts", Partial)
 		}
 	}
 	return m, nil

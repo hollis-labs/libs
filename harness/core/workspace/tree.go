@@ -50,13 +50,13 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	input = copyRecord(input)
 	_, input.Resources = canonicalInputs(Spec{}, input.Resources)
 	if input.OperationID == "" {
-		return PlannedWorkspace{}, refuse("missing_operation_id", "spec", Conflict)
+		return PlannedWorkspace{}, refuse(CodeMissingOperationId, "spec", Conflict)
 	}
 	if err := input.Root.Validate(); err != nil {
 		return PlannedWorkspace{}, err
 	}
 	if input.RootMode != 0700 {
-		return PlannedWorkspace{}, refuse("unsafe_boot_root_mode", "artifacts", Conflict)
+		return PlannedWorkspace{}, refuse(CodeUnsafeBootRootMode, "artifacts", Conflict)
 	}
 	if err := input.Resources.LockRoot.Validate(); err != nil {
 		return PlannedWorkspace{}, err
@@ -90,29 +90,29 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 	}
 	for _, entry := range input.Tree.Entries {
 		if entry.Mode&^entry.Mode.Perm() != 0 {
-			return PlannedWorkspace{}, refuse("unsafe_artifact_mode", "artifacts", Conflict)
+			return PlannedWorkspace{}, refuse(CodeUnsafeArtifactMode, "artifacts", Conflict)
 		}
 	}
 	if err := ValidateManagedTree(input.Tree, input.CredentialDestinations); err != nil {
 		return PlannedWorkspace{}, err
 	}
 	if _, err := json.Marshal(input); err != nil {
-		return PlannedWorkspace{}, refuse("invalid_frozen_input", "artifacts", Conflict)
+		return PlannedWorkspace{}, refuse(CodeInvalidFrozenInput, "artifacts", Conflict)
 	}
 	rootFound := false
 	for _, r := range input.Resources.Roots {
 		if r.ID == input.Root.ID {
 			if r != input.Root {
-				return PlannedWorkspace{}, refuse("ambiguous_root_reference", "roots", Conflict)
+				return PlannedWorkspace{}, refuse(CodeAmbiguousRootReference, "roots", Conflict)
 			}
 			rootFound = true
 		}
 	}
 	if !rootFound {
-		return PlannedWorkspace{}, refuse("missing_root_resource", "roots", Conflict)
+		return PlannedWorkspace{}, refuse(CodeMissingRootResource, "roots", Conflict)
 	}
 	if len(input.Resources.Roots) != 1 {
-		return PlannedWorkspace{}, refuse("artifact_only_extra_roots", "roots", Conflict)
+		return PlannedWorkspace{}, refuse(CodeArtifactOnlyExtraRoots, "roots", Conflict)
 	}
 	// Artifact-only callers explicitly authorize the sole managed-tree effect.
 	var grants []EffectGrant
@@ -122,18 +122,18 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 		}
 	}
 	if len(input.Tree.Entries) > 0 && len(grants) != 1 {
-		return PlannedWorkspace{}, refuse("missing_effect_grant", "effects", Conflict)
+		return PlannedWorkspace{}, refuse(CodeMissingEffectGrant, "effects", Conflict)
 	}
 	keys, err := OrderedLockKeys(input.Resources.LockNamespace, []RootRef{input.Root}, input.Observed.Roots)
 	if err != nil {
 		return PlannedWorkspace{}, err
 	}
 	if input.Observed.At.IsZero() || !input.Observed.ExpiresAt.After(input.Observed.At) {
-		return PlannedWorkspace{}, refuse("invalid_observation_window", "observations", Conflict)
+		return PlannedWorkspace{}, refuse(CodeInvalidObservationWindow, "observations", Conflict)
 	}
 	for _, cap := range []Capability{CanonicalRoots, MutationLocks} {
 		if !slices.Contains(input.Resources.Capabilities, cap) || !slices.Contains(input.Observed.Capabilities, cap) {
-			return PlannedWorkspace{}, refuse("required_capability_unavailable", "capabilities", Unsupported)
+			return PlannedWorkspace{}, refuse(CodeRequiredCapabilityUnavailable, "capabilities", Unsupported)
 		}
 	}
 	p := PlannedWorkspace{spec: Spec{SchemaVersion: SchemaVersion, OperationID: input.OperationID, Operation: Prepare, Effects: grants}, resources: copyRecord(input.Resources), observed: copyRecord(input.Observed), roots: []RootRef{input.Root}, locks: keys, valid: true}
@@ -163,7 +163,7 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 		}
 	}
 	if observed == nil {
-		return PlannedWorkspace{}, refuse("missing_root_observation", "roots", Conflict)
+		return PlannedWorkspace{}, refuse(CodeMissingRootObservation, "roots", Conflict)
 	}
 	request.TargetRoot = observed.CanonicalPath
 	if observed.Exists {
@@ -171,10 +171,10 @@ func planTree(input TreeRequest) (PlannedWorkspace, error) {
 			request.ExistingTarget = materialize.ExistingTargetAllowEmpty
 		} else {
 			if observed.Manifest == nil {
-				return PlannedWorkspace{}, refuse("missing_committed_manifest", "manifest", Conflict)
+				return PlannedWorkspace{}, refuse(CodeMissingCommittedManifest, "manifest", Conflict)
 			}
 			if input.ExpectedGeneration == "" || observed.Manifest.Generation != input.ExpectedGeneration {
-				return PlannedWorkspace{}, refuse("stale_candidate_generation", "artifacts", Conflict)
+				return PlannedWorkspace{}, refuse(CodeStaleCandidateGeneration, "artifacts", Conflict)
 			}
 			request.Operation = materialize.OperationReconcile
 			request.CurrentManifest = copyRecord(observed.Manifest)

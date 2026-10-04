@@ -17,10 +17,10 @@ import (
 // issues Ready. Every failure returns observed partial accounting, not rollback.
 func Materialize(ctx context.Context, p PlannedWorkspace, ports Ports) (ApplyResult, error) {
 	if !p.valid {
-		return ApplyResult{Status: Conflict}, refuse("invalid_plan", "plan", Conflict)
+		return ApplyResult{Status: Conflict}, refuse(CodeInvalidPlan, "plan", Conflict)
 	}
 	if len(p.spec.Sandbox.RequiredCapabilities) > 0 || len(p.spec.Cleanup.RequiredProofs) > 0 {
-		return ApplyResult{Status: Unsupported}, refuse("host_proofs_pending", "capabilities", Unsupported)
+		return ApplyResult{Status: Unsupported}, refuse(CodeHostProofsPending, "capabilities", Unsupported)
 	}
 	for _, d := range p.diagnostics {
 		if d.Status == Unsupported {
@@ -37,7 +37,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	}
 	result.Diagnostics = p.Diagnostics()
 	if ctx == nil || ports.Clock == nil || ports.Host == nil || ports.Locks == nil || ports.Observations == nil || ports.ReceiptStore == nil {
-		return result, refuse("missing_apply_port", "ports", Unsupported)
+		return result, refuse(CodeMissingApplyPort, "ports", Unsupported)
 	}
 	if err = ctx.Err(); err != nil {
 		return result, err
@@ -79,7 +79,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			return result, err
 		}
 		if lock == nil {
-			return result, refuse("invalid_held_lock", "locks", Unsupported)
+			return result, refuse(CodeInvalidHeldLock, "locks", Unsupported)
 		}
 		held = append(held, lock)
 	}
@@ -114,7 +114,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			}
 		}
 		if o.DeclaredPath != expected.DeclaredPath || o.CanonicalPath != expected.CanonicalPath || o.CanonicalBase != expected.CanonicalBase || o.Exists != expected.Exists || o.Directory != expected.Directory || o.Empty != expected.Empty || !reflect.DeepEqual(o.Manifest, expected.Manifest) {
-			return result, refuse("live_disk_mismatch", "roots", Conflict)
+			return result, refuse(CodeLiveDiskMismatch, "roots", Conflict)
 		}
 	}
 	for _, a := range p.actions {
@@ -127,7 +127,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 	if p.spec.Boot.ExpectedGeneration != "" {
 		current := physical[p.spec.Boot.Current.ID]
 		if current.Manifest == nil || current.Manifest.Generation != p.spec.Boot.ExpectedGeneration {
-			return result, refuse("stale_current_generation", "boot", Conflict)
+			return result, refuse(CodeStaleCurrentGeneration, "boot", Conflict)
 		}
 	}
 	result.Receipt.RecordedAt = ports.Clock.Now().UTC()
@@ -171,10 +171,10 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 				return result, err
 			}
 			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-				return result, refuse("owned_directory_invalid", "roots", Partial)
+				return result, refuse(CodeOwnedDirectoryInvalid, "roots", Partial)
 			}
 			if !physical[a.Root.ID].Exists && (info.Mode().Perm() != a.RootMode.Perm() || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0) {
-				return result, refuse("owned_directory_mode_mismatch", "roots", Partial)
+				return result, refuse(CodeOwnedDirectoryModeMismatch, "roots", Partial)
 			}
 			result.Receipt.Roots = setRootReceipt(result.Receipt.Roots, RootReceipt{Root: a.Root, Complete: true})
 		case TreeAction:
@@ -198,7 +198,7 @@ func apply(ctx context.Context, p PlannedWorkspace, ports Ports) (result ApplyRe
 			result.Handles = append(result.Handles, handle)
 			result.Receipt.Roots = setRootReceipt(result.Receipt.Roots, RootReceipt{Root: a.Root, Generation: manifest.Generation, Complete: true})
 		default:
-			return result, refuse("deferred_apply_action", "effects", Unsupported)
+			return result, refuse(CodeDeferredApplyAction, "effects", Unsupported)
 		}
 	}
 	result.Obligations = append(result.Obligations, Obligation{Kind: LaunchReservationPending})
@@ -229,7 +229,7 @@ func validateTarget(a Action, o RootObservation, destinations []string) error {
 	switch a.Request.Operation {
 	case materialize.OperationCreate:
 		if o.Exists && !(o.Empty && o.Manifest == nil && a.Request.ExistingTarget == materialize.ExistingTargetAllowEmpty) {
-			return refuse("candidate_changed", "candidate", Conflict)
+			return refuse(CodeCandidateChanged, "candidate", Conflict)
 		}
 	case materialize.OperationReconcile:
 		info, err := os.Lstat(a.Root.Path)
@@ -237,30 +237,30 @@ func validateTarget(a Action, o RootObservation, destinations []string) error {
 			return err
 		}
 		if info.Mode().Perm() != a.RootMode.Perm() || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
-			return refuse("unsafe_candidate_mode", "candidate", Conflict)
+			return refuse(CodeUnsafeCandidateMode, "candidate", Conflict)
 		}
 		if err := validateExistingPaths(a); err != nil {
 			return err
 		}
 		if o.Manifest == nil || o.Manifest.Generation != a.Request.ExpectedGeneration || !reflect.DeepEqual(o.Manifest, a.Request.CurrentManifest) {
-			return refuse("stale_candidate_generation", "candidate", Conflict)
+			return refuse(CodeStaleCandidateGeneration, "candidate", Conflict)
 		}
 	default:
-		return refuse("unsupported_engine_operation", "artifacts", Unsupported)
+		return refuse(CodeUnsupportedEngineOperation, "artifacts", Unsupported)
 	}
 	return nil
 }
 func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 	if now.Before(o.At) || !now.Before(o.ExpiresAt) || now.Before(p.observed.At) || !now.Before(p.observed.ExpiresAt) || !o.ExpiresAt.After(o.At) {
-		return refuse("expired_observation", "observations", Conflict)
+		return refuse(CodeExpiredObservation, "observations", Conflict)
 	}
 	if p.spec.Identity.AgentURN != "" && o.FenceVersion != p.spec.Identity.Fence.Revision {
-		return refuse("stale_identity_fence", "identity", Conflict)
+		return refuse(CodeStaleIdentityFence, "identity", Conflict)
 	}
 	seen := map[string]bool{}
 	for _, live := range o.Roots {
 		if seen[live.RootID] {
-			return refuse("duplicate_root_observation", "roots", Conflict)
+			return refuse(CodeDuplicateRootObservation, "roots", Conflict)
 		}
 		seen[live.RootID] = true
 	}
@@ -277,7 +277,7 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 			}
 		}
 		if old == nil || live == nil || live.Uncertainty != "" || live.DeclaredPath != r.Path || live.CanonicalPath != old.CanonicalPath || live.CanonicalBase != old.CanonicalBase || live.Owner != r.Owner {
-			return refuse("canonical_root_changed", "roots", Conflict)
+			return refuse(CodeCanonicalRootChanged, "roots", Conflict)
 		}
 		if r.ID == p.resources.LockRoot.ID && (!live.Exists || !live.Directory) {
 			return refuse(CodeUnknownLockNamespace, "locks", Unsupported)
@@ -286,13 +286,13 @@ func validateLive(p PlannedWorkspace, o Observations, now time.Time) error {
 	for _, a := range p.actions {
 		for _, c := range a.RequiredCapabilities {
 			if !slices.Contains(o.Capabilities, c) {
-				return refuse("required_capability_unavailable", "capabilities", Unsupported)
+				return refuse(CodeRequiredCapabilityUnavailable, "capabilities", Unsupported)
 			}
 		}
 	}
 	for _, r := range o.Receipts {
 		if r.OperationID == p.spec.OperationID && (r.SchemaVersion != SchemaVersion || r.IdentityKey != p.spec.Identity.EncodedKey || r.InputDigest != p.digest) {
-			return refuse("operation_id_reused", "receipt", Conflict)
+			return refuse(CodeOperationIdReused, "receipt", Conflict)
 		}
 	}
 	return nil
