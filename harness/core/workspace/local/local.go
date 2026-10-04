@@ -113,7 +113,16 @@ func sameResources(a, b workspace.Resources) bool {
 		slices.SortFunc(r.Roots, func(a, b workspace.RootRef) int { return compare(a.ID, b.ID) })
 		r.Grants = slices.Clone(r.Grants)
 		slices.SortFunc(r.Grants, func(a, b workspace.EffectGrant) int {
-			return compare(string(a.Kind)+"\x00"+a.RootID+"\x00"+a.AuthorizationID+"\x00"+a.Version, string(b.Kind)+"\x00"+b.RootID+"\x00"+b.AuthorizationID+"\x00"+b.Version)
+			if n := compare(string(a.Kind), string(b.Kind)); n != 0 {
+				return n
+			}
+			if n := compare(a.RootID, b.RootID); n != 0 {
+				return n
+			}
+			if n := compare(a.AuthorizationID, b.AuthorizationID); n != 0 {
+				return n
+			}
+			return compare(a.Version, b.Version)
 		})
 		r.Grants = slices.Compact(r.Grants)
 		r.Capabilities = slices.Clone(r.Capabilities)
