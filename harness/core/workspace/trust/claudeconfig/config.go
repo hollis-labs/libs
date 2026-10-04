@@ -375,6 +375,16 @@ func (s *session) Apply(ctx context.Context, r trust.Request, validate func(cont
 		return observed, false, errChanged
 	}
 	if present {
+		// Authority callbacks may change resources. An idempotent success must
+		// attest the current target and complete private configuration snapshot.
+		current, err := s.read()
+		if err != nil || !sameSnapshot(snap, current) {
+			return observed, false, errChanged
+		}
+		again, err := target(r)
+		if err != nil || again != t || ctx.Err() != nil {
+			return observed, false, errChanged
+		}
 		return observed, false, nil
 	}
 	entry["hasTrustDialogAccepted"] = json.RawMessage("true")
