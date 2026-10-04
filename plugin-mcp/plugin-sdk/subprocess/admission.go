@@ -23,24 +23,27 @@ func scopeFromContext(ctx context.Context) *requestScope {
 // A scope separates terminal publication from actual execution completion. It is
 // never found by ID when a callback replies: base IDs may already have been reused.
 type requestScope struct {
-	mu            sync.Mutex
-	id            RPCID
-	ctx           context.Context
-	cancel        context.CancelCauseFunc
-	credit        *terminalCredit
-	manager       *admission
-	terminal      bool
-	started       bool
-	completed     bool
-	children      int
-	control       bool
-	executionDone chan struct{}
-	terminalDone  chan struct{}
-	receiptOnce   sync.Once
-	releaseOnce   sync.Once
-	arrivedAt     time.Time
-	binding       *BindingID
-	method        string
+	mu                       sync.Mutex
+	id                       RPCID
+	ctx                      context.Context
+	cancel                   context.CancelCauseFunc
+	credit                   *terminalCredit
+	manager                  *admission
+	terminal                 bool
+	started                  bool
+	completed                bool
+	children                 int
+	control                  bool
+	executionDone            chan struct{}
+	terminalDone             chan struct{}
+	receiptOnce              sync.Once
+	releaseOnce              sync.Once
+	arrivedAt                time.Time
+	binding                  *BindingID
+	method                   string
+	leaseEnd, leaseBudgetEnd time.Time
+	leaseBudgets             HostRPCRemainingBudgets
+	renewPending             bool
 }
 type admission struct {
 	mu                sync.Mutex

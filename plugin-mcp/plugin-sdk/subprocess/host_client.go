@@ -14,12 +14,11 @@ import (
 // HostClientFromContext, never implement it or construct it. Later service
 // methods may be added to this same type. Production activation is separate.
 type HostClient struct {
-	scope         *requestScope
-	core          *correlation
-	grants        map[string]capability.Grant
-	ceilings      map[string]uint32
-	secrets       *secretTracker
-	bindingExpiry time.Time
+	scope    *requestScope
+	core     *correlation
+	grants   map[string]capability.Grant
+	ceilings map[string]uint32
+	secrets  *secretTracker
 }
 type hostClientKey struct{}
 
@@ -43,7 +42,8 @@ func hostClientContext(ctx context.Context, core *correlation, p InitParams, sec
 	if scope == nil || core == nil || !core.directional || p.HostServices == nil || scope.binding == nil || secrets == nil {
 		return nil, localHostFailure(capability.TargetUnavailable)
 	}
-	h := &HostClient{scope: scope, core: core, secrets: secrets, bindingExpiry: bindingExpiry, grants: map[string]capability.Grant{}, ceilings: map[string]uint32{}}
+	scope.initLease(bindingExpiry)
+	h := &HostClient{scope: scope, core: core, secrets: secrets, grants: map[string]capability.Grant{}, ceilings: map[string]uint32{}}
 	for _, g := range p.Grants {
 		g.Scope = append(json.RawMessage(nil), g.Scope...)
 		h.grants[g.GrantID] = g
@@ -77,7 +77,7 @@ func (h *HostClient) begin(ctx context.Context, method, grantID, descriptor stri
 		return fail(localHostFailure(capability.UnsupportedCapability))
 	}
 	g, ok := h.grants[grantID]
-	if !ok || g.Name != descriptor || g.SchemaVersion != 1 {
+	if !ok || method != "host/bindings/renew" && (g.Name != descriptor || g.SchemaVersion != 1) {
 		return fail(localHostFailure(capability.CapabilityDenied))
 	}
 	id, valid := h.scope.id.Integer()
@@ -94,8 +94,8 @@ func (h *HostClient) begin(ctx context.Context, method, grantID, descriptor stri
 	if expiry.Before(end) {
 		end = expiry
 	}
-	if !h.bindingExpiry.IsZero() && h.bindingExpiry.Before(end) {
-		end = h.bindingExpiry
+	if leaseEnd := h.scope.leaseDeadline(); !leaseEnd.IsZero() && leaseEnd.Before(end) {
+		end = leaseEnd
 	}
 	if deadline, ok := ctx.Deadline(); ok && deadline.Before(end) {
 		end = deadline

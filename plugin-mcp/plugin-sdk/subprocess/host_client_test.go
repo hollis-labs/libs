@@ -258,7 +258,7 @@ func TestHostClientExpiredGrantAndPrivateBinding(t *testing.T) {
 			}
 			h, ctx, core, _ := clientFixture(t, init)
 			if binding {
-				h.bindingExpiry = time.Now().Add(-time.Second)
+				h.scope.initLease(time.Now().Add(-time.Second))
 			}
 			core.publish = func([]byte, func(error)) error { t.Fatal("expired authority transmitted"); return nil }
 			_, err := h.StorageGet(ctx, StorageGetArgs{"g-StorageGet", "key"})

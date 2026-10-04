@@ -27,6 +27,7 @@ export function linkRequestScope(ctx:Context,signal:AbortSignal,budget?:LocalBud
 }
 export function retainRequestWork(ctx: Context): () => void { return requestScope(ctx)?.retain() ?? (() => { }); }
 export class RequestScope {
+    readonly lease: {end?:number;budgetEnd?:number;renewPending:boolean;bytes?:number;effects?:number;tokens?:number} = {renewPending:false};
     readonly controller = new AbortController();
     readonly executionDone: Promise<void>;
     readonly terminalDone: Promise<void>;
@@ -79,7 +80,7 @@ export class RequestScope {
                 const end = received + params.context.timeout_ms;
                 this.deadline = end;
  budgets.set(this.controller.signal,{deadline:end,binding:this.binding});
-                const tick = () => { const ms = end - performance.now(); if (ms <= 0)
+                const tick = () => { if(this.terminal)return; const ms = end - performance.now(); if (ms <= 0)
                     this.controller.abort(new DeadlineExceededError());
                 else
                     this.timer = setTimeout(tick, Math.min(ms, 2147483647)); };
