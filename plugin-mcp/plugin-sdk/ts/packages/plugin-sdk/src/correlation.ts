@@ -17,7 +17,9 @@ const methods: Record<string, [
 ]> = {
     'host/storage/get': ['StorageGetParams', 'StorageGetResult'], 'host/storage/put': ['StoragePutParams', 'StoragePutResult'], 'host/storage/delete': ['StorageDeleteParams', 'StorageDeleteResult'], 'host/secrets/get': ['SecretsGetParams', 'SecretsGetResult'], 'host/egress/request': ['EgressRequestParams', 'EgressRequestResult'], 'host/events/publish': ['EventsPublishParams', 'EventsPublishResult'], 'host/log': ['LogParams', 'LogResult'], 'host/readonly/query': ['ReadonlyQueryParams', 'ReadonlyQueryResult'], 'host/mcp/list_tools': ['MCPListToolsParams', 'MCPListToolsResult'], 'host/mcp/call_tool': ['MCPCallToolParams', 'MCPCallToolResult'], 'host/mcp/cancel_call': ['MCPCancelCallParams', 'MCPCancelCallResult'], 'host/bindings/renew': ['BindingsRenewParams', 'BindingsRenewResult'],
 };
+export interface CallMetadata { id?:number; pending?:object; receivedAt?:number; receivedWall?:number; published?:boolean; }
 type Pending = {
+    method:string; metadata:CallMetadata;
     dto: DTO;
     resolve: (result: unknown) => void;
     reject: (error: unknown) => void;
@@ -65,7 +67,9 @@ export class Correlation {
         this.pending.clear();
         this.incoming.clear();
     }
-    call(method:string,paramsRaw:string,context?:Context):Promise<unknown> {
+    call(method:string,paramsRaw:string,context?:Context):Promise<unknown> {return this.callTracked(method,paramsRaw,context,{});}
+    ownsCall(metadata:CallMetadata):boolean {const entry=metadata.id===undefined?undefined:this.pending.get(metadata.id);return metadata.id!==undefined&&metadata.pending!==undefined&&(!entry&&metadata.published===true||entry===metadata.pending&&entry.method==='host/mcp/call_tool');}
+    callTracked(method:string,paramsRaw:string,context:Context|undefined,metadata:CallMetadata):Promise<unknown> {
       const started=performance.now();
       const pair=Object.hasOwn(methods,method)?methods[method]:undefined;
       const ceiling=this.methodTimeoutMS[method];
@@ -89,7 +93,7 @@ export class Correlation {
        const cleanup=()=>{completed=true;if(timer!==undefined)clearTimeout(timer);context?.signal.removeEventListener('abort',cancel);};
        const mutation=['host/storage/put','host/storage/delete','host/events/publish','host/egress/request','host/mcp/call_tool','host/mcp/cancel_call','host/bindings/renew'].includes(method);
        const failure=(cause:unknown)=>new RPCTransportError(possible&&mutation?'unknown_outcome':cause instanceof DeadlineExceededError?'deadline_exceeded':cause instanceof TransportCancelledError?'cancelled':cause instanceof PublicationFullError?'rate_limited':'target_unavailable',possible?'unknown':'not_started',id,cause);
-       const entry:Pending={dto:pair[1],resolve,reject,cleanup,failure,deadline:end,expire:()=>cancel()};this.pending.set(id,entry);
+       const entry:Pending={method,metadata,dto:pair[1],resolve,reject,cleanup,failure,deadline:end,expire:()=>cancel()};this.pending.set(id,entry);metadata.id=id;metadata.pending=entry;
        const fail=(error:unknown)=>{if(this.pending.get(id)===entry){this.pending.delete(id);cleanup();reject(error);}};
        const cancel=()=>{
         if(completed||this.pending.get(id)!==entry)return;
@@ -103,20 +107,21 @@ export class Correlation {
         }
        };
        context?.signal.addEventListener('abort',cancel,{once:true});
-       const tick=()=>{const ms=end-performance.now();if(ms<=0)cancel();else timer=setTimeout(tick,Math.min(ms,2147483647));};
+       const tick=()=>{if(completed)return;const ms=end-performance.now();if(ms<=0)cancel();else timer=setTimeout(tick,Math.min(ms,2147483647));};
        try{
         const frame=this.encode({jsonrpc:'2.0',id,method,params});
         if(end<=performance.now()||context?.signal.aborted){cancel();return;}
-        const receipt=this.publishCall?this.publishCall(frame,publication.signal,()=>{possible=true;},()=>performance.now()>=end?new DeadlineExceededError():undefined,()=>{
+        const receipt=this.publishCall?this.publishCall(frame,publication.signal,()=>{possible=true;metadata.published=true;},()=>performance.now()>=end?new DeadlineExceededError():undefined,()=>{
           const remaining=Math.floor(end-performance.now());if(remaining<1)throw new DeadlineExceededError();
           return this.encode({jsonrpc:'2.0',id,method,params:{...params,context:{...reverse,timeout_ms:remaining}}});
-        }):(possible=true,this.publish(frame));
+        }):(possible=true,metadata.published=true,this.publish(frame));
         void receipt.catch(error=>fail(failure(error)));
         tick();
        }catch(error){fail(error);}
       });
     }
     reply(line: string): void {
+        const receivedAt=performance.now(),receivedWall=Date.now();
         validatePortableJSON(line);
         const fields = inspectEnvelope(line).fields!;
         if ([...fields.keys()].some(k => !['jsonrpc', 'id', 'result', 'error'].includes(k)))
@@ -162,6 +167,7 @@ export class Correlation {
             throw new CorrelationError();
         }
         if(performance.now()>=entry.deadline){entry.expire();return;}
+        entry.metadata.receivedAt=receivedAt;entry.metadata.receivedWall=receivedWall;
         this.pending.delete(id);
         entry.cleanup();
         if (error)

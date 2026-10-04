@@ -45,8 +45,9 @@ type pendingCall struct {
 	ctx           context.Context
 }
 type callResult struct {
-	result json.RawMessage
-	err    error
+	result     json.RawMessage
+	err        error
+	receivedAt time.Time
 }
 
 func newCorrelation(directional bool) *correlation {
@@ -128,6 +129,10 @@ func (c *correlation) call(method string, params json.RawMessage) (<-chan callRe
 // callContext is an internal seam for typed helpers. Offers supply ceilings;
 // no process-wide method timeout or host authority ledger is invented here.
 func (c *correlation) callContext(parent context.Context, method string, params json.RawMessage) (<-chan callResult, error) {
+	return c.callTracked(parent, method, params, nil)
+}
+
+func (c *correlation) callTracked(parent context.Context, method string, params json.RawMessage, registered func(int64, *pendingCall)) (<-chan callResult, error) {
 	started := time.Now()
 	pair, ok := hostMethods[method]
 	if !ok {
@@ -213,6 +218,9 @@ func (c *correlation) callContext(parent context.Context, method string, params 
 	p.releasePermit = func() { permitOnce.Do(func() { <-c.reversePermits }) }
 	owned = false
 	c.pending[id] = p
+	if registered != nil {
+		registered(id, p)
+	}
 	c.mu.Unlock()
 	value := struct {
 		JSONRPC string          `json:"jsonrpc"`
@@ -346,6 +354,7 @@ var hostMethods = map[string][2]string{
 }
 
 func (c *correlation) reply(raw []byte) error {
+	receivedAt := time.Now()
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(raw, &fields) != nil {
 		return errCorrelation
@@ -382,7 +391,7 @@ func (c *correlation) reply(raw []byte) error {
 	if p == nil {
 		return nil
 	}
-	var result callResult
+	result := callResult{receivedAt: receivedAt}
 	if body, ok := fields["result"]; ok {
 		if err := ValidateHostRPCDTO(p.resultDTO, body); err != nil {
 			return errCorrelation

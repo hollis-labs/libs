@@ -25,3 +25,6 @@ export type { AdmissionLimits } from './admission.js';
 export { HostClientError, HostRPCFailure } from './host-client.js';
 export type { HostClient, HostCallOptions, SecretValue, StorageGetArgs, StoragePutArgs, StorageDeleteArgs, SecretsGetArgs, EgressRequestArgs, EventsPublishArgs, HostLogArgs } from './host-client.js';
 export type { StorageGetResult, StoragePutResult, StorageDeleteResult, EgressRequestResult, EventsPublishResult, LogResult, HostRPCHeader, HostRPCLogField, HostRPCErrorData } from './host-rpc.js';
+
+export type { ReadonlyQueryArgs, MCPListToolsArgs, MCPCallToolArgs, MCPCancelCallArgs, BindingsRenewArgs, MCPToolCall } from './host-client.js';
+export type { ReadonlyQueryResult, MCPListToolsResult, MCPCallToolResult, MCPCancelCallResult, BindingsRenewResult, MCPTool, HostRPCRemainingBudgets } from './host-rpc.js';

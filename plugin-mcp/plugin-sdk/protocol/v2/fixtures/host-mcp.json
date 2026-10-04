@@ -1,0 +1,200 @@
+{
+ "init": {"plugin_dir":"/fixture","data_dir":"/fixture/data","cache_dir":"/fixture/cache","config":{},"log_level":"info","host_info":{"version":"fixture","protocol":2},"capability_contract":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"grants":[{"grant_id":"g-StorageGet","name":"storage.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StoragePut","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StorageDelete","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-SecretsGet","name":"secrets.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EgressRequest","name":"egress.request","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EventsPublish","name":"events.publish","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-Log","name":"log.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-ReadonlyQuery","name":"readonly.query","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-MCPListTools","name":"mcp.reach","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-MCPCallTool","name":"mcp.reach","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-MCPCancelCall","name":"mcp.reach","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-storage","name":"storage.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"}],"host_services":{"reverse_rpc_version":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"methods":["host/storage/get","host/storage/put","host/storage/delete","host/secrets/get","host/egress/request","host/events/publish","host/log","host/readonly/query","host/mcp/list_tools","host/mcp/call_tool","host/mcp/cancel_call","host/bindings/renew"],"limits":{"host_to_plugin_inflight":16,"plugin_to_host_inflight":8,"host_global_inflight":64,"control_slots":2,"max_frame_bytes":8388608,"max_queued_write_bytes":16777216,"write_timeout_ms":1000,"max_depth":8,"method_timeout_ms":{"host/storage/get":1000,"host/storage/put":1000,"host/storage/delete":1000,"host/secrets/get":1000,"host/egress/request":1000,"host/events/publish":1000,"host/log":1000,"host/readonly/query":1000,"host/mcp/list_tools":1000,"host/mcp/call_tool":1000,"host/mcp/cancel_call":1000,"host/bindings/renew":1000}}}},
+ "cases": [
+  {
+    "name": "MCPListTools",
+    "helper": "mcpListTools",
+    "method": "host/mcp/list_tools",
+    "args": {
+      "grant_id": "g-MCPListTools",
+      "server_id": "example.server"
+    },
+    "result": {
+      "server_id": "example.server",
+      "tools": []
+    }
+  },
+  {
+    "name": "MCPListTools-missing-grant",
+    "helper": "mcpListTools",
+    "method": "host/mcp/list_tools",
+    "args": {
+      "grant_id": "missing",
+      "server_id": "example.server"
+    },
+    "result": {
+      "server_id": "example.server",
+      "tools": []
+    },
+    "expected_error": "capability_denied"
+  },
+  {
+    "name": "opaque-cursor-empty-page",
+    "helper": "mcpListTools",
+    "method": "host/mcp/list_tools",
+    "args": {
+      "grant_id": "g-MCPListTools",
+      "server_id": "example.server",
+      "cursor": "opaque/+=="
+    },
+    "result": {
+      "server_id": "example.server",
+      "tools": [],
+      "next_cursor": "opaque/next+=="
+    }
+  },
+  {
+    "name": "MCPCallTool",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "g-MCPCallTool",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      }
+    },
+    "result": {
+      "content": [],
+      "is_error": false
+    }
+  },
+  {
+    "name": "MCPCallTool-missing-grant",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "missing",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      }
+    },
+    "result": {
+      "content": [],
+      "is_error": false
+    },
+    "expected_error": "capability_denied"
+  },
+  {
+    "name": "tool-is-error-is-normal",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "g-MCPCallTool",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      }
+    },
+    "result": {
+      "content": [],
+      "is_error": true
+    }
+  },
+  {
+    "name": "tool-mutation-key",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "g-MCPCallTool",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      },
+      "operation_key": "op-1"
+    },
+    "result": {
+      "content": [],
+      "is_error": false,
+      "operation_key": "op-1"
+    }
+  },
+  {
+    "name": "tool-key-mismatch",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "g-MCPCallTool",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      },
+      "operation_key": "op-1"
+    },
+    "result": {
+      "content": [],
+      "is_error": false,
+      "operation_key": "other"
+    },
+    "expected_error": "unknown_outcome"
+  },
+  {
+    "name": "stale-tool-binding",
+    "helper": "mcpCallTool",
+    "method": "host/mcp/call_tool",
+    "args": {
+      "grant_id": "g-MCPCallTool",
+      "server_id": "example.server",
+      "tool_name": "lookup",
+      "tool_binding": "tool-binding-example",
+      "arguments": {
+        "key": "one"
+      }
+    },
+    "result": {
+      "content": [],
+      "is_error": false
+    },
+    "expected_error": "host:target_unavailable",
+    "error": {
+      "code": -32010,
+      "message": "safe refusal",
+      "data": {
+        "contract": "host-rpc/1",
+        "code": "target_unavailable",
+        "detail": "stale_binding",
+        "effect_state": "not_started",
+        "retryable": false,
+        "request_id": 1
+      }
+    }
+  },
+  {
+    "name": "MCPCancelCall",
+    "helper": "mcpCancelCall",
+    "method": "host/mcp/cancel_call",
+    "args": {
+      "grant_id": "g-MCPCancelCall",
+      "target_call_id": 1
+    },
+    "result": {
+      "accepted": true,
+      "already_terminal": false
+    }
+  },
+  {
+    "name": "cancel-already-terminal",
+    "helper": "mcpCancelCall",
+    "method": "host/mcp/cancel_call",
+    "args": {
+      "grant_id": "g-MCPCancelCall",
+      "target_call_id": 1
+    },
+    "result": {
+      "accepted": false,
+      "already_terminal": true
+    }
+  }
+]
+}

@@ -251,5 +251,5 @@ SDK logging, not direct stderr/printf writes or arbitrary transformed encodings.
 Request-scoped host service helpers are defined in
 [the host client contract](docs/protocol/v2/host-clients.md). Go authors obtain the
 SDK-owned `HostClient` from `subprocess.HostClientFromContext`; TypeScript authors
-use optional `Context.host`. The seven helpers currently have private fixture
+use optional `Context.host`. The helpers currently have private fixture
 activation only. Base and hooks-only production connections expose no client.
