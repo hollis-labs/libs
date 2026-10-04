@@ -602,9 +602,11 @@ func TestMergeJSONNeverTouchesItsInputsAndReturnsDetachedOutput(t *testing.T) {
 			t.Fatalf("existing %q: the returned desired bytes alias the input", existing)
 		}
 	}
-	got, _ = keymerge.MergeJSON([]byte(`[`), existing, owned)
+	unreadableDesired := []byte(`[`)
+	unreadableDesiredBefore := bytes.Clone(unreadableDesired)
+	got, _ = keymerge.MergeJSON(unreadableDesired, existing, owned)
 	got.Document[0] = 'X'
-	if !bytes.Equal(existing, e0) {
+	if !bytes.Equal(unreadableDesired, unreadableDesiredBefore) {
 		t.Fatal("an unreadable desired document came back aliased")
 	}
 }
