@@ -89,3 +89,29 @@ func TestExistingCurrentRequiresAuditedGapBeforePublication(t *testing.T) {
 		t.Fatal("old current gap phases skipped")
 	}
 }
+
+func TestJournalDecodeRejectsEquivalentJSONFieldNames(t *testing.T) {
+	j := journalFixture(t)
+	raw, err := json.Marshal(j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, pair := range map[string][2]string{
+		"outer":        {`"Version":"` + Version + `"`, `"Version":"` + Version + `","version":"` + Version + `"`},
+		"nested":       {`"Inode":1`, `"Inode":1,"inode":1`},
+		"unicode-fold": {`"ReservationID":"original-reservation"`, `"ReservationID":"original-reservation","ReſervationID":"original-reservation"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			aliased := strings.Replace(string(raw), pair[0], pair[1], 1)
+			if aliased == string(raw) {
+				t.Fatal("fixture did not exercise duplicate field")
+			}
+			if _, err := Decode([]byte(aliased)); err == nil {
+				t.Fatal("equivalent JSON names admitted two assignments to one field")
+			}
+		})
+	}
+	if _, err := Decode(raw); err != nil {
+		t.Fatalf("single field control: %v", err)
+	}
+}

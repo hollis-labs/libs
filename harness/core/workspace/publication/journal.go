@@ -12,6 +12,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
@@ -223,10 +224,11 @@ func uniqueValue(d *json.Decoder, depth int) error {
 				return e
 			}
 			s, ok := k.(string)
-			if !ok || seen[s] {
+			folded := foldedFieldName(s)
+			if !ok || seen[folded] {
 				return ErrJournal
 			}
-			seen[s] = true
+			seen[folded] = true
 			if e = uniqueValue(d, depth+1); e != nil {
 				return e
 			}
@@ -248,4 +250,19 @@ func uniqueValue(d *json.Decoder, depth int) error {
 		return ErrJournal
 	}
 	return nil
+}
+
+// encoding/json matches struct field names using Unicode simple folding.
+// Reject a second assignment to that same field before decoding. Only object
+// member names are compared this way; evidence values retain their exact bytes.
+func foldedFieldName(name string) string {
+	return strings.Map(func(r rune) rune {
+		minimum := r
+		for next := unicode.SimpleFold(r); next != r; next = unicode.SimpleFold(next) {
+			if next < minimum {
+				minimum = next
+			}
+		}
+		return minimum
+	}, name)
 }

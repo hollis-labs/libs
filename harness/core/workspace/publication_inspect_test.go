@@ -5,6 +5,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/publication"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,58 @@ func inspectionFixture(t *testing.T) (workspace.Scope, publication.Journal, []wo
 	retry.OperationID = "retry"
 	retry.InputDigest = strings.Repeat("c", 64)
 	return scope, j, []workspace.Receipt{receipt, retry}
+}
+
+func TestPublicationInspectionKeepsFourOperationOriginsAndUncertainObligations(t *testing.T) {
+	scope, j, receipts := inspectionFixture(t)
+	for i, operation := range []string{"third", "fourth"} {
+		r := receipts[0]
+		r.OperationID = operation
+		r.InputDigest = strings.Repeat([]string{"d", "e"}[i], 64)
+		r.Phase = workspace.ArtifactsCommitted
+		r.Obligations = []workspace.Obligation{{Kind: workspace.EffectPending, RootID: operation, Code: "earlier_uncertain"}}
+		receipts = append(receipts, r)
+	}
+	raw, err := json.Marshal(j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, receipts)
+	if err != nil || out.Status != workspace.Partial || !reflect.DeepEqual(out.OriginalReceipts, receipts) {
+		t.Fatalf("original operations replaced by current retry: %+v %v", out, err)
+	}
+	for _, receipt := range receipts {
+		for _, original := range receipt.Obligations {
+			found := false
+			for _, retained := range out.Obligations {
+				found = found || retained == original
+			}
+			if !found {
+				t.Fatalf("successful later artifacts erased obligation: %+v", original)
+			}
+		}
+	}
+	for _, kind := range []string{"operation-rebind", "identity", "terminal-phase", "noncanonical-digest", "missing-origin"} {
+		t.Run(kind, func(t *testing.T) {
+			bad := append([]workspace.Receipt(nil), receipts...)
+			switch kind {
+			case "operation-rebind":
+				bad[3].OperationID = bad[0].OperationID
+			case "identity":
+				bad[3].IdentityKey = "foreign"
+			case "terminal-phase":
+				bad[3].Phase = "future"
+			case "noncanonical-digest":
+				bad[3].InputDigest = strings.ToUpper(bad[3].InputDigest)
+			case "missing-origin":
+				bad = bad[1:]
+			}
+			refused, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, bad)
+			if err == nil || refused.Status != workspace.Partial || len(refused.Retained) == 0 {
+				t.Fatalf("foreign origin erased roots or admitted: %+v %v", refused, err)
+			}
+		})
+	}
 }
 func TestPublicationInspectionRetainsAllOriginalObligationsAndRefusesRetirement(t *testing.T) {
 	scope, j, receipts := inspectionFixture(t)
