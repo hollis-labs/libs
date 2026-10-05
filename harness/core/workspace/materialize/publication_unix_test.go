@@ -332,3 +332,34 @@ func TestSyntheticPublicationLateAuthorityAndPhysicalCallbacks(t *testing.T) {
 		}
 	}
 }
+
+func TestSyntheticPublicationOpaqueAdmissionCannotRebindOriginalInputs(t *testing.T) {
+	for _, field := range []string{"operation", "digest", "journal", "control", "aside", "candidate-generation", "reservation"} {
+		t.Run(field, func(t *testing.T) {
+			req, host, capability := publicationFixture(t, true)
+			switch field {
+			case "operation":
+				capability.original.Origin.OperationID = "foreign"
+			case "digest":
+				capability.original.Origin.InputDigest = req.Journal.Layout.CandidateManifestDigest
+			case "journal":
+				capability.original.JournalID = "foreign"
+			case "control":
+				capability.original.Control.Owner = "foreign"
+			case "aside":
+				capability.original.Layout.Aside.Path += "-foreign"
+			case "candidate-generation":
+				capability.original.Layout.CandidateGeneration = "foreign"
+			case "reservation":
+				capability.original.Use.ReservationID = "foreign"
+			}
+			out, err := NewEngine(EngineOptions{}).publishVerified(context.Background(), req, host, capability)
+			if err == nil || out.Mutated || out.Committed || len(host.records) != 0 {
+				t.Fatal("opaque admission was transplanted into another original operation")
+			}
+			if _, err := LoadManifest(req.Journal.Layout.Current.Path); err != nil {
+				t.Fatal("foreign original admission changed current", err)
+			}
+		})
+	}
+}
