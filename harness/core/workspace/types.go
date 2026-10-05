@@ -157,6 +157,8 @@ const (
 	TrustEffect          EffectKind = "trust"
 	RepositoryEffect     EffectKind = "repository"
 	InstalledEffect      EffectKind = "installed_artifacts"
+	PublicationEffect    EffectKind = "boot_publication"
+	PinCreationEffect    EffectKind = "use_pin_creation"
 )
 
 type EffectGrant struct {
@@ -177,8 +179,18 @@ type InstallSpec struct {
 	Grants          []install.Grant
 }
 
+// PublicationSpec requests closed publication with a newly owned supplemental
+// pin. It freezes desired authority, not native custody, an existing pin
+// adoption or launch readiness. No artifact-only fallback is permitted.
+type PublicationSpec struct {
+	Control, Aside                          RootRef
+	JournalID, ReservationID                string
+	Authorization, PinCreationAuthorization EffectGrant
+}
+
 type Spec struct {
-	Installed                  *InstallSpec `json:",omitempty"`
+	Publication                *PublicationSpec `json:",omitempty"`
+	Installed                  *InstallSpec     `json:",omitempty"`
 	SchemaVersion, OperationID string
 	Operation                  Operation
 	Identity                   IdentitySpec
