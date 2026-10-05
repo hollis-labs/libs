@@ -66,6 +66,10 @@ func (p *ports) preparePinCreation(ctx context.Context, plan workspace.PlannedWo
 	if ctx == nil {
 		return nil, errors.New("local: pin context required")
 	}
+	// Reuse the root's detached evidence clone without minting any result proof.
+	// The durable original intent must not borrow caller-owned obligation/origin
+	// slices that a later authority callback could erase from returned recovery.
+	receipt = (workspace.ApplyResult{Receipt: receipt}).Clone().Receipt
 	union, err := p.bindHeldUnion(plan, held)
 	if err != nil {
 		return nil, err
@@ -147,7 +151,8 @@ func (p *ports) createNewPin(ctx context.Context, intent *pinCreationIntent) (ou
 	if intent == nil || intent.owner != p || intent.receipt.PinCreation == nil {
 		return out, errors.New("local: foreign pin intent")
 	}
-	out.evidence, out.receipt = *intent.receipt.PinCreation, intent.receipt
+	out.evidence = *intent.receipt.PinCreation
+	out.receipt = (workspace.ApplyResult{Receipt: intent.receipt}).Clone().Receipt
 	out.receipt.PinCreation = &out.evidence
 	if out.evidence.Created || out.evidence.Uncertain || out.evidence.Identity != (workspace.NativePinIdentity{}) {
 		return out, errors.New("local: pin creation replay unsupported")

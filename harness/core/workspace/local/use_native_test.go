@@ -665,3 +665,31 @@ func TestNewPinFirstObservationRetainsUncertaintyWithoutLateDurableWrite(t *test
 		})
 	}
 }
+
+func TestNewPinLateCallbackCannotEraseOriginalObligationThroughInputAlias(t *testing.T) {
+	p, plan, held, receipt := newPinFixture(t)
+	original := receipt.Obligations[0]
+	intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+		r, err := p.readReceipt()
+		if err != nil {
+			return err
+		}
+		if r.PinCreation != nil && r.PinCreation.Created {
+			receipt.Obligations[0].Code = "foreign-callback"
+			return errors.New("lost authority after observed inode")
+		}
+		return nil
+	}
+	out, err := p.createNewPin(context.Background(), intent)
+	if err == nil || out.reservation != nil || !slices.Contains(out.receipt.Obligations, original) {
+		t.Fatal("late input alias erased original returned recovery obligation")
+	}
+	durable, err := p.readReceipt()
+	if err != nil || !slices.Contains(durable.Obligations, original) || durable.PinCreation == nil || !durable.PinCreation.Uncertain {
+		t.Fatal("late input alias erased original durable uncertainty")
+	}
+}
