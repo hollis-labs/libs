@@ -32,6 +32,13 @@ func TestPublicationRequestRejectsMissingAndForeignAuthority(t *testing.T) {
 		edit func(*Spec, *Resources, *Observations)
 	}{
 		{"empty", func(s *Spec, _ *Resources, _ *Observations) { s.Publication = &PublicationSpec{} }},
+		{"missing-journal", func(s *Spec, _ *Resources, _ *Observations) { s.Publication.JournalID = "" }},
+		{"missing-reservation", func(s *Spec, _ *Resources, _ *Observations) { s.Publication.ReservationID = "" }},
+		{"missing-parent", func(s *Spec, _ *Resources, o *Observations) {
+			p := fixtureObservation(o, s.Boot.IdentityRoot.ID)
+			p.Exists = false
+			p.Directory = false
+		}},
 		{"foreign-control", func(s *Spec, _ *Resources, _ *Observations) { s.Publication.Control.Owner = "foreign" }},
 		{"current-aside", func(s *Spec, _ *Resources, _ *Observations) { s.Publication.Aside = s.Boot.Current }},
 		{"grant-rebound", func(s *Spec, _ *Resources, _ *Observations) { s.Publication.Authorization.AuthorizationID = "foreign" }},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"path/filepath"
@@ -194,5 +195,35 @@ func TestPublicationJournalOriginalHeaderSurvivesRetryAndRejectsSplice(t *testin
 				t.Fatal("coherent inner journal splice admitted")
 			}
 		})
+	}
+}
+
+func TestPublicationIntentCannotRestorePriorArtifactProofByRewritingPublicEvidence(t *testing.T) {
+	p, f, result, j, held := publicationAdapterFixture(t)
+	original, err := json.Marshal(result.Clone())
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j.Events = append(j.Events, publication.Event{Sequence: 4, Phase: publication.CandidateCurrentIntent})
+	if err := host.RecordPublication(context.Background(), j); err != nil {
+		t.Fatal(err)
+	}
+	if f.records[0].Phase != Interrupted {
+		t.Fatal("publication intent falsely recorded artifact-only completion phase")
+	}
+	if err := host.RecordPublication(context.Background(), j); err == nil {
+		t.Fatal("same sequence replayed into sole receipt store")
+	}
+	// Restore all public fields exactly, leaving the private earned-proof state
+	// alone. An attempted publication must monotonically invalidate that proof.
+	if err := json.Unmarshal(original, result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ArtifactsComplete() || result.LaunchReady() {
+		t.Fatal("caller restored a proof invalidated by publication intent")
 	}
 }
