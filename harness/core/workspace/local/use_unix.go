@@ -185,6 +185,10 @@ func (p *ports) createNewPin(ctx context.Context, intent *pinCreationIntent) (ou
 	}
 	// Observed inode accounting remains interrupted until the root has earned
 	// later publication/handoff facts. No phase label confers Ready or absence.
+	// Custody or reservation may fail after this Record, when another durable
+	// write would no longer be authorized. Persist conservative uncertainty NOW;
+	// even a successful private SH transport cannot clear lifecycle obligations.
+	out.evidence.Uncertain = true
 	out.receipt.PinCreation = &out.evidence
 	if err = p.Record(ctx, out.receipt); err != nil {
 		out.evidence.Uncertain = true

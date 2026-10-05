@@ -55,17 +55,24 @@ func validatePublicationSpec(s Spec) error {
 // while aggregate native preflight is unavailable. Its sole Record is the
 // original root ReceiptStore; no leaf journal store or cleanup callback exists.
 type publicationReceiptHost struct {
-	plan    PlannedWorkspace
-	ports   Ports
-	result  *ApplyResult
-	control publication.Root
-	last    publication.Journal
+	plan   PlannedWorkspace
+	ports  Ports
+	result *ApplyResult
+	// The caller owns result. Callbacks may mutate it, so only this detached
+	// admitted ledger supplies durable and returned accounting.
+	accounting ApplyResult
+	control    publication.Root
+	last       publication.Journal
 }
 
 func newPublicationReceiptHost(p PlannedWorkspace, ports Ports, result *ApplyResult, journal publication.Journal, held []HeldLock) (*publicationReceiptHost, error) {
 	if !p.valid || p.spec.Publication == nil || result == nil || !result.ArtifactsComplete() || ports.Host == nil || ports.Observations == nil || ports.Clock == nil || len(held) != len(p.locks) || slices.ContainsFunc(held, func(lock HeldLock) bool { return lock == nil }) {
 		return nil, refuse("publication_adapter_admission", "publication", Unsupported)
 	}
+	admitted := result.Clone()
+	// ControlRoot is also a callback. Restore admitted accounting on constructor
+	// failure as well as success; never snapshot caller mutations after it.
+	defer func() { *result = admitted.Clone() }()
 	store, ok := ports.ReceiptStore.(ControlledReceiptStore)
 	if !ok || store.ControlRoot() != p.spec.Publication.Control {
 		return nil, refuse("publication_control_mismatch", "publication", Conflict)
@@ -74,11 +81,15 @@ func newPublicationReceiptHost(p PlannedWorkspace, ports Ports, result *ApplyRes
 	if j.Validate() != nil || len(j.Events) != 3 || j.Events[2].Phase != publication.ReservationHeld || j.Origin.OperationID != p.spec.OperationID || j.Origin.InputDigest != p.digest || j.Origin.IdentityKey != p.spec.Identity.EncodedKey || j.Origin.AgentURN != p.spec.Identity.AgentURN || j.JournalID != p.spec.Publication.JournalID || j.Use.ReservationID != p.spec.Publication.ReservationID || j.Use.Namespace != p.resources.LockNamespace || j.Use.CanonicalID != p.spec.Boot.IdentityRoot.Path || j.Layout.CandidateGeneration != p.digest || !journalRootMatches(j.Control, p.spec.Publication.Control) || !journalRootMatches(j.Layout.Parent, p.spec.Boot.IdentityRoot) || !journalRootMatches(j.Layout.Current, p.spec.Boot.Current) || !journalRootMatches(j.Layout.Candidate, p.spec.Boot.Candidate) || !journalRootMatches(j.Layout.Aside, p.spec.Publication.Aside) {
 		return nil, refuse("publication_adapter_binding", "publication", Conflict)
 	}
-	if result.Receipt.SchemaVersion != SchemaVersion || result.Receipt.OperationID != p.spec.OperationID || result.Receipt.InputDigest != p.digest || result.Receipt.IdentityKey != p.spec.Identity.EncodedKey {
+	if admitted.Receipt.SchemaVersion != SchemaVersion || admitted.Receipt.OperationID != p.spec.OperationID || admitted.Receipt.InputDigest != p.digest || admitted.Receipt.IdentityKey != p.spec.Identity.EncodedKey {
 		return nil, refuse("publication_adapter_binding", "publication", Conflict)
 	}
-	return &publicationReceiptHost{plan: p, ports: ports, result: result, control: j.Control, last: j}, nil
+	return &publicationReceiptHost{plan: p, ports: ports, result: result, accounting: admitted, control: j.Control, last: j}, nil
 }
+
+// Each publication entry returns detached owned accounting, including failed
+// callback/Record/cancellation paths. No field is refreshed from caller state.
+func (h *publicationReceiptHost) returnAccounting() { *h.result = h.accounting.Clone() }
 
 func journalRootMatches(j publication.Root, r RootRef) bool {
 	return j.ID == r.ID && j.Path == r.Path && j.Owner == r.Owner && j.Provenance == r.Provenance
@@ -95,6 +106,7 @@ func publicationPinsEqual(a, b publication.Journal) bool {
 }
 
 func (h *publicationReceiptHost) ValidatePublication(ctx context.Context, req materialize.PublishRequest) error {
+	defer h.returnAccounting()
 	if ctx == nil {
 		return refuse("publication_context_required", "publication", Unsupported)
 	}
@@ -124,6 +136,7 @@ func (h *publicationReceiptHost) ValidatePublication(ctx context.Context, req ma
 }
 
 func (h *publicationReceiptHost) RecordPublication(ctx context.Context, j publication.Journal) error {
+	defer h.returnAccounting()
 	if err := h.validateJournal(j); err != nil {
 		return err
 	}
@@ -135,20 +148,20 @@ func (h *publicationReceiptHost) RecordPublication(ctx context.Context, j public
 	}
 	// Invalidate any prior artifact proof before intent accounting. Failures
 	// retain all roots and original obligations, never seal completion.
-	h.result.artifactsComplete = false
-	h.result.launchComplete = false
-	h.result.Status = Partial
-	h.result.Receipt.Phase = Interrupted
+	h.accounting.artifactsComplete = false
+	h.accounting.launchComplete = false
+	h.accounting.Status = Partial
+	h.accounting.Receipt.Phase = Interrupted
 	for _, root := range []RootRef{h.plan.spec.Boot.Current, h.plan.spec.Boot.Candidate, h.plan.spec.Publication.Aside} {
-		h.result.Retained = appendRoot(h.result.Retained, root)
+		h.accounting.Retained = appendRoot(h.accounting.Retained, root)
 	}
-	appendObligation(h.result, Obligation{Kind: RecoveryInspectionRequired, RootID: h.plan.spec.Boot.IdentityRoot.ID, Code: "publication_observation_required"})
+	appendObligation(&h.accounting, Obligation{Kind: RecoveryInspectionRequired, RootID: h.plan.spec.Boot.IdentityRoot.ID, Code: "publication_observation_required"})
 	owned := j.Clone()
-	h.result.Receipt.PublicationJournal = &owned
-	h.result.Receipt.Obligations = slices.Clone(h.result.Obligations)
+	h.accounting.Receipt.PublicationJournal = &owned
+	h.accounting.Receipt.Obligations = slices.Clone(h.accounting.Obligations)
 	// No clock callback after the last validation and before this Record; event
 	// sequence/origin supplies ordering, timestamps confer no authority.
-	if err := h.ports.ReceiptStore.Record(ctx, copyRecord(h.result.Receipt)); err != nil {
+	if err := h.ports.ReceiptStore.Record(ctx, copyRecord(h.accounting.Receipt)); err != nil {
 		return err
 	}
 	h.last = j.Clone()

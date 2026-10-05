@@ -74,6 +74,36 @@ func InspectPublicationEvidence(scope Scope, operation Operation, raw []byte, or
 		if _, err := admitRepositoryOrigins(r); err != nil {
 			return out, err
 		}
+		// Every nested envelope retains its OWN trusted origin. The aggregate
+		// retry header never substitutes for an earlier operation's binding.
+		pins, err := admitPinCreationOrigins(r)
+		if err != nil {
+			return out, err
+		}
+		for _, origin := range pins {
+			e := origin.Evidence
+			if e.Origin.AgentURN != scope.spec.Identity.AgentURN || e.Origin.IdentityKey != scope.spec.Identity.EncodedKey || e.Control != scope.control || e.Key.Namespace != scope.resources.LockNamespace || e.Key.CanonicalID != scope.spec.Boot.IdentityRoot.Path || e.Grant.RootID != scope.spec.Boot.IdentityRoot.ID {
+				return out, refuse("publication_scope_mismatch", "publication", Conflict)
+			}
+		}
+		journals, err := admitPublicationOrigins(r)
+		if err != nil {
+			return out, err
+		}
+		for _, origin := range journals {
+			inner := origin.Journal
+			if inner.Origin.AgentURN != scope.spec.Identity.AgentURN || inner.Origin.IdentityKey != scope.spec.Identity.EncodedKey || !journalRootMatches(inner.Control, scope.control) || !journalRootMatches(inner.Layout.Parent, scope.spec.Boot.IdentityRoot) || !journalRootMatches(inner.Layout.Current, scope.spec.Boot.Current) || inner.Use.Namespace != scope.resources.LockNamespace || inner.Use.CanonicalID != scope.spec.Boot.IdentityRoot.Path {
+				return out, refuse("publication_scope_mismatch", "publication", Conflict)
+			}
+			// Earlier candidates/asides may differ from this attempt. They must
+			// still be explicitly enrolled; never rebind or normalize their paths.
+			for _, jr := range []publication.Root{inner.Layout.Candidate, inner.Layout.Aside} {
+				root, found := findRoot(scope.roots, jr.ID)
+				if !found || !journalRootMatches(jr, root) {
+					return out, refuse("publication_scope_mismatch", "publication", Conflict)
+				}
+			}
+		}
 		switch r.Phase {
 		case Planned, Interrupted, ArtifactsCommitted:
 		default:

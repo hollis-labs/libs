@@ -6,9 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"io/fs"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,7 +44,7 @@ func (f *publicationAdapterPorts) EnsureOwnedDirectory(context.Context, RootRef,
 func (f *publicationAdapterPorts) Observe(context.Context, Resources) (Observations, error) {
 	return copyRecord(f.observed), f.event("observe")
 }
-func (f *publicationAdapterPorts) ControlRoot() RootRef { return f.control }
+func (f *publicationAdapterPorts) ControlRoot() RootRef { _ = f.event("control"); return f.control }
 func (f *publicationAdapterPorts) Record(_ context.Context, r Receipt) error {
 	f.records = append(f.records, copyRecord(r))
 	return f.event("record")
@@ -228,5 +231,140 @@ func TestPublicationIntentCannotRestorePriorArtifactProofByRewritingPublicEviden
 	}
 	if result.ArtifactsComplete() || result.LaunchReady() {
 		t.Fatal("caller restored a proof invalidated by publication intent")
+	}
+}
+
+func TestPublicationCallbacksPreserveOriginalAccounting(t *testing.T) {
+	for _, stage := range []string{"validate", "observe", "clock", "record"} {
+		for _, variant := range []string{"receipt-header", "prior-obligation"} {
+			t.Run(stage+"/"+variant, func(t *testing.T) {
+				p, f, result, j, held := publicationAdapterFixture(t)
+				original := result.Obligations[0]
+				host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+				if err != nil {
+					t.Fatal(err)
+				}
+				j.Events = append(j.Events, publication.Event{Sequence: 4, Phase: publication.CandidateCurrentIntent})
+				f.hook = func(kind string) error {
+					if kind == stage {
+						if variant == "receipt-header" {
+							result.Receipt.OperationID = "foreign-callback-operation"
+						} else {
+							result.Obligations = nil
+							result.Receipt.Obligations = nil
+						}
+					}
+					return nil
+				}
+				err = host.RecordPublication(context.Background(), j)
+				for _, record := range f.records {
+					if record.OperationID != p.OperationID() || record.PublicationJournal == nil || record.PublicationJournal.Origin.OperationID != record.OperationID {
+						t.Fatalf("foreign envelope persisted: header=%s journal=%s err=%v", record.OperationID, record.PublicationJournal.Origin.OperationID, err)
+					}
+					if !slices.Contains(record.Obligations, original) {
+						t.Fatalf("original obligation erased before durable intent: err=%v receipt=%+v", err, record)
+					}
+				}
+				if err == nil && variant == "prior-obligation" && !slices.Contains(result.Obligations, original) {
+					t.Fatal("callback erased retained original obligation")
+				}
+				if err == nil && result.Receipt.OperationID != p.OperationID() {
+					t.Fatal("callback left successful accounting bound to foreign operation")
+				}
+			})
+		}
+	}
+}
+
+// SYNTHETIC ledger admission; callbacks possess the public result, never owned
+// accounting. Populate older envelopes so deep aliases cannot erase recovery.
+func TestPublicationOwnsEntireAccountingAcrossEveryCallbackAndReturn(t *testing.T) {
+	for _, stage := range []string{"validate", "observe", "clock", "control", "record"} {
+		for _, mode := range []string{"replace", "nested", "failed-record"} {
+			t.Run(stage+"/"+mode, func(t *testing.T) {
+				p, f, result, j, held := publicationAdapterFixture(t)
+				prior := j.Clone()
+				prior.Origin.OperationID = "earlier-original"
+				prior.Origin.InputDigest = strings.Repeat("c", 64)
+				pin, e := p.PinCreationIntent()
+				if e != nil {
+					t.Fatal(e)
+				}
+				pin.Origin = prior.Origin
+				result.Receipt.PublicationOrigins = []PublicationOrigin{{SchemaVersion: SchemaVersion, OperationID: prior.Origin.OperationID, InputDigest: prior.Origin.InputDigest, IdentityKey: prior.Origin.IdentityKey, Journal: prior}}
+				result.Receipt.PinOrigins = []PinCreationOrigin{{SchemaVersion: SchemaVersion, OperationID: pin.Origin.OperationID, InputDigest: pin.Origin.InputDigest, IdentityKey: pin.Origin.IdentityKey, Evidence: pin}}
+				result.Retained = []RootRef{p.spec.Boot.Current}
+				result.artifactSeal, result.artifactsComplete = resultSeal(*result)
+				baseline := result.Clone()
+				host, e := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+				if e != nil {
+					t.Fatal(e)
+				}
+				f.hook = func(kind string) error {
+					if kind == stage {
+						if mode == "nested" {
+							result.Receipt.Roots[0].Root.Owner = "foreign"
+							result.Receipt.PublicationOrigins[0].Journal.Layout.Candidate.Owner = "foreign"
+							result.Receipt.PinOrigins[0].Evidence.Grant.AuthorizationID = "foreign"
+							result.Obligations[0].Code = "foreign"
+							result.Retained[0].Owner = "foreign"
+						} else {
+							*result = ApplyResult{Status: Ready, Receipt: Receipt{OperationID: "foreign", Phase: ArtifactsCommitted}}
+						}
+						if mode == "failed-record" && kind == "record" {
+							return errors.New("record failed after caller mutation")
+						}
+					}
+					return nil
+				}
+				// Direct Validate must restore owned accounting even before any Record.
+				if stage != "record" {
+					if e := host.ValidatePublication(context.Background(), materialize.PublishRequest{Journal: j}); e != nil {
+						t.Fatal(e)
+					}
+					if !reflect.DeepEqual(result.Clone(), baseline) {
+						t.Fatal("validation returned caller-mutated accounting")
+					}
+				}
+				j.Events = append(j.Events, publication.Event{Sequence: 4, Phase: publication.CandidateCurrentIntent})
+				e = host.RecordPublication(context.Background(), j)
+				if (mode == "failed-record" && stage == "record") != (e != nil) {
+					t.Fatalf("record result %v", e)
+				}
+				for _, r := range f.records {
+					if r.OperationID != baseline.Receipt.OperationID || r.InputDigest != baseline.Receipt.InputDigest || r.IdentityKey != baseline.Receipt.IdentityKey || !reflect.DeepEqual(r.Roots, baseline.Receipt.Roots) || !reflect.DeepEqual(r.Effects, baseline.Receipt.Effects) || !reflect.DeepEqual(r.RepositoryRequests, baseline.Receipt.RepositoryRequests) || !reflect.DeepEqual(r.RepositoryOrigins, baseline.Receipt.RepositoryOrigins) || !reflect.DeepEqual(r.PublicationOrigins, baseline.Receipt.PublicationOrigins) || !reflect.DeepEqual(r.PinOrigins, baseline.Receipt.PinOrigins) || !slices.Contains(r.Obligations, baseline.Obligations[0]) {
+						t.Fatal("sole Record lost or rebound admitted accounting")
+					}
+				}
+				if result.Receipt.OperationID != baseline.Receipt.OperationID || !reflect.DeepEqual(result.Receipt.PinOrigins, baseline.Receipt.PinOrigins) || !reflect.DeepEqual(result.Receipt.PublicationOrigins, baseline.Receipt.PublicationOrigins) || !slices.Contains(result.Obligations, baseline.Obligations[0]) || result.ArtifactsComplete() || result.LaunchReady() || result.Status != Partial || result.Receipt.Phase != Interrupted || len(result.Retained) != 3 {
+					t.Fatal("return lost admitted accounting or monotone Partial")
+				}
+			})
+		}
+	}
+}
+
+func TestPublicationConstructorControlCallbackCannotRewriteAdmittedLedger(t *testing.T) {
+	for _, refuse := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "refused"}[refuse], func(t *testing.T) {
+			p, f, result, j, held := publicationAdapterFixture(t)
+			original := result.Clone()
+			f.hook = func(stage string) error {
+				if stage == "control" {
+					*result = ApplyResult{Status: Ready}
+					if refuse {
+						f.control.Owner = "foreign"
+					}
+				}
+				return nil
+			}
+			host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+			if refuse != (err != nil) || !reflect.DeepEqual(result.Clone(), original) {
+				t.Fatal("constructor callback replaced admitted result")
+			}
+			if !refuse && !reflect.DeepEqual(host.accounting.Clone(), original) {
+				t.Fatal("constructor captured mutable caller ledger")
+			}
+		})
 	}
 }

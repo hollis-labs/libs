@@ -3,11 +3,13 @@
 package local
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"testing"
 	"time"
@@ -120,7 +122,7 @@ func TestNewPinRequiresFullUnionAndDurableIntentThenPreservesInode(t *testing.T)
 		t.Fatal(err)
 	}
 	out, err := p.createNewPin(context.Background(), intent)
-	if err != nil || !out.evidence.Created || out.evidence.Uncertain || out.reservation == nil || out.evidence.Identity.Inode == 0 {
+	if err != nil || !out.evidence.Created || !out.evidence.Uncertain || out.reservation == nil || out.evidence.Identity.Inode == 0 {
 		t.Fatalf("new inode protocol: %+v %v", out, err)
 	}
 	t.Cleanup(func() {
@@ -513,5 +515,153 @@ func TestNativeUnionBindsWholeFrozenPlanOperationAndResources(t *testing.T) {
 	p.options.Resources.Grants = nil
 	if _, err := p.bindHeldUnion(plan, locks); err == nil {
 		t.Fatal("changed host resource authority admitted")
+	}
+}
+
+func TestNewPinDurablyRetainsUncertaintyAfterObservedCustodyFailure(t *testing.T) {
+	p, plan, held, receipt := newPinFixture(t)
+	intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+		r, readErr := p.readReceipt()
+		if readErr != nil {
+			return readErr
+		}
+		if r.PinCreation != nil && r.PinCreation.Created {
+			return errors.New("SYNTHETIC late authority failure after observed inode record")
+		}
+		return nil
+	}
+	out, err := p.createNewPin(context.Background(), intent)
+	if err == nil || !out.evidence.Created || !out.evidence.Uncertain || out.reservation != nil {
+		t.Fatalf("late failure did not return created uncertainty: out=%+v err=%v", out, err)
+	}
+	durable, readErr := p.readReceipt()
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	t.Logf("SYNTHETIC returned_created=%t returned_uncertain=%t durable_created=%t durable_uncertain=%t durable_inode=%d", out.evidence.Created, out.evidence.Uncertain, durable.PinCreation != nil && durable.PinCreation.Created, durable.PinCreation != nil && durable.PinCreation.Uncertain, func() uint64 {
+		if durable.PinCreation == nil {
+			return 0
+		}
+		return durable.PinCreation.Identity.Inode
+	}())
+	if durable.PinCreation == nil || !durable.PinCreation.Created || !durable.PinCreation.Uncertain {
+		t.Fatal("created pin failure was not durably marked uncertain")
+	}
+}
+
+// Actual owned temp inodes, SYNTHETIC authority/admission. Conservative first
+// observation survives lost custody without a compensating write or recreation.
+func TestNewPinFirstObservationRetainsUncertaintyWithoutLateDurableWrite(t *testing.T) {
+	for _, kind := range []string{"authority", "control-owner", "control-replaced", "grant", "cancel", "union-released", "pin-replaced", "in-use"} {
+		t.Run(kind, func(t *testing.T) {
+			p, plan, held, receipt := newPinFixture(t)
+			intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			name := "receipt-" + digestName(p.options.OperationID) + ".json"
+			var recorded []byte
+			var changed bool
+			var other *os.File
+			t.Cleanup(func() {
+				if other != nil {
+					_ = syscall.Flock(int(other.Fd()), syscall.LOCK_UN)
+					_ = other.Close()
+				}
+			})
+			p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+				r, err := p.readReceipt()
+				if err != nil {
+					return err
+				}
+				if r.PinCreation == nil || !r.PinCreation.Created || changed {
+					return nil
+				}
+				changed = true
+				recorded, err = p.control.ReadFile(name)
+				if err != nil {
+					return err
+				}
+				switch kind {
+				case "authority":
+					return errors.New("authority lost after first inode observation")
+				case "control-owner":
+					p.options.ControlRoot.Owner = "foreign"
+				case "control-replaced":
+					path := p.options.ControlRoot.Path
+					if err := os.Rename(path, path+".retained"); err != nil {
+						return err
+					}
+					if err := os.Mkdir(path, 0700); err != nil {
+						return err
+					}
+				case "grant":
+					p.options.Resources.Grants = nil
+				case "cancel":
+					cancel()
+				case "union-released":
+					if err := held[0].Release(); err != nil {
+						return err
+					}
+				case "pin-replaced":
+					path := r.PinCreation.Path
+					if err := os.Rename(path, path+".retained"); err != nil {
+						return err
+					}
+					if err := os.WriteFile(path, []byte("replacement preserved"), 0600); err != nil {
+						return err
+					}
+				case "in-use":
+					other, err = os.OpenFile(r.PinCreation.Path, os.O_RDWR, 0)
+					if err != nil {
+						return err
+					}
+					if err := syscall.Flock(int(other.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+			out, err := p.createNewPin(ctx, intent)
+			if err == nil || !changed || out.reservation != nil || !out.evidence.Created || !out.evidence.Uncertain || out.evidence.Identity.Inode == 0 {
+				t.Fatalf("late failure lost original inode/uncertainty: %+v %v", out, err)
+			}
+			after, readErr := p.control.ReadFile(name)
+			if readErr != nil || !bytes.Equal(after, recorded) {
+				t.Fatal("attempted compensating durable write after custody loss")
+			}
+			var durable workspace.Receipt
+			if err := json.Unmarshal(after, &durable); err != nil {
+				t.Fatal(err)
+			}
+			if durable.PinCreation == nil || !durable.PinCreation.Created || !durable.PinCreation.Uncertain || durable.PinCreation.Identity != out.evidence.Identity || durable.OperationID != receipt.OperationID || durable.InputDigest != receipt.InputDigest || !slices.Equal(durable.Obligations, receipt.Obligations) {
+				t.Fatal("first durable observation lost uncertainty/original obligations")
+			}
+			path := out.evidence.Path
+			if kind == "control-replaced" {
+				path = filepath.Join(p.options.ControlRoot.Path+".retained", filepath.Base(path))
+			}
+			if kind == "pin-replaced" {
+				path += ".retained"
+				data, err := p.control.ReadFile(filepath.Base(out.evidence.Path))
+				if err != nil || string(data) != "replacement preserved" {
+					t.Fatal("replacement inode adopted or overwritten")
+				}
+			}
+			info, err := os.Lstat(path)
+			if err != nil {
+				t.Fatal("retained original inode disappeared", err)
+			}
+			stat := info.Sys().(*syscall.Stat_t)
+			if uint64(stat.Dev) != out.evidence.Identity.Device || stat.Ino != out.evidence.Identity.Inode {
+				t.Fatal("original inode was recreated")
+			}
+		})
 	}
 }

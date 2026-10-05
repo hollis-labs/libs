@@ -1,6 +1,8 @@
 package workspace_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/publication"
@@ -130,6 +132,126 @@ func TestPublicationInspectionRejectsForeignOriginsAndUnknownJournal(t *testing.
 			out, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, receipts)
 			if err == nil || len(out.Retained) == 0 {
 				t.Fatal("foreign or unknown journal accepted or roots forgotten")
+			}
+		})
+	}
+}
+
+func TestPublicationInspectionAdmitsEveryNestedOrigin(t *testing.T) {
+	for _, variant := range []string{"own-journal", "inherited-journal", "invalid-pin"} {
+		t.Run(variant, func(t *testing.T) {
+			scope, j, receipts := inspectionFixture(t)
+			foreign := j.Clone()
+			foreign.Origin.OperationID = "foreign-original-operation"
+			switch variant {
+			case "own-journal":
+				receipts[0].PublicationJournal = &foreign
+			case "inherited-journal":
+				receipts[0].PublicationOrigins = []workspace.PublicationOrigin{{SchemaVersion: workspace.SchemaVersion, OperationID: receipts[0].OperationID, InputDigest: receipts[0].InputDigest, IdentityKey: receipts[0].IdentityKey, Journal: foreign}}
+			case "invalid-pin":
+				receipts[0].PinCreation = &workspace.PinCreationEvidence{Version: "foreign-pin-version"}
+			}
+			raw, err := json.Marshal(j)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, receipts)
+			if err == nil {
+				t.Fatalf("original receipt with foreign embedded journal admitted: status=%s originals=%d", out.Status, len(out.OriginalReceipts))
+			}
+		})
+	}
+}
+
+func inspectionPinEvidence(scope workspace.Scope, j publication.Journal) workspace.PinCreationEvidence {
+	key := workspace.LockKey{Namespace: scope.Resources().LockNamespace, CanonicalID: scope.Spec().Boot.IdentityRoot.Path}
+	sum := sha256.Sum256([]byte(key.CanonicalID))
+	return workspace.PinCreationEvidence{Version: workspace.PinCreationVersion, Origin: j.Origin, Control: scope.Control(), Key: key, Path: filepath.Join(key.Namespace, "pin-"+hex.EncodeToString(sum[:])), JournalID: j.JournalID, ReservationID: j.Use.ReservationID, Grant: workspace.EffectGrant{Kind: workspace.PinCreationEffect, RootID: scope.Spec().Boot.IdentityRoot.ID, AuthorizationID: "original-pin-grant", Version: "1"}, Created: true, Uncertain: true, Identity: workspace.NativePinIdentity{Device: 2, Inode: 4}}
+}
+
+func TestPublicationInspectionPreservesOlderNestedOriginsAndEnrolledRoots(t *testing.T) {
+	scope, j, receipts := inspectionFixture(t)
+	pin := inspectionPinEvidence(scope, j)
+	if e := pin.Validate(); e != nil {
+		t.Fatal(e)
+	}
+	receipts[0].PublicationJournal = &j
+	receipts[0].PinCreation = &pin
+	// The inherited operation and enrolled candidate/Aside are different from
+	// both the selected journal and the newer aggregate; never normalize them.
+	prior := j.Clone()
+	prior.Origin.OperationID = "earlier-nested"
+	prior.Origin.InputDigest = strings.Repeat("d", 64)
+	spec, resources := scope.Spec(), scope.Resources()
+	candidate, aside := spec.Boot.Candidate, spec.Boot.Candidate
+	candidate.ID = "earlier-candidate"
+	candidate.Path = filepath.Join(spec.Boot.IdentityRoot.Path, "earlier-candidate")
+	aside.ID = "earlier-aside"
+	aside.Path = filepath.Join(spec.Boot.IdentityRoot.Path, "earlier-aside")
+	resources.Roots = append(resources.Roots, candidate, aside)
+	var err error
+	scope, err = workspace.ResolveScope(spec, resources, scope.Control())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior.Layout.Candidate.ID = candidate.ID
+	prior.Layout.Candidate.Path = candidate.Path
+	prior.Layout.Aside.ID = aside.ID
+	prior.Layout.Aside.Path = aside.Path
+	receipts[1].PublicationOrigins = []workspace.PublicationOrigin{{SchemaVersion: workspace.SchemaVersion, OperationID: prior.Origin.OperationID, InputDigest: prior.Origin.InputDigest, IdentityKey: prior.Origin.IdentityKey, Journal: prior}}
+	olderPin := pin
+	olderPin.Origin = prior.Origin
+	receipts[1].PinOrigins = []workspace.PinCreationOrigin{{SchemaVersion: workspace.SchemaVersion, OperationID: olderPin.Origin.OperationID, InputDigest: olderPin.Origin.InputDigest, IdentityKey: olderPin.Origin.IdentityKey, Evidence: olderPin}}
+	raw, _ := json.Marshal(j)
+	out, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, receipts)
+	if err != nil || !reflect.DeepEqual(out.OriginalReceipts, receipts) {
+		t.Fatalf("valid older origins rebound or erased: %+v %v", out, err)
+	}
+	out.OriginalReceipts[1].PublicationOrigins[0].Journal.Layout.Candidate.Owner = "mutated"
+	if receipts[1].PublicationOrigins[0].Journal.Layout.Candidate.Owner == "mutated" {
+		t.Fatal("returned older envelope aliases input")
+	}
+	for _, kind := range []string{"own-pin-operation", "own-pin-digest", "inherited-pin-operation", "inherited-pin-digest", "pin-schema", "pin-key", "pin-scope", "pin-root", "publication-schema", "publication-key", "publication-scope", "candidate-unenrolled", "candidate-owner", "aside-unenrolled"} {
+		t.Run(kind, func(t *testing.T) {
+			data, _ := json.Marshal(receipts)
+			var bad []workspace.Receipt
+			if err := json.Unmarshal(data, &bad); err != nil {
+				t.Fatal(err)
+			}
+			switch kind {
+			case "own-pin-operation":
+				bad[0].PinCreation.Origin.OperationID = "foreign"
+			case "own-pin-digest":
+				bad[0].PinCreation.Origin.InputDigest = strings.Repeat("e", 64)
+			case "inherited-pin-operation":
+				bad[1].PinOrigins[0].Evidence.Origin.OperationID = "foreign"
+			case "inherited-pin-digest":
+				bad[1].PinOrigins[0].Evidence.Origin.InputDigest = strings.Repeat("e", 64)
+			case "pin-schema":
+				bad[1].PinOrigins[0].SchemaVersion = "foreign"
+			case "pin-key":
+				bad[1].PinOrigins[0].IdentityKey = "foreign"
+			case "pin-root":
+				bad[1].PinOrigins[0].Evidence.Grant.RootID = "unenrolled"
+			case "pin-scope":
+				e := &bad[1].PinOrigins[0].Evidence
+				e.Control.Owner = "foreign"
+			case "publication-schema":
+				bad[1].PublicationOrigins[0].SchemaVersion = "foreign"
+			case "publication-key":
+				bad[1].PublicationOrigins[0].IdentityKey = "foreign"
+			case "publication-scope":
+				bad[1].PublicationOrigins[0].Journal.Control.Owner = "foreign"
+			case "candidate-unenrolled":
+				bad[1].PublicationOrigins[0].Journal.Layout.Candidate.ID = "unenrolled"
+			case "candidate-owner":
+				bad[1].PublicationOrigins[0].Journal.Layout.Candidate.Owner = "foreign"
+			case "aside-unenrolled":
+				bad[1].PublicationOrigins[0].Journal.Layout.Aside.ID = "unenrolled"
+			}
+			refused, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, bad)
+			if err == nil || len(refused.Retained) == 0 || len(refused.OriginalReceipts) == len(bad) {
+				t.Fatal("foreign nested origin returned or roots forgotten")
 			}
 		})
 	}
