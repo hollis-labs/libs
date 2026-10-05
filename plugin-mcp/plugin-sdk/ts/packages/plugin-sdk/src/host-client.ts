@@ -62,11 +62,11 @@ export class HostRPCFailure extends Error {
 }
 
 // Internal factory, excluded from the public barrel/package subpaths. Production
-// activation waits for the negotiated reverse lifecycle slice.
+// activation belongs to the connection negotiation policy.
 export function hostClientContext(context:Context,core:Correlation,input:InitParams,secrets:SecretTracker,bindingExpiry?:number):Context {
  const init=decodeInitParams(encodeBoundedJSON(input,8*1024*1024));
  const scope=requestScope(context);
- if(!scope || !core.directional || !init.host_services || !scope.binding || !secrets)throw new HostClientError('target_unavailable');
+ if(!scope || !core.readsReplies || !init.host_services || !scope.binding || !secrets)throw new HostClientError('target_unavailable');
  return {...context,host:new HostClientImpl(context,core,init,secrets,bindingExpiry)};
 }
 class HostClientImpl implements HostClient {
@@ -82,7 +82,7 @@ class HostClientImpl implements HostClient {
  }
  async #invoke<T>(method:string,descriptor:string,args:{grant_id:string},options:HostCallOptions|undefined,build?:(params:Record<string,unknown>)=>Record<string,unknown>,metadata:CallMetadata={},accept?:(result:T,params:Record<string,unknown>,metadata:CallMetadata)=>void):Promise<T> {
   const started=performance.now(),scope=requestScope(this.#context),budget=requestBudget(this.#context);
-  if(!scope || !scope.acceptsResult() || this.#context.signal.aborted || ['hook/handle','hook/handle_batch'].includes(scope.request.method))throw new HostClientError('target_unavailable');
+  if(!this.#core.readsReplies || !scope || !scope.acceptsResult() || this.#context.signal.aborted || ['hook/handle','hook/handle_batch'].includes(scope.request.method))throw new HostClientError('target_unavailable');
   if(['plugin/init','plugin/load','plugin/unload'].includes(scope.request.method)&&method!=='host/log')throw new HostClientError('target_unavailable');
   const ceiling=this.#ceilings[method];if(!Number.isSafeInteger(ceiling)||ceiling!<=0)throw new HostClientError('unsupported_capability');
   const grant=this.#grants.get(args.grant_id);if(!grant||method!=='host/bindings/renew'&&(grant.name!==descriptor||grant.schema_version!==1))throw new HostClientError('capability_denied');

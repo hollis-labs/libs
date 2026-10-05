@@ -44,6 +44,7 @@ type requestScope struct {
 	leaseEnd, leaseBudgetEnd time.Time
 	leaseBudgets             HostRPCRemainingBudgets
 	renewPending             bool
+	observeTerminal          func(RPCResponse)
 }
 type admission struct {
 	mu                sync.Mutex
@@ -160,6 +161,7 @@ func (s *requestScope) logicalReply(resp RPCResponse) {
 		return
 	}
 	s.terminal = true
+	observer := s.observeTerminal
 	s.mu.Unlock()
 	a := s.manager
 	if s.id == (RPCID{}) {
@@ -175,21 +177,43 @@ func (s *requestScope) logicalReply(resp RPCResponse) {
 		frame, err = a.server.encodeFrame(resp)
 	}
 	if err == nil {
-		err = a.writer.submitTerminal(frame, s.credit, s.received)
+		value := resp
+		err = a.writer.enqueueObserved(frame, s.received, true, s.credit, func() {
+			if observer != nil {
+				observer(value)
+			}
+		})
 	}
 	if err != nil {
 		// A successful callback may have committed an effect. Preserve that fact when
 		// its result cannot fit; admission failures happen before callback execution.
 		state := responseEffect(resp)
-		frame, err = a.server.encodeFrame(requestFailureResponse(s.id, capability.BudgetExceeded, state))
+		fallback := requestFailureResponse(s.id, capability.BudgetExceeded, state)
+		frame, err = a.server.encodeFrame(fallback)
 		if err == nil {
-			err = a.writer.submitTerminal(frame, s.credit, s.received)
+			err = a.writer.enqueueObserved(frame, s.received, true, s.credit, func() {
+				if observer != nil {
+					observer(fallback)
+				}
+			})
 		}
 		if err != nil {
 			s.credit.release()
 			s.received(err)
 		}
 	}
+}
+
+// Negotiation commits against the terminal actually selected for publication,
+// before its bytes can reach a peer that immediately sends the next request.
+func (s *requestScope) observeReply(fn func(RPCResponse)) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.terminal {
+		return false
+	}
+	s.observeTerminal = fn
+	return true
 }
 func (s *requestScope) received(err error) {
 	defer s.receiptOnce.Do(func() { close(s.terminalDone) })

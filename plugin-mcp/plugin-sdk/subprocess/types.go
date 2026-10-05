@@ -65,7 +65,7 @@ type HostInfo struct {
 }
 
 // InitResult acknowledges the base contract and any selected optional profiles.
-// Serve acknowledges hooks/1 only with an offer and HookHandler; reverse stays declined.
+// Serve owns acknowledgements: hooks requires an offer/handler, reverse an offer/opt-in.
 type InitResult struct {
 	ID                  string `json:"id"`
 	Name                string `json:"name"`

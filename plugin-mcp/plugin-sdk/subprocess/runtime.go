@@ -30,6 +30,8 @@ var ErrShutdownTimeout = errors.New("subprocess: shutdown incomplete: deadline e
 // the caller: close it to release any Read/Write still blocked after shutdown.
 // Serve cannot interrupt arbitrary injected I/O or kill callback goroutines.
 type ServeOptions struct {
+	// ReverseRPC explicitly opts into a valid offered reverse/1 profile.
+	ReverseRPC      bool
 	Input           io.Reader
 	Output          io.Writer
 	Context         context.Context
@@ -126,6 +128,9 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 			_ = os.Stdout.Close()
 		}
 	}, queues)
+	writer.mu.Lock()
+	writer.frameLimit = limits.OutputBytes
+	writer.mu.Unlock()
 	writer.onFailure = func(err error) { core.close(err); srv.fence(err) }
 	defer func() { writer.abort(errConnectionClosed); core.close(errConnectionClosed) }()
 	core.encode = srv.encodeFrame
@@ -153,11 +158,14 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 	}
 	admissions := newAdmission(writer, core, srv)
 	admissions.limits = admissionPolicy
+	srv.reverse = &reverseNegotiation{optIn: options.ReverseRPC, input: limits.InputBytes, output: limits.OutputBytes, core: core, server: srv, admission: admissions, writer: writer}
+	srv.outputBytes = srv.reverse.outputLimit
 	writerDone := writer.done
 	stopRead := make(chan struct{})
 	defer close(stopRead)
 	type arrival struct {
 		raw      []byte
+		bytes    int
 		received time.Time
 	}
 	events := make(chan arrival)
@@ -167,7 +175,7 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 		defer close(readerDone)
 		reader := bufio.NewReaderSize(in, 64*1024)
 		for {
-			line, err := readFrame(reader, limits.InputBytes)
+			line, frameBytes, err := readFrameCount(reader, srv.reverse.inputLimit())
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					readerErr = err
@@ -175,7 +183,7 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 				return
 			}
 			select {
-			case events <- arrival{line, time.Now()}:
+			case events <- arrival{line, frameBytes, time.Now()}:
 			case <-stopRead:
 				return
 			}
@@ -233,9 +241,13 @@ loop:
 			break loop
 		case event := <-input:
 			line := event.raw
+			if event.bytes > srv.reverse.inputLimit() {
+				inputErr = &FrameTooLargeError{Direction: "input", Limit: srv.reverse.inputLimit()}
+				break loop
+			}
 			req, fault := decodeEnvelope(line)
 			if fault != nil {
-				if core.directional && (!json.Valid(line) || replyCandidate(line)) {
+				if core.readsReplies() && (!json.Valid(line) || replyCandidate(line)) {
 					inputErr = errCorrelation
 					break loop
 				}
@@ -251,7 +263,7 @@ loop:
 				continue
 			}
 			if req == nil {
-				if core.directional {
+				if core.readsReplies() {
 					if err := core.reply(line); err != nil {
 						inputErr = err
 						break loop
@@ -269,7 +281,7 @@ loop:
 					continue
 				}
 				raw, err := paramsJSON(req.Params)
-				if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directional) == nil {
+				if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directionalMode()) == nil {
 					var p CancelParams
 					_ = json.Unmarshal(raw, &p)
 					admissions.cancelRequest(p)
@@ -355,18 +367,18 @@ loop:
 					req, fault := decodeEnvelope(line)
 					if req != nil && fault == nil && req.Method == "rpc/cancel" && req.ID == (RPCID{}) {
 						raw, err := paramsJSON(req.Params)
-						if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directional) == nil {
+						if err == nil && ValidateRPCControlDTO("CancelParams", raw, core.directionalMode()) == nil {
 							var p CancelParams
 							_ = json.Unmarshal(raw, &p)
 							admissions.cancelRequest(p)
 						}
 					}
-					if core.directional && fault != nil && (!json.Valid(line) || replyCandidate(line)) {
+					if core.readsReplies() && fault != nil && (!json.Valid(line) || replyCandidate(line)) {
 						srv.fence(errCorrelation)
 						core.close(errCorrelation)
 						return
 					}
-					if req == nil && fault == nil && core.directional {
+					if req == nil && fault == nil && core.readsReplies() {
 						if err := core.reply(line); err != nil {
 							srv.fence(err)
 							core.close(err)
@@ -441,6 +453,7 @@ loop:
 		}
 		shutdownCtx = context.WithValue(shutdownCtx, requestScopeKey{}, terminalScope)
 	}
+	shutdownCtx = srv.reverse.client(shutdownCtx)
 	cleanup := srv.beginUnload(shutdownCtx)
 	select {
 	case <-cleanup:

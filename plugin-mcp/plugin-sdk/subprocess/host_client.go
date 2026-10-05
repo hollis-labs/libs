@@ -12,7 +12,7 @@ import (
 
 // HostClient is an SDK-owned request-scoped client. Authors obtain it from
 // HostClientFromContext, never implement it or construct it. Later service
-// methods may be added to this same type. Production activation is separate.
+// methods may be added to this same type. Production availability requires negotiated reverse opt-in.
 type HostClient struct {
 	scope    *requestScope
 	core     *correlation
@@ -29,17 +29,17 @@ func HostClientFromContext(ctx context.Context) (*HostClient, bool) {
 		return nil, false
 	}
 	h, ok := ctx.Value(hostClientKey{}).(*HostClient)
-	return h, ok && h != nil && h.scope == scopeFromContext(ctx) && h.scope.acceptsResult()
+	return h, ok && h != nil && h.core.readsReplies() && h.scope == scopeFromContext(ctx) && h.scope.acceptsResult()
 }
 
-// Internal activation only, pending negotiated reverse lifecycle integration.
+// Private factory used by negotiated request delivery and conformance fixtures.
 // No guessed binding expiry: zero means its live lease is enforced by the host.
 func hostClientContext(ctx context.Context, core *correlation, p InitParams, secrets *secretTracker, bindingExpiry time.Time) (context.Context, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
 	scope := scopeFromContext(ctx)
-	if scope == nil || core == nil || !core.directional || p.HostServices == nil || scope.binding == nil || secrets == nil {
+	if scope == nil || core == nil || !core.readsReplies() || p.HostServices == nil || scope.binding == nil || secrets == nil {
 		return nil, localHostFailure(capability.TargetUnavailable)
 	}
 	scope.initLease(bindingExpiry)
@@ -63,7 +63,7 @@ func (h *HostClient) begin(ctx context.Context, method, grantID, descriptor stri
 	fail := func(err error) (context.Context, context.CancelFunc, ReverseContext, error) {
 		return nil, nil, ReverseContext{}, err
 	}
-	if h == nil || h.core == nil || h.scope == nil || ctx == nil || scopeFromContext(ctx) != h.scope || !h.scope.acceptsResult() {
+	if h == nil || h.core == nil || !h.core.readsReplies() || h.scope == nil || ctx == nil || scopeFromContext(ctx) != h.scope || !h.scope.acceptsResult() {
 		return fail(localHostFailure(capability.TargetUnavailable))
 	}
 	if h.scope.method == MethodHookHandle || h.scope.method == MethodHookHandleBatch {

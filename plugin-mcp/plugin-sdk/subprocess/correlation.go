@@ -16,12 +16,13 @@ var errCorrelation = errors.New("subprocess: invalid correlation")
 
 const coreCapacity = 256
 
-// Internal foundation; production reverse activation is deliberately absent.
-// Fixture constructors use the same engine with explicit directional state.
+// Internal engine. Negotiation owns production activation; fixtures can select
+// the same directional foundation explicitly without claiming negotiated evidence.
 type correlation struct {
 	mu              sync.Mutex
 	publishMu       sync.Mutex
 	directional     bool
+	provisional     bool
 	incoming        map[RPCID]struct{}
 	pending         map[int64]*pendingCall
 	next, high      int64
@@ -149,7 +150,9 @@ func (c *correlation) callTracked(parent context.Context, method string, params 
 			<-c.reversePermits
 		}
 	}()
+	c.mu.Lock()
 	ceiling := c.methodTimeoutMS[method]
+	c.mu.Unlock()
 	if ceiling == 0 {
 		return nil, errors.New("subprocess: method has no offered timeout")
 	}
@@ -201,7 +204,7 @@ func (c *correlation) callTracked(parent context.Context, method string, params 
 		return nil, cause
 	}
 	c.mu.Lock()
-	if !c.directional || c.closed != nil || c.next == maxRPCInteger {
+	if !(c.directional || c.provisional) || c.closed != nil || c.next == maxRPCInteger {
 		c.mu.Unlock()
 		cancel()
 		return nil, errCorrelation

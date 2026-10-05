@@ -49,6 +49,8 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 
 // server holds the per-invocation state for one Serve call.
 type server struct {
+	reverse             *reverseNegotiation
+	outputBytes         func() int
 	hooksEnabled        bool
 	hooksFixtureEnabled bool
 	hooksIncarnation    capability.RuntimeIdentity
@@ -134,6 +136,7 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			return
 		}
 		ctx = withForwardContext(ctx, forward)
+		ctx = s.reverse.client(ctx)
 	}
 	switch req.Method {
 	case MethodHookHandle, MethodHookHandleBatch:
@@ -160,35 +163,75 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.writeInitError(req.ID, err, scopeFromContext(ctx))
 			return
 		}
+		var agreement InitParams
+		if err := decodeParams(req.Params, &agreement); err != nil {
+			s.writeInitError(req.ID, err, scopeFromContext(ctx))
+			return
+		}
 		ctx = withForwardContext(ctx, params.Context)
+		ctx, err := s.reverse.prepare(ctx, params)
+		if err != nil {
+			s.writeInitError(req.ID, err, scopeFromContext(ctx))
+			return
+		}
+		accepted := false
+		defer func() {
+			if !accepted {
+				s.reverse.decline()
+			}
+		}()
 		_, hookHandler := s.plugin.(HookHandler)
 		hooksEnabled := params.HooksProfile != nil && params.HooksProfile.HooksProfileVersion == HooksProfileVersion && hookHandler
 		res, err := s.plugin.Init(ctx, params)
 		if err != nil {
+			s.reverse.decline()
 			s.writeErrorFromPluginErr(req.ID, err, scopeFromContext(ctx))
 			return
 		}
 		if scope := scopeFromContext(ctx); scope != nil && !scope.acceptsResult() {
+			s.reverse.decline()
 			scope.failContext()
 			return
 		}
-		// Hooks negotiate independently; reverse callbacks remain unavailable.
+		// The runtime owns both independent acknowledgements.
 		res.ReverseRPCVersion = nil
+		if s.reverse.selected() {
+			version := 1
+			res.ReverseRPCVersion = &version
+		}
 		res.HooksProfileVersion = nil
 		if hooksEnabled {
 			version := HooksProfileVersion
 			res.HooksProfileVersion = &version
 		}
-		if err := ValidateInitResult(params, res); err != nil {
+		if err := ValidateInitResult(agreement, res); err != nil {
+			s.reverse.decline()
 			s.writeInitError(req.ID, err, scopeFromContext(ctx))
 			return
 		}
-		s.notifyIdentity(ctx, params.Identity)
-		s.initMu.Lock()
-		s.hooksEnabled = hooksEnabled
-		s.hooksIncarnation = params.Incarnation
-		s.initialized = true
-		s.initMu.Unlock()
+		s.notifyIdentity(ctx, agreement.Identity)
+		commit := func(resp RPCResponse) {
+			if resp.Error != nil {
+				s.reverse.decline()
+				return
+			}
+			s.initMu.Lock()
+			s.reverse.activate(req.ID)
+			s.hooksEnabled = hooksEnabled
+			s.hooksIncarnation = agreement.Incarnation
+			s.initialized = true
+			s.initMu.Unlock()
+		}
+		if scope := scopeFromContext(ctx); scope != nil {
+			if !scope.acceptsResult() || !scope.observeReply(commit) {
+				s.reverse.decline()
+				scope.failContext()
+				return
+			}
+		} else {
+			commit(RPCResponse{})
+		}
+		accepted = true
 		s.writeResult(req.ID, res, scopeFromContext(ctx))
 
 	case MethodLoad:
@@ -499,6 +542,9 @@ func (s *server) writeMessage(resp RPCResponse, scopes ...*requestScope) {
 	}
 }
 func (s *server) frameOutputLimit() int {
+	if s.outputBytes != nil {
+		return s.outputBytes()
+	}
 	if s.outputLimit == 0 {
 		return DefaultFrameBytes
 	}

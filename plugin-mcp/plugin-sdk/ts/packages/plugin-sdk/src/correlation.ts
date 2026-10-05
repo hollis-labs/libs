@@ -25,7 +25,7 @@ type Pending = {
     reject: (error: unknown) => void;
     cleanup:()=>void;
     failure:(cause:unknown)=>unknown;
-    deadline:number;expire:()=>void;
+    deadline:number;expire:()=>void;revoke:()=>void;
 };
 /** Internal engine, intentionally absent from the package's author exports. */
 export class Correlation {
@@ -40,7 +40,11 @@ export class Correlation {
     reverseSlots=8;
     methodTimeoutMS:Record<string,number>=Object.create(null);
     encode!: (value: unknown) => string;
-    readonly directional: boolean;
+    directional: boolean;
+    provisional=false;
+    get readsReplies():boolean{return !this.failure&&(this.directional||this.provisional);}
+    activate(id:number):void{this.directional=true;this.provisional=false;this.high=id;}
+    revokeReverse():void{this.provisional=false;for(const entry of [...this.pending.values()])entry.revoke();}
     constructor(directional = false) { this.directional = directional; }
     admit(id: RPCID | undefined): void {
         if (this.failure)
@@ -73,7 +77,7 @@ export class Correlation {
       const started=performance.now();
       const pair=Object.hasOwn(methods,method)?methods[method]:undefined;
       const ceiling=this.methodTimeoutMS[method];
-      if(!pair||!this.directional||this.failure||!Number.isSafeInteger(ceiling)||ceiling<=0||this.next===Number.MAX_SAFE_INTEGER)return Promise.reject(this.failure??new CorrelationError());
+      if(!pair||!this.readsReplies||this.failure||!Number.isSafeInteger(ceiling)||ceiling<=0||this.next===Number.MAX_SAFE_INTEGER)return Promise.reject(this.failure??new CorrelationError());
       if(this.pending.size>=this.reverseSlots)return Promise.reject({code:'rate_limited',effect_state:'not_started',retryable:false});
       let params:Record<string,unknown>,reverse:{binding_id:string;timeout_ms:number;parent_call:{request_owner:string;id:number}};
       try{params=decodeHostRPCDTO(pair[0],paramsRaw) as unknown as Record<string,unknown>;reverse=params.context as typeof reverse;}catch(error){return Promise.reject(error);}
@@ -93,7 +97,7 @@ export class Correlation {
        const cleanup=()=>{completed=true;if(timer!==undefined)clearTimeout(timer);context?.signal.removeEventListener('abort',cancel);};
        const mutation=['host/storage/put','host/storage/delete','host/events/publish','host/egress/request','host/mcp/call_tool','host/mcp/cancel_call','host/bindings/renew'].includes(method);
        const failure=(cause:unknown)=>new RPCTransportError(possible&&mutation?'unknown_outcome':cause instanceof DeadlineExceededError?'deadline_exceeded':cause instanceof TransportCancelledError?'cancelled':cause instanceof PublicationFullError?'rate_limited':'target_unavailable',possible?'unknown':'not_started',id,cause);
-       const entry:Pending={method,metadata,dto:pair[1],resolve,reject,cleanup,failure,deadline:end,expire:()=>cancel()};this.pending.set(id,entry);metadata.id=id;metadata.pending=entry;
+       const entry:Pending={method,metadata,dto:pair[1],resolve,reject,cleanup,failure,deadline:end,expire:()=>cancel(),revoke:()=>cancel()};this.pending.set(id,entry);metadata.id=id;metadata.pending=entry;
        const fail=(error:unknown)=>{if(this.pending.get(id)===entry){this.pending.delete(id);cleanup();reject(error);}};
        const cancel=()=>{
         if(completed||this.pending.get(id)!==entry)return;

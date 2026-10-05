@@ -5,10 +5,12 @@ SDK-owned client. Its core seven helpers cover storage get/put/delete, secrets g
 request, events publish, and log. Authors consume this client; they never
 implement it. Later methods extend the same type.
 
-Activation is currently private to conformance fixtures. Base and hooks-only
-production connections have no host client. Implementing a hook handler does
-not enable reverse RPC or give it a client. Negotiated reverse activation is a
-separate slice. There is no public constructor, enable switch, or generic call.
+Production access requires explicit Go ServeOptions.ReverseRPC / TS reverseRPC
+opt-in, a valid host_services offer and successful Init acknowledgement, plus a
+live request binding. Base and hooks-only connections have no client; hook
+handlers receive none even when both profiles are acknowledged. See
+[reverse negotiation](reverse.md) for lifecycle logging and the held child/interop
+merge gate. There is no public constructor or generic call.
 
 Each call explicitly selects `grant_id` and supplies business arguments.
 The SDK copies the validated Init grant snapshot and offered method ceilings;

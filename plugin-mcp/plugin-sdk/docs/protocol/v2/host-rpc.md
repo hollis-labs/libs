@@ -1,6 +1,8 @@
 # Host RPC profile 1 — field-level draft
 
-Status: REVISION 2 — field-level schema APPROVED by orch-pp0 with changes (1)–(6) folded; consumer confirmation pending. Implementation remains separately gated. Protocol 2, optional reverse_rpc_version=1. This defines DTOs, not a working duplex transport or an acknowledgement. Schema source: protocol/v2/host-rpc.schema.json. No change to historical v1, Init, grants, capability policy, or host extensions. Current Serve validates and declines reverse offers.
+Status: REVISION 2 — field-level schema APPROVED by orch-pp0 with changes (1)–(6) folded; consumer confirmation pending. Implementation remains separately gated. Protocol 2, optional reverse_rpc_version=1. This defines DTOs, not a working duplex transport or an acknowledgement. Schema source: protocol/v2/host-rpc.schema.json. No change to historical v1, Init, grants, capability policy, or host extensions. Default Serve validates and declines reverse offers; explicit opt-in activation
+is described in [reverse negotiation](reverse.md), held for negotiated children
+and pinned real-host interop.
 
 Sources: accepted reverse-RPC 0163 (Tesseract item 01M41MHVKSR5NFSB5WVX7F1DX3), accepted capability ADR 0024 (01M41MHVD2GZFQXJ7MS8RMB2CN), stage3-plan (01M41T9SFNKNFCVZ2E4VCJSP69), current authored protocol/v2/schema.json + generate.py, capability/grant.go, docs/protocol/v2/{README,grants}.md. Subsequent orch-jsts/PP0 rulings require the context layouts below; the accepted spec's background example without binding_id is historical and is not this DTO.
 

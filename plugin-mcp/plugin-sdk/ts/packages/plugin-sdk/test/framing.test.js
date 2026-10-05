@@ -42,9 +42,13 @@ test('too-small output budget fences without publishing JSON',async()=>{
  assert.equal(writes,0);
 });
 test('output includes LF and base64 expansion in its cap',async()=>{
- let text='';const output=new Writable({write(b,_e,cb){text+=b;cb();}});
+ let text='';let initialized;const initWritten=new Promise(resolve=>{initialized=resolve;});
+ const input=new PassThrough();const output=new Writable({write(b,_e,cb){text+=b;cb();initialized();}});
  const p={...fixturePlugin('base'),httpHandle(){return {status:200,body:new Uint8Array(1024)}}};
  const init=JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin/init',params:initParams()});
- await serve(p,{input:Readable.from([init+'\n'+JSON.stringify({jsonrpc:'2.0',id:2,method:'http/handle',params:{method:'GET',path:'/',headers:{},body:''}})+'\n']),output,stderr:stderr(),outputFrameBytes:512});
+ const done=serve(p,{input,output,stderr:stderr(),outputFrameBytes:512});
+ input.write(init+'\n');await initWritten;
+ input.end(JSON.stringify({jsonrpc:'2.0',id:2,method:'http/handle',params:{method:'GET',path:'/',headers:{},body:''}})+'\n');
+ await done;
  const lines=text.trim().split('\n');const error=JSON.parse(lines[1]).error;assert.equal(error.code,-32010);assert.deepEqual(error.data,{contract:'host-rpc/1',code:'budget_exceeded',request_id:2,effect_state:'committed',retryable:false});for(const line of lines)assert.ok(Buffer.byteLength(line)+1<=512);
 });

@@ -186,14 +186,15 @@ empty and the harness supplies a test incarnation. Results acknowledge both
 is acknowledged only when the plugin implements `hookHandle`; hook methods then
 route for that connection. The runtime owns the acknowledgement. Missing offers
 or handlers leave it absent, while invalid versions retain typed Init errors.
-Reverse offers stay declined, and hook contexts provide no host client or
-plugin-originated callbacks. See [hooks/1](../../../docs/protocol/v2/hooks.md).
+Reverse negotiation is independent and requires explicit `reverseRPC: true`;
+hook contexts still provide no host client or nested callbacks. See [hooks/1](../../../docs/protocol/v2/hooks.md).
 
-Runtime params require the fields in the protocol-2 [payload matrix](../../../docs/protocol/v2/payloads.md). Optional `context` reuses the closed `ForwardContext` DTO; callbacks read `context.forwardContext`. It carries metadata only; this runtime does not authorize bindings or enforce its timeout. Invalid params return -32602 before invocation, and unrepresentable or malformed results return -32603.
+Runtime params require the fields in the protocol-2 [payload matrix](../../../docs/protocol/v2/payloads.md). Optional `context` reuses the closed `ForwardContext` DTO; callbacks read `context.forwardContext`. Its relative timeout bounds request execution; the host owns binding authority. Invalid params return -32602 before invocation, and unrepresentable or malformed results return -32603.
 
 The SDK-owned `HostClient` type has request-scoped helpers for storage,
 secrets, egress, events, log, readonly query, MCP, and binding renewal. Authors never implement this type. `Context.host`
-is currently available only through private conformance activation; base and
-hooks-only production connections omit it. See the repository's
+requires explicit `reverseRPC` opt-in, a valid host_services offer and Init ack,
+and a live bound request. Base and hook handlers omit it. See
+[reverse negotiation and its merge gate](../../../docs/protocol/v2/reverse.md). See the repository's
 [host client contract](../../../docs/protocol/v2/host-clients.md) for explicit
 grant selection, budgets, typed failures, and secret registration.
