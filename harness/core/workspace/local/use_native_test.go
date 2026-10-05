@@ -87,6 +87,43 @@ func TestExistingPinProbeThenSeparateSharedDescriptor(t *testing.T) {
 	}
 }
 
+func TestCallerSharedPinSurvivesMutationReleaseAndRefusesLateReplacement(t *testing.T) {
+	p, key, union, inode, path := existingPinFixture(t)
+	pin, err := p.reserveExistingPin(context.Background(), key, inode, union)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = syscall.Flock(int(pin.file.Fd()), syscall.LOCK_UN); _ = pin.file.Close() })
+	if err := union.locks[0].Release(); err != nil {
+		t.Fatal(err)
+	}
+	if err := pin.validatePinCustody(context.Background()); err != nil {
+		t.Fatal("caller SH lost when mutEX released", err)
+	}
+	probe, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer probe.Close()
+	err = syscall.Flock(int(probe.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+		t.Fatal("caller shared pin released unconditionally", err)
+	}
+	if err := os.Rename(path, path+"-retained"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("replacement"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := pin.validatePinCustody(context.Background()); err == nil {
+		t.Fatal("late different named pin inode accepted")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || string(b) != "replacement" {
+		t.Fatal("late mismatch repaired foreign pin")
+	}
+}
+
 func TestExistingPinRefusesUnknownChangedUsedAndReleasedCustody(t *testing.T) {
 	for _, kind := range []string{"unknown-inode", "foreign-inode", "absent", "hard-link", "in-use", "released-union", "cancelled", "foreign-ports"} {
 		t.Run(kind, func(t *testing.T) {

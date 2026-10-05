@@ -93,6 +93,26 @@ type usePin struct {
 	inode pinInode
 }
 
+// validatePinCustody is independent of the original mutation union: caller SH
+// must survive return after those EX locks release. A later handoff needs fresh
+// root authority and a newly acquired complete union as well as this check.
+func (pin *usePin) validatePinCustody(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if pin == nil || pin.owner == nil || pin.file == nil || pin.inode.inode == 0 {
+		return errors.New("local: pin reservation unavailable")
+	}
+	actual, err := openedPinInode(pin.file)
+	if err != nil || actual != pin.inode {
+		return errors.Join(errors.New("local: held pin identity changed"), err)
+	}
+	if err := pin.owner.validateFileCustody(pin.file, pin.name); err != nil {
+		return err
+	}
+	return ctx.Err()
+}
+
 // reserveExistingPin never creates, truncates, adopts by name or repairs a pin.
 // Its expected inode must come from the original trusted control record. New
 // pin creation remains unsupported until explicit grant + durable intent wiring.
