@@ -718,3 +718,24 @@ func TestNewPinReturnedEvidenceCannotRewriteOriginalDurableIntent(t *testing.T) 
 		t.Fatal("caller mutation changed durable original uncertainty")
 	}
 }
+
+func TestNewPinIntentOwnsAdmittedReceiptBeforeCallerMutation(t *testing.T) {
+	p, plan, held, receipt := newPinFixture(t)
+	original := receipt.Obligations[0]
+	intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt.Obligations[0].Code = "caller-mutation-after-intent"
+	if !slices.Contains(intent.receipt.Obligations, original) {
+		t.Fatal("caller owns private successfully-recorded intent accounting")
+	}
+	out, err := p.createNewPin(context.Background(), intent)
+	if err != nil || out.reservation == nil || !slices.Contains(out.receipt.Obligations, original) {
+		t.Fatal("original intent rebound or refused after caller-only mutation", err)
+	}
+	t.Cleanup(func() {
+		_ = syscall.Flock(int(out.reservation.file.Fd()), syscall.LOCK_UN)
+		_ = out.reservation.file.Close()
+	})
+}
