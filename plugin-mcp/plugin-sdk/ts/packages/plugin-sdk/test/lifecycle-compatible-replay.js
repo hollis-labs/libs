@@ -35,12 +35,34 @@ export function remoteDisposition(row, candidateValidation = false) {
   assert.ok(row.status === "proposed" || row.status === "observed", "unsupported authored status");
   return "candidate";
 }
+const EFFECT_REQUIRED = ["entered", "load", "reverse_pending", "ordinary_queued",
+  "control_queued", "reserved_frames", "reserved_bytes"];
+function physicalCounters(v, exp, previous, cleaned = false) {
+  decodeJSONObject(JSON.stringify(v), EFFECT_REQUIRED,
+    ["hold", "returned", "unload_attempts"]);
+  for (const [key, value] of Object.entries(v))
+    assert.ok(Number.isSafeInteger(value) && value >= 0, "invalid physical counter " + key);
+  // Optional absent cumulative counters denote zero, matching unchanged workers.
+  const limits = { entered: exp.entered, load: exp.load, hold: exp.name === "hold" ? exp.slots : 0,
+    returned: exp.returned };
+  for (const [key, limit] of Object.entries(limits)) {
+    assert.ok((v[key] ?? 0) <= limit, "callback counter exceeds domain " + key);
+    assert.ok((v[key] ?? 0) >= (previous?.[key] ?? 0), "decreasing cumulative counter " + key);
+  }
+  assert.equal(v.entered, v.load + (v.hold ?? 0), "callback inventory");
+  assert.ok((v.returned ?? 0) <= (v.hold ?? 0), "returned without ordinary callback");
+  assert.equal(v.reverse_pending, 0, "unexpected reverse call");
+  assert.equal(v.unload_attempts ?? 0, cleaned ? 1 : 0, "cleanup before actual EOF");
+  // Queue and credit occupancy can move while terminal writes retire. They are
+  // bounded instantaneous values, not cumulative effects or named barriers.
+  assert.ok(v.reserved_frames <= exp.slots, "terminal credits exceed recipe domain");
+  assert.equal(v.reserved_bytes, v.reserved_frames * 1024, "terminal credit byte custody");
+  assert.ok(v.ordinary_queued <= exp.slots + 3 && v.control_queued <= exp.slots + 3,
+    "queue occupancy exceeds complete request inventory");
+}
 function counters(v, exp, phase, cleaned = false) {
   const held = phase === "saturated" || phase === "after-refusal";
-  const allowed = ["entered", "load", "hold", "returned", "reverse_pending", "ordinary_queued",
-    "control_queued", "reserved_frames", "reserved_bytes", "unload_attempts"];
-  assert.ok(Object.keys(v).every(key => allowed.includes(key)), "unexpected callback/effect counter");
-  assert.equal(v.unload_attempts ?? 0, cleaned ? 1 : 0, "cleanup before actual EOF");
+  physicalCounters(v, exp, undefined, cleaned);
   assert.equal(v.entered, phase === "startup" ? 1 : exp.entered);
   assert.equal(v.load, phase === "startup" ? 1 : exp.load);
   assert.equal(v.hold ?? 0, exp.name === "hold" && phase !== "startup" ? 16 : 0);
@@ -193,6 +215,8 @@ export function verifyRemoteEvidence(evidence) {
           assert.equal(e.seq, acks.size + 1); acks.add(e.seq); break;
         case "snapshot":
           closed(e, ["kind", "effects"]);
+          assert.ok(!halfclose, "snapshot after actual EOF");
+          physicalCounters(e.effects, exp, lastSnapshot);
           assert.ok(snapshotControls > 0); snapshotControls--; lastSnapshot = e.effects; break;
         case "unload_started":
           closed(e, ["kind"]); assert.ok(halfclose && final && !cleanup);
@@ -200,6 +224,7 @@ export function verifyRemoteEvidence(evidence) {
         case "finished":
           closed(e, ["kind", "effects", "transport_error"], ["transport_error"]);
           assert.ok(halfclose && cleanup); assert.equal(e.transport_error, null);
+          physicalCounters(e.effects, exp, lastSnapshot, true);
           counters(e.effects, exp, "final", true);
           finished = true; break;
         default: assert.fail("unexpected fixture event " + e.kind);
