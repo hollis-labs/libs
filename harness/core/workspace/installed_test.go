@@ -984,8 +984,17 @@ func TestInstalledRefusedRetryKeepsTrustedOriginalObligations(t *testing.T) {
 			if err == nil || cancelled && !errors.Is(err, context.Canceled) || !slices.Contains(result.Obligations, old.Obligations[0]) || !slices.Contains(result.Receipt.Obligations, old.Obligations[0]) || !slices.Contains(result.Retained, s.Installed.Target) || !slices.Contains(result.Retained, s.Installed.Control) || !reflect.DeepEqual(p.Resources().RecoveryReceipts[0], old) || len(f.events) > 0 || len(f.records) > 0 || len(result.Handles) > 0 || result.ArtifactsComplete() {
 				t.Fatalf("lost original retry or reached ports: %v %+v", err, result)
 			}
-			if result.Receipt.Installed != nil {
-				t.Fatal("flattened older installed evidence under new envelope")
+			if !reflect.DeepEqual(result.Receipt, old) {
+				t.Fatal("refusal did not return original trusted wrapper intact")
+			}
+			// A further retry carries the same trusted origin, never the refused
+			// new operation or a freshly minted evidence header.
+			s.OperationID = "fixture-third-operation"
+			r.RecoveryReceipts = []workspace.Receipt{result.Receipt}
+			third := planned(t, s, c, r, o)
+			again, err := workspace.Materialize(context.Background(), third, ports)
+			if err == nil || !reflect.DeepEqual(again.Receipt, old) || !reflect.DeepEqual(third.Resources().RecoveryReceipts[0], old) || !slices.Contains(again.Obligations, old.Obligations[0]) || len(f.events) > 0 {
+				t.Fatal("cross-retry origin rebased/lost", err)
 			}
 		})
 	}

@@ -317,6 +317,12 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 			result.Retained = appendRoot(result.Retained, root.Root)
 		}
 	}
+	// Until a new attempt earns its own durable evidence, return the admitted
+	// originating wrapper intact. A refused/cancelled attempt must be retryable
+	// without flattening older Installed.Header under this operation's envelope.
+	if len(p.resources.RecoveryReceipts) == 1 {
+		result.Receipt = copyRecord(p.resources.RecoveryReceipts[0])
+	}
 	result.Receipt.Obligations = slices.Clone(result.Obligations)
 	if ctx == nil || ports.Host == nil || ports.Locks == nil || ports.Clock == nil || ports.Observations == nil || ports.ReceiptStore == nil {
 		return result, refuse(CodeMissingApplyPort, "installed", Unsupported)
@@ -571,6 +577,7 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	engineRequest.Installed.ControlIdentity = materialize.InstalledIdentity(controlInfo)
 	evidence := prepared.Evidence()
 	evidence.Generation = p.digest
+	result.Receipt = Receipt{SchemaVersion: SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest, IdentityKey: p.spec.Identity.EncodedKey, Identity: p.spec.Identity, Phase: Planned, Roots: []RootReceipt{{Root: p.spec.Installed.Target}, {Root: p.spec.Installed.Control}}}
 	result.Receipt.Installed = &evidence
 	for _, receipt := range p.resources.RecoveryReceipts {
 		for _, o := range receipt.Obligations {

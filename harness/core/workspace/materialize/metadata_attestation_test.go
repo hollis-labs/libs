@@ -31,7 +31,7 @@ func syntheticInstalledAdmission(t *testing.T) (Request, installedOriginalLedger
 		return InstalledOriginalRoot{ID: id, Path: filepath.Join(base, id), AllowedBase: base, Owner: "synthetic-owner", Provenance: "synthetic-host", Identity: "synthetic-inode-" + id, Volume: creation.Volume, CapabilityRevision: installedMetadataRevision, ObservationRevision: "synthetic-observation-1", Metadata: m}
 	}
 	before, after := []byte("old"), []byte("new")
-	c := &InstalledOriginalContext{SchemaVersion: "workspace.v1", OperationID: "synthetic-operation", InputDigest: "sha256:" + strings.Repeat("a", 64), Identity: InstalledOriginalIdentity{AgentURN: "urn:fixture:agent", EncodedKey: "fixture-key", Instance: "fixture-instance", Session: "fixture-session", Assignment: "fixture-assignment", DefinitionRevision: "fixture-revision", SemanticDigest: artifact.DigestBytes([]byte("semantic")), ArtifactDigest: artifact.DigestBytes([]byte("artifact")), DependencyDigest: artifact.DigestBytes([]byte("dependency"))}, Fence: InstalledOriginalFence{ID: "synthetic-fence", Path: filepath.Join(base, "fence"), Revision: "1", Provenance: "synthetic-host"}, Target: root("target", directory), Control: root("control", privateDir), Lock: root("lock", privateDir), ObservedAt: at, ExpiresAt: at.Add(time.Minute), Expected: InstalledExpectedIssuer{Issuer: "synthetic-issuer", Schema: "synthetic-schema", Implementation: "synthetic-version", Backend: "synthetic-backend", OS: "synthetic-os", Kernel: "synthetic-kernel", Filesystem: "synthetic-fs", Mount: "synthetic-mount", Volume: creation.Volume, SecurityContext: "synthetic-security", UserNamespace: "synthetic-namespace", CredentialVisibility: "synthetic-credentials"}, Grants: []InstalledOriginalGrant{{ID: "file-grant", Version: "1", Path: "fixture.txt", WholeFile: true}}, Authorizations: []InstalledOriginalAuthorization{{Kind: "installed_artifacts", RootID: "target", AuthorizationID: "file-grant", Version: "1"}, {Kind: "directory", RootID: "control", AuthorizationID: "control-grant", Version: "1"}}, Files: []InstalledOriginalFile{{Path: "fixture.txt", Exists: true, Kind: artifact.EntryFile, Identity: "synthetic-file-inode", Mode: 0600, Digest: artifact.DigestBytes(before), Metadata: leaf}}}
+	c := &InstalledOriginalContext{SchemaVersion: "workspace.v1", OperationID: "synthetic-operation", InputDigest: "sha256:" + strings.Repeat("a", 64), Identity: InstalledOriginalIdentity{AgentURN: "urn:fixture:agent", EncodedKey: "fixture-key", Instance: "fixture-instance", Session: "fixture-session", Assignment: "fixture-assignment", DefinitionRevision: "fixture-revision", SemanticDigest: artifact.DigestBytes([]byte("semantic")), ArtifactDigest: artifact.DigestBytes([]byte("artifact")), DependencyDigest: artifact.DigestBytes([]byte("dependency"))}, Fence: InstalledOriginalFence{ID: "synthetic-fence", Path: filepath.Join(base, "fence"), Revision: "1", Provenance: "synthetic-host"}, Target: root("target", directory), Control: root("control", privateDir), Lock: root("lock", privateDir), ObservedAt: at, ExpiresAt: at.Add(time.Minute), Expected: InstalledExpectedIssuer{Issuer: "synthetic-issuer", Schema: "synthetic-schema", Implementation: "synthetic-version", Backend: "synthetic-backend", OS: "synthetic-os", Kernel: "synthetic-kernel", Filesystem: "synthetic-fs", Mount: "synthetic-mount", Volume: creation.Volume, SecurityContext: "synthetic-security", UserNamespace: "synthetic-namespace", CredentialVisibility: "synthetic-credentials"}, Grants: []InstalledOriginalGrant{{ID: "file-grant", Version: "1", Path: "fixture.txt", WholeFile: true}}, Authorizations: []InstalledOriginalAuthorization{{Kind: "installed_artifacts", RootID: "target", AuthorizationID: "file-grant", Version: "1"}, {Kind: "owned_directory", RootID: "control", AuthorizationID: "control-grant", Version: "1"}}, Files: []InstalledOriginalFile{{Path: "fixture.txt", Exists: true, Kind: artifact.EntryFile, Identity: "synthetic-file-inode", Mode: 0600, Digest: artifact.DigestBytes(before), Metadata: leaf}}}
 	cap := InstalledCapabilities{Volume: creation.Volume, RootIdentity: c.Target.Identity, Revision: installedMetadataRevision, ObservationRevision: c.Target.ObservationRevision, CaseMode: CaseSensitive, Creation: creation, RootMetadata: directory}
 	req := Request{InstalledOriginalContext: c, Operation: OperationInstall, TargetRoot: c.Target.Path, Generation: c.InputDigest, Artifacts: artifact.Tree{Entries: []artifact.Entry{{Path: "fixture.txt", Kind: artifact.EntryFile, Mode: 0600, Bytes: after}}}, Installed: &InstalledPolicy{Capabilities: cap, CaseMode: CaseSensitive, TargetIdentity: c.Target.Identity, ControlIdentity: c.Control.Identity, Files: []InstalledFileChange{{Path: "fixture.txt", BeforeExists: true, BeforeIdentity: c.Files[0].Identity, Before: artifact.DigestBytes(before), After: artifact.DigestBytes(after), BeforeMode: 0600, AfterMode: 0600, BeforeMetadata: leaf, AfterMetadata: leaf, GrantID: "file-grant", GrantVersion: "1", Phase: InstalledPrepared}}}}
 	ledger, err := freezeInstalledOriginal(req)
@@ -520,5 +520,26 @@ func TestMetadataPrivateEnvelopeIntegrityIsNotMutableWindow(t *testing.T) {
 	e.issuer = nil
 	if _, err := verifyInstalledAttestation(context.Background(), ledger, &e, ledger.original, now); err == nil {
 		t.Fatal("integrity issued authority")
+	}
+}
+
+func TestMetadataControlGrantRequiredBeforePrivateAdmission(t *testing.T) {
+	for _, name := range []string{"missing", "foreign-root", "foreign-kind", "missing-version"} {
+		t.Run(name, func(t *testing.T) {
+			req, _, _, _ := syntheticInstalledAdmission(t)
+			switch name {
+			case "missing":
+				req.InstalledOriginalContext.Authorizations = req.InstalledOriginalContext.Authorizations[:1]
+			case "foreign-root":
+				req.InstalledOriginalContext.Authorizations[1].RootID = "foreign"
+			case "foreign-kind":
+				req.InstalledOriginalContext.Authorizations[1].Kind = "managed_tree"
+			case "missing-version":
+				req.InstalledOriginalContext.Authorizations[1].Version = ""
+			}
+			if _, err := freezeInstalledOriginal(req); err == nil {
+				t.Fatal("missing/foreign control grant accepted")
+			}
+		})
 	}
 }

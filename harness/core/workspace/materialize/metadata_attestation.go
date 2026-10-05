@@ -234,6 +234,9 @@ func freezeInstalledOriginal(r Request) (installedOriginalLedger, error) {
 			return installedOriginalLedger{}, ErrConflict
 		}
 	}
+	if !installedOriginalScopeValid(c, grants) {
+		return installedOriginalLedger{}, ErrConflict
+	}
 	if len(grants) != len(frozen.Installed.Files) || len(c.Files) != len(frozen.Installed.Files) {
 		return installedOriginalLedger{}, ErrConflict
 	}
@@ -527,4 +530,34 @@ func installedStageIntegrity(p issuedInstalledStageObservation) [32]byte {
 	}{p.requestSeal, p.admissionSeal, p.stage, p.parentIdentity, p.revision, p.observedAt, p.validUntil})
 	b = append(b, installedCoverageBytes(p.coverage)...)
 	return sha256.Sum256(append([]byte("workspace.installed.stage.v1\x00"), b...))
+}
+
+// These are the existing installed/control effect kinds, compared as data to
+// the original scope. This does not enroll or manufacture a grant.
+func installedOriginalScopeValid(c *InstalledOriginalContext, grants map[string]InstalledOriginalGrant) bool {
+	control := false
+	seen := map[InstalledOriginalAuthorization]bool{}
+	for _, a := range c.Authorizations {
+		if a.AuthorizationID == "" || a.Version == "" || seen[a] {
+			return false
+		}
+		seen[a] = true
+		if a.Kind == "owned_directory" && a.RootID == c.Control.ID {
+			control = true
+			continue
+		}
+		if a.Kind != "installed_artifacts" || a.RootID != c.Target.ID {
+			return false
+		}
+		found := false
+		for _, g := range grants {
+			if g.ID == a.AuthorizationID && g.Version == a.Version {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return control
 }
