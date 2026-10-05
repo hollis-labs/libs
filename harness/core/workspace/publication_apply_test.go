@@ -152,3 +152,67 @@ func TestPublicationUnsupportedRetainsOriginalRecoveryWithoutApplyCallbacks(t *t
 		t.Fatal("foreign original admitted by unavailable publication path")
 	}
 }
+
+func TestPinOriginsPreserveOriginalOperationAcrossRepeatedUnavailableRetries(t *testing.T) {
+	s, c, r, o := publicationInputs(t)
+	first := fixturePlanned(t, s, c, r, o)
+	intent, err := first.PinCreationIntent()
+	if err != nil {
+		t.Fatal(err)
+	}
+	obligation := Obligation{Kind: RecoveryInspectionRequired, RootID: s.Boot.IdentityRoot.ID, Code: "original-created-or-uncertain-pin"}
+	intent.Uncertain = true // Original durable intent/uncertain transport, no created inode asserted.
+	receipt := Receipt{SchemaVersion: SchemaVersion, OperationID: s.OperationID, InputDigest: first.Digest(), IdentityKey: s.Identity.EncodedKey, Identity: s.Identity, Phase: Interrupted, PinCreation: &intent, Obligations: []Obligation{obligation}}
+	for _, operation := range []string{"retry-one", "retry-two", "retry-three"} {
+		s.OperationID = operation
+		r.RecoveryReceipts = []Receipt{receipt}
+		p := fixturePlanned(t, s, c, r, o)
+		result, err := Materialize(context.Background(), p, Ports{})
+		if err == nil || result.Status != Partial || result.ArtifactsComplete() || result.LaunchReady() || !slices.Contains(result.Obligations, obligation) || len(result.Receipt.PinOrigins) != 1 || result.Receipt.PinOrigins[0].OperationID != first.OperationID() || result.Receipt.PinOrigins[0].InputDigest != first.Digest() || result.Receipt.PinOrigins[0].Evidence != intent {
+			t.Fatalf("retry rebound original pin intent: %+v %v", result, err)
+		}
+		receipt = result.Receipt
+	}
+}
+
+func TestPinOriginCoherentInnerSpliceRefusesBeforeAnyApplyPort(t *testing.T) {
+	for _, kind := range []string{"own-operation", "own-digest", "inherited-operation", "inherited-digest", "foreign-control", "foreign-key", "foreign-grant-root"} {
+		t.Run(kind, func(t *testing.T) {
+			s, c, r, o := publicationInputs(t)
+			original := fixturePlanned(t, s, c, r, o)
+			evidence, err := original.PinCreationIntent()
+			if err != nil {
+				t.Fatal(err)
+			}
+			e := &evidence
+			receipt := Receipt{SchemaVersion: SchemaVersion, OperationID: s.OperationID, InputDigest: original.Digest(), IdentityKey: s.Identity.EncodedKey, Identity: s.Identity, Phase: Interrupted, PinCreation: e}
+			if kind == "inherited-operation" || kind == "inherited-digest" {
+				s.OperationID = "intermediate"
+				r.RecoveryReceipts = []Receipt{receipt}
+				middle := fixturePlanned(t, s, c, r, o)
+				result, _ := Materialize(context.Background(), middle, Ports{})
+				receipt = result.Receipt
+				e = &receipt.PinOrigins[0].Evidence
+			}
+			switch kind {
+			case "own-operation", "inherited-operation":
+				e.Origin.OperationID = "foreign"
+			case "own-digest", "inherited-digest":
+				e.Origin.InputDigest = s.Identity.SemanticDigest.Hex
+			case "foreign-control":
+				e.Control.Owner = "foreign"
+			case "foreign-key":
+				e.Key.CanonicalID += "-foreign"
+			case "foreign-grant-root":
+				e.Grant.RootID = s.Home.Root.ID
+			}
+			s.OperationID = "final-retry"
+			r.RecoveryReceipts = []Receipt{receipt}
+			p := fixturePlanned(t, s, c, r, o)
+			result, err := Materialize(context.Background(), p, Ports{})
+			if err == nil || result.Status != Conflict || result.ArtifactsComplete() || result.LaunchReady() {
+				t.Fatalf("foreign original admitted before mutation: %+v %v", result, err)
+			}
+		})
+	}
+}

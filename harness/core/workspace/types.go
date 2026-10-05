@@ -14,6 +14,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/install"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/publication"
 	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
@@ -312,7 +313,11 @@ type RepositoryOrigin struct {
 }
 
 type Receipt struct {
-	Installed                                            *install.Evidence `json:",omitempty"`
+	// PinCreation is this operation's control-only intent/observed inode. Earlier
+	// operations retain their independently admitted envelope in PinOrigins.
+	PinCreation                                          *PinCreationEvidence `json:",omitempty"`
+	PinOrigins                                           []PinCreationOrigin  `json:",omitempty"`
+	Installed                                            *install.Evidence    `json:",omitempty"`
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
 	// receipts leave it empty and make no enrollment or continuity claim.
@@ -328,6 +333,24 @@ type Receipt struct {
 	EffectEvidence     []effects.Evidence
 	Obligations        []Obligation
 	RecordedAt         time.Time
+}
+
+// NativePinIdentity is descriptor evidence only. It supplies neither a volume
+// capability, complete metadata coverage, absence nor shim adoption.
+type NativePinIdentity struct{ Device, Inode uint64 }
+type PinCreationEvidence struct {
+	Version                        string
+	Origin                         publication.Origin
+	Control                        RootRef
+	Key                            LockKey
+	Path, JournalID, ReservationID string
+	Grant                          EffectGrant
+	Identity                       NativePinIdentity
+	Created, Uncertain             bool
+}
+type PinCreationOrigin struct {
+	SchemaVersion, OperationID, InputDigest, IdentityKey string
+	Evidence                                             PinCreationEvidence
 }
 
 type Diagnostic struct {

@@ -4,6 +4,7 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -45,6 +46,217 @@ func existingPinFixture(t *testing.T) (*ports, workspace.LockKey, *heldUnion, pi
 		t.Fatal(err)
 	}
 	return p, key, union, inode, path
+}
+
+func newPinFixture(t *testing.T) (*ports, workspace.PlannedWorkspace, []workspace.HeldLock, workspace.Receipt) {
+	t.Helper()
+	p, key, _ := custodyFixture(t)
+	base := filepath.Dir(key.Namespace)
+	urn := "urn:fixture:new-pin"
+	encoded, err := bootkey.Encode(urn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := func(id, path string) workspace.RootRef {
+		return workspace.RootRef{ID: id, Path: path, AllowedBase: base, Owner: "fixture", Provenance: "fixture"}
+	}
+	parent := ref("identity", filepath.Join(base, encoded))
+	if err := os.Mkdir(parent.Path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	home, current, candidate, aside := ref("home", filepath.Join(base, "home")), ref("current", filepath.Join(parent.Path, "current")), ref("candidate", filepath.Join(parent.Path, "candidate")), ref("aside", filepath.Join(parent.Path, "aside-original"))
+	control := ref("control", key.Namespace)
+	d := artifact.DigestBytes([]byte("SYNTHETIC native transport only"))
+	s := workspace.Spec{SchemaVersion: workspace.SchemaVersion, OperationID: "original-new-pin", Operation: workspace.Prepare,
+		Identity: workspace.IdentitySpec{AgentURN: urn, EncodedKey: encoded, Session: "fixture-session", DefinitionRevision: "fixture-revision", SemanticDigest: d, ArtifactDigest: d, DependencyDigest: d, Fence: workspace.ResourceRef{ID: "fixture-fence", Revision: "1"}},
+		Home:     workspace.HomeSpec{Root: home, Layout: workspace.FullHome, Continuity: workspace.Durable, Retention: workspace.Keep},
+		Boot:     workspace.BootSpec{IdentityRoot: parent, Current: current, Candidate: candidate, Retention: workspace.RetainForRecovery},
+		CWD:      workspace.CWDSpec{RootID: home.ID, Relative: "."}, Sandbox: workspace.SandboxSpec{Policy: sandbox.ResolvedAccessPolicy{Mode: sandbox.ConfinementDisabled}}, Cleanup: workspace.CleanupPolicy{Retention: workspace.Keep}}
+	g := workspace.EffectGrant{Kind: workspace.PublicationEffect, RootID: parent.ID, AuthorizationID: "fixture-publish-authority", Version: "1"}
+	pg := workspace.EffectGrant{Kind: workspace.PinCreationEffect, RootID: parent.ID, AuthorizationID: "fixture-pin-authority", Version: "1"}
+	s.Publication = &workspace.PublicationSpec{Control: control, Aside: aside, JournalID: "fixture-journal", ReservationID: "fixture-reservation", Authorization: g, PinCreationAuthorization: pg}
+	s.Effects = []workspace.EffectGrant{{Kind: workspace.DirectoryEffect, RootID: home.ID, AuthorizationID: "fixture-directory", Version: "1"}, {Kind: workspace.DirectoryEffect, RootID: parent.ID, AuthorizationID: "fixture-directory", Version: "1"}, g, pg}
+	r := workspace.Resources{Roots: []workspace.RootRef{home, parent, current, candidate, aside}, LockRoot: control, LockNamespace: control.Path, Grants: s.Effects, Capabilities: []workspace.Capability{workspace.CanonicalRoots, workspace.MutationLocks}}
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	o := workspace.Observations{At: at, ExpiresAt: at.Add(time.Minute), FenceVersion: s.Identity.Fence.Revision, Capabilities: r.Capabilities}
+	for _, root := range append(append([]workspace.RootRef(nil), r.Roots...), control) {
+		o.Roots = append(o.Roots, workspace.RootObservation{RootID: root.ID, DeclaredPath: root.Path, CanonicalPath: root.Path, CanonicalBase: root.AllowedBase, Owner: root.Owner, Exists: root.ID == control.ID || root.ID == parent.ID, Directory: root.ID == control.ID || root.ID == parent.ID})
+	}
+	plan, err := workspace.Plan(s, workspace.ResolvedContent{}, r, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.options.OperationID, p.options.ControlRoot, p.options.Resources = s.OperationID, control, r
+	p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error { return nil }
+	held := []workspace.HeldLock{}
+	for _, k := range plan.LockKeys() {
+		l, err := p.Acquire(context.Background(), k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held = append(held, l)
+	}
+	t.Cleanup(func() {
+		for i := len(held) - 1; i >= 0; i-- {
+			_ = held[i].Release()
+		}
+	})
+	// Synthetic transport accounting, NOT a real artifact seal/metadata/absence
+	// producer or an actually supported public publication operation.
+	receipt := workspace.Receipt{SchemaVersion: workspace.SchemaVersion, OperationID: s.OperationID, InputDigest: plan.Digest(), IdentityKey: encoded, Identity: s.Identity, Phase: workspace.ArtifactsCommitted, Obligations: []workspace.Obligation{{Kind: workspace.RecoveryInspectionRequired, RootID: parent.ID, Code: "prior-uncertain-obligation"}}}
+	if err := p.Record(context.Background(), receipt); err != nil {
+		t.Fatal(err)
+	}
+	return p, plan, held, receipt
+}
+
+func TestNewPinRequiresFullUnionAndDurableIntentThenPreservesInode(t *testing.T) {
+	p, plan, held, receipt := newPinFixture(t)
+	if _, err := p.preparePinCreation(context.Background(), plan, held[:len(held)-1], receipt); err == nil {
+		t.Fatal("missing EX resource admitted creation")
+	}
+	intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := p.createNewPin(context.Background(), intent)
+	if err != nil || !out.evidence.Created || out.evidence.Uncertain || out.reservation == nil || out.evidence.Identity.Inode == 0 {
+		t.Fatalf("new inode protocol: %+v %v", out, err)
+	}
+	t.Cleanup(func() {
+		_ = syscall.Flock(int(out.reservation.file.Fd()), syscall.LOCK_UN)
+		_ = out.reservation.file.Close()
+	})
+	if err := p.verifyPinReceipt(out.receipt); err != nil {
+		t.Fatal("observed durable receipt differs", err)
+	}
+	if len(out.receipt.Obligations) != len(receipt.Obligations) || out.receipt.Obligations[0] != receipt.Obligations[0] {
+		t.Fatal("new pin erased earlier uncertainty")
+	}
+	if _, err := p.createNewPin(context.Background(), intent); err == nil {
+		t.Fatal("same token replayed after observed receipt")
+	}
+	for _, l := range held {
+		if err := l.Release(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := out.reservation.validatePinCustody(context.Background()); err != nil {
+		t.Fatal("caller SH disappeared on EX release", err)
+	}
+	other, err := os.OpenFile(out.evidence.Path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	if err := syscall.Flock(int(other.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
+		t.Fatal("supplemental SH did not exclude EX")
+	}
+}
+
+func TestNewPinRejectsIntentFailuresAndLateAuthorityWithoutCleanup(t *testing.T) {
+	for _, kind := range []string{"foreign-receipt", "failed-record", "post-record-cancel", "late-authority", "receipt-rebound", "occupied-after-intent", "observed-authority", "late-configured-control", "late-configured-grant"} {
+		t.Run(kind, func(t *testing.T) {
+			p, plan, held, receipt := newPinFixture(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			e, _ := plan.PinCreationIntent()
+			if kind == "foreign-receipt" {
+				receipt.InputDigest = "foreign"
+			}
+			if kind == "failed-record" {
+				path := filepath.Join(p.options.ControlRoot.Path, "receipt-lock-"+digestName(p.options.OperationID))
+				if err := os.Chmod(path, 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if kind == "post-record-cancel" {
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					r, err := p.readReceipt()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if r.PinCreation != nil {
+						cancel()
+					}
+					return nil
+				}
+			}
+			intent, err := p.preparePinCreation(ctx, plan, held, receipt)
+			if kind == "foreign-receipt" || kind == "failed-record" || kind == "post-record-cancel" {
+				if err == nil || intent != nil {
+					t.Fatal("failed original intent earned creation token")
+				}
+				if _, err := os.Lstat(e.Path); !os.IsNotExist(err) {
+					t.Fatal("failed original intent created pin")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch kind {
+			case "late-configured-control":
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					p.options.ControlRoot.Owner = "foreign"
+					return nil
+				}
+			case "late-configured-grant":
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					p.options.Resources.Grants = nil
+					return nil
+				}
+			case "late-authority":
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					return errors.New("expired frozen grant")
+				}
+			case "receipt-rebound":
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					bad := intent.receipt
+					bad.OperationID = "foreign"
+					data, _ := json.Marshal(bad)
+					if err := p.control.WriteFile("receipt-"+digestName(p.options.OperationID)+".json", data, 0600); err != nil {
+						t.Fatal(err)
+					}
+					return nil
+				}
+			case "occupied-after-intent":
+				if err := os.WriteFile(e.Path, []byte("retained-existing-inode"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			case "observed-authority":
+				p.options.ValidateAuthority = func(context.Context, workspace.Spec, workspace.Resources) error {
+					r, err := p.readReceipt()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if r.PinCreation != nil && r.PinCreation.Created {
+						return errors.New("expired after observed Record")
+					}
+					return nil
+				}
+			}
+			out, err := p.createNewPin(ctx, intent)
+			if err == nil || out.reservation != nil {
+				t.Fatal("late callback/occupation earned shared use admission")
+			}
+			if kind == "observed-authority" {
+				if !out.evidence.Created || !out.evidence.Uncertain {
+					t.Fatal("late failure erased actual-created uncertain evidence")
+				}
+				if _, err := os.Lstat(e.Path); err != nil {
+					t.Fatal("late failure removed retained pin", err)
+				}
+			} else if kind == "occupied-after-intent" {
+				b, err := os.ReadFile(e.Path)
+				if err != nil || string(b) != "retained-existing-inode" || out.evidence.Created {
+					t.Fatal("existing inode adopted/truncated")
+				}
+			} else if _, err := os.Lstat(e.Path); !os.IsNotExist(err) {
+				t.Fatal("precreation refusal mutated pin")
+			}
+		})
+	}
 }
 
 func TestExistingPinProbeThenSeparateSharedDescriptor(t *testing.T) {

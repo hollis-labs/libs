@@ -161,6 +161,21 @@ func carryRecovery(result *ApplyResult, p PlannedWorkspace, live Observations) e
 			}
 			appendObligation(result, o)
 		}
+		pinOrigins, pinErr := admitPinCreationOrigins(r)
+		if pinErr != nil {
+			return pinErr
+		}
+		for _, origin := range pinOrigins {
+			e := origin.Evidence
+			if e.Origin.AgentURN != p.spec.Identity.AgentURN || e.Grant.RootID != p.spec.Boot.IdentityRoot.ID || e.Control != p.resources.LockRoot || e.Key.Namespace != p.resources.LockNamespace || e.Key.CanonicalID != p.spec.Boot.IdentityRoot.Path {
+				return refuse("pin_creation_origin_mismatch", "publication", Conflict)
+			}
+			result.Retained = appendRoot(result.Retained, p.spec.Boot.IdentityRoot)
+			if !slices.Contains(result.Receipt.PinOrigins, origin) {
+				result.Receipt.PinOrigins = append(result.Receipt.PinOrigins, origin)
+			}
+			appendObligation(result, Obligation{Kind: RecoveryInspectionRequired, RootID: origin.Evidence.Grant.RootID, Code: "original_pin_observation_required"})
+		}
 		origins, originErr := admitRepositoryOrigins(r)
 		if originErr != nil {
 			return originErr

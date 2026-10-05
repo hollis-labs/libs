@@ -17,12 +17,16 @@ import (
 )
 
 type publicationFixtureHost struct {
-	control publication.Root
-	records []publication.Journal
-	hook    func(publication.Journal) error
+	control  publication.Root
+	records  []publication.Journal
+	hook     func(publication.Journal) error
+	validate func(publication.Journal) error
 }
 
-func (h *publicationFixtureHost) ValidatePublication(context.Context, PublishRequest) error {
+func (h *publicationFixtureHost) ValidatePublication(_ context.Context, req PublishRequest) error {
+	if h.validate != nil {
+		return h.validate(req.Journal.Clone())
+	}
 	return nil
 }
 func (h *publicationFixtureHost) PublicationControl() publication.Root { return h.control }
@@ -259,5 +263,72 @@ func TestSyntheticPublicationRefusesChangedTargetsAndReplay(t *testing.T) {
 				t.Fatal("refusal altered old current", err)
 			}
 		})
+	}
+}
+
+func TestSyntheticPublicationLateAuthorityAndPhysicalCallbacks(t *testing.T) {
+	for _, stage := range []publication.Phase{publication.OldAsideIntent, publication.CandidateCurrentIntent, publication.CurrentObserved, publication.PublicationCommitted} {
+		for _, adverse := range []string{"revoked", "cancelled", "control-rebound", "pin-rebound", "candidate-manifest-changed"} {
+			t.Run(string(stage)+"/"+adverse, func(t *testing.T) {
+				req, host, capability := publicationFixture(t, true)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				var revoked bool
+				host.validate = func(publication.Journal) error {
+					if revoked {
+						return errors.New("SYNTHETIC authority expired/revoked")
+					}
+					return nil
+				}
+				host.hook = func(j publication.Journal) error {
+					if j.Events[len(j.Events)-1].Phase != stage {
+						return nil
+					}
+					switch adverse {
+					case "revoked":
+						revoked = true
+					case "cancelled":
+						cancel()
+					case "control-rebound":
+						host.control.Provenance = "foreign"
+					case "pin-rebound":
+						if err := os.Rename(j.Use.PinPath, j.Use.PinPath+"-retained"); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.WriteFile(j.Use.PinPath, []byte("foreign"), 0600); err != nil {
+							t.Fatal(err)
+						}
+					case "candidate-manifest-changed":
+						path := j.Layout.Candidate.Path
+						if stage == publication.CurrentObserved || stage == publication.PublicationCommitted {
+							path = j.Layout.Current.Path
+						}
+						if err := SaveManifest(path, Manifest{Generation: "foreign"}); err != nil {
+							t.Fatal(err)
+						}
+					}
+					return nil
+				}
+				out, err := NewEngine(EngineOptions{}).publishVerified(ctx, req, host, capability)
+				if err == nil || out.Committed || len(out.Retained) != 3 {
+					t.Fatalf("late callback minted completion/lost retention: %+v %v", out, err)
+				}
+				if stage == publication.OldAsideIntent {
+					if out.Mutated {
+						t.Fatal("late first-intent callback permitted a rename")
+					}
+					if _, err := LoadManifest(req.Journal.Layout.Current.Path); err != nil {
+						t.Fatal("current lost before first mutation", err)
+					}
+				} else {
+					if !out.Mutated {
+						t.Fatal("late refusal erased prior mutation")
+					}
+					if _, err := LoadManifest(req.Journal.Layout.Aside.Path); err != nil {
+						t.Fatal("late failure removed prior old-current obligation", err)
+					}
+				}
+			})
+		}
 	}
 }
