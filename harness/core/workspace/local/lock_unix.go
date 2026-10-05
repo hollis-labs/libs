@@ -9,18 +9,25 @@ import (
 	"io/fs"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
 
 type heldLock struct {
-	file *os.File
-	once sync.Once
-	err  error
+	file   *os.File
+	owner  *ports
+	name   string
+	active atomic.Bool
+	once   sync.Once
+	err    error
 }
 
 func (l *heldLock) Release() error {
-	l.once.Do(func() { l.err = errors.Join(syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN), l.file.Close()) })
+	l.once.Do(func() {
+		l.active.Store(false)
+		l.err = errors.Join(syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN), l.file.Close())
+	})
 	return l.err
 }
 func (p *ports) acquireFile(ctx context.Context, name string) (workspace.HeldLock, error) {
@@ -54,7 +61,9 @@ func (p *ports) acquireFile(ctx context.Context, name string) (workspace.HeldLoc
 			if err != nil {
 				return nil, errors.Join(err, syscall.Flock(int(file.Fd()), syscall.LOCK_UN), file.Close())
 			}
-			return &heldLock{file: file}, nil
+			lock := &heldLock{file: file, owner: p, name: name}
+			lock.active.Store(true)
+			return lock, nil
 		}
 		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
 			file.Close()

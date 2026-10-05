@@ -62,7 +62,12 @@ func (p PlannedWorkspace) Valid() bool { return p.valid }
 
 func (p PlannedWorkspace) EffectInputs() EffectInputs { return copyRecord(p.effectInputs) }
 
-func (p PlannedWorkspace) Digest() string            { return p.digest }
+func (p PlannedWorkspace) Digest() string      { return p.digest }
+func (p PlannedWorkspace) OperationID() string { return p.spec.OperationID }
+
+// Resources returns detached frozen host inputs for operation-bound native
+// consumers. It supplies no fresh authority or physical custody proof.
+func (p PlannedWorkspace) Resources() Resources      { return copyRecord(p.resources) }
 func (p PlannedWorkspace) Roots() []RootRef          { return slices.Clone(p.roots) }
 func (p PlannedWorkspace) LockKeys() []LockKey       { return slices.Clone(p.locks) }
 func (p PlannedWorkspace) Diagnostics() []Diagnostic { return slices.Clone(p.diagnostics) }

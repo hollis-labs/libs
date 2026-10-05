@@ -65,6 +65,11 @@ func TestPlanIsFrozenAndKeepsOrderedBindings(t *testing.T) {
 	empty.Ownership.EntryID = "fixture-empty"
 	c.Rendered[0].Tree.Entries = append(c.Rendered[0].Tree.Entries, empty)
 	p := planned(t, s, c, r, o)
+	frozenResources := p.Resources()
+	frozenResources.Roots[0].Owner = "changed-native-consumer"
+	if p.OperationID() != s.OperationID || p.Resources().Roots[0].Owner == "changed-native-consumer" {
+		t.Fatal("native consumer operation/resources escaped frozen plan")
+	}
 	before := treeAction(t, p)
 	bindings := p.Bindings()
 	bindings[0].Argv[0] = "changed"
