@@ -313,6 +313,8 @@ type RepositoryOrigin struct {
 }
 
 type Receipt struct {
+	PublicationJournal *publication.Journal `json:",omitempty"`
+	PublicationOrigins []PublicationOrigin  `json:",omitempty"`
 	// PinCreation is this operation's control-only intent/observed inode. Earlier
 	// operations retain their independently admitted envelope in PinOrigins.
 	PinCreation                                          *PinCreationEvidence `json:",omitempty"`
@@ -333,6 +335,11 @@ type Receipt struct {
 	EffectEvidence     []effects.Evidence
 	Obligations        []Obligation
 	RecordedAt         time.Time
+}
+
+type PublicationOrigin struct {
+	SchemaVersion, OperationID, InputDigest, IdentityKey string
+	Journal                                              publication.Journal
 }
 
 // NativePinIdentity is descriptor evidence only. It supplies neither a volume
