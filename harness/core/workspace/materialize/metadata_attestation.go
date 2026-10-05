@@ -259,20 +259,11 @@ func freezeInstalledOriginal(r Request) (installedOriginalLedger, error) {
 		}
 		for _, before := range c.Files {
 			if before.Path == f.Path {
-				if !installedParentsConsistent(f.Path, before.Exists, before.Parents) {
+				if !installedParentsConsistent(f.Path, before.Exists, before.Parents) || !installedParentRecordsMatch(before.Parents, frozen.Installed.Directories) {
 					return installedOriginalLedger{}, ErrConflict
 				}
 				for _, p := range before.Parents {
 					if artifact.ValidateRelPath(p.Path) != nil || !strings.HasPrefix(f.Path, p.Path+"/") || p.Created {
-						return installedOriginalLedger{}, ErrConflict
-					}
-					matched := false
-					for _, d := range frozen.Installed.Directories {
-						if d.Path == p.Path && d.Exists == p.Exists && d.Identity == p.Identity && d.Mode == p.Mode && d.Metadata == p.Metadata {
-							matched = true
-						}
-					}
-					if !matched {
 						return installedOriginalLedger{}, ErrConflict
 					}
 				}
@@ -347,13 +338,33 @@ func installedParentsConsistent(path string, leafExists bool, parents []Installe
 			return false
 		}
 		if !p.Exists {
-			if p.Identity != "" || p.Metadata != (InstalledMetadata{}) || p.Mode != 0 {
+			if p.Identity != "" || p.Metadata != (InstalledMetadata{}) || p.Mode != 0 || p.Phase != "" {
 				return false
 			}
 			missing = true
 		}
 	}
 	return !missing || !leafExists
+}
+
+// Observation and request records share an exact path locator. Compare every
+// field, including Phase/Created/presence, without changing either record.
+func installedParentRecordsMatch(parents, directories []InstalledDirectoryChange) bool {
+	for _, p := range parents {
+		matched := false
+		for _, d := range directories {
+			if d.Path == p.Path {
+				if d != p {
+					return false
+				}
+				matched = true
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneIssuedInstalled(e issuedInstalledAttestation) issuedInstalledAttestation {
@@ -443,7 +454,7 @@ func verifyInstalledAttestation(ctx context.Context, ledger installedOriginalLed
 		if f.path != want.Path || before.Path != want.Path || f.identity != want.BeforeIdentity || f.revision != ledger.original.Target.ObservationRevision || !installedCoverageComplete(f.coverage) || f.creation != ledger.request.Installed.Capabilities.Creation || before.Exists && (f.metadata != want.BeforeMetadata || !f.metadata.PreservableFile(f.creation, want.AfterMode)) || !before.Exists && f.metadata != (InstalledMetadata{}) {
 			return nil, ErrUnsupportedOperation
 		}
-		if !installedParentsConsistent(before.Path, before.Exists, before.Parents) || len(f.parents) != len(before.Parents) {
+		if !installedParentsConsistent(before.Path, before.Exists, before.Parents) || !installedParentRecordsMatch(before.Parents, ledger.request.Installed.Directories) || len(f.parents) != len(before.Parents) {
 			return nil, ErrUnsupportedOperation
 		}
 		parent := ledger.original.Target.Identity

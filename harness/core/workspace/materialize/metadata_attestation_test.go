@@ -589,7 +589,7 @@ func syntheticParentEnvelope(t *testing.T, parents []InstalledDirectoryChange, l
 	return req, issued, now
 }
 func TestMetadataAbsentParentZeroStateAtFreezeAndIssuedVerification(t *testing.T) {
-	for _, name := range []string{"valid-missing", "valid-existing", "phantom-identity", "phantom-metadata", "phantom-mode", "created", "existing-after-missing", "existing-leaf-after-missing", "wrong-parent-path", "missing-parent-observation"} {
+	for _, name := range []string{"valid-missing", "valid-existing", "phantom-identity", "phantom-metadata", "phantom-mode", "phantom-phase", "created", "existing-after-missing", "existing-leaf-after-missing", "wrong-parent-path", "missing-parent-observation"} {
 		t.Run(name, func(t *testing.T) {
 			parent := InstalledDirectoryChange{Path: "missing"}
 			switch name {
@@ -605,6 +605,8 @@ func TestMetadataAbsentParentZeroStateAtFreezeAndIssuedVerification(t *testing.T
 				parent.Metadata = InstalledMetadata{Complete: true, Volume: "synthetic-volume", FullMode: 0755}
 			case "phantom-mode":
 				parent.Mode = 0755
+			case "phantom-phase":
+				parent.Phase = InstalledPrepared
 			case "created":
 				parent.Created = true
 			}
@@ -744,5 +746,87 @@ func TestMetadataDetachedOriginalAcrossRepeatedVerification(t *testing.T) {
 	}
 	if err := revalidateInstalledAdmission(context.Background(), admission, original, original.ExpiresAt); err == nil {
 		t.Fatal("retry renewed original expiry")
+	}
+}
+
+// Original observations and the request traversal record must agree without
+// laundering Phase/Created/presence. Stage policy has its own valid phase.
+func TestMetadataOriginalParentRequestRecordAgreement(t *testing.T) {
+	for _, name := range []string{"valid-missing", "valid-existing", "valid-existing-prepared", "valid-stage-prepared", "missing-request-phase", "existing-request-phase", "existing-original-phase", "request-created", "request-presence", "request-identity", "request-mode", "request-metadata", "request-path", "conflicting-request-record"} {
+		t.Run(name, func(t *testing.T) {
+			parent := InstalledDirectoryChange{Path: "parent"}
+			existing := name != "valid-missing" && name != "valid-stage-prepared" && name != "missing-request-phase"
+			if existing {
+				fixture, _, _, _ := syntheticInstalledAdmission(t)
+				parent.Exists = true
+				parent.Identity = "synthetic-parent-inode"
+				parent.Metadata = fixture.InstalledOriginalContext.Target.Metadata
+				parent.Mode = parent.Metadata.FullMode
+			}
+			if name == "valid-existing-prepared" || name == "existing-original-phase" {
+				parent.Phase = InstalledPrepared
+			}
+			req, issued, now := syntheticParentEnvelope(t, []InstalledDirectoryChange{parent}, existing)
+			d := &req.Installed.Directories[0]
+			switch name {
+			case "valid-stage-prepared":
+				req.Installed.Stage.Phase = InstalledPrepared
+			case "missing-request-phase", "existing-request-phase":
+				d.Phase = InstalledPrepared
+			case "existing-original-phase":
+				d.Phase = ""
+			case "request-created":
+				d.Created = true
+			case "request-presence":
+				d.Exists = false
+			case "request-identity":
+				d.Identity = "foreign-inode"
+			case "request-mode":
+				d.Mode = 0700
+			case "request-metadata":
+				d.Metadata.UID++
+			case "request-path":
+				d.Path = "foreign"
+			case "conflicting-request-record":
+				conflict := *d
+				conflict.Phase = InstalledPrepared
+				req.Installed.Directories = append(req.Installed.Directories, conflict)
+			}
+			valid := strings.HasPrefix(name, "valid-")
+			_, err := freezeInstalledOriginal(req)
+			if valid && err != nil {
+				t.Fatal("valid original/request or stage policy refused", err)
+			}
+			if !valid && err == nil {
+				t.Error("contradictory original/request parent admitted at freeze")
+			}
+			// Private manufactured ledger reaches verifier's independent boundary;
+			// public JSON/data cannot manufacture issuer provenance.
+			raw, err := json.Marshal(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var owned Request
+			if err := json.Unmarshal(raw, &owned); err != nil {
+				t.Fatal(err)
+			}
+			ledger := installedOriginalLedger{request: owned, original: *owned.InstalledOriginalContext, seal: installedRequestSeal(owned)}
+			issued.original = copySyntheticOriginal(t, ledger.original)
+			issued.requestSeal = ledger.seal
+			issued.integrity = installedAttestationIntegrity(issued)
+			admission, err := verifyInstalledAttestation(context.Background(), ledger, &issued, ledger.original, now)
+			if valid {
+				if err != nil || admission == nil {
+					t.Fatal("valid private original/request or stage admission refused", err)
+				}
+				if !reflect.DeepEqual(admission.ledger.original.Files[0].Parents[0], parent) || admission.ledger.request.Installed.Directories[0] != *d || admission.ledger.request.Installed.Stage.Phase != req.Installed.Stage.Phase {
+					t.Fatal("original/request/stage record was normalized")
+				}
+				return
+			}
+			if admission != nil || !errors.Is(err, ErrUnsupportedOperation) {
+				t.Fatalf("issued boundary failed to refuse contradictory original/request parent before admission: %v", err)
+			}
+		})
 	}
 }
