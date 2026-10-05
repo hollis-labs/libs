@@ -35,11 +35,12 @@ export function remoteDisposition(row, candidateValidation = false) {
   assert.ok(row.status === "proposed" || row.status === "observed", "unsupported authored status");
   return "candidate";
 }
-function counters(v, exp, phase) {
+function counters(v, exp, phase, cleaned = false) {
   const held = phase === "saturated" || phase === "after-refusal";
   const allowed = ["entered", "load", "hold", "returned", "reverse_pending", "ordinary_queued",
     "control_queued", "reserved_frames", "reserved_bytes", "unload_attempts"];
   assert.ok(Object.keys(v).every(key => allowed.includes(key)), "unexpected callback/effect counter");
+  assert.equal(v.unload_attempts ?? 0, cleaned ? 1 : 0, "cleanup before actual EOF");
   assert.equal(v.entered, phase === "startup" ? 1 : exp.entered);
   assert.equal(v.load, phase === "startup" ? 1 : exp.load);
   assert.equal(v.hold ?? 0, exp.name === "hold" && phase !== "startup" ? 16 : 0);
@@ -199,7 +200,7 @@ export function verifyRemoteEvidence(evidence) {
         case "finished":
           closed(e, ["kind", "effects", "transport_error"], ["transport_error"]);
           assert.ok(halfclose && cleanup); assert.equal(e.transport_error, null);
-          counters(e.effects, exp, "final"); assert.equal(e.effects.unload_attempts, 1);
+          counters(e.effects, exp, "final", true);
           finished = true; break;
         default: assert.fail("unexpected fixture event " + e.kind);
       }

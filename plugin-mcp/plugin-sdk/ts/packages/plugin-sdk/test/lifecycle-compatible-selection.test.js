@@ -194,3 +194,13 @@ test("synthetic forged snapshot cannot be laundered by an invented barrier", () 
   snapshot.raw = snapshot.raw.replace('"reserved_frames":0', '"reserved_frames":1');
   assert.throws(() => verifyRemoteEvidence(evidence), "barrier must match physical snapshot");
 });
+
+test("synthetic pre-EOF cleanup counter refuses even with otherwise valid event inventory", () => {
+  const evidence = synthetic("sdk-lifecycle-overflow-v2");
+  const snapshot = evidence.records.filter(r => r.kind === "event" && r.raw.includes('"kind":"snapshot"')).at(-1);
+  const wrapper = JSON.parse(snapshot.raw);
+  wrapper.fixture_event.effects.unload_attempts = 1;
+  snapshot.raw = JSON.stringify(wrapper) + "\n";
+  evidence.records.find(r => r.kind === "barrier" && r.phase === "final").effects.unload_attempts = 1;
+  assert.throws(() => verifyRemoteEvidence(evidence), /cleanup before actual EOF/);
+});
