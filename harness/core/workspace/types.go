@@ -14,6 +14,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/install"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/publication"
 	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
@@ -157,6 +158,8 @@ const (
 	TrustEffect          EffectKind = "trust"
 	RepositoryEffect     EffectKind = "repository"
 	InstalledEffect      EffectKind = "installed_artifacts"
+	PublicationEffect    EffectKind = "boot_publication"
+	PinCreationEffect    EffectKind = "use_pin_creation"
 )
 
 type EffectGrant struct {
@@ -177,8 +180,18 @@ type InstallSpec struct {
 	Grants          []install.Grant
 }
 
+// PublicationSpec requests closed publication with a newly owned supplemental
+// pin. It freezes desired authority, not native custody, an existing pin
+// adoption or launch readiness. No artifact-only fallback is permitted.
+type PublicationSpec struct {
+	Control, Aside                          RootRef
+	JournalID, ReservationID                string
+	Authorization, PinCreationAuthorization EffectGrant
+}
+
 type Spec struct {
-	Installed                  *InstallSpec `json:",omitempty"`
+	Publication                *PublicationSpec `json:",omitempty"`
+	Installed                  *InstallSpec     `json:",omitempty"`
 	SchemaVersion, OperationID string
 	Operation                  Operation
 	Identity                   IdentitySpec
@@ -300,7 +313,13 @@ type RepositoryOrigin struct {
 }
 
 type Receipt struct {
-	Installed                                            *install.Evidence `json:",omitempty"`
+	PublicationJournal *publication.Journal `json:",omitempty"`
+	PublicationOrigins []PublicationOrigin  `json:",omitempty"`
+	// PinCreation is this operation's control-only intent/observed inode. Earlier
+	// operations retain their independently admitted envelope in PinOrigins.
+	PinCreation                                          *PinCreationEvidence `json:",omitempty"`
+	PinOrigins                                           []PinCreationOrigin  `json:",omitempty"`
+	Installed                                            *install.Evidence    `json:",omitempty"`
 	SchemaVersion, OperationID, InputDigest, IdentityKey string
 	// Identity records originating pins for new-path recovery. Artifact-only
 	// receipts leave it empty and make no enrollment or continuity claim.
@@ -316,6 +335,29 @@ type Receipt struct {
 	EffectEvidence     []effects.Evidence
 	Obligations        []Obligation
 	RecordedAt         time.Time
+}
+
+type PublicationOrigin struct {
+	SchemaVersion, OperationID, InputDigest, IdentityKey string
+	Journal                                              publication.Journal
+}
+
+// NativePinIdentity is descriptor evidence only. It supplies neither a volume
+// capability, complete metadata coverage, absence nor shim adoption.
+type NativePinIdentity struct{ Device, Inode uint64 }
+type PinCreationEvidence struct {
+	Version                        string
+	Origin                         publication.Origin
+	Control                        RootRef
+	Key                            LockKey
+	Path, JournalID, ReservationID string
+	Grant                          EffectGrant
+	Identity                       NativePinIdentity
+	Created, Uncertain             bool
+}
+type PinCreationOrigin struct {
+	SchemaVersion, OperationID, InputDigest, IdentityKey string
+	Evidence                                             PinCreationEvidence
 }
 
 type Diagnostic struct {

@@ -62,7 +62,12 @@ func (p PlannedWorkspace) Valid() bool { return p.valid }
 
 func (p PlannedWorkspace) EffectInputs() EffectInputs { return copyRecord(p.effectInputs) }
 
-func (p PlannedWorkspace) Digest() string            { return p.digest }
+func (p PlannedWorkspace) Digest() string      { return p.digest }
+func (p PlannedWorkspace) OperationID() string { return p.spec.OperationID }
+
+// Resources returns detached frozen host inputs for operation-bound native
+// consumers. It supplies no fresh authority or physical custody proof.
+func (p PlannedWorkspace) Resources() Resources      { return copyRecord(p.resources) }
 func (p PlannedWorkspace) Roots() []RootRef          { return slices.Clone(p.roots) }
 func (p PlannedWorkspace) LockKeys() []LockKey       { return slices.Clone(p.locks) }
 func (p PlannedWorkspace) Diagnostics() []Diagnostic { return slices.Clone(p.diagnostics) }
@@ -115,6 +120,9 @@ func (p PlannedWorkspace) Actions() []Action {
 // root identities and disk evidence come only from explicit observations;
 // successful planning promises neither apply success nor launch readiness.
 func Plan(spec Spec, content ResolvedContent, resources Resources, observed Observations) (PlannedWorkspace, error) {
+	if spec.Publication != nil && spec.Operation == Install {
+		return PlannedWorkspace{}, refuse("publication_operation_unsupported", "publication", Unsupported)
+	}
 	if spec.Operation == Install && spec.Installed != nil {
 		return planInstalledWorkspace(spec, content, resources, observed)
 	}
@@ -265,6 +273,9 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 	current, candidate, parent := obs[spec.Boot.Current.ID], obs[spec.Boot.Candidate.ID], obs[spec.Boot.IdentityRoot.ID]
 	if filepath.Dir(current.CanonicalPath) != parent.CanonicalPath || filepath.Dir(candidate.CanonicalPath) != parent.CanonicalPath || current.CanonicalPath == candidate.CanonicalPath {
 		return PlannedWorkspace{}, refuse(CodeInvalidBootSiblings, "boot", Conflict)
+	}
+	if err := planPublication(p, obs); err != nil {
+		return PlannedWorkspace{}, err
 	}
 	mutationRoots := []RootRef{spec.Home.Root, spec.Boot.IdentityRoot}
 	lockObs := slices.Clone(p.observed.Roots)
@@ -513,6 +524,9 @@ func Plan(spec Spec, content ResolvedContent, resources Resources, observed Obse
 func resolvedRoots(spec Spec, resources Resources) ([]RootRef, error) {
 	all := slices.Clone(resources.Roots)
 	required := []RootRef{spec.Home.Root, spec.Boot.IdentityRoot, spec.Boot.Current, spec.Boot.Candidate}
+	if spec.Publication != nil {
+		required = append(required, spec.Publication.Aside)
+	}
 	for _, s := range spec.Scratch {
 		required = append(required, s.Root)
 	}

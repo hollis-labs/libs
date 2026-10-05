@@ -24,6 +24,9 @@ func Materialize(ctx context.Context, p PlannedWorkspace, ports Ports) (ApplyRes
 	if !p.valid {
 		return ApplyResult{Status: Conflict}, refuse(CodeInvalidPlan, "plan", Conflict)
 	}
+	if p.spec.Publication != nil {
+		return unavailablePublication(p)
+	}
 	if len(p.spec.Sandbox.RequiredCapabilities) > 0 || len(p.spec.Cleanup.RequiredProofs) > 0 {
 		return ApplyResult{Status: Unsupported}, refuse(CodeHostProofsPending, "capabilities", Unsupported)
 	}

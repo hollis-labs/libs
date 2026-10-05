@@ -31,6 +31,9 @@ func (s Spec) Validate() error {
 	if err := validateFrozenValues(s); err != nil {
 		return err
 	}
+	if err := validatePublicationSpec(s); err != nil {
+		return err
+	}
 	if s.SchemaVersion != SchemaVersion {
 		return refuse(CodeUnsupportedSchema, "spec", Unsupported)
 	}
@@ -209,7 +212,7 @@ func validateAccess(access []sandbox.AccessKind) error {
 
 func validEffect(k EffectKind) bool {
 	switch k {
-	case DirectoryEffect, ArtifactEffect, CredentialLinkEffect, TrustEffect, RepositoryEffect, InstalledEffect:
+	case DirectoryEffect, ArtifactEffect, CredentialLinkEffect, TrustEffect, RepositoryEffect, InstalledEffect, PublicationEffect, PinCreationEffect:
 		return true
 	}
 	return false

@@ -2,10 +2,12 @@ package workspace
 
 import (
 	"context"
+	"reflect"
 	"slices"
 
 	"github.com/hollis-labs/substrate/harness/workspace/credentials"
 	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/substrate/harness/workspace/publication"
 	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 )
@@ -160,6 +162,42 @@ func carryRecovery(result *ApplyResult, p PlannedWorkspace, live Observations) e
 				}
 			}
 			appendObligation(result, o)
+		}
+		pinOrigins, pinErr := admitPinCreationOrigins(r)
+		if pinErr != nil {
+			return pinErr
+		}
+		for _, origin := range pinOrigins {
+			e := origin.Evidence
+			if e.Origin.AgentURN != p.spec.Identity.AgentURN || e.Grant.RootID != p.spec.Boot.IdentityRoot.ID || e.Control != p.resources.LockRoot || e.Key.Namespace != p.resources.LockNamespace || e.Key.CanonicalID != p.spec.Boot.IdentityRoot.Path {
+				return refuse("pin_creation_origin_mismatch", "publication", Conflict)
+			}
+			result.Retained = appendRoot(result.Retained, p.spec.Boot.IdentityRoot)
+			if !slices.Contains(result.Receipt.PinOrigins, origin) {
+				result.Receipt.PinOrigins = append(result.Receipt.PinOrigins, origin)
+			}
+			appendObligation(result, Obligation{Kind: RecoveryInspectionRequired, RootID: origin.Evidence.Grant.RootID, Code: "original_pin_observation_required"})
+		}
+		publicationOrigins, pubErr := admitPublicationOrigins(r)
+		if pubErr != nil {
+			return pubErr
+		}
+		for _, origin := range publicationOrigins {
+			j := origin.Journal
+			if j.Origin.AgentURN != p.spec.Identity.AgentURN || !journalRootMatches(j.Layout.Parent, p.spec.Boot.IdentityRoot) || !journalRootMatches(j.Layout.Current, p.spec.Boot.Current) || !journalRootMatches(j.Control, p.resources.LockRoot) || j.Use.Namespace != p.resources.LockNamespace {
+				return refuse("publication_origin_mismatch", "publication", Conflict)
+			}
+			for _, jr := range []publication.Root{j.Layout.Current, j.Layout.Candidate, j.Layout.Aside} {
+				root, ok := findRoot(p.roots, jr.ID)
+				if !ok || !journalRootMatches(jr, root) {
+					return refuse("publication_origin_mismatch", "publication", Conflict)
+				}
+				result.Retained = appendRoot(result.Retained, root)
+			}
+			if !slices.ContainsFunc(result.Receipt.PublicationOrigins, func(existing PublicationOrigin) bool { return reflect.DeepEqual(existing, origin) }) {
+				result.Receipt.PublicationOrigins = append(result.Receipt.PublicationOrigins, origin)
+			}
+			appendObligation(result, Obligation{Kind: RecoveryInspectionRequired, RootID: p.spec.Boot.IdentityRoot.ID, Code: "original_publication_observation_required"})
 		}
 		origins, originErr := admitRepositoryOrigins(r)
 		if originErr != nil {
