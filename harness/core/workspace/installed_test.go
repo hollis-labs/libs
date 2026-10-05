@@ -7,6 +7,7 @@ import (
 	"fmt"
 	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
 	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/substrate/harness/workspace/effects"
 	"github.com/hollis-labs/substrate/harness/workspace/install"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
@@ -841,6 +842,40 @@ func TestInstalledUnknownRealEnumerationRefusesSyntheticCapabilityBeforeReceipt(
 	}
 }
 
+func TestInstalledMissingIssuerRefusesBeforeAnyPort(t *testing.T) {
+	// Complete-looking fixture data is not issued metadata provenance.
+	s, c, r, o, f := installedInputsMetadataFixture(t, runtimes.Claude, true)
+	p := planned(t, s, c, r, o)
+	callbacks := 0
+	f.onValidate = func() error { callbacks++; return nil }
+	f.onClock = func() { callbacks++ }
+	result, err := workspace.Materialize(context.Background(), p, f.ports())
+	var refusal *workspace.Refusal
+	if !errors.As(err, &refusal) || refusal.Status != workspace.Unsupported {
+		t.Fatalf("missing issuer did not refuse: %v", err)
+	}
+	if callbacks != 0 || len(f.events) != 0 || len(f.records) != 0 || len(result.Handles) != 0 {
+		t.Fatalf("missing issuer reached ports: callbacks=%d events=%v", callbacks, f.events)
+	}
+	if result.ArtifactsComplete() || result.LaunchReady() {
+		t.Fatal("comparison data earned completion")
+	}
+	for _, ref := range []workspace.RootRef{s.Installed.Target, s.Installed.Control, r.LockRoot} {
+		names, er := os.ReadDir(ref.Path)
+		if er != nil {
+			t.Fatal(er)
+		}
+		for _, name := range names {
+			if strings.HasPrefix(name.Name(), ".installed-stage-") {
+				t.Fatal("missing issuer created stage")
+			}
+		}
+	}
+	if _, er := os.Stat(filepath.Join(s.Installed.Target.Path, s.Installed.Grants[0].Path)); !os.IsNotExist(er) {
+		t.Fatal("missing issuer published")
+	}
+}
+
 func TestInstalledFrozenVolumeCapabilityAdmission(t *testing.T) {
 	for _, kind := range []string{"missing", "duplicate", "root", "revision", "unknown-case", "metadata", "unrelated"} {
 		t.Run(kind, func(t *testing.T) {
@@ -884,6 +919,82 @@ func TestInstalledEveryRootRequiresOwnCapability(t *testing.T) {
 			var typed *workspace.Refusal
 			if !errors.As(err, &typed) || typed.Status != workspace.Unsupported {
 				t.Fatalf("admitted unverified resource capability: %v", err)
+			}
+		})
+	}
+}
+
+// Counts the configured-store accessor too: refusal must precede ALL ports.
+type installedNoIssuerStore struct{ *installedPorts }
+
+func (f installedNoIssuerStore) ControlRoot() workspace.RootRef {
+	f.events = append(f.events, "control-root")
+	return f.control
+}
+
+func TestInstalledOriginalContextDetachedBeforeCallbacks(t *testing.T) {
+	s, c, r, o, f := installedInputsMetadataFixture(t, runtimes.Claude, true)
+	p := planned(t, s, c, r, o)
+	original := p.Actions()[0].Request.InstalledOriginalContext
+	if original == nil || original.OperationID != s.OperationID || original.InputDigest != p.Digest() || original.ObservedAt != o.At || original.ExpiresAt != o.ExpiresAt || original.Identity.SemanticDigest != s.Identity.SemanticDigest || original.Identity.ArtifactDigest != s.Identity.ArtifactDigest || original.Identity.DependencyDigest != s.Identity.DependencyDigest || original.Fence.Revision != s.Identity.Fence.Revision || original.Expected != (materialize.InstalledExpectedIssuer{}) {
+		t.Fatal("original context not preserved/unknown issuer manufactured")
+	}
+	want := *original
+	original.Grants[0].KeyPaths[0][0] = "foreign"
+	original.Expected.Issuer = "caller"
+	s.Installed.Grants[0].Version = "foreign"
+	s.Identity.Fence.Revision = "foreign"
+	r.Roots[0].Path = "foreign"
+	o.InstalledVolumes[0].ObservationRevision = "foreign"
+	o.ExpiresAt = o.ExpiresAt.Add(time.Hour)
+	fresh := p.Actions()[0].Request.InstalledOriginalContext
+	want.Grants = fresh.Grants // compare the path separately after mutating caller's copy
+	if fresh.Grants[0].KeyPaths[0][0] != "managed" || fresh.Expected != (materialize.InstalledExpectedIssuer{}) || fresh.ExpiresAt != want.ExpiresAt || fresh.Fence != want.Fence || fresh.Control.Path == "foreign" || fresh.Target.ObservationRevision == "foreign" {
+		t.Fatal("caller alias changed frozen original context")
+	}
+	ports := f.ports()
+	ports.ReceiptStore = installedNoIssuerStore{f}
+	result, err := workspace.Materialize(context.Background(), p, ports)
+	var typed *workspace.Refusal
+	if !errors.As(err, &typed) || typed.Status != workspace.Unsupported || len(f.events) > 0 || len(f.records) > 0 || result.ArtifactsComplete() || result.Status == workspace.Ready {
+		t.Fatalf("frozen no-issuer path reached ports/completion: %v %v", err, f.events)
+	}
+}
+
+func TestInstalledRefusedRetryKeepsTrustedOriginalObligations(t *testing.T) {
+	for _, cancelled := range []bool{false, true} {
+		t.Run(fmt.Sprint(cancelled), func(t *testing.T) {
+			s, c, r, o, f := installedInputsMetadataFixture(t, runtimes.Claude, true)
+			oldDigest := "sha256:" + strings.Repeat("b", 64)
+			old := workspace.Receipt{SchemaVersion: workspace.SchemaVersion, OperationID: "fixture-old-operation", InputDigest: oldDigest, IdentityKey: s.Identity.EncodedKey, Identity: s.Identity, Phase: workspace.ArtifactsCommitted, Roots: []workspace.RootReceipt{{Root: s.Installed.Target, Complete: true, Generation: oldDigest}, {Root: s.Installed.Control, Complete: true}}, Obligations: []workspace.Obligation{{Kind: workspace.RecoveryInspectionRequired, RootID: s.Installed.Target.ID, Code: "older-operation-obligation"}}, Installed: &install.Evidence{Header: effects.Header{Version: effects.SchemaVersion, OperationID: "fixture-old-operation", InputDigest: oldDigest}, Generation: oldDigest, TargetID: s.Installed.Target.ID, CanonicalTarget: s.Installed.Target.Path, ControlID: s.Installed.Control.ID, CanonicalControl: s.Installed.Control.Path}}
+			r.RecoveryReceipts = []workspace.Receipt{old}
+			p := planned(t, s, c, r, o)
+			// Caller/serialized copies cannot revise the admitted older wrapper.
+			exported := p.Resources()
+			exported.RecoveryReceipts[0].Installed.Header.OperationID = "foreign"
+			exported.RecoveryReceipts[0].Obligations = nil
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if cancelled {
+				cancel()
+			}
+			ports := f.ports()
+			ports.ReceiptStore = installedNoIssuerStore{f}
+			result, err := workspace.Materialize(ctx, p, ports)
+			if err == nil || cancelled && !errors.Is(err, context.Canceled) || !slices.Contains(result.Obligations, old.Obligations[0]) || !slices.Contains(result.Receipt.Obligations, old.Obligations[0]) || !slices.Contains(result.Retained, s.Installed.Target) || !slices.Contains(result.Retained, s.Installed.Control) || !reflect.DeepEqual(p.Resources().RecoveryReceipts[0], old) || len(f.events) > 0 || len(f.records) > 0 || len(result.Handles) > 0 || result.ArtifactsComplete() {
+				t.Fatalf("lost original retry or reached ports: %v %+v", err, result)
+			}
+			if !reflect.DeepEqual(result.Receipt, old) {
+				t.Fatal("refusal did not return original trusted wrapper intact")
+			}
+			// A further retry carries the same trusted origin, never the refused
+			// new operation or a freshly minted evidence header.
+			s.OperationID = "fixture-third-operation"
+			r.RecoveryReceipts = []workspace.Receipt{result.Receipt}
+			third := planned(t, s, c, r, o)
+			again, err := workspace.Materialize(context.Background(), third, ports)
+			if err == nil || !reflect.DeepEqual(again.Receipt, old) || !reflect.DeepEqual(third.Resources().RecoveryReceipts[0], old) || !slices.Contains(again.Obligations, old.Obligations[0]) || len(f.events) > 0 {
+				t.Fatal("cross-retry origin rebased/lost", err)
 			}
 		})
 	}

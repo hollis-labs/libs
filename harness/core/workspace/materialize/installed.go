@@ -424,6 +424,13 @@ func (e *DefaultEngine) planInstalled(ctx context.Context, req Request) (Plan, e
 	if req.Installed == nil || req.Generation == "" || req.Installed.TargetIdentity == "" || req.Installed.ControlIdentity == "" {
 		return Plan{}, ErrUnsafeTarget
 	}
+	// Freeze independently before callbacks or native inspection. Comparison
+	// data is not a capability; this consumer has no production issued envelope.
+	ledger, err := admitInstalledOriginal(ctx, req)
+	if err != nil {
+		return Plan{}, err
+	}
+	req = ledger.request
 	cap, err := InspectInstalledCapabilities(ctx, req.TargetRoot, req.Installed.CaseMode)
 	if err != nil || !req.Installed.Capabilities.Valid() {
 		return Plan{}, ErrUnsupportedOperation
@@ -504,6 +511,7 @@ func (e *DefaultEngine) applyInstalled(ctx context.Context, req Request) (h Hand
 	if err != nil {
 		return h, err
 	}
+	req = plan.Request // detached plan, never caller aliases
 	h = Handle{TargetRoot: req.TargetRoot, Manifest: plan.Manifest, Report: plan.Report}
 	h.Report.Complete = false
 	root, _, err := openExistingTargetRoot(req.TargetRoot)

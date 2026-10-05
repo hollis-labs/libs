@@ -81,17 +81,18 @@ type TargetRoots struct {
 
 // Request is the write boundary input for the shared engine.
 type Request struct {
-	Installed          *InstalledPolicy     `json:",omitempty"`
-	Operation          Operation            `yaml:"operation" json:"operation"`
-	TargetRoot         string               `yaml:"target_root" json:"target_root"`
-	Roots              TargetRoots          `yaml:"roots,omitempty" json:"roots,omitempty"`
-	Artifacts          artifact.Tree        `yaml:"artifacts" json:"artifacts"`
-	CurrentManifest    *Manifest            `yaml:"current_manifest,omitempty" json:"current_manifest,omitempty"`
-	ExistingTarget     ExistingTargetPolicy `yaml:"existing_target,omitempty" json:"existing_target,omitempty"`
-	Reconcile          ReconcilePolicy      `yaml:"reconcile,omitempty" json:"reconcile,omitempty"`
-	Selection          Selection            `yaml:"selection,omitempty" json:"selection,omitempty"`
-	Generation         string               `yaml:"generation,omitempty" json:"generation,omitempty"`
-	ExpectedGeneration string               `yaml:"expected_generation,omitempty" json:"expected_generation,omitempty"`
+	InstalledOriginalContext *InstalledOriginalContext `json:",omitempty"`
+	Installed                *InstalledPolicy          `json:",omitempty"`
+	Operation                Operation                 `yaml:"operation" json:"operation"`
+	TargetRoot               string                    `yaml:"target_root" json:"target_root"`
+	Roots                    TargetRoots               `yaml:"roots,omitempty" json:"roots,omitempty"`
+	Artifacts                artifact.Tree             `yaml:"artifacts" json:"artifacts"`
+	CurrentManifest          *Manifest                 `yaml:"current_manifest,omitempty" json:"current_manifest,omitempty"`
+	ExistingTarget           ExistingTargetPolicy      `yaml:"existing_target,omitempty" json:"existing_target,omitempty"`
+	Reconcile                ReconcilePolicy           `yaml:"reconcile,omitempty" json:"reconcile,omitempty"`
+	Selection                Selection                 `yaml:"selection,omitempty" json:"selection,omitempty"`
+	Generation               string                    `yaml:"generation,omitempty" json:"generation,omitempty"`
+	ExpectedGeneration       string                    `yaml:"expected_generation,omitempty" json:"expected_generation,omitempty"`
 }
 
 func (r Request) Validate() error {

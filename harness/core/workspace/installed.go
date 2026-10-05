@@ -210,9 +210,40 @@ func planInstalledWorkspace(s Spec, c ResolvedContent, r Resources, o Observatio
 			publicRequest.Installed.ControlIdentity = obs.FileIdentity
 		}
 	}
+	publicRequest.InstalledOriginalContext = installedOriginalContext(s, r, o, digest, publicRequest)
 	p.actions = []Action{{Kind: InstalledTreeAction, Root: s.Installed.Target, CanonicalPath: s.Installed.Target.Path, Request: publicRequest, RequiredCapabilities: []Capability{CanonicalRoots, MutationLocks, InstalledMerge}}}
 	return p, nil
 }
+
+// installedOriginalContext transports already-frozen comparison data. No
+// trusted upstream issuer or credential visibility input exists here. Expected
+// stays unknown; capability labels and hashes never supply provenance.
+func installedOriginalContext(s Spec, r Resources, o Observations, digest string, req materialize.Request) *materialize.InstalledOriginalContext {
+	c := &materialize.InstalledOriginalContext{SchemaVersion: s.SchemaVersion, OperationID: s.OperationID, InputDigest: digest,
+		Identity: materialize.InstalledOriginalIdentity{AgentURN: s.Identity.AgentURN, EncodedKey: s.Identity.EncodedKey, Instance: s.Identity.Instance, Session: s.Identity.Session, Assignment: s.Identity.Assignment, DefinitionRevision: s.Identity.DefinitionRevision, SemanticDigest: s.Identity.SemanticDigest, ArtifactDigest: s.Identity.ArtifactDigest, DependencyDigest: s.Identity.DependencyDigest},
+		Fence:    materialize.InstalledOriginalFence{ID: s.Identity.Fence.ID, Path: s.Identity.Fence.Path, Revision: s.Identity.Fence.Revision, Provenance: s.Identity.Fence.Provenance}, ObservedAt: o.At, ExpiresAt: o.ExpiresAt}
+	root := func(ref RootRef) materialize.InstalledOriginalRoot {
+		cap := installedTargetCapabilities(o, ref.ID)
+		return materialize.InstalledOriginalRoot{ID: ref.ID, Path: ref.Path, AllowedBase: ref.AllowedBase, Owner: ref.Owner, Provenance: ref.Provenance, Identity: cap.RootIdentity, Volume: cap.Volume, CapabilityRevision: cap.Revision, ObservationRevision: cap.ObservationRevision, Metadata: cap.RootMetadata}
+	}
+	c.Target, c.Control, c.Lock = root(s.Installed.Target), root(s.Installed.Control), root(r.LockRoot)
+	for _, g := range s.Installed.Grants {
+		c.Grants = append(c.Grants, materialize.InstalledOriginalGrant{ID: g.ID, Version: g.Version, Path: g.Path, WholeFile: g.WholeFile, KeyPaths: copyRecord(g.KeyPaths)})
+	}
+	for _, g := range s.Effects {
+		c.Authorizations = append(c.Authorizations, materialize.InstalledOriginalAuthorization{Kind: string(g.Kind), RootID: g.RootID, AuthorizationID: g.AuthorizationID, Version: g.Version})
+	}
+	for _, f := range req.Installed.Files {
+		for _, b := range o.InstalledFiles {
+			if b.Path == f.Path {
+				c.Files = append(c.Files, materialize.InstalledOriginalFile{Path: b.Path, Identity: b.Identity, Exists: b.Exists, Kind: b.Kind, Mode: b.Mode, Digest: b.Digest, Metadata: b.Metadata, Parents: copyRecord(b.Parents)})
+				break
+			}
+		}
+	}
+	return c
+}
+
 func installRefusal(err error) error {
 	status := Conflict
 	if errors.Is(err, install.ErrUnsupported) || errors.Is(err, materialize.ErrUnsupportedOperation) {
@@ -276,11 +307,38 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	result.Status = Partial
 	result.Receipt = Receipt{SchemaVersion: SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest, IdentityKey: p.spec.Identity.EncodedKey, Identity: p.spec.Identity, Phase: Planned}
 	result.Receipt.Roots = []RootReceipt{{Root: p.spec.Installed.Target}, {Root: p.spec.Installed.Control}}
+	// Keep trusted prior obligations and roots on this refused new attempt. Older
+	// installed evidence remains bound to its original receipt, never reissued.
+	for _, receipt := range p.resources.RecoveryReceipts {
+		for _, o := range receipt.Obligations {
+			appendObligation(&result, o)
+		}
+		for _, root := range receipt.Roots {
+			result.Retained = appendRoot(result.Retained, root.Root)
+		}
+	}
+	// Until a new attempt earns its own durable evidence, return the admitted
+	// originating wrapper intact. A refused/cancelled attempt must be retryable
+	// without flattening older Installed.Header under this operation's envelope.
+	if len(p.resources.RecoveryReceipts) == 1 {
+		result.Receipt = copyRecord(p.resources.RecoveryReceipts[0])
+	}
+	result.Receipt.Obligations = slices.Clone(result.Obligations)
 	if ctx == nil || ports.Host == nil || ports.Locks == nil || ports.Clock == nil || ports.Observations == nil || ports.ReceiptStore == nil {
 		return result, refuse(CodeMissingApplyPort, "installed", Unsupported)
 	}
 	if err = ctx.Err(); err != nil {
 		return result, err
+	}
+	if len(p.actions) != 1 || p.actions[0].Request.InstalledOriginalContext == nil || !reflect.DeepEqual(p.actions[0].Request.InstalledOriginalContext, installedOriginalContext(p.spec, p.resources, p.observed, p.digest, p.actions[0].Request)) {
+		result.Status = Unsupported
+		return result, refuse("installed_original_context_mismatch", "installed", Unsupported)
+	}
+	// No trusted issuer exists. Refuse before ControlRoot, locks, Clock, Host,
+	// Observe, Record or filesystem work. A DTO cannot enable the native path.
+	if p.actions[0].Request.InstalledOriginalContext.Expected == (materialize.InstalledExpectedIssuer{}) {
+		result.Status = Unsupported
+		return result, refuse("installed_metadata_issuer_unknown", "installed", Unsupported)
 	}
 	store, ok := ports.ReceiptStore.(ControlledReceiptStore)
 	if !ok || store.ControlRoot() != p.spec.Installed.Control {
@@ -512,12 +570,14 @@ func applyInstalledWorkspace(ctx context.Context, p PlannedWorkspace, ports Port
 	}
 	engineRequest := prepared.EngineRequest()
 	engineRequest.Generation = p.digest
+	engineRequest.InstalledOriginalContext = copyRecord(p.actions[0].Request.InstalledOriginalContext)
 	targetInfo, _ := os.Lstat(p.spec.Installed.Target.Path)
 	controlInfo, _ := os.Lstat(p.spec.Installed.Control.Path)
 	engineRequest.Installed.TargetIdentity = materialize.InstalledIdentity(targetInfo)
 	engineRequest.Installed.ControlIdentity = materialize.InstalledIdentity(controlInfo)
 	evidence := prepared.Evidence()
 	evidence.Generation = p.digest
+	result.Receipt = Receipt{SchemaVersion: SchemaVersion, OperationID: p.spec.OperationID, InputDigest: p.digest, IdentityKey: p.spec.Identity.EncodedKey, Identity: p.spec.Identity, Phase: Planned, Roots: []RootReceipt{{Root: p.spec.Installed.Target}, {Root: p.spec.Installed.Control}}}
 	result.Receipt.Installed = &evidence
 	for _, receipt := range p.resources.RecoveryReceipts {
 		for _, o := range receipt.Obligations {
