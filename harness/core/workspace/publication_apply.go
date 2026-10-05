@@ -70,6 +70,7 @@ func newPublicationReceiptHost(p PlannedWorkspace, ports Ports, result *ApplyRes
 		return nil, refuse("publication_adapter_admission", "publication", Unsupported)
 	}
 	admitted := result.Clone()
+	j := journal.Clone()
 	// ControlRoot is also a callback. Restore admitted accounting on constructor
 	// failure as well as success; never snapshot caller mutations after it.
 	defer func() { *result = admitted.Clone() }()
@@ -77,7 +78,6 @@ func newPublicationReceiptHost(p PlannedWorkspace, ports Ports, result *ApplyRes
 	if !ok || store.ControlRoot() != p.spec.Publication.Control {
 		return nil, refuse("publication_control_mismatch", "publication", Conflict)
 	}
-	j := journal.Clone()
 	if j.Validate() != nil || len(j.Events) != 3 || j.Events[2].Phase != publication.ReservationHeld || j.Origin.OperationID != p.spec.OperationID || j.Origin.InputDigest != p.digest || j.Origin.IdentityKey != p.spec.Identity.EncodedKey || j.Origin.AgentURN != p.spec.Identity.AgentURN || j.JournalID != p.spec.Publication.JournalID || j.Use.ReservationID != p.spec.Publication.ReservationID || j.Use.Namespace != p.resources.LockNamespace || j.Use.CanonicalID != p.spec.Boot.IdentityRoot.Path || j.Layout.CandidateGeneration != p.digest || !journalRootMatches(j.Control, p.spec.Publication.Control) || !journalRootMatches(j.Layout.Parent, p.spec.Boot.IdentityRoot) || !journalRootMatches(j.Layout.Current, p.spec.Boot.Current) || !journalRootMatches(j.Layout.Candidate, p.spec.Boot.Candidate) || !journalRootMatches(j.Layout.Aside, p.spec.Publication.Aside) {
 		return nil, refuse("publication_adapter_binding", "publication", Conflict)
 	}
@@ -137,6 +137,9 @@ func (h *publicationReceiptHost) ValidatePublication(ctx context.Context, req ma
 
 func (h *publicationReceiptHost) RecordPublication(ctx context.Context, j publication.Journal) error {
 	defer h.returnAccounting()
+	// A callback may also hold the caller's event slice. The admitted next
+	// journal, like the original ledger, must be detached before any callback.
+	j = j.Clone()
 	if err := h.validateJournal(j); err != nil {
 		return err
 	}

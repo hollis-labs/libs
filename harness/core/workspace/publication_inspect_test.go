@@ -211,7 +211,7 @@ func TestPublicationInspectionPreservesOlderNestedOriginsAndEnrolledRoots(t *tes
 	if receipts[1].PublicationOrigins[0].Journal.Layout.Candidate.Owner == "mutated" {
 		t.Fatal("returned older envelope aliases input")
 	}
-	for _, kind := range []string{"own-pin-operation", "own-pin-digest", "inherited-pin-operation", "inherited-pin-digest", "pin-schema", "pin-key", "pin-scope", "pin-root", "publication-schema", "publication-key", "publication-scope", "candidate-unenrolled", "candidate-owner", "aside-unenrolled"} {
+	for _, kind := range []string{"own-pin-operation", "own-pin-digest", "inherited-pin-operation", "inherited-pin-digest", "pin-schema", "pin-key", "pin-scope", "pin-root", "publication-schema", "publication-key", "publication-scope", "candidate-unenrolled", "candidate-owner", "aside-unenrolled", "cross-family-digest", "nested-outer-digest"} {
 		t.Run(kind, func(t *testing.T) {
 			data, _ := json.Marshal(receipts)
 			var bad []workspace.Receipt
@@ -248,6 +248,12 @@ func TestPublicationInspectionPreservesOlderNestedOriginsAndEnrolledRoots(t *tes
 				bad[1].PublicationOrigins[0].Journal.Layout.Candidate.Owner = "foreign"
 			case "aside-unenrolled":
 				bad[1].PublicationOrigins[0].Journal.Layout.Aside.ID = "unenrolled"
+			case "cross-family-digest":
+				bad[1].PinOrigins[0].InputDigest = strings.Repeat("e", 64)
+				bad[1].PinOrigins[0].Evidence.Origin.InputDigest = strings.Repeat("e", 64)
+			case "nested-outer-digest":
+				bad[1].PublicationOrigins[0].OperationID = bad[0].OperationID
+				bad[1].PublicationOrigins[0].Journal.Origin.OperationID = bad[0].OperationID
 			}
 			refused, err := workspace.InspectPublicationEvidence(scope, workspace.Recover, raw, bad)
 			if err == nil || len(refused.Retained) == 0 || len(refused.OriginalReceipts) == len(bad) {

@@ -345,25 +345,62 @@ func TestPublicationOwnsEntireAccountingAcrossEveryCallbackAndReturn(t *testing.
 }
 
 func TestPublicationConstructorControlCallbackCannotRewriteAdmittedLedger(t *testing.T) {
-	for _, refuse := range []bool{false, true} {
-		t.Run(map[bool]string{false: "success", true: "refused"}[refuse], func(t *testing.T) {
-			p, f, result, j, held := publicationAdapterFixture(t)
-			original := result.Clone()
-			f.hook = func(stage string) error {
-				if stage == "control" {
-					*result = ApplyResult{Status: Ready}
-					if refuse {
-						f.control.Owner = "foreign"
+	for _, kind := range []string{"replace", "nested", "journal"} {
+		for _, refuse := range []bool{false, true} {
+			t.Run(kind+map[bool]string{false: "/success", true: "/refused"}[refuse], func(t *testing.T) {
+				p, f, result, j, held := publicationAdapterFixture(t)
+				original := result.Clone()
+				originalJournal := j.Clone()
+				f.hook = func(stage string) error {
+					if stage == "control" {
+						switch kind {
+						case "replace":
+							*result = ApplyResult{Status: Ready}
+						case "nested":
+							result.Receipt.Roots[0].Root.Owner = "foreign"
+							result.Obligations[0].Code = "foreign"
+						case "journal":
+							j.Events[0].Phase = "foreign"
+						}
+						if refuse {
+							f.control.Owner = "foreign"
+						}
 					}
+					return nil
+				}
+				host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+				if refuse != (err != nil) || !reflect.DeepEqual(result.Clone(), original) {
+					t.Fatal("constructor callback replaced admitted result")
+				}
+				if !refuse && (!reflect.DeepEqual(host.accounting.Clone(), original) || !reflect.DeepEqual(host.last, originalJournal)) {
+					t.Fatal("constructor captured mutable caller ledger or journal")
+				}
+			})
+		}
+	}
+}
+
+func TestPublicationCallbackCannotMutateAdmittedNextJournalEvents(t *testing.T) {
+	for _, stage := range []string{"validate", "observe", "clock", "control", "record"} {
+		t.Run(stage, func(t *testing.T) {
+			p, f, result, j, held := publicationAdapterFixture(t)
+			host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
+			if err != nil {
+				t.Fatal(err)
+			}
+			j.Events = append(j.Events, publication.Event{Sequence: 4, Phase: publication.CandidateCurrentIntent})
+			expected := j.Clone()
+			f.hook = func(kind string) error {
+				if kind == stage {
+					j.Events[3].Phase = "foreign"
 				}
 				return nil
 			}
-			host, err := newPublicationReceiptHost(p, adapterPorts(f), result, j, held)
-			if refuse != (err != nil) || !reflect.DeepEqual(result.Clone(), original) {
-				t.Fatal("constructor callback replaced admitted result")
+			if err := host.RecordPublication(context.Background(), j); err != nil {
+				t.Fatal(err)
 			}
-			if !refuse && !reflect.DeepEqual(host.accounting.Clone(), original) {
-				t.Fatal("constructor captured mutable caller ledger")
+			if len(f.records) != 1 || f.records[0].PublicationJournal == nil || !reflect.DeepEqual(*f.records[0].PublicationJournal, expected) || !reflect.DeepEqual(host.last, expected) || !reflect.DeepEqual(*result.Receipt.PublicationJournal, expected) {
+				t.Fatal("callback event alias entered sole durable accounting")
 			}
 		})
 	}

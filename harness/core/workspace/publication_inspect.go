@@ -59,15 +59,21 @@ func InspectPublicationEvidence(scope Scope, operation Operation, raw []byte, or
 	// An aggregate retry operation must not replace any earlier origin header.
 	matched := false
 	operationDigests := map[string]string{}
+	bindOrigin := func(operation, digest string) error {
+		if prior, ok := operationDigests[operation]; ok && prior != digest {
+			return refuse("publication_origin_mismatch", "publication", Conflict)
+		}
+		operationDigests[operation] = digest
+		return nil
+	}
 	for _, r := range original {
 		bytes, digestErr := hex.DecodeString(r.InputDigest)
 		if digestErr != nil || len(bytes) != 32 || hex.EncodeToString(bytes) != r.InputDigest {
 			return out, refuse("publication_origin_mismatch", "publication", Conflict)
 		}
-		if prior, ok := operationDigests[r.OperationID]; ok && prior != r.InputDigest {
-			return out, refuse("publication_origin_mismatch", "publication", Conflict)
+		if err := bindOrigin(r.OperationID, r.InputDigest); err != nil {
+			return out, err
 		}
-		operationDigests[r.OperationID] = r.InputDigest
 		if r.SchemaVersion != SchemaVersion || r.OperationID == "" || r.InputDigest == "" || r.IdentityKey != j.Origin.IdentityKey {
 			return out, refuse("publication_origin_mismatch", "publication", Conflict)
 		}
@@ -81,6 +87,9 @@ func InspectPublicationEvidence(scope Scope, operation Operation, raw []byte, or
 			return out, err
 		}
 		for _, origin := range pins {
+			if err := bindOrigin(origin.OperationID, origin.InputDigest); err != nil {
+				return out, err
+			}
 			e := origin.Evidence
 			if e.Origin.AgentURN != scope.spec.Identity.AgentURN || e.Origin.IdentityKey != scope.spec.Identity.EncodedKey || e.Control != scope.control || e.Key.Namespace != scope.resources.LockNamespace || e.Key.CanonicalID != scope.spec.Boot.IdentityRoot.Path || e.Grant.RootID != scope.spec.Boot.IdentityRoot.ID {
 				return out, refuse("publication_scope_mismatch", "publication", Conflict)
@@ -91,6 +100,9 @@ func InspectPublicationEvidence(scope Scope, operation Operation, raw []byte, or
 			return out, err
 		}
 		for _, origin := range journals {
+			if err := bindOrigin(origin.OperationID, origin.InputDigest); err != nil {
+				return out, err
+			}
 			inner := origin.Journal
 			if inner.Origin.AgentURN != scope.spec.Identity.AgentURN || inner.Origin.IdentityKey != scope.spec.Identity.EncodedKey || !journalRootMatches(inner.Control, scope.control) || !journalRootMatches(inner.Layout.Parent, scope.spec.Boot.IdentityRoot) || !journalRootMatches(inner.Layout.Current, scope.spec.Boot.Current) || inner.Use.Namespace != scope.resources.LockNamespace || inner.Use.CanonicalID != scope.spec.Boot.IdentityRoot.Path {
 				return out, refuse("publication_scope_mismatch", "publication", Conflict)
