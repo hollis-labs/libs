@@ -223,3 +223,35 @@ func TestPinOriginCoherentInnerSpliceRefusesBeforeAnyApplyPort(t *testing.T) {
 		})
 	}
 }
+
+func TestPublicationPreservesFullRepositoryLockUnionAndAggregateRefusal(t *testing.T) {
+	s, c, r, o := repositoryPlanInputs(t)
+	before := fixturePlanned(t, s, c, r, o)
+	aside := s.Boot.Candidate
+	aside.ID = "aside"
+	aside.Path = filepath.Join(s.Boot.IdentityRoot.Path, "aside-original")
+	g := EffectGrant{Kind: PublicationEffect, RootID: s.Boot.IdentityRoot.ID, AuthorizationID: "explicit-publication", Version: "1"}
+	pg := EffectGrant{Kind: PinCreationEffect, RootID: s.Boot.IdentityRoot.ID, AuthorizationID: "explicit-pin", Version: "1"}
+	s.Publication = &PublicationSpec{Control: r.LockRoot, Aside: aside, JournalID: "original-journal", ReservationID: "original-reservation", Authorization: g, PinCreationAuthorization: pg}
+	s.Effects = append(s.Effects, g, pg)
+	r.Grants = append(r.Grants, g, pg)
+	r.Roots = append(r.Roots, aside)
+	o.Roots = append(o.Roots, RootObservation{RootID: aside.ID, DeclaredPath: aside.Path, CanonicalPath: aside.Path, CanonicalBase: aside.AllowedBase, Owner: aside.Owner})
+	parent := fixtureObservation(&o, s.Boot.IdentityRoot.ID)
+	parent.Exists = true
+	parent.Directory = true
+	after := fixturePlanned(t, s, c, r, o)
+	if !reflect.DeepEqual(before.LockKeys(), after.LockKeys()) {
+		t.Fatal("publication changed full Source/Common/Base/shared canonical union")
+	}
+	for _, root := range []string{after.EffectInputs().Repositories[0].Source.Path, after.EffectInputs().Repositories[0].Common.Path, after.EffectInputs().Repositories[0].Base.Path, s.Boot.IdentityRoot.Path} {
+		if !slices.Contains(after.LockKeys(), LockKey{Namespace: r.LockNamespace, CanonicalID: root}) {
+			t.Fatal("complete declared canonical lock omitted")
+		}
+	}
+	f := &publicationAdapterPorts{control: r.LockRoot, observed: o, hook: func(string) error { panic("missing aggregate publication capability must refuse before all callbacks") }}
+	result, err := Materialize(context.Background(), after, adapterPorts(f))
+	if err == nil || result.Status != Unsupported || result.ArtifactsComplete() || result.LaunchReady() || len(f.records) != 0 {
+		t.Fatal("publication executed repository/artifact/receipt despite missing group admission")
+	}
+}
