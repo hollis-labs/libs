@@ -5,6 +5,48 @@ duplex recipe and lifecycle recipes against real Go, Node and Deno children.
 `protocol/v2/fixtures/duplex-child.json` versions the selected profiles/cases and
 lists the remaining owners. No reader, demux or SDK publication is mocked.
 
+Expanded selection is authored in the same fixture as `expanded_selection`:
+
+```json
+{
+  "version": 1,
+  "kind": "source-group",
+  "source_group": "expanded",
+  "modes": {
+    "internal-test-only": {"exclude_scenarios": []},
+    "normal-serve-negotiated": {"exclude_scenarios": ["base-cancel"]}
+  }
+}
+```
+
+`negotiated.expanded_selection` links to `normal-serve-negotiated`. The SDK
+driver and a future generic host adapter consume this selector rather than
+maintain their own membership lists. Version 1 requires exactly these selector
+fields, both mode keys, and only the `exclude_scenarios` operator per mode.
+The source group must be an own fixture property containing an array. Selection
+keeps source order and excludes matching scenarios before disposition,
+including proposed rows. Exclusion is distinct from unavailability.
+
+Validate the entire referenced group before execution, even excluded or
+unrequested rows: unique nonblank names, normative level, observed or proposed
+status (only an absent status defaults to observed), nonblank observed scenario
+and profile, and nonblank proposed owner/reason. Optional proposed scenario and
+profile must be nonblank strings when present. Exclusions must be arrays of
+unique nonblank strings. Unsupported versions, kinds, modes, operators, source
+statuses, missing linkage/group or malformed metadata are refusals; they never
+fall back to all cases. Unknown future top-level corpus groups remain separately
+named pending coverage for consumers, not selected cases or passes.
+
+An empty source group or explicit empty requested subset is valid; missing or
+unknown modes are refused. Requested subsets retain source order. Unknown or
+excluded requested names and duplicate requests are newly refused instead of
+silently producing an empty or partial replay. Existing SDK dispatch continues
+to refuse unknown observed scenario implementations. Selection preserves source
+status and authored owner/reason; execution separately reports `passed` or
+`unavailable`. Proposed rows never become passes. Reports must identify the exact
+source commit, corpus and selector versions, fixture hash and execution mode;
+a new fixture receipt does not adopt a consumer pin or certify host replay.
+
 The minimum duplex recipe observes opposite-direction `id:1`, progress while
 Init waits for a typed `host/log` reply, refusal of pipelined ordinary work,
 reader progress during Unload's reverse log, once-only cleanup, terminal reply
@@ -12,7 +54,7 @@ and actual child exit. Its fixture installs internal directional correlation;
 Init still declines reverse. This is engine evidence, not negotiated reverse
 support or plugin-host interoperability. Expanded shared child cases exercise saturation, cancellation, deadlines,
 writer capacity/fairness and effects. Hook composition stays explicitly
-unavailable until reverse negotiation attaches clients to hook contexts.
+unavailable even with reverse active; a separate per-item scope/client design is required.
 
 The parent also requests actual stdin EOF and SIGTERM during an awaiting
 handler, then checks graceful exit, stdout exhaustion and unload effects.
@@ -48,7 +90,7 @@ stdout, stderr flood, blocked stdin, missing barriers and failed spawn.
 Availability and obligation are separate. Both Go and TS validate file/step
 levels, preferred notes for historical quirks, and finding/owner metadata
 before skipping proposed cases. Implemented normative cases fail on an
-assertion. The two deliberately unavailable proposals report their exact
+assertion. Unavailable proposals report their exact
 owner; they do not count as passed. Historical v1 files are untouched.
 
 From the pinned source checkout, after building the TS workspace:
@@ -74,7 +116,7 @@ first pin follows this driver slice. That adapter must exercise its real
 Conn/spawn/cancel/dispose and typed backends with the same raw vectors. The
 SDK fake host cannot certify authorization, bindings, host-global limits,
 backend effects or durable operation-key receipts. Real Go/Node negotiated
-child replay and pinned host interop must pass before reverse acknowledgement;
+child replay and pinned host interop must pass before reverse activation merges;
 internal fixture bypass cannot satisfy that gate.
 
 The dedicated child matrix targets POSIX systems (Linux in CI); it relies on inherited pipes and SIGTERM/SIGKILL. These harness controls are test-only.
@@ -97,3 +139,42 @@ fake host uses the same bounded writer over the real parent pipe. Cleanup
 failure/panic, hung callbacks/cleanup and disconnect observe actual child exit.
 The 200 ms shutdown and short forward budgets in fault recipes are fixture-only
 safety/test values; they never change SDK defaults.
+
+## Negotiated normal-Serve children
+
+The same replay command also drives `TestNegotiatedFixtureChild` and
+`negotiated-worker.js` through the public Go `ServeWithOptions` and TypeScript
+`serve` APIs. These children never create or activate correlation, construct
+clients, or inject grants. The parent sends a real Init offer and host-issued
+bindings; callbacks consume `HostClientFromContext(ctx)` or `ctx.host`.
+Private scope/writer observations report limits and accounting without changing
+them. Controlled author/output barriers retain the existing deterministic
+saturation and queue probes.
+
+`negotiated-replay.js` replays the shared negotiation matrix, raw invalid offers,
+actual typed bound helpers, author mutation of the received Init, unoffered
+methods, provisional Init logging with colliding directional IDs, log-only
+Load/Unload, failed Init and cached-client revocation, late replies, EOF/SIGTERM,
+accepted minima and subsequent input bounds, and the consumed Init high-water.
+The expanded child recipes additionally run with runtime-delivered clients and
+an acknowledged reverse profile. Base cancellation and reusable string IDs stay
+in the declined-profile matrix. Results explicitly distinguish
+`normal-serve-negotiated` from `internal-test-only`.
+
+For focused negotiated replay after building the Go fixture binary and TS:
+
+```sh
+node ts/packages/plugin-sdk/test/negotiated-replay.js go "$GOTMPDIR/duplex-child"
+node ts/packages/plugin-sdk/test/negotiated-replay.js node
+node ts/packages/plugin-sdk/test/negotiated-replay.js deno
+```
+
+The normal child-replay entry point includes both matrices in existing CI legs.
+All children share the bounded parent, private control channel and guaranteed
+reaping. A proposal is reported as unavailable, never a pass. Hook helpers stay
+unconditionally unavailable, owned by the SDK hook-context and plugin-hooks adapter
+maintainers pending a separate per-item composition design.
+
+These are SDK fake-host transport proofs. Real plugin-host authority, binding
+ledgers, commit-time revocation, host-global admission, trusted depth and durable
+receipts still require a pinned plugin-host integration run before activation merges.

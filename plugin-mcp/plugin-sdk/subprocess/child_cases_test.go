@@ -18,14 +18,15 @@ import (
 type childCases struct {
 	writer *frameWriter
 	transcriptBase
-	mu      sync.Mutex
-	core    *correlation
-	init    InitParams
-	event   func(any)
-	gates   map[string]chan struct{}
-	counts  map[string]int
-	profile string
-	armed   bool
+	mu         sync.Mutex
+	core       *correlation
+	init       InitParams
+	event      func(any)
+	gates      map[string]chan struct{}
+	counts     map[string]int
+	profile    string
+	armed      bool
+	negotiated bool
 }
 
 func newChildCases(profile string, core *correlation, event func(any)) *childCases {
@@ -92,10 +93,13 @@ func (p *childCases) Snapshot() map[string]any {
 		out[k] = v
 	}
 	w := p.writer
+	core := p.core
 	p.mu.Unlock()
-	p.core.mu.Lock()
-	out["reverse_pending"] = len(p.core.pending)
-	p.core.mu.Unlock()
+	if core != nil {
+		core.mu.Lock()
+		out["reverse_pending"] = len(core.pending)
+		core.mu.Unlock()
+	}
 	if w != nil {
 		w.mu.Lock()
 		out["ordinary_queued"] = len(w.ordinary.queue)
@@ -132,9 +136,13 @@ func (p *childCases) entered(ctx context.Context, name string) (any, <-chan stru
 func (p *childCases) Init(ctx context.Context, v InitParams) (InitResult, error) {
 	p.mu.Lock()
 	p.writer = scopeFromContext(ctx).manager.writer
-	p.mu.Unlock()
 	p.init = v
-	p.core.methodTimeoutMS = v.HostServices.Limits.MethodTimeoutMS
+	if p.negotiated {
+		p.core = scopeFromContext(ctx).manager.core // Observe runtime-owned state, never create or activate it.
+	} else {
+		p.core.methodTimeoutMS = v.HostServices.Limits.MethodTimeoutMS
+	}
+	p.mu.Unlock()
 	return p.transcriptBase.Init(ctx, v)
 }
 func (p *childCases) Load(ctx context.Context) (LoadResult, error) {
@@ -168,7 +176,11 @@ func childFailure(err error) map[string]any {
 	var local *capability.Error
 	var transport *RPCTransportError
 	if errors.As(err, &host) {
-		return map[string]any{"code": host.Data.Code, "effect_state": host.Data.EffectState}
+		result := map[string]any{"code": host.Data.Code, "effect_state": host.Data.EffectState}
+		if host.Data.Detail != "" {
+			result["detail"] = host.Data.Detail
+		}
+		return result
 	}
 	if errors.As(err, &local) {
 		return map[string]any{"code": local.Code, "effect_state": local.EffectState}
@@ -208,11 +220,18 @@ func (p *childCases) Command(ctx context.Context, v CommandRequest) (CommandResu
 		if a.Gate {
 			<-g
 		}
-		hctx, err := hostClientContext(ctx, p.core, p.init, newSecretTracker(), time.Time{})
-		if err != nil {
-			return CommandResult{}, err
+		hctx := ctx
+		if !p.negotiated {
+			var err error
+			hctx, err = hostClientContext(ctx, p.core, p.init, newSecretTracker(), time.Time{})
+			if err != nil {
+				return CommandResult{}, err
+			}
 		}
-		h, _ := HostClientFromContext(hctx)
+		h, ok := HostClientFromContext(hctx)
+		if !ok {
+			return CommandResult{}, errors.New("missing delivered host client")
+		}
 		var wg sync.WaitGroup
 		results := make([]map[string]any, a.N)
 		for i := range results {

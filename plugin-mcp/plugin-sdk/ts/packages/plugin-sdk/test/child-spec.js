@@ -3,16 +3,18 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 const worker = fileURLToPath(new URL("./duplex-worker.js", import.meta.url));
 export function childSpec(runtime, profile, goChild) {
+  const negotiated = profile.startsWith("negotiated:");
+  const entry = negotiated ? fileURLToPath(new URL("./negotiated-worker.js", import.meta.url)) : worker;
   if (runtime === "go") {
     assert.ok(goChild, "Go test child path required");
     return {
       command: goChild,
-      args: ["-test.run=^TestDuplexFixtureChild$"],
+      args: [negotiated ? "-test.run=^TestNegotiatedFixtureChild$" : "-test.run=^TestDuplexFixtureChild$"],
       options: { env: { SDK_FIXTURE_CHILD: profile } },
     };
   }
   if (runtime === "node")
-    return { command: process.execPath, args: [worker, profile], options: {} };
+    return { command: process.execPath, args: [entry, profile], options: {} };
   if (runtime === "deno")
     return {
       command: "deno",
@@ -23,7 +25,7 @@ export function childSpec(runtime, profile, goChild) {
         "--no-check",
         "--allow-env",
         "--fixture-control-permission",
-        worker,
+        entry,
         profile,
       ],
       options: { pathControl: true },

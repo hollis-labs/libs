@@ -1,6 +1,6 @@
 {
   "corpus_version": 1,
-  "coverage": "Real stdio base, lifecycle and expanded client/admission/writer/effect cases with private fixture activation. Reverse remains declined; this is not negotiated plugin-host interoperability.",
+  "coverage": "Real stdio base, lifecycle, internal-engine and normal-Serve negotiated client/admission/writer/effect cases. Negotiated children use delivered clients and real Init offers. SDK fake-host transport evidence does not certify plugin-host authorization or durability.",
   "base_profiles": [
     "base",
     "full",
@@ -10,7 +10,9 @@
     "lifecycle-shutdown"
   ],
   "duplex_source": "duplex-correlation.json",
-  "duplex_runtime_cases": ["pending-init-and-quiescing-cleanup"],
+  "duplex_runtime_cases": [
+    "pending-init-and-quiescing-cleanup"
+  ],
   "lifecycle": [
     {
       "name": "host-eof-unloads-once",
@@ -81,8 +83,8 @@
   ],
   "pending_coverage": [
     {
-      "feature": "Negotiated reverse profile and pinned real plugin-host replay",
-      "owner": "SDK reverse profile and the plugin-host interop adapter"
+      "feature": "Pinned real plugin-host replay, authorization and durable receipts",
+      "owner": "plugin-host interoperability adapter"
     }
   ],
   "expanded": [
@@ -213,5 +215,48 @@
       "reason": "Hook helpers remain unavailable even with both profiles negotiated; per-item binding/client composition requires a separate approved design.",
       "level": "normative"
     }
-  ]
+  ],
+  "negotiated": {
+    "mode": "normal-serve-negotiated",
+    "worker_api": {
+      "go": "ServeWithOptions(Plugin, ServeOptions{ReverseRPC: true})",
+      "typescript": "serve(plugin, {reverseRPC: true})"
+    },
+    "matrix": "negotiation.json",
+    "recipes": [
+      "invalid-raw-offers",
+      "bound-helper-and-immutable-snapshot",
+      "unoffered-helper",
+      "lifecycle-directional-id-collision",
+      "failed-init-error-panic-output-fallback-deadline",
+      "pending-provisional-log-revocation-late-reply",
+      "cleanup-eof-sigterm-no-parent",
+      "accepted-minima-and-input-bound",
+      "init-id-high-water"
+    ],
+    "expanded_scenarios": "All expanded observed cases except base-cancel (declined/base-only ID reuse).",
+    "unavailable": [
+      {
+        "feature": "hook-duplex",
+        "owner": "SDK hook-context and plugin-hooks adapter maintainers",
+        "reason": "Hooks unconditionally receive no helper client; per-item composition requires a separate design."
+      }
+    ],
+    "expanded_selection": "normal-serve-negotiated"
+  },
+  "expanded_selection": {
+    "version": 1,
+    "kind": "source-group",
+    "source_group": "expanded",
+    "modes": {
+      "internal-test-only": {
+        "exclude_scenarios": []
+      },
+      "normal-serve-negotiated": {
+        "exclude_scenarios": [
+          "base-cancel"
+        ]
+      }
+    }
+  }
 }
