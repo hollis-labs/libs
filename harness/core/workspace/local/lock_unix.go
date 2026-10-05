@@ -27,6 +27,9 @@ func (p *ports) acquireFile(ctx context.Context, name string) (workspace.HeldLoc
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if err := p.validateControlCustody(); err != nil {
+		return nil, err
+	}
 	if info, err := p.control.Lstat(name); err == nil {
 		if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
 			return nil, errors.New("local: invalid lock file")
@@ -34,13 +37,23 @@ func (p *ports) acquireFile(ctx context.Context, name string) (workspace.HeldLoc
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	file, err := p.control.OpenFile(name, os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0600)
+	file, err := p.control.OpenFile(name, os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if err != nil {
 		return nil, err
 	}
+	if err = p.validateFileCustody(file, name); err != nil {
+		return nil, errors.Join(err, file.Close())
+	}
 	for {
+		if err = ctx.Err(); err != nil {
+			return nil, errors.Join(err, file.Close())
+		}
 		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
+			err = errors.Join(ctx.Err(), p.validateFileCustody(file, name))
+			if err != nil {
+				return nil, errors.Join(err, syscall.Flock(int(file.Fd()), syscall.LOCK_UN), file.Close())
+			}
 			return &heldLock{file: file}, nil
 		}
 		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
