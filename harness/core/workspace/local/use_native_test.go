@@ -693,3 +693,28 @@ func TestNewPinLateCallbackCannotEraseOriginalObligationThroughInputAlias(t *tes
 		t.Fatal("late input alias erased original durable uncertainty")
 	}
 }
+
+func TestNewPinReturnedEvidenceCannotRewriteOriginalDurableIntent(t *testing.T) {
+	p, plan, held, receipt := newPinFixture(t)
+	original := receipt.Obligations[0]
+	intent, err := p.preparePinCreation(context.Background(), plan, held, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := p.createNewPin(context.Background(), intent)
+	if err != nil || out.reservation == nil {
+		t.Fatal("synthetic positive transport", err)
+	}
+	t.Cleanup(func() {
+		_ = syscall.Flock(int(out.reservation.file.Fd()), syscall.LOCK_UN)
+		_ = out.reservation.file.Close()
+	})
+	out.receipt.Obligations[0].Code = "caller-mutation"
+	if !slices.Contains(intent.receipt.Obligations, original) {
+		t.Fatal("returned evidence rewrote private original intent")
+	}
+	durable, err := p.readReceipt()
+	if err != nil || !slices.Contains(durable.Obligations, original) || !durable.PinCreation.Uncertain {
+		t.Fatal("caller mutation changed durable original uncertainty")
+	}
+}
