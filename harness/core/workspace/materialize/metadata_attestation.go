@@ -259,20 +259,7 @@ func freezeInstalledOriginal(r Request) (installedOriginalLedger, error) {
 		}
 		for _, before := range c.Files {
 			if before.Path == f.Path {
-				parts := strings.Split(f.Path, "/")
-				if len(before.Parents) != len(parts)-1 {
-					return installedOriginalLedger{}, ErrConflict
-				}
-				missing := false
-				for i, p := range before.Parents {
-					if p.Path != strings.Join(parts[:i+1], "/") || missing && p.Exists {
-						return installedOriginalLedger{}, ErrConflict
-					}
-					if !p.Exists {
-						missing = true
-					}
-				}
-				if missing && before.Exists {
+				if !installedParentsConsistent(f.Path, before.Exists, before.Parents) {
 					return installedOriginalLedger{}, ErrConflict
 				}
 				for _, p := range before.Parents {
@@ -345,9 +332,37 @@ func admitInstalledOriginal(ctx context.Context, req Request) (installedOriginal
 	}
 	return ledger, ErrUnsupportedOperation
 }
+
+// A missing ancestor has no observed inode or metadata, and no descendant
+// can already exist beneath it. Apply this at both original freeze and private
+// issued verification so neither boundary admits contradictory observations.
+func installedParentsConsistent(path string, leafExists bool, parents []InstalledDirectoryChange) bool {
+	parts := strings.Split(path, "/")
+	if len(parents) != len(parts)-1 {
+		return false
+	}
+	missing := false
+	for i, p := range parents {
+		if p.Path != strings.Join(parts[:i+1], "/") || p.Created || missing && p.Exists {
+			return false
+		}
+		if !p.Exists {
+			if p.Identity != "" || p.Metadata != (InstalledMetadata{}) || p.Mode != 0 {
+				return false
+			}
+			missing = true
+		}
+	}
+	return !missing || !leafExists
+}
+
 func cloneIssuedInstalled(e issuedInstalledAttestation) issuedInstalledAttestation {
 	b, _ := json.Marshal(e.original)
-	_ = json.Unmarshal(b, &e.original)
+	// Decode into a fresh value: decoding over a shallow copy may reuse slices
+	// still owned by the supplied envelope, including nested key and parent data.
+	var original InstalledOriginalContext
+	_ = json.Unmarshal(b, &original)
+	e.original = original
 	e.files = slices.Clone(e.files)
 	for i := range e.files {
 		e.files[i].parents = slices.Clone(e.files[i].parents)
@@ -428,7 +443,7 @@ func verifyInstalledAttestation(ctx context.Context, ledger installedOriginalLed
 		if f.path != want.Path || before.Path != want.Path || f.identity != want.BeforeIdentity || f.revision != ledger.original.Target.ObservationRevision || !installedCoverageComplete(f.coverage) || f.creation != ledger.request.Installed.Capabilities.Creation || before.Exists && (f.metadata != want.BeforeMetadata || !f.metadata.PreservableFile(f.creation, want.AfterMode)) || !before.Exists && f.metadata != (InstalledMetadata{}) {
 			return nil, ErrUnsupportedOperation
 		}
-		if len(f.parents) != len(before.Parents) {
+		if !installedParentsConsistent(before.Path, before.Exists, before.Parents) || len(f.parents) != len(before.Parents) {
 			return nil, ErrUnsupportedOperation
 		}
 		parent := ledger.original.Target.Identity

@@ -543,3 +543,206 @@ func TestMetadataControlGrantRequiredBeforePrivateAdmission(t *testing.T) {
 		})
 	}
 }
+
+// Private constructor fixture: no native backend and no filesystem effect.
+func syntheticParentEnvelope(t *testing.T, parents []InstalledDirectoryChange, leafExists bool) (Request, issuedInstalledAttestation, time.Time) {
+	t.Helper()
+	req, _, issued, now := syntheticInstalledAdmission(t)
+	components := make([]string, 0, len(parents)+1)
+	for _, p := range parents {
+		components = append(components, filepath.Base(p.Path))
+	}
+	components = append(components, "fixture.txt")
+	path := strings.Join(components, "/")
+	req.Artifacts.Entries[0].Path = path
+	req.InstalledOriginalContext.Grants[0].Path = path
+	before := &req.InstalledOriginalContext.Files[0]
+	before.Path = path
+	before.Parents = parents
+	f := &req.Installed.Files[0]
+	f.Path = path
+	if !leafExists {
+		before.Identity = ""
+		before.Exists = false
+		before.Kind = ""
+		before.Mode = 0
+		before.Digest = artifact.Digest{}
+		before.Metadata = InstalledMetadata{}
+		f.BeforeIdentity = ""
+		f.BeforeExists = false
+		f.BeforeMode = 0
+		f.Before = artifact.Digest{}
+		f.BeforeMetadata = InstalledMetadata{}
+	}
+	req.Installed.Directories = append([]InstalledDirectoryChange(nil), parents...)
+	issued.files[0].path = path
+	issued.files[0].identity = f.BeforeIdentity
+	issued.files[0].metadata = f.BeforeMetadata
+	issued.files[0].parentIdentity = req.InstalledOriginalContext.Target.Identity
+	issued.files[0].parents = nil
+	for _, p := range parents {
+		issued.files[0].parents = append(issued.files[0].parents, installedParentAttestation{path: p.Path, identity: p.Identity, metadata: p.Metadata, revision: req.InstalledOriginalContext.Target.ObservationRevision, coverage: installedCoverage{true, true, true, true}})
+		if p.Exists {
+			issued.files[0].parentIdentity = p.Identity
+		}
+	}
+	return req, issued, now
+}
+func TestMetadataAbsentParentZeroStateAtFreezeAndIssuedVerification(t *testing.T) {
+	for _, name := range []string{"valid-missing", "valid-existing", "phantom-identity", "phantom-metadata", "phantom-mode", "created", "existing-after-missing", "existing-leaf-after-missing", "wrong-parent-path", "missing-parent-observation"} {
+		t.Run(name, func(t *testing.T) {
+			parent := InstalledDirectoryChange{Path: "missing"}
+			switch name {
+			case "valid-existing":
+				fixture, _, _, _ := syntheticInstalledAdmission(t)
+				parent.Exists = true
+				parent.Identity = "synthetic-parent-inode"
+				parent.Metadata = fixture.InstalledOriginalContext.Target.Metadata
+				parent.Mode = parent.Metadata.FullMode
+			case "phantom-identity":
+				parent.Identity = "phantom-inode"
+			case "phantom-metadata":
+				parent.Metadata = InstalledMetadata{Complete: true, Volume: "synthetic-volume", FullMode: 0755}
+			case "phantom-mode":
+				parent.Mode = 0755
+			case "created":
+				parent.Created = true
+			}
+			parents := []InstalledDirectoryChange{parent}
+			if name == "existing-after-missing" {
+				fixture, _, _, _ := syntheticInstalledAdmission(t)
+				parents = append(parents, InstalledDirectoryChange{Path: "missing/existing", Exists: true, Identity: "synthetic-child-inode", Mode: 0755, Metadata: fixture.InstalledOriginalContext.Target.Metadata})
+			}
+			req, issued, now := syntheticParentEnvelope(t, parents, name == "existing-leaf-after-missing" || name == "valid-existing")
+			if name == "wrong-parent-path" {
+				req.InstalledOriginalContext.Files[0].Parents[0].Path = "foreign"
+				req.Installed.Directories[0].Path = "foreign"
+				issued.files[0].parents[0].path = "foreign"
+			}
+			if name == "missing-parent-observation" {
+				req.InstalledOriginalContext.Files[0].Parents = nil
+				req.Installed.Directories = nil
+				issued.files[0].parents = nil
+			}
+			valid := name == "valid-missing" || name == "valid-existing"
+			ledger, err := freezeInstalledOriginal(req)
+			if valid {
+				if err != nil {
+					t.Fatal("valid missing-parent freeze refused", err)
+				}
+			} else if err == nil {
+				t.Error("absent-parent contradiction admitted by freeze")
+			}
+			// Construct a private SYNTHETIC ledger to reach issued verification even
+			// when freeze correctly refuses. Hashing data still cannot issue public proof.
+			raw, _ := json.Marshal(req)
+			var owned Request
+			if e := json.Unmarshal(raw, &owned); e != nil {
+				t.Fatal(e)
+			}
+			ledger = installedOriginalLedger{request: owned, original: *owned.InstalledOriginalContext, seal: installedRequestSeal(owned)}
+			issued.original = copySyntheticOriginal(t, ledger.original)
+			issued.requestSeal = ledger.seal
+			issued.integrity = installedAttestationIntegrity(issued)
+			a, err := verifyInstalledAttestation(context.Background(), ledger, &issued, ledger.original, now)
+			if valid {
+				if err != nil || a == nil {
+					t.Fatal("valid missing parent private admission refused", err)
+				}
+				return
+			}
+			if a != nil || !errors.Is(err, ErrUnsupportedOperation) {
+				t.Fatalf("issued verifier failed to reject absent-parent contradiction before admission: %v", err)
+			}
+		})
+	}
+}
+
+func TestMetadataOriginalEnvelopeCollectionsDetachedAfterAdmission(t *testing.T) {
+	for _, name := range []string{"grant", "authorization", "file", "nested-key", "nested-parent"} {
+		t.Run(name, func(t *testing.T) {
+			req, ledger, issued, now := syntheticInstalledAdmission(t)
+			if name == "nested-key" {
+				req.InstalledOriginalContext.Grants[0].WholeFile = false
+				req.InstalledOriginalContext.Grants[0].KeyPaths = [][]string{{"section", "key"}}
+				req.Installed.Files[0].KeysBefore = []keymerge.KeyState{{Path: keymerge.KeyPath{"section", "key"}}}
+				req.Installed.Files[0].KeysAfter = []keymerge.KeyState{{Path: keymerge.KeyPath{"section", "key"}, Exists: true, Digest: "fixture"}}
+				var err error
+				ledger, err = freezeInstalledOriginal(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				issued.original = copySyntheticOriginal(t, ledger.original)
+				issued.requestSeal = ledger.seal
+			}
+			if name == "nested-parent" {
+				parent := InstalledDirectoryChange{Path: "missing"}
+				req, issued, now = syntheticParentEnvelope(t, []InstalledDirectoryChange{parent}, false)
+				var err error
+				ledger, err = freezeInstalledOriginal(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				issued.original = copySyntheticOriginal(t, ledger.original)
+				issued.requestSeal = ledger.seal
+			}
+			issued.integrity = installedAttestationIntegrity(issued)
+			a, err := verifyInstalledAttestation(context.Background(), ledger, &issued, ledger.original, now)
+			if err != nil || a == nil {
+				t.Fatal("valid private admission unreachable", err)
+			}
+			switch name {
+			case "grant":
+				issued.original.Grants[0].ID = "caller-mutated"
+			case "authorization":
+				issued.original.Authorizations[0].Version = "caller-mutated"
+			case "file":
+				issued.original.Files[0].Identity = "caller-mutated"
+			case "nested-key":
+				issued.original.Grants[0].KeyPaths[0][0] = "caller-mutated"
+			case "nested-parent":
+				issued.original.Files[0].Parents[0].Identity = "caller-mutated"
+			}
+			if err := revalidateInstalledAdmission(context.Background(), a, a.ledger.original, now); err != nil {
+				t.Fatalf("supplied envelope corrupted earned private %s snapshot: %v", name, err)
+			}
+			// Fresh current comparison really changed: keep refusal, not snapshot repair
+			// from caller input or renewed authority.
+			if err := revalidateInstalledAdmission(context.Background(), a, issued.original, now); err == nil {
+				t.Fatal("changed current comparison was silently reminted")
+			}
+		})
+	}
+}
+
+func TestMetadataDetachedOriginalAcrossRepeatedVerification(t *testing.T) {
+	_, ledger, supplied, now := syntheticInstalledAdmission(t)
+	admission, err := verifyInstalledAttestation(context.Background(), ledger, &supplied, ledger.original, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := copySyntheticOriginal(t, ledger.original)
+	for i := 1; i <= 3; i++ {
+		// A later verification earns another detached admission to the SAME
+		// original operation and window; it cannot refresh authority on retry.
+		prior := admission
+		admission, err = verifyInstalledAttestation(context.Background(), prior.ledger, &prior.issued, original, now.Add(time.Duration(i)*time.Second))
+		if err != nil {
+			t.Fatal("valid original retry refused", err)
+		}
+		prior.issued.original.Grants[0].Version = "caller-replaced"
+		prior.issued.original.Authorizations[0].AuthorizationID = "caller-replaced"
+		prior.issued.original.Files[0].Identity = "caller-replaced"
+		if err := revalidateInstalledAdmission(context.Background(), admission, original, now.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatal("prior wrapper mutation corrupted retry", err)
+		}
+		foreign := copySyntheticOriginal(t, original)
+		foreign.OperationID = "new-operation"
+		if err := revalidateInstalledAdmission(context.Background(), admission, foreign, now); err == nil {
+			t.Fatal("retry reminted foreign operation")
+		}
+	}
+	if err := revalidateInstalledAdmission(context.Background(), admission, original, original.ExpiresAt); err == nil {
+		t.Fatal("retry renewed original expiry")
+	}
+}
