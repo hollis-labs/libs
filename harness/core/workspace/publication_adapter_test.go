@@ -220,6 +220,9 @@ func TestPublicationIntentCannotRestorePriorArtifactProofByRewritingPublicEviden
 	}
 	// Restore all public fields exactly, leaving the private earned-proof state
 	// alone. An attempted publication must monotonically invalidate that proof.
+	// An omitted JSON field does not clear an existing pointer on Unmarshal;
+	// explicitly clear that caller-writable field before restoring the snapshot.
+	result.Receipt.PublicationJournal = nil
 	if err := json.Unmarshal(original, result); err != nil {
 		t.Fatal(err)
 	}
