@@ -1,0 +1,256 @@
+{
+  "status": "normative",
+  "raw_dtos": [
+    {
+      "name": "base-overload",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "extra",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":false,\"extra\":1}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "wrong-contract",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"host-rpc/1\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "string-retryable",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":\"false\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "unknown-code",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"internal_error\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "null-code",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":null,\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "rate-limited-committed",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"committed\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "missing",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "unknown-outcome",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"unknown_outcome\",\"effect_state\":\"unknown\",\"retryable\":false}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "unknown-outcome-known",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"unknown_outcome\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "duplicate",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"code\":\"cancelled\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "wrong-case",
+      "dto": "PluginRPCErrorData",
+      "raw": "{\"Contract\":\"plugin-rpc/2\",\"code\":\"rate_limited\",\"effect_state\":\"not_started\",\"retryable\":false}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "host-caller_cancelled",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":17,\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "host-deadline_exceeded",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":17,\"reason\":\"deadline_exceeded\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "host-parent_cancelled",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":17,\"reason\":\"parent_cancelled\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "host-connection_closing",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":17,\"reason\":\"connection_closing\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "plugin-caller_cancelled",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"plugin\",\"id\":17,\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "plugin-deadline_exceeded",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"plugin\",\"id\":17,\"reason\":\"deadline_exceeded\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "plugin-parent_cancelled",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"plugin\",\"id\":17,\"reason\":\"parent_cancelled\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "plugin-connection_closing",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"plugin\",\"id\":17,\"reason\":\"connection_closing\"}",
+      "valid": true,
+      "directional": true
+    },
+    {
+      "name": "zero-base",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":0,\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "zero-profile",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":0,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": true
+    },
+    {
+      "name": "negative-base",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":-1,\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "empty-string-base",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":\"\",\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "string-base",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":\"MixedCase\",\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "null-id",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":null,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "fraction-id",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":1.5,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "unsafe-id",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":9007199254740992,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "unknown-owner",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"Host\",\"id\":0,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "unknown-reason",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":0,\"reason\":\"cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "null-reason",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":0,\"reason\":null}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "extra-cancel",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":0,\"reason\":\"caller_cancelled\",\"extra\":1}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "exponent-id",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":1e0,\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    },
+    {
+      "name": "escaped-key",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"i\\u0064\":1,\"reason\":\"caller_cancelled\"}",
+      "valid": true,
+      "directional": false
+    },
+    {
+      "name": "lone-surrogate",
+      "dto": "CancelParams",
+      "raw": "{\"request_owner\":\"host\",\"id\":\"\\ud800\",\"reason\":\"caller_cancelled\"}",
+      "valid": false,
+      "directional": false
+    }
+  ],
+  "policy": {
+    "forward_slots": 16,
+    "reverse_slots": 8,
+    "control_slots": 2,
+    "terminal_credit_bytes": 1024
+  }
+}

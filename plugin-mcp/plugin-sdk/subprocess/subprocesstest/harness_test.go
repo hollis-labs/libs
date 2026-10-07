@@ -1,0 +1,229 @@
+package subprocesstest_test
+
+import (
+	"context"
+	"encoding/json"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"os"
+	"testing"
+
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess/subprocesstest"
+)
+
+type echoPlugin struct{}
+
+func (echoPlugin) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
+	return subprocess.InitResult{
+		ID: "echo", Name: "Echo", Version: "0.0.1",
+		Description: "test", Protocol: subprocess.ProtocolVersion, CapabilityContract: 1,
+	}, nil
+}
+
+func (echoPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
+	return subprocess.LoadResult{}, nil
+}
+
+func (echoPlugin) Unload(ctx context.Context) error { return nil }
+
+func (echoPlugin) Command(ctx context.Context, req subprocess.CommandRequest) (subprocess.CommandResult, error) {
+	return subprocess.CommandResult{Action: "message", Content: "echo: " + req.Args}, nil
+}
+
+func TestHarnessBasicLifecycle(t *testing.T) {
+	h := subprocesstest.New(t, echoPlugin{})
+	defer h.Close()
+
+	ctx := context.Background()
+	init, err := h.Init(ctx)
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if init.ID != "echo" {
+		t.Errorf("init id = %q, want echo", init.ID)
+	}
+	if _, err := h.Load(ctx); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	res, err := h.Command(ctx, "say", "session-1", "hello")
+	if err != nil {
+		t.Fatalf("Command: %v", err)
+	}
+	if res.Action != "message" || res.Content != "echo: hello" {
+		t.Errorf("command result = %+v", res)
+	}
+
+	if err := h.Unload(ctx); err != nil {
+		t.Fatalf("Unload: %v", err)
+	}
+}
+
+func TestHarnessWithJSONRoundtrip(t *testing.T) {
+	h := subprocesstest.New(t, echoPlugin{}, subprocesstest.WithJSONRoundtrip(true))
+	defer h.Close()
+
+	if !h.RoundtripEnabled() {
+		t.Fatal("roundtrip not enabled")
+	}
+
+	ctx := context.Background()
+	if _, err := h.Init(ctx); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	res, err := h.Command(ctx, "x", "s", "y")
+	if err != nil {
+		t.Fatalf("Command: %v", err)
+	}
+	if res.Content != "echo: y" {
+		t.Errorf("roundtrip broke payload: %+v", res)
+	}
+}
+
+// brokenPlugin returns a CommandResult whose Envelopes contain a
+// channel in the Data map — channels cannot be marshaled to JSON, so
+// roundtrip mode must surface this as an error rather than silently
+// succeeding (which a normal in-process test would).
+type brokenPlugin struct{}
+
+func (brokenPlugin) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
+	return subprocess.InitResult{ID: "broken", Protocol: subprocess.ProtocolVersion}, nil
+}
+func (brokenPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
+	return subprocess.LoadResult{}, nil
+}
+func (brokenPlugin) Unload(ctx context.Context) error { return nil }
+func (brokenPlugin) Command(ctx context.Context, req subprocess.CommandRequest) (subprocess.CommandResult, error) {
+	return subprocess.CommandResult{
+		Action:  "message",
+		Content: "ok",
+		Envelopes: []plugin.EnvelopeOut{
+			{Type: "broken", Data: map[string]interface{}{"ch": make(chan int)}},
+		},
+	}, nil
+}
+
+func TestRoundtripCatchesUnserializableResult(t *testing.T) {
+	// Roundtrip OFF: unserializable payload slides through the harness
+	// and the test would pass silently — exactly the bug class we want
+	// to catch. Explicitly disable because CI may set the env var.
+	h := subprocesstest.New(t, brokenPlugin{}, subprocesstest.WithJSONRoundtrip(false))
+	defer h.Close()
+	if _, err := h.Command(context.Background(), "x", "", ""); err != nil {
+		t.Fatalf("expected success without roundtrip, got %v", err)
+	}
+
+	// Roundtrip ON: marshal fails on the unserializable channel and
+	// the harness surfaces the error.
+	h2 := subprocesstest.New(t, brokenPlugin{}, subprocesstest.WithJSONRoundtrip(true))
+	defer h2.Close()
+	if _, err := h2.Command(context.Background(), "x", "", ""); err == nil {
+		t.Errorf("expected roundtrip to catch unserializable payload, got no error")
+	}
+}
+
+func TestEnvTruthyDefault(t *testing.T) {
+	_ = os.Unsetenv("PLUGIN_SDK_JSON_ROUNDTRIP")
+	_ = os.Unsetenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
+	h := subprocesstest.New(t, echoPlugin{})
+	if h.RoundtripEnabled() {
+		t.Errorf("roundtrip should default off when env is unset")
+	}
+}
+
+func TestEnvTruthyEnabled(t *testing.T) {
+	// Clear the legacy var so this test exercises only the canonical name.
+	_ = os.Unsetenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
+	t.Setenv("PLUGIN_SDK_JSON_ROUNDTRIP", "1")
+	h := subprocesstest.New(t, echoPlugin{})
+	if !h.RoundtripEnabled() {
+		t.Errorf("roundtrip should be enabled via PLUGIN_SDK_JSON_ROUNDTRIP")
+	}
+}
+
+func TestEnvTruthyEnabledLegacy(t *testing.T) {
+	// Backward compatibility: the legacy env var name continues to work.
+	_ = os.Unsetenv("PLUGIN_SDK_JSON_ROUNDTRIP")
+	t.Setenv("NANITE_PLUGIN_SDK_JSON_ROUNDTRIP", "1")
+	h := subprocesstest.New(t, echoPlugin{})
+	if !h.RoundtripEnabled() {
+		t.Errorf("roundtrip should still be enabled via legacy NANITE_PLUGIN_SDK_JSON_ROUNDTRIP")
+	}
+}
+
+func TestHarnessCommandOnNonHandlerPlugin(t *testing.T) {
+	h := subprocesstest.New(t, &minimalPlugin{})
+	defer h.Close()
+	if _, err := h.Command(context.Background(), "x", "", ""); err == nil {
+		t.Fatal("expected error when plugin lacks CommandHandler")
+	}
+}
+
+type minimalPlugin struct{}
+
+func (*minimalPlugin) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
+	return subprocess.InitResult{ID: "min", Protocol: subprocess.ProtocolVersion}, nil
+}
+func (*minimalPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
+	return subprocess.LoadResult{}, nil
+}
+func (*minimalPlugin) Unload(ctx context.Context) error { return nil }
+
+// capabilityPlugin records what the host granted at Init and reports
+// whether it took the degraded path — the shape a plugin author is
+// meant to test.
+type capabilityPlugin struct {
+	degraded bool
+	granted  capability.GrantSet
+}
+
+func (p *capabilityPlugin) Init(ctx context.Context, params subprocess.InitParams) (subprocess.InitResult, error) {
+	p.granted = params.Grants
+	p.degraded = !params.HasCapability("example.capability")
+	return subprocess.InitResult{
+		ID: "cap", Name: "Cap", Version: "0.0.1",
+		Description: "test", Protocol: subprocess.ProtocolVersion, CapabilityContract: 1,
+	}, nil
+}
+
+func (p *capabilityPlugin) Load(ctx context.Context) (subprocess.LoadResult, error) {
+	return subprocess.LoadResult{}, nil
+}
+
+func (p *capabilityPlugin) Unload(ctx context.Context) error { return nil }
+
+func TestHarnessWithGranted(t *testing.T) {
+	p := &capabilityPlugin{}
+	h := subprocesstest.New(t, p, subprocesstest.WithGrants(capability.GrantSet{{GrantID: "g", Name: "example.capability", SchemaVersion: 1, Scope: json.RawMessage(`{}`), HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1, Audience: "test", IssuedAt: "2026-10-03T00:00:00Z", ExpiresAt: "2026-10-04T00:00:00Z", PolicyRevision: "1"}}))
+	defer h.Close()
+
+	if _, err := h.Init(context.Background()); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if p.degraded {
+		t.Errorf("plugin degraded despite the capability being granted")
+	}
+	if len(p.granted) != 1 || p.granted[0].Name != "example.capability" {
+		t.Errorf("Granted = %v", p.granted)
+	}
+}
+
+// The default harness grants nothing, so a plugin that assumes a
+// capability it never received fails its own tests rather than the
+// operator's install.
+func TestHarnessGrantsNothingByDefault(t *testing.T) {
+	p := &capabilityPlugin{}
+	h := subprocesstest.New(t, p)
+	defer h.Close()
+
+	if _, err := h.Init(context.Background()); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if !p.degraded {
+		t.Errorf("plugin did not degrade against a host that granted nothing")
+	}
+	if p.granted != nil {
+		t.Errorf("Granted = %v, want nil", p.granted)
+	}
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Known fields require exact wire spelling.",
+  "response_raw": "{\"registry_version\":2,\"host_instance\":\"host-epoch\",\"Revision\":3,\"plugins\":{},\"kinds\":{},\"regions\":{},\"contributions\":{},\"refusals\":[]}",
+  "go": {
+    "validate": "ErrInvalidContribution"
+  },
+  "ts": {
+    "validate": "ErrInvalidContribution"
+  }
+}

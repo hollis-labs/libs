@@ -1,0 +1,166 @@
+{
+  "level": "normative",
+  "profile": "base",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "raw": "{",
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700
+        }
+      },
+      "level": "normative",
+      "message_prefix": "parse error:"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "string-id",
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "string-id",
+        "result": {
+          "ok": true
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": [],
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": {
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "plugin/init",
+        "params": {
+          "host_info": {
+            "protocol": 999
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32600,
+          "message": "init already attempted"
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": {
+        "jsonrpc": "1.0",
+        "id": 3,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      },
+      "level": "normative"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": 42
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "error": {
+          "code": -32600,
+          "message": "invalid request"
+        }
+      },
+      "level": "normative"
+    }
+  ]
+}

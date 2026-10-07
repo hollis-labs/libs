@@ -1,0 +1,221 @@
+{
+  "init": {"plugin_dir":"/fixture","data_dir":"/fixture/data","cache_dir":"/fixture/cache","config":{},"log_level":"info","host_info":{"version":"fixture","protocol":2},"capability_contract":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"grants":[{"grant_id":"g-StorageGet","name":"storage.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StoragePut","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-StorageDelete","name":"storage.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-SecretsGet","name":"secrets.read","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EgressRequest","name":"egress.request","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-EventsPublish","name":"events.publish","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"},{"grant_id":"g-Log","name":"log.write","schema_version":1,"scope":{},"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1,"audience":"host.private-stdio","issued_at":"2000-01-01T00:00:00Z","expires_at":"2099-01-01T00:00:00Z","policy_revision":"policy-1"}],"host_services":{"reverse_rpc_version":1,"incarnation":{"host_instance":"fixture-host","owner_id":"fixture","owner_generation":1},"methods":["host/storage/get","host/storage/put","host/storage/delete","host/secrets/get","host/egress/request","host/events/publish","host/log"],"limits":{"host_to_plugin_inflight":16,"plugin_to_host_inflight":8,"host_global_inflight":64,"control_slots":2,"max_frame_bytes":8388608,"max_queued_write_bytes":16777216,"write_timeout_ms":1000,"max_depth":8,"method_timeout_ms":{"host/storage/get":1000,"host/storage/put":1000,"host/storage/delete":1000,"host/secrets/get":1000,"host/egress/request":1000,"host/events/publish":1000,"host/log":1000}}}},
+  "cases": [
+    {
+      "name": "StorageGet",
+      "helper": "storageGet",
+      "method": "host/storage/get",
+      "args": {
+        "grant_id": "g-StorageGet",
+        "key": "preferences"
+      },
+      "result": {
+        "found": false
+      }
+    },
+    {
+      "name": "StorageGet-unknown-grant",
+      "helper": "storageGet",
+      "method": "host/storage/get",
+      "args": {
+        "grant_id": "missing",
+        "key": "preferences"
+      },
+      "result": {
+        "found": false
+      },
+      "expected_error": "capability_denied"
+    },
+    {
+      "name": "StoragePut",
+      "helper": "storagePut",
+      "method": "host/storage/put",
+      "args": {
+        "grant_id": "g-StoragePut",
+        "key": "preferences",
+        "value": {
+          "theme": "dark"
+        },
+        "expected_revision": null,
+        "operation_key": "put-1"
+      },
+      "result": {
+        "operation_key": "put-1",
+        "revision": "r1"
+      }
+    },
+    {
+      "name": "StoragePut-unknown-grant",
+      "helper": "storagePut",
+      "method": "host/storage/put",
+      "args": {
+        "grant_id": "missing",
+        "key": "preferences",
+        "value": {
+          "theme": "dark"
+        },
+        "expected_revision": null,
+        "operation_key": "put-1"
+      },
+      "result": {
+        "operation_key": "put-1",
+        "revision": "r1"
+      },
+      "expected_error": "capability_denied"
+    },
+    {
+      "name": "StoragePut-receipt-mismatch",
+      "helper": "storagePut",
+      "method": "host/storage/put",
+      "args": {
+        "grant_id": "g-StoragePut",
+        "key": "preferences",
+        "value": {
+          "theme": "dark"
+        },
+        "expected_revision": null,
+        "operation_key": "put-1"
+      },
+      "result": {
+        "operation_key": "different",
+        "revision": "r1"
+      },
+      "expected_error": "unknown_outcome"
+    },
+    {
+      "name": "storage-put-explicit-null",
+      "helper": "storagePut",
+      "method": "host/storage/put",
+      "args": {
+        "grant_id": "g-StoragePut",
+        "key": "preferences",
+        "value": null,
+        "expected_revision": null,
+        "operation_key": "put-1"
+      },
+      "result": {
+        "operation_key": "put-1",
+        "revision": "r1"
+      },
+      "expected_error": "invalid_input"
+    },
+    {
+      "name": "StorageDelete",
+      "helper": "storageDelete",
+      "method": "host/storage/delete",
+      "args": {
+        "grant_id": "g-StorageDelete",
+        "key": "preferences",
+        "expected_revision": "r1",
+        "operation_key": "delete-1"
+      },
+      "result": {
+        "operation_key": "delete-1",
+        "deleted": true,
+        "revision": "r2"
+      }
+    },
+    {
+      "name": "StorageDelete-unknown-grant",
+      "helper": "storageDelete",
+      "method": "host/storage/delete",
+      "args": {
+        "grant_id": "missing",
+        "key": "preferences",
+        "expected_revision": "r1",
+        "operation_key": "delete-1"
+      },
+      "result": {
+        "operation_key": "delete-1",
+        "deleted": true,
+        "revision": "r2"
+      },
+      "expected_error": "capability_denied"
+    },
+    {
+      "name": "StorageDelete-receipt-mismatch",
+      "helper": "storageDelete",
+      "method": "host/storage/delete",
+      "args": {
+        "grant_id": "g-StorageDelete",
+        "key": "preferences",
+        "expected_revision": "r1",
+        "operation_key": "delete-1"
+      },
+      "result": {
+        "operation_key": "different",
+        "deleted": true,
+        "revision": "r2"
+      },
+      "expected_error": "unknown_outcome"
+    },
+    {
+      "name": "storage-found",
+      "helper": "storageGet",
+      "method": "host/storage/get",
+      "args": {
+        "grant_id": "g-StorageGet",
+        "key": "preferences"
+      },
+      "result": {
+        "found": true,
+        "value": {
+          "nested": [
+            1,
+            "x"
+          ]
+        },
+        "revision": "r1"
+      }
+    },
+    {
+      "name": "host-scope_denied",
+      "helper": "storageGet",
+      "method": "host/storage/get",
+      "args": {
+        "grant_id": "g-StorageGet",
+        "key": "preferences"
+      },
+      "result": {
+        "found": false
+      },
+      "expected_error": "host:scope_denied",
+      "error": {
+        "code": -32010,
+        "message": "safe refusal",
+        "data": {
+          "contract": "host-rpc/1",
+          "code": "scope_denied",
+          "effect_state": "not_started",
+          "retryable": false,
+          "request_id": 1
+        }
+      }
+    },
+    {
+      "name": "host-target_unavailable",
+      "helper": "storageGet",
+      "method": "host/storage/get",
+      "args": {
+        "grant_id": "g-StorageGet",
+        "key": "preferences"
+      },
+      "result": {
+        "found": false
+      },
+      "expected_error": "host:target_unavailable",
+      "error": {
+        "code": -32010,
+        "message": "safe refusal",
+        "data": {
+          "contract": "host-rpc/1",
+          "code": "target_unavailable",
+          "effect_state": "not_started",
+          "retryable": false,
+          "request_id": 1,
+          "detail": "stale_binding"
+        }
+      }
+    }
+  ]
+}

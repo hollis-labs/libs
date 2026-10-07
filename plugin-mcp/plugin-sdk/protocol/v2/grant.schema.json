@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Protocol-2 capability grant transport data",
+  "description": "Grant structure is shared by protocol-2 Init. Optional profile transports require separate conformance. Runtime validators additionally reject duplicate keys, enforce decimal-only integer tokens, valid UTC timestamps with expires_at after issued_at, unique grant IDs, tuple equality and nesting <=128. Scope semantics remain descriptor-owned. Runtime validators reject unpaired Unicode surrogates; scope integer-form tokens must be within ±9007199254740991 and numeric values must be finite. Descriptor schemas string-encode larger integers.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Grant"
+    },
+    {
+      "$ref": "#/$defs/GrantSet"
+    },
+    {
+      "$ref": "#/$defs/RuntimeIdentity"
+    }
+  ],
+  "$defs": {
+    "RuntimeIdentity": {
+      "type": "object",
+      "properties": {
+        "host_instance": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "host_instance",
+        "owner_id",
+        "owner_generation"
+      ],
+      "additionalProperties": false
+    },
+    "Grant": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "schema_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "scope": {
+          "not": {
+            "type": "null"
+          },
+          "description": "Normalized descriptor-owned non-null JSON. Portable numeric tokens: integer-form within ±9007199254740991; all numbers finite. Larger integers must be string-encoded."
+        },
+        "host_instance": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "audience": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+        },
+        "policy_revision": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "grant_id",
+        "name",
+        "schema_version",
+        "scope",
+        "host_instance",
+        "owner_id",
+        "owner_generation",
+        "audience",
+        "issued_at",
+        "expires_at",
+        "policy_revision"
+      ],
+      "additionalProperties": false
+    },
+    "GrantSet": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Grant"
+      }
+    }
+  }
+}

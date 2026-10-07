@@ -1,0 +1,39 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries / coverage
+*.test
+*.out
+coverage.out
+coverage.txt
+
+# TypeScript companion (ts/) — dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Editor / OS scratch
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Agent / AI assistant artifacts (must not appear in a public repo)
+.agentrc/
+agentrc.yaml
+agentrc.yml
+.claude/
+AUDIT_RESULTS.md
+.lefthook.yml
+lefthook.yml
+.nanite/

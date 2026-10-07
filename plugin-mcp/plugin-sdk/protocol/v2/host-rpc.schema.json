@@ -1,0 +1,1660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.hollis-labs.com/plugin-sdk/protocol/v2/host-rpc.schema.json",
+  "title": "Protocol 2 optional reverse RPC profile 1 — approved field contract, revision 2",
+  "$ref": "#/$defs/ReverseRequest",
+  "$defs": {
+    "Token": {
+      "type": "string",
+      "pattern": "\\S",
+      "maxLength": 4096
+    },
+    "SafePositiveInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "TimeoutMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "OpaqueJSON": {
+      "not": {
+        "type": "null"
+      },
+      "description": "Bounded non-null host/descriptor-owned portable JSON. Its nested object schemas are HOST-OWNED, not open SDK DTOs. Duplicate decoded keys forbidden; depth <=128; integer-form tokens JS-safe, all numbers finite. Nested null only if the owning resource/tool/value schema permits it."
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "Base64": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "description": "Canonical padded RFC4648 base64; empty valid. Runtime decoder verifies canonical re-encoding and encoded+decoded byte budgets."
+    },
+    "ParentCall": {
+      "type": "object",
+      "properties": {
+        "request_owner": {
+          "enum": [
+            "host",
+            "plugin"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        }
+      },
+      "required": [
+        "request_owner",
+        "id"
+      ],
+      "additionalProperties": false,
+      "description": "Host ledger validates this exact owner/id against the live binding. For provisional host/log during init/load/unload, request_owner is host and id is the positive safe ID of the in-flight plugin/init, plugin/load or plugin/unload request. Unknown/wrong-owner/wrong-binding references share external parent_invalid; terminal same-binding parent alone may report parent_terminal. Depth/deadline are ledger-owned."
+    },
+    "ForwardContext": {
+      "type": "object",
+      "properties": {
+        "binding_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "timeout_ms": {
+          "$ref": "#/$defs/TimeoutMs"
+        }
+      },
+      "required": [
+        "timeout_ms"
+      ],
+      "additionalProperties": false
+    },
+    "ReverseContext": {
+      "type": "object",
+      "properties": {
+        "binding_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "timeout_ms": {
+          "$ref": "#/$defs/TimeoutMs"
+        },
+        "parent_call": {
+          "$ref": "#/$defs/ParentCall"
+        }
+      },
+      "required": [
+        "binding_id",
+        "timeout_ms",
+        "parent_call"
+      ],
+      "additionalProperties": false
+    },
+    "Header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$",
+          "maxLength": 256
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Headers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Header"
+      },
+      "maxItems": 128
+    },
+    "LogField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 256
+        },
+        "value": {
+          "$ref": "#/$defs/OpaqueJSON"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "LogFields": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LogField"
+      },
+      "maxItems": 128
+    },
+    "StorageGetParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "StorageGetResult": {
+      "type": "object",
+      "properties": {
+        "found": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "revision": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "found"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "found": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value",
+              "revision"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "revision"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "StoragePutParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 4096
+        },
+        "value": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "expected_revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Token"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Required null=create-only, including after deletion; otherwise CAS against current live revision. Host revisions increase monotonically per key, never reused across tombstones or incarnation changes."
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "key",
+        "value",
+        "expected_revision",
+        "operation_key"
+      ],
+      "additionalProperties": false
+    },
+    "StoragePutResult": {
+      "type": "object",
+      "properties": {
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        },
+        "revision": {
+          "$ref": "#/$defs/Token",
+          "description": "Host-issued monotonic per-key revision; after a tombstone a create-only put returns a strictly higher revision. Opaque string on wire, ordering host-owned."
+        }
+      },
+      "required": [
+        "operation_key",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "StorageDeleteParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 4096
+        },
+        "expected_revision": {
+          "$ref": "#/$defs/Token"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "key",
+        "expected_revision",
+        "operation_key"
+      ],
+      "additionalProperties": false
+    },
+    "StorageDeleteResult": {
+      "type": "object",
+      "properties": {
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        },
+        "deleted": {
+          "const": true
+        },
+        "revision": {
+          "$ref": "#/$defs/Token",
+          "description": "Host-issued tombstone revision strictly above prior per-key revisions, never reused; deleting an absent key is conflict."
+        }
+      },
+      "required": [
+        "operation_key",
+        "deleted",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "SecretsGetParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "secret_ref": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "secret_ref"
+      ],
+      "additionalProperties": false
+    },
+    "SecretsGetResult": {
+      "type": "object",
+      "properties": {
+        "value_base64": {
+          "$ref": "#/$defs/Base64"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "value_base64",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "EgressRequestParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "HEAD",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "maxLength": 8192
+        },
+        "headers": {
+          "$ref": "#/$defs/Headers"
+        },
+        "body_base64": {
+          "$ref": "#/$defs/Base64"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "method",
+        "url"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "enum": [
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "operation_key"
+            ]
+          }
+        }
+      ]
+    },
+    "EgressRequestResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "$ref": "#/$defs/Headers"
+        },
+        "body_base64": {
+          "$ref": "#/$defs/Base64"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "status",
+        "headers",
+        "body_base64"
+      ],
+      "additionalProperties": false
+    },
+    "EventsPublishParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "event_name": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 256
+        },
+        "payload": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "event_name",
+        "payload",
+        "operation_key"
+      ],
+      "additionalProperties": false
+    },
+    "EventsPublishResult": {
+      "type": "object",
+      "properties": {
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        },
+        "accepted": {
+          "const": true
+        },
+        "event_id": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "operation_key",
+        "accepted",
+        "event_id"
+      ],
+      "additionalProperties": false
+    },
+    "LogParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "fields": {
+          "$ref": "#/$defs/LogFields"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "level",
+        "message"
+      ],
+      "additionalProperties": false,
+      "description": "During init/load/unload only with explicit log.write grant and a host-issued provisional/cleanup binding. parent_call owner=host/id exactly the in-flight lifecycle request; validate against same ledger, never accept SDK-invented parent."
+    },
+    "LogResult": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "additionalProperties": false
+    },
+    "ReadonlyQueryParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "resource": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 256
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "params": {
+          "$ref": "#/$defs/OpaqueJSON"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "resource",
+        "schema_version",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "ReadonlyQueryResult": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 256
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "data": {
+          "$ref": "#/$defs/OpaqueJSON"
+        }
+      },
+      "required": [
+        "resource",
+        "schema_version",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListToolsParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "server_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "cursor": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "server_id"
+      ],
+      "additionalProperties": false
+    },
+    "MCPTool": {
+      "type": "object",
+      "properties": {
+        "tool_name": {
+          "$ref": "#/$defs/Token"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "input_schema": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "output_schema": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "effect": {
+          "enum": [
+            "read",
+            "write",
+            "destructive"
+          ]
+        },
+        "tool_binding": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "tool_name",
+        "input_schema",
+        "effect",
+        "tool_binding"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListToolsResult": {
+      "type": "object",
+      "properties": {
+        "server_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MCPTool"
+          },
+          "maxItems": 256
+        },
+        "next_cursor": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "server_id",
+        "tools"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallToolParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "server_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "tool_name": {
+          "$ref": "#/$defs/Token"
+        },
+        "tool_binding": {
+          "$ref": "#/$defs/Token"
+        },
+        "arguments": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "server_id",
+        "tool_name",
+        "tool_binding",
+        "arguments"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallToolResult": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "$ref": "#/$defs/MCPContent"
+        },
+        "is_error": {
+          "type": "boolean"
+        },
+        "structured_content": {
+          "$ref": "#/$defs/OpaqueJSON"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "content",
+        "is_error"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCancelCallParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "target_call_id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "target_call_id"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCancelCallResult": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "already_terminal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accepted",
+        "already_terminal"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "accepted": {
+              "const": true
+            },
+            "already_terminal": {
+              "const": false
+            }
+          }
+        },
+        {
+          "properties": {
+            "accepted": {
+              "const": false
+            },
+            "already_terminal": {
+              "const": true
+            }
+          }
+        }
+      ]
+    },
+    "BindingsRenewParams": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "context": {
+          "$ref": "#/$defs/ReverseContext"
+        },
+        "requested_lease_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        }
+      },
+      "required": [
+        "grant_id",
+        "context",
+        "requested_lease_ms"
+      ],
+      "additionalProperties": false
+    },
+    "RemainingBudgets": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "$ref": "#/$defs/TimeoutMs"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "effects": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "timeout_ms"
+      ],
+      "additionalProperties": false
+    },
+    "BindingsRenewResult": {
+      "type": "object",
+      "properties": {
+        "binding_id": {
+          "$ref": "#/$defs/Token"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "remaining_budgets": {
+          "$ref": "#/$defs/RemainingBudgets"
+        }
+      },
+      "required": [
+        "binding_id",
+        "expires_at",
+        "remaining_budgets"
+      ],
+      "additionalProperties": false
+    },
+    "HostRPCErrorData": {
+      "type": "object",
+      "properties": {
+        "contract": {
+          "const": "host-rpc/1"
+        },
+        "code": {
+          "enum": [
+            "invalid_request",
+            "unauthenticated",
+            "capability_denied",
+            "scope_denied",
+            "unsupported_capability",
+            "target_unavailable",
+            "budget_exceeded",
+            "rate_limited",
+            "cancelled",
+            "deadline_exceeded",
+            "unknown_outcome",
+            "internal_error",
+            "conflict"
+          ]
+        },
+        "request_id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "effect_state": {
+          "enum": [
+            "not_started",
+            "not_committed",
+            "committed",
+            "unknown"
+          ]
+        },
+        "retryable": {
+          "const": false
+        },
+        "detail": {
+          "$ref": "#/$defs/FailureDetail"
+        }
+      },
+      "required": [
+        "contract",
+        "code",
+        "request_id",
+        "effect_state",
+        "retryable"
+      ],
+      "additionalProperties": false
+    },
+    "HostRPCError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "const": -32010
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "data": {
+          "$ref": "#/$defs/HostRPCErrorData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "StorageGetRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/storage/get"
+        },
+        "params": {
+          "$ref": "#/$defs/StorageGetParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "StorageGetResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/StorageGetResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "StoragePutRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/storage/put"
+        },
+        "params": {
+          "$ref": "#/$defs/StoragePutParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "StoragePutResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/StoragePutResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "StorageDeleteRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/storage/delete"
+        },
+        "params": {
+          "$ref": "#/$defs/StorageDeleteParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "StorageDeleteResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/StorageDeleteResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "SecretsGetRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/secrets/get"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsGetParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "SecretsGetResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsGetResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "EgressRequestRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/egress/request"
+        },
+        "params": {
+          "$ref": "#/$defs/EgressRequestParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "EgressRequestResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/EgressRequestResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "EventsPublishRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/events/publish"
+        },
+        "params": {
+          "$ref": "#/$defs/EventsPublishParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "EventsPublishResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/EventsPublishResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "LogRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/log"
+        },
+        "params": {
+          "$ref": "#/$defs/LogParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "LogResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/LogResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ReadonlyQueryRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/readonly/query"
+        },
+        "params": {
+          "$ref": "#/$defs/ReadonlyQueryParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "ReadonlyQueryResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/ReadonlyQueryResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListToolsRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/mcp/list_tools"
+        },
+        "params": {
+          "$ref": "#/$defs/MCPListToolsParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListToolsResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/MCPListToolsResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallToolRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/mcp/call_tool"
+        },
+        "params": {
+          "$ref": "#/$defs/MCPCallToolParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallToolResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/MCPCallToolResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCancelCallRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/mcp/cancel_call"
+        },
+        "params": {
+          "$ref": "#/$defs/MCPCancelCallParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCancelCallResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/MCPCancelCallResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "BindingsRenewRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "method": {
+          "const": "host/bindings/renew"
+        },
+        "params": {
+          "$ref": "#/$defs/BindingsRenewParams"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "BindingsRenewResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "result": {
+          "$ref": "#/$defs/BindingsRenewResult"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ApplicationErrorResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/SafePositiveInteger"
+        },
+        "error": {
+          "$ref": "#/$defs/HostRPCError"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "ReverseRequest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StorageGetRequest"
+        },
+        {
+          "$ref": "#/$defs/StoragePutRequest"
+        },
+        {
+          "$ref": "#/$defs/StorageDeleteRequest"
+        },
+        {
+          "$ref": "#/$defs/SecretsGetRequest"
+        },
+        {
+          "$ref": "#/$defs/EgressRequestRequest"
+        },
+        {
+          "$ref": "#/$defs/EventsPublishRequest"
+        },
+        {
+          "$ref": "#/$defs/LogRequest"
+        },
+        {
+          "$ref": "#/$defs/ReadonlyQueryRequest"
+        },
+        {
+          "$ref": "#/$defs/MCPListToolsRequest"
+        },
+        {
+          "$ref": "#/$defs/MCPCallToolRequest"
+        },
+        {
+          "$ref": "#/$defs/MCPCancelCallRequest"
+        },
+        {
+          "$ref": "#/$defs/BindingsRenewRequest"
+        }
+      ]
+    },
+    "MCPContent": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OpaqueJSON"
+      },
+      "maxItems": 1024,
+      "description": "Normal MCP content blocks; each block's closed schema belongs to the negotiated host/tool resource contract; SDK carries bounded portable JSON."
+    },
+    "FailureDetail": {
+      "type": "string",
+      "enum": [
+        "stale_binding",
+        "callback_cycle",
+        "depth_exceeded",
+        "parent_invalid",
+        "parent_terminal"
+      ],
+      "description": "Closed capability.FailureDetail vocabulary. Parent details added by approved field review; capability leaf follow-up must add these exact values. No raw diagnostics."
+    }
+  },
+  "x-protocol-version": 2,
+  "x-reverse-rpc-version": 1,
+  "x-methods": {
+    "host/storage/get": {
+      "params": "StorageGetParams",
+      "result": "StorageGetResult",
+      "capability": "storage.read",
+      "effect": "read",
+      "request": "StorageGetRequest",
+      "response": "StorageGetResponse"
+    },
+    "host/storage/put": {
+      "params": "StoragePutParams",
+      "result": "StoragePutResult",
+      "capability": "storage.write",
+      "effect": "mutation",
+      "request": "StoragePutRequest",
+      "response": "StoragePutResponse"
+    },
+    "host/storage/delete": {
+      "params": "StorageDeleteParams",
+      "result": "StorageDeleteResult",
+      "capability": "storage.write",
+      "effect": "mutation",
+      "request": "StorageDeleteRequest",
+      "response": "StorageDeleteResponse"
+    },
+    "host/secrets/get": {
+      "params": "SecretsGetParams",
+      "result": "SecretsGetResult",
+      "capability": "secrets.read",
+      "effect": "read",
+      "request": "SecretsGetRequest",
+      "response": "SecretsGetResponse"
+    },
+    "host/egress/request": {
+      "params": "EgressRequestParams",
+      "result": "EgressRequestResult",
+      "capability": "egress.request",
+      "effect": "conditional",
+      "request": "EgressRequestRequest",
+      "response": "EgressRequestResponse"
+    },
+    "host/events/publish": {
+      "params": "EventsPublishParams",
+      "result": "EventsPublishResult",
+      "capability": "events.publish",
+      "effect": "mutation",
+      "request": "EventsPublishRequest",
+      "response": "EventsPublishResponse"
+    },
+    "host/log": {
+      "params": "LogParams",
+      "result": "LogResult",
+      "capability": "log.write",
+      "effect": "telemetry",
+      "request": "LogRequest",
+      "response": "LogResponse"
+    },
+    "host/readonly/query": {
+      "params": "ReadonlyQueryParams",
+      "result": "ReadonlyQueryResult",
+      "capability": "readonly.query",
+      "effect": "read",
+      "request": "ReadonlyQueryRequest",
+      "response": "ReadonlyQueryResponse"
+    },
+    "host/mcp/list_tools": {
+      "params": "MCPListToolsParams",
+      "result": "MCPListToolsResult",
+      "capability": "mcp.reach",
+      "effect": "read",
+      "request": "MCPListToolsRequest",
+      "response": "MCPListToolsResponse"
+    },
+    "host/mcp/call_tool": {
+      "params": "MCPCallToolParams",
+      "result": "MCPCallToolResult",
+      "capability": "mcp.reach",
+      "effect": "conditional",
+      "request": "MCPCallToolRequest",
+      "response": "MCPCallToolResponse"
+    },
+    "host/mcp/cancel_call": {
+      "params": "MCPCancelCallParams",
+      "result": "MCPCancelCallResult",
+      "capability": "mcp.reach",
+      "effect": "control",
+      "request": "MCPCancelCallRequest",
+      "response": "MCPCancelCallResponse"
+    },
+    "host/bindings/renew": {
+      "params": "BindingsRenewParams",
+      "result": "BindingsRenewResult",
+      "capability": "binding-current-grants",
+      "effect": "lease",
+      "request": "BindingsRenewRequest",
+      "response": "BindingsRenewResponse"
+    }
+  },
+  "x-runtime-constraints": {
+    "max_encoded_params_bytes": 1048576,
+    "max_encoded_result_bytes": 1048576,
+    "max_frame_bytes_including_lf": 8388608,
+    "max_json_depth": 128,
+    "integer_token_form": "Canonical decimal integer tokens; no fraction/exponent. Minus permitted for standard negative error codes and signed portable opaque integer values; profile IDs/counters are nonnegative as specified.",
+    "optional": "omitted, never null; put.expected_revision is the sole structural null",
+    "authority": "host ledger, never plugin claims",
+    "request_ids": "positive JS-safe decimal-token integers for this profile; base IDs are a separate string/safe-integer domain"
+  }
+}

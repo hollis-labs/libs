@@ -1,0 +1,256 @@
+# plugin-sdk
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/plugin-mcp/plugin-sdk.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/plugin-mcp/plugin-sdk)
+
+The plugin contract, in two halves. A universal **Go SDK** for building
+plugins that talk to a host application over JSON-RPC stdio, and a
+**TypeScript companion** (`ts/`) for both the browser registry/loader and a
+**TS server SDK**
+(`@hollis-labs/plugin-sdk`) running the same stdio contract on Node 22+ and Deno.
+
+Both halves are host-neutral: neither has a dependency on any specific host
+product, and host applications extend them with their own registration
+surfaces in their own packages. They live in one repository so the registry
+wire contract is defined once, with a Go view and a TypeScript view of the
+same thing.
+
+## Status
+
+Pre-1.0 (`v0.x`). The wire protocol (`subprocess.ProtocolVersion = 2`)
+and exported interfaces are stable in practice but the API may still
+shift between minor versions; treat any minor bump as potentially
+breaking and read the CHANGELOG before upgrading. Patch bumps
+(`v0.x.y`) are documentation, examples, and internal hardening only.
+
+## Install
+
+```bash
+go get github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
+```
+
+## What's in the box
+
+- The `Plugin` contract and core base types (`Host`, `CRUDHandler`,
+  `EventHook`, `UIComponent`, `Connector`, `ConfigFieldDef`).
+- Typed plugin errors (`Error` / `PluginError`) with HTTP-friendly
+  status codes, and the `ErrCancelled` sentinel for pre-hook
+  cancellation.
+- `EnvelopeOut` / `MessageOut` wire types for envelope emission.
+- `subprocess` — JSON-RPC 2.0 wire protocol, `subprocess.Serve`
+  entry point (handles stdin/stdout, dispatch, concurrency, panic
+  recovery, signal-driven shutdown), capability interfaces
+  (`CommandHandler`, `EventHandler`, `CRUDHandler`, `MCPHandler`,
+  `HTTPHandler`, `Migrator`, `HealthChecker`, `IdentityAware`),
+  config / data / cache helpers, and a stderr JSON-lines logger with
+  secret redaction. An optional, opaque `Identity` value rides through
+  `InitParams`/`CommandExecParams`/`EventHandleParams`/`MCPCallRequest`/
+  `HTTPRequest` unparsed — plugin-sdk carries it, never verifies it.
+- `subprocess.CapabilityRequest` and `InitParams.Grants` — a capability
+  declaration mechanism with an open vocabulary: a plugin declares what
+  ambient access it needs, and the host reports back what it allowed. The
+  SDK validates grant structure; descriptor policy and execution
+  enforcement belong to the host. See `docs/security-model.md`.
+- `capability` — shared descriptors, exact scope narrowing, typed host failures
+  and strict Grant/RuntimeIdentity DTOs. `capability/host` owns non-plugin scoped
+  credentials, selective revocation and payload-free audit helpers. Hosts supply
+  authentication and reviewed policy; see [host credentials](docs/capability-credentials.md).
+- `subprocess/subprocesstest` — in-process test harness for driving
+  plugins without spawning a real subprocess, with optional JSON
+  roundtripping to catch wire-format bugs.
+- `manifest` — a shared subprocess declaration with host extension objects,
+  config/secrets, capabilities, tools, hooks, server/UI artifacts and inclusive
+  host/engine ranges. It requires protocol 2, as does Serve. Its dependency-free encoder emits JSON for `plugin.yaml`;
+  decoding rejects legacy dialects, unknown fields and duplicate keys. Helpers
+  check semantic version bounds and verify immutable bundle inventories.
+  See [the manifest contract](docs/manifest.md).
+- `registry` — the Go view of the plugin registry wire contract: the
+  registry-v2 catalog of owner-qualified declarative, component, and handler
+  contributions, with host kind/region admission, runtime and digest verification,
+  revision publication, and reverse-order disposal scopes. See the
+  [registry wire and lifecycle contract](docs/protocol/registry-v2.md).
+- `ts/packages/plugin-sdk` — zero-runtime-dependency Node/Deno stdio runtime,
+  capability interfaces, config and redacting logger, plus the `/test` harness.
+  See [the server package](ts/packages/plugin-sdk/README.md) and
+  [the protocol 2 handshake](docs/protocol/v2/README.md).
+- `ts/packages/plugin-registry` — `@hollis-labs/plugin-registry`, the
+  browser half. The TypeScript view of the same contract, and a loader
+  that dynamic-imports each plugin's ES module, resolves the named
+  exports the registry names, and isolates load failures per plugin. The
+  core entry point has no dependencies; `@hollis-labs/plugin-registry/react`
+  adds the React adapter behind an optional peer.
+
+## Quickstart
+
+A minimum-viable plugin is roughly fifty lines:
+
+```go
+package main
+
+import (
+    "context"
+    "os"
+
+    "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+)
+
+type hello struct{}
+
+func (hello) Init(ctx context.Context, p subprocess.InitParams) (subprocess.InitResult, error) {
+    return subprocess.InitResult{
+        ID:       "hello",
+        Name:     "Hello",
+        Version:  "0.1.0",
+        Protocol: subprocess.ProtocolVersion,
+        CapabilityContract: 1,
+    }, nil
+}
+
+func (hello) Load(ctx context.Context) (subprocess.LoadResult, error) {
+    return subprocess.LoadResult{}, nil
+}
+
+func (hello) Unload(ctx context.Context) error { return nil }
+
+func (hello) Command(ctx context.Context, req subprocess.CommandRequest) (subprocess.CommandResult, error) {
+    return subprocess.CommandResult{Action: "message", Content: "hello, " + req.Args}, nil
+}
+
+func main() {
+    if err := subprocess.Serve(hello{}); err != nil {
+        os.Exit(1)
+    }
+}
+```
+
+A runnable copy lives at [`examples/hello/`](./examples/hello). Build
+it with `go build -o hello ./examples/hello`; the
+`examples/hello/hello_test.go` file demonstrates exercising the same
+plugin in-process via the test harness.
+
+## Layout
+
+```
+github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
+├── doc.go                 package-level overview
+├── plugin.go              Plugin, Host, CRUDHandler, EventHook, UIComponent, ...
+├── errors.go              Error type, sentinels, constructors
+├── envelope.go            EnvelopeOut, MessageOut
+├── logger.go              Logger interface
+├── docs/
+│   ├── security-model.md  trust boundary, guarantees, and the seams
+│   ├── best-practices.md  patterns, with worked examples
+│   └── proposals/         open design proposals
+├── examples/
+│   └── hello/             minimum-viable subprocess plugin
+└── subprocess/
+    ├── protocol.go        JSON-RPC 2.0 wire types, methods, error codes
+    ├── types.go           Init / Load / Command / Event / CRUD / MCP / HTTP / Migrate wire types
+    ├── types_sdk.go       SDK-level Go types and capability interfaces
+    ├── server.go          subprocess.Serve entry point
+    ├── config.go          ConfigReader (with secret redaction integration)
+    ├── data.go            DataHelper, CacheHelper
+    ├── log.go             stderr JSON-lines logger
+    └── subprocesstest/
+        └── harness.go     in-process test harness
+```
+
+The TypeScript packages, an npm workspace nested one level down so Go tooling and
+`node_modules/` stay out of each other's way:
+
+```
+ts/
+├── package.json           private workspace root
+└── packages/
+    ├── plugin-sdk/        @hollis-labs/plugin-sdk (server runtime and /test harness)
+    └── plugin-registry/   @hollis-labs/plugin-registry
+        └── src/
+            ├── types.ts        the wire contract, TypeScript view
+            ├── loader.ts       createPluginRegistry
+            ├── stylesheets.ts  the stylesheet sink and its default
+            └── react.ts        the React adapter (optional peer)
+```
+
+## Security model and best practices
+
+Two documents for anyone building against this SDK:
+
+- **[`docs/security-model.md`](./docs/security-model.md)** — the trust boundary,
+  what the SDK guarantees (panic isolation, credentials that do not travel in
+  the environment, secret redaction in the logger, a pinned wire protocol), what
+  it deliberately leaves to the host (authentication, sandboxing, resource
+  limits, authorization, output filtering), and the seams where those guarantees
+  stop.
+- **[`docs/best-practices.md`](./docs/best-practices.md)** — patterns that hold
+  up, with worked examples from hosts and plugins built on this SDK.
+
+The one-line version, if you read nothing else: **whatever your plugin returns
+is published** — to a terminal, a log, an HTTP response, or an AI model's
+context window. Never return a vendor SDK type; map it onto your own, treat that
+mapping as an allow-list, and test that a credential field cannot appear in the
+output.
+
+Open proposals live in [`docs/proposals/`](./docs/proposals).
+
+## Versioning
+
+Independent release cycle. Consumers pin a tagged version via `go.mod`.
+See [CHANGELOG.md](./CHANGELOG.md) for per-release notes.
+
+## Testing
+
+```bash
+go test ./...
+```
+
+Both TypeScript packages build and test with `npm`, from `ts/`:
+
+```bash
+cd ts && npm install
+npm run typecheck
+npm test
+```
+
+For wire-format fidelity, enable JSON roundtripping in the harness so
+every request and response is marshaled + unmarshaled before the
+plugin sees it:
+
+```bash
+PLUGIN_SDK_JSON_ROUNDTRIP=1 go test ./...
+```
+
+The legacy `NANITE_PLUGIN_SDK_JSON_ROUNDTRIP` env var name is still
+honored for backward compatibility but is deprecated; prefer
+`PLUGIN_SDK_JSON_ROUNDTRIP` in new configurations.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
+
+HTTP hosts can populate `HTTPRequest.RawPath` and `RawQuery` from `net/url.URL`
+to preserve escaped path separators and the full query through `http/handle`.
+Plugins can parse `RawQuery` with `url.ParseQuery` to retain repeated and empty
+values instead of relying on a scalar query projection. These fields carry URL
+data; they do not verify a caller or grant route ownership.
+
+### SDK log redaction
+
+Go `Config.Secret` registers values with the connection's existing secret tracker.
+SDK JSON-line logging redacts registered values in message text, nested data,
+custom JSON output, and canonical base64 (including JSON-encoded byte slices).
+Overlapping values match longest first. Registration precedes exposure of a
+secret; logging an unregistered value cannot redact it.
+
+Go log records are bounded to 64 KiB of JSON, 128 field pairs, 4,096 values and
+128 nesting levels. Oversized, cyclic, invalid or unserializable records emit a
+sanitized fallback with redacted message text and no raw marshal error. A secret
+snapshot that exceeds its bounded pattern budget drops fields and masks the
+message instead of using a partial snapshot. Keys in Go field pairs must be
+strings. SDK bounds cannot preempt author `MarshalJSON` code. Redaction covers
+SDK logging, not direct stderr/printf writes or arbitrary transformed encodings.
+
+Request-scoped host service helpers are defined in
+[the host client contract](docs/protocol/v2/host-clients.md). Go authors obtain the
+SDK-owned `HostClient` from `subprocess.HostClientFromContext`; TypeScript authors
+use optional `Context.host`. Explicit `ServeOptions.ReverseRPC` / `reverseRPC` opt-in plus a valid host offer
+and Init acknowledgement enables bound request-scoped clients; base and hook
+handlers expose none. See [negotiation and its merge gate](docs/protocol/v2/reverse.md).

@@ -1,0 +1,17 @@
+# Individually reviewed imported fixture findings; no operational credentials allowed.
+# Independent triage 01M4C6V3ARTQ32AY42C6PBBYP3; imported sources in plugin-mcp/IMPORTS.md.
+# Historical personal-path exception preserves already-public documentation under owner direction.
+# Scanner commit matching uses the first 12 hex characters, not full-SHA or line matching.
+secret-assignment plugin-mcp/api-projection/interpreter/adversarial_test.go Literal hostile upstream JSON and injected fixture credential; TestAdversarial asserts response allowlisting and credential noninterference. Each matched api_key/access_token/nested token/API_TOKEN literal is test-authored, not obtained from a credential store.
+secret-assignment plugin-mcp/go-mcp/supervisedstdio/supervisedstdio_test.go secret and inheritedSecret are fixed fixture literals planted in SUP_SECRET/SUP_INHERITED and explicitly checked absent from redacted stderr.
+secret-assignment plugin-mcp/plugin-host/pluginhosttest/fixture.go EnvSecret is the environment variable NAME PLUGINHOSTTEST_SECRET; flood reads its test-injected value. This declaration contains no secret value.
+secret-assignment plugin-mcp/plugin-host/pluginhosttest/suite.go Host R17 tok-...-SECRET-VALUE is planted in stderr-flood and leak-checked; SDK hosttest fixture-secret-c58... is planted in unsafe-install artifacts and leak-checked.
+secret-assignment plugin-mcp/plugin-host/process_test.go api_key is fixed resolved-by-the-host Init delivery fixture; secret is fixed diagnostic literal explicitly tested for redaction.
+secret-assignment plugin-mcp/plugin-host/tail_test.go hunter2-secret is fixed RedactEdgeFragments input tested for whole/split/edge redaction.
+credentials-in-url plugin-mcp/plugin-sdk/subprocess/hostrpc_test.go Literal user-info on reserved example.com is a table input that must be rejected by DTO validation, not an operational credential.
+secret-assignment plugin-mcp/plugin-sdk/ts/packages/plugin-sdk/test/helpers.test.js fixture-token is fixed ConfigReader/SecretTracker and child logger input; asserts redacted outputs. Grouped additional occurrences are the same planted fixture.
+credentials-in-url plugin-mcp/plugin-sdk/ts/packages/plugin-sdk/test/host-rpc.test.js Literal user-info on reserved example.com is an assert.throws URL validation input, not an operational credential.
+secret-assignment plugin-mcp/plugin-sdk/ts/packages/plugin-sdk/test/stdio-acceptance.js fixture-secret is fixed test plugin/init config; stderr must contain REDACTED and must not contain this literal.
+home-path-macos plugin-mcp/go-mcp/AUDIT_RESULTS.md@f780b93ad955 Nonsecret audit documentation, original public source b690cdb7dc1439158c821c78446b5971698c2db5 -> filtered f780b93ad955484dfdfe6a22488e4c6a7692f309, lines92-94; absent current tree. Owner directs history preservation; independent blob/source-map review confirmed. Only this rule/path/12-hex commit prefix is enforced; text/line/full-SHA scope is independently reviewed.
+secret-assignment plugin-mcp/plugin-sdk/capability/host/hosttest/extra_probes.go@61beae7685ed fixture-secret-diagnostic-07e891a3 is explicitly assigned to the probe fixture and leak-checked in diagnostic/reply artifacts.
+secret-assignment plugin-mcp/plugin-sdk/capability/host/hosttest/suite.go@123571bb4ff2 Host R17 tok-...-SECRET-VALUE is planted in stderr-flood and leak-checked; SDK hosttest fixture-secret-c58... is planted in unsafe-install artifacts and leak-checked.

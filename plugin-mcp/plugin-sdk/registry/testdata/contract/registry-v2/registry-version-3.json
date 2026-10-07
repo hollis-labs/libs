@@ -1,0 +1,19 @@
+{
+  "description": "registry-version-3",
+  "response": {
+    "host_instance": "host-epoch",
+    "revision": 3,
+    "plugins": {},
+    "kinds": {},
+    "regions": {},
+    "contributions": {},
+    "refusals": [],
+    "registry_version": 3
+  },
+  "go": {
+    "validate": "ErrRegistryVersion"
+  },
+  "ts": {
+    "validate": "ErrRegistryVersion"
+  }
+}

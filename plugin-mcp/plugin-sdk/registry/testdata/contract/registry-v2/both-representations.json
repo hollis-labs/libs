@@ -1,0 +1,78 @@
+{
+  "description": "both-representations",
+  "response": {
+    "host_instance": "host-epoch",
+    "revision": 2,
+    "plugins": {
+      "notes": {
+        "owner_generation": "1",
+        "bundle_url": "/notes.js",
+        "bundle_version": "sha256:432454fbfbe3939f8e96c89e0b0c2d9a2feee03cfde11f0d5eec52da27c0db92",
+        "stylesheet_url": "/notes.css",
+        "runtime": [
+          {
+            "name": "react",
+            "min": "19.0.0",
+            "max": "19.9.9"
+          }
+        ]
+      }
+    },
+    "kinds": {
+      "panel": {
+        "schema_version": 1,
+        "metadata_schema": {},
+        "representations": [
+          "component"
+        ],
+        "regions": [
+          "rail"
+        ],
+        "required_capabilities": []
+      }
+    },
+    "regions": {
+      "rail": {
+        "kinds": [
+          "panel"
+        ],
+        "representations": [
+          "component"
+        ],
+        "context_schema": {},
+        "ordering": "priority-ascending"
+      }
+    },
+    "contributions": {
+      "panel": {
+        "notes/main": {
+          "owner_id": "notes",
+          "owner_generation": "1",
+          "local_key": "main",
+          "kind": "panel",
+          "schema_version": 1,
+          "required": true,
+          "representation": "component",
+          "metadata": {
+            "title": "Notes"
+          },
+          "component": {
+            "export": "Panel",
+            "region": "rail"
+          },
+          "public_binding": "notes-panel",
+          "declarative": {},
+          "status": "accepted"
+        }
+      }
+    },
+    "refusals": [],
+    "registry_version": 2
+  },
+  "go": {
+    "validate": "ErrInvalidContribution"
+  },
+  "ts": {
+    "validate": "ErrInvalidContribution"
+  }
+}

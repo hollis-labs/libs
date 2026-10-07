@@ -1,0 +1,705 @@
+package subprocess
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
+)
+
+// --- Test plugins exercising each capability interface ---
+
+type basePlugin struct {
+	id      string
+	name    string
+	version string
+}
+
+func (p *basePlugin) Init(ctx context.Context, params InitParams) (InitResult, error) {
+	if p.id == "" {
+		p.id = "test"
+	}
+	if p.name == "" {
+		p.name = "Test"
+	}
+	if p.version == "" {
+		p.version = "1"
+	}
+	return InitResult{CapabilityContract: 1, ID: p.id, Name: p.name, Version: p.version, Description: "test", Protocol: ProtocolVersion}, nil
+}
+func (p *basePlugin) Load(ctx context.Context) (LoadResult, error) { return LoadResult{}, nil }
+func (p *basePlugin) Unload(ctx context.Context) error             { return nil }
+
+type commandPlugin struct{ basePlugin }
+
+func (p *commandPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	return CommandResult{Action: "message", Content: "hello " + req.Args}, nil
+}
+
+type eventPlugin struct{ basePlugin }
+
+func (p *eventPlugin) EventHandle(ctx context.Context, req EventRequest) (EventResult, error) {
+	if req.Type == "veto" {
+		return EventResult{Cancel: true, Reason: "no"}, nil
+	}
+	return EventResult{}, nil
+}
+
+type crudPlugin struct{ basePlugin }
+
+func (p *crudPlugin) Create(ctx context.Context, rt string, d map[string]interface{}) (map[string]interface{}, error) {
+	d["_created"] = true
+	return d, nil
+}
+func (p *crudPlugin) Read(ctx context.Context, rt, id string) (map[string]interface{}, error) {
+	if id == "missing" {
+		return nil, plugin.ErrNotFound("no such " + rt)
+	}
+	return map[string]interface{}{"id": id, "rt": rt}, nil
+}
+func (p *crudPlugin) Update(ctx context.Context, rt, id string, d map[string]interface{}) (map[string]interface{}, error) {
+	return d, nil
+}
+func (p *crudPlugin) Delete(ctx context.Context, rt, id string) error { return nil }
+func (p *crudPlugin) List(ctx context.Context, rt string, f map[string]interface{}) ([]map[string]interface{}, error) {
+	return []map[string]interface{}{{"id": "x"}}, nil
+}
+
+// --- Helpers ---
+
+// drive runs serveWith against a scripted list of RPCRequest values
+// written to an in-memory pipe, and returns the collected responses.
+// It closes the input writer after all requests are written so Serve
+// exits cleanly. An optional true flag waits for every reply when the test
+// exercises metadata rather than concurrent admission.
+func drive(t *testing.T, p Plugin, reqs []RPCRequest, sequential ...bool) []RPCResponse {
+	t.Helper()
+	autoInit := len(reqs) > 0 && reqs[0].Method != MethodInit
+	if autoInit {
+		reqs = append([]RPCRequest{{JSONRPC: "2.0", ID: NumberID(8000), Method: MethodInit, Params: validInitParams()}}, reqs...)
+	}
+	in, inW := io.Pipe()
+	var out bytes.Buffer
+	var outMu sync.Mutex
+
+	// Wrap out in a sync writer so Serve's writeMu + our reads don't
+	// race on the buffer.
+	ack := make(chan RPCID, 1)
+	outW := &syncWriter{buf: &out, mu: &outMu, published: ack}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- serveWith(p, in, outW)
+	}()
+
+	// Feed requests.
+	for _, r := range reqs {
+		line, err := json.Marshal(r)
+		if err != nil {
+			t.Fatalf("marshal req: %v", err)
+		}
+		line = append(line, '\n')
+		if _, err := inW.Write(line); err != nil {
+			t.Fatalf("write req: %v", err)
+		}
+		if r.Method == MethodInit || len(sequential) > 0 && sequential[0] {
+			for id := range ack {
+				if id == r.ID {
+					break
+				}
+			}
+		}
+	}
+	_ = inW.Close() // signals EOF → Serve returns
+
+	if err := <-done; err != nil {
+		t.Fatalf("serveWith: %v", err)
+	}
+
+	outMu.Lock()
+	defer outMu.Unlock()
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	var resps []RPCResponse
+	for _, l := range lines {
+		if l == "" {
+			continue
+		}
+		var r RPCResponse
+		if err := json.Unmarshal([]byte(l), &r); err != nil {
+			t.Fatalf("bad response line %q: %v", l, err)
+		}
+		if autoInit && r.ID == NumberID(8000) {
+			if r.Error != nil {
+				t.Fatalf("setup init: %+v", r.Error)
+			}
+			continue
+		}
+		resps = append(resps, r)
+	}
+	// Responses are produced concurrently — sort by ID so test
+	// assertions on resps[N] are deterministic.
+	sort.Slice(resps, func(i, j int) bool { return resps[i].ID.number < resps[j].ID.number })
+	return resps
+}
+
+type syncWriter struct {
+	buf       *bytes.Buffer
+	mu        *sync.Mutex
+	published chan RPCID
+}
+
+func (w *syncWriter) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	n, err := w.buf.Write(b)
+	if w.published != nil {
+		var reply RPCResponse
+		if json.Unmarshal(b, &reply) == nil {
+			select {
+			case w.published <- reply.ID:
+			default:
+			}
+		}
+	}
+	return n, err
+}
+
+// --- Tests ---
+
+func TestServe_InitLoadUnload(t *testing.T) {
+	p := &basePlugin{id: "test", name: "Test", version: "0.0.1"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: validInitParams()},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodLoad},
+		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodUnload},
+	})
+	if len(resps) != 3 {
+		t.Fatalf("got %d responses, want 3", len(resps))
+	}
+	for _, r := range resps {
+		if r.Error != nil {
+			t.Errorf("id=%v got error: %+v", r.ID, r.Error)
+		}
+	}
+
+	var init InitResult
+	if err := json.Unmarshal(resps[0].Result, &init); err != nil {
+		t.Fatalf("init result: %v", err)
+	}
+	if init.ID != "test" || init.Protocol != 2 {
+		t.Errorf("init result = %+v", init)
+	}
+}
+
+func TestServe_MethodNotFoundForMissingCapability(t *testing.T) {
+	p := &basePlugin{id: "test"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("want 1 response, got %d", len(resps))
+	}
+	if resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps[0].Error)
+	}
+}
+
+func TestServe_CommandHandler(t *testing.T) {
+	p := &commandPlugin{basePlugin: basePlugin{id: "cmd"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
+			Params: CommandExecParams{Name: "greet", Args: "world"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res CommandExecResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if res.Action != "message" || res.Content != "hello world" {
+		t.Errorf("result = %+v", res)
+	}
+}
+
+func TestServe_CommandEnvelopesPropagate(t *testing.T) {
+	p := &envelopeCommandPlugin{basePlugin: basePlugin{id: "env"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
+			Params: CommandExecParams{Name: "emit"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res CommandExecResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.card" {
+		t.Errorf("envelopes did not propagate: %+v", res.Envelopes)
+	}
+}
+
+type envelopeCommandPlugin struct{ basePlugin }
+
+func (p *envelopeCommandPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	return CommandResult{
+		Action:    "message",
+		Content:   "ok",
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.card", Data: map[string]interface{}{"k": "v"}}},
+	}, nil
+}
+
+func TestServe_EventEnvelopesPropagate(t *testing.T) {
+	p := &envelopeEventPlugin{basePlugin: basePlugin{id: "env-evt"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle,
+			Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "message.sent"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res EventHandleResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.trace" {
+		t.Errorf("event envelopes did not propagate: %+v", res.Envelopes)
+	}
+}
+
+type envelopeEventPlugin struct{ basePlugin }
+
+func (p *envelopeEventPlugin) EventHandle(ctx context.Context, req EventRequest) (EventResult, error) {
+	return EventResult{
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.trace", Data: map[string]interface{}{"seen": true}}},
+	}, nil
+}
+
+func TestServe_EventHandlerCancel(t *testing.T) {
+	p := &eventPlugin{basePlugin: basePlugin{id: "evt"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodEventHandle, Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "veto", PreHook: true}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res EventHandleResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !res.Cancel {
+		t.Errorf("expected Cancel=true, got %+v", res)
+	}
+}
+
+func TestServe_CRUDErrorMapping(t *testing.T) {
+	p := &crudPlugin{basePlugin: basePlugin{id: "crud"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "missing"}},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodCRUDRead, Params: CRUDParams{ResourceType: "widget", ID: "found"}},
+	})
+	if len(resps) != 2 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error == nil || resps[0].Error.Code != ErrCodeNotFound {
+		t.Errorf("expected NotFound, got %+v", resps[0].Error)
+	}
+	if resps[1].Error != nil {
+		t.Errorf("unexpected error on found read: %+v", resps[1].Error)
+	}
+}
+
+func TestServe_PanicRecovery(t *testing.T) {
+	p := &panicPlugin{basePlugin: basePlugin{id: "panic"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "boom"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error == nil || resps[0].Error.Code != ErrCodeInternal {
+		t.Errorf("expected internal error from panic, got %+v", resps[0].Error)
+	}
+	if !strings.Contains(resps[0].Error.Message, "panic") {
+		t.Errorf("message missing 'panic': %q", resps[0].Error.Message)
+	}
+}
+
+type panicPlugin struct{ basePlugin }
+
+func (p *panicPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	panic(fmt.Errorf("boom"))
+}
+
+// --- MCP / HTTP / Migrate dispatch tests (v0.3.0) ---
+
+type mcpPlugin struct {
+	basePlugin
+	gotReq MCPCallRequest
+}
+
+func (p *mcpPlugin) MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCallResult, error) {
+	p.gotReq = req
+	if req.ToolName == "boom" {
+		return MCPCallResult{}, fmt.Errorf("tool failed")
+	}
+	return MCPCallResult{
+		Content:   json.RawMessage(`{"ok":true}`),
+		Envelopes: []plugin.EnvelopeOut{{Type: "demo.result", Data: map[string]interface{}{"k": "v"}}},
+	}, nil
+}
+
+func TestServe_MCPHandler(t *testing.T) {
+	p := &mcpPlugin{basePlugin: basePlugin{id: "mcp"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMCPCallTool,
+			Params: MCPCallRequest{ToolName: "search", Arguments: map[string]interface{}{"q": "cats"}, SessionID: "s1"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	var res MCPCallResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(res.Content) != `{"ok":true}` {
+		t.Errorf("content = %s", res.Content)
+	}
+	if len(res.Envelopes) != 1 || res.Envelopes[0].Type != "demo.result" {
+		t.Errorf("envelopes did not propagate: %+v", res.Envelopes)
+	}
+	if p.gotReq.ToolName != "search" || p.gotReq.SessionID != "s1" {
+		t.Errorf("plugin did not receive request: %+v", p.gotReq)
+	}
+}
+
+func TestServe_MCPMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMCPCallTool, Params: MCPCallRequest{ToolName: "x"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps[0].Error)
+	}
+}
+
+type httpPlugin struct{ basePlugin }
+
+func (p *httpPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
+	if req.Method == "GET" && req.Path == "/ping" {
+		return HTTPResponse{Status: 200, Headers: map[string]string{"X-Echo": req.Query["msg"], "X-Raw-Query": req.RawQuery, "X-Raw-Path": req.RawPath}, Body: []byte("pong")}, nil
+	}
+	return HTTPResponse{Status: 404}, nil
+}
+
+func TestServe_HTTPHandler(t *testing.T) {
+	p := &httpPlugin{basePlugin: basePlugin{id: "http"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodHTTPHandle,
+			Params: HTTPRequest{Method: "GET", Path: "/ping", RawPath: "/p%69ng", RawQuery: "msg=hi&msg=again&empty=", Query: map[string]string{"msg": "hi"}}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	var res HTTPResponse
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if res.Status != 200 || string(res.Body) != "pong" || res.Headers["X-Echo"] != "hi" || res.Headers["X-Raw-Query"] != "msg=hi&msg=again&empty=" || res.Headers["X-Raw-Path"] != "/p%69ng" {
+		t.Errorf("response = %+v", res)
+	}
+}
+
+func TestServe_HTTPMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps)
+	}
+}
+
+type migratePlugin struct {
+	basePlugin
+	gotFrom, gotTo string
+}
+
+func (p *migratePlugin) Migrate(ctx context.Context, from, to string) error {
+	p.gotFrom = from
+	p.gotTo = to
+	if to == "bad" {
+		return fmt.Errorf("migration failed")
+	}
+	return nil
+}
+
+func TestServe_Migrator(t *testing.T) {
+	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{FromVersion: "0.1.0", ToVersion: "0.2.0", DataDir: "/fixture/data"}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	if resps[0].Error != nil {
+		t.Fatalf("unexpected error: %+v", resps[0].Error)
+	}
+	if p.gotFrom != "0.1.0" || p.gotTo != "0.2.0" {
+		t.Errorf("plugin did not receive params: from=%q to=%q", p.gotFrom, p.gotTo)
+	}
+}
+
+func TestServe_MigrateError(t *testing.T) {
+	p := &migratePlugin{basePlugin: basePlugin{id: "mig"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{DataDir: "/fixture/data", FromVersion: "0.1.0", ToVersion: "bad"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeInternal {
+		t.Errorf("expected internal error, got %+v", resps)
+	}
+}
+
+func TestServe_MigrateMethodNotFound(t *testing.T) {
+	p := &basePlugin{id: "none"}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodMigrate, Params: MigrateParams{DataDir: "/fixture/data", FromVersion: "0.1.0", ToVersion: "0.2.0"}},
+	})
+	if len(resps) != 1 || resps[0].Error == nil || resps[0].Error.Code != ErrCodeMethodNotFound {
+		t.Errorf("expected method-not-found, got %+v", resps)
+	}
+}
+
+// --- Identity plumbing (CW-20260918-0043) ---
+
+// identityPlugin implements every capability whose params can carry
+// Identity, plus IdentityAware itself, so a single plugin proves
+// Identity reaches a handler two ways: directly off the request
+// struct, and via the IdentityAware.Identity callback. Fields are
+// mutex-protected because drive() dispatches concurrently.
+type identityPlugin struct {
+	basePlugin
+
+	mu       sync.Mutex
+	notified []string
+
+	lastCommandIdentity string
+	lastEventIdentity   string
+	lastMCPIdentity     string
+	lastHTTPIdentity    string
+}
+
+func (p *identityPlugin) Identity(ctx context.Context, identity json.RawMessage) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.notified = append(p.notified, string(identity))
+}
+
+func (p *identityPlugin) notifiedValues() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]string, len(p.notified))
+	copy(out, p.notified)
+	return out
+}
+
+func (p *identityPlugin) Command(ctx context.Context, req CommandRequest) (CommandResult, error) {
+	p.mu.Lock()
+	p.lastCommandIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return CommandResult{Action: "noop"}, nil
+}
+
+func (p *identityPlugin) commandIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastCommandIdentity
+}
+
+func (p *identityPlugin) EventHandle(ctx context.Context, req EventRequest) (EventResult, error) {
+	p.mu.Lock()
+	p.lastEventIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return EventResult{}, nil
+}
+
+func (p *identityPlugin) eventIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastEventIdentity
+}
+
+func (p *identityPlugin) MCPCallTool(ctx context.Context, req MCPCallRequest) (MCPCallResult, error) {
+	p.mu.Lock()
+	p.lastMCPIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return MCPCallResult{Content: json.RawMessage(`"ok"`)}, nil
+}
+
+func (p *identityPlugin) mcpIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastMCPIdentity
+}
+
+func (p *identityPlugin) HTTPHandle(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
+	p.mu.Lock()
+	p.lastHTTPIdentity = string(req.Identity)
+	p.mu.Unlock()
+	return HTTPResponse{Status: 200}, nil
+}
+
+func (p *identityPlugin) httpIdentity() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastHTTPIdentity
+}
+
+func TestServe_IdentityAwareInit(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	params := validInitParams()
+	params.Identity = json.RawMessage(`{"user_id":"u1"}`)
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodInit, Params: params},
+	})
+	if len(resps) != 1 || resps[0].Error != nil {
+		t.Fatalf("resps = %+v", resps)
+	}
+	if got := p.notifiedValues(); len(got) != 1 || got[0] != `{"user_id":"u1"}` {
+		t.Errorf("notified = %v, want one call with the Init identity", got)
+	}
+}
+
+func TestServe_IdentityAwareDispatchMethods(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	idA := json.RawMessage(`{"user_id":"cmd"}`)
+	idB := json.RawMessage(`{"user_id":"evt"}`)
+	idC := json.RawMessage(`{"user_id":"mcp"}`)
+	idD := json.RawMessage(`{"user_id":"http"}`)
+
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x", Identity: idA}},
+		{JSONRPC: "2.0", ID: NumberID(2), Method: MethodEventHandle, Params: EventHandleParams{Source: "host", Data: map[string]interface{}{}, Type: "y", Identity: idB}},
+		{JSONRPC: "2.0", ID: NumberID(3), Method: MethodMCPCallTool, Params: MCPCallRequest{Arguments: map[string]interface{}{}, ToolName: "z", Identity: idC}},
+		{JSONRPC: "2.0", ID: NumberID(4), Method: MethodHTTPHandle, Params: HTTPRequest{Method: "GET", Path: "/x", Identity: idD}},
+	})
+	for _, r := range resps {
+		if r.Error != nil {
+			t.Errorf("id=%v error: %+v", r.ID, r.Error)
+		}
+	}
+
+	if got := p.commandIdentity(); got != string(idA) {
+		t.Errorf("CommandRequest.Identity = %q, want %q", got, idA)
+	}
+	if got := p.eventIdentity(); got != string(idB) {
+		t.Errorf("EventRequest.Identity = %q, want %q", got, idB)
+	}
+	if got := p.mcpIdentity(); got != string(idC) {
+		t.Errorf("MCPCallRequest.Identity = %q, want %q", got, idC)
+	}
+	if got := p.httpIdentity(); got != string(idD) {
+		t.Errorf("HTTPRequest.Identity = %q, want %q", got, idD)
+	}
+
+	notified := p.notifiedValues()
+	if len(notified) != 4 {
+		t.Fatalf("IdentityAware.Identity called %d times, want 4: %v", len(notified), notified)
+	}
+	want := map[string]bool{string(idA): true, string(idB): true, string(idC): true, string(idD): true}
+	for _, n := range notified {
+		if !want[n] {
+			t.Errorf("unexpected notified value %q", n)
+		}
+		delete(want, n)
+	}
+	if len(want) != 0 {
+		t.Errorf("missing notified values: %v", want)
+	}
+}
+
+// TestServe_IdentityNotCalledWhenAbsent proves IdentityAware is truly
+// zero-cost when the host never populates Identity: a plugin that
+// implements the capability gets no calls at all, not a call with an
+// empty value.
+func TestServe_IdentityNotCalledWhenAbsent(t *testing.T) {
+	p := &identityPlugin{basePlugin: basePlugin{id: "id"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute, Params: CommandExecParams{Name: "x"}},
+	})
+	if len(resps) != 1 || resps[0].Error != nil {
+		t.Fatalf("resps = %+v", resps)
+	}
+	if got := p.notifiedValues(); len(got) != 0 {
+		t.Errorf("Identity() called with no identity present: %v", got)
+	}
+}
+
+// TestServe_IdentityIgnoredWithoutIdentityAware proves a plugin that
+// doesn't implement IdentityAware is completely unaffected by an
+// Identity value riding along on the request — dispatch behaves
+// exactly as it does without Identity present at all.
+func TestServe_IdentityIgnoredWithoutIdentityAware(t *testing.T) {
+	p := &commandPlugin{basePlugin: basePlugin{id: "cmd"}}
+	resps := drive(t, p, []RPCRequest{
+		{JSONRPC: "2.0", ID: NumberID(1), Method: MethodCommandExecute,
+			Params: CommandExecParams{Name: "greet", Args: "world", Identity: json.RawMessage(`{"user_id":"u1"}`)}},
+	})
+	if len(resps) != 1 {
+		t.Fatalf("got %d", len(resps))
+	}
+	var res CommandExecResult
+	if err := json.Unmarshal(resps[0].Result, &res); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if res.Action != "message" || res.Content != "hello world" {
+		t.Errorf("result = %+v, plugin without IdentityAware should be unaffected", res)
+	}
+}
+
+func TestServe_NilPlugin(t *testing.T) {
+	err := Serve(nil)
+	if err == nil {
+		t.Fatal("expected error for nil plugin")
+	}
+}
+
+func TestServe_ParseError(t *testing.T) {
+	in, inW := io.Pipe()
+	var out bytes.Buffer
+	var mu sync.Mutex
+	outW := &syncWriter{buf: &out, mu: &mu}
+
+	p := &basePlugin{id: "x"}
+	done := make(chan error, 1)
+	go func() { done <- serveWith(p, in, outW) }()
+
+	_, _ = inW.Write([]byte("this is not json\n"))
+	_ = inW.Close()
+	if err := <-done; err != nil {
+		t.Fatalf("serveWith: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(out.String(), "parse error") {
+		t.Errorf("expected parse error response, got %q", out.String())
+	}
+}

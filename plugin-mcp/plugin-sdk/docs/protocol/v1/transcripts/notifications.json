@@ -1,0 +1,47 @@
+{
+  "level": "normative",
+  "profile": "full",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "method": "event/handle",
+        "params": {
+          "type": "cancelled"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "command/execute",
+        "params": {
+          "name": "internal"
+        }
+      },
+      "level": "observed-quirk",
+      "preferred": "ID 0 is a valid numeric request ID and must receive a correlated reply; only an absent ID denotes a notification. Explicit null IDs also must not silently become notifications."
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "method": "unknown"
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "ok": true
+        }
+      }
+    }
+  ]
+}
