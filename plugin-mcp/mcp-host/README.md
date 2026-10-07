@@ -8,8 +8,9 @@ plugin-sdk-dialect subprocess (`inprocess` mode). See the ADR at
 full design and the process/inprocess tradeoff.
 
 `github.com/hollis-labs/station` is the first real consumer — a small
-binary wrapping `mcphost.Run` with flag parsing and its own config. Use it
-as the worked example of building on this library.
+binary wrapping `mcphost.Run` with flag parsing and its own config. Its
+historical inprocess setup needs the protocol-2 owner initialization described
+below before use with this release.
 
 ## Status
 
@@ -32,6 +33,10 @@ go get github.com/hollis-labs/libs/plugin-mcp/mcp-host
 
 ## Quickstart
 
+This snippet assumes process-mode logical servers. Inprocess entries also need
+trusted per-spawn factories in `Options.InprocessInitFactories`; see
+"Protocol-2 plugin initialization" below.
+
 ```go
 cfg, err := config.Load("station.yaml")
 if err != nil {
@@ -46,9 +51,9 @@ if err := mcphost.Run(ctx, cfg, mcphost.Options{HTTPAddr: ":8080"}); err != nil 
 }
 ```
 
-That's a complete host. See `examples/plugins/` for two real, standalone
-backing plugins (one per transport mode) and `examples/config/host.yaml` for
-a config wiring both of them up.
+See `examples/plugins/` for process and inprocess backing plugins. The mixed
+`examples/config/host.yaml` is a configuration template; its clock entry also
+requires the host's genuine programmatic Init factory before `Run`.
 
 ## Config
 
@@ -166,8 +171,9 @@ go vet ./...
 go test -race -count=1 ./...
 ```
 
-No CI, no Makefile — these three are the only gate (same convention as
-`go-mcp`).
+The active libs workflow `.github/workflows/plugin-mcp.yml` checks the
+consolidated module and the SDK/host fixtures. The commands above are local
+package checks; use `scripts/check plugin-mcp` at the libs root for the module.
 
 ## Known gaps and boundaries
 
@@ -179,10 +185,10 @@ No CI, no Makefile — these three are the only gate (same convention as
 - **No hot-reload from a running config change.** `registry` supports hot
   add/remove programmatically; nothing wires that to a live config-file
   watch yet.
-- **`inprocess` plugins get no `DataDir`/`CacheDir`.** `plugin/init`'s
-  `InitParams.DataDir`/`CacheDir` are sent empty — a plugin that calls
-  `ResolvedDataDir()` gets `ErrNoDataDir`. Fine for the current stateless
-  examples; a real gap for a future plugin needing persistence.
+- **Inprocess initialization needs host policy input.** The owner factory
+  supplies real plugin/data/cache roots, incarnation and explicit grants on
+  every spawn. YAML alone cannot supply this authority; missing or invalid
+  input is rejected before process creation.
 - **`go-mcp/client.Pool`'s stdio dial can't be supervised.** Pool's own
   stdio spawn is fully internal and reactive-only — it never exposes the
   spawned `*exec.Cmd`, so nothing outside it can ever get a real
