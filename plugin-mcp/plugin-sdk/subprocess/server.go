@@ -8,8 +8,8 @@ import (
 	"io"
 	"sync"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
-	"github.com/hollis-labs/plugin-sdk/capability"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // Serve runs the JSON-RPC server loop against a plugin, reading

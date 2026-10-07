@@ -19,7 +19,7 @@ import (
 	"log/slog"
 	"os"
 
-	mcpsanitize "github.com/hollis-labs/go-mcp-sanitize"
+	mcpsanitize "github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )

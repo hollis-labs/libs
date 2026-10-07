@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	sdksub "github.com/hollis-labs/plugin-sdk/subprocess"
+	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // ErrGone reports that the plugin subprocess's pipe closed — exited,

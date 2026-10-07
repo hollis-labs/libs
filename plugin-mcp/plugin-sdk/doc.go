@@ -8,17 +8,17 @@
 //
 // Layout:
 //
-//   - github.com/hollis-labs/plugin-sdk
+//   - github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
 //     Plugin, Host, CRUDHandler, EventHook, UIComponent, errors,
 //     EnvelopeOut/MessageOut, Logger.
 //
-//   - github.com/hollis-labs/plugin-sdk/subprocess
+//   - github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess
 //     Subprocess server library (Serve), JSON-RPC 2.0 wire protocol,
 //     plugin-side capability interfaces (CommandHandler,
 //     EventHandler, MCPHandler, HTTPHandler, Migrator, ...), and
 //     stderr JSON-lines logging.
 //
-//   - github.com/hollis-labs/plugin-sdk/subprocess/subprocesstest
+//   - github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess/subprocesstest
 //     In-process test harness for driving plugins without spawning a
 //     subprocess.
 //

@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hollis-labs/plugin-sdk.git",
+    "url": "git+https://github.com/hollis-labs/libs/plugin-mcp/plugin-sdk.git",
     "directory": "ts"
   },
   "type": "module",

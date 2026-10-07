@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
-	httptransport "github.com/hollis-labs/go-mcp/transport/http"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	httptransport "github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http"
 )
 
 // fixtureEnvVar, when set in the test process's environment, makes

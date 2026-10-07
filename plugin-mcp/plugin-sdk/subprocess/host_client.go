@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // HostClient is an SDK-owned request-scoped client. Authors obtain it from

@@ -1,6 +1,6 @@
 # plugin-host
 
-Host-side driver for [plugin-sdk](https://github.com/hollis-labs/plugin-sdk)'s stdio JSON-RPC protocol: spawn a plugin, handshake, make id-correlated calls, restart it when it crashes, and stop it within bounded time.
+Host-side driver for [plugin-sdk](https://github.com/hollis-labs/libs/plugin-mcp/plugin-sdk)'s stdio JSON-RPC protocol: spawn a plugin, handshake, make id-correlated calls, restart it when it crashes, and stop it within bounded time.
 
 ## Status
 
@@ -9,7 +9,7 @@ Host-side driver for [plugin-sdk](https://github.com/hollis-labs/plugin-sdk)'s s
 ## Install
 
 ```sh
-go get github.com/hollis-labs/plugin-host
+go get github.com/hollis-labs/libs/plugin-mcp/plugin-host
 ```
 
 ## Usage
@@ -24,9 +24,9 @@ import (
 	"os"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
-	"github.com/hollis-labs/plugin-sdk/capability"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 func main() {

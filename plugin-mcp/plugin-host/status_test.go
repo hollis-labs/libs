@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 )
 
 // A real child completes init/load, then emits stderr and exits on its next

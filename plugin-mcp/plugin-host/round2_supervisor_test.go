@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 )
 
 func rawHealthSpec(t *testing.T, reply string) pluginhost.Spec {

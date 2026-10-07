@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
 )
 
 // --- SDK-level Go types exposed to plugin authors ---

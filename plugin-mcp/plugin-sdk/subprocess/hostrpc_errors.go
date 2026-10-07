@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // HostRPCErrorData uses the capability leaf's exact field types and vocabulary.

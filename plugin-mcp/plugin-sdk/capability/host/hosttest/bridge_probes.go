@@ -3,7 +3,7 @@ package hosttest
 import (
 	"context"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 func bridgeProbes() []probe {

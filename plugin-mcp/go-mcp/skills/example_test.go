@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing/fstest"
 
-	"github.com/hollis-labs/go-mcp/server"
-	"github.com/hollis-labs/go-mcp/skills"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/skills"
 )
 
 // A server publishes its orientation docs as one tool. In a real server the

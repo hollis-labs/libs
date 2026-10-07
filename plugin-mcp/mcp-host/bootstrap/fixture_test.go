@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 // TestMain makes the test binary act as a trivial standalone MCP server

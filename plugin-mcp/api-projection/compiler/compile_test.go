@@ -3,7 +3,7 @@ package compiler
 import (
 	"testing"
 
-	"github.com/hollis-labs/api-projection/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
 )
 
 func testDoc() *Document {

@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/plugin-host/internal/interopfixture"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/internal/interopfixture"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type interopLifecycleInput struct {

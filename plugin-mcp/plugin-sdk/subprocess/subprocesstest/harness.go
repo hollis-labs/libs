@@ -38,8 +38,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // envJSONRoundtrip is the canonical env var that forces JSON roundtrip

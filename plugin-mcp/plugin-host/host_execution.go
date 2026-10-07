@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // executeHost is the direct test seam; negotiated Conn workers supply their

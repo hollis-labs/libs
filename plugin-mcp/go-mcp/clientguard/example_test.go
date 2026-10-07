@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/go-mcp/clientguard"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/clientguard"
 )
 
 // A Guard wraps the caller's own call. After threshold consecutive failures

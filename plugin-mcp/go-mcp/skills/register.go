@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hollis-labs/go-mcp/budget"
-	"github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 // DefaultArgName is the argument Register reads the skill name from.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/plugin-sdk/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/manifest"
 )
 
 func testArtifact(name string, executable bool) manifest.Artifact {

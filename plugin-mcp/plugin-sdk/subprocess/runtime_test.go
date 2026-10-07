@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
 )
 
 type shutdownPlugin struct {

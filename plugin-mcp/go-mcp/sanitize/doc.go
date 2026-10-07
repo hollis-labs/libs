@@ -8,7 +8,7 @@
 // pollution shapes and produces a cleaned args map that callers can hand to
 // their normal handler logic.
 //
-// This package folds in go-mcp-sanitize (github.com/hollis-labs/go-mcp-sanitize)
+// This package folds in go-mcp-sanitize (github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize)
 // as go-mcp's sanitize subpackage, per the go-mcp v2 consolidation ADR. Its
 // detection logic below is unchanged; only [Middleware] was rewritten, from
 // a github.com/mark3labs/mcp-go ToolHandlerFunc wrapper to an

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 )
 
 type callbackGenerationStore struct {

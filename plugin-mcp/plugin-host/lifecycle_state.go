@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // MaxOwnerGeneration is the largest integer represented exactly by Go/JS

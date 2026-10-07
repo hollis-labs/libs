@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 )
 
 var _ error = (*budget.ToolError)(nil)

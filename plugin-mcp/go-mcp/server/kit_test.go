@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-mcp/supervise"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervise"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

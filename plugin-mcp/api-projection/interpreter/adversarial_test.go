@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/api-projection/manifest"
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 const injectedCredential = "ghp_TOP_SECRET_DO_NOT_LEAK_0000000000"

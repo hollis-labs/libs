@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hollis-labs/api-projection/compiler"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/compiler"
 	"gopkg.in/yaml.v3"
 )
 

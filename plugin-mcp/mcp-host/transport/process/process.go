@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 // New builds a process-mode registry.Transport from cfg. ctx bounds the

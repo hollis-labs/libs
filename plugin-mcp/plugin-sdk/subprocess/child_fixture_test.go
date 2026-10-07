@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/internal/strictjson"
 )
 
 // This entry runs only in a dedicated test binary launched by the Node parent.

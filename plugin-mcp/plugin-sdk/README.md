@@ -1,6 +1,6 @@
 # plugin-sdk
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/plugin-sdk.svg)](https://pkg.go.dev/github.com/hollis-labs/plugin-sdk)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/plugin-mcp/plugin-sdk.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/plugin-mcp/plugin-sdk)
 
 The plugin contract, in two halves. A universal **Go SDK** for building
 plugins that talk to a host application over JSON-RPC stdio, and a
@@ -25,7 +25,7 @@ breaking and read the CHANGELOG before upgrading. Patch bumps
 ## Install
 
 ```bash
-go get github.com/hollis-labs/plugin-sdk
+go get github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
 ```
 
 ## What's in the box
@@ -90,7 +90,7 @@ import (
     "context"
     "os"
 
-    "github.com/hollis-labs/plugin-sdk/subprocess"
+    "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type hello struct{}
@@ -130,7 +130,7 @@ plugin in-process via the test harness.
 ## Layout
 
 ```
-github.com/hollis-labs/plugin-sdk
+github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
 ├── doc.go                 package-level overview
 ├── plugin.go              Plugin, Host, CRUDHandler, EventHook, UIComponent, ...
 ├── errors.go              Error type, sentinels, constructors

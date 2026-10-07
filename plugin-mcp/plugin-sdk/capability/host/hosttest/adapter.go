@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/capability/host"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability/host"
 )
 
 // Adapter opens a fresh isolated host fixture for each probe. Open must use the

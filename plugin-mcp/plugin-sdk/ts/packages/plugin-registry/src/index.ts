@@ -1,7 +1,7 @@
 /**
  * `@hollis-labs/plugin-registry` — the browser half of the plugin contract.
  *
- * The Go half is `github.com/hollis-labs/plugin-sdk`, in the same repository.
+ * The Go half is `github.com/hollis-labs/libs/plugin-mcp/plugin-sdk`, in the same repository.
  * `registry/registry.go` there is the other view of the wire contract this
  * package's `types.ts` declares.
  *

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hollis-labs/go-mcp/mcptest"
-	"github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/mcptest"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 // exampleT is a minimal TestingT for a runnable example; in a real test, pass

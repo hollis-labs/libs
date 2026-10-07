@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 )
 
 // LifecycleDriver is the separate lifecycle contract; process-only hosts can

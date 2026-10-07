@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	gmcpclient "github.com/hollis-labs/go-mcp/client"
+	gmcpclient "github.com/hollis-labs/libs/plugin-mcp/go-mcp/client"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 // dialTransport backs a process-mode logical server whose config sets

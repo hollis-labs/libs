@@ -2,7 +2,7 @@
 // lightweight subprocess speaking plugin-sdk/subprocess's JSON-RPC
 // dialect, never implementing MCP itself. mcp-host performs the one
 // real MCP handshake on its behalf (see
-// github.com/hollis-labs/mcp-host/transport/inprocess).
+// github.com/hollis-labs/libs/plugin-mcp/mcp-host/transport/inprocess).
 //
 // Its tool catalog is declared in config (see examples/config/host.yaml's
 // inprocess.tools block for this plugin's "now" tool), not here — this
@@ -18,8 +18,8 @@ import (
 	"os"
 	"time"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
-	sdksub "github.com/hollis-labs/plugin-sdk/subprocess"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
+	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type clockPlugin struct{}

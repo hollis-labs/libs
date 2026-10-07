@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // SubjectKind excludes plugins: plugins use their authenticated stdio binding.

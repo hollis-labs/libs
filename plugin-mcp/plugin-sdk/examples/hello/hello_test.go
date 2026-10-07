@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hollis-labs/plugin-sdk/subprocess"
-	"github.com/hollis-labs/plugin-sdk/subprocess/subprocesstest"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess/subprocesstest"
 )
 
 // TestHelloLifecycle drives the hello plugin through init/load/unload

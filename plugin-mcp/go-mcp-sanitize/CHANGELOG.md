@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `github.com/hollis-labs/go-mcp-sanitize` are documented
+All notable changes to `github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize` are documented
 in this file. The project follows [Semantic Versioning](https://semver.org/).
 
 ## v0.1.1 — 2026-05-10

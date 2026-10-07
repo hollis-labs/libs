@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hollis-labs/api-projection/credential"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/credential"
 )
 
 func main() {

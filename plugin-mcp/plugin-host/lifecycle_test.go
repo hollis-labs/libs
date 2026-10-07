@@ -5,8 +5,8 @@ package pluginhost_test
 import (
 	"context"
 	"errors"
-	pluginhost "github.com/hollis-labs/plugin-host"
-	"github.com/hollis-labs/plugin-host/pluginhosttest"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/pluginhosttest"
 	"sync/atomic"
 	"testing"
 	"time"

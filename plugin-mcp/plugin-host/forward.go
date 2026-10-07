@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 const maxRequestID int64 = 9007199254740991

@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/go-mcp/supervise"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervise"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 const (

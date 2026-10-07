@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/plugin-host/internal/interopfixture"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/internal/interopfixture"
 )
 
 const interopSDKSourceCommit = "ea8ec0dca862d0c7284cc6a130a4b27fb812ed21"

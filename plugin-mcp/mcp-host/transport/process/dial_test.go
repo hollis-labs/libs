@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
 )
 
 func TestDial_ListToolsAndCallTool(t *testing.T) {

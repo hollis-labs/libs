@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	pluginhost "github.com/hollis-labs/plugin-host"
-	"github.com/hollis-labs/plugin-host/pluginhosttest"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/pluginhosttest"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 const supervisorWait = 20 * time.Second

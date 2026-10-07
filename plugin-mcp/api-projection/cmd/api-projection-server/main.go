@@ -16,10 +16,10 @@ import (
 	"fmt"
 	"os"
 
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 
-	"github.com/hollis-labs/api-projection/interpreter"
-	"github.com/hollis-labs/api-projection/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/interpreter"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
 )
 
 // version is the reported server version; overridable at build time via

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
 )
 
 // These fixtures exercise the real reader, dispatcher and writer. The fixture

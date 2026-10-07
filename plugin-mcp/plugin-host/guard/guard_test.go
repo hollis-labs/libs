@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/plugin-host/guard"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/guard"
 )
 
 func TestGuardedReturnsTheAnswer(t *testing.T) {

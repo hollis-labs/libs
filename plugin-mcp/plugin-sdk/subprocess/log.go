@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
 )
 
 // stderrLogger is a simple JSON-lines logger that writes to stderr.

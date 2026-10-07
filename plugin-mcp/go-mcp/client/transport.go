@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/go-mcp/compat"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/compat"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

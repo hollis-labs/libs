@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )

@@ -3,13 +3,13 @@ package subprocesstest_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 	"os"
 	"testing"
 
-	plugin "github.com/hollis-labs/plugin-sdk"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
-	"github.com/hollis-labs/plugin-sdk/subprocess/subprocesstest"
+	plugin "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess/subprocesstest"
 )
 
 type echoPlugin struct{}

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/hollis-labs/go-mcp/budget"
-	"github.com/hollis-labs/go-mcp/server"
-	"github.com/hollis-labs/go-mcp/skills"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/skills"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // Plan is a host-normalized candidate. The callbacks must treat its slices,

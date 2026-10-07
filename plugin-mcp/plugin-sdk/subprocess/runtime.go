@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
-	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/internal/strictjson"
 )
 
 // DefaultShutdownTimeout bounds drain, cleanup and flush together.

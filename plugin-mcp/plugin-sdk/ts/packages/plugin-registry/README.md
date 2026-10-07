@@ -1,7 +1,7 @@
 # @hollis-labs/plugin-registry
 
 The browser registry, loader and optional React adapter for
-`github.com/hollis-labs/plugin-sdk`. The Go and TypeScript views share the
+`github.com/hollis-labs/libs/plugin-mcp/plugin-sdk`. The Go and TypeScript views share the
 [registry contract](../../../docs/protocol/registry-v2.md) and conformance fixtures.
 The core has no runtime dependencies. React `^19` is an optional peer behind
 `./react`. Version 0.2.0 is a breaking replacement for the registry shape in 0.1.0;

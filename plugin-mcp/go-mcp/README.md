@@ -48,14 +48,14 @@ for release notes.
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-mcp/budget
-go get github.com/hollis-labs/go-mcp/server
-go get github.com/hollis-labs/go-mcp/args
-go get github.com/hollis-labs/go-mcp/client
-go get github.com/hollis-labs/go-mcp/transport/http
-go get github.com/hollis-labs/go-mcp/auth
-go get github.com/hollis-labs/go-mcp/compat
-go get github.com/hollis-labs/go-mcp/supervise
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/server
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/args
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/client
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/auth
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/compat
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervise
 ```
 
 ## Quickstart
@@ -68,7 +68,7 @@ package main
 import (
     "fmt"
 
-    "github.com/hollis-labs/go-mcp/budget"
+    "github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 )
 
 type Task struct {
@@ -117,7 +117,7 @@ A runnable end-to-end demo lives in [`examples/list/`](./examples/list).
 
 ## Packages
 
-`github.com/hollis-labs/go-mcp/budget`
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget`
 
 - `Envelope` — response wrapper with `Items`, `Count`, `Total`, `Truncated`,
   and `Hint` fields, plus opt-in `HasMore`, `NextCursor` and `TruncatedBy`
@@ -189,7 +189,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 )
 
 func main() {
@@ -240,7 +240,7 @@ caching (the sibling `go-toolresult` library); a portfolio-wide list envelope
 (surfaces keep their own wire shape); sort allow-lists and SQL typing of
 keyset values; token counting beyond the 4-bytes-per-token estimate.
 
-`github.com/hollis-labs/go-mcp/server`
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/server`
 
 - `Tool` — a tool registration: name, optional `Title`, description, input
   schema, optional `OutputSchema`, handler, and four **required** typed
@@ -302,7 +302,7 @@ keyset values; token counting beyond the 4-bytes-per-token estimate.
   `notifications/initialized`, so that handler only fires over a legacy
   pre-2026-07-28 handshake.
 
-`github.com/hollis-labs/go-mcp/client`
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/client`
 
 - `Pool` — a named set of external MCP server connections, dialing each
   lazily on first use and reusing the connection thereafter.
@@ -353,7 +353,7 @@ keyset values; token counting beyond the 4-bytes-per-token estimate.
   -32602. A transport failure, a 429/502/503/504 or a closed connection
   still fails the check.
 
-`github.com/hollis-labs/go-mcp/transport/http`
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http`
 
 - `NewHandler(server, opts)` — wrap a `server.Server` as an `http.Handler`
   exposing it over the official SDK's Streamable HTTP transport, in
@@ -363,7 +363,7 @@ keyset values; token counting beyond the 4-bytes-per-token estimate.
 
 ### Executable staleness
 
-`github.com/hollis-labs/go-mcp/staleness` compares identities acquired by the
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/staleness` compares identities acquired by the
 product against the launch selector supplied by its owner. `Compare` requires
 compatible schemes, products and platforms; missing evidence yields `unknown`.
 `different` means different replacement content, including a rollback. It does
@@ -392,7 +392,7 @@ behavior is included.
 
 ### Child-process supervision
 
-`github.com/hollis-labs/go-mcp/supervise` holds the primitives Tether's own
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervise` holds the primitives Tether's own
 proactive stdio-upstream supervisor was built from, generalized for reuse.
 Like `staleness`, it is dependency-free and owns no lifecycle: it never spawns
 a process, calls `os.Exit`, sends a signal, or restarts anything. The
@@ -453,7 +453,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 func main() {
@@ -531,7 +531,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -629,7 +629,7 @@ and hints are never inferred from tool names.
 
 ## Skills tool (`skills`)
 
-`github.com/hollis-labs/go-mcp/skills` registers one tool that lets an agent
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/skills` registers one tool that lets an agent
 read a server's orientation docs progressively: called with no argument it
 returns the catalog (`{"items": [{"name", "description"}...], "meta":
 {"count", "progressive_discovery": true, "next": <tool>}}`), called with a name
@@ -664,7 +664,7 @@ ranked broker and layered discovery are deliberately not part of this package.
 
 ## Supervised stdio (`supervisedstdio`)
 
-`github.com/hollis-labs/go-mcp/supervisedstdio` runs one local MCP server as a
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervisedstdio` runs one local MCP server as a
 child process and keeps it up: `Start` spawns the command, performs the
 handshake, and leaves a supervisor that reconnects on exit, on a bounded
 backoff (`supervise.Policy`, default five restarts at 1s to 16s), classifying
@@ -710,7 +710,7 @@ periodic liveness probes.
 
 ## Client call guard (`clientguard`)
 
-`github.com/hollis-labs/go-mcp/clientguard` decides whether a call to an
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/clientguard` decides whether a call to an
 external upstream is attempted at all: per-key circuit breaking and client-side
 call-rate limiting, meant to wrap `client.Pool.CallTool`. Like `budget`,
 `staleness` and `supervise` it is stdlib-only and owns no lifecycle: it does
@@ -809,7 +809,7 @@ MIT License — see [`LICENSE`](./LICENSE). © Hollis Labs.
 
 ## Test helper (`mcptest`)
 
-`github.com/hollis-labs/go-mcp/mcptest` is the portfolio's minimum-profile
+`github.com/hollis-labs/libs/plugin-mcp/go-mcp/mcptest` is the portfolio's minimum-profile
 check for a server built on `server`: `Connect` wires it to an in-process
 client over the SDK's in-memory transport and completes the MCP handshake. A
 server for which it succeeds meets the minimum profile (ruling Q14a,

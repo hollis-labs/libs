@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/api-projection/manifest"
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 func releasesManifest(baseURL string) *manifest.Manifest {
@@ -53,7 +53,7 @@ func TestHandler_BuildsRequestAndMapsResponse(t *testing.T) {
 		gotAuth = r.Header.Get("Authorization")
 		gotAccept = r.Header.Get("Accept")
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[{"tag_name":"v0.2.0","name":"v0.2.0","published_at":"2026-09-18T21:53:23Z","html_url":"https://github.com/hollis-labs/mcp-host/releases/tag/v0.2.0","id":391806144,"url":"https://api.github.com/internal","author":{"login":"chrispian"}}]`))
+		_, _ = w.Write([]byte(`[{"tag_name":"v0.2.0","name":"v0.2.0","published_at":"2026-09-18T21:53:23Z","html_url":"https://github.com/hollis-labs/libs/plugin-mcp/mcp-host/releases/tag/v0.2.0","id":391806144,"url":"https://api.github.com/internal","author":{"login":"chrispian"}}]`))
 	}))
 	defer srv.Close()
 

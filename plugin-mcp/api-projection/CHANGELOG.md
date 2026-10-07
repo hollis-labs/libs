@@ -22,5 +22,5 @@ minor bumps for additive surface, patch bumps for fixes.
   the interpreter.
 - A read-only GitHub releases pilot as a worked example.
 
-[Unreleased]: https://github.com/hollis-labs/api-projection/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/hollis-labs/api-projection/releases/tag/v0.1.0
+[Unreleased]: https://github.com/hollis-labs/libs/plugin-mcp/api-projection/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/hollis-labs/libs/plugin-mcp/api-projection/releases/tag/v0.1.0

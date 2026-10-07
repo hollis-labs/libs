@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
 )
 
 // fixtureEnvVar makes the test binary act as a trivial standalone MCP

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 // fakeTransport is the same shape registry's own tests use — no real

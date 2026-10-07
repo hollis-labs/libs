@@ -30,7 +30,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hollis-labs/api-projection/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
 	"github.com/zalando/go-keyring"
 )
 

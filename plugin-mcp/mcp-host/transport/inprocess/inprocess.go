@@ -47,11 +47,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/go-mcp/supervise"
-	sdksub "github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/supervise"
+	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 const (

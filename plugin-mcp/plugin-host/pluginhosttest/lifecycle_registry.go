@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	pluginhost "github.com/hollis-labs/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 	"reflect"
 	"sync"
 	"testing"

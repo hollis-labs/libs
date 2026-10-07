@@ -1,6 +1,6 @@
 # go-mcp-sanitize
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-mcp-sanitize.svg)](https://pkg.go.dev/github.com/hollis-labs/go-mcp-sanitize)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize)
 
 A small Go module for cleaning malformed Anthropic tool-call XML that leaks
 into the **values** of MCP free-text parameters, plus a one-line middleware
@@ -41,7 +41,7 @@ loudly in [`CHANGELOG.md`](./CHANGELOG.md).
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-mcp-sanitize@latest
+go get github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize@latest
 ```
 
 Floor versions: Go 1.26.2, `github.com/mark3labs/mcp-go` v0.47.0.
@@ -54,7 +54,7 @@ Runnable demos live under [`examples/`](./examples).
 import (
     "log/slog"
 
-    "github.com/hollis-labs/go-mcp-sanitize"
+    "github.com/hollis-labs/libs/plugin-mcp/go-mcp-sanitize"
     "github.com/mark3labs/mcp-go/server"
 )
 

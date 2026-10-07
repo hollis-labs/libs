@@ -5,12 +5,28 @@
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
-  "engines": { "node": ">=22" },
-  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./test": { "types": "./dist/harness.d.ts", "import": "./dist/harness.js" },
-    "./build": { "types": "./dist/build/index.d.ts", "import": "./dist/build/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./test": {
+      "types": "./dist/harness.d.ts",
+      "import": "./dist/harness.js"
+    },
+    "./build": {
+      "types": "./dist/build/index.d.ts",
+      "import": "./dist/build/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -21,6 +37,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run build && node --test test/*.test.js"
   },
-  "devDependencies": { "@types/node": "^22.0.0" },
-  "repository": { "type": "git", "url": "git+https://github.com/hollis-labs/plugin-sdk.git", "directory": "ts/packages/plugin-sdk" }
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollis-labs/libs.git",
+    "directory": "plugin-mcp/plugin-sdk/ts/packages/plugin-sdk"
+  }
 }

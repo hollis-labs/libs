@@ -22,7 +22,7 @@ type ExitInfo struct {
 }
 
 // classifyExit reads the exit code and signal from a process's terminal
-// state. It is adapted from ClassifyExit in github.com/hollis-labs/go-mcp
+// state. It is adapted from ClassifyExit in github.com/hollis-labs/libs/plugin-mcp/go-mcp
 // (supervise/exit.go), copied rather than imported for the same reason as
 // [Tail]. On a platform where the state does not report a syscall.WaitStatus
 // the signal name is unavailable and only the exit code is reported.

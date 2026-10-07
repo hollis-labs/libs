@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hollis-labs/plugin-host/internal/strictjson"
-	"github.com/hollis-labs/plugin-sdk/subprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/internal/strictjson"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type wireEnvelope struct {

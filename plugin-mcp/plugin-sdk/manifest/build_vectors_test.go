@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hollis-labs/plugin-sdk/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/manifest"
 )
 
 // Immutable build-v1 payload bytes/modes are shared with the Node build helper.

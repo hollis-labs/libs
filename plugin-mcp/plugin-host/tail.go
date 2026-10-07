@@ -1,6 +1,6 @@
 package pluginhost
 
-// Tail and Redact are lifted from github.com/hollis-labs/go-mcp
+// Tail and Redact are lifted from github.com/hollis-labs/libs/plugin-mcp/go-mcp
 // (supervise/tail.go), copied rather than imported: that package is
 // stdlib-only but its module requires the MCP SDK, and a host driver for a
 // different protocol should not carry it. Only the package name, the doc

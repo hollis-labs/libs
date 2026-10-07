@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-mcp/budget"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
 )
 
 // Task is a stand-in for whatever record an MCP server would return.

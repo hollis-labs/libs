@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
-	httptransport "github.com/hollis-labs/go-mcp/transport/http"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	httptransport "github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )

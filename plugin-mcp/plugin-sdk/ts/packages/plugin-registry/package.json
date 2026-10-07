@@ -17,12 +17,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hollis-labs/plugin-sdk.git",
-    "directory": "ts/packages/plugin-registry"
+    "url": "git+https://github.com/hollis-labs/libs.git",
+    "directory": "plugin-mcp/plugin-sdk/ts/packages/plugin-registry"
   },
-  "homepage": "https://github.com/hollis-labs/plugin-sdk/tree/main/ts/packages/plugin-registry#readme",
+  "homepage": "https://github.com/hollis-labs/libs/tree/main/plugin-mcp/plugin-sdk/ts/packages/plugin-registry#readme",
   "bugs": {
-    "url": "https://github.com/hollis-labs/plugin-sdk/issues"
+    "url": "https://github.com/hollis-labs/libs/issues"
   },
   "type": "module",
   "sideEffects": false,

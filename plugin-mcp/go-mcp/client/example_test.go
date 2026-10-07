@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http/httptest"
 
-	"github.com/hollis-labs/go-mcp/client"
-	"github.com/hollis-labs/go-mcp/server"
-	httptransport "github.com/hollis-labs/go-mcp/transport/http"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/client"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	httptransport "github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

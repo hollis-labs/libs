@@ -13,13 +13,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/hollis-labs/go-mcp/auth"
-	"github.com/hollis-labs/go-mcp/budget"
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
-	httptransport "github.com/hollis-labs/go-mcp/transport/http"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/auth"
+	"github.com/hollis-labs/libs/plugin-mcp/go-mcp/budget"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
+	httptransport "github.com/hollis-labs/libs/plugin-mcp/go-mcp/transport/http"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
 )
 
 const identityVersion = "dev"

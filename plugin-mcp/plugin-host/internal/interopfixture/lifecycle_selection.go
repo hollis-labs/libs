@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hollis-labs/plugin-host/internal/strictjson"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/internal/strictjson"
 )
 
 const LifecyclePublicMode = "public-conn-isolated-transport"

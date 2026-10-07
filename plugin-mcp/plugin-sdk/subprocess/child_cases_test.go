@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/capability"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 )
 
 // Private fixture activation only. These callbacks use the merged author clients;

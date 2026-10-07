@@ -29,9 +29,9 @@ inputs:
   repo_name: plugin-host
   stability: pre-1.0
 computed:
-  import_line: pluginhost "github.com/hollis-labs/plugin-host"
-  import_path: github.com/hollis-labs/plugin-host
-  module_path: github.com/hollis-labs/plugin-host
+  import_line: pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+  import_path: github.com/hollis-labs/libs/plugin-mcp/plugin-host
+  module_path: github.com/hollis-labs/libs/plugin-mcp/plugin-host
   year: "2026"
 files:
   .github/workflows/check.yml:

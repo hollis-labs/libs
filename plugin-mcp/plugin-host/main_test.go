@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hollis-labs/plugin-host/pluginhosttest"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-host/pluginhosttest"
 )
 
 func TestMain(m *testing.M) {

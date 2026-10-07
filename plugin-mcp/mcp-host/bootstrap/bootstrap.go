@@ -13,10 +13,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/registry"
-	"github.com/hollis-labs/mcp-host/transport/inprocess"
-	"github.com/hollis-labs/mcp-host/transport/process"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/transport/inprocess"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/transport/process"
 )
 
 // BuildRegistry constructs and registers every logical server in cfg,

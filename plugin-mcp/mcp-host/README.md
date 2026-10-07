@@ -27,7 +27,7 @@ inprocess" below. See [`CHANGELOG.md`](./CHANGELOG.md) for release notes.
 ## Install
 
 ```bash
-go get github.com/hollis-labs/mcp-host
+go get github.com/hollis-labs/libs/plugin-mcp/mcp-host
 ```
 
 ## Quickstart

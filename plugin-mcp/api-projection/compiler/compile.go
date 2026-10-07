@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hollis-labs/api-projection/manifest"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
 	"gopkg.in/yaml.v3"
 )
 

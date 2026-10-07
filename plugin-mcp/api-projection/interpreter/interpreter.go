@@ -36,8 +36,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/api-projection/manifest"
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	"github.com/hollis-labs/libs/plugin-mcp/api-projection/manifest"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 )
 
 // Interpreter serves one loaded manifest's tools.

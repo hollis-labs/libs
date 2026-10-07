@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/plugin-sdk/internal/strictjson"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/internal/strictjson"
 )
 
 // ForwardContextFromContext returns host-provided invocation metadata. It does

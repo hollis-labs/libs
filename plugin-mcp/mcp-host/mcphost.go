@@ -22,11 +22,11 @@ import (
 	"net/http"
 	"time"
 
-	gmcpserver "github.com/hollis-labs/go-mcp/server"
+	gmcpserver "github.com/hollis-labs/libs/plugin-mcp/go-mcp/server"
 
-	"github.com/hollis-labs/mcp-host/bootstrap"
-	"github.com/hollis-labs/mcp-host/config"
-	"github.com/hollis-labs/mcp-host/serving"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/bootstrap"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/serving"
 )
 
 // Options configures Run.
