@@ -1,4 +1,4 @@
-package providerplant
+package planting
 
 import (
 	"context"

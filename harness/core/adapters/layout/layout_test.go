@@ -186,7 +186,7 @@ func TestFindPrefersTheMostSpecificRow(t *testing.T) {
 	}{
 		{"every-mode row for plain print", perTurn, layout.Instructions, "", true},
 		{"mode+variant row beats every-mode row", bare, layout.Instructions, "--append-system-prompt-file", true},
-		{"bare only applies in its own mode", layout.Shape{Mode: runtimes.ModeStreamingStdio, Variant: layout.VariantBare}, layout.NativeConfig, "", true},
+		{"unsupported bare transport refuses instead of falling back", layout.Shape{Mode: runtimes.ModeStreamingStdio, Variant: layout.VariantBare}, layout.NativeConfig, "", false},
 		{"zero shape sees every-mode rows", layout.Shape{}, layout.MCP, "--mcp-config", true},
 	}
 	for _, c := range cases {

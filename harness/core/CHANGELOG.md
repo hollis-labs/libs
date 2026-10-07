@@ -8,7 +8,12 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
-The harness module contains the packages of eleven former Hollis Labs modules, moved in with their git history at their final homes, and a stdio process shim library with its `cairn-shim` executable, written in this module. The old modules' release tags were not carried over. The module requires `llm-core` v0.1.0 and `mesh` v0.1.0 and builds with Go 1.26.6. It has no released version and no tag yet. Its package layout is interim and will move again with the restructure.
+## v0.1.0
+
+- Consolidated provider placement into `adapters/layout/plan`. Parent layout queries are pure derived compatibility views, including explicit existing MCP mirrors and permissions. The generator owns only `plan-fields.json` and `PLAN-FIELDS.md`; older layout exports remain historical evidence. Unsupported transport/variant queries refuse instead of falling back to an unrelated shape. Artifact and golden fixture bytes remain unchanged.
+
+
+The harness module contains the packages of eleven former Hollis Labs modules, moved in with their git history at their final homes, and a stdio process shim library with its `cairn-shim` executable, written in this module. The old modules' release tags were not carried over. The module requires `llm-core` v0.1.0 and `mesh` v0.1.0 and builds with Go 1.26.6. This first library release consolidates launch planting under `agentlaunch/planting` and managed workspace mutation under the workspace root and concrete materialize engine. Runtime adoption is separate from library availability.
 
 ### Known issues
 
@@ -25,6 +30,12 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
   materialize engine. Side-writer and engine overrides are removed. Existing
   unsafe roots, nonempty unmanifested content and credential placeholders refuse
   before mutation. Pure provider projection remains available separately.
+  The interim `workspace/plant`, `workspace/providerplant` and `workspace/bootdir`
+  packages are removed. `agentlaunch/planting` owns the wrapper `Planter`,
+  `PlantSpec`, `PlantResult`, `PlantHook`, `SharedPlanter` and `NoOpPlanter`
+  contracts and provider projection/preparation adapters. The bootdir writer
+  has no public replacement; callers submit explicit artifacts through the
+  sole materialization route. Historical bootdir coverage stays test-only.
   Archived baselines and seeds remain unchanged; active routing deltas are
   documented in `workspace/README.md`.
 
@@ -47,12 +58,21 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
 - Explicit Claude/Codex installed artifact planning and apply through the
   concrete engine, external receipts and exact path/key authority. Existing
   user directories remain untouched; unreadable or drifted owned documents
-  refuse. Installed completion remains artifact-only, without launch readiness.
+  refuse. Real Linux and Darwin installed mutation is currently Unsupported:
+  no trusted metadata-attestation issuer is implemented. A data-only original
+  context and private detached consumer/verifier are present; synthetic tests
+  exercise their binding rules without granting native capability. Installed
+  completion remains artifact-only, without launch readiness.
+- Closed publication accounting and origin inspection retain original requests,
+  receipt origins and prior obligations across retries. Recorded pins use the
+  existing mutation-lock mapping and separate exclusive probe/shared use
+  descriptors. Publication remains Unsupported without trusted metadata,
+  isolation and custody evidence; opaque use reservations do not earn Ready.
 
 - Pure provider document assembly under `workspace/render`, native leaf-key
   ownership metadata, intended offline snapshots, and separate generated
-  exports for the authored provider plan-field table. Existing writers remain
-  in place while callers migrate.
+  exports for the authored provider plan-field table. Library launch adapters
+  route artifacts through the workspace authority boundary and sole engine.
 - Installed Codex encoding preserves literal strings and explicit parent MCP
   tables; installed instruction markers retain their format and use the resolved
   definition identifier.
@@ -86,10 +106,10 @@ The harness module contains the packages of eleven former Hollis Labs modules, m
   ownership annotations to match emitted leaves exactly.
 
 - The new artifact contract requests owner-only permissions for installed native
-  settings and configuration. At installed apply, existing settings are tightened
-  to 0600 on the next explicit install; no permission is widened. This narrows
-  the archived Claude settings mode of 0644. Existing planting behavior has not
-  been routed to this contract yet, and content drift checks ignore file modes.
+  settings and configuration. This requested mode narrows the archived Claude
+  settings mode of 0644. Existing-file replacement refuses unpreservable
+  ownership/mode or unknown metadata; native installed mutation is Unsupported,
+  so this release does not tighten existing operator files.
 
 - `adapters/layout/gen` writes `adapters/layout/layout.json` and `adapters/layout/docs/LAYOUT.md`, the files' new locations relative to the module root (the generator's two path constants; it would otherwise have written `layout/layout.json` and `docs/LAYOUT.md` next to the module root).
 - Code that pinned a sibling at a tag now builds against the sibling's source at its old repository's `main`: `runner` (was `go-providers` v0.26.0, `go-sandbox` v0.3.0, `go-llm-types` v0.3.0), `adapters/provider` (was `go-llm-contracts` v0.1.0, `go-permission` v0.1.0) and `sandbox` (was `go-safefs` v0.1.0).

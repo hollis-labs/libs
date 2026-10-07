@@ -163,7 +163,8 @@
         ],
         "note": "strict covers measured config sources only"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "provider": "claude",
@@ -495,7 +496,8 @@
           "CFG3"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "codex-config",
@@ -526,7 +528,9 @@
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "provider": "codex",
@@ -570,7 +574,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "provider": "codex",
@@ -692,7 +697,8 @@
           "CFG2"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "opencode-config",
@@ -723,7 +729,9 @@
         ],
         "note": "no measured MCP-only isolation"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "provider": "opencode",
@@ -838,7 +846,8 @@
         "reference": "adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl",
         "note": "agy 1.2.7 live plugin discovery; isolation unmeasured"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "provider": "antigravity",
@@ -1306,7 +1315,8 @@
           "CFG3"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "codex-config",
@@ -1334,7 +1344,8 @@
           "CFG3"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "codex-config",
@@ -1371,7 +1382,9 @@
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "composition": "codex-config",
@@ -1404,7 +1417,9 @@
         ],
         "note": "exclusivity depends on CODEX_HOME binding"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "provider": "codex",
@@ -1483,7 +1498,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "credential_policy": "link-only-never-write",
@@ -1502,7 +1518,8 @@
         "reference": "adapters/layout/plan/doc.go",
         "note": "explicit real-provider-home link; no rendering or ambient read"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "provider": "codex",
@@ -1775,7 +1792,8 @@
           "CFG2"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "opencode-config",
@@ -1807,7 +1825,8 @@
           "CFG2"
         ]
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384
     },
     {
       "composition": "opencode-config",
@@ -1846,7 +1865,9 @@
         ],
         "note": "no measured MCP-only isolation"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "composition": "opencode-config",
@@ -1884,7 +1905,9 @@
         ],
         "note": "no measured MCP-only isolation"
       },
-      "mode_bits": "0600"
+      "mode_bits": "0600",
+      "compatibility_mode_bits": 384,
+      "compatibility_mcp_path": ".mcp.json"
     },
     {
       "provider": "opencode",

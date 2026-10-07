@@ -13,7 +13,7 @@ import (
 	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 	"github.com/hollis-labs/substrate/harness/adapters"
@@ -68,7 +68,7 @@ func preparedClaude(t *testing.T, binary string, mode runtimes.Mode) *agentlaunc
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	exec, err := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithArtifactAuthorization(fixtureAuthorization(t)))
+	exec, err := planting.PrepareExecution(context.Background(), prepared, planting.WithArtifactAuthorization(fixtureAuthorization(t)))
 	if err != nil {
 		t.Fatalf("PrepareExecution: %v", err)
 	}

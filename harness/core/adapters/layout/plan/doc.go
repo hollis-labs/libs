@@ -1,16 +1,15 @@
 // Package plan owns the provider layout PLAN-FIELD table for resolved provider inputs.
-// It is distinct from workspace.Plan or a launch plan. This is the final home:
-// the legacy adapters/layout table will be removed while this package stays.
-// The root retains the generator and generated exports and may re-export.
-// The plan-fields.json and docs/PLAN-FIELDS.md exports describe this table.
-// Existing layout.json and docs/LAYOUT.md exports describe the legacy table
-// until cutover.
-// It is pure: no writes, credential reads, pin resolution or process launches.
-// The parent layout package temporarily retains its legacy table to preserve
-// existing projections. Cutover follows serializer and workspace integration;
-// the planned removal of the legacy table follows that cutover.
+// It is distinct from workspace.Plan or a launch plan. The parent layout
+// package exposes mechanical compatibility views of this table only; it owns
+// no second placement policy or writer. The root retains the generator and
+// current plan-fields.json and docs/PLAN-FIELDS.md exports. Older layout.json
+// and docs/LAYOUT.md are retained historical evidence, not current generated
+// outputs. This package is pure: no writes, credential reads, pin resolution
+// or process launches. Per-row compatibility metadata preserves existing
+// adapter permissions and operator MCP mirrors without changing canonical
+// renderer evidence or granting extra write authority.
 //
-// Intended deltas from legacy output, applied only at cutover:
+// Canonical rendering deltas from historical projection output:
 //   - Absent Codex posture drops implicit never/workspace-write native defaults.
 //     Headless transports refuse absence; a declared host default
 //     can explicitly retain the former native settings. Interactive support
@@ -32,7 +31,8 @@
 //   - Claude settings.json and .mcp.json are explicitly 0600.
 //   - Codex config.toml and Antigravity mcp_config.json are explicitly 0600;
 //     Codex auth.json is a credential link effect, never an empty planted file.
-//   - Unread MCP mirrors are dropped. OpenCode agents.json and .opencode/skills
+//   - Canonical rendering omits unread MCP mirrors; compatibility projections retain
+//     explicitly declared operator mirrors. OpenCode agents.json and .opencode/skills
 //     removals describe the legacy table; neither occurs in archived writer output.
 //
 // Installed encodings retain the generated-by banner (the resolved definition

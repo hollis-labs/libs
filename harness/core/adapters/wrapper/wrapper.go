@@ -23,10 +23,10 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/acp"
 	"github.com/hollis-labs/substrate/harness/adapters/activity"
 	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/interception/filters"
 	"github.com/hollis-labs/substrate/harness/interception/policy"
 	"github.com/hollis-labs/substrate/harness/sandbox/wrapper"
-	"github.com/hollis-labs/substrate/harness/workspace/plant"
 )
 
 // Config describes a single wrapped-process invocation. Build a Config,
@@ -97,11 +97,11 @@ type Config struct {
 	//
 	// When PreparedExecution carries a materialized handle, wrapper planting is
 	// rejected instead of running a competing writer.
-	Planter plant.Planter
+	Planter planting.Planter
 
 	// PlantSpec describes what Planter should lay down. Ignored when
 	// Planter is nil.
-	PlantSpec plant.Spec
+	PlantSpec planting.PlantSpec
 
 	// PreparedExecution is an already resolved/materialized agentkit handoff.
 	// Native and ACP wrapper runtimes consume its exact argv/env/cwd and
@@ -1273,11 +1273,11 @@ func (w *Wrapper) runSandbox(ctx context.Context, source runtimeevents.Source, s
 	return nil
 }
 
-// countSpecFiles tallies the discrete file slots in a plant.Spec for
+// countSpecFiles tallies the discrete file slots in a planting.PlantSpec for
 // the plant.started event's "files_planned" payload. Counts entries in
 // Files plus MCPConfig (if present); ProviderSettings and Hooks are
 // reported separately.
-func countSpecFiles(spec plant.Spec) int {
+func countSpecFiles(spec planting.PlantSpec) int {
 	n := len(spec.Files)
 	if spec.MCPConfig != nil {
 		n++

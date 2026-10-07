@@ -132,6 +132,15 @@ type CredentialPolicy string
 const LinkOnlyNeverWrite CredentialPolicy = "link-only-never-write"
 
 type Row struct {
+	// Compatibility fields describe adapter projections only; they are excluded
+	// from canonical render evidence and operation inputs.
+	// CompatibilityModeBits preserves the existing adapter projection default:
+	// zero means its historical 0644 default, not a grant or installed mode.
+	CompatibilityModeBits uint32 `json:"-"`
+	// CompatibilityMCPPath is the existing operator mirror of a native MCP slot.
+	// It is not the file the runtime reads and grants no extra write authority.
+	CompatibilityMCPPath string `json:"-"`
+
 	// Composition explicitly authorizes concerns to share one serializer-owned document.
 	Composition      string            `json:"composition,omitempty"`
 	CredentialPolicy CredentialPolicy  `json:"credential_policy,omitempty"`

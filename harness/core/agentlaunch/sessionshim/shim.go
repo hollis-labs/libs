@@ -18,7 +18,7 @@
 //
 // # AutoPlantBootDir
 //
-// A PreparedLaunch produced by providerplant.PrepareAndPlant already has
+// A PreparedLaunch produced by planting.PrepareAndPlant already has
 // its bootdir planted. ToSessionLaunch therefore leaves
 // StartOptions.AutoPlantBootDir false: the go-agent-sessions planter
 // must not run a second time over the same directory.
@@ -34,7 +34,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 )
 
 // ErrNilPrepared is returned by ToSessionLaunch when the prepared argument is
@@ -77,7 +77,7 @@ type SessionLaunch struct {
 //   - Options.BootPrompt  ← BootPrompt
 //   - Options.BootContent ← BootContent
 //   - Options.BootMode    ← BootMode
-//   - Options.PlantContext← providerplant.PlantContextFor(prepared)
+//   - Options.PlantContext← planting.PlantContextFor(prepared)
 //   - Options.AutoPlantBootDir stays false (bootdir already planted)
 //
 // A streaming-stdio launch takes its boot prompt as its first stdin turn; see
@@ -101,8 +101,8 @@ func ToSessionLaunch(prepared *agentlaunch.PreparedLaunch) (SessionLaunch, error
 		BootPrompt:   prepared.BootPrompt,
 		BootContent:  prepared.BootContent,
 		BootMode:     prepared.BootMode,
-		PlantContext: providerplant.PlantContextFor(prepared),
-		// AutoPlantBootDir intentionally false — providerplant.Plant
+		PlantContext: planting.PlantContextFor(prepared),
+		// AutoPlantBootDir intentionally false — planting.Plant
 		// already materialized the bootdir.
 	}
 	if prepared.Launch == nil {

@@ -14,7 +14,8 @@ import (
 )
 
 // The built-in adapters derive every path, flag, environment variable and
-// working directory from package layout, the single table of what each agent
+// working directory from the pure layout compatibility view of adapters/layout/plan,
+// the sole authored table of what each agent
 // CLI reads. A missing row is a programming error in that table, caught by
 // TestLayoutTableCoversBuiltInAdapters, so these helpers panic rather than
 // thread an error through every projection.

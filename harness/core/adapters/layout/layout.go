@@ -1,6 +1,11 @@
 package layout
 
-import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+import (
+	"reflect"
+
+	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+)
 
 // Variant names a runtime-specific launch variant: a flag that changes where
 // the harness looks for its files without changing the transport mode. The
@@ -107,14 +112,15 @@ type Entry struct {
 	// package writes but Step 0 does not measure. Exactly one of Probe and
 	// Unprobed is set.
 	Unprobed string `json:"unprobed,omitempty"`
-	// Note is human-readable context rendered into docs/LAYOUT.md.
+	// Note is human-readable context derived from the canonical row evidence.
 	Note string `json:"note,omitempty"`
 }
 
 // Table returns a copy of the one table, in stable order.
 //
-// Deprecated: use adapters/layout/plan; legacy table retires at the planned removal of the legacy table.
+// Deprecated: use adapters/layout/plan; this API is a derived compatibility view, not an authored placement table.
 func Table() []Entry {
+	table := compatibilityTable()
 	out := make([]Entry, len(table))
 	for i, e := range table {
 		out[i] = e.clone()
@@ -147,11 +153,30 @@ func (e Entry) appliesTo(s Shape) (specificity int, ok bool) {
 // Variant are each empty or equal to s's. The zero Shape returns only the
 // every-mode rows.
 //
-// Deprecated: use adapters/layout/plan; legacy table retires at the planned removal of the legacy table.
+// Deprecated: use adapters/layout/plan; this API is a derived compatibility view, not an authored placement table.
 func For(r runtimes.ID, s Shape) []Entry {
+	if s.Mode != "" {
+		if _, err := plan.For(r, plan.Boot, s.Mode, plan.Variant(s.Variant)); err != nil {
+			return nil
+		}
+	}
 	var out []Entry
-	for _, e := range table {
-		if _, ok := e.appliesTo(s); e.Provider == r && ok {
+	for _, e := range compatibilityTable() {
+		if _, ok := e.appliesTo(s); e.Provider != r || !ok {
+			continue
+		}
+		// Exact transport rows can repeat a default placement. Emit that
+		// binding once, while retaining distinct variant-specific locators.
+		duplicate := false
+		for _, prior := range out {
+			a, b := prior.clone(), e.clone()
+			a.Mode, b.Mode, a.Variant, b.Variant = "", "", "", ""
+			if reflect.DeepEqual(a, b) {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
 			out = append(out, e.clone())
 		}
 	}
@@ -163,8 +188,14 @@ func For(r runtimes.ID, s Shape) []Entry {
 // every-mode row. Among rows of equal specificity the first in Table order
 // (the primary) wins.
 //
-// Deprecated: use adapters/layout/plan; legacy table retires at the planned removal of the legacy table.
+// Deprecated: use adapters/layout/plan; this API is a derived compatibility view, not an authored placement table.
 func Find(r runtimes.ID, s Shape, c Concern) (Entry, bool) {
+	if s.Mode != "" {
+		if _, err := plan.For(r, plan.Boot, s.Mode, plan.Variant(s.Variant)); err != nil {
+			return Entry{}, false
+		}
+	}
+	table := compatibilityTable()
 	var best *Entry
 	bestSpec := -1
 	for i := range table {
@@ -187,17 +218,17 @@ func Find(r runtimes.ID, s Shape, c Concern) (Entry, bool) {
 // s. Flag, Env and CWD on the row are what the launch must also carry for the
 // harness to scan it.
 //
-// Deprecated: use adapters/layout/plan; legacy table retires at the planned removal of the legacy table.
+// Deprecated: use adapters/layout/plan; this API is a derived compatibility view, not an authored placement table.
 func SkillRoot(r runtimes.ID, s Shape) (Entry, bool) { return Find(r, s, Skills) }
 
 // Runtimes returns the runtimes the table has rows for, in canonical
 // (runtimes.IDs) order. A runtime without rows has no boot-dir layout: it is
 // launched only over ACP.
 //
-// Deprecated: use adapters/layout/plan; legacy table retires at the planned removal of the legacy table.
+// Deprecated: use adapters/layout/plan; this API is a derived compatibility view, not an authored placement table.
 func Runtimes() []runtimes.ID {
 	have := map[runtimes.ID]bool{}
-	for _, e := range table {
+	for _, e := range compatibilityTable() {
 		have[e.Provider] = true
 	}
 	var out []runtimes.ID

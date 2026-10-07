@@ -69,6 +69,7 @@ func buildTable() []Row {
 	}
 	add(codex, Boot, MCP, "mcp", "config.toml", "codex-config", Slot, 0600, Evidence{Reference: exclusive, Observations: []string{"MCP2", "MCP3", "MCP6", "MCP8"}, Note: "exclusivity depends on CODEX_HOME binding"})
 	out[len(out)-1].DocumentSlot = "mcp_servers"
+	out[len(out)-1].CompatibilityMCPPath = ".mcp.json"
 	out[len(out)-1].ExclusiveMCP = Supported
 	add(codex, Boot, Skills, "skills", "skills/{name}/SKILL.md", "skill-package", Package, 0644, obs("X2", "X3", "X4"))
 	add(codex, Boot, Credentials, "credentials", "auth.json", "credential-link", Link, 0600, source("explicit real-provider-home link; no rendering or ambient read"))
@@ -86,6 +87,7 @@ func buildTable() []Row {
 	add(oc, Boot, Settings, "native-config", "opencode.json", "opencode-config", File, 0600, obs("CFG2"))
 	add(oc, Boot, MCP, "mcp", "opencode.json", "opencode-config", Slot, 0600, Evidence{Reference: exclusive, Observations: []string{"MCP1", "MCP2", "MCP3", "MCP4"}, Note: "no measured MCP-only isolation"})
 	out[len(out)-1].DocumentSlot = "mcp"
+	out[len(out)-1].CompatibilityMCPPath = ".mcp.json"
 	out[len(out)-1].ExclusiveMCP = Unsupported
 	add(oc, Boot, Skills, "skills", "skills/{name}/SKILL.md", "skill-package", Package, 0644, obs("O2"))
 	add(agy, Boot, Permissions, "runtime-permissions", "", "", RuntimeBinding, 0, source("adapters/registry/posture.go: agy permission mapping is runtime-only; no native permission file; agy 1.2.14 accepts flags, behavior is not fully measured"))
@@ -114,6 +116,16 @@ func buildTable() []Row {
 		}
 	}
 	add(codex, Installed, Skills, "skills", ".agents/skills/{name}/SKILL.md", "skill-package", Package, 0644, source("installed skill path deliberately differs from isolated boot"))
+	// Preserve established BootDirSpec/projection modes separately from the
+	// canonical render contract. These are compatibility bytes, not permissions
+	// inferred for a live operator document.
+	for i := range out {
+		r := &out[i]
+		if r.Layer == Boot && (r.Field == MCP || r.Field == Credentials ||
+			(r.Field == Settings && (r.Provider == codex || r.Provider == oc))) {
+			r.CompatibilityModeBits = 0600
+		}
+	}
 	// Exact-mode bindings override layer defaults, preserving paths/serializers.
 	defaults := append([]Row(nil), out...)
 	for _, r := range defaults {

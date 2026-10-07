@@ -1,108 +1,96 @@
 package layout
 
-import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+import (
+	"strings"
 
-// table is the one source of truth. Values were decided by the Step 0 probe
-// (docs/HARNESS-DISCOVERY.md); the probe ids on each row exist in the newest
-// golden under provider/testdata/harness-discovery, which a test enforces.
-//
-// Order matters only for skills rows of one (runtime, shape): the first is the
-// primary that SkillRoot returns. A runtime with no rows here (Copilot, Pi) has
-// no boot-dir layout and is launched only over ACP.
-var table = []Entry{
-	// ---- Claude Code. Launch: cwd = boot, config discovered from cwd. ----
-	{Provider: runtimes.Claude, Concern: Instructions, Root: RootBoot, Rel: "CLAUDE.md", CWD: RootBoot,
-		Unprobed: "instruction file auto-load is a model-visible effect Step 0 does not measure (no model call)"},
-	{Provider: runtimes.Claude, Mode: runtimes.ModeSubprocessPerTurn, Variant: VariantBare, Concern: Instructions, Root: RootBoot, Rel: "CLAUDE.md", Flag: "--append-system-prompt-file", CWD: RootBoot,
-		Unprobed: "--bare skips CLAUDE.md discovery; the flag delivers it (model-visible, not measured)"},
-	{Provider: runtimes.Claude, Concern: Boot, Root: RootBoot, Rel: "boot.md",
-		Unprobed: "kick-off content read by the launcher, not discovered by the harness"},
-	{Provider: runtimes.Claude, Concern: MCP, Root: RootBoot, Rel: ".mcp.json", FileMode: 0o600, Flag: "--mcp-config", CWD: RootBoot,
-		Probe: []string{"CFG1", "CFG4"},
-		Note:  "read from cwd by convention (CFG1) and by --mcp-config <file> (CFG4)"},
-	{Provider: runtimes.Claude, Concern: NativeConfig, Root: RootBoot, Rel: ".claude/settings.json", CWD: RootBoot,
-		Probe: []string{"CFG1"},
-		Note:  "read from cwd .claude/settings.json in -p mode; --add-dir loads neither settings nor .mcp.json (CFG3)"},
-	{Provider: runtimes.Claude, Mode: runtimes.ModeSubprocessPerTurn, Variant: VariantBare, Concern: NativeConfig, Root: RootBoot, Rel: ".claude/settings.json", Flag: "--settings", CWD: RootBoot,
-		Probe: []string{"CFG2"},
-		Note:  "--bare skips cwd discovery, so the file is passed explicitly"},
-	{Provider: runtimes.Claude, Concern: Skills, Root: RootBoot, Rel: ".claude/skills", Form: FormDir, CWD: RootBoot,
-		Probe: []string{"C1", "C2"},
-		Note:  "<cwd>/.claude/skills/<name>/SKILL.md; flat <name>.md is not read"},
-	{Provider: runtimes.Claude, Mode: runtimes.ModeSubprocessPerTurn, Variant: VariantBare, Concern: Skills, Root: RootBoot, Rel: ".claude/skills", Form: FormDir, Flag: "--add-dir", CWD: RootBoot,
-		Probe: []string{"C4", "C5"},
-		Note:  "--bare reads no cwd or user skills (C4); only <--add-dir dir>/.claude/skills (C5), so the boot root must itself be --add-dir'ed when skills are projected"},
-	{Provider: runtimes.Claude, Concern: ProjectDir, Root: RootProject, Flag: "--add-dir", CWD: RootBoot,
-		Probe: []string{"C3", "C5"},
-		Note:  "extra directory, not a working root; accepted in every mode, and the built-in launch convention passes it in every mode"},
+	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+)
 
-	// ---- Codex. Launch: cwd = boot, CODEX_HOME = boot. ----
-	{Provider: runtimes.Codex, Concern: Instructions, Root: RootBoot, Rel: "AGENTS.md", CWD: RootBoot,
-		Probe: []string{"CFG2", "CFG3"},
-		Note:  "AGENTS.md is read from cwd and from $CODEX_HOME"},
-	{Provider: runtimes.Codex, Concern: Boot, Root: RootBoot, Rel: "boot.md",
-		Unprobed: "kick-off content read by the launcher, not discovered by the harness"},
-	{Provider: runtimes.Codex, Concern: NativeConfig, Root: RootBoot, Rel: "config.toml", FileMode: 0o600,
-		Env: map[string]string{"CODEX_HOME": "boot"}, CWD: RootBoot,
-		Probe: []string{"CFG2", "CFG3"},
-		Note:  "$CODEX_HOME/config.toml. A .codex/config.toml under a redirected HOME also works (CFG4) but is not this convention; a project .codex/config.toml was not applied (untrusted, CFG1)"},
-	{Provider: runtimes.Codex, Concern: Auth, Root: RootBoot, Rel: "auth.json", FileMode: 0o600,
-		Env: map[string]string{"CODEX_HOME": "boot"}, CWD: RootBoot,
-		Unprobed: "credential placeholder resolved by runtime preparation; no credential is used by Step 0"},
-	{Provider: runtimes.Codex, Concern: MCP, Root: RootBoot, Rel: ".mcp.json", FileMode: 0o600,
-		Unprobed: "mirror for operators; Codex reads MCP servers from config.toml, not this file"},
-	{Provider: runtimes.Codex, Concern: Skills, Root: RootBoot, Rel: "skills", Form: FormDir,
-		Env: map[string]string{"CODEX_HOME": "boot"}, CWD: RootBoot,
-		Probe: []string{"X2", "X3", "X4"},
-		Note:  "$CODEX_HOME/skills/<name>/SKILL.md survives with and without --cd <project>; <boot>/.agents/skills does not survive --cd (X2 vs X3), and singular skill/ and flat .md are never read"},
-	{Provider: runtimes.Codex, Mode: runtimes.ModeSubprocessPerTurn, Concern: ProjectDir, Root: RootProject, Flag: "--cd",
-		Probe: []string{"X3"},
-		Note:  "--cd is the working root (codex -C), not an extra directory; app-server takes the project root over JSON-RPC instead"},
-
-	// ---- OpenCode. Launch: cwd = project, OPENCODE_CONFIG_DIR = boot. ----
-	{Provider: runtimes.OpenCode, Concern: Instructions, Root: RootBoot, Rel: "agents/" + AgentPlaceholder + ".md",
-		Env: map[string]string{"OPENCODE_CONFIG_DIR": "boot"}, CWD: RootProject,
-		Unprobed: "agent prompt file is model-visible only; Step 0 does not measure it"},
-	{Provider: runtimes.OpenCode, Concern: NativeConfig, Root: RootBoot, Rel: "opencode.json", FileMode: 0o600,
-		Env: map[string]string{"OPENCODE_CONFIG_DIR": "boot"}, CWD: RootProject,
-		Probe: []string{"CFG2"},
-		Note:  "$OPENCODE_CONFIG_DIR/opencode.json is merged with project and user config"},
-	{Provider: runtimes.OpenCode, Concern: Boot, Root: RootBoot, Rel: "boot.md",
-		Unprobed: "kick-off content read by the launcher, not discovered by the harness"},
-	{Provider: runtimes.OpenCode, Concern: MCP, Root: RootBoot, Rel: ".mcp.json", FileMode: 0o600,
-		Unprobed: "mirror for operators; OpenCode reads MCP servers from opencode.json"},
-	{Provider: runtimes.OpenCode, Concern: Skills, Root: RootBoot, Rel: "skills", Form: FormDir,
-		Env: map[string]string{"OPENCODE_CONFIG_DIR": "boot"}, CWD: RootProject,
-		Probe: []string{"O2"},
-		Note:  "$OPENCODE_CONFIG_DIR/skills/<name>/SKILL.md (singular skill/ also read; flat .md is not)"},
-	{Provider: runtimes.OpenCode, Concern: Skills, Root: RootBoot, Rel: ".opencode/skills", Form: FormDir, CWD: RootBoot,
-		Probe: []string{"O2", "O3"},
-		Note:  "alias, valid only when cwd == boot (O3); NOT scanned under $OPENCODE_CONFIG_DIR when cwd is the project (O2)"},
-	{Provider: runtimes.OpenCode, Mode: runtimes.ModeSubprocessPerTurn, Concern: ProjectDir, Root: RootProject, Flag: "--dir",
-		Unprobed: "flag is exercised by a real run, which needs a model call"},
-	{Provider: runtimes.OpenCode, Mode: runtimes.ModeHTTPSSE, Concern: Runtime, Root: RootProject, Rel: "", Flag: "serve",
-		Unprobed: "the opencode subcommand that starts the HTTP+SSE runtime, not a harness discovery path"},
-
-	// ---- Antigravity (agy). Launch: cwd = boot, project via --add-dir. ----
-	// agy has no config-dir variable: its global config is ~/.gemini/config,
-	// shared with the Antigravity desktop app, and relocating HOME relocates
-	// the credentials too. Everything projected therefore lives in the
-	// workspace customization root <cwd>/.agents, which agy discovers by
-	// walking from cwd (no .git needed). Global MCP servers and skills under
-	// ~/.gemini/config still load alongside; a workspace skill shadows a
-	// global one of the same name. Rows were verified live against agy 1.2.7
-	// (go-providers providertest/fixtures/antigravity; Tether
-	// CW-20260930-0107), not by the Step 0 harness probe.
-	{Provider: runtimes.Antigravity, Concern: Instructions, Root: RootBoot, Rel: "AGENTS.md", CWD: RootBoot,
-		Unprobed: "verified live against agy 1.2.7: <cwd>/AGENTS.md and the --add-dir project's own AGENTS.md both apply; not in the Step 0 golden"},
-	{Provider: runtimes.Antigravity, Concern: Boot, Root: RootBoot, Rel: "boot.md",
-		Unprobed: "kick-off content read by the launcher, not discovered by the harness"},
-	{Provider: runtimes.Antigravity, Concern: NativeConfig, Root: RootBoot, Rel: ".agents/plugins/tether/plugin.json", CWD: RootBoot,
-		Unprobed: "verified live against agy 1.2.7: a workspace plugin under <cwd>/.agents/plugins/<name>/ is discovered and enabled by default; plugin.json is its marker"},
-	{Provider: runtimes.Antigravity, Concern: MCP, Root: RootBoot, Rel: ".agents/plugins/tether/mcp_config.json", FileMode: 0o600, CWD: RootBoot,
-		Unprobed: "verified live against agy 1.2.7: the plugin's servers are spawned (cwd = the plugin dir) and exposed as <plugin>_<server>; tool schemas are cached under ~/.gemini/antigravity-cli/mcp/<plugin>_<server>/, so names must be stable per server"},
-	{Provider: runtimes.Antigravity, Concern: Skills, Root: RootBoot, Rel: ".agents/skills", Form: FormDir, CWD: RootBoot,
-		Unprobed: "verified live against agy 1.2.7: <cwd>/.agents/skills/<name>/SKILL.md loads and shadows a global ~/.gemini/config/skills/<name>"},
-	{Provider: runtimes.Antigravity, Mode: runtimes.ModeSubprocessPerTurn, Concern: ProjectDir, Root: RootProject, Flag: "--add-dir",
-		Unprobed: "verified live against agy 1.2.7: an --add-dir project is readable and its AGENTS.md applies"},
+// compatibilityTable is a mechanical view of the sole authored plan table.
+// It contains no authored paths, permissions or launch-token policy.
+func compatibilityTable() []Entry {
+	var out []Entry
+	seen := map[string]bool{}
+	add := func(e Entry) {
+		key := strings.Join([]string{string(e.Provider), string(e.Mode), string(e.Variant), string(e.Concern), string(e.Root), e.Rel, e.Flag}, "\x00")
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, e)
+		}
+	}
+	for _, row := range plan.Table() {
+		if row.Layer != plan.Boot || row.Capability != plan.Supported {
+			continue
+		}
+		var concern Concern
+		switch row.Field {
+		case plan.Instructions:
+			concern = Instructions
+		case plan.Kickoff:
+			concern = Boot
+		case plan.Settings, plan.PlantingPlugin:
+			concern = NativeConfig
+		case plan.MCP:
+			concern = MCP
+		case plan.Skills:
+			concern = Skills
+		case plan.Credentials:
+			concern = Auth
+		default:
+			continue
+		}
+		e := Entry{Provider: row.Provider, Mode: row.Mode, Variant: Variant(row.Variant), Concern: concern,
+			Root: Root(row.Root), Rel: row.Path, FileMode: row.CompatibilityModeBits,
+			CWD: Root(row.Locator.CWD), Note: row.Evidence.Note}
+		// A mirror is explicitly named in the same canonical MCP row.
+		if row.CompatibilityMCPPath != "" {
+			e.Rel = row.CompatibilityMCPPath
+		}
+		if row.Field == plan.Skills {
+			const suffix = "/{name}/SKILL.md"
+			if row.Form != plan.Package || !strings.HasSuffix(row.Path, suffix) {
+				panic("layout: skill placement lacks declared package suffix")
+			}
+			e.Rel = strings.TrimSuffix(row.Path, suffix)
+			e.Form = FormDir
+		}
+		if strings.Contains(row.Evidence.Reference, "/harness-discovery/") && len(row.Evidence.Observations) > 0 {
+			e.Probe = append([]string(nil), row.Evidence.Observations...)
+		} else {
+			e.Unprobed = row.Evidence.Reference
+		}
+		for key, value := range row.Locator.Env {
+			if e.Env == nil {
+				e.Env = map[string]string{}
+			}
+			e.Env[key] = string(value)
+		}
+		for i, token := range row.Locator.Argv {
+			if i == 0 {
+				continue
+			}
+			if token == "{path}" || row.Field == plan.Skills && token == "{B}" {
+				e.Flag = row.Locator.Argv[i-1]
+			}
+		}
+		add(e)
+		// Project placement is a token pair, never an RPC project parameter.
+		for i, token := range row.Locator.Argv {
+			if i > 0 && token == "{P}" {
+				project := e.clone()
+				project.Concern, project.Root, project.Rel, project.Form = ProjectDir, RootProject, "", ""
+				project.FileMode = 0
+				project.Flag = row.Locator.Argv[i-1]
+				add(project)
+			}
+		}
+		if row.Locator.RPCProject != "" && len(row.Locator.Argv) > 0 && !strings.HasPrefix(row.Locator.Argv[0], "-") {
+			runtime := e.clone()
+			runtime.Concern, runtime.Root, runtime.Rel, runtime.Form = Runtime, RootProject, "", ""
+			runtime.FileMode = 0
+			runtime.Flag = row.Locator.Argv[0]
+			add(runtime)
+		}
+	}
+	return out
 }

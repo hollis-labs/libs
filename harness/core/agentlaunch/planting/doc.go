@@ -1,4 +1,4 @@
-// Package providerplant is the go-providers integration layer for
+// Package planting is the go-providers integration layer for
 // agentlaunch: it owns translating a PreparedLaunch into the
 // provider-specific files planted inside the materialized bootdir and the
 // launch bindings that run them.
@@ -6,19 +6,22 @@
 // # Why this package exists
 //
 // The core agentlaunch package owns launch schema, compile/provenance, and
-// workspace/bootdir allocation, but it stops at an empty (or
+// workspace and boot-directory allocation, but it stops at an empty (or
 // hook-populated) bootdir. Before this package, every consumer (Tether,
 // Torque, Nanite) had to reimplement the last and most provider-specific
 // step: rendering the provider's boot files (CLAUDE.md / AGENTS.md /
 // agents/<name>.md / config.toml / .mcp.json …) into the bootdir and
 // building the argv that runs them.
 //
-// providerplant closes that gap. It resolves the right go-providers adapter
+// Planting closes that gap. It resolves the right go-providers adapter
 // for the launch's runtime and mode (DefaultResolver, through
 // provider.NewAdapter; WithAdapter or WithResolver override it), renders the
 // adapter's provider projection (or its legacy BootDirSpec), adds the
 // injection files, and materializes the result into
-// PreparedLaunch.PlantedBootDir through go-materialize.
+// PreparedLaunch.PlantedBootDir through agentlaunch.MaterializeArtifacts
+// and the sole workspace materialization engine. Materializing entry points
+// validate explicit inactive/private artifact authority before resolver/render
+// callbacks; pure ProjectExecution remains independent of authority.
 //
 // # Entry points
 //
@@ -68,8 +71,8 @@
 // # Relationship to agentsessions
 //
 // agentsessions can also plant bootdirs (its AutoPlantBootDir path).
-// When a launch goes through providerplant the bootdir is ALREADY
+// When a launch goes through planting the bootdir is ALREADY
 // planted, so the sessionshim package emits StartOptions with
 // AutoPlantBootDir disabled — the two planters never run twice over the
 // same dir.
-package providerplant
+package planting

@@ -15,8 +15,8 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/internal/workspacetest"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
 )
 
 // These tests drive a prepared launch end to end (compile, Prepare,
@@ -57,7 +57,7 @@ func preparedFor(t *testing.T, providerID string, mode runtimes.Mode, inj agentl
 	// This fixture owns its candidate explicitly. Most cases exercise only
 	// projection/bindings against fake CLIs; the Plant case supplies authority.
 	prepared.PlantedBootDir = workspacetest.PrivateDir(t)
-	exec, err := providerplant.ProjectExecution(context.Background(), prepared)
+	exec, err := planting.ProjectExecution(context.Background(), prepared)
 	if err != nil {
 		t.Fatalf("ProjectExecution: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestPreparedStreamingClaude_BootPromptArrivesOnStdin(t *testing.T) {
 // and boot delivery.
 func TestToSessionLaunch_StreamingClaudeUsesTheTemplate(t *testing.T) {
 	prepared, _ := preparedFor(t, "claude", runtimes.ModeStreamingStdio, agentlaunch.InjectionSpec{})
-	if err := providerplant.Plant(context.Background(), prepared, providerplant.WithArtifactAuthorization(sessionFixtureAuthority(t))); err != nil {
+	if err := planting.Plant(context.Background(), prepared, planting.WithArtifactAuthorization(sessionFixtureAuthority(t))); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 	sl, err := ToSessionLaunch(prepared)
