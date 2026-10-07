@@ -1,0 +1,98 @@
+{
+  "schema_version": 2,
+  "id": "example.vector",
+  "name": "Vector \u003c\u0026\u003e",
+  "version": "0.1.0",
+  "protocol": 2,
+  "runtime": "subprocess",
+  "server": {
+    "runtime": "node",
+    "engines": {
+      "node": {
+        "min": "22.0.0"
+      }
+    },
+    "entry": "bin/server.js"
+  },
+  "ui": {
+    "bundle": "ui/index.js",
+    "stylesheet": "ui/style.css",
+    "isolation": "sandboxed-frame"
+  },
+  "artifact": {
+    "files": [
+      {
+        "path": "assets/data.bin",
+        "sha256": "037e68ac6512d2c57a0d7247a76b3ab486a7f7e9c05ea50cae197782c80b63d4"
+      },
+      {
+        "path": "bin/native",
+        "sha256": "a74974af1f1b7e20077fbc071fde6216d1ab7ba813b974318c4ae8e2271be948",
+        "executable": true
+      },
+      {
+        "path": "bin/server.js",
+        "sha256": "65e3b7e14d515a825a9bb1edb44d03af98a6f01dba4489b4c4d3485bcec0b206"
+      },
+      {
+        "path": "ui/index.js",
+        "sha256": "73582e1e70b0860dd2f3f7dcb464c1a41e06bc718a2b79cebb9a2581f716d890"
+      },
+      {
+        "path": "ui/style.css",
+        "sha256": "36470a88dcc6443d17b18b3f5735d25bdd3113b458758e45670b47f289ef5849"
+      }
+    ],
+    "tree_sha256": "78ff60b3f38b02c25a343d64c626b66b9141ae0d52e87fce2e9012f0c317ccc9"
+  },
+  "hooks": [
+    {
+      "name": "session.end",
+      "priority": 0,
+      "once": false,
+      "view": "summary",
+      "mode": "sequential",
+      "timeout": 1000,
+      "on_error": "open"
+    }
+  ],
+  "config": {
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "default": "10"
+      }
+    },
+    "secrets": {
+      "api_key": {
+        "label": "API key",
+        "required": true
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "echo",
+      "description": "Echo input",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "effect": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ],
+  "hosts": {
+    "nanite": {
+      "min": "0.1.0"
+    }
+  },
+  "nanite": {}
+}

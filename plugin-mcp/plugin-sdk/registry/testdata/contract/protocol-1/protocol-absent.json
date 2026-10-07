@@ -1,0 +1,16 @@
+{
+  "description": "No protocol key at all — the shape of a host that never adopted the contract — is refused whole, not read as protocol 0 or 1.",
+  "response": {
+    "plugins": {},
+    "contributions": {}
+  },
+  "go": {
+    "validate": "ErrProtocol"
+  },
+  "ts": {
+    "accepted": false,
+    "declared": 0,
+    "refusals": [],
+    "imports": []
+  }
+}

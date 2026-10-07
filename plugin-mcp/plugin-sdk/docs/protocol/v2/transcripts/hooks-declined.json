@@ -1,0 +1,130 @@
+{
+  "level": "normative",
+  "profile": "hooks-declined",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": [],
+          "hooks_profile": {
+            "hooks_profile_version": 1
+          }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "hook/handle",
+        "params": {
+          "bad": "shape"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32601,
+          "message": "hook request rejected",
+          "data": {
+            "contract": "hooks/1",
+            "code": "profile_unavailable"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "hook/handle_batch",
+        "params": {
+          "bad": "shape"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32601,
+          "message": "hook request rejected",
+          "data": {
+            "contract": "hooks/1",
+            "code": "profile_unavailable"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "method": "hook/handle",
+        "params": {
+          "invocation_id": "call-1",
+          "catalog_version": "1",
+          "hook": "example.record.before_save",
+          "schema_digest": "decl-v1",
+          "kind": "filter",
+          "mode": "waterfall",
+          "scope": {
+            "incarnation": {
+              "host_instance": "fixture-host",
+              "owner_id": "fixture",
+              "owner_generation": 1
+            },
+            "registration_id": "reg-1"
+          },
+          "context": {
+            "binding_id": "binding-1",
+            "timeout_ms": 1000
+          },
+          "payload": {
+            "title": "old"
+          },
+          "metadata": {},
+          "deadline": "2030-01-01T00:00:00Z",
+          "aggregate_budget_ms": 1000,
+          "depth": 1,
+          "trace": {
+            "trace_id": "0123456789abcdef0123456789abcdef",
+            "span_id": "0123456789abcdef"
+          },
+          "root_invocation_id": "root-1"
+        }
+      }
+    }
+  ],
+  "purpose": "A valid offer without HookHandler declines even if the plugin authors profile acknowledgements."
+}

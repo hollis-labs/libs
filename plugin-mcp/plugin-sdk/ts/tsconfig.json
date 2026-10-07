@@ -1,0 +1,21 @@
+{
+  "//": "Base config every package extends, matching libs/design-kit so the two TypeScript workspaces in this portfolio read the same. Package-specific `include` and `types` stay in the package's own tsconfig.",
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "erasableSyntaxOnly": true,
+    "ignoreDeprecations": "6.0"
+  },
+  "files": []
+}

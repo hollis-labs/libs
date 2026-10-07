@@ -1,0 +1,300 @@
+package subprocess
+
+import (
+	"encoding/json"
+	"errors"
+	"github.com/hollis-labs/plugin-sdk/capability"
+	"os"
+	"strings"
+	"testing"
+)
+
+func TestInitParamsRoundtripAllFields(t *testing.T) {
+	in := InitParams{
+		PluginDir:          "/plugins/foo",
+		DataDir:            "/data/foo",
+		CacheDir:           "/cache/foo",
+		Config:             map[string]string{"k": "v"},
+		LogLevel:           "debug",
+		HostInfo:           HostInfo{Version: "1.2.3", Protocol: 2},
+		CapabilityContract: 1,
+		Incarnation:        capability.RuntimeIdentity{HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1},
+		Identity:           json.RawMessage(`{"user_id":"u1"}`),
+	}
+
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var out InitParams
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if out.PluginDir != in.PluginDir {
+		t.Errorf("PluginDir = %q, want %q", out.PluginDir, in.PluginDir)
+	}
+	if out.DataDir != in.DataDir {
+		t.Errorf("DataDir = %q, want %q", out.DataDir, in.DataDir)
+	}
+	if out.CacheDir != in.CacheDir {
+		t.Errorf("CacheDir = %q, want %q", out.CacheDir, in.CacheDir)
+	}
+	if out.LogLevel != in.LogLevel {
+		t.Errorf("LogLevel = %q, want %q", out.LogLevel, in.LogLevel)
+	}
+	if out.Config["k"] != "v" {
+		t.Errorf("Config[k] = %q, want %q", out.Config["k"], "v")
+	}
+	if out.HostInfo.Version != in.HostInfo.Version {
+		t.Errorf("HostInfo.Version = %q, want %q", out.HostInfo.Version, in.HostInfo.Version)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity = %s, want %s", out.Identity, in.Identity)
+	}
+}
+
+func TestInitParamsRejectsV1(t *testing.T) {
+	var out InitParams
+	if json.Unmarshal([]byte(`{"plugin_dir":"/plugins/foo","host_info":{"version":"test","protocol":1}}`), &out) == nil {
+		t.Fatal("v1 accepted")
+	}
+}
+func validInitParams() InitParams {
+	return InitParams{PluginDir: "/plugins/test", DataDir: "/data/test", CacheDir: "/cache/test", Config: map[string]string{}, LogLevel: "info", HostInfo: HostInfo{Version: "test", Protocol: 2}, CapabilityContract: 1, Incarnation: capability.RuntimeIdentity{HostInstance: "test-host", OwnerID: "test-plugin", OwnerGeneration: 1}}
+}
+
+func TestResolvedDataDirPopulated(t *testing.T) {
+	p := InitParams{DataDir: "/data/foo"}
+	got, err := p.ResolvedDataDir()
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got != "/data/foo" {
+		t.Errorf("got %q, want %q", got, "/data/foo")
+	}
+}
+
+func TestResolvedDataDirEmptyReturnsError(t *testing.T) {
+	p := InitParams{}
+	if _, err := p.ResolvedDataDir(); !errors.Is(err, ErrNoDataDir) {
+		t.Errorf("err = %v, want ErrNoDataDir", err)
+	}
+}
+
+func TestResolvedCacheDirPopulated(t *testing.T) {
+	p := InitParams{CacheDir: "/cache/foo"}
+	got, err := p.ResolvedCacheDir()
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got != "/cache/foo" {
+		t.Errorf("got %q, want %q", got, "/cache/foo")
+	}
+}
+
+func TestResolvedCacheDirEmptyFallsBackToTempDir(t *testing.T) {
+	p := InitParams{}
+	got, err := p.ResolvedCacheDir()
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got != os.TempDir() {
+		t.Errorf("got %q, want os.TempDir() %q", got, os.TempDir())
+	}
+}
+
+// --- v0.2.0 wire types (B.10 surface) ---
+
+func TestMCPCallRequestRoundtrip(t *testing.T) {
+	in := MCPCallRequest{
+		ToolName:  "summarize",
+		Arguments: map[string]interface{}{"text": "hi", "max": float64(10)},
+		SessionID: "sess-1",
+		Identity:  json.RawMessage(`{"user_id":"u1","scopes":["read"]}`),
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out MCPCallRequest
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.ToolName != in.ToolName || out.SessionID != in.SessionID {
+		t.Errorf("roundtrip lost scalars: %+v", out)
+	}
+	if out.Arguments["text"] != "hi" {
+		t.Errorf("arguments lost: %+v", out.Arguments)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
+	}
+}
+
+// TestMCPCallRequestIdentityOmittedWhenEmpty verifies Identity is
+// opt-in on the wire: a request that never set it must not gain an
+// "identity" key, so an older plugin decoding a v0.4.0-shaped payload
+// sees exactly what it always saw.
+func TestMCPCallRequestIdentityOmittedWhenEmpty(t *testing.T) {
+	b, err := json.Marshal(MCPCallRequest{ToolName: "x"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(b), "identity") {
+		t.Errorf("expected no identity key in %s", b)
+	}
+}
+
+func TestMCPCallResultRoundtrip(t *testing.T) {
+	in := MCPCallResult{
+		Content: json.RawMessage(`{"text":"ok"}`),
+		IsError: false,
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out MCPCallResult
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(out.Content) != `{"text":"ok"}` {
+		t.Errorf("Content lost: %q", string(out.Content))
+	}
+}
+
+func TestHTTPRequestResponseRoundtrip(t *testing.T) {
+	req := HTTPRequest{
+		Method:   "POST",
+		Path:     "/x/one/two",
+		RawPath:  "/x/one%2Ftwo",
+		RawQuery: "a=1&a=2&empty=&bare",
+		Query:    map[string]string{"a": "1"},
+		Headers:  map[string]string{"Content-Type": "application/json"},
+		Body:     []byte(`{"ok":true}`),
+		Identity: json.RawMessage(`{"user_id":"u1"}`),
+	}
+	b, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal req: %v", err)
+	}
+	var gotReq HTTPRequest
+	if err := json.Unmarshal(b, &gotReq); err != nil {
+		t.Fatalf("unmarshal req: %v", err)
+	}
+	if gotReq.Method != "POST" || gotReq.Path != req.Path || gotReq.RawPath != req.RawPath || gotReq.RawQuery != req.RawQuery || string(gotReq.Body) != `{"ok":true}` {
+		t.Errorf("req roundtrip lost data: %+v", gotReq)
+	}
+	if string(gotReq.Identity) != string(req.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", gotReq.Identity, req.Identity)
+	}
+
+	resp := HTTPResponse{
+		Status:  201,
+		Headers: map[string]string{"Location": "/x/1"},
+		Body:    []byte("created"),
+	}
+	b, err = json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal resp: %v", err)
+	}
+	var gotResp HTTPResponse
+	if err := json.Unmarshal(b, &gotResp); err != nil {
+		t.Fatalf("unmarshal resp: %v", err)
+	}
+	if gotResp.Status != 201 || string(gotResp.Body) != "created" {
+		t.Errorf("resp roundtrip lost data: %+v", gotResp)
+	}
+}
+
+func TestMigrateParamsResultRoundtrip(t *testing.T) {
+	params := MigrateParams{FromVersion: "1.0.0", ToVersion: "1.1.0", DataDir: "/data/foo"}
+	b, err := json.Marshal(params)
+	if err != nil {
+		t.Fatalf("marshal params: %v", err)
+	}
+	var gotP MigrateParams
+	if err := json.Unmarshal(b, &gotP); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if gotP != params {
+		t.Errorf("params roundtrip: got %+v want %+v", gotP, params)
+	}
+
+	res := MigrateResult{Notes: []string{"applied 1→2", "backfilled column"}}
+	b, err = json.Marshal(res)
+	if err != nil {
+		t.Fatalf("marshal res: %v", err)
+	}
+	var gotR MigrateResult
+	if err := json.Unmarshal(b, &gotR); err != nil {
+		t.Fatalf("unmarshal res: %v", err)
+	}
+	if len(gotR.Notes) != 2 || gotR.Notes[0] != "applied 1→2" {
+		t.Errorf("res roundtrip lost notes: %+v", gotR)
+	}
+
+	// Empty MigrateResult — "no-op migration" — must marshal cleanly.
+	b, err = json.Marshal(MigrateResult{})
+	if err != nil {
+		t.Fatalf("marshal empty: %v", err)
+	}
+	if string(b) != "{}" {
+		t.Errorf("empty MigrateResult marshaled to %q, want %q", string(b), "{}")
+	}
+}
+
+// --- Identity plumbing (CW-20260918-0043) ---
+
+func TestCommandExecParamsRoundtrip(t *testing.T) {
+	in := CommandExecParams{
+		Name:      "greet",
+		SessionID: "sess-1",
+		Args:      "world",
+		Identity:  json.RawMessage(`{"user_id":"u1"}`),
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out CommandExecParams
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Name != in.Name || out.SessionID != in.SessionID || out.Args != in.Args {
+		t.Errorf("roundtrip lost scalars: %+v", out)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
+	}
+}
+
+func TestEventHandleParamsRoundtrip(t *testing.T) {
+	in := EventHandleParams{
+		Type:      "message.sending",
+		Source:    "chat",
+		Data:      map[string]interface{}{"k": "v"},
+		SessionID: "sess-1",
+		PreHook:   true,
+		Identity:  json.RawMessage(`{"user_id":"u1"}`),
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out EventHandleParams
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Type != in.Type || out.Source != in.Source || out.SessionID != in.SessionID || out.PreHook != in.PreHook {
+		t.Errorf("roundtrip lost scalars: %+v", out)
+	}
+	if out.Data["k"] != "v" {
+		t.Errorf("Data lost: %+v", out.Data)
+	}
+	if string(out.Identity) != string(in.Identity) {
+		t.Errorf("Identity lost: got %s, want %s", out.Identity, in.Identity)
+	}
+}

@@ -1,0 +1,61 @@
+{
+  "description": "handler",
+  "response": {
+    "host_instance": "host-epoch",
+    "revision": 3,
+    "plugins": {
+      "p": {
+        "owner_generation": "2"
+      }
+    },
+    "kinds": {
+      "mcp.tool": {
+        "schema_version": 1,
+        "metadata_schema": {},
+        "representations": [
+          "handler"
+        ],
+        "regions": [],
+        "required_capabilities": [
+          "mcp.define"
+        ]
+      }
+    },
+    "regions": {},
+    "contributions": {
+      "mcp.tool": {
+        "p/read": {
+          "owner_id": "p",
+          "owner_generation": "2",
+          "local_key": "read",
+          "kind": "mcp.tool",
+          "schema_version": 1,
+          "required": false,
+          "representation": "handler",
+          "metadata": {
+            "nested": [
+              1,
+              null,
+              {
+                "unicode": "caf\u00e9"
+              }
+            ]
+          },
+          "handler": {
+            "id": "notes.read"
+          },
+          "public_binding": "notes__read",
+          "status": "accepted"
+        }
+      }
+    },
+    "refusals": [],
+    "registry_version": 2
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "validate": "ok"
+  }
+}

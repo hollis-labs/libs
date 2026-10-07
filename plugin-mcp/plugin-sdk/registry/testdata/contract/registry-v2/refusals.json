@@ -1,0 +1,28 @@
+{
+  "description": "refusals",
+  "response": {
+    "host_instance": "host-epoch",
+    "revision": 3,
+    "plugins": {},
+    "kinds": {},
+    "regions": {},
+    "contributions": {},
+    "refusals": [
+      {
+        "owner_id": "p",
+        "owner_generation": "2",
+        "kind": "future",
+        "local_key": "x",
+        "required": false,
+        "reason": "unsupported-kind"
+      }
+    ],
+    "registry_version": 2
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "validate": "ok"
+  }
+}

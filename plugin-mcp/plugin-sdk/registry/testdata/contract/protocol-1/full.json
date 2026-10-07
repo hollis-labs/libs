@@ -1,0 +1,49 @@
+{
+  "description": "Every wire key at every level: protocol, plugins.{bundle_url,stylesheet_url,bundle_version,runtime.{name,version}}, contributions.<kind>.<key>.{plugin_id,export,meta}.",
+  "response": {
+    "protocol": 1,
+    "plugins": {
+      "acme.widgets": {
+        "bundle_url": "/api/plugins/acme.widgets/ui/index.js",
+        "stylesheet_url": "/api/plugins/acme.widgets/ui/index.css",
+        "bundle_version": "1757600000000",
+        "runtime": {
+          "name": "react",
+          "version": "^19.0.0"
+        }
+      }
+    },
+    "contributions": {
+      "envelope": {
+        "acme.report": {
+          "plugin_id": "acme.widgets",
+          "export": "ReportView",
+          "meta": {
+            "version": 2
+          }
+        }
+      },
+      "slot": {
+        "acme.nav": {
+          "plugin_id": "acme.widgets",
+          "export": "NavItem",
+          "meta": {
+            "slot": "rail",
+            "priority": 10
+          }
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 2,
+    "refusals": [],
+    "imports": [
+      "/api/plugins/acme.widgets/ui/index.js?v=1757600000000"
+    ]
+  }
+}

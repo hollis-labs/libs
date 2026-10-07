@@ -1,0 +1,186 @@
+{
+  "level": "normative",
+  "profile": "base",
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "command/execute"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CommandHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "event/handle"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement EventHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "crud/create"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CRUDHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "crud/read"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CRUDHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "crud/update"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CRUDHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "crud/delete"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CRUDHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "crud/list"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement CRUDHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "mcp/call_tool"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement MCPHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "http/handle"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement HTTPHandler"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "plugin/migrate"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "error": {
+          "code": -32601,
+          "message": "plugin does not implement Migrator"
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "mcp/list_tools"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "error": {
+          "code": -32601,
+          "message": "unknown method \"mcp/list_tools\""
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "host/storage/get"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "error": {
+          "code": -32601,
+          "message": "unknown method \"host/storage/get\""
+        }
+      }
+    }
+  ]
+}

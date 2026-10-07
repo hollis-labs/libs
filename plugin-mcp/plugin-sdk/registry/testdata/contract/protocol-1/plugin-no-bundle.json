@@ -1,0 +1,26 @@
+{
+  "description": "A plugin described with no bundle_url: its contribution is declared but unresolvable, and nothing is imported.",
+  "response": {
+    "protocol": 1,
+    "plugins": {
+      "acme.headless": {}
+    },
+    "contributions": {
+      "envelope": {
+        "acme.report": {
+          "plugin_id": "acme.headless",
+          "export": "ReportView"
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 1,
+    "refusals": [],
+    "imports": []
+  }
+}

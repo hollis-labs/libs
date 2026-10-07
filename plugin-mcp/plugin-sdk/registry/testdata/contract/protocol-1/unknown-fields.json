@@ -1,0 +1,43 @@
+{
+  "description": "Unknown extra fields at every level are ignored by both views (forward compatibility); Go therefore cannot round-trip this one.",
+  "response": {
+    "protocol": 1,
+    "future_top": true,
+    "plugins": {
+      "acme.widgets": {
+        "bundle_url": "/api/plugins/acme.widgets/ui/index.js",
+        "future_plugin": {
+          "x": 1
+        },
+        "runtime": {
+          "name": "react",
+          "version": "^19.0.0",
+          "future_runtime": 1
+        }
+      }
+    },
+    "contributions": {
+      "envelope": {
+        "acme.report": {
+          "plugin_id": "acme.widgets",
+          "export": "ReportView",
+          "future_contribution": [
+            1
+          ]
+        }
+      }
+    }
+  },
+  "go": {
+    "validate": "ok",
+    "roundtrip": false
+  },
+  "ts": {
+    "accepted": true,
+    "declared": 1,
+    "refusals": [],
+    "imports": [
+      "/api/plugins/acme.widgets/ui/index.js"
+    ]
+  }
+}

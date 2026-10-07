@@ -1,0 +1,60 @@
+{
+  "corpus_version": 1,
+  "contract_version": 2,
+  "selection": {
+    "version": 1,
+    "kind": "source-group",
+    "modes": {
+      "public-conn-isolated-transport": {
+        "source_group": "lifecycle_compatible_v2",
+        "exclude_scenarios": []
+      },
+      "sdk-normal-serve-remote-overflow": {
+        "source_group": "sdk_remote_overflow_v2",
+        "exclude_scenarios": []
+      }
+    }
+  },
+  "groups": {
+    "lifecycle_compatible_v2": [
+      {
+        "name": "forward-after-initial-load-finite-lifecycle-saturation",
+        "scenario": "forward-v2",
+        "profile": "expanded",
+        "level": "normative",
+        "status": "proposed",
+        "owner": "/root/sdk_owner_replacement",
+        "reason": "Source allocation freeze and actual Go Node Deno public Conn evidence pending."
+      },
+      {
+        "name": "terminal-credit-after-initial-load-finite-lifecycle",
+        "scenario": "credits-v2",
+        "profile": "expanded",
+        "level": "normative",
+        "status": "proposed",
+        "owner": "/root/sdk_owner_replacement",
+        "reason": "Source allocation freeze and actual Go Node Deno public Conn evidence pending."
+      }
+    ],
+    "sdk_remote_overflow_v2": [
+      {
+        "name": "sdk-remote-forward-overflow-after-initial-load",
+        "scenario": "sdk-forward-overflow-v2",
+        "profile": "expanded",
+        "level": "normative",
+        "status": "proposed",
+        "owner": "/root/sdk_owner_replacement",
+        "reason": "Source implementation and actual Go Node Deno SDK remote typed overflow evidence pending."
+      },
+      {
+        "name": "sdk-remote-lifecycle-overflow-after-initial-load",
+        "scenario": "sdk-lifecycle-overflow-v2",
+        "profile": "expanded",
+        "level": "normative",
+        "status": "proposed",
+        "owner": "/root/sdk_owner_replacement",
+        "reason": "Source implementation and actual Go Node Deno SDK remote typed overflow evidence pending."
+      }
+    ]
+  }
+}

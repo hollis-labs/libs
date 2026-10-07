@@ -1,0 +1,26 @@
+{
+  "status": "internal-engine",
+  "description": "Small numbers are fixture-only, supplied as explicit contexts or host offer ceilings; no SDK method defaults.",
+  "expired_forward": {
+    "method": "plugin/health",
+    "params_raw": "{\"context\":{\"timeout_ms\":1}}",
+    "age_ms": 1000
+  },
+  "no_default_methods": [
+    {
+      "method": "plugin/init"
+    },
+    {
+      "method": "plugin/load"
+    },
+    {
+      "method": "plugin/migrate",
+      "params_raw": "{\"from_version\":\"1\",\"to_version\":\"2\",\"data_dir\":\"data\"}"
+    },
+    {
+      "method": "mcp/call_tool",
+      "params_raw": "{\"tool_name\":\"slow\",\"arguments\":{}}"
+    }
+  ],
+  "reverse_offer_timeout_ms": 500
+}

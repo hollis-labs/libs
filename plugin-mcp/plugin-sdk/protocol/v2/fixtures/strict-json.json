@@ -1,0 +1,154 @@
+[
+  {
+    "name": "value",
+    "input": "{\"opaque\":{\"A\":1,\"a\":2},\"v\":[true,null,\"a\\\"b\"]}",
+    "valid": true
+  },
+  {
+    "name": "exact-duplicate",
+    "input": "{\"a\":1,\"a\":2}",
+    "valid": false
+  },
+  {
+    "name": "escaped-duplicate",
+    "input": "{\"a\":1,\"\\u0061\":2}",
+    "valid": false
+  },
+  {
+    "name": "nested-duplicate",
+    "input": "{\"opaque\":[{\"a\":1,\"a\":2}]}",
+    "valid": false
+  },
+  {
+    "name": "closed-case-fold",
+    "input": "{\"id\":1,\"ID\":2}",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "closed-wrong-case",
+    "input": "{\"ID\":1}",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "closed-unknown",
+    "input": "{\"id\":1,\"extra\":true}",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "closed-missing",
+    "input": "{}",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "closed-null",
+    "input": "{\"id\":null}",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "closed",
+    "input": "{\"id\":9007199254740991.4}",
+    "fields": [
+      "id"
+    ],
+    "valid": true
+  },
+  {
+    "name": "null-string",
+    "input": "{\"id\":\"null\"}",
+    "fields": [
+      "id"
+    ],
+    "valid": true
+  },
+  {
+    "name": "opaque-case",
+    "input": "{\"id\":{\"A\":1,\"a\":2}}",
+    "fields": [
+      "id"
+    ],
+    "valid": true
+  },
+  {
+    "name": "trailing-value",
+    "input": "{} {}",
+    "valid": false
+  },
+  {
+    "name": "trailing-comma",
+    "input": "{\"a\":1,}",
+    "valid": false
+  },
+  {
+    "name": "trailing-array-comma",
+    "input": "[1,]",
+    "valid": false
+  },
+  {
+    "name": "bad-escape",
+    "input": "\"\\x\"",
+    "valid": false
+  },
+  {
+    "name": "leading-zero",
+    "input": "01",
+    "valid": false
+  },
+  {
+    "name": "object-required",
+    "input": "[]",
+    "fields": [
+      "id"
+    ],
+    "valid": false
+  },
+  {
+    "name": "exponent",
+    "input": "[1e0,-0,0.5]",
+    "valid": true
+  },
+  {
+    "name": "nan",
+    "input": "NaN",
+    "valid": false
+  },
+  {
+    "name": "lone-high-escape",
+    "input": "\"\\ud800\"",
+    "valid": false
+  },
+  {
+    "name": "lone-low-escape",
+    "input": "\"\\udfff\"",
+    "valid": false
+  },
+  {
+    "name": "surrogate-pair",
+    "input": "\"\\ud83d\\ude00\"",
+    "valid": true
+  },
+  {
+    "name": "lone-surrogate-key",
+    "input": "{\"\\ud800\":1}",
+    "valid": false
+  },
+  {
+    "name": "depth-limit",
+    "input": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+    "valid": false
+  }
+]

@@ -1,0 +1,42 @@
+# @hollis-labs/plugin-registry
+
+## 0.2.0 - 2026-10-03
+
+- Breaking: registry v2 requires `registry_version: 2` in place of `protocol`,
+  owner generations, host epochs, safe revisions, explicit kind/region admission
+  and three contribution representations. Legacy and dual-key documents fail by
+  name; there is no v1 fallback.
+- Require per-entry `status` and carry optional `status_reason`. Only `accepted`
+  entries activate. Inactive entries stay listed without import or mounting;
+  unknown nonempty statuses project as `unavailable`, preserve `status_reason`
+  and produce `unknown-status` diagnostics without echoing the raw status.
+  Empty/missing status remains invalid. Top-level refusals remain authoritative.
+- Revoke before replacement import, dispose in reverse order, quarantine failed
+  cleanup and reject stale completions. React components retain generation gates;
+  unchanged data retains identity and one disposer.
+- Validate raw JSON duplicates and field casing against shared Go fixtures;
+  enforce runtime ranges and SHA-256 integrity on the exact bytes imported.
+- Require integer number literal spelling in integer wire fields before JSON
+  normalization; decimal/exponent tokens are refused while opaque metadata and
+  declarative JSON continue to allow floats.
+
+### Migration
+
+Hosts upgrading from 0.1.0 must emit registry v2 and implement explicit admission,
+runtime checks and generation disposal; no v1 fallback or shim is provided.
+Pass original JSON text to the loader so raw-key and integer-literal checks run.
+Nanite remains on 0.1.0 until its host adopts registry v2.
+
+## 0.1.0 — 2026-09-29
+
+First npm release. Wire protocol 1.
+
+Until now the package was reachable only by a `file:` path into a checkout of
+this repository (plugin-sdk v0.4.0 and v0.5.0 shipped it that way), which broke
+any consumer whose CI checks out its own repo alone. Nothing in `src/` changed
+for this release: the loader, the wire types (`PluginRegistryResponse` and
+friends), the `./react` entry point and the stylesheet sinks are the code those
+tags carried. What changed is the packaging — the package is no longer private,
+the tarball ships `dist`, `README.md`, `CHANGELOG.md` and `LICENSE`, and the
+source and declaration maps are no longer emitted because they pointed at a
+`../src` the tarball does not contain.

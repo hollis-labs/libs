@@ -1,0 +1,10 @@
+{
+  "description": "raw-case-variant-version-duplicate",
+  "response_raw": "{\"host_instance\":\"host-epoch\",\"revision\":3,\"plugins\":{},\"kinds\":{},\"regions\":{},\"contributions\":{},\"refusals\":[],\"registry_version\":2,\"REGISTRY_VERSION\":2}",
+  "go": {
+    "validate": "ErrCollision"
+  },
+  "ts": {
+    "validate": "ErrCollision"
+  }
+}

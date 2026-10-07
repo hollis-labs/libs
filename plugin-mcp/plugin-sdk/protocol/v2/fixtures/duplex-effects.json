@@ -1,0 +1,38 @@
+{
+  "status": "internal-engine",
+  "description": "Local classification recipes; host backend commit/cancel serialization and operation-key receipt recovery remain host-owned.",
+  "cases": [
+    {
+      "name": "host/storage/put-not-published",
+      "method": "host/storage/put",
+      "params_raw": "{\"grant_id\":\"g-StoragePut\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"expected_revision\":null,\"operation_key\":\"put-1\"}",
+      "possible": false,
+      "code": "cancelled",
+      "effect_state": "not_started"
+    },
+    {
+      "name": "host/storage/put-possibly-published",
+      "method": "host/storage/put",
+      "params_raw": "{\"grant_id\":\"g-StoragePut\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"key\":\"preferences\",\"value\":{\"theme\":\"dark\"},\"expected_revision\":null,\"operation_key\":\"put-1\"}",
+      "possible": true,
+      "code": "unknown_outcome",
+      "effect_state": "unknown"
+    },
+    {
+      "name": "host/log-not-published",
+      "method": "host/log",
+      "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}",
+      "possible": false,
+      "code": "cancelled",
+      "effect_state": "not_started"
+    },
+    {
+      "name": "host/log-possibly-published",
+      "method": "host/log",
+      "params_raw": "{\"grant_id\":\"g-Log\",\"context\":{\"binding_id\":\"binding-example\",\"timeout_ms\":1000,\"parent_call\":{\"request_owner\":\"host\",\"id\":17}},\"level\":\"info\",\"message\":\"ready\",\"fields\":[]}",
+      "possible": true,
+      "code": "cancelled",
+      "effect_state": "unknown"
+    }
+  ]
+}

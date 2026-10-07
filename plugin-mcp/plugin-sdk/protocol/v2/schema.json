@@ -1,0 +1,1009 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "plugin-sdk protocol 2 wire shapes",
+  "description": "Protocol 2 strict Init, normative JSON-RPC envelopes, lifecycle shutdown and runtime payloads. IDs are strings or safe decimal-token integers. Exact decoded structural keys, required/non-null fields and per-method defaults are enforced before callback invocation. Duplicate decoded keys and unpaired Unicode reject. Null IDs only on error replies; absent request ID denotes notification; batches reject. Framing and optional profiles have separate conformance stages.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/RPCRequest"
+    },
+    {
+      "$ref": "#/$defs/RPCResponse"
+    }
+  ],
+  "$defs": {
+    "RPCRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "type": "string",
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/RPCID"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {}
+      },
+      "required": [
+        "jsonrpc",
+        "method"
+      ],
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "result"
+            ]
+          },
+          {
+            "required": [
+              "error"
+            ]
+          }
+        ]
+      }
+    },
+    "RPCError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {}
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": true
+    },
+    "RPCResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "type": "string",
+          "const": "2.0"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RPCID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result": {},
+        "error": {
+          "$ref": "#/$defs/RPCError"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "id"
+      ],
+      "additionalProperties": true,
+      "oneOf": [
+        {
+          "required": [
+            "result"
+          ],
+          "not": {
+            "required": [
+              "error"
+            ]
+          },
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/RPCID"
+            }
+          }
+        },
+        {
+          "required": [
+            "error"
+          ],
+          "not": {
+            "required": [
+              "result"
+            ]
+          }
+        }
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "method"
+            ]
+          },
+          {
+            "required": [
+              "params"
+            ]
+          }
+        ]
+      }
+    },
+    "HostInfo": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "integer",
+          "const": 2
+        }
+      },
+      "required": [
+        "version",
+        "protocol"
+      ],
+      "additionalProperties": false
+    },
+    "InitParams": {
+      "type": "object",
+      "properties": {
+        "plugin_dir": {
+          "type": "string"
+        },
+        "data_dir": {
+          "type": "string"
+        },
+        "cache_dir": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "log_level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "host_info": {
+          "$ref": "#/$defs/HostInfo"
+        },
+        "capability_contract": {
+          "type": "integer",
+          "const": 1
+        },
+        "incarnation": {
+          "$ref": "#/$defs/RuntimeIdentity"
+        },
+        "grants": {
+          "$ref": "#/$defs/GrantSet"
+        },
+        "identity": {},
+        "host_services": {
+          "$ref": "#/$defs/HostServices"
+        },
+        "hooks_profile": {
+          "$ref": "#/$defs/HooksProfile"
+        },
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "plugin_dir",
+        "data_dir",
+        "cache_dir",
+        "config",
+        "log_level",
+        "host_info",
+        "capability_contract",
+        "incarnation",
+        "grants"
+      ],
+      "additionalProperties": false
+    },
+    "InitResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "integer",
+          "const": 2
+        },
+        "capability_contract": {
+          "type": "integer",
+          "const": 1
+        },
+        "reverse_rpc_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "hooks_profile_version": {
+          "type": "integer",
+          "const": 1
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "protocol",
+        "capability_contract"
+      ],
+      "additionalProperties": false
+    },
+    "SkippedRegistration": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "LoadResult": {
+      "type": "object",
+      "properties": {
+        "skipped_registrations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkippedRegistration"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "EnvelopeOut": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "data": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {}
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "CommandExecParams": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "args": {
+          "type": "string"
+        },
+        "identity": {},
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "name",
+        "session_id",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "CommandExecResult": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "envelopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvelopeOut"
+          }
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "EventHandleParams": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "pre_hook": {
+          "type": "boolean"
+        },
+        "identity": {},
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "type",
+        "source",
+        "data",
+        "pre_hook"
+      ],
+      "additionalProperties": false
+    },
+    "EventHandleResult": {
+      "type": "object",
+      "properties": {
+        "cancel": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "envelopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvelopeOut"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "CRUDParams": {
+      "type": "object",
+      "properties": {
+        "resource_type": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "resource_type"
+      ],
+      "additionalProperties": false
+    },
+    "CRUDResult": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "CRUDListResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "HealthResult": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallRequest": {
+      "type": "object",
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "identity": {},
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "tool_name",
+        "arguments"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCallResult": {
+      "type": "object",
+      "properties": {
+        "content": {},
+        "is_error": {
+          "type": "boolean"
+        },
+        "envelopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvelopeOut"
+          }
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "HTTPRequest": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "raw_path": {
+          "type": "string"
+        },
+        "raw_query": {
+          "type": "string"
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "identity": {},
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "method",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "HTTPResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "headers": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MigrateParams": {
+      "type": "object",
+      "properties": {
+        "from_version": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "to_version": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "data_dir": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "from_version",
+        "to_version",
+        "data_dir"
+      ],
+      "additionalProperties": false
+    },
+    "MigrateResult": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "CapabilityRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "metadata": {}
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": true
+    },
+    "EmptyParams": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OKResult": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeIdentity": {
+      "type": "object",
+      "properties": {
+        "host_instance": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "host_instance",
+        "owner_id",
+        "owner_generation"
+      ],
+      "additionalProperties": false
+    },
+    "Grant": {
+      "type": "object",
+      "properties": {
+        "grant_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "schema_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "scope": {
+          "not": {
+            "type": "null"
+          },
+          "description": "Normalized descriptor-owned non-null JSON. Portable numeric tokens: integer-form within ±9007199254740991; all numbers finite. Larger integers must be string-encoded."
+        },
+        "host_instance": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "owner_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "audience": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+        },
+        "policy_revision": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "grant_id",
+        "name",
+        "schema_version",
+        "scope",
+        "host_instance",
+        "owner_id",
+        "owner_generation",
+        "audience",
+        "issued_at",
+        "expires_at",
+        "policy_revision"
+      ],
+      "additionalProperties": false
+    },
+    "GrantSet": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Grant"
+      }
+    },
+    "HooksProfile": {
+      "type": "object",
+      "properties": {
+        "hooks_profile_version": {
+          "type": "integer",
+          "const": 1
+        }
+      },
+      "required": [
+        "hooks_profile_version"
+      ],
+      "additionalProperties": false
+    },
+    "HostServices": {
+      "type": "object",
+      "properties": {
+        "reverse_rpc_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "incarnation": {
+          "$ref": "#/$defs/RuntimeIdentity"
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limits": {
+          "$ref": "#/$defs/HostServiceLimits"
+        }
+      },
+      "required": [
+        "reverse_rpc_version",
+        "incarnation",
+        "methods",
+        "limits"
+      ],
+      "additionalProperties": false
+    },
+    "HostServiceLimits": {
+      "type": "object",
+      "properties": {
+        "host_to_plugin_inflight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "plugin_to_host_inflight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "host_global_inflight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "control_slots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "max_frame_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "max_queued_write_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "write_timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "method_timeout_ms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          }
+        }
+      },
+      "required": [
+        "host_to_plugin_inflight",
+        "plugin_to_host_inflight",
+        "host_global_inflight",
+        "control_slots",
+        "max_frame_bytes",
+        "max_queued_write_bytes",
+        "write_timeout_ms",
+        "max_depth",
+        "method_timeout_ms"
+      ],
+      "additionalProperties": false
+    },
+    "RPCID": {
+      "type": [
+        "string",
+        "integer"
+      ],
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "Integer IDs use decimal integer tokens only; no exponents or fractions."
+    }
+  },
+  "x-protocol-version": 2,
+  "x-methods": {
+    "plugin/init": {
+      "params": "InitParams",
+      "result": "InitResult",
+      "handler": "required"
+    },
+    "plugin/load": {
+      "params": "EmptyParams",
+      "result": "LoadResult",
+      "handler": "required"
+    },
+    "plugin/unload": {
+      "params": "EmptyParams",
+      "result": "OKResult",
+      "handler": "required"
+    },
+    "plugin/health": {
+      "params": "EmptyParams",
+      "result": "HealthResult",
+      "handler": "HealthChecker"
+    },
+    "command/execute": {
+      "params": "CommandExecParams",
+      "result": "CommandExecResult",
+      "handler": "CommandHandler"
+    },
+    "event/handle": {
+      "params": "EventHandleParams",
+      "result": "EventHandleResult",
+      "handler": "EventHandler"
+    },
+    "crud/create": {
+      "params": "CRUDParams",
+      "result": "CRUDResult",
+      "handler": "CRUDHandler",
+      "required-fields": [
+        "resource_type",
+        "data"
+      ]
+    },
+    "crud/read": {
+      "params": "CRUDParams",
+      "result": "CRUDResult",
+      "handler": "CRUDHandler",
+      "required-fields": [
+        "resource_type",
+        "id"
+      ]
+    },
+    "crud/update": {
+      "params": "CRUDParams",
+      "result": "CRUDResult",
+      "handler": "CRUDHandler",
+      "required-fields": [
+        "resource_type",
+        "id",
+        "data"
+      ]
+    },
+    "crud/delete": {
+      "params": "CRUDParams",
+      "result": "OKResult",
+      "handler": "CRUDHandler",
+      "required-fields": [
+        "resource_type",
+        "id"
+      ]
+    },
+    "crud/list": {
+      "params": "CRUDParams",
+      "result": "CRUDListResult",
+      "handler": "CRUDHandler",
+      "defaults": {
+        "filters": {}
+      }
+    },
+    "mcp/call_tool": {
+      "params": "MCPCallRequest",
+      "result": "MCPCallResult",
+      "handler": "MCPHandler"
+    },
+    "http/handle": {
+      "params": "HTTPRequest",
+      "result": "HTTPResponse",
+      "handler": "HTTPHandler"
+    },
+    "plugin/migrate": {
+      "params": "MigrateParams",
+      "result": "MigrateResult",
+      "handler": "Migrator"
+    }
+  },
+  "x-payload-policy": {
+    "required": "present, typed, non-null; identifier strings nonblank",
+    "optional": "absent defaults only; explicit structural null rejected",
+    "opaque": "descriptor-owned keys, duplicate decoded keys rejected at every depth",
+    "empty-params": "absent or closed object with optional context",
+    "context": "optional ForwardContext from host-rpc.schema.json; metadata only, no authority or deadline enforcement",
+    "results": "required fields encoded; optional zero/empty values omitted; CRUD data and MCP content may be null; CRUD list defaults empty array"
+  }
+}

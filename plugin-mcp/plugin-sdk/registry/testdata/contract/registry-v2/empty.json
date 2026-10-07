@@ -1,0 +1,19 @@
+{
+  "description": "empty",
+  "response": {
+    "host_instance": "host-epoch",
+    "revision": 3,
+    "plugins": {},
+    "kinds": {},
+    "regions": {},
+    "contributions": {},
+    "refusals": [],
+    "registry_version": 2
+  },
+  "go": {
+    "validate": "ok"
+  },
+  "ts": {
+    "validate": "ok"
+  }
+}

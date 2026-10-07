@@ -1,0 +1,182 @@
+# The gate covers Go and the npm workspace, with additional Node 22 and Deno
+# runtime legs. Gate only — nothing here publishes; the release
+# steps are a runbook in AGENTS.md ("Releasing the TS package").
+#
+# govulncheck is pinned (v1.8.0), not @latest: an unpinned scanner changes its
+# verdict without a commit. It reads the stdlib version from go.mod's `go` line,
+# which is the portfolio floor 1.26.6, so it judges the stdlib the build uses.
+#
+# Every step is its own `run:` so exit codes propagate; no `|| true` and no
+# `command -v tool && tool || echo skipping` idiom anywhere.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: go · gofmt · vet · test -race · govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test -race
+        run: go test -race -count=1 ./...
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+      # Dedicated Go child matrix; ordinary go test has no Node dependency.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: install child parent dependencies
+        run: npm --prefix ts ci
+
+      - name: build child parent codecs
+        run: npm --prefix ts run build
+
+      - name: build Go fixture child
+        run: GOFLAGS=-p=2 go test -race -c ./subprocess -o "$RUNNER_TEMP/duplex-child"
+
+      - name: Go child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node ts/packages/plugin-sdk/test/child-replay.js go "$RUNNER_TEMP/duplex-child"
+
+  ts:
+    name: ts · typecheck · build · test · pack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      # `npm ci` runs plugin-registry's `prepare`, which builds dist/. That is
+      # the same path a consumer's install takes, so a break in it is a break
+      # for them.
+      - name: install
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      # Build before test: the tests import dist/, which a fresh tree only has
+      # because `prepare` built it. `npm test` also builds, but naming the step
+      # keeps a build failure from reading as a test failure.
+      - name: build
+        run: npm run build
+
+      - name: test
+        run: npm test
+
+      - name: real Node child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js node
+
+      # The published file list is a property of the package, checked before a
+      # human runs `npm publish`, not after.
+      - name: pack (dry run)
+        run: npm pack --dry-run --workspaces
+
+  ts-node22:
+    name: ts · Node 22 · typecheck · build · test · pack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: install
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: build
+        run: npm run build
+
+      - name: test
+        run: npm test
+
+      - name: real Node child corpus replay
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js node
+
+      - name: pack (dry run)
+        run: npm pack --dry-run --workspaces
+
+  ts-deno:
+    name: deno · stdio acceptance · transcript replay
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      # Node installs/builds the workspace and drives the real Deno child.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 'v2.x'
+
+      - name: install
+        run: npm ci
+
+      - name: build
+        run: npm run build
+
+      # Only local modules and Node built-ins: no Deno network permission or
+      # dependency downloads. npm ci owns dependency installation above.
+      - name: real stdio acceptance (Deno child)
+        run: node packages/plugin-sdk/test/stdio-acceptance.js deno run --cached-only --no-npm --no-check --allow-env
+
+      - name: shared transcript replay (Deno)
+        run: deno test --cached-only --no-npm --no-check --allow-read --allow-env packages/plugin-sdk/test/transcripts.test.js
+
+      - name: real Deno child corpus replay (Node parent)
+        run: TMPDIR="$RUNNER_TEMP" node packages/plugin-sdk/test/child-replay.js deno

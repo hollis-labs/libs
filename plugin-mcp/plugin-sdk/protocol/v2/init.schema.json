@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Protocol-2 Init DTO",
+  "oneOf": [
+    {
+      "$ref": "schema.json#/$defs/InitParams"
+    },
+    {
+      "$ref": "schema.json#/$defs/InitResult"
+    }
+  ]
+}

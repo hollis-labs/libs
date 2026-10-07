@@ -1,0 +1,17 @@
+{
+  "description": "A response at a protocol this build does not speak is refused whole.",
+  "response": {
+    "protocol": 2,
+    "plugins": {},
+    "contributions": {}
+  },
+  "go": {
+    "validate": "ErrProtocol"
+  },
+  "ts": {
+    "accepted": false,
+    "declared": 0,
+    "refusals": [],
+    "imports": []
+  }
+}

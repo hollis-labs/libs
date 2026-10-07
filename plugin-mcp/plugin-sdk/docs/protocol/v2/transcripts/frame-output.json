@@ -1,0 +1,66 @@
+{
+  "level": "normative",
+  "profile": "frame-output",
+  "steps": [
+    {
+      "level": "normative",
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "method": "plugin/init",
+        "params": {
+          "plugin_dir": "/fixture",
+          "data_dir": "/fixture/data",
+          "cache_dir": "/fixture/cache",
+          "config": {},
+          "log_level": "info",
+          "host_info": {
+            "version": "fixture",
+            "protocol": 2
+          },
+          "capability_contract": 1,
+          "incarnation": {
+            "host_instance": "fixture-host",
+            "owner_id": "fixture",
+            "owner_generation": 1
+          },
+          "grants": []
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 8000,
+        "result": {
+          "id": "fixture",
+          "name": "Fixture",
+          "version": "1.0.0",
+          "description": "conformance",
+          "protocol": 2,
+          "capability_contract": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "plugin/health"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32010,
+          "message": "budget_exceeded",
+          "data": {
+            "contract": "host-rpc/1",
+            "code": "budget_exceeded",
+            "request_id": 1,
+            "effect_state": "committed",
+            "retryable": false
+          }
+        }
+      }
+    }
+  ]
+}
