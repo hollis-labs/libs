@@ -237,6 +237,12 @@ jobs:
           echo "INTEROP_GO_VERSION=$(go version)" >> "$GITHUB_ENV"
           echo "INTEROP_NODE_VERSION=$(node --version)" >> "$GITHUB_ENV"
           echo "INTEROP_DENO_VERSION=$(deno --version | head -1)" >> "$GITHUB_ENV"
+          # Current execution/module identity is separate from historical pins
+          # retained in the imported test reports.
+          git rev-parse HEAD > "$assets/consolidated-execution-head"
+          git rev-parse HEAD:plugin-mcp > "$assets/consolidated-module-tree"
+          go list -m -json > "$assets/consolidated-go-module.json"
+          pwd > "$assets/consolidated-execution-workdir"
           echo "REVERSE_GO_CHILD=$assets/duplex-child" >> "$GITHUB_ENV"
           echo "REVERSE_NODE_WORKER=$fixture/ts/packages/plugin-sdk/test/negotiated-worker.js" >> "$GITHUB_ENV"
 
@@ -257,3 +263,7 @@ jobs:
             ${{ runner.temp }}/plugin-host-interop-*/authority-report.json
             ${{ runner.temp }}/plugin-host-interop-*/build-receipt
             ${{ runner.temp }}/plugin-host-interop-*/ts-build-receipt
+            ${{ runner.temp }}/plugin-host-interop-*/consolidated-execution-head
+            ${{ runner.temp }}/plugin-host-interop-*/consolidated-module-tree
+            ${{ runner.temp }}/plugin-host-interop-*/consolidated-go-module.json
+            ${{ runner.temp }}/plugin-host-interop-*/consolidated-execution-workdir
