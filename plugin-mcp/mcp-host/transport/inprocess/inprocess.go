@@ -356,13 +356,14 @@ func (e *initializationError) Error() string { return "owner initialization: " +
 func (e *initializationError) Unwrap() error { return e.cause }
 
 func (t *Transport) prepareInitialization(ctx context.Context) (config.InprocessInitialization, error) {
-	t.initMu.Lock()
-	defer t.initMu.Unlock()
 	fail := func(err error) (config.InprocessInitialization, error) {
 		return config.InprocessInitialization{}, &initializationError{err}
 	}
 	if t.initFactory == nil {
 		return fail(errors.New("required InitFactory is missing"))
+	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
 	}
 	input, err := t.initFactory(ctx)
 	if err != nil {
@@ -391,6 +392,11 @@ func (t *Transport) prepareInitialization(ctx context.Context) (config.Inprocess
 	if err := json.Unmarshal(raw, &snapshot); err != nil {
 		return fail(err)
 	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
+	}
+	t.initMu.Lock()
+	defer t.initMu.Unlock()
 	previous, next := t.lastIncarnation, snapshot.Incarnation
 	if previous != (capability.RuntimeIdentity{}) &&
 		(next.HostInstance != previous.HostInstance || next.OwnerID != previous.OwnerID || next.OwnerGeneration <= previous.OwnerGeneration) {
@@ -405,7 +411,18 @@ func (t *Transport) prepareInitialization(ctx context.Context) (config.Inprocess
 // plugin/init + plugin/load handshake over its stdin/stdout.
 func (t *Transport) spawnOnce(ctx context.Context) (*exec.Cmd, *rpcTransport, error) {
 	spawnCtx, cancel := context.WithTimeout(ctx, connectTimeout)
-	defer cancel()
+	// Close cancels policy work as well as the handshake. Host code runs outside
+	// transport locks, and this observer is joined before spawnOnce returns.
+	observerDone := make(chan struct{})
+	go func() {
+		defer close(observerDone)
+		select {
+		case <-t.stopCh:
+			cancel()
+		case <-spawnCtx.Done():
+		}
+	}()
+	defer func() { cancel(); <-observerDone }()
 	input, err := t.prepareInitialization(spawnCtx)
 	if err != nil {
 		return nil, nil, err
@@ -423,10 +440,16 @@ func (t *Transport) spawnOnce(ctx context.Context) (*exec.Cmd, *rpcTransport, er
 	if err != nil {
 		return nil, nil, fmt.Errorf("stdin pipe: %w", err)
 	}
-	if err := spawnCtx.Err(); err != nil {
-		return nil, nil, err
+	t.mu.Lock()
+	if t.closed || spawnCtx.Err() != nil {
+		t.mu.Unlock()
+		_ = stdout.Close()
+		_ = stdin.Close()
+		return nil, nil, &initializationError{context.Canceled}
 	}
-	if err := cmd.Start(); err != nil {
+	err = cmd.Start()
+	t.mu.Unlock()
+	if err != nil {
 		return nil, nil, fmt.Errorf("start: %w", err)
 	}
 

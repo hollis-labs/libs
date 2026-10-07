@@ -85,7 +85,7 @@ func TestNew_InvalidCommand_FailsFast(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := New(ctx, "bogus", &config.InprocessConfig{Command: "/nonexistent/station-test-plugin"}, testLogger())
+	_, err := New(ctx, "bogus", &config.InprocessConfig{Command: "/nonexistent/station-test-plugin", InitFactory: fixtureInitFactory(t)}, testLogger())
 	if err == nil {
 		t.Fatal("New: expected error for nonexistent command, got nil")
 	}
@@ -412,5 +412,43 @@ func TestSupervisionFactoryFailureOrStaleStopsBeforeSpawn(t *testing.T) {
 				t.Fatalf("extra attempt or live process: calls=%d pid=%d", calls.Load(), tr.Pid())
 			}
 		})
+	}
+}
+
+func TestCloseCancelsPendingRestartInitialization(t *testing.T) {
+	cfg := selfExecFixtureConfig(t, nil)
+	factory := cfg.InitFactory
+	entered := make(chan struct{})
+	var calls atomic.Int64
+	cfg.InitFactory = func(ctx context.Context) (config.InprocessInitialization, error) {
+		if calls.Add(1) == 1 {
+			return factory(ctx)
+		}
+		close(entered)
+		<-ctx.Done()
+		return config.InprocessInitialization{}, ctx.Err()
+	}
+	tr, err := New(context.Background(), "fixture", cfg, testLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Close()
+	if err := syscall.Kill(tr.Pid(), syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("restart factory not entered")
+	}
+	closed := make(chan struct{})
+	go func() { _ = tr.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not cancel pending owner initialization")
+	}
+	if tr.Pid() != 0 || calls.Load() != 2 {
+		t.Fatal("closed transport restarted")
 	}
 }

@@ -83,7 +83,6 @@ configuration and environment do not create authority. `nil` grants are invalid;
 a non-nil empty array is an explicit no-authority choice. This transport remains
 forward-only and refuses optional reverse/hooks offers.
 
-`mcphost.Run`'s identity strings (client/server name+version reported over
-the wire) are currently hardcoded (`"mcp-host"`/`"dev"` in the transport
-packages) rather than configurable. Fine for a single consumer; revisit if
-a second consumer wants its own identity reported instead.
+Process-mode MCP client identity remains fixed in the transport. Inprocess
+HostInfo and expected plugin identity/version are supplied by the trusted owner
+factory; the logical-server ID is a routing key, not incarnation authority.
