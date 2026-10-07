@@ -75,7 +75,7 @@ jobs:
           mkdir -p "$assets"
           fixture="$assets/source"
           git init "$fixture"
-          git -C "$fixture" remote add origin https://github.com/hollis-labs/libs/plugin-mcp/plugin-sdk.git
+          git -C "$fixture" remote add origin https://github.com/hollis-labs/plugin-sdk.git
           git -C "$fixture" fetch --depth=1 origin $pin
           git -C "$fixture" checkout --detach FETCH_HEAD
           test "$(git -C "$fixture" rev-parse HEAD)" = $pin

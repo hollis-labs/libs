@@ -7,7 +7,7 @@ It is not: a place for agent, harness, LLM-provider or mesh code (that belongs i
 ## Start Here
 
 - `README.md` — what each module is for, the rules, how to develop across modules and how releases work.
-- `<module>/` — one directory per module: `go.mod`, a package doc, a `CHANGELOG.md`. Packages arrive through `scripts/import-repo`. `plugin-mcp` is a held stub: import nothing into it.
+- `<module>/` — one directory per module: `go.mod`, a package doc, a `CHANGELOG.md`. Packages arrive through `scripts/import-repo`. `plugin-mcp` contains the history-preserved plugin and MCP packages.
 - `scripts/` — all tooling. `scripts/repo.conf` is the only per-repository setting; the other scripts are identical to the ones in the `substrate` repository.
 - `.github/workflows/` — `<module>.yml` run one module (path-filtered) through `_module.yml`; `guards.yml` runs the repository-wide guards.
 

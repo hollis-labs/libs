@@ -10,4 +10,9 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ### Added
 
-- Empty module skeleton: `go.mod` and a package doc. No API yet.
+- History-preserving imports of plugin-sdk, plugin-host, mcp-host, go-mcp,
+  go-mcp-sanitize and api-projection under one module.
+- Final Go import paths under `github.com/hollis-labs/libs/plugin-mcp`,
+  with each original package root retained and npm package names unchanged.
+- Original dependency requirements and MIT licenses retained. Plugin hooks
+  remain a separately released dependency.

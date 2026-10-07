@@ -6,8 +6,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hollis-labs/libs/plugin-mcp/plugin-sdk.git",
-    "directory": "ts"
+    "url": "git+https://github.com/hollis-labs/libs.git",
+    "directory": "plugin-mcp/plugin-sdk/ts"
   },
   "type": "module",
   "workspaces": [

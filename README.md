@@ -8,8 +8,8 @@ these libraries. These libraries never depend on substrate.
 ## Status
 
 `util`, `ui-go` and `workflow` hold code that was imported, with its git history,
-from earlier standalone repositories. `plugin-mcp` is a held stub: it builds and
-is empty. Releases are per module and tagged `<module>/vX.Y.Z`; the versions of
+from earlier standalone repositories. `plugin-mcp` holds the plugin SDK, plugin host and MCP libraries imported
+from their standalone repositories. Releases are per module and tagged `<module>/vX.Y.Z`; the versions of
 a module are listed in its own `CHANGELOG.md`.
 
 ## Modules
@@ -21,7 +21,7 @@ Each module has its own `go.mod`, its own version and its own tags.
 | `util` | `github.com/hollis-labs/libs/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue and a scheduler. |
 | `ui-go` | `github.com/hollis-labs/libs/ui-go` | Streaming and web UI building blocks for Go services: server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `workflow` | `github.com/hollis-labs/libs/workflow` | The workflow engine and its host. |
-| `plugin-mcp` | `github.com/hollis-labs/libs/plugin-mcp` | A held stub. The name is reserved for the MCP plugin libraries; nothing is imported here until the plugin baseline is decided. |
+| `plugin-mcp` | `github.com/hollis-labs/libs/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 
 Use a module the usual way, once it has a release:
 
