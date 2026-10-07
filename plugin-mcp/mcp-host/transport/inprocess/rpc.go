@@ -2,6 +2,7 @@ package inprocess
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,7 +36,7 @@ type rpcTransport struct {
 	nextID atomic.Int64
 
 	mu       sync.Mutex
-	pending  map[int64]chan *sdksub.RPCResponse
+	pending  map[sdksub.RPCID]chan *sdksub.RPCResponse
 	closedBy error
 
 	writeMu sync.Mutex
@@ -48,7 +49,7 @@ func newRPCTransport(r io.Reader, w io.Writer) *rpcTransport {
 	t := &rpcTransport{
 		w:       w,
 		r:       bufio.NewReaderSize(r, 64*1024),
-		pending: make(map[int64]chan *sdksub.RPCResponse),
+		pending: make(map[sdksub.RPCID]chan *sdksub.RPCResponse),
 		done:    make(chan struct{}),
 	}
 	go t.readLoop()
@@ -74,7 +75,14 @@ func (t *rpcTransport) closeWriter() {
 }
 
 func (t *rpcTransport) call(ctx context.Context, method string, params any) (*sdksub.RPCResponse, error) {
-	id := t.nextID.Add(1)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	n := t.nextID.Add(1)
+	if n <= 0 || n > 9007199254740991 {
+		return nil, errors.New("inprocess: safe request IDs exhausted")
+	}
+	id := sdksub.NumberID(n)
 	reply := make(chan *sdksub.RPCResponse, 1)
 
 	t.mu.Lock()
@@ -134,7 +142,13 @@ func (t *rpcTransport) write(msg any) error {
 	data = append(data, '\n')
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
-	_, err = t.w.Write(data)
+	n, err := t.w.Write(data)
+	if err == nil && n != len(data) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		t.closeWith(err)
+	}
 	return err
 }
 
@@ -143,7 +157,16 @@ func (t *rpcTransport) readLoop() {
 	for {
 		line, err := t.r.ReadBytes('\n')
 		if len(line) > 0 {
+			if err != nil {
+				readErr = errors.New("inprocess: partial response frame")
+				break
+			}
 			t.deliver(line)
+			select {
+			case <-t.done:
+				return
+			default:
+			}
 		}
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
@@ -156,8 +179,9 @@ func (t *rpcTransport) readLoop() {
 }
 
 func (t *rpcTransport) deliver(line []byte) {
-	var resp sdksub.RPCResponse
-	if err := json.Unmarshal(line, &resp); err != nil {
+	resp, err := decodeResponse(line)
+	if err != nil {
+		t.closeWith(err)
 		return
 	}
 	t.mu.Lock()
@@ -167,9 +191,76 @@ func (t *rpcTransport) deliver(line []byte) {
 		return
 	}
 	select {
-	case reply <- &resp:
+	case reply <- resp:
 	default:
 	}
+}
+
+// decodeResponse accepts only exact, duplicate-free reply envelopes. Incoming
+// requests/notifications are unsupported on this forward-only connection.
+func decodeResponse(line []byte) (*sdksub.RPCResponse, error) {
+	bad := func() (*sdksub.RPCResponse, error) { return nil, errors.New("inprocess: invalid response envelope") }
+	d := json.NewDecoder(bytes.NewReader(line))
+	start, err := d.Token()
+	if err != nil || start != json.Delim('{') {
+		return bad()
+	}
+	fields := make(map[string]json.RawMessage)
+	for d.More() {
+		token, err := d.Token()
+		if err != nil {
+			return bad()
+		}
+		name, ok := token.(string)
+		if !ok {
+			return bad()
+		}
+		if _, exists := fields[name]; exists {
+			return bad()
+		}
+		switch name {
+		case "jsonrpc", "id", "result", "error":
+		default:
+			return bad()
+		}
+		var raw json.RawMessage
+		if d.Decode(&raw) != nil {
+			return bad()
+		}
+		fields[name] = raw
+	}
+	if _, err := d.Token(); err != nil {
+		return bad()
+	}
+	var extra any
+	if d.Decode(&extra) != io.EOF {
+		return bad()
+	}
+	var version string
+	if json.Unmarshal(fields["jsonrpc"], &version) != nil || version != "2.0" {
+		return bad()
+	}
+	var id sdksub.RPCID
+	if json.Unmarshal(fields["id"], &id) != nil {
+		return bad()
+	}
+	if n, ok := id.Integer(); !ok || n <= 0 {
+		return bad()
+	}
+	result, hasResult := fields["result"]
+	rawError, hasError := fields["error"]
+	if hasResult == hasError {
+		return bad()
+	}
+	resp := &sdksub.RPCResponse{JSONRPC: version, ID: id, Result: result}
+	if hasError {
+		var rpcError *sdksub.RPCError
+		if json.Unmarshal(rawError, &rpcError) != nil || rpcError == nil {
+			return bad()
+		}
+		resp.Error = rpcError
+	}
+	return resp, nil
 }
 
 func (t *rpcTransport) closeWith(cause error) {
@@ -182,7 +273,7 @@ func (t *rpcTransport) closeWith(cause error) {
 		}
 		close(t.done)
 	}
-	t.pending = make(map[int64]chan *sdksub.RPCResponse)
+	t.pending = make(map[sdksub.RPCID]chan *sdksub.RPCResponse)
 	t.mu.Unlock()
 }
 

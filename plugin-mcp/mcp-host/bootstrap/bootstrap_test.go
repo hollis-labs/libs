@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"testing"
@@ -98,4 +99,21 @@ func TestBuildRegistry_PartialFailureClosesEarlierTransports(t *testing.T) {
 	// Nothing to directly assert on process cleanup here beyond "it
 	// didn't hang" — BuildRegistry's own closeAll call is exercised by
 	// this path; T3's own tests cover Close's process-teardown behavior.
+}
+
+func TestBuildRegistryThreadsOwnerFactoryWithoutMutatingConfig(t *testing.T) {
+	failure := errors.New("owner refused initialization")
+	called := false
+	input := &config.InprocessConfig{Command: "/nonexistent/plugin", Tools: []config.ToolManifest{{Name: "tool"}}}
+	cfg := &config.Config{LogicalServers: []config.LogicalServer{{ID: "plugin", Name: "Plugin", Transport: config.TransportInprocess, Inprocess: input}}}
+	factories := map[string]config.InprocessInitFactory{"plugin": func(context.Context) (config.InprocessInitialization, error) {
+		called = true
+		return config.InprocessInitialization{}, failure
+	}}
+	if _, err := BuildRegistry(context.Background(), cfg, testLogger(), factories); !errors.Is(err, failure) {
+		t.Fatalf("factory error not propagated before spawn: %v", err)
+	}
+	if !called || input.InitFactory != nil {
+		t.Fatal("factory ignored or caller config mutated")
+	}
 }

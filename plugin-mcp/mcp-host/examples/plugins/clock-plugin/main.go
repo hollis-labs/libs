@@ -27,8 +27,9 @@ type clockPlugin struct{}
 func (clockPlugin) Init(ctx context.Context, params sdksub.InitParams) (sdksub.InitResult, error) {
 	return sdksub.InitResult{
 		ID: "clock-plugin", Name: "Clock Plugin", Version: "0.1.0",
-		Description: "Reports the current time.",
-		Protocol:    sdksub.ProtocolVersion,
+		Description:        "Reports the current time.",
+		Protocol:           sdksub.ProtocolVersion,
+		CapabilityContract: 1,
 	}, nil
 }
 

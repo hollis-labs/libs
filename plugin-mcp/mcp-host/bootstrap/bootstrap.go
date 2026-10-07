@@ -27,10 +27,21 @@ import (
 // including the one that just failed, and any already added to the
 // registry — is closed before returning, so a partial startup failure
 // never leaks a spawned subprocess.
-func BuildRegistry(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*registry.Registry, error) {
+func BuildRegistry(ctx context.Context, cfg *config.Config, logger *slog.Logger, factories ...map[string]config.InprocessInitFactory) (*registry.Registry, error) {
+	if len(factories) > 1 {
+		return nil, fmt.Errorf("build registry: only one initialization factory map is accepted")
+	}
 	reg := registry.New()
 
 	for _, ls := range cfg.LogicalServers {
+		// Copy only the config used for this build; never mutate caller input.
+		if ls.Inprocess != nil && len(factories) > 0 {
+			copyConfig := *ls.Inprocess
+			if factory, ok := factories[0][ls.ID]; ok {
+				copyConfig.InitFactory = factory
+			}
+			ls.Inprocess = &copyConfig
+		}
 		transport, err := buildTransport(ctx, ls, logger)
 		if err != nil {
 			closeAll(reg)

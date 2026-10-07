@@ -31,6 +31,10 @@ import (
 
 // Options configures Run.
 type Options struct {
+	// InprocessInitFactories supplies trusted per-attempt initialization by
+	// logical server ID. Config-file values cannot supply current authority.
+	InprocessInitFactories map[string]config.InprocessInitFactory
+
 	// Logger receives Run's own diagnostic logging. Defaults to
 	// slog.Default() when nil.
 	Logger *slog.Logger
@@ -61,7 +65,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) error {
 		httpAddr = ":8080"
 	}
 
-	reg, err := bootstrap.BuildRegistry(ctx, cfg, logger)
+	reg, err := bootstrap.BuildRegistry(ctx, cfg, logger, opts.InprocessInitFactories)
 	if err != nil {
 		return fmt.Errorf("mcphost: build registry: %w", err)
 	}

@@ -1,3 +1,6 @@
+# Inprocess entries also require a trusted programmatic InitFactory via Run
+# options or config.InprocessConfig. YAML does not supply roots/incarnation/grants.
+# Each spawn needs a fresh owner generation and expected plugin ID/version.
 # Example mcp-host config. See README.md for the full field reference.
 #
 # Two logical servers: a process-mode echo server exposed over stdio, and

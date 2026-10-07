@@ -4,9 +4,12 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
+
+	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 
 	"gopkg.in/yaml.v3"
 )
@@ -78,11 +81,31 @@ type ProcessConfig struct {
 	Supervise *bool `yaml:"supervise,omitempty"`
 }
 
+// InprocessInitialization is supplied by the trusted host for one spawn attempt.
+// ExpectedID and ExpectedVersion are independently verified plugin metadata.
+// Params must contain explicit roots, the current host-issued incarnation and
+// an explicit grant array; an empty array means the host chose no authority.
+type InprocessInitialization struct {
+	Params          sdksub.InitParams
+	ExpectedID      string
+	ExpectedVersion string
+}
+
+// InprocessInitFactory must issue a fresh owner generation for every attempt,
+// including retries. It owns policy and roots; the transport never creates them.
+// The factory must honor ctx and must not return shared mutable state that is
+// concurrently modified while the transport snapshots it.
+type InprocessInitFactory func(ctx context.Context) (InprocessInitialization, error)
+
 // InprocessConfig backs an `inprocess`-mode logical server: a subprocess
 // plugin speaking plugin-sdk/subprocess's dialect. Always spawned and,
 // by default, supervised by mcp-host — there is no dial variant, since an
 // inprocess plugin never runs standalone.
 type InprocessConfig struct {
+	// InitFactory is programmatic trusted-host input, never YAML authority.
+	// Required at construction; parsing a config does not invent one.
+	InitFactory InprocessInitFactory `yaml:"-"`
+
 	Command string            `yaml:"command"`
 	Args    []string          `yaml:"args,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`

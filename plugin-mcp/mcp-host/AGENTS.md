@@ -75,11 +75,13 @@ substituted before registration (`serving/serving.go`) — the official SDK's
 upstream server/plugin that never declared one is a real, not-hypothetical
 case.
 
-`inprocess` plugins never receive a `DataDir`/`CacheDir` from `plugin/init`
-— this library has no per-plugin data directory concept yet. A plugin
-calling `InitParams.ResolvedDataDir()` gets `ErrNoDataDir`. Fine today (no
-example plugin needs persistence); a real gap the first data-bearing plugin
-will hit.
+`inprocess` initialization is trusted programmatic input. A per-spawn
+`config.InprocessInitFactory` supplies all three roots, the current host-owned
+incarnation, an explicit grant array and expected plugin identity/version.
+Missing/invalid input fails before spawn. Every restart needs a fresh generation;
+configuration and environment do not create authority. `nil` grants are invalid;
+a non-nil empty array is an explicit no-authority choice. This transport remains
+forward-only and refuses optional reverse/hooks offers.
 
 `mcphost.Run`'s identity strings (client/server name+version reported over
 the wire) are currently hardcoded (`"mcp-host"`/`"dev"` in the transport

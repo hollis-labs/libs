@@ -196,3 +196,30 @@ No CI, no Makefile — these three are the only gate (same convention as
 ## License
 
 MIT License — see [`LICENSE`](./LICENSE). © Hollis Labs.
+
+## Protocol-2 plugin initialization
+
+The `inprocess` transport requires trusted host initialization for every spawn
+attempt. A YAML command, environment or logical-server ID does not supply
+incarnation authority. Provide `config.InprocessConfig.InitFactory` directly,
+or use `mcphost.Options.InprocessInitFactories` (keyed by logical-server ID)
+when calling `Run`. `bootstrap.BuildRegistry` accepts the same optional factory
+map. Process-mode servers retain their existing configuration.
+
+The factory returns `config.InprocessInitialization`: SDK `InitParams`, the
+expected plugin ID, and its expected version. The host supplies actual plugin,
+data and cache roots, protocol 2, capability contract 1, its current incarnation
+and an explicit grant set. `nil` grants are rejected; a non-nil empty
+`capability.GrantSet{}` is an explicit choice of no delegated authority. No
+roots, identity, policy or grants are invented from configuration or environment.
+The factory must honor its context and return data it does not mutate during
+snapshotting. The transport deep-copies maps, grants and raw JSON before spawn.
+
+Every supervision attempt invokes the factory again. The same host/owner tuple
+must carry a strictly newer safe generation; repeated/stale generations, owner
+changes and factory failures stop supervision without another spawn. A rejected
+or mismatched Init cannot publish Load. The transport verifies the SDK Init
+contract plus the supplied expected plugin ID/version before proceeding. It is
+forward-only: reverse and hooks offers are refused, as are unsolicited profile
+acknowledgements. Missing factories fail closed before creating a process;
+existing inprocess configuration needs this programmatic migration.
