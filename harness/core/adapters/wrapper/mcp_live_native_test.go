@@ -15,8 +15,8 @@ import (
 	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	permission "github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 	"github.com/hollis-labs/substrate/harness/adapters/activity"
@@ -77,7 +77,7 @@ func preparedLiveMCP(t *testing.T, id runtimes.ID, mode runtimes.Mode, binary st
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	execution, err := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithArtifactAuthorization(fixtureAuthorization(t)))
+	execution, err := planting.PrepareExecution(context.Background(), prepared, planting.WithArtifactAuthorization(fixtureAuthorization(t)))
 	if err != nil {
 		t.Fatalf("PrepareExecution: %v", err)
 	}

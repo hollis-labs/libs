@@ -1,4 +1,4 @@
-package plant
+package planting
 
 import (
 	"context"
@@ -16,16 +16,16 @@ import (
 )
 
 // Planter lays down per-session boot files into a boot dir the wrapper
-// owns. The wrapper calls Plant once before exec; the returned Result
+// owns. The wrapper calls Plant once before exec; the returned PlantResult
 // reports what was actually written so the activity stream can emit a
 // plant.completed event with the manifest.
 type Planter interface {
-	Plant(ctx context.Context, bootDir string, spec Spec) (Result, error)
+	Plant(ctx context.Context, bootDir string, spec PlantSpec) (PlantResult, error)
 }
 
-// Spec describes what to plant. All fields are optional — an empty Spec
+// PlantSpec describes what to plant. All fields are optional — an empty PlantSpec
 // is a valid no-op planting.
-type Spec struct {
+type PlantSpec struct {
 	// Artifacts is the modern, lossless input path. Entries preserve modes,
 	// binary bytes, explicit directories, ownership and provenance. Legacy
 	// fields below are adapted into additional artifact entries with explicit
@@ -65,24 +65,24 @@ type Spec struct {
 
 	// Hooks lists provider-specific hooks to install (Claude Code
 	// PreToolUse/PostToolUse, OpenCode plugin entry points, ...).
-	// Encoding is provider-specific; legacy Hook entries are written as
+	// Encoding is provider-specific; legacy PlantHook entries are written as
 	// executable files under hooks/<provider>/<name>.
-	Hooks []Hook
+	Hooks []PlantHook
 
 	// RecoveryPrompt is a per-session prompt the wrapper can re-inject
 	// when a session needs to resume context after restart.
 	RecoveryPrompt string
 }
 
-// Hook is a provider-specific hook the planter should install.
-type Hook struct {
+// PlantHook is a provider-specific hook the planter should install.
+type PlantHook struct {
 	Provider string
 	Name     string
 	Payload  []byte
 }
 
-// Result is what a [Planter] reports after planting completes.
-type Result struct {
+// PlantResult is what a [Planter] reports after planting completes.
+type PlantResult struct {
 	// PlantedFiles lists the absolute paths of files the Planter wrote,
 	// updated, changed mode for, or removed. Kept for compatibility with the
 	// original wrapper event payload.
@@ -111,20 +111,20 @@ type Result struct {
 	Handle *materialize.Handle
 }
 
-// SharedPlanter adapts wrapper Spec into agentkit's neutral artifact and
+// SharedPlanter adapts wrapper PlantSpec into agentkit's neutral artifact and
 // materialization engine.
 type SharedPlanter struct {
 	Authorize agentlaunch.ArtifactAuthorizer
 }
 
 // Plant implements [Planter].
-func (p SharedPlanter) Plant(ctx context.Context, bootDir string, spec Spec) (Result, error) {
+func (p SharedPlanter) Plant(ctx context.Context, bootDir string, spec PlantSpec) (PlantResult, error) {
 	tree, err := specArtifactTree(spec)
 	if err != nil {
-		return Result{}, err
+		return PlantResult{}, err
 	}
 	if len(tree.Entries) == 0 {
-		return Result{Operation: effectiveOperation(spec), Complete: true}, nil
+		return PlantResult{Operation: effectiveOperation(spec), Complete: true}, nil
 	}
 	handle, err := agentlaunch.MaterializeArtifacts(ctx, agentlaunch.ArtifactMaterializationRequest{
 		TargetRoot:         bootDir,
@@ -149,18 +149,18 @@ func (p SharedPlanter) Plant(ctx context.Context, bootDir string, spec Spec) (Re
 type NoOpPlanter struct{}
 
 // Plant implements [Planter].
-func (NoOpPlanter) Plant(_ context.Context, _ string, _ Spec) (Result, error) {
-	return Result{}, nil
+func (NoOpPlanter) Plant(_ context.Context, _ string, _ PlantSpec) (PlantResult, error) {
+	return PlantResult{}, nil
 }
 
-func effectiveOperation(spec Spec) materialize.Operation {
+func effectiveOperation(spec PlantSpec) materialize.Operation {
 	if spec.Operation != "" {
 		return spec.Operation
 	}
 	return materialize.OperationReconcile
 }
 
-func specArtifactTree(spec Spec) (artifact.Tree, error) {
+func specArtifactTree(spec PlantSpec) (artifact.Tree, error) {
 	entries := append([]artifact.Entry(nil), spec.Artifacts.Entries...)
 	for rel, content := range spec.Files {
 		entries = append(entries, legacyFileEntry(rel, content, 0o644, "file:"+rel))
@@ -217,14 +217,14 @@ func providerSettingsPath(provider string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("plant: provider settings for %q: unknown runtime", provider)
 	}
-	e, ok := layout.Find(d.ID, layout.Shape{}, layout.NativeConfig)
+	e, ok := layout.Find(d.ID, layout.Shape{Mode: d.DefaultMode}, layout.NativeConfig)
 	if !ok {
 		return "", fmt.Errorf("plant: provider settings for %q: runtime %s has no native config file in the go-providers layout", provider, d.ID)
 	}
 	return e.Rel, nil
 }
 
-func hookPath(h Hook) (string, error) {
+func hookPath(h PlantHook) (string, error) {
 	provider := strings.Trim(strings.ToLower(h.Provider), "/")
 	name := strings.Trim(h.Name, "/")
 	if provider == "" || name == "" {
@@ -233,11 +233,11 @@ func hookPath(h Hook) (string, error) {
 	return filepath.ToSlash(filepath.Join("hooks", provider, name)), nil
 }
 
-func resultFromHandle(bootDir string, handle *materialize.Handle) Result {
+func resultFromHandle(bootDir string, handle *materialize.Handle) PlantResult {
 	if handle == nil {
-		return Result{}
+		return PlantResult{}
 	}
-	result := Result{
+	result := PlantResult{
 		Operation: handle.Report.Operation,
 		Complete:  handle.Report.Complete,
 		Handle:    handle,

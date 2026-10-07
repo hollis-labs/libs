@@ -22,7 +22,7 @@ func TestCheckPassesOnCommittedFiles(t *testing.T) {
 func TestCheckDetectsStaleAndWriteFixes(t *testing.T) {
 	dir := t.TempDir()
 	stale, err := run(dir, true)
-	if err != nil || len(stale) != 4 {
+	if err != nil || len(stale) != 2 {
 		t.Fatalf("empty tree: stale=%v err=%v", stale, err)
 	}
 	if _, err := run(dir, false); err != nil {
@@ -31,21 +31,21 @@ func TestCheckDetectsStaleAndWriteFixes(t *testing.T) {
 	if stale, err := run(dir, true); err != nil || len(stale) != 0 {
 		t.Fatalf("after write: stale=%v err=%v", stale, err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, docPath), []byte("edited\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, planDocPath), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	stale, err = run(dir, true)
-	if err != nil || len(stale) != 1 || stale[0] != docPath {
+	if err != nil || len(stale) != 1 || stale[0] != planDocPath {
 		t.Fatalf("edited doc: stale=%v err=%v", stale, err)
 	}
 }
 
 func TestMarkdownMentionsEveryProvider(t *testing.T) {
-	outs, err := render(nil)
+	outs, err := renderPlan()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(outs[jsonPath]), `"schema": 1`) {
+	if !strings.Contains(string(outs[planJSONPath]), `"schema": "provider-plan-fields.v1"`) {
 		t.Error("json output lacks the schema version")
 	}
 }

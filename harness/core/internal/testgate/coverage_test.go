@@ -23,7 +23,7 @@ var scope = []string{
 	"adapters/claude/", "adapters/claudeacp/", "adapters/codex/", "adapters/codexacp/",
 	"adapters/copilotacp/", "adapters/opencode/", "adapters/opencodeacp/", "adapters/piacp/",
 	"interception/classifybridge/", "interception/policy/", "interception/filters",
-	"workspace/plant/", "sandbox/wrapper/", "sandbox/snapshot/",
+	"agentlaunch/planting/", "sandbox/wrapper/", "sandbox/snapshot/",
 	"internal/childoutput/", "internal/closegate/", "internal/sidebyside/", "internal/testgate/",
 }
 

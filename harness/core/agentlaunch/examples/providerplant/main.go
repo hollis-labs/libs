@@ -18,8 +18,8 @@
 //  1. Build a LaunchPlan with an InjectionSpec carrying a native skill
 //     file and a bootdir overlay entry.
 //  2. launcher.Compile the plan.
-//  3. providerplant.PrepareAndPlant — one call that prepares the
-//     workspace/bootdir AND plants the provider BootDirSpec files,
+//  3. planting.PrepareAndPlant — one call that prepares the
+//     the explicit artifact engine AND plants the provider BootDirSpec files,
 //     native files, and overlay.
 //  4. sessionshim.ToSessionLaunch — convert the PreparedLaunch into the
 //     binary + StartOptions go-agent-sessions' Manager.Start consumes.
@@ -35,8 +35,8 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/sessionshim"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 
@@ -97,7 +97,7 @@ func run() error {
 	}
 
 	// 3. Prepare + Plant in one call.
-	prepared, err := providerplant.PrepareAndPlant(ctx, compiled)
+	prepared, err := planting.PrepareAndPlant(ctx, compiled)
 	if err != nil {
 		return fmt.Errorf("prepare and plant: %w", err)
 	}

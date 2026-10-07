@@ -23,13 +23,13 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters"
 	"github.com/hollis-labs/substrate/harness/adapters/activity"
 	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/interception/classifybridge"
 	"github.com/hollis-labs/substrate/harness/interception/filters"
 	"github.com/hollis-labs/substrate/harness/interception/filters/classify"
 	"github.com/hollis-labs/substrate/harness/interception/policy"
 	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
 	"github.com/hollis-labs/substrate/harness/sandbox/wrapper"
-	"github.com/hollis-labs/substrate/harness/workspace/plant"
 )
 
 // ---------------------------------------------------------------------
@@ -184,18 +184,18 @@ type recordingPlanter struct {
 	mu       sync.Mutex
 	calls    int
 	lastDir  string
-	lastSpec plant.Spec
+	lastSpec planting.PlantSpec
 	files    []string
 	err      error
 }
 
-func (p *recordingPlanter) Plant(_ context.Context, bootDir string, spec plant.Spec) (plant.Result, error) {
+func (p *recordingPlanter) Plant(_ context.Context, bootDir string, spec planting.PlantSpec) (planting.PlantResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls++
 	p.lastDir = bootDir
 	p.lastSpec = spec
-	return plant.Result{PlantedFiles: p.files}, p.err
+	return planting.PlantResult{PlantedFiles: p.files}, p.err
 }
 
 // recordingPolicyObserver records every Observe call and returns a configurable
@@ -643,8 +643,8 @@ func TestRunSharedPlanterCreateDoesNotPrecreateTarget(t *testing.T) {
 		Activity: activity.NewBridge(sink),
 		Workdir:  dir,
 		BootDir:  bootDir,
-		Planter:  plant.SharedPlanter{Authorize: fixtureAuthorization(t)},
-		PlantSpec: plant.Spec{
+		Planter:  planting.SharedPlanter{Authorize: fixtureAuthorization(t)},
+		PlantSpec: planting.PlantSpec{
 			Operation: materialize.OperationCreate,
 			Artifacts: artifact.Tree{Entries: []artifact.Entry{
 				{Path: "bin/run.sh", Kind: artifact.EntryFile, Mode: 0o755, Bytes: []byte("#!/bin/sh\nexit 0\n"), Ownership: artifact.Ownership{EntryID: "modern:bin", GroupID: "modern"}},
@@ -1021,9 +1021,9 @@ func TestRunInvokesPlanter(t *testing.T) {
 	script := writeFakeScript(t, dir, []string{"done"})
 
 	planter := &recordingPlanter{files: []string{"/tmp/wrapper-boot/.mcp.json"}}
-	spec := plant.Spec{
+	spec := planting.PlantSpec{
 		Files: map[string][]byte{"hello.txt": []byte("hi")},
-		Hooks: []plant.Hook{{Provider: "claude", Name: "PreToolUse", Payload: []byte("{}")}},
+		Hooks: []planting.PlantHook{{Provider: "claude", Name: "PreToolUse", Payload: []byte("{}")}},
 	}
 
 	adapter := &fakeRuntimeAdapter{cli: &fakeCLI{name: "fakecli", script: script}}

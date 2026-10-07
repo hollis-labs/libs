@@ -1,4 +1,4 @@
-package bootdir
+package planting
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func fixtureAuthorization(t *testing.T) agentlaunch.ArtifactAuthorizer {
+func wrapperFixtureAuthorization(t *testing.T) agentlaunch.ArtifactAuthorizer {
 	t.Helper()
 	resolve := workspacetest.New(t)
 	return func(ctx context.Context, path string) (agentlaunch.ArtifactAuthority, error) {
@@ -16,4 +16,4 @@ func fixtureAuthorization(t *testing.T) agentlaunch.ArtifactAuthorizer {
 	}
 }
 
-func fixturePrivateDir(t *testing.T) string { t.Helper(); return workspacetest.PrivateDir(t) }
+func wrapperFixturePrivateDir(t *testing.T) string { t.Helper(); return workspacetest.PrivateDir(t) }

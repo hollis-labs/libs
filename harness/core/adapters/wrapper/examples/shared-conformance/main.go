@@ -13,10 +13,10 @@ import (
 
 	"github.com/hollis-labs/substrate/harness/agentcontext"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/workspace"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/plant"
 )
 
 type scenarioResult struct {
@@ -365,7 +365,7 @@ func runTether(ctx context.Context, base string) (scenarioResult, error) {
 		fileEntry("bundles/task-alpha/AGENTS.md", []byte("alpha task bundle\n"), 0o644, "tether-alpha", "tether:task-alpha"),
 		fileEntry("bundles/task-beta/AGENTS.md", []byte("beta task bundle\n"), 0o644, "tether-beta", "tether:task-beta"),
 	}, copied.Entries...)}
-	result, err := (plant.SharedPlanter{Authorize: authorize}).Plant(ctx, bootRoot, plant.Spec{
+	result, err := (planting.SharedPlanter{Authorize: authorize}).Plant(ctx, bootRoot, planting.PlantSpec{
 		Artifacts: tree,
 		Operation: materialize.OperationCreate,
 		ProviderSettings: map[string][]byte{

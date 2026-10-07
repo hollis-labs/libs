@@ -6,14 +6,12 @@ import (
 	"github.com/hollis-labs/substrate/harness/adapters/provider"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/bootdir"
 	"github.com/hollis-labs/substrate/harness/workspace/goldens"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/plant"
-	"github.com/hollis-labs/substrate/harness/workspace/providerplant"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	"os"
 	"path/filepath"
@@ -41,9 +39,9 @@ func TestHistoricalBaselineWithActiveRouting(t *testing.T) {
 				case "providerplant":
 					ev, projection, err = renderProvider(t, in, root)
 				case "plant":
-					spec := plant.Spec{Files: map[string][]byte{"AGENTS.md": []byte("Fixture instructions.\n")}, MCPConfig: []byte("{\"mcpServers\":{}}\n"), ProviderSettings: map[string][]byte{in.Provider: []byte("fixture settings\n")}, Hooks: []plant.Hook{{Provider: in.Provider, Name: "start.sh", Payload: []byte("#!/bin/sh\nexit 0\n")}}, RecoveryPrompt: "Fixture recovery.\n", Artifacts: fixtureArtifacts(), Generation: "fixture-v1", Operation: materialize.OperationCreate}
-					p := plant.SharedPlanter{Authorize: fixtureAuthorization(t)}
-					var res plant.Result
+					spec := planting.PlantSpec{Files: map[string][]byte{"AGENTS.md": []byte("Fixture instructions.\n")}, MCPConfig: []byte("{\"mcpServers\":{}}\n"), ProviderSettings: map[string][]byte{in.Provider: []byte("fixture settings\n")}, Hooks: []planting.PlantHook{{Provider: in.Provider, Name: "start.sh", Payload: []byte("#!/bin/sh\nexit 0\n")}}, RecoveryPrompt: "Fixture recovery.\n", Artifacts: fixtureArtifacts(), Generation: "fixture-v1", Operation: materialize.OperationCreate}
+					p := planting.SharedPlanter{Authorize: fixtureAuthorization(t)}
+					var res planting.PlantResult
 					res, err = p.Plant(context.Background(), root, spec)
 					if err == nil && in.Scenario == "refresh" {
 						unrelated(t, root)
@@ -59,21 +57,21 @@ func TestHistoricalBaselineWithActiveRouting(t *testing.T) {
 					}
 				case "bootdir":
 					var writes []string
-					w := bootdir.Writer{Authorize: fixtureAuthorization(t)}
+					w := baselineWriter{Authorize: fixtureAuthorization(t)}
 					if in.Scenario == "atomic" {
-						w.OnWritten = func(f bootdir.WrittenFile) { writes = append(writes, f.RelPath) }
+						w.OnWritten = func(f baselineWrittenFile) { writes = append(writes, f.RelPath) }
 						t.Log("delta sole-engine: AtomicWrite side writer replaced by metadata observer")
 					}
 					spec := agentlaunch.InjectionSpec{NativeFiles: []agentlaunch.NativeFile{{Kind: agentlaunch.NativeFileRaw, RelPath: "skills/sample/scripts/run.sh", Content: "#!/bin/sh\nexit 0\n", Mode: 0751}}, BootDirOverlay: map[string]string{"AGENTS.md": "Fixture instructions.\n", "notes/empty.txt": ""}}
-					var res bootdir.WriteResult
-					res, err = w.WriteInjectionSpec(root, spec, bootdir.WriteOptions{})
+					var res baselineWriteResult
+					res, err = w.WriteInjectionSpec(root, spec, baselineWriteOptions{})
 					if err == nil && in.Scenario == "refresh" {
 						unrelated(t, root)
 						spec.BootDirOverlay["AGENTS.md"] = "Refreshed instructions.\n"
-						res, err = w.WriteInjectionSpec(root, spec, bootdir.WriteOptions{})
+						res, err = w.WriteInjectionSpec(root, spec, baselineWriteOptions{})
 					}
 					ev.Bindings = struct {
-						Result       bootdir.WriteResult
+						Result       baselineWriteResult
 						AtomicWrites []string
 					}{res, writes}
 				case "agentlaunch":
@@ -169,14 +167,14 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 	if c, ok := a.(*provider.ClaudeAdapter); ok && in.Variant == "bare" {
 		c.Bare = true
 	}
-	ex, err := providerplant.ProjectExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+	ex, err := planting.ProjectExecution(context.Background(), prepared, planting.WithAdapter(a.(provider.BootDirProvider)))
 	if err != nil {
 		return ev, nil, err
 	}
 	authorize := fixtureAuthorization(t)
 	var routed *agentlaunch.PreparedExecution
 	if in.Provider != "codex" {
-		routed, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
+		routed, err = planting.PrepareExecution(context.Background(), prepared, planting.WithAdapter(a.(provider.BootDirProvider)), planting.WithArtifactAuthorization(authorize))
 		if err != nil {
 			return ev, nil, err
 		}
@@ -186,7 +184,7 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 			unrelated(t, root)
 		}
 		prepared.BootPrompt = "Refreshed instructions.\n"
-		ex, err = providerplant.ProjectExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)))
+		ex, err = planting.ProjectExecution(context.Background(), prepared, planting.WithAdapter(a.(provider.BootDirProvider)))
 		if err != nil {
 			return ev, nil, err
 		}
@@ -207,11 +205,11 @@ func renderProvider(t *testing.T, in goldens.Input, root string) (goldens.Eviden
 		First, Resumed []string
 	}{ex.Bindings, first, resumed}
 	if in.Provider == "codex" {
-		_, refusal := providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
+		_, refusal := planting.PrepareExecution(context.Background(), prepared, planting.WithAdapter(a.(provider.BootDirProvider)), planting.WithArtifactAuthorization(authorize))
 		return ev, ex, refusal
 	}
 	if in.Scenario == "refresh" {
-		routed, err = providerplant.PrepareExecution(context.Background(), prepared, providerplant.WithAdapter(a.(provider.BootDirProvider)), providerplant.WithArtifactAuthorization(authorize))
+		routed, err = planting.PrepareExecution(context.Background(), prepared, planting.WithAdapter(a.(provider.BootDirProvider)), planting.WithArtifactAuthorization(authorize))
 		if err != nil {
 			return ev, nil, err
 		}
