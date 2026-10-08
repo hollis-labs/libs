@@ -6,8 +6,12 @@ All notable changes to the `harness` module are documented here. The format foll
 `harness/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
-## [Unreleased]
+## v0.2.0 (Unreleased)
 
+- Added `cmd/cairn boot --resolved` with versioned resolved Input/HostInputDTO
+  JSON. `--plan` returns a pure plan; default preparation preserves the typed
+  missing-host-port refusal and full result. JSON does not construct host
+  authority. The older Cairn module/binary and live launch paths are untouched.
 - Added the named `catalog-auto` permission binding with explicit yolo posture
   and deny-rule bypass evidence. It requires caller-authorized yolo ceilings and
   refuses required deny enforcement; it does not implement native auto mode.

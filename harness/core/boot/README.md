@@ -116,3 +116,34 @@ The existing launch convention owns process CWD. An explicit `Workspace.CWD.Chil
 must equal that resolved CWD, or preparation refuses before ports; boot does not
 overwrite the canonical boot-directory CWD or silently discard a child request.
 `ProtocolProject` remains a separate protocol project locator.
+
+## Resolved CLI
+
+The new command lives in this module; it leaves the older Cairn module and any
+installed binary untouched. After this source is released, build it with
+`go build ./cmd/cairn` from the harness module.
+
+```sh
+cairn boot --resolved request.json --plan
+cairn boot --resolved - < request.json
+```
+
+The resolved envelope has `schema_version: "harness.boot.v1"`, `input` containing
+the complete `boot.Input` (including its own matching schema version), and `host`
+containing a `boot.HostInputDTO`. Callers resolve and pin those inputs before
+invocation; the CLI loads no definition, profile or catalog. `--resolved -` reads
+stdin. Unknown fields, duplicate keys, malformed Unicode, trailing JSON values
+and input larger than 32 MiB refuse. Old `--json` and legacy boot shapes refuse.
+
+`--plan` is pure and returns a description with no earned application result.
+Default preparation follows `boot.Prepare` with no host ports: valid supported
+requests return the typed `missing_apply_port` refusal, complete description and
+engine partial accounting. The CLI does not turn decoded grants, paths or
+observations into authority capabilities. Library callers with independently
+supplied `workspace.Ports` can prepare; concrete CLI host binding is future work.
+
+Except for help, stdout is one versioned JSON response containing `result`
+(the full `boot.Result`), `artifacts_complete`, and an optional error with
+`phase`, `code` and `message`. Exit 0 means pure planning succeeded, 1 means
+planning/preparation refused, and 2 means invocation or decoding failed.
+No command launches a process, runs hooks, publishes current, or grants Ready.
