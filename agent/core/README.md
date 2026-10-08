@@ -57,6 +57,5 @@ outcomes, canonical HTTP replay and persisted snapshots after database reopen.
 It makes no model or network calls. `examples/embed/main_test.go` runs it with a
 fresh temporary database.
 
-Artifact-bearing context composition belongs to the caller's adapter; the
-Harness adapter is `harness/agentcomposition`. That adapter depends on this
-module, while this module has no Harness dependency.
+Artifact-bearing context composition stays in an embedding adapter that imports
+this module. The agent module has no Harness dependency.
