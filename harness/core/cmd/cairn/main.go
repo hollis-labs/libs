@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/hollis-labs/substrate/harness/boot"
@@ -94,6 +96,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return finish(err, 2)
 	}
 	if err := rejectDuplicateKeys(json.NewDecoder(bytes.NewReader(data))); err != nil {
+		return finish(err, 2)
+	}
+	if err := validateFieldNames(data, reflect.TypeOf(resolvedRequest{})); err != nil {
 		return finish(err, 2)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -201,4 +206,127 @@ func rejectDuplicateKeys(decoder *json.Decoder) error {
 	}
 	_, err = decoder.Token()
 	return err
+}
+
+// The JSON decoder accepts case-insensitive struct field aliases. Resolved
+// intent requires the declared spelling; map keys are data and retain their
+// case sensitivity. Custom JSON values keep their own decoding contract.
+func validateFieldNames(data json.RawMessage, typ reflect.Type) error {
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return nil
+	}
+	unmarshaler := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+	if typ.Implements(unmarshaler) || reflect.PointerTo(typ).Implements(unmarshaler) {
+		return nil
+	}
+	switch typ.Kind() {
+	case reflect.Struct:
+		var values map[string]json.RawMessage
+		if err := json.Unmarshal(data, &values); err != nil {
+			return err
+		}
+		fields := schemaFields(typ)
+		for name, value := range values {
+			field, exact := fields[name]
+			if !exact {
+				for canonical := range fields {
+					if strings.EqualFold(name, canonical) {
+						return fmt.Errorf("struct field %q must use declared spelling %q", name, canonical)
+					}
+				}
+				continue // DisallowUnknownFields supplies the unknown-field error.
+			}
+			if err := validateFieldNames(value, field.typ); err != nil {
+				return err
+			}
+		}
+	case reflect.Map:
+		var values map[string]json.RawMessage
+		if err := json.Unmarshal(data, &values); err != nil {
+			return err
+		}
+		for _, value := range values {
+			if err := validateFieldNames(value, typ.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Array, reflect.Slice:
+		if typ.Elem().Kind() == reflect.Uint8 {
+			return nil // Encoded byte content is not a struct-field namespace.
+		}
+		var values []json.RawMessage
+		if err := json.Unmarshal(data, &values); err != nil {
+			return err
+		}
+		for _, value := range values {
+			if err := validateFieldNames(value, typ.Elem()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+type schemaField struct {
+	typ       reflect.Type
+	depth     int
+	tagged    bool
+	ambiguous bool
+}
+
+// Embedded fields follow JSON's shallowest-field and tagged-field precedence.
+// An ambiguous name stays unknown so the strict decoder can refuse it.
+func schemaFields(typ reflect.Type) map[string]schemaField {
+	fields := map[string]schemaField{}
+	var visit func(reflect.Type, int, map[reflect.Type]bool)
+	visit = func(typ reflect.Type, depth int, path map[reflect.Type]bool) {
+		if path[typ] {
+			return
+		}
+		path[typ] = true
+		defer delete(path, typ)
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			if field.PkgPath != "" && !field.Anonymous {
+				continue
+			}
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if name == "-" {
+				continue
+			}
+			underlying := field.Type
+			for underlying.Kind() == reflect.Pointer {
+				underlying = underlying.Elem()
+			}
+			if field.Anonymous && name == "" && underlying.Kind() == reflect.Struct {
+				visit(underlying, depth+1, path)
+				continue
+			}
+			if field.PkgPath != "" {
+				continue
+			}
+			tagged := name != ""
+			if name == "" {
+				name = field.Name
+			}
+			candidate := schemaField{typ: field.Type, depth: depth, tagged: tagged}
+			prior, exists := fields[name]
+			if !exists || depth < prior.depth || depth == prior.depth && tagged && !prior.tagged {
+				fields[name] = candidate
+			} else if depth == prior.depth && tagged == prior.tagged {
+				prior.ambiguous = true
+				fields[name] = prior
+			}
+		}
+	}
+	visit(typ, 0, map[reflect.Type]bool{})
+	for name, field := range fields {
+		if field.ambiguous {
+			delete(fields, name)
+		}
+	}
+	return fields
 }

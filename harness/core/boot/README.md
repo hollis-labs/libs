@@ -115,7 +115,8 @@ There is no default or normalization.
 The existing launch convention owns process CWD. An explicit `Workspace.CWD.Child`
 must equal that resolved CWD, or preparation refuses before ports; boot does not
 overwrite the canonical boot-directory CWD or silently discard a child request.
-`ProtocolProject` remains a separate protocol project locator.
+The project defaults to the resolved `RootID` plus `Relative`; only an explicit
+`ProtocolProject` overrides that project locator. `Child` never supplies it.
 
 ## Resolved CLI
 
@@ -132,8 +133,11 @@ The resolved envelope has `schema_version: "harness.boot.v1"`, `input` containin
 the complete `boot.Input` (including its own matching schema version), and `host`
 containing a `boot.HostInputDTO`. Callers resolve and pin those inputs before
 invocation; the CLI loads no definition, profile or catalog. `--resolved -` reads
-stdin. Unknown fields, duplicate keys, malformed Unicode, trailing JSON values
-and input larger than 32 MiB refuse. Old `--json` and legacy boot shapes refuse.
+stdin. Typed struct fields require their declared JSON spelling, including nested
+fields; case aliases and collisions refuse before decoding. Dynamic map keys
+remain case-sensitive data (`A` and `a` are distinct). Unknown fields, duplicate
+keys, malformed Unicode, trailing JSON values and input larger than 32 MiB refuse.
+Old `--json` and legacy boot shapes refuse.
 
 `--plan` is pure and returns a description with no earned application result.
 Default preparation follows `boot.Prepare` with no host ports: valid supported

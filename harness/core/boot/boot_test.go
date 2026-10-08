@@ -315,6 +315,24 @@ func TestExplicitChildCWDIsHonoredOrRefusedBeforePorts(t *testing.T) {
 	}
 }
 
+func TestMatchingChildDoesNotBecomeProtocolProject(t *testing.T) {
+	for _, id := range []runtimes.ID{runtimes.Claude, runtimes.Codex, runtimes.Antigravity} {
+		t.Run(string(id), func(t *testing.T) {
+			in, host, f := inputFixture(t)
+			in.Dispatch.Provider = id
+			in.Workspace.CWD.Child = in.Workspace.Boot.Candidate.Path
+			p, err := Plan(in, host)
+			if err != nil || !p.Valid() || len(f.calls) != 0 {
+				t.Fatal("matching canonical child was reinterpreted as project", err, f.calls)
+			}
+			d := p.Description()
+			if d.CWD != in.Workspace.CWD.Child || !slices.Contains(d.Argv, in.Workspace.Home.Root.Path) {
+				t.Fatal("rootID+relative project or canonical child lost", d.CWD, d.Argv)
+			}
+		})
+	}
+}
+
 func TestCatalogAutoBindingRequiresIndependentCeilingAndCurrentVersion(t *testing.T) {
 	for _, tc := range []struct {
 		name, code string

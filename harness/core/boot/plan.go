@@ -283,8 +283,6 @@ func projectPath(spec workspace.Spec, resources workspace.Resources) (string, er
 	cwd := filepath.Join(root.Path, spec.CWD.Relative)
 	if spec.CWD.ProtocolProject != "" {
 		cwd = spec.CWD.ProtocolProject
-	} else if spec.CWD.Child != "" {
-		cwd = spec.CWD.Child
 	}
 	return cwd, nil
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/substrate/harness/adapters/provider"
 	"github.com/hollis-labs/substrate/harness/boot"
 	"github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/sandbox"
@@ -170,6 +171,48 @@ func TestCLIArgumentsAndDecodeRefuseAmbiguity(t *testing.T) {
 }
 
 type brokenReader struct{}
+
+func TestTypedFieldCaseAliasesRefuseWithoutChangingDynamicMaps(t *testing.T) {
+	request := resolvedFixture(t)
+	valid := requestBytes(t, request)
+	for _, tc := range []struct{ name, old, replacement string }{
+		{"model collision", `"model":"fixture-model"`, `"model":"fixture-model","Model":"foreign-model"`},
+		{"model alias", `"model":"fixture-model"`, `"Model":"foreign-model"`},
+		{"effort collision", `"effort":"high"`, `"effort":"high","Effort":"low"`},
+		{"input collision", `"input":{`, `"Input":{},"input":{`},
+		{"envelope alias", `"schema_version":`, `"SCHEMA_VERSION":`},
+		{"nested policy alias", `"SkipsDenyRules":false`, `"skipsdenyrules":false`},
+		{"nested root alias", `"AllowedBase":`, `"allowedbase":`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !bytes.Contains(valid, []byte(tc.old)) {
+				t.Fatal("fixture did not reach alias")
+			}
+			data := bytes.Replace(valid, []byte(tc.old), []byte(tc.replacement), 1)
+			exit, out := invoke(t, []string{"boot", "--resolved", "-", "--plan"}, data)
+			if exit != 2 || out.Error == nil || out.Error.Code != "cli_input" {
+				t.Fatal("struct field alias accepted or laundered", exit, out.Result.Description.Model, out.Error)
+			}
+		})
+	}
+	request.Input.Settings = boot.NativeSettings{Provenance: request.Input.Context.Provenance, Claude: &boot.ClaudeSettings{Environment: map[string]string{"A": "one", "a": "two"}}}
+	request.Host.Environment = []boot.EnvironmentEntry{
+		{Delta: provider.EnvDelta{Name: "TEAM_A", Value: "one", Operation: provider.EnvSet, Precedence: provider.EnvCallerWins}, Provenance: request.Host.Provenance},
+		{Delta: provider.EnvDelta{Name: "TEAM_a", Value: "two", Operation: provider.EnvSet, Precedence: provider.EnvCallerWins}, Provenance: request.Host.Provenance},
+	}
+	data := requestBytes(t, request)
+	for _, replacement := range []string{`"Delta":`, `"delta":{},"Delta":`} {
+		aliased := bytes.Replace(data, []byte(`"delta":`), []byte(replacement), 1)
+		exit, out := invoke(t, []string{"boot", "--resolved", "-", "--plan"}, aliased)
+		if exit != 2 || out.Error == nil || out.Error.Code != "cli_input" {
+			t.Fatal("typed environment-array alias accepted", exit, out.Error)
+		}
+	}
+	exit, out := invoke(t, []string{"boot", "--resolved", "-", "--plan"}, requestBytes(t, request))
+	if exit != 0 || out.Error != nil || out.Result.Description.RequestedSettings.Claude.Environment["A"] != "one" || out.Result.Description.RequestedSettings.Claude.Environment["a"] != "two" {
+		t.Fatal("case-sensitive dynamic data refused or rewritten", exit, out.Error)
+	}
+}
 
 func (brokenReader) Read([]byte) (int, error) { return 0, errors.New("fixture read error") }
 
