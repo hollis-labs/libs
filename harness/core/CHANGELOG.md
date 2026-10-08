@@ -8,6 +8,11 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+- Added the named `catalog-auto` permission binding with explicit yolo posture
+  and deny-rule bypass evidence. It requires caller-authorized yolo ceilings and
+  refuses required deny enforcement; it does not implement native auto mode.
+  All named bindings now carry `harness-permission-profiles-v2`; boot refuses
+  stale resolved versions. Hosts must resolve and authorize the binding separately.
 - Added `boot.Plan` and `boot.Prepare` for caller-resolved definitions, typed
   policy, explicit model/effort, neutral composed context and independently
   authorized host inputs. Canonical artifacts use the sole workspace engine;

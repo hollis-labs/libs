@@ -4,7 +4,7 @@ import "fmt"
 
 // ProfileBindingVersion is launch evidence. Change it when binding semantics
 // change; the definition pins only the name. These bindings grant no mesh verbs.
-const ProfileBindingVersion = "harness-permission-profiles-v1"
+const ProfileBindingVersion = "harness-permission-profiles-v2"
 
 // ProfileBinding is the resolved named posture and its launch-evidence version.
 type ProfileBinding struct {
@@ -19,6 +19,9 @@ var profileBindings = []ProfileBinding{
 	{"plan", ModePlan, ProfileBindingVersion, false},
 	{"accept-edits", ModeAcceptEdits, ProfileBindingVersion, false},
 	{"yolo", ModeYolo, ProfileBindingVersion, true},
+	// This named catalog policy currently selects the explicit yolo posture.
+	// It does not implement a provider-native auto mode or confer a ceiling.
+	{"catalog-auto", ModeYolo, ProfileBindingVersion, true},
 }
 
 func ProfileBindings() []ProfileBinding { return append([]ProfileBinding(nil), profileBindings...) }

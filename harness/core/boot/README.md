@@ -44,7 +44,12 @@ process lifecycle remain separate contracts.
 - `Definition.Policy` carries the resolved named permission binding, restrictions,
   approval and escalation references, and source provenance. The binding is
   compared with the existing permission table and explicit host ceiling. Unknown
-  names, including `catalog-auto`, refuse. Approval/escalation references preserve
+  names refuse. The named `catalog-auto` binding explicitly selects `ModeYolo`,
+  reports `SkipsDenyRules: true`, and requires yolo in the caller-supplied authorized
+  ceiling. It refuses when either host or definition requires deny enforcement.
+  All authored profile bindings use `harness-permission-profiles-v2`; a stale
+  resolved version refuses. `catalog-auto` does not implement native `auto` or
+  supply host permission. Approval/escalation references preserve
   their opaque URI and resolved SHA256; nonempty requirements currently refuse
   because boot implements no approval or escalation engine.
 - `Input.Workspace` carries semantic directory/access requests and identity pins.

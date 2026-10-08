@@ -175,7 +175,7 @@ func TestPrepareEarlyRefusalsKeepProvenanceAndTouchNoPorts(t *testing.T) {
 		{"effort", "missing_dispatch_selection", func(i *Input, h *HostInputs) { i.Dispatch.Effort = "" }},
 		{"runtime", "missing_dispatch_selection", func(i *Input, h *HostInputs) { i.Dispatch.Mode = "" }},
 		{"provider", "missing_dispatch_selection", func(i *Input, h *HostInputs) { i.Dispatch.Provider = "" }},
-		{"unknown policy", "unknown_permission_profile", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Name = "catalog-auto" }},
+		{"unknown policy", "unknown_permission_profile", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Name = "unbound-profile" }},
 		{"ceiling", "permission_ceiling", func(i *Input, h *HostInputs) { h.Ceiling.Modes = nil }},
 		{"binding version", "policy_binding_mismatch", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Version = "foreign" }},
 		{"workspace policy mismatch", "policy_binding_mismatch", func(i *Input, h *HostInputs) {
@@ -312,6 +312,48 @@ func TestExplicitChildCWDIsHonoredOrRefusedBeforePorts(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestCatalogAutoBindingRequiresIndependentCeilingAndCurrentVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		change     func(*Input, *HostInputs)
+	}{
+		{"enrolled", "", func(*Input, *HostInputs) {}},
+		{"ceiling", "permission_ceiling", func(i *Input, h *HostInputs) { h.Ceiling.Modes = []permission.Mode{permission.ModePlan} }},
+		{"host deny", "deny_enforcement_required", func(i *Input, h *HostInputs) { h.Ceiling.RequiresDenyEnforcement = true }},
+		{"definition deny", "deny_enforcement_required", func(i *Input, h *HostInputs) { i.Definition.Policy.RequiresDenyEnforcement = true }},
+		{"stale version", "policy_binding_mismatch", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Version = "harness-permission-profiles-v1" }},
+		{"false skip claim", "policy_binding_mismatch", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.SkipsDenyRules = false }},
+		{"native auto", "native_policy_mixture", func(i *Input, h *HostInputs) {
+			i.Settings = NativeSettings{Provenance: i.Context.Provenance, Claude: &ClaudeSettings{PermissionsDefaultMode: "auto"}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, host, f := inputFixture(t)
+			in.Definition.Policy.Profile = permission.ProfileBinding{Name: "catalog-auto", Mode: permission.ModeYolo, Version: "harness-permission-profiles-v2", SkipsDenyRules: true}
+			host.Ceiling.Modes = []permission.Mode{permission.ModeYolo}
+			tc.change(&in, &host)
+			result, err := Prepare(context.Background(), in, host)
+			if tc.code != "" {
+				var be *Error
+				if !errors.As(err, &be) || be.Code != tc.code || len(f.calls) != 0 || result.ArtifactsComplete() {
+					t.Fatalf("required refusal %s: err=%v calls=%v", tc.code, err, f.calls)
+				}
+				return
+			}
+			if err != nil || !result.ArtifactsComplete() {
+				t.Fatal("enrolled binding refused", err)
+			}
+			if result.Description.Definition.Policy.Profile != in.Definition.Policy.Profile || !slices.Contains(result.Description.Argv, "--dangerously-skip-permissions") {
+				t.Fatal("name/version/posture not retained", result.Description)
+			}
+			b, err := os.ReadFile(result.Description.SettingsPath)
+			if err != nil || !strings.Contains(string(b), "bypassPermissions") || strings.Contains(string(b), `"auto"`) {
+				t.Fatal("effective binding became native auto", err, string(b))
+			}
+		})
 	}
 }
 
