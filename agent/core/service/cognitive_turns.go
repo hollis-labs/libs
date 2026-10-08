@@ -13,20 +13,18 @@ import (
 	chatstream "github.com/hollis-labs/go-chatstream"
 	"github.com/hollis-labs/go-chatstream/hubbind"
 	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/nanite/internal/chat"
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
-const CognitiveEventRetention = 4096
-const CognitiveEventGrace = 300 * time.Second
-const CognitiveKeepalive = 15 * time.Second
+const EventRetention = 4096
+const EventGrace = 300 * time.Second
+const Keepalive = 15 * time.Second
 
-var ErrCognitiveTurnNotFound = errors.New("turn not found in this view")
+var ErrTurnNotFound = errors.New("turn not found in this view")
 
-// CognitiveTurnSnapshot is captured under the same lock that publishes the
+// Snapshot[Message] is captured under the same lock that publishes the
 // canonical log. EventCheckpoint and Message therefore describe one revision.
 // Turn IDs, run IDs and output IDs currently share one opaque local ID.
-type CognitiveTurnSnapshot struct {
+type Snapshot[Message any] struct {
 	SessionViewID     string              `json:"session_view_id"`
 	TurnID            string              `json:"turn_id"`
 	RunID             string              `json:"run_id"`
@@ -36,28 +34,30 @@ type CognitiveTurnSnapshot struct {
 	CancelRequested   bool                `json:"cancel_requested"`
 	Revision          uint64              `json:"revision"`
 	EventCheckpoint   uint64              `json:"event_checkpoint"`
-	DeltaMode         chat.DeltaMode      `json:"delta_mode"`
+	DeltaMode         string              `json:"delta_mode"`
 	Effort            string              `json:"effort"`
 	Message           *chatstream.Message `json:"message"`
 	Content           string              `json:"content"`
-	CommittedMessage  *store.Message      `json:"committed_message,omitempty"`
+	CommittedMessage  *Message            `json:"committed_message,omitempty"`
 }
 
-// CognitiveTurns keeps authoritative run reductions independently of the
+// Turns[Message] keeps authoritative run reductions independently of the
 // bounded event log. Expiring a log does not expire its status/snapshot.
-type CognitiveTurns struct {
-	mu    sync.Mutex
-	runs  map[string]*cognitiveRun
-	hub   *streamhub.Hub
-	store *store.Store
+type Turns[Message any] struct {
+	mu             sync.Mutex
+	runs           map[string]*Run[Message]
+	hub            *streamhub.Hub
+	store          SnapshotStore
+	stateKind      string
+	activityPrefix string
 }
 
-type cognitiveRun struct {
+type Run[Message any] struct {
 	mu            sync.Mutex
-	owner         *CognitiveTurns
-	snapshot      CognitiveTurnSnapshot
+	owner         *Turns[Message]
+	snapshot      Snapshot[Message]
 	canceled      bool
-	loadMessage   func() (*store.Message, error)
+	loadMessage   func() (Committed[Message], error)
 	partID        string
 	phase         string
 	partNumber    int
@@ -66,19 +66,26 @@ type cognitiveRun struct {
 	usage         *chatstream.Usage
 }
 
-func NewCognitiveTurns(backing ...*store.Store) *CognitiveTurns {
-	t := &CognitiveTurns{runs: make(map[string]*cognitiveRun), hub: streamhub.New(streamhub.NewMemoryLog(),
-		streamhub.WithAutoOpen(false), streamhub.WithTerminal(hubbind.Terminal),
-		streamhub.WithRetention(streamhub.Retention{MaxRecords: CognitiveEventRetention}),
-		streamhub.WithRetainAfterClose(CognitiveEventGrace))}
-	if len(backing) > 0 {
-		t.store = backing[0]
+func NewTurns[Message any](backing SnapshotStore, opts Options) *Turns[Message] {
+	hub := opts.Hub
+	if hub == nil {
+		hub = streamhub.New(streamhub.NewMemoryLog(),
+			streamhub.WithAutoOpen(false), streamhub.WithTerminal(hubbind.Terminal),
+			streamhub.WithRetention(streamhub.Retention{MaxRecords: EventRetention}),
+			streamhub.WithRetainAfterClose(EventGrace))
 	}
-	return t
+	stateKind, prefix := opts.StateActivityKind, opts.ActivityPrefix
+	if stateKind == "" {
+		stateKind = "agent.turn_state"
+	}
+	if prefix == "" {
+		prefix = "agent."
+	}
+	return &Turns[Message]{runs: make(map[string]*Run[Message]), hub: hub, store: backing, stateKind: stateKind, activityPrefix: prefix}
 }
 
-func (t *CognitiveTurns) create(viewID, id, provider, model string, mode chat.DeltaMode, effort string, load func() (*store.Message, error)) *cognitiveRun {
-	r := &cognitiveRun{owner: t, loadMessage: load, snapshot: CognitiveTurnSnapshot{SessionViewID: viewID, TurnID: id, RunID: id, OutputMessageID: id, State: "submitted", DeltaMode: mode, Effort: effort}}
+func (t *Turns[Message]) Create(viewID, id, provider, model string, mode string, effort string, load func() (Committed[Message], error)) *Run[Message] {
+	r := &Run[Message]{owner: t, loadMessage: load, snapshot: Snapshot[Message]{SessionViewID: viewID, TurnID: id, RunID: id, OutputMessageID: id, State: "submitted", DeltaMode: mode, Effort: effort}}
 	if err := t.hub.Open(context.Background(), id); err != nil {
 		panic(err)
 	}
@@ -92,7 +99,7 @@ func (t *CognitiveTurns) create(viewID, id, provider, model string, mode chat.De
 	return r
 }
 
-func (t *CognitiveTurns) run(viewID, id string) (*cognitiveRun, error) {
+func (t *Turns[Message]) run(viewID, id string) (*Run[Message], error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	r := t.runs[id]
@@ -101,12 +108,12 @@ func (t *CognitiveTurns) run(viewID, id string) (*cognitiveRun, error) {
 		defer cancel()
 		data, err := t.store.GetCognitiveTurnSnapshot(ctx, viewID, id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrCognitiveTurnNotFound
+			return nil, ErrTurnNotFound
 		}
 		if err != nil {
 			return nil, err
 		}
-		r = &cognitiveRun{owner: t}
+		r = &Run[Message]{owner: t}
 		if err = json.Unmarshal([]byte(data), &r.snapshot); err != nil {
 			return nil, err
 		}
@@ -126,15 +133,15 @@ func (t *CognitiveTurns) run(viewID, id string) (*cognitiveRun, error) {
 		t.runs[id] = r
 	}
 	if r == nil || (viewID != "" && r.snapshot.SessionViewID != viewID) {
-		return nil, ErrCognitiveTurnNotFound
+		return nil, ErrTurnNotFound
 	}
 	return r, nil
 }
 
-func (t *CognitiveTurns) Get(viewID, id string) (CognitiveTurnSnapshot, error) {
+func (t *Turns[Message]) Get(viewID, id string) (Snapshot[Message], error) {
 	r, err := t.run(viewID, id)
 	if err != nil {
-		return CognitiveTurnSnapshot{}, err
+		return Snapshot[Message]{}, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -147,7 +154,7 @@ func (t *CognitiveTurns) Get(viewID, id string) (CognitiveTurnSnapshot, error) {
 	return snapshot, nil
 }
 
-func (t *CognitiveTurns) pendingView(viewID string) bool {
+func (t *Turns[Message]) PendingView(viewID string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, run := range t.runs {
@@ -161,17 +168,17 @@ func (t *CognitiveTurns) pendingView(viewID string) bool {
 	return false
 }
 
-func (t *CognitiveTurns) Subscribe(ctx context.Context, viewID, id string, after uint64) (streamhub.Subscription, error) {
+func (t *Turns[Message]) Subscribe(ctx context.Context, viewID, id string, after uint64) (streamhub.Subscription, error) {
 	if _, err := t.run(viewID, id); err != nil {
 		return nil, err
 	}
 	return t.hub.Subscribe(ctx, id, streamhub.SubscribeOptions{After: streamhub.Seq(after), Buffer: 256, Policy: streamhub.CloseAndResume})
 }
 
-func (t *CognitiveTurns) CancelRequested(viewID, id string) (CognitiveTurnSnapshot, error) {
+func (t *Turns[Message]) CancelRequested(viewID, id string) (Snapshot[Message], error) {
 	r, err := t.run(viewID, id)
 	if err != nil {
-		return CognitiveTurnSnapshot{}, err
+		return Snapshot[Message]{}, err
 	}
 	r.mu.Lock()
 	if !r.snapshot.Message.Status.Done() && !r.snapshot.CancelRequested {
@@ -179,14 +186,14 @@ func (t *CognitiveTurns) CancelRequested(viewID, id string) (CognitiveTurnSnapsh
 		r.snapshot.Revision++
 		if err := r.save(); err != nil {
 			r.mu.Unlock()
-			return CognitiveTurnSnapshot{}, err
+			return Snapshot[Message]{}, err
 		}
 	}
 	r.mu.Unlock()
 	return t.Get(viewID, id)
 }
 
-func (t *CognitiveTurns) working(id string) {
+func (t *Turns[Message]) Working(id string) {
 	r, err := t.run("", id)
 	if err != nil {
 		return
@@ -198,7 +205,7 @@ func (t *CognitiveTurns) working(id string) {
 	}
 }
 
-func (t *CognitiveTurns) ending(id string, canceled bool) {
+func (t *Turns[Message]) Ending(id string, canceled bool) {
 	r, err := t.run("", id)
 	if err != nil {
 		return
@@ -208,7 +215,7 @@ func (t *CognitiveTurns) ending(id string, canceled bool) {
 	r.mu.Unlock()
 }
 
-func (r *cognitiveRun) publish(ev chatstream.Event) {
+func (r *Run[Message]) publish(ev chatstream.Event) {
 	if r.snapshot.Message != nil && r.snapshot.Message.Status.Done() {
 		return
 	}
@@ -244,29 +251,29 @@ func (r *cognitiveRun) publish(ev chatstream.Event) {
 
 func jsonValue(v any) json.RawMessage { data, _ := json.Marshal(v); return data }
 
-func (r *cognitiveRun) state(state string) {
+func (r *Run[Message]) state(state string) {
 	if r.snapshot.Message != nil && r.snapshot.Message.Status.Done() {
 		return
 	}
 	r.snapshot.State = state
-	r.publish(chatstream.Event{Verb: chatstream.VerbActivity, Kind: "nanite.turn_state", Value: jsonValue(map[string]string{"state": state})})
+	r.publish(chatstream.Event{Verb: chatstream.VerbActivity, Kind: r.owner.stateKind, Value: jsonValue(map[string]string{"state": state})})
 }
 
-func (r *cognitiveRun) message() {
+func (r *Run[Message]) message() {
 	if !r.openedMessage {
 		r.publish(chatstream.Event{Verb: chatstream.VerbMessageStart, MessageID: r.snapshot.OutputMessageID, Role: "assistant"})
 		r.openedMessage = true
 	}
 }
 
-func (r *cognitiveRun) closePart() {
+func (r *Run[Message]) closePart() {
 	if r.partID != "" {
 		r.publish(chatstream.Event{Verb: chatstream.VerbPartEnd, PartID: r.partID})
 		r.partID = ""
 	}
 }
 
-func (r *cognitiveRun) consume(evt chat.StreamEvent) {
+func (r *Run[Message]) Consume(evt Input) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.snapshot.Message.Status.Done() {
@@ -283,12 +290,12 @@ func (r *cognitiveRun) consume(evt chat.StreamEvent) {
 			r.partID = fmt.Sprintf("text-%d", r.partNumber)
 			r.phase = evt.Phase
 			kind := chatstream.PartText
-			if evt.Phase == chat.PhaseThinking {
+			if evt.Phase == "thinking" {
 				kind = chatstream.PartReasoning
 			}
 			r.publish(chatstream.Event{Verb: chatstream.VerbPartStart, PartID: r.partID, Kind: string(kind), Meta: map[string]json.RawMessage{chatstream.MetaPhase: jsonValue(evt.Phase)}})
 		}
-		if evt.Phase == chat.PhaseFinal || evt.Phase == "" {
+		if evt.Phase == "final" || evt.Phase == "" {
 			r.snapshot.Content += evt.Content
 		}
 		r.publish(chatstream.Event{Verb: chatstream.VerbPartDelta, PartID: r.partID, Text: evt.Content})
@@ -318,7 +325,7 @@ func (r *cognitiveRun) consume(evt chat.StreamEvent) {
 		}
 		r.publish(chatstream.Event{Verb: chatstream.VerbPartEnd, PartID: id, Final: final})
 	case "approval_request":
-		var prompt chat.ApprovalRequestPayload
+		var prompt ApprovalPrompt
 		if err := json.Unmarshal([]byte(evt.Data), &prompt); err != nil {
 			r.lastError = &chatstream.RunError{Code: "invalid_approval", Message: "invalid native permission prompt"}
 			return
@@ -329,18 +336,22 @@ func (r *cognitiveRun) consume(evt chat.StreamEvent) {
 		r.publish(chatstream.Event{Verb: chatstream.VerbApprovalRequest, ApprovalID: prompt.RequestID, CallID: prompt.CallID, Reason: prompt.Reason, Descriptor: jsonValue(map[string]any{"tool": prompt.Tool, "input": prompt.Input, "supported_scopes": []string{"once"}}), Mode: chatstream.ApprovalInBand, ExpiresAt: &expires})
 	case "error":
 		r.lastError = &chatstream.RunError{Code: "provider_error", Message: evt.Error}
-		if evt.StructuredError != nil {
-			r.lastError.Code = string(evt.StructuredError.Code)
-			r.lastError.Message = evt.StructuredError.Message
+		if evt.Failure != nil {
+			failure := *evt.Failure
+			r.lastError = &failure
 		}
 	case "stream_end":
 		r.finish(true)
 	case "status", "tool_warning", "notify_pause", "plugin_envelope", "panel_signal", "subagent_run_status_changed", "message_received", "circuit_open", "rate_budget_pause", "handoff_loaded", "slot_changed":
-		r.publish(chatstream.Event{Verb: chatstream.VerbActivity, Kind: "nanite." + evt.Type, Value: jsonValue(evt)})
+		value := evt.Raw
+		if value == nil {
+			value = jsonValue(evt)
+		}
+		r.publish(chatstream.Event{Verb: chatstream.VerbActivity, Kind: r.owner.activityPrefix + evt.Type, Value: value})
 	}
 }
 
-func (r *cognitiveRun) end() {
+func (r *Run[Message]) End() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.snapshot.Message.Status.Done() {
@@ -351,7 +362,7 @@ func (r *cognitiveRun) end() {
 // Only this finalizer publishes terminal events, after the producer has
 // committed its final or partial assistant row. Queued cancellation has no
 // assistant row because execution never began.
-func (r *cognitiveRun) finish(completed bool) {
+func (r *Run[Message]) finish(completed bool) {
 	r.closePart()
 	if r.openedMessage {
 		r.publish(chatstream.Event{Verb: chatstream.VerbMessageEnd, MessageID: r.snapshot.OutputMessageID})
@@ -366,24 +377,26 @@ func (r *cognitiveRun) finish(completed bool) {
 		terminal = chatstream.Event{Verb: chatstream.VerbRunAbort, Reason: "canceled"}
 		state = "canceled"
 	}
-	msg, err := r.loadMessage()
+	var committed Committed[Message]
+	var err error
+	if r.loadMessage == nil {
+		err = errors.New("committed output loader unavailable")
+	} else {
+		committed, err = r.loadMessage()
+	}
 	if err == nil {
-		r.snapshot.CommittedMessage = msg
-		var metadata struct {
-			Interrupted bool `json:"interrupted"`
-		}
-		_ = json.Unmarshal([]byte(msg.Metadata), &metadata)
+		r.snapshot.CommittedMessage = committed.Message
 		if completed {
-			canceled = metadata.Interrupted
+			canceled = committed.Interrupted
 		}
 		if canceled {
 			terminal = chatstream.Event{Verb: chatstream.VerbRunAbort, Reason: "canceled"}
 			state = "canceled"
 		}
-		var structured chat.StructuredMessage
-		if json.Unmarshal([]byte(msg.Content), &structured) == nil && structured.Version > 0 {
-			r.snapshot.Content = structured.Text
+		if committed.Content != nil {
+			r.snapshot.Content = *committed.Content
 		}
+
 		if completed && !canceled && r.lastError == nil {
 			terminal = chatstream.Event{Verb: chatstream.VerbRunFinish, Reason: "stop"}
 			state = "completed"
@@ -399,7 +412,7 @@ func (r *cognitiveRun) finish(completed bool) {
 	r.publish(terminal)
 }
 
-func (r *cognitiveRun) save() error {
+func (r *Run[Message]) save() error {
 	if r.owner.store == nil {
 		return nil
 	}
@@ -412,7 +425,7 @@ func (r *cognitiveRun) save() error {
 	return r.owner.store.SaveCognitiveTurnSnapshot(ctx, r.snapshot.SessionViewID, r.snapshot.TurnID, string(data))
 }
 
-func (t *CognitiveTurns) setUsage(id string, usage *chatstream.Usage) {
+func (t *Turns[Message]) SetUsage(id string, usage *chatstream.Usage) {
 	r, err := t.run("", id)
 	if err != nil {
 		return

@@ -1,6 +1,8 @@
-// Package agent contains the embeddable agent runtime components.
+// Package agent contains embeddable native agent runtime mechanisms.
 //
-// The context package owns native slot windows, compaction and handoff mechanics.
-// The agentcontext package owns ordered declarative context assembly and its
-// resolver and skill interfaces. Applications provide models, policy and storage.
+// Context assembly, provider turns, iteration control, tool scheduling, bound
+// approvals and child lifecycle are exposed through subpackages. The service
+// package supplies per-run canonical reduction, status, snapshot and replay;
+// transport/httpstream writes those events after host authorization.
+// Applications supply preparation, models, policy, storage, tools and admission.
 package agent

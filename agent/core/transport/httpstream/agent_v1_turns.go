@@ -1,10 +1,13 @@
-package api
+// Package httpstream writes authenticated host-owned per-run canonical events.
+// It registers no routes and supplies no credentials; host middleware owns
+// authorization, off-box configuration and view/run lookup before Write.
+package httpstream
 
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -13,78 +16,39 @@ import (
 	"github.com/hollis-labs/go-chatstream/sink"
 	"github.com/hollis-labs/go-chatstream/sink/native"
 	streamhub "github.com/hollis-labs/go-streamhub"
-	"github.com/hollis-labs/nanite/internal/service"
+	agentservice "github.com/hollis-labs/substrate/agent/service"
 )
 
-type agentV1TurnLinks struct {
-	Status   string `json:"status"`
-	Snapshot string `json:"snapshot"`
-	Events   string `json:"events"`
-	Cancel   string `json:"cancel"`
+var ErrForeignRun = errors.New("canonical event belongs to a different run")
+
+type State struct {
+	RunID             string
+	After, Checkpoint uint64
 }
 
-func agentV1TurnRoutes(view, id string) agentV1TurnLinks {
-	status := agentV1RoutePrefix + "/sessions/" + url.PathEscape(view) + "/turns/" + url.PathEscape(id)
-	return agentV1TurnLinks{Status: status, Snapshot: status, Events: status + "/events", Cancel: status + "/cancel"}
-}
-
-func (a *API) agentV1Turn(w http.ResponseWriter, r *http.Request) (service.CognitiveTurnSnapshot, bool) {
-	view, id := r.PathValue("id"), r.PathValue("turnId")
-	if _, err := a.Services.Sessions.Get(r.Context(), view); err != nil {
-		a.agentV1LookupError(w, err)
-		return service.CognitiveTurnSnapshot{}, false
+// ParseCursor accepts the strict Last-Event-ID form, excluding reserved latest
+// cursors and query parameter fallbacks.
+func ParseCursor(r *http.Request) (uint64, error) {
+	if r.URL.RawQuery != "" {
+		return 0, errors.New("event cursors use Last-Event-ID only; query parameters are unsupported")
 	}
-	if a.Services.Streams == nil {
-		a.agentV1Error(w, 503, "native turns unavailable")
-		return service.CognitiveTurnSnapshot{}, false
-	}
-	snapshot, err := a.Services.Streams.CognitiveTurns().Get(view, id)
-	if err != nil {
-		if errors.Is(err, service.ErrCognitiveTurnNotFound) {
-			a.agentV1Error(w, 404, "turn not found in this view")
-		} else {
-			a.agentV1Error(w, 500, "turn lookup failed")
+	var after uint64
+	if values := r.Header.Values("Last-Event-ID"); len(values) > 0 {
+		if len(values) != 1 || values[0] == "" {
+			return 0, errors.New("invalid Last-Event-ID")
 		}
-		return service.CognitiveTurnSnapshot{}, false
+		for _, c := range values[0] {
+			if c < '0' || c > '9' {
+				return 0, errors.New("invalid Last-Event-ID")
+			}
+		}
+		var err error
+		after, err = strconv.ParseUint(values[0], 10, 64)
+		if err != nil || after == uint64(streamhub.FromLatest) {
+			return 0, errors.New("invalid Last-Event-ID")
+		}
 	}
-	return snapshot, true
-}
-
-func (a *API) handleAgentV1GetTurn(w http.ResponseWriter, r *http.Request) {
-	snapshot, ok := a.agentV1Turn(w, r)
-	if !ok {
-		return
-	}
-	a.jsonResp(w, 200, struct {
-		service.CognitiveTurnSnapshot
-		Links agentV1TurnLinks `json:"links"`
-	}{snapshot, agentV1TurnRoutes(snapshot.SessionViewID, snapshot.TurnID)})
-}
-
-func (a *API) handleAgentV1CancelTurn(w http.ResponseWriter, r *http.Request) {
-	snapshot, ok := a.agentV1Turn(w, r)
-	if !ok {
-		return
-	}
-	canceler, ok := a.Services.Chat.(service.CognitiveTurnCancellation)
-	if !ok {
-		a.agentV1Error(w, 503, "targeted cancellation unavailable")
-		return
-	}
-	// Mark intent before signaling the exact generation. A completion that
-	// already committed wins; cancellation never rewrites a terminal state.
-	if _, err := a.Services.Streams.CognitiveTurns().CancelRequested(snapshot.SessionViewID, snapshot.TurnID); err != nil {
-		a.agentV1Error(w, 500, "failed to record cancellation")
-		return
-	}
-	if !snapshot.Message.Status.Done() {
-		canceler.CancelCognitiveTurn(snapshot.SessionViewID, snapshot.TurnID)
-	}
-	snapshot, _ = a.Services.Streams.CognitiveTurns().Get(snapshot.SessionViewID, snapshot.TurnID)
-	a.jsonResp(w, 200, struct {
-		service.CognitiveTurnSnapshot
-		Links agentV1TurnLinks `json:"links"`
-	}{snapshot, agentV1TurnRoutes(snapshot.SessionViewID, snapshot.TurnID)})
+	return after, nil
 }
 
 type agentCanonicalEncoder struct{ sink.Encoder }
@@ -95,39 +59,11 @@ func (e agentCanonicalEncoder) Headers() http.Header {
 	return headers
 }
 
-func (a *API) handleAgentV1TurnEvents(w http.ResponseWriter, r *http.Request) {
-	if r.URL.RawQuery != "" {
-		a.agentV1Error(w, 400, "event cursors use Last-Event-ID only; query parameters are unsupported")
-		return
-	}
-	var after uint64
-	if values := r.Header.Values("Last-Event-ID"); len(values) > 0 {
-		if len(values) != 1 || values[0] == "" {
-			a.agentV1Error(w, 400, "invalid Last-Event-ID")
-			return
-		}
-		for _, c := range values[0] {
-			if c < '0' || c > '9' {
-				a.agentV1Error(w, 400, "invalid Last-Event-ID")
-				return
-			}
-		}
-		var err error
-		after, err = strconv.ParseUint(values[0], 10, 64)
-		if err != nil || after == uint64(streamhub.FromLatest) {
-			a.agentV1Error(w, 400, "invalid Last-Event-ID")
-			return
-		}
-	}
-	snapshot, ok := a.agentV1Turn(w, r)
-	if !ok {
-		return
-	}
-	sub, err := a.Services.Streams.CognitiveTurns().Subscribe(r.Context(), snapshot.SessionViewID, snapshot.TurnID, after)
-	expired := errors.Is(err, streamhub.ErrUnknownStream)
-	if err != nil && !expired {
-		a.agentV1Error(w, 503, "native event log unavailable")
-		return
+// Write serializes a previously authorized subscription. Expired logs produce
+// a gap to the authoritative checkpoint; disconnects never create an outcome.
+func Write(w http.ResponseWriter, r *http.Request, sub streamhub.Subscription, state State, expired bool) error {
+	if sub == nil && !expired {
+		return errors.New("native subscription unavailable")
 	}
 	encoder := agentCanonicalEncoder{native.New()}
 	w.Header().Set("X-Chat-Encoding", "chatstream/v1")
@@ -136,52 +72,55 @@ func (a *API) handleAgentV1TurnEvents(w http.ResponseWriter, r *http.Request) {
 		if sub != nil {
 			_ = sub.Close()
 		}
-		return
+		return err
 	}
 	if expired {
-		gap := chatstream.Event{V: chatstream.SchemaVersion, RunID: snapshot.RunID, Time: time.Now().UTC(), Verb: chatstream.VerbGap, Reason: chatstream.GapRetention, From: after + 1, To: snapshot.EventCheckpoint}
-		if after > snapshot.EventCheckpoint {
+		gap := chatstream.Event{V: chatstream.SchemaVersion, RunID: state.RunID, Time: time.Now().UTC(), Verb: chatstream.VerbGap, Reason: chatstream.GapRetention, From: state.After + 1, To: state.Checkpoint}
+		if state.After > state.Checkpoint {
 			gap.Reason = chatstream.GapCursorAhead
-			gap.From = after
-			gap.To = snapshot.EventCheckpoint
+			gap.From = state.After
+			gap.To = state.Checkpoint
 		}
-		if after != snapshot.EventCheckpoint {
-			_ = encoder.Encode(writer, gap)
+		if state.After != state.Checkpoint {
+			return encoder.Encode(writer, gap)
 		}
-		return
+		return nil
 	}
 	defer func() { _ = sub.Close() }()
 	var comments sink.Bind
 	for {
-		nextCtx, cancel := context.WithTimeout(r.Context(), service.CognitiveKeepalive)
+		nextCtx, cancel := context.WithTimeout(r.Context(), agentservice.Keepalive)
 		item, nextErr := sub.Next(nextCtx)
 		cancel()
 		if errors.Is(nextErr, context.DeadlineExceeded) && r.Context().Err() == nil {
-			if comments.Comment(writer, "keepalive") != nil {
-				return
+			if err := comments.Comment(writer, "keepalive"); err != nil {
+				return err
 			}
 			continue
 		}
 		if nextErr != nil {
-			return
+			if errors.Is(nextErr, io.EOF) {
+				return nil
+			}
+			return nextErr
 		}
 		var ev chatstream.Event
 		if item.Gap != nil {
-			ev = hubbind.GapEvent(snapshot.RunID, time.Now().UTC(), *item.Gap)
+			ev = hubbind.GapEvent(state.RunID, time.Now().UTC(), *item.Gap)
 		} else {
 			ev, err = hubbind.Decode(item.Record)
 			if err != nil {
-				return
+				return err
 			}
 		}
-		if encoder.Encode(writer, ev) != nil {
-			return
+		if ev.RunID != state.RunID {
+			return ErrForeignRun
+		}
+		if err := encoder.Encode(writer, ev); err != nil {
+			return err
 		}
 		if ev.IsTerminal() {
-			return
+			return nil
 		}
 	}
-	// A downstream disconnect/slow-consumer close must never synthesize a
-	// second run outcome. The encoder's Close finalizer is deliberately not
-	// used: clients resume the log or load the authoritative status snapshot.
 }

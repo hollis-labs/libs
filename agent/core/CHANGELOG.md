@@ -8,7 +8,13 @@ All notable changes to the `agent` module are documented here. The format follow
 
 ## [Unreleased]
 
+## [0.1.0]
+
 ### Added
 
 - Native context windows, token budgets, compaction, overflow classification and handoff mechanics extracted with their source history and behavioral tests.
 - Ordered agentcontext assembly, provenance, limits, resolvers and skill discovery, with no harness dependency. Artifact composition remains a caller-owned harness adapter.
+- Provider turn observation, native iteration control, bounded tool batches and once-bound approval registry.
+- Child lifecycle mechanics with explicit host authorization and a standalone SQLite storage contract.
+- Canonical per-run status, durable snapshots, bounded replay and an HTTP SSE writer with host-owned authentication.
+- An offline public-API embedding example exercising tools, approvals, retries, cancellation, truncated terminals and database reopen.
