@@ -38,7 +38,9 @@ Use `Service.NewReaper` while the service dispatches children: it excludes owned
 capacity waits under the same lock as admission and cancellation. Standalone
 `NewReaper` is for recovery without an active owner. Admission and retry require
 a durable running row; a terminal reaper/operator outcome cannot be revived.
-Authorized interactive approval bypass dispatches through the async owner path.
+Bootstrap orphan grace starts at slot admission, so old queue age cannot reap
+a newly admitted child. Workers that still lack a child after that grace remain
+recoverable. Authorized interactive approval bypass uses the async owner path.
 
 On successful persistence, the service commits a complete snapshot and event
 checkpoint through one atomic host store operation before fan-out. Check the

@@ -407,12 +407,12 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	}
 
 	// --- Orphan branch: status=running, empty child_session_id, older
-	// than orphan_grace by created_at. ---
+	// than orphan_grace since admission (or creation if never admitted). ---
 	//
-	// The hard-ceiling and inactivity branches above already catch rows
-	// that DO have started_at set, so this branch only fires for rows
-	// that never even reached spawn (child session creation failed
-	// silently, or the runner crashed before persistChildSessionID).
+	// Slot admission refreshes started_at. A child that waited for capacity
+	// gets a full bootstrap grace after that handoff; queue age cannot reap
+	// fresh admitted work. Creation age is the recovery fallback for rows
+	// without a start. An admitted worker that never bootstraps still expires.
 	// Both sides wrapped in datetime() for the same canonicalization
 	// reason as the branches above.
 	orphanCutoff := now.Add(-r.orphanGrace).Format(time.RFC3339Nano)
@@ -422,7 +422,7 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	       completed_at = ?
 	 WHERE status = 'running'
 	   AND child_session_id = ''
-	   AND datetime(created_at) < datetime(?)`
+	   AND datetime(COALESCE(NULLIF(started_at, ''), created_at)) < datetime(?)`
 
 	res, err = r.db.ExecContext(ctx, orphanSQL+queueGuard, append([]any{ReasonOrphanReaper, nowRFC, orphanCutoff}, queued...)...)
 	if err != nil {

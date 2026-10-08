@@ -9,16 +9,22 @@ import (
 )
 
 type reviewRunner struct {
-	calls        atomic.Int64
-	db           Database
-	entered      chan string
-	release      chan struct{}
-	failure      error
-	beforeReturn func(*Run) error
+	calls           atomic.Int64
+	db              Database
+	entered         chan string
+	release         chan struct{}
+	failure         error
+	beforeReturn    func(*Run) error
+	beforeBootstrap func(context.Context, *Run) error
 }
 
 func (r *reviewRunner) Run(ctx context.Context, run *Run) (*Result, error) {
 	r.calls.Add(1)
+	if r.beforeBootstrap != nil {
+		if err := r.beforeBootstrap(ctx, run); err != nil {
+			return nil, err
+		}
+	}
 	if r.db != nil {
 		if _, err := r.db.ExecContext(ctx, `UPDATE subagent_runs SET child_session_id=? WHERE id=? AND status=?`, "child-"+run.ID, run.ID, StatusRunning); err != nil {
 			return nil, err
@@ -201,5 +207,118 @@ func TestReaperTerminalDuringAttemptStopsRetry(t *testing.T) {
 	row := waitReviewStatus(t, svc, id, StatusFailed)
 	if runner.calls.Load() != 1 || row.RetryCount != 0 || row.Error != ReasonTimeoutReaper {
 		t.Fatalf("reaper terminal revived: calls=%d row=%+v", runner.calls.Load(), row)
+	}
+}
+
+// A long-lived queue row must receive admission-relative bootstrap grace.
+// The same owned worker must still be reaped if it never creates its child.
+func TestOldQueueGetsFreshBootstrapGraceAfterAdmission(t *testing.T) {
+	db, _ := newTestDB(t)
+	bootstrapEntered := make(chan string, 1)
+	bootstrapRelease := make(chan struct{})
+	runner := &reviewRunner{db: db, entered: make(chan string, 4), release: make(chan struct{})}
+	runner.beforeBootstrap = func(ctx context.Context, run *Run) error {
+		if run.Prompt != "queued" {
+			return nil
+		}
+		bootstrapEntered <- run.ID
+		select {
+		case <-bootstrapRelease:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	svc := newTestService(db, runner, nil, nil, nil)
+	var occupants []string
+	for i := 0; i < 3; i++ {
+		id, err := svc.Spawn(t.Context(), SpawnRequest{ParentSessionID: "parent", Role: "worker", Prompt: "occupy", Mode: ModeAsync})
+		if err != nil {
+			t.Fatal(err)
+		}
+		occupants = append(occupants, id)
+		<-runner.entered
+	}
+	ids := make(chan string, 1)
+	svc.SetStreamSink(&runningRunSink{runIDs: ids})
+	admitted := make(chan error, 1)
+	go func() {
+		_, err := svc.Spawn(t.Context(), SpawnRequest{ParentSessionID: "parent", Role: "worker", Prompt: "queued", Mode: ModeAsync})
+		admitted <- err
+	}()
+	var id string
+	select {
+	case id = <-ids:
+	case <-time.After(time.Second):
+		t.Fatal("queue not observable")
+	}
+	old := time.Now().Add(-2 * time.Minute).UTC().Format(time.RFC3339Nano)
+	if _, err := db.ExecContext(t.Context(), `UPDATE subagent_runs SET created_at=?,started_at=? WHERE id=? AND status=?`, old, old, id, StatusRunning); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	reaper := svc.NewReaper(ReaperOptions{Now: func() time.Time { return now }})
+	if counts, err := reaper.SweepOnce(t.Context()); err != nil || counts.Total() != 0 {
+		t.Fatalf("owned old queue reaped: %+v %v", counts, err)
+	}
+	close(runner.release)
+	select {
+	case err := <-admitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("admission stuck")
+	}
+	select {
+	case actual := <-bootstrapEntered:
+		if actual != id {
+			t.Fatalf("wrong bootstrap %s", actual)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("bootstrap not reached")
+	}
+	for _, occupant := range occupants {
+		waitReviewStatus(t, svc, occupant, StatusCompleted)
+	}
+	// No child_session_id has been written. The row's old creation time must
+	// not expire the newly admitted worker before bootstrap grace elapses.
+	now = time.Now()
+	if counts, err := reaper.SweepOnce(t.Context()); err != nil || counts.Total() != 0 {
+		t.Fatalf("fresh admission reaped before bootstrap: %+v %v", counts, err)
+	}
+	waitReviewStatus(t, svc, id, StatusRunning)
+	now = now.Add(2 * time.Minute)
+	if counts, err := reaper.SweepOnce(t.Context()); err != nil || counts.Orphans != 1 {
+		t.Fatalf("abandoned admitted worker protected indefinitely: %+v %v", counts, err)
+	}
+	row := waitReviewStatus(t, svc, id, StatusFailed)
+	if row.Error != ReasonOrphanReaper {
+		t.Fatalf("wrong winner: %+v", row)
+	}
+	close(bootstrapRelease)
+	// Join the admitted worker before the database fixture closes.
+	select {
+	case <-runner.entered:
+	case <-time.After(time.Second):
+		t.Fatal("worker did not settle")
+	}
+	deadline := time.After(time.Second)
+	for {
+		svc.cancelMu.Lock()
+		_, owned := svc.cancelers[id]
+		svc.cancelMu.Unlock()
+		if !owned {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("worker owner did not settle")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	row = waitReviewStatus(t, svc, id, StatusFailed)
+	if row.Error != ReasonOrphanReaper || runner.calls.Load() != 4 {
+		t.Fatalf("orphan outcome revived: calls=%d row=%+v", runner.calls.Load(), row)
 	}
 }
