@@ -1,8 +1,6 @@
-// Package agent is the root package of the agent module.
+// Package agent contains the embeddable agent runtime components.
 //
-// It will hold the agent runtime core.
-//
-// The module is a skeleton: packages arrive through history-preserving
-// imports (see scripts/import-repo in the repository root) and are released
-// with module-prefixed tags of the form agent/vX.Y.Z.
+// The context package owns native slot windows, compaction and handoff mechanics.
+// The agentcontext package owns ordered declarative context assembly and its
+// resolver and skill interfaces. Applications provide models, policy and storage.
 package agent

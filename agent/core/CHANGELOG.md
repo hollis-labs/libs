@@ -10,4 +10,5 @@ All notable changes to the `agent` module are documented here. The format follow
 
 ### Added
 
-- Empty module skeleton: `go.mod` and a package doc. No API yet.
+- Native context windows, token budgets, compaction, overflow classification and handoff mechanics extracted with their source history and behavioral tests.
+- Ordered agentcontext assembly, provenance, limits, resolvers and skill discovery, with no harness dependency. Artifact composition remains a caller-owned harness adapter.
