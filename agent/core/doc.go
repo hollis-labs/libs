@@ -1,8 +1,8 @@
-// Package agent is the root package of the agent module.
+// Package agent contains embeddable native agent runtime mechanisms.
 //
-// It will hold the agent runtime core.
-//
-// The module is a skeleton: packages arrive through history-preserving
-// imports (see scripts/import-repo in the repository root) and are released
-// with module-prefixed tags of the form agent/vX.Y.Z.
+// Context assembly, provider turns, iteration control, tool scheduling, bound
+// approvals and child lifecycle are exposed through subpackages. The service
+// package supplies per-run canonical reduction, status, snapshot and replay;
+// transport/httpstream writes those events after host authorization.
+// Applications supply preparation, models, policy, storage, tools and admission.
 package agent
