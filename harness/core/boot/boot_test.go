@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -227,6 +228,90 @@ func TestPrepareEarlyRefusalsKeepProvenanceAndTouchNoPorts(t *testing.T) {
 				t.Fatal("refusal mutated candidate", err)
 			}
 		})
+	}
+}
+
+func TestExplicitEffortRefusesUnknownAndPreservesSupportedValues(t *testing.T) {
+	for _, tc := range []struct {
+		provider    runtimes.ID
+		supported   []string
+		unsupported []string
+	}{
+		{runtimes.Claude, []string{"low", "medium", "high", "xhigh"}, []string{"definitely-unsupported", "HIGH", "auto", "max", "ultra"}},
+		{runtimes.Codex, []string{"low", "medium", "high", "xhigh", "max", "ultra"}, []string{"definitely-unsupported", "HIGH", "auto", "custom-unattested"}},
+		{runtimes.Antigravity, []string{"low", "medium", "high"}, []string{"definitely-unsupported", "HIGH", "auto", "xhigh", "max"}},
+	} {
+		for _, effort := range tc.unsupported {
+			t.Run(string(tc.provider)+"/refuse/"+effort, func(t *testing.T) {
+				in, host, f := inputFixture(t)
+				in.Dispatch.Provider, in.Dispatch.Effort = tc.provider, effort
+				result, err := Prepare(context.Background(), in, host)
+				var be *Error
+				if !errors.As(err, &be) || be.Phase != PhasePlan || be.Code != "unsupported_effort" {
+					t.Fatalf("unknown effort reached preparation: error=%v status=%s calls=%v", err, result.Apply.Status, f.calls)
+				}
+				if len(f.calls) != 0 || result.ArtifactsComplete() {
+					t.Fatal("effort refusal touched ports or earned artifacts", f.calls)
+				}
+				if result.Description.Effort != effort || result.Description.Provenance.Dispatch != in.Dispatch.Provenance {
+					t.Fatal("refused intent was normalized or lost")
+				}
+			})
+		}
+		for _, effort := range tc.supported {
+			t.Run(string(tc.provider)+"/preserve/"+effort, func(t *testing.T) {
+				in, host, f := inputFixture(t)
+				in.Dispatch.Provider, in.Dispatch.Effort = tc.provider, effort
+				p, err := Plan(in, host)
+				if err != nil || !p.Valid() || len(f.calls) != 0 || p.Description().Effort != effort {
+					t.Fatal("supported explicit effort failed", err, f.calls)
+				}
+				if tc.provider == runtimes.Antigravity {
+					args := p.Description().Argv
+					i := slices.Index(args, "--effort")
+					if i < 0 || i+1 >= len(args) || args[i+1] != effort {
+						t.Fatal("explicit effort was not serialized", args)
+					}
+				} else {
+					result, err := Prepare(context.Background(), in, host)
+					if err != nil || !result.ArtifactsComplete() {
+						t.Fatal("supported effort failed concrete artifact preparation", err)
+					}
+					b, err := os.ReadFile(result.Description.SettingsPath)
+					if err != nil || !strings.Contains(string(b), effort) {
+						t.Fatal("explicit effort missing from canonical settings", err, string(b))
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestExplicitChildCWDIsHonoredOrRefusedBeforePorts(t *testing.T) {
+	for _, provider := range []runtimes.ID{runtimes.Claude, runtimes.Codex, runtimes.Antigravity} {
+		for _, matching := range []bool{false, true} {
+			t.Run(string(provider)+"/matching="+fmt.Sprint(matching), func(t *testing.T) {
+				in, host, f := inputFixture(t)
+				in.Dispatch.Provider = provider
+				in.Workspace.CWD.ProtocolProject = in.Workspace.Home.Root.Path
+				in.Workspace.CWD.Child = in.Workspace.Home.Root.Path
+				if matching {
+					in.Workspace.CWD.Child = in.Workspace.Boot.Candidate.Path
+				}
+				if matching {
+					p, err := Plan(in, host)
+					if err != nil || !p.Valid() || p.Description().CWD != in.Workspace.CWD.Child || len(f.calls) != 0 {
+						t.Fatal("matching child refused or canonical boot cwd changed", err, p.Description().CWD)
+					}
+					return
+				}
+				result, err := Prepare(context.Background(), in, host)
+				var be *Error
+				if !errors.As(err, &be) || be.Phase != PhaseProject || be.Code != "unsupported_child_cwd" || len(f.calls) != 0 || result.ArtifactsComplete() {
+					t.Fatalf("different child was silently dropped: error=%v cwd=%s calls=%v", err, result.Description.CWD, f.calls)
+				}
+			})
+		}
 	}
 }
 

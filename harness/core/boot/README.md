@@ -96,3 +96,18 @@ prompt delimiter and resume placement. Streaming Claude describes a JSON user
 message line. PTY text has no terminal-submit framing; RPC modes leave turn
 submission to the caller. None is sent. Actual launch readiness and supported
 model/effort behavior must be validated by the adopting host.
+
+The boot serialization set is exact and case sensitive: Claude accepts `low`,
+`medium`, `high`, `xhigh`; Codex accepts `low`, `medium`, `high`, `xhigh`, `max`,
+`ultra`; Antigravity accepts `low`, `medium`, `high`. Other values refuse before
+ports. Claude's [`effortLevel` settings key](https://code.claude.com/docs/en/model-config)
+does not accept session-only `max`. The Codex set uses the values illustrated in
+its [configuration reference](https://developers.openai.com/codex/config-reference/);
+it is this package's supported set, not an exhaustive upstream enum or proof that
+every model/client accepts them. Antigravity follows its existing adapter contract.
+There is no default or normalization.
+
+The existing launch convention owns process CWD. An explicit `Workspace.CWD.Child`
+must equal that resolved CWD, or preparation refuses before ports; boot does not
+overwrite the canonical boot-directory CWD or silently discard a child request.
+`ProtocolProject` remains a separate protocol project locator.

@@ -84,6 +84,9 @@ func describeProcess(in Input, host HostInputs, project string, tree artifact.Tr
 	if err != nil {
 		return err
 	}
+	if in.Workspace.CWD.Child != "" && in.Workspace.CWD.Child != b.CWD {
+		return failure(PhaseProject, "unsupported_child_cwd", errors.New("explicit child CWD differs from the provider launch convention"))
+	}
 	out.Executable, out.Argv, out.CWD = proj.Launch.Executable, b.Argv, b.CWD
 	out.Environment = nil
 	derived := Provenance{"harness/provider-launch", "harness-provider-conventions-v1"}

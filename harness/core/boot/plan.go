@@ -196,6 +196,31 @@ func validateInput(in Input, host HostInputs) error {
 }
 
 func nativeSettings(in Input, out *render.NativeInputs) error {
+	// This is the boot package's evidenced serialization set, not a model
+	// capability claim. Unknown/custom values require a separately supported
+	// binding; they must not reach settings or argv as arbitrary strings.
+	var supported []string
+	switch in.Dispatch.Provider {
+	case runtimes.Claude:
+		// The effortLevel settings key excludes the session-only max level.
+		supported = []string{"low", "medium", "high", "xhigh"}
+	case runtimes.Codex:
+		supported = []string{"low", "medium", "high", "xhigh", "max", "ultra"}
+	case runtimes.Antigravity:
+		supported = []string{"low", "medium", "high"}
+	}
+	if supported != nil {
+		found := false
+		for _, effort := range supported {
+			if effort == in.Dispatch.Effort {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return failure(PhasePlan, "unsupported_effort", errors.New("explicit effort has no supported provider binding"))
+		}
+	}
 	if in.Settings.Claude != nil && in.Dispatch.Provider != runtimes.Claude {
 		return failure(PhasePlan, "provider_settings_mismatch", errors.New("Claude settings supplied for another provider"))
 	}
@@ -332,6 +357,10 @@ func text(s string) bool {
 }
 func failure(phase Phase, code string, err error) *Error { return &Error{phase, code, err} }
 func errorCode(err error, fallback string) string {
+	var b *Error
+	if errors.As(err, &b) {
+		return b.Code
+	}
 	var w *workspace.Refusal
 	if errors.As(err, &w) {
 		return w.Code
