@@ -24,10 +24,12 @@ func TestCeilingExpressesDenyRequirement(t *testing.T) {
 	}
 }
 func TestYoloRefusesRequiredDenyEnforcement(t *testing.T) {
-	_, err := BindProfile("yolo", Ceiling{Modes: []Mode{ModeYolo}, RequiresDenyEnforcement: true})
-	var pe *ProfileError
-	if !errors.As(err, &pe) || pe.Code != CodeDenyEnforcement {
-		t.Fatal(err)
+	for _, name := range []string{"yolo", "catalog-auto"} {
+		_, err := BindProfile(name, Ceiling{Modes: []Mode{ModeYolo}, RequiresDenyEnforcement: true})
+		var pe *ProfileError
+		if !errors.As(err, &pe) || pe.Code != CodeDenyEnforcement {
+			t.Fatal(err)
+		}
 	}
 	binding, err := BindProfile("default", Ceiling{Modes: []Mode{ModeDefault}, RequiresDenyEnforcement: true})
 	if err != nil || binding.SkipsDenyRules {
@@ -43,6 +45,8 @@ func TestExportedProfileRefusalCodes(t *testing.T) {
 		{"", Ceiling{}, CodeMissingProfile}, {"unknown", Ceiling{}, CodeUnknownProfile},
 		{"default", Ceiling{}, CodePermissionCeiling},
 		{"yolo", Ceiling{Modes: []Mode{ModeYolo}, RequiresDenyEnforcement: true}, CodeDenyEnforcement},
+		{"catalog-auto", Ceiling{Modes: []Mode{ModeYolo}, RequiresDenyEnforcement: true}, CodeDenyEnforcement},
+		{"catalog-auto", Ceiling{Modes: []Mode{ModePlan}}, CodePermissionCeiling},
 	} {
 		_, err := BindProfile(c.name, c.ceiling)
 		var pe *ProfileError
