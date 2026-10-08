@@ -5,16 +5,13 @@ import (
 	"errors"
 	"sync"
 	"testing"
-
-	"github.com/hollis-labs/nanite/internal/dispatch"
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // stubTrustResolver is a test seam for TrustResolverIface.
 type stubTrustResolver struct {
 	mu    sync.Mutex
 	calls []trustResolveCall
-	tier  dispatch.TrustTier
+	tier  string
 	err   error
 }
 
@@ -22,11 +19,20 @@ type trustResolveCall struct {
 	agentProfileID string
 }
 
-func (r *stubTrustResolver) ResolveTrust(_ context.Context, agentProfileID string) (dispatch.TrustTier, error) {
+func (r *stubTrustResolver) AuthorizeSpawn(_ context.Context, agentProfileID string) (SpawnAuthorization, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if agentProfileID == "" {
+		return SpawnAuthorization{}, nil
+	}
 	r.calls = append(r.calls, trustResolveCall{agentProfileID})
-	return r.tier, r.err
+	if r.err != nil {
+		return SpawnAuthorization{}, r.err
+	}
+	if r.tier == "untrusted" {
+		return SpawnAuthorization{Refusal: errTestUntrusted}, nil
+	}
+	return SpawnAuthorization{BypassApproval: r.tier == "trusted"}, nil
 }
 
 func (r *stubTrustResolver) callCount() int {
@@ -71,10 +77,10 @@ func (l *stubEventLogger) last() eventLogCall {
 func TestSpawn_UntrustedRole(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := &notCalledRunner{t: t}
-	resolver := &stubTrustResolver{tier: dispatch.TrustUntrusted}
+	resolver := &stubTrustResolver{tier: "untrusted"}
 
-	svc := NewService(db, runner, nil, nil, stubSettings{store.UserSettings{SubagentApprovalRequired: false}})
-	svc.SetTrustResolver(resolver)
+	svc := newTestService(db, runner, nil, nil, stubSettings{Settings{SubagentApprovalRequired: false}})
+	svc.SetSpawnAuthorizer(resolver)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -88,7 +94,7 @@ func TestSpawn_UntrustedRole(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for untrusted role, got nil")
 	}
-	if !errors.Is(err, dispatch.ErrUntrustedRole) {
+	if !errors.Is(err, errTestUntrusted) {
 		t.Errorf("expected ErrUntrustedRole, got: %v", err)
 	}
 	if resolver.callCount() != 1 {
@@ -100,14 +106,14 @@ func TestSpawn_UntrustedRole(t *testing.T) {
 func TestSpawn_TrustedRole(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	resolver := &stubTrustResolver{tier: dispatch.TrustTrusted}
+	resolver := &stubTrustResolver{tier: "trusted"}
 	logger := &stubEventLogger{}
 	emitter := &stubEmitter{}
 
-	svc := NewService(db, EchoRunner{}, poster, emitter, stubSettings{
-		store.UserSettings{SubagentApprovalRequired: true},
+	svc := newTestService(db, EchoRunner{}, poster, emitter, stubSettings{
+		Settings{SubagentApprovalRequired: true},
 	})
-	svc.SetTrustResolver(resolver)
+	svc.SetSpawnAuthorizer(resolver)
 	svc.SetEventLogger(logger)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -157,12 +163,12 @@ func TestSpawn_TrustedRole(t *testing.T) {
 func TestSpawn_NormalRole_ApprovalRequired(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	resolver := &stubTrustResolver{tier: dispatch.TrustNormal}
+	resolver := &stubTrustResolver{tier: "normal"}
 
-	svc := NewService(db, &notCalledRunner{t: t}, nil, emitter, stubSettings{
-		store.UserSettings{SubagentApprovalRequired: true},
+	svc := newTestService(db, &notCalledRunner{t: t}, nil, emitter, stubSettings{
+		Settings{SubagentApprovalRequired: true},
 	})
-	svc.SetTrustResolver(resolver)
+	svc.SetSpawnAuthorizer(resolver)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-3",
@@ -195,13 +201,13 @@ func TestSpawn_NormalRole_ApprovalRequired(t *testing.T) {
 // to normal gate.
 func TestSpawn_NoAgentProfileID_FallbackToNormal(t *testing.T) {
 	db, _ := newTestDB(t)
-	resolver := &stubTrustResolver{tier: dispatch.TrustTrusted} // would be trusted if consulted
+	resolver := &stubTrustResolver{tier: "trusted"} // would be trusted if consulted
 	poster := &stubPoster{}
 
-	svc := NewService(db, EchoRunner{}, poster, nil, stubSettings{
-		store.UserSettings{SubagentApprovalRequired: false},
+	svc := newTestService(db, EchoRunner{}, poster, nil, stubSettings{
+		Settings{SubagentApprovalRequired: false},
 	})
-	svc.SetTrustResolver(resolver)
+	svc.SetSpawnAuthorizer(resolver)
 
 	// No AgentProfileID → resolver should NOT be called.
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -228,14 +234,14 @@ func TestSpawn_TrustResolverError_FailClosed(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
 	resolver := &stubTrustResolver{
-		tier: dispatch.TrustNormal,
+		tier: "normal",
 		err:  errors.New("db unavailable"),
 	}
 
-	svc := NewService(db, &notCalledRunner{t: t}, nil, emitter, stubSettings{
-		store.UserSettings{SubagentApprovalRequired: true},
+	svc := newTestService(db, &notCalledRunner{t: t}, nil, emitter, stubSettings{
+		Settings{SubagentApprovalRequired: true},
 	})
-	svc.SetTrustResolver(resolver)
+	svc.SetSpawnAuthorizer(resolver)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-5",

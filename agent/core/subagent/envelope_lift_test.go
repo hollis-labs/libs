@@ -27,7 +27,7 @@ const listCardEnvelope = `{"kind":"envelope","version":1,"type":"list-card",` +
 func TestSpawn_LiftsChildEnvelopeToParent(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	svc := NewService(db, envelopeRunner{resultJSON: listCardEnvelope},
+	svc := newTestService(db, envelopeRunner{resultJSON: listCardEnvelope},
 		&stubPoster{}, emitter, stubSettings{})
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -74,7 +74,7 @@ func TestSpawn_LiftsChildEnvelopeToParent(t *testing.T) {
 func TestSpawn_NoEnvelope_NothingLifted(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	svc := NewService(db, emptyEnvelopeRunner{summary: "plain text result"},
+	svc := newTestService(db, emptyEnvelopeRunner{summary: "plain text result"},
 		&stubPoster{}, emitter, stubSettings{})
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -102,7 +102,7 @@ func TestSpawn_PartialResultEnvelopeLifted(t *testing.T) {
 	partialJSON := `{"partial":true,"summary":"cut mid-task",` +
 		`"envelope":` + listCardEnvelope + `,` +
 		`"tools":{"calls":3,"results_success":3,"results_error":0}}`
-	svc := NewService(db, partialEnvelopeRunner{resultJSON: partialJSON},
+	svc := newTestService(db, partialEnvelopeRunner{resultJSON: partialJSON},
 		&stubPoster{}, emitter, stubSettings{})
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -179,7 +179,7 @@ func TestExtractLiftableEnvelopes(t *testing.T) {
 // wiring) does not panic — the lift is simply skipped.
 func TestSpawn_NilApprover_LiftIsNoOp(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, envelopeRunner{resultJSON: listCardEnvelope},
+	svc := newTestService(db, envelopeRunner{resultJSON: listCardEnvelope},
 		&stubPoster{}, nil, stubSettings{})
 
 	if _, err := svc.Spawn(context.Background(), SpawnRequest{

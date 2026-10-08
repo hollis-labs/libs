@@ -97,7 +97,7 @@ func TestExecute_RetryExhaustionTerminatesAsFailed(t *testing.T) {
 	runner := &countingRunner{
 		outcomes: []runOutcome{failOutcome(), failOutcome(), failOutcome(), failOutcome()},
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -155,7 +155,7 @@ func TestExecute_RetrySucceedsBeforeBudget(t *testing.T) {
 			productiveOutcome("eventually finished"),
 		},
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -201,7 +201,7 @@ func TestExecute_OnFailBlockSuppressesRetry(t *testing.T) {
 	runner := &countingRunner{
 		outcomes: []runOutcome{failOutcome(), failOutcome()},
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -236,7 +236,7 @@ func TestExecute_OnFailBlockSuppressesRetry(t *testing.T) {
 func TestExecute_OnFailEscalateSuppressesRetry(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := &countingRunner{outcomes: []runOutcome{failOutcome(), failOutcome()}}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	id, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,
 		MaxRetries: 3, OnFail: OnFailEscalate,
@@ -265,7 +265,7 @@ func (r *fabricationRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 func TestExecute_FabricationDoesNotRetry(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := &fabricationRunner{}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -298,12 +298,12 @@ func TestExecute_FabricationDoesNotRetry(t *testing.T) {
 //
 // Tested at the shouldRetry layer rather than end-to-end because driving
 // the over_budget classification end-to-end requires the per-attempt
-// timeout to actually fire, and the floor (minTimeoutSeconds=60) makes
+// timeout to actually fire, and the floor (MinTimeoutSeconds=60) makes
 // that infeasible in a unit test. The end-to-end taxonomy test in
 // service_test.go already covers the wall-clock backstop integration.
 func TestShouldRetry_OverBudgetIgnoresOnFailBlock(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 
 	// Insert a row so shouldRetry's row-status re-read finds something
 	// other than canceled / rejected. The values here mimic mid-chain
@@ -349,7 +349,7 @@ func TestShouldRetry_OverBudgetIgnoresOnFailBlock(t *testing.T) {
 // NOT retry, even with budget remaining.
 func TestShouldRetry_FailedHonoursOnFailBlock(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	run := &Run{
 		ID:              "test-run-2",
 		ParentSessionID: "p",
@@ -385,7 +385,7 @@ func TestShouldRetry_FailedHonoursOnFailBlock(t *testing.T) {
 // another runner invocation.
 func TestShouldRetry_CanceledRowAbortsChain(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	run := &Run{
 		ID:              "test-run-3",
 		ParentSessionID: "p",
@@ -421,7 +421,7 @@ func TestExecute_CancelDuringAttemptBailsOut(t *testing.T) {
 	runner := &blockingRunner{
 		started: make(chan struct{}, 8),
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	runID := make(chan string, 1)
 	go func() {
@@ -505,7 +505,7 @@ func (r *blockingRunner) Run(ctx context.Context, _ *Run) (*Result, error) {
 func TestExecute_MaxRetriesZeroIsSingleShot(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := &countingRunner{outcomes: []runOutcome{failOutcome(), failOutcome()}}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,
@@ -529,7 +529,7 @@ func TestExecute_MaxRetriesZeroIsSingleShot(t *testing.T) {
 // row.
 func TestExecute_DefaultsAreAppliedWhenUnset(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,
@@ -553,7 +553,7 @@ func TestExecute_DefaultsAreAppliedWhenUnset(t *testing.T) {
 // OnFail value must be rejected before any DB write.
 func TestSpawn_RejectsInvalidOnFail(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,
 		OnFail: "yolo",
@@ -582,7 +582,7 @@ func TestExecute_StalledRetriesUnderOnFailRetry(t *testing.T) {
 	runner := &countingRunner{
 		outcomes: []runOutcome{stallOutcome(), stallOutcome(), productiveOutcome("got through")},
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,
@@ -605,7 +605,7 @@ func TestExecute_StalledRetriesUnderOnFailRetry(t *testing.T) {
 func TestExecute_StalledOnFailBlockSuppressesRetry(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := &countingRunner{outcomes: []runOutcome{stallOutcome(), stallOutcome()}}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "p", Role: "r", Prompt: "p", Mode: ModeSync,

@@ -1,30 +1,5 @@
-// Package subagent implements nanite's inline subagent spawn flow —
-// the control path by which a primary chat agent creates and
-// supervises a short-lived secondary agent to handle a subtask
-// (dogfood case: primary spawns one secondary to hit Engine MCP for
-// a project summary, another to run a knowledge task).
-//
-// Scope of this package:
-//   - Run lifecycle (subagent_runs) persisted across process
-//     restarts.
-//   - Spawn / Status / Cancel public API.
-//   - Runner interface — the actual LLM-backed execution is injected
-//     by the container so this package stays independent of the
-//     chat engine. A stub runner keeps the integration testable.
-//   - Reply delivery: on completion, a message is posted back to
-//     the parent via the messaging subsystem (kind=subagent_result,
-//     channel=chat for sync, channel=inbox for async).
-//
-// Approval flow (D13) is DEFERRED to a follow-up commit — this
-// package ships the happy path only, per session direction:
-//   - Mode "api"  auto-approves (caller is assumed trusted).
-//   - Mode "sync" runs immediately (treated like api for MVP).
-//   - Mode "async" runs immediately but returns early (result lands
-//     in the parent's inbox channel).
-//
-// Interactive approval (envelope-driven, user accepts/rejects) is
-// flagged in the run-lifecycle table (status=requested → approved)
-// but no approval envelope is emitted yet. That's T9.2.
+// Package subagent owns inline child lifecycle, approval coordination, retries,
+// fanout, heartbeat, reaping and parent reply delivery through host ports.
 package subagent
 
 import "context"

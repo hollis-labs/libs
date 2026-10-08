@@ -27,7 +27,7 @@ func (p stubParentage) IsSubagentSession(ctx context.Context, sessionID string) 
 func TestSpawn_RecursionCap_RejectsParentedCaller(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, EchoRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, poster, nil, stubSettings{})
 
 	// "sess-child" is itself a subagent; "sess-root" is a root session.
 	svc.SetParentageChecker(stubParentage{
@@ -84,7 +84,7 @@ func TestSpawn_RecursionCap_RejectsParentedCaller(t *testing.T) {
 // than risking an unbounded recursive chain.
 func TestSpawn_RecursionCap_FailsClosedOnCheckError(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetParentageChecker(stubParentage{err: errors.New("db exploded")})
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -104,7 +104,7 @@ func TestSpawn_RecursionCap_FailsClosedOnCheckError(t *testing.T) {
 // root and would-be-child sessions spawn successfully.
 func TestSpawn_RecursionCap_DisabledWhenUnwired(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	// No SetParentageChecker call.
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{

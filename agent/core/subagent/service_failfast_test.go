@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // fakeProfileResolver is a minimal ProfileResolver. profiles maps slug
@@ -20,11 +18,11 @@ import (
 // used by the "transient lookup error" case to exercise the non-
 // ErrNoRows branch of the gate.
 type fakeProfileResolver struct {
-	profiles    map[string]*store.AgentProfile
+	profiles    map[string]*Profile
 	errOverride error
 }
 
-func (f *fakeProfileResolver) GetAgentBySlug(ctx context.Context, slug string) (*store.AgentProfile, error) {
+func (f *fakeProfileResolver) GetAgentBySlug(ctx context.Context, slug string) (*Profile, error) {
 	if f.errOverride != nil {
 		return nil, f.errOverride
 	}
@@ -51,12 +49,12 @@ func (r *recordingRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 func TestSpawn_FailFast_NoProfileForRole(t *testing.T) {
 	db, _ := newTestDB(t)
 	resolver := &fakeProfileResolver{
-		profiles: map[string]*store.AgentProfile{
+		profiles: map[string]*Profile{
 			"worker": {Slug: "worker", CanExecute: true},
 		},
 	}
 	runner := &recordingRunner{}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(resolver)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -99,12 +97,12 @@ func TestSpawn_FailFast_NoProfileForRole(t *testing.T) {
 func TestSpawn_FailFast_RoleNotExecutable(t *testing.T) {
 	db, _ := newTestDB(t)
 	resolver := &fakeProfileResolver{
-		profiles: map[string]*store.AgentProfile{
+		profiles: map[string]*Profile{
 			"planner": {Slug: "planner", CanExecute: false},
 		},
 	}
 	runner := &recordingRunner{}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(resolver)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -136,11 +134,11 @@ func TestSpawn_FailFast_RoleNotExecutable(t *testing.T) {
 func TestSpawn_FailFast_TextOnlyWhitelistAccepted(t *testing.T) {
 	db, _ := newTestDB(t)
 	resolver := &fakeProfileResolver{
-		profiles: map[string]*store.AgentProfile{
+		profiles: map[string]*Profile{
 			"hint-selector": {Slug: "hint-selector", CanExecute: false},
 		},
 	}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(resolver)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -163,11 +161,11 @@ func TestSpawn_FailFast_TextOnlyWhitelistAccepted(t *testing.T) {
 func TestSpawn_FailFast_ExecutableRoleAccepted(t *testing.T) {
 	db, _ := newTestDB(t)
 	resolver := &fakeProfileResolver{
-		profiles: map[string]*store.AgentProfile{
+		profiles: map[string]*Profile{
 			"worker": {Slug: "worker", CanExecute: true},
 		},
 	}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(resolver)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -194,7 +192,7 @@ func TestSpawn_FailFast_LookupErrorPropagates(t *testing.T) {
 	db, _ := newTestDB(t)
 	transientErr := errors.New("database is closed")
 	resolver := &fakeProfileResolver{errOverride: transientErr}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(resolver)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -222,7 +220,7 @@ func TestSpawn_FailFast_LookupErrorPropagates(t *testing.T) {
 // runner end-to-end without needing a profile resolver.
 func TestSpawn_FailFast_DisabledWhenResolverNil(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	// Deliberately do not call SetProfileResolver.
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{

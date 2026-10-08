@@ -2,7 +2,6 @@ package subagent
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -33,7 +32,7 @@ const (
 	// there). A run that keeps heartbeating forever is still not allowed
 	// to run forever; this is the last-resort kill.
 	//
-	// Deliberately NOT maxTimeoutSeconds (7200s / 2h, service.go) — that
+	// Deliberately NOT MaxTimeoutSeconds (7200s / 2h, service.go) — that
 	// constant is the override ceiling on the OLD single wall-clock knob
 	// (timeout_seconds), a considered bound for how long a single
 	// unconfigured attempt may run, not a considered bound for "how long
@@ -78,7 +77,7 @@ const (
 //   - SweepOnce is safe to call from tests directly; it returns the
 //     counts of rows reaped per category for assertion.
 type Reaper struct {
-	db          *sql.DB
+	db          Database
 	interval    time.Duration
 	orphanGrace time.Duration
 	// hardCeiling is the non-resetting backstop duration (CW-20260816-0004).
@@ -124,7 +123,7 @@ type ReaperOptions struct {
 // NewReaper constructs a Reaper bound to db. Defaults for Interval,
 // OrphanGrace, HardCeiling, and Now are applied at construction time —
 // pass non-zero values to override. db is required.
-func NewReaper(db *sql.DB, opts ReaperOptions) *Reaper {
+func NewReaper(db Database, opts ReaperOptions) *Reaper {
 	interval := opts.Interval
 	if interval <= 0 {
 		interval = DefaultReaperInterval

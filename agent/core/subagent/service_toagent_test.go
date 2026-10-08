@@ -3,9 +3,6 @@ package subagent
 import (
 	"context"
 	"testing"
-
-	"github.com/hollis-labs/nanite/internal/store"
-	"github.com/hollis-labs/nanite/internal/store/mailboxadapter"
 )
 
 // TestSpawn_ReplyDelivery_ParentSlug_ToAgentIDResolution is the regression pin
@@ -33,12 +30,9 @@ func TestSpawn_ReplyDelivery_ParentSlug_ToAgentIDResolution(t *testing.T) {
 	// real-world pattern where agent_profiles.ID is a generated UUID
 	// or prefixed ID (e.g. "agt-operator-001") but slug is the bare
 	// role name ("operator").
-	if err := st.CreateAgent(context.Background(), &store.AgentProfile{
-		ID:     "agt-operator-001",
-		Slug:   "operator",
-		Name:   "Operator",
-		Kind:   "internal",
-		Status: "active",
+	if err := st.CreateAgent(context.Background(), &Profile{
+		ID:   "agt-operator-001",
+		Slug: "operator",
 	}); err != nil {
 		t.Fatalf("seed operator profile: %v", err)
 	}
@@ -46,9 +40,9 @@ func TestSpawn_ReplyDelivery_ParentSlug_ToAgentIDResolution(t *testing.T) {
 	// newTestDB already seeds the "worker" profile at id="blt-worker-001"
 	// (migration 060) for the child role.
 
-	messagingSvc := mailboxadapter.New(st).Service
+	messagingSvc := newProfilePoster(st)
 
-	svc := NewService(db, EchoRunner{}, messagingSvc, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, messagingSvc, nil, stubSettings{})
 	svc.SetProfileResolver(st)
 
 	// Spawn with ParentAgentID="operator" (the slug) instead of

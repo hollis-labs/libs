@@ -22,9 +22,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-
-	"github.com/hollis-labs/nanite/internal/dispatch"
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // stubElicitationEmitter simulates an elicitation emitter.
@@ -52,7 +49,7 @@ func TestElicitationApprovalOrthogonality(t *testing.T) {
 	db, _ := newTestDB(t)
 
 	// Trust resolver: the "plugin" agent profile is untrusted.
-	untrustedResolver := &stubTrustResolver{tier: dispatch.TrustUntrusted}
+	untrustedResolver := &stubTrustResolver{tier: "untrusted"}
 
 	// Approval emitter: should NOT be called for untrusted (call is refused
 	// before even reaching the gated path).
@@ -61,10 +58,10 @@ func TestElicitationApprovalOrthogonality(t *testing.T) {
 	// Elicitation emitter: completely separate; simulated independently.
 	elicitEmitter := &stubElicitationEmitter{}
 
-	svc := NewService(db, EchoRunner{}, nil, approvalEmitter, stubSettings{
-		store.UserSettings{SubagentApprovalRequired: true},
+	svc := newTestService(db, EchoRunner{}, nil, approvalEmitter, stubSettings{
+		Settings{SubagentApprovalRequired: true},
 	})
-	svc.SetTrustResolver(untrustedResolver)
+	svc.SetSpawnAuthorizer(untrustedResolver)
 
 	// 1. Attempt to spawn an untrusted plugin role.
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -79,7 +76,7 @@ func TestElicitationApprovalOrthogonality(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrUntrustedRole, got nil")
 	}
-	if !errors.Is(err, dispatch.ErrUntrustedRole) {
+	if !errors.Is(err, errTestUntrusted) {
 		t.Errorf("expected ErrUntrustedRole, got: %v", err)
 	}
 

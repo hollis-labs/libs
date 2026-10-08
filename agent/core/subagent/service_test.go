@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,9 +13,6 @@ import (
 	"time"
 
 	messaging "github.com/hollis-labs/go-messaging/mailbox"
-	"github.com/hollis-labs/nanite/internal/store"
-	"github.com/hollis-labs/nanite/internal/store/mailboxadapter"
-	"github.com/hollis-labs/nanite/internal/storetest"
 
 	_ "modernc.org/sqlite"
 )
@@ -26,15 +22,18 @@ import (
 // the messaging reply path touches session_events + agent_messages, so
 // we run the full migration set by going through the existing
 // *store.Store constructor.
-func newTestDB(t *testing.T) (*sql.DB, *store.Store) {
+func newTestDB(t *testing.T) (*sql.DB, *testProfiles) {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "test.db")
-	s, err := storetest.New(t, context.Background(), dbPath)
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "subagents.db"))
 	if err != nil {
-		t.Fatalf("store.New: %v", err)
+		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = s.Close(context.Background()); _ = os.Remove(dbPath) })
-	return s.DB, s
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err = db.Exec(SQLiteSchema); err != nil {
+		t.Fatal(err)
+	}
+	return db, &testProfiles{profiles: map[string]*Profile{"worker": {ID: "blt-worker-001", Slug: "worker", CanExecute: true}, "planner": {ID: "blt-planner-001", Slug: "planner", CanExecute: false}}}
 }
 
 // stubPoster captures the last SendMessage input without actually
@@ -88,9 +87,9 @@ func (e *stubEmitter) Last() emitCall {
 }
 
 // stubSettings returns fixed UserSettings.
-type stubSettings struct{ us store.UserSettings }
+type stubSettings struct{ us Settings }
 
-func (s stubSettings) GetUserSettings(ctx context.Context) (*store.UserSettings, error) {
+func (s stubSettings) GetUserSettings(ctx context.Context) (*Settings, error) {
 	return &s.us, nil
 }
 
@@ -105,7 +104,7 @@ func (r *notCalledRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 func TestSpawn_SyncEchoRunner_RoundTrip(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, EchoRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, poster, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -165,7 +164,7 @@ func TestSpawn_SyncEchoRunner_RoundTrip(t *testing.T) {
 func TestSpawn_AsyncMode_RepliesViaInbox(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, EchoRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, poster, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -206,7 +205,7 @@ func TestSpawn_AsyncMode_RepliesViaInbox(t *testing.T) {
 
 func TestSpawn_RejectsMissingFields(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, nil, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, nil, nil, stubSettings{})
 
 	cases := []struct {
 		name string
@@ -228,7 +227,7 @@ func TestSpawn_RejectsMissingFields(t *testing.T) {
 
 func TestSpawn_NoRunnerConfigured(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, nil, nil, nil, stubSettings{})
+	svc := newTestService(db, nil, nil, nil, stubSettings{})
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", Role: "r", Prompt: "p",
@@ -249,7 +248,7 @@ func (failRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 func TestSpawn_FailedRunner_SetsStatusFailed(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, failRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, failRunner{}, poster, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -308,7 +307,7 @@ func (stalledRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 // alone and is not mistaken for a genuine crash.
 func TestSpawn_StalledRunner_SetsStatusStalled(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, stalledRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, stalledRunner{}, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -346,7 +345,7 @@ func TestSpawn_StalledRunner_SetsStatusStalled(t *testing.T) {
 func TestSpawn_FailedRunner_PersistsPartialResultJSON(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, partialFailRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, partialFailRunner{}, poster, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -381,7 +380,7 @@ func TestSpawn_FailedRunner_PersistsPartialResultJSON(t *testing.T) {
 
 func TestCancel_TerminalIsNoop(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -425,7 +424,7 @@ func TestCancel_PerRunContextCancellation(t *testing.T) {
 		started: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -511,7 +510,7 @@ func TestSpawn_EmitsRunningEventBeforeRunner(t *testing.T) {
 	gate := make(chan struct{})
 	runner := gateRunner{release: gate}
 
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	doneCh := make(chan string, 1)
@@ -562,7 +561,7 @@ func TestSpawn_EmitsRunningEventBeforeRunner(t *testing.T) {
 func TestSpawn_EmitsTerminalEventOnComplete(t *testing.T) {
 	db, _ := newTestDB(t)
 	sink := &recordingSink{}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -593,7 +592,7 @@ func TestSpawn_EmitsTerminalEventOnComplete(t *testing.T) {
 func TestSpawn_EmitsTerminalEventOnFailure(t *testing.T) {
 	db, _ := newTestDB(t)
 	sink := &recordingSink{}
-	svc := NewService(db, failRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, failRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -630,7 +629,7 @@ func TestSpawn_EmitsTerminalEventOnCanceled(t *testing.T) {
 		started: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -685,7 +684,7 @@ func TestSpawn_EmitsTerminalEventOnCanceled(t *testing.T) {
 
 func TestSpawn_PersistsParentAgentID(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -718,7 +717,7 @@ func TestCancel_UnblocksRunnerEvenWhenDBUpdateFails(t *testing.T) {
 		started: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -757,9 +756,9 @@ func TestCancel_UnblocksRunnerEvenWhenDBUpdateFails(t *testing.T) {
 func TestSpawn_Gated_InsertsRequestedAndEmitsEnvelope(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true}}
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true}}
 	runner := &notCalledRunner{t: t}
-	svc := NewService(db, runner, nil, emitter, settings)
+	svc := newTestService(db, runner, nil, emitter, settings)
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",
@@ -790,9 +789,9 @@ func TestSpawn_Gated_InsertsRequestedAndEmitsEnvelope(t *testing.T) {
 func TestSpawn_InteractiveMode_GatesEvenWhenFlagOff(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: false}}
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: false}}
 	runner := &notCalledRunner{t: t}
-	svc := NewService(db, runner, nil, emitter, settings)
+	svc := newTestService(db, runner, nil, emitter, settings)
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "primary",
@@ -813,8 +812,8 @@ func TestSpawn_InteractiveMode_GatesEvenWhenFlagOff(t *testing.T) {
 func TestSpawn_Ungated_UnchangedBehavior(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: false}}
-	svc := NewService(db, EchoRunner{}, nil, emitter, settings)
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: false}}
+	svc := newTestService(db, EchoRunner{}, nil, emitter, settings)
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "primary",
@@ -861,9 +860,9 @@ func (p *recordingPoster) Last() messaging.SendInput {
 func TestApprove_TransitionsAndRunsRunner(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true, SubagentApprovalTimeoutSeconds: 3600}}
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true, SubagentApprovalTimeoutSeconds: 3600}}
 	poster := &recordingPoster{}
-	svc := NewService(db, EchoRunner{}, poster, emitter, settings)
+	svc := newTestService(db, EchoRunner{}, poster, emitter, settings)
 
 	runID, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", ParentAgentID: "p",
@@ -889,8 +888,8 @@ func TestApprove_TransitionsAndRunsRunner(t *testing.T) {
 func TestApprove_NotPending_WhenAlreadyTerminal(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true}}
-	svc := NewService(db, EchoRunner{}, nil, emitter, settings)
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true}}
+	svc := newTestService(db, EchoRunner{}, nil, emitter, settings)
 
 	runID, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", ParentAgentID: "p",
@@ -906,9 +905,9 @@ func TestApprove_NotPending_WhenAlreadyTerminal(t *testing.T) {
 func TestApprove_StaleReturnsExpiredError(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true, SubagentApprovalTimeoutSeconds: 1}}
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true, SubagentApprovalTimeoutSeconds: 1}}
 	poster := &recordingPoster{}
-	svc := NewService(db, EchoRunner{}, poster, emitter, settings)
+	svc := newTestService(db, EchoRunner{}, poster, emitter, settings)
 
 	runID, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", ParentAgentID: "p",
@@ -931,11 +930,11 @@ func TestApprove_StaleReturnsExpiredError(t *testing.T) {
 
 func TestApprove_RejectsMalformedCreatedAt(t *testing.T) {
 	db, _ := newTestDB(t)
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, EchoRunner{}, nil, &stubEmitter{}, settings)
+	svc := newTestService(db, EchoRunner{}, nil, &stubEmitter{}, settings)
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", ParentAgentID: "p",
@@ -964,9 +963,9 @@ func TestApprove_RejectsMalformedCreatedAt(t *testing.T) {
 func TestReject_TransitionsAndPostsReply(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true}}
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true}}
 	poster := &recordingPoster{}
-	svc := NewService(db, EchoRunner{}, poster, emitter, settings)
+	svc := newTestService(db, EchoRunner{}, poster, emitter, settings)
 
 	runID, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1", ParentAgentID: "primary",
@@ -999,8 +998,8 @@ func TestReject_TransitionsAndPostsReply(t *testing.T) {
 func TestReject_NotPending(t *testing.T) {
 	db, _ := newTestDB(t)
 	emitter := &stubEmitter{}
-	settings := stubSettings{us: store.UserSettings{SubagentApprovalRequired: true}}
-	svc := NewService(db, EchoRunner{}, nil, emitter, settings)
+	settings := stubSettings{us: Settings{SubagentApprovalRequired: true}}
+	svc := newTestService(db, EchoRunner{}, nil, emitter, settings)
 
 	runID, _ := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "s", ParentAgentID: "p",
@@ -1022,84 +1021,6 @@ func TestReject_NotPending(t *testing.T) {
 // with Slug=role and collide with the UNIQUE constraint on the existing
 // row — on every single reply, not just repeated ones. Spawns two children
 // with the SAME role in sequence against the production mailbox adapters.
-func TestSpawn_ReplyDelivery_ExistingRoleSlug_NoAutoRegisterCollision(t *testing.T) {
-	db, st := newTestDB(t)
-
-	// newTestDB runs the full migration set, which already seeds the
-	// real internal "worker" profile at id="blt-worker-001" (migration
-	// 060) — the exact real-world shape this bug depends on: a role
-	// whose agent_profiles.id is never equal to its slug. No manual seed
-	// needed/possible here (it would collide with the migration's row).
-	if err := st.CreateAgent(context.Background(), &store.AgentProfile{
-		ID:     "parent-1",
-		Slug:   "parent-1",
-		Name:   "Parent",
-		Kind:   "internal",
-		Status: "active",
-	}); err != nil {
-		t.Fatalf("seed parent profile: %v", err)
-	}
-
-	messagingSvc := mailboxadapter.New(st).Service
-
-	svc := NewService(db, EchoRunner{}, messagingSvc, nil, stubSettings{})
-	svc.SetProfileResolver(st)
-
-	for i := 0; i < 2; i++ {
-		id, err := svc.Spawn(context.Background(), SpawnRequest{
-			ParentSessionID: "sess-1",
-			ParentAgentID:   "parent-1",
-			Role:            "worker",
-			Prompt:          "do work",
-			Mode:            ModeSync,
-		})
-		if err != nil {
-			t.Fatalf("Spawn #%d: %v", i, err)
-		}
-		run, err := svc.Status(context.Background(), id)
-		if err != nil {
-			t.Fatalf("Status #%d: %v", i, err)
-		}
-		if run.Status != StatusCompleted {
-			t.Fatalf("run #%d Status = %q, want %q (Error=%q)", i, run.Status, StatusCompleted, run.Error)
-		}
-
-		// The run completing does NOT prove the parent learned about it —
-		// reply-delivery failures are only slog.Warn'd, never surfaced back
-		// onto run.Status (that's the actual failure mode this ticket is
-		// about: "parent may never learn a dispatched child completed").
-		// So assert directly on delivery: the parent session must have
-		// exactly i+1 reply messages by now.
-		msgs, err := messagingSvc.RecentForSession(context.Background(), "sess-1", 10)
-		if err != nil {
-			t.Fatalf("RecentForSession #%d: %v", i, err)
-		}
-		// CW-20260512-0019: completion replies now carry
-		// Kind=subagent_result, not the generic KindReply.
-		replies := 0
-		for _, m := range msgs {
-			if m.Kind == ResultMessageKind {
-				replies++
-			}
-		}
-		if replies != i+1 {
-			t.Fatalf("reply #%d: parent has %d subagent_result message(s) in sess-1, want %d — reply delivery failed (likely the agent_profiles.slug constraint)", i, replies, i+1)
-		}
-	}
-
-	// No phantom row with id="worker" should ever have been created by a
-	// (would-be) failed auto-register attempt.
-	if _, err := st.GetAgent(context.Background(), "worker"); err == nil {
-		t.Error(`a spurious agent_profiles row with id="worker" was created — auto-register should never have been attempted for an already-known role`)
-	}
-	real, err := st.GetAgent(context.Background(), "blt-worker-001")
-	if err != nil {
-		t.Fatalf("real worker profile missing: %v", err)
-	}
-	if real.Slug != "worker" {
-		t.Errorf("real worker profile slug = %q, want %q", real.Slug, "worker")
-	}
-}
 
 // TestSpawn_ProviderOverride_PropagatesIntoRun verifies that
 // SpawnRequest.Provider is copied to the persisted Run row and visible
@@ -1107,7 +1028,7 @@ func TestSpawn_ReplyDelivery_ExistingRoleSlug_NoAutoRegisterCollision(t *testing
 func TestSpawn_ProviderOverride_PropagatesIntoRun(t *testing.T) {
 	db, _ := newTestDB(t)
 	poster := &stubPoster{}
-	svc := NewService(db, EchoRunner{}, poster, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, poster, nil, stubSettings{})
 
 	// Non-empty override.
 	id, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -1168,7 +1089,7 @@ func (r emptyEnvelopeRunner) Run(_ context.Context, _ *Run) (*Result, error) {
 // object rather than storing a bare {}.
 func TestSpawn_EmptyEnvelope_PersistsSummaryNotEmptyObject(t *testing.T) {
 	db, _ := newTestDB(t)
-	svc := NewService(db, emptyEnvelopeRunner{summary: "did the work"}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, emptyEnvelopeRunner{summary: "did the work"}, &stubPoster{}, nil, stubSettings{})
 
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-1",

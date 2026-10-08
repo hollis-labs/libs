@@ -7,7 +7,7 @@ import (
 )
 
 // TestTimeoutInRange pins the Torque-parity validation window
-// [minTimeoutSeconds, maxTimeoutSeconds] (60s–7200s) used by both the
+// [MinTimeoutSeconds, MaxTimeoutSeconds] (60s–7200s) used by both the
 // env-var resolver and the explicit per-call timeout clamp in Spawn.
 func TestTimeoutInRange(t *testing.T) {
 	cases := []struct {
@@ -17,16 +17,16 @@ func TestTimeoutInRange(t *testing.T) {
 		{0, false},
 		{-1, false},
 		{59, false},
-		{minTimeoutSeconds, true}, // 60 — lower bound inclusive
+		{MinTimeoutSeconds, true}, // 60 — lower bound inclusive
 		{300, true},               // the legacy fixed default
 		{1800, true},              // DefaultTimeoutSeconds
-		{maxTimeoutSeconds, true}, // 7200 — upper bound inclusive
-		{maxTimeoutSeconds + 1, false},
+		{MaxTimeoutSeconds, true}, // 7200 — upper bound inclusive
+		{MaxTimeoutSeconds + 1, false},
 		{999999, false},
 	}
 	for _, c := range cases {
-		if got := timeoutInRange(c.secs); got != c.want {
-			t.Errorf("timeoutInRange(%d) = %v, want %v", c.secs, got, c.want)
+		if got := TimeoutInRange(c.secs); got != c.want {
+			t.Errorf("TimeoutInRange(%d) = %v, want %v", c.secs, got, c.want)
 		}
 	}
 }
@@ -46,7 +46,7 @@ func TestResolveDefaultTimeoutSeconds_EnvUnset(t *testing.T) {
 // raise or lower the wall-clock backstop budget via the env var without
 // recompiling — priority tier 1 of the Torque resolveTimeout mirror.
 func TestResolveDefaultTimeoutSeconds_EnvInRange(t *testing.T) {
-	for _, secs := range []int{minTimeoutSeconds, 600, 3600, maxTimeoutSeconds} {
+	for _, secs := range []int{MinTimeoutSeconds, 600, 3600, MaxTimeoutSeconds} {
 		t.Run(strconv.Itoa(secs), func(t *testing.T) {
 			t.Setenv(defaultTimeoutEnvVar, strconv.Itoa(secs))
 			if got := resolveDefaultTimeoutSeconds(); got != secs {
@@ -96,7 +96,7 @@ func TestSpawn_TimeoutResolution(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv(defaultTimeoutEnvVar, c.envValue)
 			db, _ := newTestDB(t)
-			svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+			svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 
 			id, err := svc.Spawn(context.Background(), SpawnRequest{
 				ParentSessionID: "sess-1",

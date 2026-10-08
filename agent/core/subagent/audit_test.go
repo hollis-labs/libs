@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"testing"
-
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // insertFailedRun helps seed subagent_runs rows that simulate a failure
@@ -56,7 +54,7 @@ func TestAuditUnknownRoles_GroupsByRoleAndCounts(t *testing.T) {
 	// the audit output — it's not the fail-fast gate's failure mode.
 	insertFailedRun(t, db, "r5", "worker", "provider stream stalled — no response")
 
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(s)
 
 	entries, err := svc.AuditUnknownRoles(context.Background())
@@ -110,7 +108,7 @@ func TestAuditUnknownRoles_GroupsByRoleAndCounts(t *testing.T) {
 // well-formed empty array.
 func TestAuditUnknownRoles_EmptyWhenNoFailingRuns(t *testing.T) {
 	db, s := newTestDB(t)
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetProfileResolver(s)
 
 	entries, err := svc.AuditUnknownRoles(context.Background())
@@ -134,7 +132,7 @@ func TestAuditUnknownRoles_FlagsTextOnlyWhitelist(t *testing.T) {
 	// because hint-selector is whitelisted, but pin the flag wiring).
 	insertFailedRun(t, db, "r1", "hint-selector", "timeout: orphan, no child session")
 
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	// Deliberately do NOT wire the resolver — exercises the
 	// HasProfile=false branch when svc.profiles is nil.
 
@@ -152,4 +150,4 @@ func TestAuditUnknownRoles_FlagsTextOnlyWhitelist(t *testing.T) {
 
 // Confirm we link the symbol so the test stays accurate even if
 // the `store` import is removed by an over-eager edit.
-var _ = store.AgentProfile{}
+var _ = Profile{}

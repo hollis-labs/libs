@@ -8,7 +8,7 @@ import (
 )
 
 // TestHeartbeatIntervalInRange pins the validation window
-// [minHeartbeatSeconds, maxHeartbeatSeconds] used by the env-var
+// [MinHeartbeatSeconds, MaxHeartbeatSeconds] used by the env-var
 // resolver. 0 is handled separately by resolveHeartbeatInterval as
 // "disabled", not validated here.
 func TestHeartbeatIntervalInRange(t *testing.T) {
@@ -18,15 +18,15 @@ func TestHeartbeatIntervalInRange(t *testing.T) {
 	}{
 		{-1, false},
 		{0, false},
-		{minHeartbeatSeconds, true},
+		{MinHeartbeatSeconds, true},
 		{30, true}, // DefaultHeartbeatSeconds
-		{maxHeartbeatSeconds, true},
-		{maxHeartbeatSeconds + 1, false},
+		{MaxHeartbeatSeconds, true},
+		{MaxHeartbeatSeconds + 1, false},
 		{999999, false},
 	}
 	for _, c := range cases {
-		if got := heartbeatIntervalInRange(c.secs); got != c.want {
-			t.Errorf("heartbeatIntervalInRange(%d) = %v, want %v", c.secs, got, c.want)
+		if got := HeartbeatIntervalInRange(c.secs); got != c.want {
+			t.Errorf("HeartbeatIntervalInRange(%d) = %v, want %v", c.secs, got, c.want)
 		}
 	}
 }
@@ -55,7 +55,7 @@ func TestResolveHeartbeatInterval_EnvZeroDisables(t *testing.T) {
 // TestResolveHeartbeatInterval_EnvInRange confirms an operator can
 // retune the cadence via the env var without recompiling.
 func TestResolveHeartbeatInterval_EnvInRange(t *testing.T) {
-	for _, secs := range []int{minHeartbeatSeconds, 10, 60, maxHeartbeatSeconds} {
+	for _, secs := range []int{MinHeartbeatSeconds, 10, 60, MaxHeartbeatSeconds} {
 		t.Run(strconv.Itoa(secs), func(t *testing.T) {
 			t.Setenv(heartbeatSecondsEnvVar, strconv.Itoa(secs))
 			if got, want := resolveHeartbeatInterval(), time.Duration(secs)*time.Second; got != want {
@@ -95,7 +95,7 @@ func TestExecute_EmitsHeartbeatsWhileRunnerInFlight(t *testing.T) {
 	gate := make(chan struct{})
 	runner := gateRunner{release: gate}
 
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	doneCh := make(chan struct{})
@@ -173,7 +173,7 @@ func TestExecute_NoHeartbeatsWhenDisabled(t *testing.T) {
 
 	db, _ := newTestDB(t)
 	sink := &recordingSink{}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, nil, stubSettings{})
 	svc.SetStreamSink(sink)
 
 	_, err := svc.Spawn(context.Background(), SpawnRequest{

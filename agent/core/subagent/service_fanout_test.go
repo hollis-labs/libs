@@ -27,8 +27,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // controlledRunner allows tests to govern when each Run call starts, blocks,
@@ -274,7 +272,7 @@ func TestFanout_UnderCap_RunsConcurrently(t *testing.T) {
 	// hot path).
 	db.SetMaxOpenConns(1)
 	runner := newControlledRunner()
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	const n = 3
 	// Each Run will block ~50ms after the gate opens. Use a generous
@@ -341,7 +339,7 @@ func TestFanout_AtCap_QueuesExtra(t *testing.T) {
 	db, _ := newTestDB(t)
 	db.SetMaxOpenConns(1) // serialize SQLite writes; see UnderCap comment
 	runner := newControlledRunner()
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	const (
 		total = 5
@@ -410,7 +408,7 @@ func TestFanout_CancelWhileQueued(t *testing.T) {
 	db, _ := newTestDB(t)
 	db.SetMaxOpenConns(1) // serialize SQLite writes; see UnderCap comment
 	runner := newControlledRunner()
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	const cap3 = 3
 	ctx := context.Background()
@@ -501,7 +499,7 @@ func TestFanout_CapacityErrorDistinguishable(t *testing.T) {
 	db, _ := newTestDB(t)
 	db.SetMaxOpenConns(1) // serialize SQLite writes
 	runner := newControlledRunner()
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	const cap3 = 3
 	ctx := context.Background()
@@ -583,11 +581,11 @@ func TestFanout_ApproveObeysConcurrencyCap(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	runner := newControlledRunner()
 	defer runner.release()
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
 
 	const total = 5
 	runIDs := make([]string, 0, total)
@@ -651,7 +649,7 @@ func TestFanout_OperatorCancelWhileQueuedPreventsRunner(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	runner := newControlledRunner()
 	defer runner.release()
-	svc := NewService(db, runner, &stubPoster{}, nil, stubSettings{})
+	svc := newTestService(db, runner, &stubPoster{}, nil, stubSettings{})
 
 	fillCh := spawnAsync(t, svc, context.Background(), spawnFanoutCap)
 	deadline := time.Now().Add(2 * time.Second)
@@ -737,11 +735,11 @@ func TestApprove_CancelEmissionOrdering(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := newControlledRunner()
 	defer runner.release()
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-approve-cancel-order",
 		ParentAgentID:   "parent-agent",
@@ -819,11 +817,11 @@ func TestApprove_CancelEmissionOrdering(t *testing.T) {
 func TestApprove_BlockedRunDoesNotReorderAnotherRun(t *testing.T) {
 	db, _ := newTestDB(t)
 	db.SetMaxOpenConns(1)
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, &stubEmitter{}, settings)
 	spawnRequested := func(prompt string) string {
 		t.Helper()
 		runID, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -879,11 +877,11 @@ func TestApprove_BlockedRunDoesNotReorderAnotherRun(t *testing.T) {
 func TestApprove_PanickingCallbackDoesNotWedgeOtherRuns(t *testing.T) {
 	db, _ := newTestDB(t)
 	db.SetMaxOpenConns(1)
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, EchoRunner{}, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, EchoRunner{}, &stubPoster{}, &stubEmitter{}, settings)
 	spawnRequested := func(prompt string) string {
 		t.Helper()
 		runID, err := svc.Spawn(context.Background(), SpawnRequest{
@@ -947,11 +945,11 @@ func TestApprove_HandoffPrecedesRunningTransition(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := newControlledRunner()
 	defer runner.release()
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-approve-handoff",
 		ParentAgentID:   "parent-agent",
@@ -1004,11 +1002,11 @@ func TestApprove_RequestCancellationAfterTransitionRetainsOwner(t *testing.T) {
 	db, _ := newTestDB(t)
 	runner := newControlledRunner()
 	defer runner.release()
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-approve-request-cancel",
 		ParentAgentID:   "parent-agent",
@@ -1056,11 +1054,11 @@ func TestApprove_ConcurrentDuplicateApproveCancelSingleOwner(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	runner := newControlledRunner()
 	defer runner.release()
-	settings := stubSettings{us: store.UserSettings{
+	settings := stubSettings{us: Settings{
 		SubagentApprovalRequired:       true,
 		SubagentApprovalTimeoutSeconds: 3600,
 	}}
-	svc := NewService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
+	svc := newTestService(db, runner, &stubPoster{}, &stubEmitter{}, settings)
 	runID, err := svc.Spawn(context.Background(), SpawnRequest{
 		ParentSessionID: "sess-approve-race",
 		ParentAgentID:   "parent-agent",

@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,9 +14,6 @@ import (
 	"github.com/google/uuid"
 
 	messaging "github.com/hollis-labs/go-messaging/mailbox"
-	"github.com/hollis-labs/nanite/internal/dispatch"
-	"github.com/hollis-labs/nanite/internal/safego"
-	"github.com/hollis-labs/nanite/internal/store"
 )
 
 // DefaultTimeoutSeconds is the wall-clock BACKSTOP for a runner when
@@ -44,7 +39,7 @@ import (
 // CW-20260517-0036: this constant is the *floor for an unconfigured
 // deployment* only. An operator raises (or lowers) the backstop budget
 // via NANITE_SUBAGENT_DEFAULT_TIMEOUT_SECONDS without recompiling —
-// resolveDefaultTimeoutSeconds() reads it on every Spawn. Per-role
+// svc.defaultTimeoutSeconds() reads it on every Spawn. Per-role
 // control of the *governing* inactivity window already exists via the
 // agent profile's constraints JSON (`idle_timeout_seconds`, parsed into
 // chat.AgentConstraints and consumed by resolveIterationLimits); a
@@ -59,54 +54,9 @@ const DefaultTimeoutSeconds = 1800
 // the next priority tier. 60s is below any realistic agent orientation
 // budget; 7200s (2h) is a generous ceiling for a single heavy run.
 const (
-	minTimeoutSeconds = 60
-	maxTimeoutSeconds = 7200
+	MinTimeoutSeconds = 60
+	MaxTimeoutSeconds = 7200
 )
-
-// defaultTimeoutEnvVar is the operator knob for the wall-clock backstop
-// budget applied to a subagent run that does not carry an explicit
-// per-call timeout. Mirrors Torque's profile/env tiering. A value
-// outside [minTimeoutSeconds, maxTimeoutSeconds] is ignored with a
-// warning so a typo can't silently disable the backstop.
-const defaultTimeoutEnvVar = "NANITE_SUBAGENT_DEFAULT_TIMEOUT_SECONDS"
-
-// timeoutInRange reports whether secs is a usable subagent-run timeout.
-func timeoutInRange(secs int) bool {
-	return secs >= minTimeoutSeconds && secs <= maxTimeoutSeconds
-}
-
-// resolveDefaultTimeoutSeconds picks the wall-clock backstop budget for
-// a subagent run that did not supply an explicit per-call timeout, in
-// priority order (mirrors Torque resolveTimeout, timeout.go:35-43):
-//
-//  1. NANITE_SUBAGENT_DEFAULT_TIMEOUT_SECONDS when set and within
-//     [minTimeoutSeconds, maxTimeoutSeconds]
-//  2. DefaultTimeoutSeconds (the compiled-in 1800s floor)
-//
-// An explicit, in-range req.TimeoutSeconds still takes precedence over
-// both — that check stays in Spawn, ahead of this call. An env value
-// that is unparseable or out of range is ignored (with a warning) so a
-// misconfiguration falls back safely rather than disabling the backstop.
-func resolveDefaultTimeoutSeconds() int {
-	raw := strings.TrimSpace(os.Getenv(defaultTimeoutEnvVar))
-	if raw == "" {
-		return DefaultTimeoutSeconds
-	}
-	secs, err := strconv.Atoi(raw)
-	if err != nil {
-		slog.Warn("subagent: ignoring non-integer timeout override env var",
-			"env", defaultTimeoutEnvVar, "value", raw, "fallback_seconds", DefaultTimeoutSeconds)
-		return DefaultTimeoutSeconds
-	}
-	if !timeoutInRange(secs) {
-		slog.Warn("subagent: ignoring out-of-range timeout override env var",
-			"env", defaultTimeoutEnvVar, "value", secs,
-			"min", minTimeoutSeconds, "max", maxTimeoutSeconds,
-			"fallback_seconds", DefaultTimeoutSeconds)
-		return DefaultTimeoutSeconds
-	}
-	return secs
-}
 
 // DefaultHeartbeatSeconds is the cadence of "still running" progress
 // pings emitted while a subagent's runner call is in flight
@@ -122,55 +72,14 @@ const DefaultHeartbeatSeconds = 30
 // Heartbeat cadence validation range and operator override. Mirrors the
 // timeout knob's env-tiering shape above. A raw value of exactly "0"
 // disables heartbeats outright (some deployments may prefer silence);
-// anything else outside [minHeartbeatSeconds, maxHeartbeatSeconds] is
+// anything else outside [MinHeartbeatSeconds, MaxHeartbeatSeconds] is
 // rejected with a warning and falls back to DefaultHeartbeatSeconds so a
 // typo can't accidentally spam (too low) or silence (too high) the
 // signal.
 const (
-	minHeartbeatSeconds = 1
-	maxHeartbeatSeconds = 300
+	MinHeartbeatSeconds = 1
+	MaxHeartbeatSeconds = 300
 )
-
-// heartbeatSecondsEnvVar is the operator knob for the heartbeat cadence.
-const heartbeatSecondsEnvVar = "NANITE_SUBAGENT_HEARTBEAT_SECONDS"
-
-// heartbeatIntervalInRange reports whether secs is a usable heartbeat
-// cadence (0 is handled separately by the caller as "disabled").
-func heartbeatIntervalInRange(secs int) bool {
-	return secs >= minHeartbeatSeconds && secs <= maxHeartbeatSeconds
-}
-
-// resolveHeartbeatInterval picks the "still running" ping cadence for a
-// subagent run, in priority order:
-//
-//  1. NANITE_SUBAGENT_HEARTBEAT_SECONDS == "0" → heartbeats disabled
-//     (returns 0).
-//  2. NANITE_SUBAGENT_HEARTBEAT_SECONDS set to another in-range value →
-//     that value.
-//  3. unset, unparseable, or out of range → DefaultHeartbeatSeconds.
-func resolveHeartbeatInterval() time.Duration {
-	raw := strings.TrimSpace(os.Getenv(heartbeatSecondsEnvVar))
-	if raw == "" {
-		return DefaultHeartbeatSeconds * time.Second
-	}
-	secs, err := strconv.Atoi(raw)
-	if err != nil {
-		slog.Warn("subagent: ignoring non-integer heartbeat override env var",
-			"env", heartbeatSecondsEnvVar, "value", raw, "fallback_seconds", DefaultHeartbeatSeconds)
-		return DefaultHeartbeatSeconds * time.Second
-	}
-	if secs == 0 {
-		return 0
-	}
-	if !heartbeatIntervalInRange(secs) {
-		slog.Warn("subagent: ignoring out-of-range heartbeat override env var",
-			"env", heartbeatSecondsEnvVar, "value", secs,
-			"min", minHeartbeatSeconds, "max", maxHeartbeatSeconds,
-			"fallback_seconds", DefaultHeartbeatSeconds)
-		return DefaultHeartbeatSeconds * time.Second
-	}
-	return time.Duration(secs) * time.Second
-}
 
 // spawnFanoutCap is the maximum number of Spawn invocations that may
 // have their runner executing concurrently. FIFO ordering is preserved
@@ -301,12 +210,13 @@ type ApprovalEmitter interface {
 // SettingsReader returns the per-user settings. Container-injected so the
 // subagent package doesn't take a hard dep on the full Store.
 type SettingsReader interface {
-	GetUserSettings(ctx context.Context) (*store.UserSettings, error)
+	GetUserSettings(ctx context.Context) (*Settings, error)
 }
 
-// TrustResolverIface is the subset of dispatch.TrustResolver that the
-// subagent package depends on. *store.Store satisfies it via ResolveTrust.
-type TrustResolverIface = dispatch.TrustResolver
+// SpawnAuthorizer supplies the host decision before durable spawn effects.
+type SpawnAuthorizer interface {
+	AuthorizeSpawn(context.Context, string) (SpawnAuthorization, error)
+}
 
 // EventLogger persists audit events for trust-bypassed dispatches.
 // *store.Store satisfies it; nil = audit logging skipped.
@@ -343,7 +253,7 @@ type ParentageChecker interface {
 // GetAgentBySlug already wraps with %w so this contract holds in
 // production.
 type ProfileResolver interface {
-	GetAgentBySlug(ctx context.Context, slug string) (*store.AgentProfile, error)
+	GetAgentBySlug(ctx context.Context, slug string) (*Profile, error)
 }
 
 // replyFromAgentID resolves the agent identity a subagent reply should be
@@ -377,17 +287,20 @@ func (svc *Service) replyFromAgentID(role string) (id string, registerAs string)
 // Service coordinates the spawn → run → complete → reply flow.
 // Safe for concurrent use.
 type Service struct {
-	db            *sql.DB
+	db            Database
 	runner        Runner
 	poster        MessagePoster
 	approver      ApprovalEmitter
 	settings      SettingsReader
 	streamSink    SubagentStreamSink
 	reactor       CompletionReactor
-	trustResolver TrustResolverIface
+	authorizer    SpawnAuthorizer
 	eventLogger   EventLogger
 	parentage     ParentageChecker
 	profiles      ProfileResolver
+	timeout       func() int
+	heartbeat     func() time.Duration
+	panicReporter func(context.Context, string, any, []byte)
 
 	// cancelers holds a per-run cancellation owner keyed by runID so
 	// Cancel(runID) can propagate cancellation into the in-flight
@@ -413,7 +326,7 @@ type Service struct {
 // T10 will wire the real impl). The settings reader provides per-user
 // settings for gating decisions (nil = only ModeInteractive triggers
 // gating; T6 wires cfg.Store).
-func NewService(db *sql.DB, runner Runner, poster MessagePoster, approver ApprovalEmitter, settings SettingsReader) *Service {
+func NewService(db Database, runner Runner, poster MessagePoster, approver ApprovalEmitter, settings SettingsReader) *Service {
 	return &Service{
 		db:        db,
 		runner:    runner,
@@ -425,9 +338,9 @@ func NewService(db *sql.DB, runner Runner, poster MessagePoster, approver Approv
 	}
 }
 
-// SetTrustResolver wires the H1 trust resolver. Call before any Spawn.
-// When nil, Spawn falls back to TrustNormal for every spawn.
-func (svc *Service) SetTrustResolver(r TrustResolverIface) { svc.trustResolver = r }
+// SetSpawnAuthorizer supplies explicit host authorization. Call before Spawn.
+// A missing authorizer refuses spawning before durable effects.
+func (svc *Service) SetSpawnAuthorizer(r SpawnAuthorizer) { svc.authorizer = r }
 
 // SetEventLogger wires the audit event logger. Call before any Spawn.
 // When nil, trust_dispatch audit rows are skipped (non-fatal).
@@ -629,7 +542,7 @@ func (svc *Service) emitHeartbeat(run *Run, elapsed time.Duration) {
 }
 
 // startHeartbeat launches a background ticker that calls emitHeartbeat
-// for run every resolveHeartbeatInterval() until either the returned
+// for run every svc.heartbeatInterval() until either the returned
 // stop func is called or runCtx is done, whichever comes first.
 //
 // Callers MUST call the returned stop func exactly once, immediately
@@ -638,13 +551,13 @@ func (svc *Service) emitHeartbeat(run *Run, elapsed time.Duration) {
 // writes. A nil streamSink or a resolved interval of 0 (heartbeats
 // disabled) makes this a no-op that still returns a safe stop func.
 func (svc *Service) startHeartbeat(runCtx context.Context, run *Run) (stop func()) {
-	interval := resolveHeartbeatInterval()
+	interval := svc.heartbeatInterval()
 	if interval <= 0 || svc.streamSink == nil {
 		return func() {}
 	}
 	stopCh := make(chan struct{})
 	started := time.Now()
-	safego.Go(runCtx, "subagent.heartbeat", func() {
+	svc.goSafe(runCtx, "subagent.heartbeat", func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -792,14 +705,14 @@ func (svc *Service) Spawn(ctx context.Context, req SpawnRequest) (string, error)
 	// `timeout_seconds: 5` can't disable the backstop, and a runaway
 	// `timeout_seconds: 999999` can't extend it past the 2h ceiling.
 	timeout := req.TimeoutSeconds
-	if timeout > 0 && !timeoutInRange(timeout) {
+	if timeout > 0 && !TimeoutInRange(timeout) {
 		slog.Warn("subagent: explicit timeout_seconds out of range; falling back to resolved default",
-			"requested_seconds", timeout, "min", minTimeoutSeconds, "max", maxTimeoutSeconds,
+			"requested_seconds", timeout, "min", MinTimeoutSeconds, "max", MaxTimeoutSeconds,
 			"role", req.Role)
 		timeout = 0
 	}
 	if timeout <= 0 {
-		timeout = resolveDefaultTimeoutSeconds()
+		timeout = svc.defaultTimeoutSeconds()
 	}
 	inputs := req.InputsJSON
 	if inputs == "" {
@@ -849,25 +762,23 @@ func (svc *Service) Spawn(ctx context.Context, req SpawnRequest) (string, error)
 	// resolution is no longer workspace-scoped — workspace_role_trust
 	// (the override layer) is retired in full, operator-confirmed
 	// 2026-08-18.
-	trust := dispatch.TrustNormal
-	if svc.trustResolver != nil && req.AgentProfileID != "" {
-		t, terr := svc.trustResolver.ResolveTrust(ctx, req.AgentProfileID)
-		if terr != nil {
-			// Fail closed: treat resolve error as normal (require approval).
-			slog.Warn("subagent: trust resolve error; defaulting to normal", "err", terr,
-				"agent_profile_id", req.AgentProfileID)
-		} else {
-			trust = t
-		}
+	if svc.authorizer == nil {
+		return "", ErrAuthorizationUnavailable
 	}
-
-	// Untrusted: refuse outright. ErrUntrustedRole must NOT be bypassed.
-	if trust == dispatch.TrustUntrusted {
-		return "", dispatch.ErrUntrustedRole
+	authorization, authErr := svc.authorizer.AuthorizeSpawn(ctx, req.AgentProfileID)
+	if authorization.Refusal != nil {
+		return "", authorization.Refusal
 	}
-
-	// Trusted: bypass approval, write audit log, proceed to ungated path.
-	if trust == dispatch.TrustTrusted {
+	if authErr != nil {
+		// The host's existing lookup-failure posture requires approval.
+		// An error can never inherit the resolver's bypass decision.
+		slog.Warn("subagent: trust resolve error; defaulting to normal", "err", authErr, "agent_profile_id", req.AgentProfileID)
+		authorization = SpawnAuthorization{}
+	}
+	if authorization.Refusal != nil {
+		return "", authorization.Refusal
+	}
+	if authorization.BypassApproval {
 		meta, _ := json.Marshal(map[string]any{
 			"agent_profile_id": req.AgentProfileID,
 			"role":             req.Role,
@@ -991,7 +902,7 @@ func (svc *Service) Spawn(ctx context.Context, req SpawnRequest) (string, error)
 		if err := svc.acquireSpawnSlotForRun(run.ID, slotWait); err != nil {
 			return "", err
 		}
-		safego.Go(context.Background(), "subagent.run", func() {
+		svc.goSafe(context.Background(), "subagent.run", func() {
 			svc.executeWithSlot(slotWait.runCtx, run, req.ParentAgentID, slotWait)
 		})
 	}
@@ -1247,7 +1158,7 @@ func (svc *Service) Approve(ctx context.Context, runID string) error {
 	// Acquire inside the dispatched goroutine so approval responses do not
 	// inherit queue latency. The same semaphore and cancellation registration
 	// used by Spawn govern the approved run.
-	safego.Go(context.Background(), "subagent.run", func() {
+	svc.goSafe(context.Background(), "subagent.run", func() {
 		if err := svc.acquireSpawnSlotForRun(run.ID, slotWait); err != nil {
 			return
 		}
@@ -1632,7 +1543,7 @@ func (svc *Service) execute(ctx context.Context, run *Run, parentAgentID string)
 	if svc.reactor != nil {
 		runCopy := run
 		msgID := msg.ID
-		safego.Go(context.Background(), "subagent.completion-reactor", func() {
+		svc.goSafe(context.Background(), "subagent.completion-reactor", func() {
 			svc.reactor.ReactToCompletion(context.Background(), runCopy, msgID)
 		})
 	}
