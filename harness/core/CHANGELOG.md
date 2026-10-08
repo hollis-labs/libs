@@ -8,6 +8,15 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+- Added `boot.Plan` and `boot.Prepare` for caller-resolved definitions, typed
+  policy, explicit model/effort, neutral composed context and independently
+  authorized host inputs. Canonical artifacts use the sole workspace engine;
+  complete process argv uses existing provider conventions. Full apply results,
+  source provenance, retained roots and obligations survive failures; artifact
+  completion grants no Ready or process launch. Required unsupported hooks,
+  policy references and native settings refuse before mutation. OpenCode effort
+  remains unsupported. Existing published v0.1.0 is unchanged.
+
 ## v0.1.0
 
 - Consolidated provider placement into `adapters/layout/plan`. Parent layout queries are pure derived compatibility views, including explicit existing MCP mirrors and permissions. The generator owns only `plan-fields.json` and `PLAN-FIELDS.md`; older layout exports remain historical evidence. Unsupported transport/variant queries refuse instead of falling back to an unrelated shape. Artifact and golden fixture bytes remain unchanged.

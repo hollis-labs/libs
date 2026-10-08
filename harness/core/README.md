@@ -7,6 +7,9 @@ sessions and managed workspace artifacts. Import packages from
 
 ## Package boundaries
 
+- `boot` provides pure planning and workspace-backed preparation for explicit
+  resolved dispatches. Its detached process description and complete partial
+  apply result grant no launch readiness. See [boot/README.md](boot/README.md).
 - `adapters/provider`, `adapters/registry` and `adapters/layout` define provider
   rendering and launch conventions. `adapters/layout/plan` owns the sole
   authored field table; parent layout queries are derived compatibility views.
