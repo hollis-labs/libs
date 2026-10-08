@@ -177,6 +177,13 @@ func TestPrepareEarlyRefusalsKeepProvenanceAndTouchNoPorts(t *testing.T) {
 		{"unknown policy", "unknown_permission_profile", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Name = "catalog-auto" }},
 		{"ceiling", "permission_ceiling", func(i *Input, h *HostInputs) { h.Ceiling.Modes = nil }},
 		{"binding version", "policy_binding_mismatch", func(i *Input, h *HostInputs) { i.Definition.Policy.Profile.Version = "foreign" }},
+		{"workspace policy mismatch", "policy_binding_mismatch", func(i *Input, h *HostInputs) {
+			i.Workspace.Sandbox.Profile = permission.ProfileBinding{Name: "yolo", Mode: permission.ModeYolo}
+		}},
+		{"native effort mismatch", "effort_mismatch", func(i *Input, h *HostInputs) {
+			i.Settings = NativeSettings{Provenance: i.Context.Provenance, Claude: &ClaudeSettings{EffortLevel: "low"}}
+		}},
+		{"unpinned instructions", "unpinned_context", func(i *Input, h *HostInputs) { i.Context.Artifacts[0].Content.Pin.Source = "" }},
 		{"approvals", "unsupported_policy_references", func(i *Input, h *HostInputs) {
 			i.Definition.Policy.Approvals = []PolicyReference{{URI: "fixture:approval", Digest: strings.Repeat("a", 64)}}
 		}},
