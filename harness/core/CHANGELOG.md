@@ -6,7 +6,7 @@ All notable changes to the `harness` module are documented here. The format foll
 `harness/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
-## [Unreleased]
+## v0.3.0
 
 ### Changed
 
