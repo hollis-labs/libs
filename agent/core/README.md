@@ -19,7 +19,10 @@ The host supplies models, policy, persistence, tools and lifecycle admission.
 than delegating the whole loop to the embedding host. `Retry` repeats the same
 iteration; `Continue` advances it; interrupted runs terminate without successful
 finalization. `turn.ExecuteTurn` can require a provider terminal event; a closed
-stream alone does not establish successful completion.
+stream alone does not establish successful completion. The reader defaults to
+immediate cancellation. A host that must account for already incurred provider
+usage can opt into a bounded drain of the queue observed on cancellation; it
+never waits for new producer events and still returns the cancellation cause.
 
 Definitions, model authorization, permission posture and tool grants remain
 host decisions. Request metadata and context provenance do not confer authority.
