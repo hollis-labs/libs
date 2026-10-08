@@ -1,4 +1,4 @@
-package agentcontext
+package agentcomposition
 
 import (
 	"context"
@@ -8,28 +8,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hollis-labs/substrate/agent/agentcontext"
+
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 type composeStubProvider struct{}
 
-func (composeStubProvider) Assemble(ctx context.Context, req ContextRequest) (*ContextResult, error) {
-	results := make([]SlotResult, 0, len(req.Slots))
+func (composeStubProvider) Assemble(ctx context.Context, req agentcontext.ContextRequest) (*agentcontext.ContextResult, error) {
+	results := make([]agentcontext.SlotResult, 0, len(req.Slots))
 	for _, slot := range req.Slots {
 		if slot.Required && slot.Source.Inline.Content == "" {
-			return nil, ErrSlotRequiredAndEmpty
+			return nil, agentcontext.ErrSlotRequiredAndEmpty
 		}
-		results = append(results, SlotResult{
+		results = append(results, agentcontext.SlotResult{
 			Name:          slot.Name,
 			Section:       slot.Section,
 			Content:       slot.Source.Inline.Content,
 			Bytes:         len(slot.Source.Inline.Content),
-			TokenEstimate: EstimateTokens(len(slot.Source.Inline.Content)),
-			Provenance:    SlotProvenance{Kind: slot.Source.Kind, Source: slot.Name, Bytes: len(slot.Source.Inline.Content), ContentHash: digestString(slot.Source.Inline.Content)},
+			TokenEstimate: agentcontext.EstimateTokens(len(slot.Source.Inline.Content)),
+			Provenance:    agentcontext.SlotProvenance{Kind: slot.Source.Kind, Source: slot.Name, Bytes: len(slot.Source.Inline.Content), ContentHash: digestString(slot.Source.Inline.Content)},
 		})
 	}
-	rendered, limits := DefaultRenderer{}.Render(results, req.Limits)
-	return &ContextResult{Slots: results, Rendered: rendered, Provenance: Provenance{Input: req.Provenance, LibraryVersion: Version, RequestHash: HashStringForTest(req), AssembledAt: fixedComposeTime()}, Limits: limits}, nil
+	rendered, limits := agentcontext.DefaultRenderer{}.Render(results, req.Limits)
+	return &agentcontext.ContextResult{Slots: results, Rendered: rendered, Provenance: agentcontext.Provenance{Input: req.Provenance, LibraryVersion: agentcontext.Version, RequestHash: HashStringForTest(req), AssembledAt: fixedComposeTime()}, Limits: limits}, nil
 }
 
 func TestComposerGraphOrderingDedupAndMergeRules(t *testing.T) {
@@ -125,10 +127,10 @@ func TestComposerSlotDocumentAssemblyDeterministicAndDigest(t *testing.T) {
 	composer := NewComposer(ComposerOptions{Provider: composeStubProvider{}})
 	req := ComposeRequest{Recipe: AuthoredRecipe{
 		ID:         "root",
-		Provenance: ProvenanceInput{LineageAlias: "fixture", ProfileID: "rev-1"},
-		Slots: []SlotSpec{
-			{Name: "intro", Section: "## Intro", Required: true, Source: SlotSource{Kind: SlotSourceKindInline, Inline: InlineSource{Content: "hello"}}},
-			{Name: "body", Section: "## Body", Source: SlotSource{Kind: SlotSourceKindInline, Inline: InlineSource{Content: "world"}}},
+		Provenance: agentcontext.ProvenanceInput{LineageAlias: "fixture", ProfileID: "rev-1"},
+		Slots: []agentcontext.SlotSpec{
+			{Name: "intro", Section: "## Intro", Required: true, Source: agentcontext.SlotSource{Kind: agentcontext.SlotSourceKindInline, Inline: agentcontext.InlineSource{Content: "hello"}}},
+			{Name: "body", Section: "## Body", Source: agentcontext.SlotSource{Kind: agentcontext.SlotSourceKindInline, Inline: agentcontext.InlineSource{Content: "world"}}},
 		},
 	}}
 	first, err := composer.Compose(req)
@@ -192,8 +194,8 @@ func TestNormalizeResolvedCompositionDirectArtifactPath(t *testing.T) {
 	}
 }
 
-func HashStringForTest(req ContextRequest) string {
-	h, err := HashRequest(req)
+func HashStringForTest(req agentcontext.ContextRequest) string {
+	h, err := agentcontext.HashRequest(req)
 	if err != nil {
 		return digestValue(req)
 	}

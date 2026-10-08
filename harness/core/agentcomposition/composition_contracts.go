@@ -1,22 +1,25 @@
-package agentcontext
+package agentcomposition
 
-import "github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+import (
+	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+)
 
 // AuthoredRecipe is the app-neutral composition input for callers that want
 // shared base/parts/slot/document assembly. Apps supply definitions and policy;
 // this package owns deterministic merge mechanics.
 type AuthoredRecipe struct {
-	ID          string            `yaml:"id" json:"id"`
-	Base        string            `yaml:"base,omitempty" json:"base,omitempty"`
-	Parts       []PartRef         `yaml:"parts,omitempty" json:"parts,omitempty"`
-	Slots       []SlotSpec        `yaml:"slots,omitempty" json:"slots,omitempty"`
-	Documents   []Document        `yaml:"documents,omitempty" json:"documents,omitempty"`
-	Artifacts   artifact.Tree     `yaml:"artifacts,omitempty" json:"artifacts,omitempty"`
-	Inputs      map[string]any    `yaml:"inputs,omitempty" json:"inputs,omitempty"`
-	MergeRules  []MergeRule       `yaml:"merge_rules,omitempty" json:"merge_rules,omitempty"`
-	Extensions  map[string]any    `yaml:"extensions,omitempty" json:"extensions,omitempty"`
-	Provenance  ProvenanceInput   `yaml:"provenance,omitempty" json:"provenance,omitempty"`
-	Annotations map[string]string `yaml:"annotations,omitempty" json:"annotations,omitempty"`
+	ID          string                       `yaml:"id" json:"id"`
+	Base        string                       `yaml:"base,omitempty" json:"base,omitempty"`
+	Parts       []PartRef                    `yaml:"parts,omitempty" json:"parts,omitempty"`
+	Slots       []agentcontext.SlotSpec      `yaml:"slots,omitempty" json:"slots,omitempty"`
+	Documents   []Document                   `yaml:"documents,omitempty" json:"documents,omitempty"`
+	Artifacts   artifact.Tree                `yaml:"artifacts,omitempty" json:"artifacts,omitempty"`
+	Inputs      map[string]any               `yaml:"inputs,omitempty" json:"inputs,omitempty"`
+	MergeRules  []MergeRule                  `yaml:"merge_rules,omitempty" json:"merge_rules,omitempty"`
+	Extensions  map[string]any               `yaml:"extensions,omitempty" json:"extensions,omitempty"`
+	Provenance  agentcontext.ProvenanceInput `yaml:"provenance,omitempty" json:"provenance,omitempty"`
+	Annotations map[string]string            `yaml:"annotations,omitempty" json:"annotations,omitempty"`
 }
 
 type PartRef struct {

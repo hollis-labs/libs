@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcomposition"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
 	"github.com/hollis-labs/substrate/harness/workspace"
@@ -152,21 +152,21 @@ func runCairn(ctx context.Context, base string) (scenarioResult, error) {
 		fileEntry("managed/config.json", jsonDoc.Bytes, 0o600, "cairn-json-managed", "cairn:install-docs"),
 		fileEntry("managed/config.toml", tomlDoc.Bytes, 0o600, "cairn-toml-managed", "cairn:install-docs"),
 	)
-	defs := []agentcontext.AuthoredRecipe{{
+	defs := []agentcomposition.AuthoredRecipe{{
 		ID: "cairn-base",
-		Documents: []agentcontext.Document{{ID: "instructions", Path: "AGENTS.md", Sections: []agentcontext.Section{{
+		Documents: []agentcomposition.Document{{ID: "instructions", Path: "AGENTS.md", Sections: []agentcomposition.Section{{
 			ID: "base", Title: "## Base", Content: "synthetic Cairn base profile",
 		}}}},
 	}, {
 		ID:        "cairn-install",
 		Artifacts: fsTree,
-		Documents: []agentcontext.Document{{ID: "instructions", Sections: []agentcontext.Section{{
+		Documents: []agentcomposition.Document{{ID: "instructions", Sections: []agentcomposition.Section{{
 			ID: "install", Title: "## Install", Content: "filesystem tree plus managed JSON/TOML install",
 		}}}},
 	}}
 	prepared, err := agentlaunch.ResolvePreparation(ctx, agentlaunch.PrepareRequest{
 		Kind:   agentlaunch.PrepareInputAuthoredRecipe,
-		Recipe: &agentcontext.AuthoredRecipe{ID: "cairn-root", Base: "cairn-base", Parts: []agentcontext.PartRef{{ID: "cairn-install"}}},
+		Recipe: &agentcomposition.AuthoredRecipe{ID: "cairn-root", Base: "cairn-base", Parts: []agentcomposition.PartRef{{ID: "cairn-install"}}},
 		Roots:  roots(base, bootRoot),
 		Projection: agentlaunch.ProviderProjection{Bindings: agentlaunch.ExecutionBindings{
 			Argv: []string{"/bin/sh", "-c", "exit 0"},
