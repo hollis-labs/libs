@@ -1,4 +1,4 @@
-package service
+package approval
 
 import (
 	"context"
@@ -10,12 +10,12 @@ import (
 	permissionlib "github.com/hollis-labs/go-permission"
 )
 
-func TestCognitiveApprovalsOwnershipAndRepetition(t *testing.T) {
+func TestRegistryOwnershipAndRepetition(t *testing.T) {
 	engine := permissionlib.NewEngine(permissionlib.ModeDefault, nil)
-	approvals := NewCognitiveApprovals(engine)
+	approvals := New(engine)
 	req := engine.RequestApproval("view", "dev_write", nil, "permission required")
 	approvals.Bind(req, "run", "call")
-	if _, err := approvals.Respond(t.Context(), "other", req.ID, permissionlib.DecisionAllow, permissionlib.ScopeOnce); !errors.Is(err, ErrCognitiveApprovalNotFound) {
+	if _, err := approvals.Respond(t.Context(), "other", req.ID, permissionlib.DecisionAllow, permissionlib.ScopeOnce); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("wrong view: %v", err)
 	}
 	first, err := approvals.Respond(t.Context(), "view", req.ID, permissionlib.DecisionAllow, permissionlib.ScopeOnce)
@@ -31,14 +31,14 @@ func TestCognitiveApprovalsOwnershipAndRepetition(t *testing.T) {
 	if err != nil || repeat != first {
 		t.Fatalf("repeat=%+v err=%v", repeat, err)
 	}
-	if _, err := approvals.Respond(t.Context(), "view", req.ID, permissionlib.DecisionDeny, permissionlib.ScopeOnce); !errors.Is(err, ErrCognitiveApprovalConflict) {
+	if _, err := approvals.Respond(t.Context(), "view", req.ID, permissionlib.DecisionDeny, permissionlib.ScopeOnce); !errors.Is(err, ErrConflict) {
 		t.Fatalf("conflicting decision: %v", err)
 	}
 }
 
-func TestCognitiveApprovalsConcurrentConflictAndExpiry(t *testing.T) {
+func TestRegistryConcurrentConflictAndExpiry(t *testing.T) {
 	engine := permissionlib.NewEngine(permissionlib.ModeDefault, nil)
-	approvals := NewCognitiveApprovals(engine)
+	approvals := New(engine)
 	req := engine.RequestApproval("view", "dev_write", nil, "permission required")
 	approvals.Bind(req, "run", "call")
 	start := make(chan struct{})
@@ -54,7 +54,7 @@ func TestCognitiveApprovalsConcurrentConflictAndExpiry(t *testing.T) {
 	close(start)
 	group.Wait()
 	first, second := <-results, <-results
-	if (first != nil || !errors.Is(second, ErrCognitiveApprovalConflict)) && (second != nil || !errors.Is(first, ErrCognitiveApprovalConflict)) {
+	if (first != nil || !errors.Is(second, ErrConflict)) && (second != nil || !errors.Is(first, ErrConflict)) {
 		t.Fatalf("conflicting responders: %v, %v", first, second)
 	}
 	_ = engine.WaitForApproval(t.Context(), req)
@@ -63,7 +63,7 @@ func TestCognitiveApprovalsConcurrentConflictAndExpiry(t *testing.T) {
 	expired := engine.RequestApproval("view", "dev_write", nil, "expired")
 	expired.CreatedAt = time.Now().Add(-permissionlib.DefaultApprovalTimeout - time.Second)
 	approvals.Bind(expired, "expired-run", "expired-call")
-	if _, err := approvals.Respond(t.Context(), "view", expired.ID, permissionlib.DecisionAllow, permissionlib.ScopeOnce); !errors.Is(err, ErrCognitiveApprovalConflict) {
+	if _, err := approvals.Respond(t.Context(), "view", expired.ID, permissionlib.DecisionAllow, permissionlib.ScopeOnce); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expired approval: %v", err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())

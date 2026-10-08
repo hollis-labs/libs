@@ -199,13 +199,13 @@ func TestAssemblePassesEnvToResolver(t *testing.T) {
 	})
 	req := ContextRequest{
 		Slots:      []SlotSpec{{Name: "a", Source: SlotSource{Kind: SlotSourceKindInline}}},
-		Workdir:    "/Users/test/work",
+		Workdir:    "/work/example",
 		Provenance: ProvenanceInput{LineageAlias: "nanite.backend.main"},
 	}
 	if _, err := p.Assemble(context.Background(), req); err != nil {
 		t.Fatalf("Assemble: %v", err)
 	}
-	if seenWorkdir != "/Users/test/work" || seenLineage != "nanite.backend.main" {
+	if seenWorkdir != "/work/example" || seenLineage != "nanite.backend.main" {
 		t.Fatalf("env not propagated: workdir=%q lineage=%q", seenWorkdir, seenLineage)
 	}
 }

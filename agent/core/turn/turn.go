@@ -1,4 +1,4 @@
-package service
+package turn
 
 import (
 	"context"
@@ -29,6 +29,9 @@ type TurnRequest struct {
 	Stream      TurnStreamStarter
 	IdleTimeout time.Duration
 	Sink        TurnSink
+	// RequireTerminal rejects EOF without a normalized provider EventDone.
+	// Hosts with a legacy provider contract may leave this false.
+	RequireTerminal bool
 }
 
 // TurnResult contains everything produced by one model invocation.
@@ -103,51 +106,26 @@ func ExecuteTurn(ctx context.Context, req TurnRequest) (TurnResult, error) {
 		return result, &TurnError{Kind: TurnErrorStart, Err: err}
 	}
 
-	streamIdle := time.NewTimer(req.IdleTimeout)
-	defer streamIdle.Stop()
+	reader, err := NewReader(streamCtx, events, req.IdleTimeout)
+	if err != nil {
+		return result, err
+	}
+	defer reader.Close()
 
 	var text strings.Builder
 	for {
-		// Give caller cancellation precedence over a simultaneously ready
-		// provider event or channel closure. Without this check, select could
-		// nondeterministically report an empty successful Turn after cancel.
-		if err := streamCtx.Err(); err != nil {
+		event, ok, err := reader.Next()
+		if err != nil {
 			result.Text = text.String()
-			return result, &TurnError{Kind: TurnErrorStream, Err: context.Cause(streamCtx)}
+			result.Stalled = errors.Is(err, ErrTurnStalled)
+			return result, err
 		}
-
-		var event llmtypes.StreamEvent
-		var ok bool
-		select {
-		case event, ok = <-events:
-			if err := streamCtx.Err(); err != nil {
-				result.Text = text.String()
-				return result, &TurnError{Kind: TurnErrorStream, Err: context.Cause(streamCtx)}
-			}
-			if !ok {
-				result.Text = text.String()
-				return result, nil
-			}
-			// Stop-then-drain-then-reset is the race-free Timer reset idiom
-			// used by the existing chat provider stream loop.
-			if !streamIdle.Stop() {
-				select {
-				case <-streamIdle.C:
-				default:
-				}
-			}
-			streamIdle.Reset(req.IdleTimeout)
-		case <-streamIdle.C:
-			cancelStream()
+		if !ok {
 			result.Text = text.String()
-			result.Stalled = true
-			return result, &TurnError{
-				Kind: TurnErrorStalled,
-				Err:  fmt.Errorf("%w: no provider events for %s", ErrTurnStalled, req.IdleTimeout),
+			if req.RequireTerminal && !reader.TerminalSeen() {
+				return result, &TurnError{Kind: TurnErrorStream, Err: ErrTurnTruncated}
 			}
-		case <-streamCtx.Done():
-			result.Text = text.String()
-			return result, &TurnError{Kind: TurnErrorStream, Err: context.Cause(streamCtx)}
+			return result, nil
 		}
 
 		switch event.Type {
@@ -205,8 +183,8 @@ func ExecuteTurn(ctx context.Context, req TurnRequest) (TurnResult, error) {
 			return result, &TurnError{Kind: TurnErrorStream, Err: streamErr}
 
 		case llmtypes.EventSessionID, llmtypes.EventDone:
-			// These events are intentionally inert, matching the current
-			// provider stream loop. Channel closure ends the Turn.
+			// Reader records normalized terminal events. Session IDs remain
+			// host metadata; channel closure ends the invocation.
 		}
 	}
 }
