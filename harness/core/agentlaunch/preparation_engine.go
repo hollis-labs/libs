@@ -4,27 +4,27 @@ import (
 	"context"
 	"path"
 
-	"github.com/hollis-labs/substrate/harness/agentcontext"
+	"github.com/hollis-labs/substrate/harness/agentcomposition"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 // SharedPrepareOptions configure ResolvePreparation.
 type SharedPrepareOptions struct {
-	Composer    agentcontext.Composer
-	Definitions []agentcontext.AuthoredRecipe
+	Composer    agentcomposition.Composer
+	Definitions []agentcomposition.AuthoredRecipe
 	Authorize   ArtifactAuthorizer
 }
 
 // SharedPrepareOption mutates SharedPrepareOptions.
 type SharedPrepareOption func(*SharedPrepareOptions)
 
-func WithComposer(c agentcontext.Composer) SharedPrepareOption {
+func WithComposer(c agentcomposition.Composer) SharedPrepareOption {
 	return func(o *SharedPrepareOptions) { o.Composer = c }
 }
 
-func WithCompositionDefinitions(defs []agentcontext.AuthoredRecipe) SharedPrepareOption {
-	return func(o *SharedPrepareOptions) { o.Definitions = append([]agentcontext.AuthoredRecipe(nil), defs...) }
+func WithCompositionDefinitions(defs []agentcomposition.AuthoredRecipe) SharedPrepareOption {
+	return func(o *SharedPrepareOptions) { o.Definitions = append([]agentcomposition.AuthoredRecipe(nil), defs...) }
 }
 
 func WithArtifactAuthorization(a ArtifactAuthorizer) SharedPrepareOption {
@@ -85,7 +85,7 @@ func ResolvePreparation(ctx context.Context, req PrepareRequest, opts ...SharedP
 	return prepared, nil
 }
 
-func resolvePreparationArtifacts(ctx context.Context, req PrepareRequest, cfg SharedPrepareOptions) (*agentcontext.ResolvedComposition, artifact.Tree, error) {
+func resolvePreparationArtifacts(ctx context.Context, req PrepareRequest, cfg SharedPrepareOptions) (*agentcomposition.ResolvedComposition, artifact.Tree, error) {
 	switch req.Kind {
 	case PrepareInputArtifacts:
 		entries, err := artifact.Normalize(req.Artifacts.Entries)
@@ -94,7 +94,7 @@ func resolvePreparationArtifacts(ctx context.Context, req PrepareRequest, cfg Sh
 		}
 		return nil, artifact.Tree{Entries: entries, Provenance: req.Artifacts.Provenance}, nil
 	case PrepareInputResolvedComposition:
-		comp, err := agentcontext.NormalizeResolvedComposition(*req.Composition)
+		comp, err := agentcomposition.NormalizeResolvedComposition(*req.Composition)
 		if err != nil {
 			return nil, artifact.Tree{}, err
 		}
@@ -106,9 +106,9 @@ func resolvePreparationArtifacts(ctx context.Context, req PrepareRequest, cfg Sh
 	case PrepareInputAuthoredRecipe:
 		composer := cfg.Composer
 		if composer == nil {
-			composer = agentcontext.NewComposer(agentcontext.ComposerOptions{})
+			composer = agentcomposition.NewComposer(agentcomposition.ComposerOptions{})
 		}
-		comp, err := composer.Compose(agentcontext.ComposeRequest{Recipe: *req.Recipe, Definitions: cfg.Definitions})
+		comp, err := composer.Compose(agentcomposition.ComposeRequest{Recipe: *req.Recipe, Definitions: cfg.Definitions})
 		if err != nil {
 			return nil, artifact.Tree{}, err
 		}
@@ -122,7 +122,7 @@ func resolvePreparationArtifacts(ctx context.Context, req PrepareRequest, cfg Sh
 	}
 }
 
-func compositionArtifactTree(comp agentcontext.ResolvedComposition) (artifact.Tree, error) {
+func compositionArtifactTree(comp agentcomposition.ResolvedComposition) (artifact.Tree, error) {
 	entries := append([]artifact.Entry(nil), comp.Artifacts.Entries...)
 	for _, doc := range comp.Documents {
 		rel := doc.Path

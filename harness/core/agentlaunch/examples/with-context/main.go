@@ -37,8 +37,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/substrate/harness/agentcontext"
-	"github.com/hollis-labs/substrate/harness/agentcontext/resolvers"
+	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/substrate/agent/agentcontext/resolvers"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
