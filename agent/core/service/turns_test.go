@@ -96,3 +96,50 @@ func TestMissingHostCommitCannotYieldSuccessfulTerminal(t *testing.T) {
 		t.Fatalf("invalid snapshot serialization: %v", err)
 	}
 }
+
+type failingSnapshots struct {
+	snapshots
+	failure error
+}
+
+func (s *failingSnapshots) SaveCognitiveTurnSnapshot(ctx context.Context, view, id, data string) error {
+	if s.failure != nil {
+		return s.failure
+	}
+	return s.snapshots.SaveCognitiveTurnSnapshot(ctx, view, id, data)
+}
+
+func TestPersistentSnapshotOutageIsObservableWithoutDurableClaim(t *testing.T) {
+	for _, duringCreate := range []bool{false, true} {
+		t.Run(map[bool]string{false: "consume", true: "create"}[duringCreate], func(t *testing.T) {
+			cause := errors.New("snapshot store unavailable")
+			backing := &failingSnapshots{snapshots: snapshots{data: make(map[string]string)}}
+			if duringCreate {
+				backing.failure = cause
+			}
+			turns := service.NewTurns[output](backing, service.Options{})
+			run := turns.Create("view", "turn", "fake", "model", "live", "normal", nil)
+			if !duringCreate {
+				backing.failure = cause
+			}
+			err := run.Consume(service.Input{Type: "delta", Content: "partial"})
+			if !errors.Is(err, service.ErrSnapshotPersistence) || !errors.Is(err, cause) || !errors.Is(run.PersistenceError(), cause) || !errors.Is(run.End(), cause) {
+				t.Fatalf("store failure hidden: %v", err)
+			}
+			live, err := turns.Get("view", "turn")
+			if err != nil || live.State != "failed" || live.Message.Error.Code != "persistence_failed" {
+				t.Fatalf("false successful outcome: %+v %v", live, err)
+			}
+			backing.failure = nil
+			fresh := service.NewTurns[output](backing, service.Options{})
+			recovered, err := fresh.Get("view", "turn")
+			if duringCreate {
+				if !errors.Is(err, service.ErrTurnNotFound) {
+					t.Fatalf("uncommitted creation falsely recovered: %+v %v", recovered, err)
+				}
+			} else if err != nil || recovered.Message.Error.Code != "process_lost" || recovered.EventCheckpoint >= live.EventCheckpoint {
+				t.Fatalf("failed terminal falsely durable: %+v %v", recovered, err)
+			}
+		})
+	}
+}

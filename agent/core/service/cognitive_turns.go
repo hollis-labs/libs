@@ -21,6 +21,11 @@ const Keepalive = 15 * time.Second
 
 var ErrTurnNotFound = errors.New("turn not found in this view")
 
+// ErrSnapshotPersistence reports failure to commit a snapshot. A failure
+// terminal can still be observed live, but total store outage cannot preserve
+// that terminal over restart. Hosts must inspect mutation errors.
+var ErrSnapshotPersistence = errors.New("turn snapshot persistence failed")
+
 // Snapshot[Message] is captured under the same lock that publishes the
 // canonical log. EventCheckpoint and Message therefore describe one revision.
 // Turn IDs, run IDs and output IDs currently share one opaque local ID.
@@ -53,17 +58,18 @@ type Turns[Message any] struct {
 }
 
 type Run[Message any] struct {
-	mu            sync.Mutex
-	owner         *Turns[Message]
-	snapshot      Snapshot[Message]
-	canceled      bool
-	loadMessage   func() (Committed[Message], error)
-	partID        string
-	phase         string
-	partNumber    int
-	openedMessage bool
-	lastError     *chatstream.RunError
-	usage         *chatstream.Usage
+	mu             sync.Mutex
+	owner          *Turns[Message]
+	snapshot       Snapshot[Message]
+	canceled       bool
+	loadMessage    func() (Committed[Message], error)
+	partID         string
+	phase          string
+	partNumber     int
+	openedMessage  bool
+	lastError      *chatstream.RunError
+	usage          *chatstream.Usage
+	persistenceErr error
 }
 
 func NewTurns[Message any](backing SnapshotStore, opts Options) *Turns[Message] {
@@ -84,6 +90,9 @@ func NewTurns[Message any](backing SnapshotStore, opts Options) *Turns[Message] 
 	return &Turns[Message]{runs: make(map[string]*Run[Message]), hub: hub, store: backing, stateKind: stateKind, activityPrefix: prefix}
 }
 
+// Create returns a discoverable run even when persistence fails. Inspect
+// Run.PersistenceError before host dispatch; a live failure is not a durable
+// admission guarantee when the backing store cannot commit either save.
 func (t *Turns[Message]) Create(viewID, id, provider, model string, mode string, effort string, load func() (Committed[Message], error)) *Run[Message] {
 	r := &Run[Message]{owner: t, loadMessage: load, snapshot: Snapshot[Message]{SessionViewID: viewID, TurnID: id, RunID: id, OutputMessageID: id, State: "submitted", DeltaMode: mode, Effort: effort}}
 	if err := t.hub.Open(context.Background(), id); err != nil {
@@ -232,10 +241,13 @@ func (r *Run[Message]) publish(ev chatstream.Event) {
 	r.snapshot.Revision++
 	if saveErr := r.save(); saveErr != nil {
 		r.snapshot.State = "failed"
+		r.persistenceErr = errors.Join(ErrSnapshotPersistence, saveErr)
 		ev = chatstream.Event{V: ev.V, RunID: ev.RunID, Time: ev.Time, Seq: ev.Seq, Verb: chatstream.VerbRunError, Code: "persistence_failed", Message: "failed to commit native turn snapshot"}
 		reduced, _ = chatstream.Reduce([]chatstream.Event{ev}, prior)
 		r.snapshot.Message = reduced
-		_ = r.save()
+		if fallbackErr := r.save(); fallbackErr != nil {
+			r.persistenceErr = errors.Join(r.persistenceErr, fallbackErr)
+		}
 	}
 	// Prepare the authoritative reduction before fan-out. A status reader
 	// waits on this lock until the hub has assigned the same checkpoint.
@@ -273,9 +285,9 @@ func (r *Run[Message]) closePart() {
 	}
 }
 
-func (r *Run[Message]) Consume(evt Input) {
+func (r *Run[Message]) Consume(evt Input) (err error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	defer func() { err = r.persistenceErr; r.mu.Unlock() }()
 	if r.snapshot.Message.Status.Done() {
 		return
 	}
@@ -326,7 +338,7 @@ func (r *Run[Message]) Consume(evt Input) {
 		r.publish(chatstream.Event{Verb: chatstream.VerbPartEnd, PartID: id, Final: final})
 	case "approval_request":
 		var prompt ApprovalPrompt
-		if err := json.Unmarshal([]byte(evt.Data), &prompt); err != nil {
+		if parseErr := json.Unmarshal([]byte(evt.Data), &prompt); parseErr != nil {
 			r.lastError = &chatstream.RunError{Code: "invalid_approval", Message: "invalid native permission prompt"}
 			return
 		}
@@ -349,14 +361,16 @@ func (r *Run[Message]) Consume(evt Input) {
 		}
 		r.publish(chatstream.Event{Verb: chatstream.VerbActivity, Kind: r.owner.activityPrefix + evt.Type, Value: value})
 	}
+	return
 }
 
-func (r *Run[Message]) End() {
+func (r *Run[Message]) End() (err error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	defer func() { err = r.persistenceErr; r.mu.Unlock() }()
 	if !r.snapshot.Message.Status.Done() {
 		r.finish(false)
 	}
+	return
 }
 
 // Only this finalizer publishes terminal events, after the producer has
@@ -433,4 +447,13 @@ func (t *Turns[Message]) SetUsage(id string, usage *chatstream.Usage) {
 	r.mu.Lock()
 	r.usage = usage
 	r.mu.Unlock()
+}
+
+// PersistenceError retains the first failed snapshot mutation and any failed
+// fallback save. It also covers Create/Working mutations before consumption.
+// A successful later read cannot prove the failed live terminal was durable.
+func (r *Run[Message]) PersistenceError() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.persistenceErr
 }

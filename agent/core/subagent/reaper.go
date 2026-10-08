@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,6 +79,7 @@ const (
 //     counts of rows reaped per category for assertion.
 type Reaper struct {
 	db          Database
+	owner       *Service
 	interval    time.Duration
 	orphanGrace time.Duration
 	// hardCeiling is the non-resetting backstop duration (CW-20260816-0004).
@@ -341,6 +343,20 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	if r.db == nil {
 		return SweepCounts{}, nil
 	}
+	var queued []any
+	if r.owner != nil {
+		r.owner.cancelMu.Lock()
+		defer r.owner.cancelMu.Unlock()
+		for id, wait := range r.owner.cancelers {
+			if wait.queued {
+				queued = append(queued, id)
+			}
+		}
+	}
+	queueGuard := ""
+	if len(queued) > 0 {
+		queueGuard = " AND id NOT IN (" + strings.TrimSuffix(strings.Repeat("?,", len(queued)), ",") + ")"
+	}
 	now := r.now().UTC()
 	nowRFC := now.Format(time.RFC3339Nano)
 
@@ -358,7 +374,7 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	   AND started_at != ''
 	   AND datetime(started_at, '+' || ? || ' seconds') < datetime(?)`
 
-	res, err := r.db.ExecContext(ctx, hardCeilingSQL, ReasonTimeoutReaper, nowRFC, hardCeilingSeconds, nowRFC)
+	res, err := r.db.ExecContext(ctx, hardCeilingSQL+queueGuard, append([]any{ReasonTimeoutReaper, nowRFC, hardCeilingSeconds, nowRFC}, queued...)...)
 	if err != nil {
 		return counts, fmt.Errorf("reaper hard-ceiling sweep: %w", err)
 	}
@@ -382,7 +398,7 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	         '+' || timeout_seconds || ' seconds'
 	       ) < datetime(?)`
 
-	res, err = r.db.ExecContext(ctx, inactivitySQL, ReasonInactivityReaper, nowRFC, nowRFC)
+	res, err = r.db.ExecContext(ctx, inactivitySQL+queueGuard, append([]any{ReasonInactivityReaper, nowRFC, nowRFC}, queued...)...)
 	if err != nil {
 		return counts, fmt.Errorf("reaper inactivity sweep: %w", err)
 	}
@@ -408,7 +424,7 @@ func (r *Reaper) SweepOnce(ctx context.Context) (SweepCounts, error) {
 	   AND child_session_id = ''
 	   AND datetime(created_at) < datetime(?)`
 
-	res, err = r.db.ExecContext(ctx, orphanSQL, ReasonOrphanReaper, nowRFC, orphanCutoff)
+	res, err = r.db.ExecContext(ctx, orphanSQL+queueGuard, append([]any{ReasonOrphanReaper, nowRFC, orphanCutoff}, queued...)...)
 	if err != nil {
 		return counts, fmt.Errorf("reaper orphan sweep: %w", err)
 	}

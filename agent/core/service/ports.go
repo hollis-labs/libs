@@ -14,7 +14,9 @@ import (
 
 // SnapshotStore commits the entire snapshot, including canonical reduction and
 // checkpoint, atomically. It returns sql.ErrNoRows for an unknown owned turn.
-// Snapshots survive log expiry and restarts; event logs are process-local.
+// Successfully committed snapshots survive log expiry and restarts; event logs
+// are process-local. A failed save is observable through Run.PersistenceError
+// and Consume/End, and cannot promise restart survival during a store outage.
 type SnapshotStore interface {
 	GetCognitiveTurnSnapshot(context.Context, string, string) (string, error)
 	SaveCognitiveTurnSnapshot(context.Context, string, string, string) error

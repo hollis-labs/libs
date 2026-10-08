@@ -34,9 +34,21 @@ use the permission engine's broader semantics through `RespondRetained`.
 The database schema and port contract are described in
 [subagent/STORAGE.md](subagent/STORAGE.md). The host owns migrations and database
 connections; the library reads no environment variables to configure liveness.
+Use `Service.NewReaper` while the service dispatches children: it excludes owned
+capacity waits under the same lock as admission and cancellation. Standalone
+`NewReaper` is for recovery without an active owner. Admission and retry require
+a durable running row; a terminal reaper/operator outcome cannot be revived.
+Authorized interactive approval bypass dispatches through the async owner path.
 
-The service commits a complete snapshot and event checkpoint through one atomic
-host store operation before fan-out. Output must be committed before terminal
+On successful persistence, the service commits a complete snapshot and event
+checkpoint through one atomic host store operation before fan-out. Check the
+returned run's `PersistenceError` after `Create`; `Consume` and `End` also return
+retained typed `ErrSnapshotPersistence` failures. A failed write produces a live
+failure terminal, with a fallback snapshot save. If both writes fail, that live
+terminal is not durable: restart reads the last committed snapshot, fails an
+unfinished one as `process_lost`, or reports not found if creation never committed.
+The host must observe and settle persistence errors; a later status read cannot
+prove the failed terminal survived the outage. Output must be committed before terminal
 publication. Snapshots survive a database reopen; event logs are process-local,
 bounded and expire after closure. A recovered unfinished turn becomes a failed
 `process_lost` outcome. Expired replay emits a gap; clients retrieve the snapshot

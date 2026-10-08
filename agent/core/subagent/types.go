@@ -2,7 +2,10 @@
 // fanout, heartbeat, reaping and parent reply delivery through host ports.
 package subagent
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Mode names the execution style for a spawn request.
 const (
@@ -285,3 +288,6 @@ type SubagentStreamSink interface {
 type CompletionReactor interface {
 	ReactToCompletion(ctx context.Context, run *Run, messageID string)
 }
+
+// ErrRunTerminated reports a durable terminal decision before admission/retry.
+var ErrRunTerminated = errors.New("subagent run already reached a terminal outcome")

@@ -93,6 +93,9 @@ func runExampleCase(backing hostStore, mode string) (agentservice.Snapshot[outpu
 	defer cancel(nil)
 	turns := agentservice.NewTurns[output](backing, agentservice.Options{})
 	run := turns.Create("example-view", mode, "fake", "fake-model", "live", "normal", func() (agentservice.Committed[output], error) { return backing.load(mode) })
+	if err := run.PersistenceError(); err != nil {
+		return agentservice.Snapshot[output]{}, err
+	}
 	turns.Working(mode)
 	engine := permission.NewEngine(permission.ModeDefault, &permission.RuleSet{Rules: []permission.Rule{{Tool: "lookup", Behavior: permission.DecisionAsk}}})
 	approvals := approval.New(engine)
@@ -175,7 +178,9 @@ func runExampleCase(backing hostStore, mode string) (agentservice.Snapshot[outpu
 			return runloop.Proceed
 		},
 	})
-	run.End()
+	if err := run.End(); err != nil {
+		return agentservice.Snapshot[output]{}, err
+	}
 	if loopErr != nil {
 		return agentservice.Snapshot[output]{}, loopErr
 	}
@@ -277,6 +282,10 @@ func exercise(path string) error {
 		return errors.New("child spawn accepted missing host authority")
 	}
 	children.SetSpawnAuthorizer(childPolicy{})
+	reaper := children.NewReaper(subagent.ReaperOptions{})
+	if _, err := reaper.SweepOnce(context.Background()); err != nil {
+		return err
+	}
 	id, err := children.Spawn(context.Background(), subagent.SpawnRequest{ParentSessionID: "example-view", ParentAgentID: "fake-parent", Role: "fake-child", Prompt: "child work", Mode: subagent.ModeSync})
 	if err != nil {
 		return err

@@ -859,20 +859,19 @@ func (svc *Service) Spawn(ctx context.Context, req SpawnRequest) (string, error)
 	//   b) trust == TrustNormal and approval gate evaluated to false.
 	run.Status = StatusRunning
 	run.StartedAt = run.CreatedAt
-	if err := svc.insertRun(ctx, run); err != nil {
-		return "", fmt.Errorf("insert run: %w", err)
+	// The bound reaper and cancellation observe insertion and queue ownership
+	// as one handoff; there is no durable ownerless window before capacity wait.
+	svc.cancelMu.Lock()
+	insertErr := svc.insertRun(ctx, run)
+	var slotWait *spawnSlotWait
+	if insertErr == nil {
+		slotWait = svc.registerSpawnSlotWaitLocked(ctx, run.ID)
+	}
+	svc.cancelMu.Unlock()
+	if insertErr != nil {
+		return "", fmt.Errorf("insert run: %w", insertErr)
 	}
 
-	// G-5: emit running event so the parent UI can render "subagent
-	// spawned" before the runner does any work.
-	var slotWait *spawnSlotWait
-	switch mode {
-	case ModeSync, ModeAsync, ModeAPI:
-		// Register operator cancellation before publishing the running event.
-		// A sink consumer can call Cancel as soon as that event is visible,
-		// including while this goroutine is still waiting for capacity.
-		slotWait = svc.registerSpawnSlotWait(ctx, run.ID)
-	}
 	svc.emitStatus(run, "")
 
 	switch mode {
@@ -889,7 +888,7 @@ func (svc *Service) Spawn(ctx context.Context, req SpawnRequest) (string, error)
 			return "", err
 		}
 		svc.executeWithSlot(slotWait.runCtx, run, req.ParentAgentID, slotWait)
-	case ModeAsync, ModeAPI:
+	case ModeAsync, ModeAPI, ModeInteractive:
 		// Non-blocking: fire-and-forget goroutine. The reply lands
 		// in the parent session's inbox (async) or chat (api).
 		// Background-derived ctx because the caller's request ctx
@@ -1172,9 +1171,11 @@ func (svc *Service) Approve(ctx context.Context, runID string) error {
 // lifetime with operator cancellation; runCtx is background-derived so a
 // request ending after acquisition does not stop an executing subagent.
 type spawnSlotWait struct {
-	queueCtx context.Context
-	runCtx   context.Context
-	cancel   context.CancelFunc
+	queueCtx  context.Context
+	runCtx    context.Context
+	cancel    context.CancelFunc
+	queued    bool // protected by Service.cancelMu
+	startedAt string
 
 	// Status emission ordering is per run. At most the observable running
 	// transition and one authoritative terminal transition can queue here, so
@@ -1205,7 +1206,7 @@ func (svc *Service) registerSpawnSlotWaitLocked(waitCtx context.Context, runID s
 		queueCancel()
 		runCancel()
 	}
-	wait := &spawnSlotWait{queueCtx: queueCtx, runCtx: runCtx, cancel: cancel}
+	wait := &spawnSlotWait{queueCtx: queueCtx, runCtx: runCtx, cancel: cancel, queued: true}
 	svc.cancelers[runID] = wait
 	return wait
 }
@@ -1231,6 +1232,22 @@ func (svc *Service) acquireSpawnSlotForRun(runID string, wait *spawnSlotWait) er
 	err := wait.queueCtx.Err()
 	if err == nil {
 		err = wait.runCtx.Err()
+	}
+	if ownerIsCurrent && err == nil {
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		var res sql.Result
+		res, err = svc.db.ExecContext(wait.queueCtx, `UPDATE subagent_runs SET started_at=?, last_activity_at=? WHERE id=? AND status=?`, now, now, runID, StatusRunning)
+		if err == nil {
+			var n int64
+			n, err = res.RowsAffected()
+			if err == nil && n == 0 {
+				err = ErrRunTerminated
+			}
+		}
+		if err == nil {
+			wait.queued = false
+			wait.startedAt = now
+		}
 	}
 	svc.cancelMu.Unlock()
 	if !ownerIsCurrent || err != nil {
@@ -1315,6 +1332,7 @@ func (svc *Service) releaseSpawnSlot() { <-svc.spawnSem }
 // lifecycle's cancellation owner, cancels both contexts, and returns the slot
 // exactly once regardless of how execute exits (success, error, or cancel).
 func (svc *Service) executeWithSlot(ctx context.Context, run *Run, parentAgentID string, owner *spawnSlotWait) {
+	run.StartedAt = owner.startedAt
 	defer svc.releaseSpawnSlot()
 	defer owner.cancel()
 	defer svc.clearRunCanceler(run.ID, owner)
@@ -1419,8 +1437,8 @@ func (svc *Service) execute(ctx context.Context, run *Run, parentAgentID string)
 		// + retry_count carry the prior history). The next attempt
 		// will overwrite the terminal fields.
 		if err := svc.persistRetryCheckpoint(ctx, run); err != nil {
-			slog.Warn("subagent: persist retry checkpoint", "err", err, "run_id", run.ID,
-				"retry_count", run.RetryCount)
+			slog.Warn("subagent: persist retry checkpoint", "err", err, "run_id", run.ID, "retry_count", run.RetryCount)
+			break
 		}
 		// Reset the attempt-local fields so the next iteration writes
 		// fresh state instead of carrying the prior attempt's residue.
@@ -1925,24 +1943,15 @@ func (svc *Service) shouldRetry(ctx context.Context, run *Run, runErr error) boo
 		}
 	}
 
-	// Concurrent Cancel: re-read the row's status before committing to
-	// another attempt. A Cancel that landed between attempts updates the
-	// row to canceled; we must observe that and abort the chain rather
-	// than the next runner.Run resurrecting it. Use a short-bounded
-	// background ctx so a canceled parent ctx doesn't prevent the read.
+	// Only the durable running owner may begin another attempt. Reaper and
+	// operator terminal outcomes outrank the local runner result; lookup failure
+	// cannot authorize another durable effect.
 	checkCtx, checkCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer checkCancel()
 	var persistedStatus string
-	if err := svc.db.QueryRowContext(checkCtx,
-		`SELECT status FROM subagent_runs WHERE id = ?`, run.ID,
-	).Scan(&persistedStatus); err == nil {
-		if persistedStatus == StatusCanceled || persistedStatus == StatusRejected {
-			return false
-		}
+	if err := svc.db.QueryRowContext(checkCtx, `SELECT status FROM subagent_runs WHERE id=?`, run.ID).Scan(&persistedStatus); err != nil || persistedStatus != StatusRunning {
+		return false
 	}
-	// On a DB error, conservatively allow the retry — the next attempt's
-	// finalize will still observe the cancel via finalizeRun's guarded
-	// UPDATE. The whole row check is defense-in-depth.
 
 	return true
 }
@@ -2008,10 +2017,8 @@ func lastAttemptStatus(attemptsJSON string) string {
 // (via finalizeRun) writes fresh state. Uses a 5s timeout on a fresh
 // background ctx so a canceled parent doesn't prevent the write.
 //
-// This persistence is best-effort: a failure here is logged but does not
-// abort the retry chain. The in-memory Run state is the source of truth
-// inside execute's loop; the DB row is the eventual surface that a
-// crash-recovery read would consult.
+// The guarded checkpoint is required before another attempt. A failed write
+// or terminal durable row stops the chain; local state cannot revive it.
 func (svc *Service) persistRetryCheckpoint(parentCtx context.Context, run *Run) error {
 	attempts := run.AttemptsJSON
 	if attempts == "" {
@@ -2019,15 +2026,25 @@ func (svc *Service) persistRetryCheckpoint(parentCtx context.Context, run *Run) 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := svc.db.ExecContext(ctx,
+	res, err := svc.db.ExecContext(ctx,
 		`UPDATE subagent_runs
 		   SET status = ?, retry_count = ?, attempts_json = ?,
 		       error = '', result_json = '{}', completed_at = ''
-		 WHERE id = ? AND status NOT IN (?, ?)`,
+		 WHERE id = ? AND status = ?`,
 		StatusRunning, run.RetryCount, attempts,
-		run.ID, StatusCanceled, StatusRejected,
+		run.ID, StatusRunning,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrRunTerminated
+	}
+	return nil
 }
 
 // selectSQL is the canonical SELECT clause for subagent_runs rows.
@@ -2078,4 +2095,13 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+// NewReaper binds recovery sweeps to this service's queue ownership. Use this
+// constructor while dispatching children; standalone NewReaper is for recovery
+// without an active service. Queued runs are excluded under the admission lock.
+func (svc *Service) NewReaper(opts ReaperOptions) *Reaper {
+	r := NewReaper(svc.db, opts)
+	r.owner = svc
+	return r
 }
