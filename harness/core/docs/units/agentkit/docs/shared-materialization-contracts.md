@@ -45,8 +45,8 @@ Callers can enter at three levels:
 | Entry | Contract type | Used when |
 | --- | --- | --- |
 | Direct artifacts | `artifact.Tree`, `agentlaunch.PrepareRequest{Kind: PrepareInputArtifacts}` | A caller already has files/trees and wants render/install/launch preparation without composition |
-| Resolved composition | `agentcomposition.ResolvedComposition`, `PrepareInputResolvedComposition` | A caller has already resolved ordered parts, documents and artifacts |
-| Authored recipe | `agentcomposition.AuthoredRecipe`, `PrepareInputAuthoredRecipe` | A caller wants shared composition to resolve base/parts/merge/document assembly |
+| Resolved composition | `agentcontext.ResolvedComposition`, `PrepareInputResolvedComposition` | A caller has already resolved ordered parts, documents and artifacts |
+| Authored recipe | `agentcontext.AuthoredRecipe`, `PrepareInputAuthoredRecipe` | A caller wants shared composition to resolve base/parts/merge/document assembly |
 
 Materialization is independent through `materialize.Request` and `materialize.Engine`; render/install callers do not need a runtime, wrapper or daemon.
 

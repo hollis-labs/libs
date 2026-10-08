@@ -18,7 +18,7 @@ excluded (see the migration map).
 
 ## Packages
 
-- `github.com/hollis-labs/substrate/agent/agentcontext`
+- `github.com/hollis-labs/substrate/harness/agentcontext`
   - Slot-source resolver framework (static_file, static_dir, inline, cmd,
     http_text, http_json, role_summary, skill_index). Deterministic
     boot-prompt assembly with byte/token budgets and per-slot provenance.

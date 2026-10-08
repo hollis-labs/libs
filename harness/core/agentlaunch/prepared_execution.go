@@ -3,7 +3,7 @@ package agentlaunch
 import (
 	"errors"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 	permission "github.com/hollis-labs/substrate/harness/interception/permission"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
@@ -40,14 +40,14 @@ func (k PrepareInputKind) Valid() bool {
 // recipe. The shared implementation added by later tasks will allow callers to
 // enter at any of those levels without requiring a full runtime.
 type PrepareRequest struct {
-	Kind        PrepareInputKind                      `yaml:"kind" json:"kind"`
-	Artifacts   *artifact.Tree                        `yaml:"artifacts,omitempty" json:"artifacts,omitempty"`
-	Composition *agentcomposition.ResolvedComposition `yaml:"composition,omitempty" json:"composition,omitempty"`
-	Recipe      *agentcomposition.AuthoredRecipe      `yaml:"recipe,omitempty" json:"recipe,omitempty"`
-	Projection  ProviderProjection                    `yaml:"projection,omitempty" json:"projection,omitempty"`
-	Roots       ExecutionRoots                        `yaml:"roots" json:"roots"`
-	Access      AccessRequirements                    `yaml:"access,omitempty" json:"access,omitempty"`
-	Legacy      LegacyCompatibility                   `yaml:"legacy,omitempty" json:"legacy,omitempty"`
+	Kind        PrepareInputKind                  `yaml:"kind" json:"kind"`
+	Artifacts   *artifact.Tree                    `yaml:"artifacts,omitempty" json:"artifacts,omitempty"`
+	Composition *agentcontext.ResolvedComposition `yaml:"composition,omitempty" json:"composition,omitempty"`
+	Recipe      *agentcontext.AuthoredRecipe      `yaml:"recipe,omitempty" json:"recipe,omitempty"`
+	Projection  ProviderProjection                `yaml:"projection,omitempty" json:"projection,omitempty"`
+	Roots       ExecutionRoots                    `yaml:"roots" json:"roots"`
+	Access      AccessRequirements                `yaml:"access,omitempty" json:"access,omitempty"`
+	Legacy      LegacyCompatibility               `yaml:"legacy,omitempty" json:"legacy,omitempty"`
 }
 
 func (r PrepareRequest) Validate() error {
@@ -94,16 +94,16 @@ type ProviderProjection struct {
 // code. It is distinct from the older PreparedLaunch compatibility struct,
 // which M12/M14 will adapt onto this shape.
 type PreparedExecution struct {
-	InputKind       PrepareInputKind                      `yaml:"input_kind" json:"input_kind"`
-	Composition     *agentcomposition.ResolvedComposition `yaml:"composition,omitempty" json:"composition,omitempty"`
-	Artifacts       artifact.Tree                         `yaml:"artifacts" json:"artifacts"`
-	Materialization *materialize.Handle                   `yaml:"materialization,omitempty" json:"materialization,omitempty"`
-	Bindings        ExecutionBindings                     `yaml:"bindings" json:"bindings"`
-	Roots           ExecutionRoots                        `yaml:"roots" json:"roots"`
-	Access          AccessRequirements                    `yaml:"access" json:"access"`
-	Effects         []RuntimeEffect                       `yaml:"effects,omitempty" json:"effects,omitempty"`
-	Diagnostics     []CapabilityDiagnostic                `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
-	Legacy          LegacyCompatibility                   `yaml:"legacy,omitempty" json:"legacy,omitempty"`
+	InputKind       PrepareInputKind                  `yaml:"input_kind" json:"input_kind"`
+	Composition     *agentcontext.ResolvedComposition `yaml:"composition,omitempty" json:"composition,omitempty"`
+	Artifacts       artifact.Tree                     `yaml:"artifacts" json:"artifacts"`
+	Materialization *materialize.Handle               `yaml:"materialization,omitempty" json:"materialization,omitempty"`
+	Bindings        ExecutionBindings                 `yaml:"bindings" json:"bindings"`
+	Roots           ExecutionRoots                    `yaml:"roots" json:"roots"`
+	Access          AccessRequirements                `yaml:"access" json:"access"`
+	Effects         []RuntimeEffect                   `yaml:"effects,omitempty" json:"effects,omitempty"`
+	Diagnostics     []CapabilityDiagnostic            `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
+	Legacy          LegacyCompatibility               `yaml:"legacy,omitempty" json:"legacy,omitempty"`
 	// Boot is how the boot prompt reaches the agent, from the PreparedLaunch
 	// the execution was prepared from.
 	Boot BootDelivery `yaml:"boot,omitempty" json:"boot,omitempty"`

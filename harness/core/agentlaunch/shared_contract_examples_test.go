@@ -3,7 +3,7 @@ package agentlaunch_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 	"github.com/hollis-labs/substrate/harness/agentlaunch"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
@@ -41,12 +41,12 @@ func TestSharedMaterializationContractsCoverEntrypoints(t *testing.T) {
 		t.Fatalf("direct artifact prepare request invalid: %v", err)
 	}
 
-	resolved := agentcomposition.ResolvedComposition{
+	resolved := agentcontext.ResolvedComposition{
 		ID: "torque-task-bundle",
-		Documents: []agentcomposition.Document{{
+		Documents: []agentcontext.Document{{
 			ID:   "agents",
 			Path: "AGENTS.md",
-			Sections: []agentcomposition.Section{{
+			Sections: []agentcontext.Section{{
 				ID:          "task",
 				Content:     "synthetic task context",
 				Contributor: "torque",
@@ -64,11 +64,11 @@ func TestSharedMaterializationContractsCoverEntrypoints(t *testing.T) {
 		t.Fatalf("resolved composition prepare request invalid: %v", err)
 	}
 
-	recipe := agentcomposition.AuthoredRecipe{
+	recipe := agentcontext.AuthoredRecipe{
 		ID:         "cairn-install",
 		Base:       "base-agent",
-		Parts:      []agentcomposition.PartRef{{ID: "install-docs"}},
-		MergeRules: []agentcomposition.MergeRule{{Field: "documents.sections", Kind: agentcomposition.MergeAppend}},
+		Parts:      []agentcontext.PartRef{{ID: "install-docs"}},
+		MergeRules: []agentcontext.MergeRule{{Field: "documents.sections", Kind: agentcontext.MergeAppend}},
 	}
 	fromRecipe := agentlaunch.PrepareRequest{
 		Kind:   agentlaunch.PrepareInputAuthoredRecipe,

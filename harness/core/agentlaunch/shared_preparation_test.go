@@ -6,15 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
+	"github.com/hollis-labs/substrate/harness/agentcontext"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 func TestResolvePreparation_ResolvedCompositionInstallsDocumentsAndArtifacts(t *testing.T) {
 	bootRoot := fixturePrivateDir(t)
-	comp := agentcomposition.ResolvedComposition{
+	comp := agentcontext.ResolvedComposition{
 		ID:        "resolved",
-		Documents: []agentcomposition.Document{{ID: "instructions", Path: "AGENTS.md", Sections: []agentcomposition.Section{{ID: "base", Content: "base instructions"}}}},
+		Documents: []agentcontext.Document{{ID: "instructions", Path: "AGENTS.md", Sections: []agentcontext.Section{{ID: "base", Content: "base instructions"}}}},
 		Artifacts: artifact.Tree{Entries: []artifact.Entry{{Path: "bin/tool", Kind: artifact.EntryFile, Mode: 0o755, Bytes: []byte{0, 1, 2}}}},
 	}
 	prepared, err := resolveWithAuthority(t, context.Background(), PrepareRequest{
@@ -42,7 +42,7 @@ func TestResolvePreparation_ResolvedCompositionInstallsDocumentsAndArtifacts(t *
 
 func TestResolvePreparation_AuthoredRecipeAndRawArtifactsUseSameMaterializer(t *testing.T) {
 	bootRoot := fixturePrivateDir(t)
-	recipe := agentcomposition.AuthoredRecipe{ID: "recipe", Documents: []agentcomposition.Document{{ID: "doc", Path: "doc.md", Content: "hello"}}}
+	recipe := agentcontext.AuthoredRecipe{ID: "recipe", Documents: []agentcontext.Document{{ID: "doc", Path: "doc.md", Content: "hello"}}}
 	prepared, err := resolveWithAuthority(t, context.Background(), PrepareRequest{Kind: PrepareInputAuthoredRecipe, Recipe: &recipe, Roots: ExecutionRoots{BootRoot: bootRoot, CWD: bootRoot}})
 	if err != nil {
 		t.Fatalf("resolveWithAuthority(t, authored): %v", err)

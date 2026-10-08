@@ -1,4 +1,4 @@
-package agentcomposition
+package agentcontext
 
 import (
 	"context"
@@ -9,17 +9,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
-
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 )
 
 type ComposerOptions struct {
-	Provider agentcontext.ContextProvider
+	Provider ContextProvider
 }
 
 type DefaultComposer struct {
-	provider agentcontext.ContextProvider
+	provider ContextProvider
 }
 
 func NewComposer(opts ComposerOptions) *DefaultComposer {
@@ -74,9 +72,9 @@ func (c *DefaultComposer) ComposeContext(ctx context.Context, req ComposeRequest
 		}
 		if len(recipe.Slots) > 0 {
 			if c.provider == nil {
-				return ResolvedComposition{}, fmt.Errorf("%w: slot provider required", agentcontext.ErrMissingResolver)
+				return ResolvedComposition{}, fmt.Errorf("%w: slot provider required", ErrMissingResolver)
 			}
-			result, err := c.provider.Assemble(ctx, agentcontext.ContextRequest{Slots: recipe.Slots, Limits: agentcontext.Limits{}, Provenance: recipe.Provenance})
+			result, err := c.provider.Assemble(ctx, ContextRequest{Slots: recipe.Slots, Limits: Limits{}, Provenance: recipe.Provenance})
 			if err != nil {
 				return ResolvedComposition{}, err
 			}
