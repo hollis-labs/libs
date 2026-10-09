@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/plugin-sdk/registry"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/registry"
 )
 
 func fixtureRegistry(generation string, revision uint64, body []byte) (registry.Response, map[string]Bundle) {
