@@ -6,6 +6,13 @@ All notable changes to the `harness` module are documented here. The format foll
 `harness/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
+## [Unreleased]
+
+### Fixed
+
+- Runner test fixtures build on Windows: isolate POSIX resource-limit reporting
+  and CPU-signal tests while retaining zero-limit and unsupported-limit coverage.
+
 ## v0.3.1
 
 ### Fixed
