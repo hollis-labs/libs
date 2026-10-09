@@ -8,11 +8,14 @@ require (
 	github.com/hollis-labs/go-llm-types v0.5.1
 	github.com/hollis-labs/go-messaging v0.7.0
 	github.com/hollis-labs/go-permission v0.1.0
+	github.com/hollis-labs/substrate/llm-core v0.1.0
+	github.com/oklog/ulid/v2 v2.1.2
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.60.1
 )
 
 require (
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 )

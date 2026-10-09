@@ -14,6 +14,12 @@ The host supplies models, policy, persistence, tools and lifecycle admission.
 | `subagent` | Child lifecycle, fanout, approvals, retries, heartbeat and replies | Explicit spawn authorization, database, profiles, settings and mailbox |
 | `service` | Canonical per-run reduction, status, snapshot and bounded replay | Atomic snapshot store and committed output projection |
 | `transport/httpstream` | Strict cursors and canonical per-run SSE encoding | Route registration, authentication and authorized subscription |
+| `contextwindow` | Fixed ordered context slots, budgets, compaction, overflow and handoff | Summarization provider and persistence callbacks |
+| `loopdetect` | In-memory repeated tool-call detection | Session identity and policy response |
+| `reflexes` | DB-agnostic reflex evaluation, arbitration and action staging | State, storage and action handlers |
+| `toolbroker/broker` | Intent-aware tool selection, pruning and enrichment | Tool registry and optional enrichment data |
+| `toolresult` | Bounded result previews, paging and scope-isolated recovery | Store, scope and retention policy |
+| `toolselect` | Deterministic ranking and pure tool-visibility profiles | Catalog, grants and launch assignment |
 
 `runloop.Execute` drives the loop itself. Its ports return directives rather
 than delegating the whole loop to the embedding host. `Retry` repeats the same

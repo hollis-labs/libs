@@ -1,0 +1,26 @@
+[PARTIAL PREVIEW — not a complete read. Omitted content must be retrieved before making claims about it.]
+"": array (300 items; indices refer to original order)
+[OMITTED items 2..298, end-exclusive (296 items)]
+"/0": object (3 fields)
+"/0/id": 0
+"/0/name": "row"
+"/0/payload": "pppppppppppppppppppppppppppppppppppppppp"
+
+"/1": object (3 fields)
+"/1/id": 1
+"/1/name": "row"
+"/1/payload": "pppppppppppppppppppppppppppppppppppppppp"
+
+"/298": object (3 fields)
+"/298/id": 298
+"/298/name": "row"
+"/298/payload": "pppppppppppppppppppppppppppppppppppppppp"
+
+"/299": object (3 fields)
+"/299/id": 299
+"/299/name": "row"
+"/299/payload": "pppppppppppppppppppppppppppppppppppppppp"
+
+
+
+[TRUNCATED — full result cached as tool_result://<ID> (total_size=22991 bytes, expires_at=<EXPIRES>). Use fetch_tool_result({"id":"<ID>"}) for pages, optionally with json_pointer to select a field (for example /stdout). Use search_tool_result({"id":"<ID>","pattern":"..."}) for matching regions. Preview labels are JSON pointers; fetch offsets address the selected text.]

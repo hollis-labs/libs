@@ -8,6 +8,23 @@ All notable changes to the `agent` module are documented here. The format follow
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-09
+
+### Added
+
+- Six standalone libraries, moved into the agent module with their complete Git
+  histories: `contextwindow`, `loopdetect`, `reflexes`, `toolbroker`,
+  `toolresult` and `toolselect`.
+- Per-package migration notes recording old and new import paths, source commits
+  and the standalone tags that were deliberately not carried into this module.
+
+### Changed
+
+- Imports within the moved packages now use the agent module paths.
+- `contextwindow` uses the consolidated `llm-core/llmtypes` and
+  `llm-core/llmcontracts` packages; `toolselect/launch` uses
+  `llm-core/contracts`. Public symbols and package clauses are unchanged.
+
 ## [0.1.0]
 
 ### Added

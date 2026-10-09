@@ -1,0 +1,15 @@
+=== fetch 0 error=false
+[Cached result <ID>; json_pointer=""; bytes 0..2048 of 3201 (end-exclusive); has_more=true; next_offset=2048]
+
+{
+  "ID": "CW-20260814-0015",
+  "Title": "A2A: Task persistence + TaskManager",
+  "Description": "## What\nThe core of A2A protocol adoption (CW-20260813-0002). Implements the design doc's \"Task lifecycle and routing\" and \"Persistence\" sections — this is the piece that makes the \"A2A is a protocol adapter, not a new execution substrate\" principle real: every Task is fulfilled by exactly one of Nanite's two existing execution paths, never a third parallel mechanism.\n\n## How to fix\n- New a2a_tasks table (+ migration): task ID, target kind (workflow | instance), target reference, caller-supplied message, durable_agent_instance_id (set once routing resolves), derived TaskState (cached, refreshed on read and on state-change triggers), push notification config (nullable, populated by the later push-notifications ticket), created/updated timestamps. This table is bookkeeping and translation only — it points at workflow_runs/durable_agent_instances, it does not duplicate their state.\n- TaskManager service implementation in internal/service (plain functions/methods, thin-wrapper-over-service-layer pattern, per internal/a2a's pure wire types from CW-20260814-0014). Two routing outcomes on submission:\n  - Target = workflow skill: call the existing WorkflowLauncher.Launch (Agent Workflows pillar) to start a new template-class durable-agent instance. Store the resulting durable_agent_instance_id.\n  - Target = existing instance address: call DurableWake.Wake() with Reason: DurableAgentWakeExternalMessage (making this enum value real for the first time) and WakePayload.Prompt set from the Task's message. This requires CW-20260814-0013 (Prompt injection fix) to have landed.\n- TaskState must be derived from the real execution status being tracked, never independently maintained.\n- Non-workflow-backed tasks get the coarser completion semantics the design doc specifies.\n\n## Non-goals\n- No input-required state — that's CW-20260814-0016, which depends on this one.\n- No JSON-RPC/HTTP transport — that's CW-202
+=== fetch 1 error=false
+[Cached result <ID>; json_pointer="/DependsOn/String"; bytes 0..39 of 39 (end-exclusive); has_more=false; next_offset=39]
+
+["CW-20260814-0013","CW-20260814-0014"]
+=== fetch 2 error=false
+[Cached result <ID>; json_pointer=""; bytes 100..400 of 3201 (end-exclusive); has_more=true; next_offset=400]
+
+ What\nThe core of A2A protocol adoption (CW-20260813-0002). Implements the design doc's \"Task lifecycle and routing\" and \"Persistence\" sections — this is the piece that makes the \"A2A is a protocol adapter, not a new execution substrate\" principle real: every Task is fulfilled by exactly on
