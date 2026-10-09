@@ -22,6 +22,7 @@ Each module has its own `go.mod`, its own version and its own tags.
 | `ui-go` | `github.com/hollis-labs/libs/ui-go` | Streaming and web UI building blocks for Go services: server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `workflow` | `github.com/hollis-labs/libs/workflow` | The workflow engine and its host. |
 | `plugin-mcp` | `github.com/hollis-labs/libs/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
+| `message-pipeline` | `github.com/hollis-labs/libs/message-pipeline` | Portable immutable message stages, bounded annotations/traces and durable store interfaces. |
 
 Use a module the usual way, once it has a release:
 

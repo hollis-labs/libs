@@ -1,6 +1,6 @@
 # libs
 
-General-purpose Go libraries from Hollis Labs: `util`, `ui-go`, `workflow` and `plugin-mcp`. A multi-module repository: every top-level directory with a `go.mod` is a module with its own version and tags.
+General-purpose Go libraries from Hollis Labs: `util`, `ui-go`, `workflow`, `plugin-mcp` and `message-pipeline`. A multi-module repository: every top-level directory with a `go.mod` is a module with its own version and tags.
 
 It is not: a place for agent, harness, LLM-provider or mesh code (that belongs in the `substrate` repository), a place for application code or deployment configuration, or a single Go module.
 
