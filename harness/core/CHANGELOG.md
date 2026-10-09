@@ -12,7 +12,7 @@ All notable changes to the `harness` module are documented here. The format foll
 
 - Move ordered context assembly, resolvers and skills to `substrate/agent/agentcontext`; move artifact-backed recipes and composers to the caller-owned `agentcomposition` package. Callers use their authoritative owners directly, without old-path aliases. Neutral boot inputs are unchanged.
 
-## v0.2.0 (Unreleased)
+## v0.2.0
 
 - Added `cmd/cairn boot --resolved` with versioned resolved Input/HostInputDTO
   JSON. `--plan` returns a pure plan; default preparation preserves the typed
