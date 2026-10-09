@@ -12,6 +12,7 @@
 //	                  (used by go-runner supervision tests)
 //	-trap-sigterm     install a SIGTERM handler that ignores the signal
 //	                  (used to test the SIGTERM->WaitDelay->SIGKILL path)
+//	-trap-delay   D   delay trap installation (test scheduling fixture)
 //	-burn-cpu     D   after emitting events, busy-loop for D before exit
 //	                  (used to test resource limits)
 //	-malloc-mb    N   after emitting events, allocate N MiB and hold it
@@ -39,6 +40,7 @@ func main() {
 	stderrMsg := flag.String("stderr-msg", "", "if non-empty, write this line to stderr before the stdout stream")
 	sleepDur := flag.Duration("sleep", 0, "after emitting events, sleep for this duration before exit")
 	trapSigterm := flag.Bool("trap-sigterm", false, "install a SIGTERM handler that ignores the signal")
+	trapDelay := flag.Duration("trap-delay", 0, "delay trap installation before emitting events")
 	burnCPU := flag.Duration("burn-cpu", 0, "after emitting events, busy-loop for this duration before exit")
 	mallocMB := flag.Int("malloc-mb", 0, "after emitting events, allocate this many MiB and hold it")
 	showRlimits := flag.Bool("show-rlimits", false, "before emitting events, print current RLIMIT_* values as delta lines")
@@ -46,6 +48,7 @@ func main() {
 	flag.Parse()
 
 	if *trapSigterm {
+		time.Sleep(*trapDelay)
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGTERM)
 		go func() {
