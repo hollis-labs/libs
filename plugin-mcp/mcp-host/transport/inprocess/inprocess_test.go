@@ -125,9 +125,8 @@ func TestClose_StopsProcessAndIsIdempotent(t *testing.T) {
 }
 
 // TestSupervisedRestart_OnCrash kills the plugin subprocess out from
-// under a live Transport and confirms go-mcp/supervise-driven recovery
-// (the reactive path — rpcTransport.Done fires the moment the dead
-// process's stdout hits EOF), mirroring T3's process-mode restart test.
+// under a live Transport and confirms plugin-host-driven recovery,
+// mirroring the process-mode restart test.
 func TestSupervisedRestart_OnCrash(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

@@ -7,11 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
-	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
-	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
-	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
-	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 	"log/slog"
 	"os"
 	"sort"
@@ -19,6 +14,12 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/registry"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
+	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
 
 const connectTimeout = 30 * time.Second
