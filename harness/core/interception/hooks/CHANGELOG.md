@@ -1,5 +1,11 @@
 # Changelog
 
+## Retirement — 2026-10-09
+
+- Redirect new development to `github.com/hollis-labs/plugin-hooks` in `github.com/hollis-labs/plugin-hooks v0.1.0`.
+- The successor remains standalone by design. Its catalog engine is a clean break from the historical eleven-event contract; adapt hook registration, dispatch and policy rather than rewriting an import blindly.
+- Archive after the final redirect merge; retain all historical source and tags.
+
 All notable changes to go-hooks are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

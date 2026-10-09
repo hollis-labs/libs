@@ -1,5 +1,20 @@
 # go-hooks
 
+## Replacement and repository retirement
+
+New development uses `github.com/hollis-labs/plugin-hooks` from the released module
+`github.com/hollis-labs/plugin-hooks v0.1.0`:
+
+```sh
+go get github.com/hollis-labs/plugin-hooks@v0.1.0
+```
+
+The successor remains standalone by design. Its catalog engine is a clean break from the historical eleven-event contract; adapt hook registration, dispatch and policy rather than rewriting an import blindly.
+
+This final redirect is followed by repository archival. Existing source, tags,
+versions and Git history remain available; nothing is deleted. The sections
+below describe the preserved standalone implementation.
+
 The hooks contract: the eleven-event vocabulary, the JSON a hook receives and
 returns, the `allow` / `deny` / `ask` decision values, a per-hook failure mode
 with no default, and pure managed > user > project layer resolution. Hosts
