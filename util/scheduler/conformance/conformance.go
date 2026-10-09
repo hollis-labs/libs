@@ -20,7 +20,8 @@ type Factory func(t *testing.T) scheduler.Store
 // to create a schedule, since the engine contract only ever reads them.
 type Seeder interface {
 	// CreateSchedule stores sch verbatim (ID, NextRun, Enabled, JobType,
-	// Payload, Retry). It must fail if the ID already exists.
+	// Payload, Retry, timing and policy options). Invalid timing/policies and
+	// duplicate IDs must fail before storage.
 	CreateSchedule(ctx context.Context, sch scheduler.Schedule) error
 }
 
@@ -42,6 +43,10 @@ func Run(t *testing.T, newStore Factory) {
 		name string
 		fn   func(*testing.T, *fixture)
 	}{
+		{"PruneRetentionAndNoRecreation", testPruneRetention},
+		{"TimingRoundTripAndInvalidZone", testTimingRoundTrip},
+		{"QueueFullRequiresExplicitTerminalDecision", testQueueFullExplicitDecision},
+		{"QueueClaimsExcludeActiveSibling", testQueueClaimExclusion},
 		{"ListDueSchedules", testListDueSchedules},
 		{"CreateFireAdvancesSchedule", testCreateFireAdvances},
 		{"CreateFireRejectsStaleExpectedNext", testCreateFireStaleNext},

@@ -14,11 +14,47 @@
 
 ## What changed
 
-- **Module.** The code is now part of the `github.com/hollis-labs/libs/util` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.1.1 v0.2.0 v0.3.0) were not carried over; the first release of the new module will be tagged `util/v0.1.0` (not tagged yet).
+- **Module.** The code is now part of the `github.com/hollis-labs/libs/util` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.1.1 v0.2.0 v0.3.0) were not carried over; the consolidated module uses `util/vX.Y.Z` tags, starting with `util/v0.1.0`.
 - **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages and the history in `CHANGELOG.md` are left as written.
 - **API.** No symbol was renamed or changed by the move.
 - **Dependency versions.** Everything this lib required is at the same version it had before.
 - **Files not carried to the new location** (git history still has them): `.github`, `go.mod`, `go.sum`.
+
+## util/v0.4.0 hardening migration
+
+This is a pre-1 release of the entire util module; the standalone scheduler
+version numbers do not select a new package release. Pin
+`github.com/hollis-labs/libs/util v0.4.0`, keeping the imports above.
+
+Custom stores must add `Store.Prune(ctx, olderThan time.Time) (int, error)`
+and preserve the updated claim, materialization and policy snapshots. Pruning
+terminal records must not allow the same occurrence's FireID to be created
+again. A store needs durable high-water/tombstone protection, not just DELETE.
+Run the updated portable conformance suite against the application's adapter.
+
+Persist/round-trip schedule location, interval, anchor, jitter and retention
+configuration, plus overlap/misfire policies, grace and bounded catch-up/queue
+limits. Fire snapshots retain their overlap/queue policy and outcome reason;
+configuration edits must not change a previously materialized attempt.
+Use the actual exported validation/next-run helpers rather than treating an
+empty cron expression as every possible one-time/interval case.
+
+Reference-store schema evolution and dispatch/misfire semantics are documented
+in [dispatch and misfires](docs/dispatch-and-misfires.md). The reference store
+owns its schema migrations; applications with custom tables own theirs.
+Do not infer a live schema migration or scheduler activation from upgrading
+this Go module.
+
+Observers may receive `failure` and `misfire` in addition to the historical
+kinds. `failure` is emitted once after a failed enqueue's durable outcome;
+do not count it again from `retry`/`exhaustion`. Duration measures Enqueue,
+not downstream job execution. Existing Observer interfaces remain passive.
+See [OBSERVABILITY.md](OBSERVABILITY.md) for metrics and slog adapters.
+
+The deprecated `Job.RunID` remains an alias of FireID pending the v1 decision.
+The [v1 freeze plan](API_FREEZE.md) is a proposal and creates no v1 guarantee.
+Linux/macOS native CI and visible advisory Windows results accompany this
+release; consumers own their actual operational/platform acceptance.
 
 ---
 
