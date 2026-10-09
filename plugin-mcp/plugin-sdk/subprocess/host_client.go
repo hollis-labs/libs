@@ -16,6 +16,7 @@ import (
 type HostClient struct {
 	scope    *requestScope
 	core     *correlation
+	state    *grantState
 	grants   map[string]capability.Grant
 	ceilings map[string]uint32
 	secrets  *secretTracker
@@ -44,6 +45,12 @@ func hostClientContext(ctx context.Context, core *correlation, p InitParams, sec
 	}
 	scope.initLease(bindingExpiry)
 	h := &HostClient{scope: scope, core: core, secrets: secrets, grants: map[string]capability.Grant{}, ceilings: map[string]uint32{}}
+	h.state, _ = ctx.Value(grantsKey{}).(*grantState)
+	if h.state != nil {
+		if current, live := h.state.snapshot(); live {
+			p.Grants = current
+		}
+	}
 	for _, g := range p.Grants {
 		g.Scope = append(json.RawMessage(nil), g.Scope...)
 		h.grants[g.GrantID] = g
@@ -77,6 +84,14 @@ func (h *HostClient) begin(ctx context.Context, method, grantID, descriptor stri
 		return fail(localHostFailure(capability.UnsupportedCapability))
 	}
 	g, ok := h.grants[grantID]
+	if h.state != nil {
+		h.state.mu.RLock()
+		ended := h.state.ended
+		h.state.mu.RUnlock()
+		if ended {
+			ok = false
+		}
+	}
 	if !ok || method != "host/bindings/renew" && (g.Name != descriptor || g.SchemaVersion != 1) {
 		return fail(localHostFailure(capability.CapabilityDenied))
 	}

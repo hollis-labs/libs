@@ -42,6 +42,7 @@ export interface InitParams {
   host_services?: HostServices;
   hooks_profile?: HooksProfile;
   context?: ForwardContext;
+  grants_renewal_version?: 1;
 }
 
 export interface InitResult {
@@ -53,6 +54,7 @@ export interface InitResult {
   capability_contract: 1;
   reverse_rpc_version?: 1;
   hooks_profile_version?: 1;
+  grants_renewal_version?: 1;
 }
 
 export interface SkippedRegistration {
@@ -227,3 +229,17 @@ export interface HostServiceLimits {
 }
 
 export type RPCID = string | number;
+
+export interface GrantsRenewParams {
+  renewal_version: 1;
+  sequence: number;
+  incarnation: RuntimeIdentity;
+  grants: GrantSet;
+  context: ForwardContext;
+}
+
+export interface GrantsRenewResult {
+  renewal_version: 1;
+  sequence: number;
+  incarnation: RuntimeIdentity;
+}

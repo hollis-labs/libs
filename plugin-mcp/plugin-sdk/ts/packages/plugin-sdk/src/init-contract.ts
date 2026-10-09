@@ -30,12 +30,21 @@ export function decodeRuntimeIdentity(raw: string): RuntimeIdentity {
   const generation = integer(f.get('owner_generation')!,'owner_generation',Number.MAX_SAFE_INTEGER); if (!generation) invalid('owner_generation');
   return {host_instance:string(f.get('host_instance')!,'host_instance'), owner_id:string(f.get('owner_id')!,'owner_id'),owner_generation:generation};
 }
+export function grantTimestamp(value:string):bigint{return timestamp(JSON.stringify(value),'timestamp');}
 function timestamp(raw: string, field: string): bigint {
   const text = string(raw,field); const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/.exec(text); if (!match) invalid(field);
   const [year,month,day,hour,minute,second] = match.slice(1,7).map(Number);
   const date = new Date(0); date.setUTCFullYear(year!,month!-1,day!); date.setUTCHours(hour!,minute!,second!,0);
   if (date.getUTCFullYear() !== year || date.getUTCMonth()+1 !== month || date.getUTCDate() !== day || date.getUTCHours() !== hour || date.getUTCMinutes() !== minute || date.getUTCSeconds() !== second) invalid(field);
   return BigInt(date.getTime())*1000000n + BigInt((match[7] ?? '').padEnd(9,'0'));
+}
+const rawScopes=new WeakMap<Grant,{raw:string,value:string}>();
+export function grantScopeJSON(grant:Grant):string {
+ const saved=rawScopes.get(grant),value=JSON.stringify(grant.scope);
+ return saved?.value===value?saved.raw:value;
+}
+export function cloneGrantSet(grants:Grant[]):Grant[] {
+ return grants.map(grant=>{ const copy=decodeGrant(encodeGrant(grant)); rawScopes.set(copy,{raw:grantScopeJSON(grant),value:JSON.stringify(copy.scope)});return copy; });
 }
 export function decodeGrant(raw: string): Grant {
   const names = ['grant_id','name','schema_version','scope','host_instance','owner_id','owner_generation','audience','issued_at','expires_at','policy_revision'];
@@ -45,7 +54,9 @@ export function decodeGrant(raw: string): Grant {
   if (!integer(f.get('owner_generation')!,'owner_generation',Number.MAX_SAFE_INTEGER)) invalid('owner_generation');
   if (timestamp(f.get('expires_at')!,'expires_at') <= timestamp(f.get('issued_at')!,'issued_at')) invalid('expires_at');
   try { validatePortableJSON(f.get('scope')!); } catch { invalid('scope'); }
-  return parseJSONTokens(raw) as Grant;
+  const grant=parseJSONTokens(raw) as Grant;
+ rawScopes.set(grant,{raw:f.get('scope')!,value:JSON.stringify(grant.scope)});
+ return grant;
 }
 // Parse each array element from its original tokens before JSON.parse can round it.
 function rawArray(raw: string, field: string): string[] {
@@ -74,7 +85,7 @@ function hostServices(raw: string, incarnation: RuntimeIdentity): HostServices {
   return parseJSONTokens(raw) as HostServices;
 }
 export function decodeInitParams(raw: string): InitParams {
-  const f=fields(raw,'params',['plugin_dir','data_dir','cache_dir','config','log_level','host_info','capability_contract','incarnation','grants'],['identity','host_services','hooks_profile','context']);
+  const f=fields(raw,'params',['plugin_dir','data_dir','cache_dir','config','log_level','host_info','capability_contract','incarnation','grants'],['identity','host_services','hooks_profile','context','grants_renewal_version']);
   if(f.has('context')) {try { decodeForwardContext(f.get('context')!); } catch { invalid('context'); }}
   const host=fields(f.get('host_info')!,'host_info',['version','protocol']); version(host.get('protocol')!,'host_info.protocol','protocol_mismatch',2); string(host.get('version')!,'host_info.version');
   version(f.get('capability_contract')!,'capability_contract','capability_contract_mismatch',1);
@@ -83,19 +94,21 @@ export function decodeInitParams(raw: string): InitParams {
   if(Object.values(object(f.get('config')!,'config')).some(v=>typeof v!=='string')) invalid('config');
   const incarnation=decodeRuntimeIdentity(f.get('incarnation')!); decodeGrantSet(f.get('grants')!,incarnation);
   if(f.has('host_services')) hostServices(f.get('host_services')!,incarnation);
-  if(f.has('hooks_profile')) {const h=fields(f.get('hooks_profile')!,'hooks_profile',['hooks_profile_version']); version(h.get('hooks_profile_version')!,'hooks_profile.hooks_profile_version','profile_mismatch',1);}
-  return parseJSONTokens(raw) as InitParams;
+  if(f.has('grants_renewal_version'))version(f.get('grants_renewal_version')!,'grants_renewal_version','profile_mismatch',1);
+ if(f.has('hooks_profile')) {const h=fields(f.get('hooks_profile')!,'hooks_profile',['hooks_profile_version']); version(h.get('hooks_profile_version')!,'hooks_profile.hooks_profile_version','profile_mismatch',1);}
+  const params=parseJSONTokens(raw) as InitParams;params.grants=decodeGrantSet(f.get('grants')!,incarnation);return params;
 }
 export function decodeInitResult(raw: string): InitResult {
-  const f=fields(raw,'result',['id','name','version','description','protocol','capability_contract'],['reverse_rpc_version','hooks_profile_version']);
+  const f=fields(raw,'result',['id','name','version','description','protocol','capability_contract'],['reverse_rpc_version','hooks_profile_version','grants_renewal_version']);
   for(const key of ['id','name','version']) string(f.get(key)!,key); string(f.get('description')!,'description',false);
   version(f.get('protocol')!,'protocol','protocol_mismatch',2); version(f.get('capability_contract')!,'capability_contract','capability_contract_mismatch',1);
-  for(const key of ['reverse_rpc_version','hooks_profile_version']) if(f.has(key)) version(f.get(key)!,key,'profile_mismatch',1);
+  for(const key of ['reverse_rpc_version','hooks_profile_version','grants_renewal_version']) if(f.has(key)) version(f.get(key)!,key,'profile_mismatch',1);
   return parseJSONTokens(raw) as InitResult;
 }
 export function validateInitResult(input: InitParams, result: InitResult): void {
   encodeInitParams(input); encodeInitResult(result);
-  if(result.reverse_rpc_version!==undefined && !input.host_services) throw new InitError('profile_mismatch','reverse_rpc_version',0,result.reverse_rpc_version);
+  if(result.grants_renewal_version!==undefined && input.grants_renewal_version===undefined)throw new InitError('profile_mismatch','grants_renewal_version',0,result.grants_renewal_version);
+ if(result.reverse_rpc_version!==undefined && !input.host_services) throw new InitError('profile_mismatch','reverse_rpc_version',0,result.reverse_rpc_version);
   if(result.hooks_profile_version!==undefined && !input.hooks_profile) throw new InitError('profile_mismatch','hooks_profile_version',0,result.hooks_profile_version);
 }
 
@@ -105,7 +118,7 @@ function encode(value: unknown, field: string): string {
   try {
     return JSON.stringify(value, function(this: unknown, key, item: unknown) {
       if (typeof item === 'number' && !Number.isFinite(item) || typeof item === 'function' || typeof item === 'symbol' || typeof item === 'bigint') invalid(field);
-      const optional = field === 'params' ? ['identity','host_services','hooks_profile','context'] : field === 'result' ? ['reverse_rpc_version','hooks_profile_version'] : [];
+      const optional = field === 'params' ? ['identity','host_services','hooks_profile','context','grants_renewal_version'] : field === 'result' ? ['reverse_rpc_version','hooks_profile_version','grants_renewal_version'] : [];
       if (item === undefined && !(this === value && optional.includes(key))) invalid(field);
       return item;
     });

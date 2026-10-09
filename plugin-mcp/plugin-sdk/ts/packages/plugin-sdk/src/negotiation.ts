@@ -1,4 +1,4 @@
-import { decodeInitParams, encodeInitParams, InitError } from './init-contract.js';
+import { cloneGrantSet, decodeInitParams, encodeInitParams, InitError } from './init-contract.js';
 import { hostClientContext } from './host-client.js';
 import { requestScope } from './admission.js';
 import type { Admission } from './admission.js';
@@ -37,6 +37,7 @@ export class ReverseNegotiation {
   if(['plugin/init','plugin/load','plugin/unload'].includes(scope.request.method)&&(!this.input.host_services!.limits.method_timeout_ms['host/log']||!this.input.grants.some(g=>g.name==='log.write'&&g.schema_version===1)))return ctx;
   return hostClientContext(ctx,this.core,this.input,this.secrets);
  }
+ acceptedGrants(grants:InitParams['grants']):void{if(this.input)this.input.grants=cloneGrantSet(grants);}
  activate(id:number):void{if(this.input){this.core.activate(id);this.active=true;}}
  decline():void{if(this.input&&!this.active){this.input=undefined;this.core.revokeReverse();}}
 }

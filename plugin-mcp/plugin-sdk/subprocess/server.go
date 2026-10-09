@@ -49,6 +49,7 @@ func serveWith(p Plugin, in io.Reader, out io.Writer) error {
 
 // server holds the per-invocation state for one Serve call.
 type server struct {
+	grants              grantState
 	reverse             *reverseNegotiation
 	outputBytes         func() int
 	hooksEnabled        bool
@@ -120,6 +121,7 @@ func (s *server) notifyIdentity(ctx context.Context, identity json.RawMessage) {
 // dispatch routes a single RPCRequest to the plugin. For notifications
 // (req.ID == (RPCID{})) the response is suppressed.
 func (s *server) dispatch(ctx context.Context, req RPCRequest) {
+	ctx = context.WithValue(ctx, grantsKey{}, &s.grants)
 	if req.Method != MethodInit {
 		s.initMu.Lock()
 		ready := s.initialized
@@ -139,6 +141,8 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 		ctx = s.reverse.client(ctx)
 	}
 	switch req.Method {
+	case MethodGrantsRenew:
+		s.renewGrants(ctx, req)
 	case MethodHookHandle, MethodHookHandleBatch:
 		s.dispatchHook(ctx, req)
 	case MethodInit:
@@ -199,6 +203,11 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			version := 1
 			res.ReverseRPCVersion = &version
 		}
+		res.GrantsRenewalVersion = nil
+		if _, ok := s.plugin.(GrantsRenewalHandler); ok && agreement.GrantsRenewalVersion != nil {
+			version := GrantsRenewalVersion
+			res.GrantsRenewalVersion = &version
+		}
 		res.HooksProfileVersion = nil
 		if hooksEnabled {
 			version := HooksProfileVersion
@@ -219,6 +228,12 @@ func (s *server) dispatch(ctx context.Context, req RPCRequest) {
 			s.reverse.activate(req.ID)
 			s.hooksEnabled = hooksEnabled
 			s.hooksIncarnation = agreement.Incarnation
+			s.grants.mu.Lock()
+			s.grants.owner = agreement.Incarnation
+			s.grants.grants = agreement.Grants.Clone()
+			s.grants.initialized = true
+			s.grants.enabled = res.GrantsRenewalVersion != nil
+			s.grants.mu.Unlock()
 			s.initialized = true
 			s.initMu.Unlock()
 		}
@@ -596,6 +611,9 @@ func (s *server) supportsMethod(method string) bool {
 	switch method {
 	case MethodLoad, MethodUnload, MethodHealth:
 		return true
+	case MethodGrantsRenew:
+		_, ok := s.plugin.(GrantsRenewalHandler)
+		return ok
 	case MethodCommandExecute:
 		return s.asCommand != nil
 	case MethodEventHandle:

@@ -147,3 +147,16 @@ func (c *correlation) readsReplies() bool {
 	return c.closed == nil && (c.directional || c.provisional)
 }
 func (c *correlation) directionalMode() bool { c.mu.Lock(); defer c.mu.Unlock(); return c.directional }
+
+// acceptedGrants refreshes discovery for lifecycle cleanup contexts, which are
+// created after forward admission closes. Authority and bindings stay unchanged.
+func (n *reverseNegotiation) acceptedGrants(grants capability.GrantSet) {
+	if n == nil {
+		return
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.offered {
+		n.params.Grants = grants.Clone()
+	}
+}
