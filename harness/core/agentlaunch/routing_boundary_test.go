@@ -22,15 +22,15 @@ func (s *routingStore) Record(ctx context.Context, r workspace.Receipt) error {
 }
 
 func TestLegacyRoutingRefusesBeforeAnyReceiptOrMutation(t *testing.T) {
-	for _, name := range []string{"missing authority", "directory 0750", "reserved credential", "existing credential", "existing root 0755", "unmanifested content", "cancelled"} {
+	for _, name := range []string{"missing authority", "directory 0775", "reserved credential", "existing credential", "existing root 0755", "unmanifested content", "cancelled"} {
 		t.Run(name, func(t *testing.T) {
 			base := fixturePrivateDir(t)
 			root := filepath.Join(base, "candidate")
 			tree := artifact.Tree{Entries: []artifact.Entry{{Path: "file.txt", Kind: artifact.EntryFile, Mode: 0644, Bytes: []byte("desired")}}}
 			var existingMode os.FileMode
 			switch name {
-			case "directory 0750":
-				tree.Entries = []artifact.Entry{{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0750}}
+			case "directory 0775":
+				tree.Entries = []artifact.Entry{{Path: "empty", Kind: artifact.EntryDirectory, Mode: 0775}}
 			case "existing credential":
 				tree.Entries[0].Path = "auth.json"
 				existingMode = 0700
