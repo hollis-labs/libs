@@ -12,10 +12,13 @@ All notable changes to the `util` module are documented here. The format follows
 
 ### Security
 
-- Upgrade OpenTelemetry APIs, SDKs and trace/metric exporters to v1.44.0,
-  log APIs/SDK/exporter to v0.20.0, and gRPC to v1.83.1. These versions address
+- Upgrade OpenTelemetry APIs, SDKs and trace/metric exporters to v1.45.0,
+  log APIs/SDK/exporter to v0.21.0, and gRPC to v1.83.1. These versions address
   GO-2026-4985, GO-2026-5158, GO-2026-5426, GO-2026-6061 and GO-2026-6348.
   The OTel v1.43.0 baggage regression requires v1.44.0 rather than v1.43.0.
+- Address the additional current scanner findings: GO-2026-6505 (exporter
+  endpoint logging), GO-2026-6615 (log batch busy-spin), and GO-2026-6603,
+  GO-2026-6611, GO-2026-6612 and GO-2026-6617 with `golang.org/x/net` v0.60.0.
 - Use Go 1.26.9 as the preferred toolchain; retain the Go 1.26.6 language floor.
 
 ### Changed
