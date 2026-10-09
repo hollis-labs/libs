@@ -1,25 +1,25 @@
-# go-hooks
+# Interception hooks
 
 Hooks contract: 11-event vocabulary, allow/deny/ask decisions, per-hook failure mode, layer resolution; hosts implement the engine.
 
-It is not an engine, a sandbox or a config loader. Hosts implement the engine; this repo is the contract, one subprocess helper and the conformance fixtures.
+It is not an engine, a sandbox or a config loader. Hosts implement the engine; this package is the contract, one subprocess helper and the conformance fixtures.
 
 ## Start Here
 
-- `hooks` (module root) — pure types and functions: `event.go`, `input.go`, `output.go`, `hook.go`, `resolve.go`, `match.go`. Zero I/O.
+- `hooks` (package root) — pure types and functions: `event.go`, `input.go`, `output.go`, `hook.go`, `resolve.go`, `match.go`. Zero I/O.
 - `cmdhook/` — the only code that starts a process. `conformance/` — the `go:embed` fixture tree (`testdata/<Event>/<case>/`) and the reference runner.
 - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- `../../CHANGELOG.md` — module release history; `MIGRATION.md` — old imports.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+cd harness
+go vet ./interception/hooks/...
+go test -race -count=1 ./interception/hooks/...
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, `scripts/check -race harness` is the module gate.
 
 ## Boundaries
 

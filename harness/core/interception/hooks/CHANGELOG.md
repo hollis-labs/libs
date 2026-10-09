@@ -1,3 +1,7 @@
+> Historical source changelog, preserved from `go-hooks`. Current releases
+> are recorded in [the Harness module changelog](../../CHANGELOG.md); see
+> [MIGRATION.md](MIGRATION.md) for the current import home.
+
 # Changelog
 
 ## Retirement — 2026-10-09

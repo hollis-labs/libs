@@ -1,19 +1,9 @@
-# go-hooks
+# Interception hooks
 
-## Replacement and repository retirement
-
-New development uses `github.com/hollis-labs/plugin-hooks` from the released module
-`github.com/hollis-labs/plugin-hooks v0.1.0`:
-
-```sh
-go get github.com/hollis-labs/plugin-hooks@v0.1.0
-```
-
-The successor remains standalone by design. Its catalog engine is a clean break from the historical eleven-event contract; adapt hook registration, dispatch and policy rather than rewriting an import blindly.
-
-This final redirect is followed by repository archival. Existing source, tags,
-versions and Git history remain available; nothing is deleted. The sections
-below describe the preserved standalone implementation.
+The historical `go-hooks` implementation now lives in the published
+`github.com/hollis-labs/substrate/harness` module. Its source history is preserved.
+See [MIGRATION.md](MIGRATION.md) for import changes and the separate
+`plugin-hooks` catalog engine.
 
 The hooks contract: the eleven-event vocabulary, the JSON a hook receives and
 returns, the `allow` / `deny` / `ask` decision values, a per-hook failure mode
@@ -28,7 +18,9 @@ agreement is this module.
 
 ## Status
 
-**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+This is a pre-1.0 library contract. The import adds no boot hook installation,
+engine wiring or native-provider normalization. Hosts retain execution and
+permission authority.
 
 Known gaps, unverified against the live Claude Code hooks reference (verify
 before relying on them for a real integration):
@@ -44,7 +36,7 @@ before relying on them for a real integration):
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-hooks
+go get github.com/hollis-labs/substrate/harness@v0.4.0
 ```
 
 ## Usage
@@ -62,8 +54,8 @@ import (
 	"log"
 	"time"
 
-	hooks "github.com/hollis-labs/go-hooks"
-	"github.com/hollis-labs/go-hooks/cmdhook"
+	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
+	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
 )
 
 func main() {
@@ -176,7 +168,7 @@ a host in another language re-implements the same loop over the same tree.
 
 This module is pre-1.0: minor releases may break the exported API, and there
 is no compatibility promise yet. Pin an exact version, and read
-[CHANGELOG.md](./CHANGELOG.md) before upgrading; every breaking change is
+[the module changelog](../../CHANGELOG.md) before upgrading; every breaking change is
 listed there. Native Claude Code and Codex payloads are not identical to this
 contract (for example Claude nests some output under `hookSpecificOutput` and
 uses the word `block`); normalizing them is the host adapter's job.
@@ -207,12 +199,12 @@ regexes are Go RE2, not JavaScript.
 ## Development
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+cd harness
+go vet ./interception/hooks/...
+go test -race -count=1 ./interception/hooks/...
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, `scripts/check -race harness` is the module gate.
 
 ## License
 

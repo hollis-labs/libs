@@ -3,7 +3,7 @@ package conformance_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-hooks/conformance"
+	"github.com/hollis-labs/substrate/harness/interception/hooks/conformance"
 )
 
 func ExampleLoad() {

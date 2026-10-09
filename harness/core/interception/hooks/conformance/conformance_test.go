@@ -6,9 +6,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	hooks "github.com/hollis-labs/go-hooks"
-	"github.com/hollis-labs/go-hooks/cmdhook"
-	"github.com/hollis-labs/go-hooks/conformance"
+	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
+	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
+	"github.com/hollis-labs/substrate/harness/interception/hooks/conformance"
 )
 
 func loadAll(t *testing.T) []conformance.Case {

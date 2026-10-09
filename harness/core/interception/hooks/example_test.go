@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	hooks "github.com/hollis-labs/go-hooks"
+	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
 )
 
 func ExampleResolve() {

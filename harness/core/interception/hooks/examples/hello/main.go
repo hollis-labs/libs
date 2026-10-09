@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	hooks "github.com/hollis-labs/go-hooks"
-	"github.com/hollis-labs/go-hooks/cmdhook"
+	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
+	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
 )
 
 func main() {
