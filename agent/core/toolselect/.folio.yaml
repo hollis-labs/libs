@@ -1,0 +1,89 @@
+folio_version: "0.1"
+generated_at: 2026-09-29T18:09:10.015377-05:00
+generator: folio/0.1.0
+presets:
+  - id: go-baseline
+    version: 0.1.0
+    source: bundled
+    resolved_path: bundled:presets/go-baseline
+  - id: go-lib
+    version: 0.3.0
+    source: bundled
+    resolved_path: bundled:presets/go-lib
+inputs:
+  agents_boundaries: |-
+    - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
+    - See the Boundaries section of AGENTS.md for the invariants and the tests that guard each.
+  agents_start_here: |-
+    - `toolselect` package — the importable API; its `doc.go` is the package documentation.
+    - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
+    - `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+  copyright_holder: Hollis Labs
+  description: Deterministic BM25 tool ranker and pure MCP tool-visibility profile evaluator.
+  github_owner: hollis-labs
+  go_packages: ./...
+  go_toolchain: ""
+  go_version: 1.26.6
+  package_layout: root
+  package_name: toolselect
+  repo_name: go-toolselect
+  stability: pre-1.0
+computed:
+  import_line: toolselect "github.com/hollis-labs/go-toolselect"
+  import_path: github.com/hollis-labs/go-toolselect
+  module_path: github.com/hollis-labs/go-toolselect
+  year: "2026"
+files:
+  .github/workflows/check.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:4c780e44205b3f7aaa0ccc15c6b652cf5ddca5f2e57d2847db12d0625571eea8
+  .github/workflows/release.yml:
+    preset: go-lib
+    digest_at_gen: sha256:bed9e4d6db48638fb1a412cdea236c1b137dc0b8580db1f0bf384225269dc783
+  .gitignore:
+    preset: go-baseline
+    digest_at_gen: sha256:4a587de479cb2645ab2094d664761a053fb9c1344ba7f904a020b9e73b3e9f63
+  .golangci.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:0270341a4bf62ff9147e1f6a3804817f265b1db5f1b64317f70c0f00d31839cb
+  AGENTS.md:
+    preset: go-baseline
+    digest_at_gen: sha256:5c6f1b53f5ea0d094fa4322cc07dc007a17f7ea6dbea48905a3f650653a95977
+  CHANGELOG.md:
+    preset: go-baseline
+    digest_at_gen: sha256:b4d336b8f7cb5fcaca9f1d027ac4661205b30bdd08a7000fdec6e61254e27dcc
+  LICENSE:
+    preset: go-baseline
+    digest_at_gen: sha256:29fde794587339581b8d68aa7753337b321da45cbe49cf5a0be907db7e67e7d8
+  README.md:
+    preset: go-lib
+    digest_at_gen: sha256:c87916e373c310ffb38b18d213bdd935dac72c2dc0b84fc63307f38ea490e459
+  doc.go:
+    preset: go-lib
+    digest_at_gen: sha256:2593bc2dc0407312d6ce3cde930781e5560576d48feea6c3a390290b1b9d6b84
+  example_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:801369c62211104b778bdd3bafaa6bad6f598f0221fdcef4937b1a6a05c6b2c9
+  examples/hello/main.go:
+    preset: go-lib
+    digest_at_gen: sha256:c6527de6137e5de2fdc7025606784954d67643a2062aa717aa3df4c71ae636f6
+  go.mod:
+    preset: go-lib
+    digest_at_gen: sha256:d8f8f7d6711dc9c4e4795d49df08efb4626f081244ca6022d62526e61518caf2
+  lefthook.yml:
+    preset: go-baseline
+    digest_at_gen: sha256:c9eba3f2820e8c7b08f2b66aca4191869561941181b0f5d2fd3ce5d3c88fe894
+  toolselect.go:
+    preset: go-lib
+    digest_at_gen: sha256:b69e0503fb7f8d7b707794a9046714d0be61a5908991c81ae4004bb75ddf2007
+  toolselect_test.go:
+    preset: go-lib
+    digest_at_gen: sha256:6b66e93067b37b0dbbb1155123be455f2b65ea97707649a486185b0932302c56
+sync_history:
+  - at: 2026-09-29T18:09:10.015377-05:00
+    operation: init
+    presets:
+      - id: go-baseline
+        version: 0.1.0
+      - id: go-lib
+        version: 0.3.0
