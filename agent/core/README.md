@@ -1,6 +1,8 @@
 # Agent
 
-Embeddable native agent mechanisms, with no application or harness imports.
+Embeddable native agent mechanisms, with no application imports.
+The approval registry uses the released harness permission engine; provider
+events and messaging use llm-core and mesh, and run projections use ui-go.
 The host supplies models, policy, persistence, tools and lifecycle admission.
 
 | Package | Owns | Host supplies |
@@ -81,4 +83,6 @@ It makes no model or network calls. `examples/embed/main_test.go` runs it with a
 fresh temporary database.
 
 Artifact-bearing context composition stays in an embedding adapter that imports
-this module. The agent module has no Harness dependency.
+this module. The approval registry depends on `harness/interception/permission`; it does not
+import harness launch, workspace or artifact adapters. The host still supplies
+the permission engine and every authorization decision.

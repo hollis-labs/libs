@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/hubbind"
-	streamhub "github.com/hollis-labs/go-streamhub"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/hubbind"
+	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
 )
 
 const EventRetention = 4096

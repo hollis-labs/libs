@@ -15,12 +15,9 @@ import (
 	"strings"
 	"time"
 
-	chatstream "github.com/hollis-labs/go-chatstream"
-	"github.com/hollis-labs/go-chatstream/conformance"
-	"github.com/hollis-labs/go-chatstream/hubbind"
-	llmtypes "github.com/hollis-labs/go-llm-types"
-	messaging "github.com/hollis-labs/go-messaging/mailbox"
-	permission "github.com/hollis-labs/go-permission"
+	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui-go/chatstream/conformance"
+	"github.com/hollis-labs/libs/ui-go/chatstream/hubbind"
 	"github.com/hollis-labs/substrate/agent/approval"
 	"github.com/hollis-labs/substrate/agent/runloop"
 	agentservice "github.com/hollis-labs/substrate/agent/service"
@@ -28,6 +25,9 @@ import (
 	"github.com/hollis-labs/substrate/agent/tooluse"
 	"github.com/hollis-labs/substrate/agent/transport/httpstream"
 	"github.com/hollis-labs/substrate/agent/turn"
+	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging/mailbox"
 
 	_ "modernc.org/sqlite"
 )

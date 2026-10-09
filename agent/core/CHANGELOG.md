@@ -8,6 +8,19 @@ All notable changes to the `agent` module are documented here. The format follow
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-09
+
+### Changed
+
+- Core turn/context streams, approvals, run projections and subagent messaging
+  now use the published llm-core, harness permission, ui-go and mesh package
+  identities. Consumers must migrate their corresponding standalone imports;
+  old and new named types are not interchangeable. Approval decisions, stream
+  handling and persistence behavior are unchanged.
+- Removed the core module's standalone library requirements. The approval
+  registry now explicitly depends on the harness permission package, while
+  launch and artifact custody remain host-owned.
+
 ## [0.2.0] — 2026-10-09
 
 ### Added

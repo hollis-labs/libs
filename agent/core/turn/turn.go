@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 // TurnStreamStarter begins the provider stream for one model invocation.

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging/mailbox"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging/mailbox"
 )
 
 var errTestUntrusted = errors.New("host: role is untrusted")

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
 	"github.com/hollis-labs/substrate/agent/turn"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func TestCanonicalTurnRequiresProviderTerminal(t *testing.T) {
