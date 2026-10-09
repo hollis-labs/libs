@@ -8,6 +8,10 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `util/tesseractclient`: An HTTP client for Tesseract's memory API, with an importable fake in `tesseracttest` (from `go-tesseract-client`, 9 commits of history). The package clause stays `tesseract`, as it was before the move. The lib keeps its own `CHANGELOG.md` and has a `MIGRATION.md` with the old and new import paths.
+
 ## v0.1.0 — 2026-10-03
 
 First release of the util module: the packages of twelve former Hollis Labs modules, moved in with their git history.
