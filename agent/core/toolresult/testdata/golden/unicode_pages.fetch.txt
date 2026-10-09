@@ -1,0 +1,14 @@
+=== fetch 0 error=false
+[Cached result <ID>; json_pointer="/stdout"; bytes 0..6 of 13300 (end-exclusive); has_more=true; next_offset=6]
+
+é🙂
+=== fetch 1 error=false
+[Cached result <ID>; json_pointer="/a~1b~0c/0"; bytes 0..16 of 16 (end-exclusive); has_more=false; next_offset=16]
+
+9007199254740993
+=== fetch 2 error=true
+Error: JSON pointer "/a~1b~0c/01": invalid array index "01"
+=== fetch 3 error=true
+Error: json_pointer must be empty or start with /
+=== fetch 4 error=true
+Error: offset must be a non-negative integer no greater than 1073741824

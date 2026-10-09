@@ -1,0 +1,6 @@
+[PARTIAL PREVIEW — not a complete read. Omitted content must be retrieved before making claims about it.]
+
+[OMITTED bytes 0..500 (500 bytes); ranges are end-exclusive]
+
+
+[TRUNCATED — full result cached as tool_result://<ID> (total_size=500 bytes, expires_at=<EXPIRES>). Use fetch_tool_result({"id":"<ID>"}) for pages, optionally with json_pointer to select a field (for example /stdout). Use search_tool_result({"id":"<ID>","pattern":"..."}) for matching regions. Preview labels are JSON pointers; fetch offsets address the selected text.]

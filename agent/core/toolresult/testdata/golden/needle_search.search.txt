@@ -1,0 +1,25 @@
+=== search 0 error=false
+[Cached result <ID>; json_pointer="/stdout"; matching lines=1; total_bytes=7041; has_more=true; next_offset=7017]
+
+--- Line 1; match bytes 7000..7006; context bytes 6334..7028; context_truncated=true ---
+ prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix NEEDLE one
+other
+NEEDLE two
+
+
+=== search 1 error=false
+[Cached result <ID>; json_pointer="/stdout"; matching lines=2; total_bytes=7041; has_more=false; next_offset=7041]
+
+--- Line 3; match bytes 7017..7023; context bytes 6351..7041; context_truncated=true ---
+efix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix prefix NEEDLE one
+other
+NEEDLE two
+NEEDLE three
+
+
+--- Line 4; match bytes 7028..7034; context bytes 7011..7041; context_truncated=false ---
+other
+NEEDLE two
+NEEDLE three
+
+
