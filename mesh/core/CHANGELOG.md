@@ -8,6 +8,15 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.1.1 — 2026-10-09
+
+### Fixed
+
+- Messaging's shared request/reply contract waits for subscription registration
+  before sending, instead of a scheduling-dependent sleep. Subscription and
+  reply failures are reported directly; delayed stores retain the same outcome
+  assertions and request deadline.
+
 ## v0.1.0 — 2026-10-03
 
 ### Added

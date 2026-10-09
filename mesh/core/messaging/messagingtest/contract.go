@@ -277,18 +277,27 @@ func RunContract(t *testing.T, factory Factory, opts ...ContractOption) {
 		A := recipient("rqA")
 		B := recipient("rqB")
 
+		ready := make(chan error, 1)
+		replied := make(chan error, 1)
 		go func() {
 			// Bob subscribes to requests addressed to him.
 			sub, err := s.Subscribe(ctx, B, messaging.Filter{Kind: []messaging.Kind{messaging.MsgKindRequest}})
+			ready <- err
 			if err != nil {
 				return
 			}
 			for r := range sub {
-				_, _ = d.Reply(ctx, r, json.RawMessage(`"pong"`))
+				_, err := d.Reply(ctx, r, json.RawMessage(`"pong"`))
+				replied <- err
 				return
 			}
 		}()
-		time.Sleep(10 * time.Millisecond)
+		select {
+		case err := <-ready:
+			must(t, err)
+		case <-ctx.Done():
+			t.Fatalf("waiting for request subscription: %v", ctx.Err())
+		}
 
 		resp, err := d.Request(ctx, messaging.Envelope{
 			From:    A,
@@ -296,6 +305,12 @@ func RunContract(t *testing.T, factory Factory, opts ...ContractOption) {
 			Payload: json.RawMessage(`"ping"`),
 		})
 		must(t, err)
+		select {
+		case err := <-replied:
+			must(t, err)
+		case <-ctx.Done():
+			t.Fatalf("waiting for reply completion: %v", ctx.Err())
+		}
 		if string(resp.Payload) != `"pong"` {
 			t.Errorf("resp = %s", string(resp.Payload))
 		}
