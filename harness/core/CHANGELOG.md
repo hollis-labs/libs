@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.4.0
+
 ### Fixed
 
 - Runner SIGKILL escalation test waits for child output proving SIGTERM trap
@@ -15,6 +17,16 @@ All notable changes to the `harness` module are documented here. The format foll
 
 - Runner test fixtures build on Windows: isolate POSIX resource-limit reporting
   and CPU-signal tests while retaining zero-limit and unsupported-limit coverage.
+
+### Added
+
+- Import the historical `go-hooks` implementation with its Git history into
+  `interception/hooks`, including the command runner and conformance fixtures.
+  Existing interception policy, filter and permission APIs are unchanged.
+- Publish migration instructions for the root, `cmdhook` and `conformance`
+  imports. The standalone `plugin-hooks` catalog engine remains separate.
+  Host-owned execution, required failure modes and known native payload
+  normalization gaps remain explicit; no boot hook execution is added.
 
 ## v0.3.1
 

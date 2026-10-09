@@ -28,6 +28,9 @@ sessions and managed workspace artifacts. Import packages from
   repositories and trust use typed handlers and one external receipt store.
 - `workspace/render`, `workspace/keymerge` and `workspace/install` provide pure
   rendering, owned-key merge and installed-target planning.
+- `interception/hooks` preserves the eleven-event hooks contract, pure layer
+  resolution, an explicit subprocess runner and conformance fixtures. Hosts
+  own engine wiring and execution authority. See [its migration guide](interception/hooks/MIGRATION.md).
 - `shim` and `cmd/cairn-shim` provide a private authenticated stdio process shim.
 
 See [workspace/README.md](workspace/README.md) for authority, recovery and
