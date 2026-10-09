@@ -1,5 +1,11 @@
 # Changelog
 
+## Retirement — 2026-10-09
+
+- Redirect new development to `github.com/hollis-labs/substrate/mesh/agentdef` in `github.com/hollis-labs/substrate/mesh v0.1.0`.
+- The replacement is the v2 definition contract. Its symbols, file schema and digest differ from this preserved v1 implementation; adapt the caller explicitly rather than rewriting an import blindly.
+- Archive after the final redirect merge; retain all historical source and tags.
+
 All notable changes to go-agentdef are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
