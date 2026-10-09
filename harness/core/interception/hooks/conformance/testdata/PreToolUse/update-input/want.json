@@ -1,0 +1,1 @@
+{"exit_code":0,"output":{"decision":"allow","updatedInput":{"command":"ls /tmp/build"}},"want_err_substr":""}

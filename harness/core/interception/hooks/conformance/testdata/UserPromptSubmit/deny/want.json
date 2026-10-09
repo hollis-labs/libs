@@ -1,0 +1,1 @@
+{"exit_code":0,"output":{"decision":"deny","reason":"prompt contains a secret"},"want_err_substr":""}
