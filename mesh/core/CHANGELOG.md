@@ -8,6 +8,29 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-09
+
+### Added
+
+- History-preserved `agentdefv1` with the full version-1 parser, layered loading,
+  skill-tree resolution/copying, lint, generated-span validation, tests and CLI.
+  Version-2 `mesh/agentdef` is unchanged; schemas remain separate without aliases
+  or fallback. The command uses released `llm-core/contracts/capabilities`;
+  the library retains its caller-supplied capability resolver.
+- History-preserved `agentmuxclient`, retaining the `agentmux` package name,
+  legacy socket, session/broker/catalog endpoints, event DTOs, API errors and
+  messaging adapters. Existing `tetherclient` behavior is unchanged.
+
+### Changed
+
+- Minimum Go version is 1.26.9, including the standard-library security fixes
+  absent from 1.26.6.
+- `github.com/hollis-labs/go-agentdef` imports move to
+  `github.com/hollis-labs/substrate/mesh/agentdefv1` (package `agentdef`).
+- The old `github.com/hollis-labs/go-agentmux-client` import moves to
+  `github.com/hollis-labs/substrate/mesh/agentmuxclient`; messaging imports now
+  use the sibling `mesh/messaging` packages. Consumer adoption is separate.
+
 ## v0.1.1 — 2026-10-09
 
 ### Fixed
