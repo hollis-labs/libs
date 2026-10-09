@@ -8,6 +8,10 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-09
+
+Adds the Tesseract memory API client, moved in with its git history. No existing package changed.
+
 ### Added
 
 - `util/tesseractclient`: An HTTP client for Tesseract's memory API, with an importable fake in `tesseracttest` (from `go-tesseract-client`, 9 commits of history). The package clause stays `tesseract`, as it was before the move. The lib keeps its own `CHANGELOG.md` and has a `MIGRATION.md` with the old and new import paths.

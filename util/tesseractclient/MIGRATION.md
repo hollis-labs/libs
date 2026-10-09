@@ -13,7 +13,7 @@
 
 ## What changed
 
-- **Module.** The code is now part of the `github.com/hollis-labs/libs/util` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0) were not carried over; the package first ships in the next `util` release.
+- **Module.** The code is now part of the `github.com/hollis-labs/libs/util` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0) were not carried over; the package first ships in `util/v0.2.0`.
 - **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages and the history in `CHANGELOG.md` are left as written.
 - **Package name.** The package clause stays `tesseract`, as it was before the move; only the directory is named `tesseractclient`. Code that imported it under the name `tesseract` keeps working with the new path.
 - **API.** No symbol was renamed or changed by the move.
