@@ -26,6 +26,9 @@ All notable changes to the `util` module are documented here. The format follows
 - Follow the upstream OTel SDK's default metric cardinality limit of 2000;
   measurements with additional attribute sets aggregate into
   `otel.metric.overflow=true`. Telemetry options and public Go APIs are unchanged.
+- Upgrade the slog bridge to v0.20.0 for the new log API. Consumers calling
+  upstream log value constructors directly must migrate to `otel/attribute`;
+  OTel log v0.21.0 removes the old `log.Value` and `log.KeyValue` APIs.
 
 ## v0.2.0 — 2026-10-09
 
