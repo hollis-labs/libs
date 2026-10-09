@@ -174,7 +174,15 @@ func (r *Runner) execute(parent context.Context, s StageSpec, in Input) (Record,
 			answers <- a
 		}()
 		a.result, a.err = s.Stage.Run(ctx, Input{Message: in.Message, State: in.State.Clone()})
-		a.result = a.result.clone()
+		if a.result.Disposition == "" {
+			a.result.Disposition = Pass
+		}
+		if validateResult(a.result) == nil {
+			a.result = a.result.clone()
+		} else {
+			// Reject oversized declarations before copying their slices.
+			a.result = Result{Disposition: Hold}
+		}
 	}()
 	select {
 	case <-ctx.Done():

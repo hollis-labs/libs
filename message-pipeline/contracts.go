@@ -188,7 +188,9 @@ type Cursor struct {
 }
 
 // CursorStore is adapter-owned. CompareAndSwap must not advance past unsettled
-// publications. An adapter needing atomic sink/result/cursor settlement implements
+// publications. Empty Version denotes an absent cursor; existing cursors (even
+// sequence zero) require nonempty versions, and CAS must compare the full expected
+// value. An adapter needing atomic sink/result/cursor settlement implements
 // that transaction itself; Runner never advances a cursor.
 type CursorStore interface {
 	Load(context.Context, string) (Cursor, bool, error)

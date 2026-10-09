@@ -299,3 +299,13 @@ func TestFailedMarkerMustFitBeforePersistence(t *testing.T) {
 		t.Fatalf("bad limit result: %+v %v", got, err)
 	}
 }
+
+func TestOversizedDeclarationsFailBeforeAccumulation(t *testing.T) {
+	r := runner(t, []StageSpec{spec("oversized", func(context.Context, Input) (Result, error) {
+		return Result{Summaries: make([]Summary, MaxEntries+1)}, nil
+	})}, &memoryStore{})
+	got, err := r.Run(context.Background(), message(), State{})
+	if err != nil || got.State.Traces[0].FailureCode != InvalidOutput || len(got.State.Annotations) != 0 {
+		t.Fatalf("oversized declaration accepted %+v %v", got, err)
+	}
+}
