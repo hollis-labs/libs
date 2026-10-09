@@ -1,5 +1,11 @@
 # Changelog
 
+## Retirement — 2026-10-09
+
+- Redirect new development to `github.com/hollis-labs/substrate/mesh/tetherclient` in `github.com/hollis-labs/substrate/mesh v0.1.0`.
+- The successor is the Tether client. Adapt legacy mux names, socket defaults and endpoint contracts explicitly; this does not assert API equivalence or change existing consumer pins.
+- Archive after the final redirect merge; retain all historical source and tags.
+
 All notable changes to go-agentmux-client are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
