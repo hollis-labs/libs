@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Run inprocess plugins through plugin-host's Supervisor/Client, removing the
+  duplicate codec, process reaper, health loop and restart loop. Keep static
+  tool catalogs and explicit owner factories; expose typed driver status.
+- Apply the driver's shared generation reservations and semantic-version checks.
+  Process-mode MCP transports are unchanged.
+
 All notable changes to this project will be documented in this file.
 
 ## v0.2.0 — 2026-09-18

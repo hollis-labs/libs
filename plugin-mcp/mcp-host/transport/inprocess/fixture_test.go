@@ -73,7 +73,7 @@ func (p *fixturePlugin) Init(ctx context.Context, params sdksub.InitParams) (sdk
 			return sdksub.InitResult{}, closeErr
 		}
 	}
-	return sdksub.InitResult{ID: "fixture", Name: "Fixture Plugin", Version: "test", Protocol: sdksub.ProtocolVersion, CapabilityContract: 1}, nil
+	return sdksub.InitResult{ID: "fixture", Name: "Fixture Plugin", Version: "0.1.0", Protocol: sdksub.ProtocolVersion, CapabilityContract: 1}, nil
 }
 
 func (p *fixturePlugin) Load(ctx context.Context) (sdksub.LoadResult, error) {
@@ -96,6 +96,10 @@ func (p *fixturePlugin) Health(ctx context.Context) (sdksub.HealthStatus, error)
 }
 
 func (p *fixturePlugin) MCPCallTool(ctx context.Context, req sdksub.MCPCallRequest) (sdksub.MCPCallResult, error) {
+	if req.ToolName == "wait" {
+		<-ctx.Done()
+		return sdksub.MCPCallResult{}, ctx.Err()
+	}
 	msg, _ := req.Arguments["message"].(string)
 	payload, err := json.Marshal(map[string]any{"pong": "pong:" + msg})
 	if err != nil {
@@ -115,7 +119,7 @@ func runRawInitFixture(mode string) {
 		}
 		result := map[string]any{}
 		if request.Method == sdksub.MethodInit {
-			result = map[string]any{"id": "fixture", "name": "fixture", "version": "test", "description": "", "protocol": 2, "capability_contract": 1}
+			result = map[string]any{"id": "fixture", "name": "fixture", "version": "0.1.0", "description": "", "protocol": 2, "capability_contract": 1}
 			switch mode {
 			case "reverse":
 				result["reverse_rpc_version"] = 1

@@ -1,6 +1,6 @@
 // Package bootstrap wires mcp-host's config, registry, and transport
 // packages together: for each configured logical server it builds the
-// right transport and registers it, discovering its tool list before
+// right transport (the inprocess adapter delegates to plugin-host) and registers it, discovering its tool list before
 // returning. A consumer that wants full control (custom tools beyond
 // config-declared servers, a different transport) can use
 // registry/config/transport directly instead — see the root mcphost
