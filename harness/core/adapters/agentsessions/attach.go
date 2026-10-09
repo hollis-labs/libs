@@ -199,6 +199,14 @@ func (b *attachBroker) subscribe(depth int) (replay []byte, ch <-chan []byte, ca
 // receives the full ring (the gap between sinceSeq and ringStart is
 // lost — callers detect this by comparing expected vs received bytes).
 func (b *attachBroker) subscribeSince(depth int, sinceSeq int64) (replay []byte, ch <-chan []byte, cancel func()) {
+	replay, ch, cancel, _ = b.subscribeSnapshot(depth, sinceSeq)
+	return replay, ch, cancel
+}
+
+// subscribeSnapshot captures retention boundaries under the same lock as
+// replay and live registration. The snapshot remains valid for this replay
+// even when later writes advance the ring.
+func (b *attachBroker) subscribeSnapshot(depth int, sinceSeq int64) (replay []byte, ch <-chan []byte, cancel func(), snapshot AttachSnapshot) {
 	if depth <= 0 {
 		depth = b.chanCap
 	}
@@ -206,11 +214,15 @@ func (b *attachBroker) subscribeSince(depth int, sinceSeq int64) (replay []byte,
 	defer b.mu.Unlock()
 
 	replay = computeReplay(b.ring, b.totalWritten, sinceSeq)
+	snapshot = AttachSnapshot{
+		OldestOffset: b.totalWritten - int64(len(b.ring)),
+		NextOffset:   b.totalWritten,
+	}
 
 	out := make(chan []byte, depth)
 	if b.closed {
 		close(out)
-		return replay, out, func() {}
+		return replay, out, func() {}, snapshot
 	}
 
 	id := b.subNext
@@ -228,7 +240,7 @@ func (b *attachBroker) subscribeSince(depth int, sinceSeq int64) (replay []byte,
 			b.mu.Unlock()
 		})
 	}
-	return replay, out, cancel
+	return replay, out, cancel, snapshot
 }
 
 // close tears down the broker: closes every subscriber channel, marks the

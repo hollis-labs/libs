@@ -465,6 +465,15 @@ type AttachOptions struct {
 	// Depth overrides the subscriber channel depth for this attach.
 	// Zero uses the broker's default.
 	Depth int
+
+	// OnSnapshot, when non-nil, runs once after replay capture and live
+	// registration, before any bytes are written to the attach writer. It
+	// runs without Manager or broker locks. The snapshot describes that
+	// admission boundary; concurrent writes may subsequently advance the
+	// ring. Return an error to abort without writing stream bytes and release
+	// both the subscriber and attachment bookkeeping. No callback is made
+	// for an unknown session or one with attach disabled.
+	OnSnapshot func(AttachSnapshot) error
 }
 
 // Attach subscribes w to the named session's live output stream. Attach
@@ -516,8 +525,13 @@ func (m *Manager) AttachWith(ctx context.Context, id string, w io.Writer, opts A
 		}
 	}()
 
-	replay, ch, cancel := e.broker.subscribeSince(opts.Depth, opts.SinceSeq)
+	replay, ch, cancel, snapshot := e.broker.subscribeSnapshot(opts.Depth, opts.SinceSeq)
 	defer cancel()
+	if opts.OnSnapshot != nil {
+		if err := opts.OnSnapshot(snapshot); err != nil {
+			return err
+		}
+	}
 	return copyStream(ctx, w, replay, ch)
 }
 
