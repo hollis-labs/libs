@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	webui "github.com/hollis-labs/go-webui"
+	webui "github.com/hollis-labs/libs/ui-go/webui"
 )
 
 type Config struct {
