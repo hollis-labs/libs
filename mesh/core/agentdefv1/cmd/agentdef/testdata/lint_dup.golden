@@ -1,0 +1,2 @@
+testdata/lint/dup.md: duplicate-entry: warn: tools lists "read" more than once
+testdata/lint/dup.md: description-label: warn: description has 2 words; say what the agent does and when to delegate to it
