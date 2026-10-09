@@ -18,7 +18,7 @@ Each module has its own `go.mod`, its own version and its own tags.
 
 | Module | Import path | Scope |
 |---|---|---|
-| `util` | `github.com/hollis-labs/libs/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue and a scheduler. |
+| `util` | `github.com/hollis-labs/libs/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler and a Tesseract memory API client. |
 | `ui-go` | `github.com/hollis-labs/libs/ui-go` | Streaming and web UI building blocks for Go services: server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `workflow` | `github.com/hollis-labs/libs/workflow` | The workflow engine and its host. |
 | `plugin-mcp` | `github.com/hollis-labs/libs/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
