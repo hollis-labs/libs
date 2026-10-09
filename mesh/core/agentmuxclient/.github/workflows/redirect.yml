@@ -1,0 +1,16 @@
+name: redirect documentation
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check documentation whitespace
+        run: git diff --check HEAD^ HEAD
