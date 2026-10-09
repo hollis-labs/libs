@@ -125,12 +125,12 @@ func (s *httpStore) Consume(ctx context.Context, id string, recipient messaging.
 	q := url.Values{}
 	q.Set("as", recipient.URN())
 	path := withQuery("/messages/"+url.PathEscape(id)+"/consume", q)
-	return mapStoreError(s.c.doNoBody(ctx, http.MethodPost, path, nil, http.StatusNoContent))
+	return mapStoreError(s.c.doNoBody(ctx, path, nil))
 }
 
 // Cancel marks an envelope dead. Idempotent. Returns ErrNotFound if absent.
 func (s *httpStore) Cancel(ctx context.Context, id string) error {
-	err := s.c.doNoBody(ctx, http.MethodPost, "/messages/"+url.PathEscape(id)+"/cancel", nil, http.StatusNoContent)
+	err := s.c.doNoBody(ctx, "/messages/"+url.PathEscape(id)+"/cancel", nil)
 	return mapStoreError(err)
 }
 
@@ -225,7 +225,7 @@ func (d *httpDispatcher) Reply(ctx context.Context, parent messaging.Envelope, p
 		Payload:     payload,
 		ContentType: "application/json",
 	}
-	return d.httpStore.Send(ctx, resp)
+	return d.Send(ctx, resp)
 }
 
 // mapStoreError translates HTTP API errors into canonical messaging sentinel errors.

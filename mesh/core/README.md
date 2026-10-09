@@ -12,6 +12,7 @@ how an agent is defined.
 | `mesh` (root) | The provider contract: actors and URNs, verbs, canonical task, session and instance states with their mapping table, the event envelope, capability descriptors and negotiation, assignment receipts, lookup and authorized replay, versioned results, typed diagnostics, and enrollment, execution and binding records. Standard library only. |
 | `mesh/fake`, `mesh/conformance` | An in-memory provider and the reusable conformance suites. Provider implementations run the suites in their own tests. |
 | `mesh/teams`, `mesh/teams/memory` | The team model behind host interfaces: slots, phases, authority checks, routing, spawning with limits, launch and recovery, and an in-memory host for tests. |
+| `mesh/agentdefv1` | Preserved version-1 parser, layered authoring/skills utilities, generated-span validation, linting and CLI, without changing the version-2 schema. |
 | `mesh/agentdef` | Parsing, validation and digests for the version-2 agent definition file. |
 | `mesh/agentmuxclient` | Preserved legacy Agent Mux client (package `agentmux`), with its original socket, DTOs and endpoint contracts; new integrations use `mesh/tetherclient`. |
 | `mesh/messaging`, `mesh/federation`, `mesh/hitl`, `mesh/tetherclient` | Durable messaging, cross-host federation, human-in-the-loop requests and the HTTP client for the Tether daemon. |
@@ -39,7 +40,7 @@ schema `urn:hollis-labs:mesh:result/v1` are provisional.
 
 ## Requirements
 
-Go 1.26.6 or newer. The root package imports only the standard library; other packages
+Go 1.26.9 or newer. The root package imports only the standard library; other packages
 bring the third-party modules listed in `go.mod` (for example the SQLite driver used by
 `messaging/sqlstore`).
 

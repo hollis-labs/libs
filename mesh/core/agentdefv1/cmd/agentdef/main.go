@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/agent-contracts-leaf/capabilities"
-	agentdef "github.com/hollis-labs/go-agentdef"
+	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
+	agentdef "github.com/hollis-labs/substrate/mesh/agentdefv1"
 )
 
 func main() {

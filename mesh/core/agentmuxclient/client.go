@@ -127,11 +127,11 @@ func (c *Client) GetSession(ctx context.Context, sessionID string) (Session, err
 }
 
 func (c *Client) StopSession(ctx context.Context, sessionID string) error {
-	return c.doNoBody(ctx, http.MethodPost, "/sessions/"+url.PathEscape(sessionID)+"/stop", nil, http.StatusNoContent)
+	return c.doNoBody(ctx, "/sessions/"+url.PathEscape(sessionID)+"/stop", nil)
 }
 
 func (c *Client) ResizeSession(ctx context.Context, sessionID string, rows, cols uint16) error {
-	return c.doNoBody(ctx, http.MethodPost, "/sessions/"+url.PathEscape(sessionID)+"/resize", ResizeRequest{Rows: rows, Cols: cols}, http.StatusNoContent)
+	return c.doNoBody(ctx, "/sessions/"+url.PathEscape(sessionID)+"/resize", ResizeRequest{Rows: rows, Cols: cols})
 }
 
 func (c *Client) SendInput(ctx context.Context, sessionID string, data []byte) error {
@@ -144,7 +144,7 @@ func (c *Client) SendInput(ctx context.Context, sessionID string, data []byte) e
 	if err != nil {
 		return wrapIfUnreachable(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		return readAPIError(resp)
 	}
@@ -160,7 +160,7 @@ func (c *Client) AttachSession(ctx context.Context, sessionID string, w io.Write
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, err = io.Copy(w, resp.Body)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -176,7 +176,7 @@ func (c *Client) WaitSession(ctx context.Context, sessionID string) (int, error)
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out WaitResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return 0, fmt.Errorf("decode wait response: %w", err)
@@ -326,7 +326,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any, want
 	if err != nil {
 		return wrapIfUnreachable(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != wantStatus {
 		return readAPIError(resp)
 	}
@@ -339,8 +339,8 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any, want
 	return nil
 }
 
-func (c *Client) doNoBody(ctx context.Context, method, path string, body any, wantStatus int) error {
-	return c.doJSON(ctx, method, path, body, wantStatus, nil)
+func (c *Client) doNoBody(ctx context.Context, path string, body any) error {
+	return c.doJSON(ctx, http.MethodPost, path, body, http.StatusNoContent, nil)
 }
 
 func (c *Client) doStream(ctx context.Context, path string, q url.Values) (*http.Response, error) {
@@ -355,7 +355,7 @@ func (c *Client) doStream(ctx context.Context, path string, q url.Values) (*http
 		return nil, wrapIfUnreachable(err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		return nil, readAPIError(resp)
 	}
 	return resp, nil

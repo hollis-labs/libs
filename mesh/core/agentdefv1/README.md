@@ -1,38 +1,37 @@
 # go-agentdef
 
-## Replacement and repository retirement
+## Substrate relocation
 
-New development uses `github.com/hollis-labs/substrate/mesh/agentdef` from the released module
-`github.com/hollis-labs/substrate/mesh v0.1.0`:
+The complete version-1 library and command now live at
+`github.com/hollis-labs/substrate/mesh/agentdefv1` in `mesh/v0.2.0`.
+The Go package remains `agentdef`. This preserves the version-1 parser, layered
+loading, skill-tree pins/copying, linting and generated-span checks without
+changing the separate version-2 `mesh/agentdef` schema.
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.1.0
+go get github.com/hollis-labs/substrate/mesh@v0.2.0
+go install github.com/hollis-labs/substrate/mesh/agentdefv1/cmd/agentdef@v0.2.0
 ```
 
-The replacement is the v2 definition contract. Its symbols, file schema and digest differ from this preserved v1 implementation; adapt the caller explicitly rather than rewriting an import blindly.
-
-This final redirect is followed by repository archival. Existing source, tags,
-versions and Git history remain available; nothing is deleted. The sections
-below describe the preserved standalone implementation.
-
-Parse, validate and fingerprint agent definition files: one markdown file per
-agent, strict YAML frontmatter above the instructions. Layered sources, Agent
-Skills resolution and hash-pinning, and an `agentdef` CLI for CI.
+These schemas have no aliases or implicit conversion. The version-1 CLI uses
+`llm-core/contracts/capabilities` for its static capability vocabulary; library
+callers still supply their own `WithCapabilities` function. No runtime or grant
+is installed or inferred. Old repository tags are not carried; consumers adopt
+explicitly.
 
 ## Status
 
-**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
+This version-1 package ships in `mesh/v0.2.0`. The module is pre-1.0; pin an exact version and review its changelog before adopting. It is separate from the version-2 definition schema.
 
 See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-agentdef
+go get github.com/hollis-labs/substrate/mesh/agentdefv1
 ```
 
-The `agentdef` command has no tagged release yet; build it from a clone with
-`go build -o agentdef ./cmd/agentdef`.
+Install the command at the module version shown above, or build from the mesh module directory with `go build -o agentdef ./agentdefv1/cmd/agentdef`.
 
 ## Usage
 
@@ -43,7 +42,7 @@ import (
 	"fmt"
 	"log"
 
-	agentdef "github.com/hollis-labs/go-agentdef"
+	agentdef "github.com/hollis-labs/substrate/mesh/agentdefv1"
 )
 
 const file = `---
@@ -116,7 +115,7 @@ launch-record digests it feeds settle on one.
 `Validate` checks the capability names in `requires` and `uses` against a
 catalog only when you pass `WithCapabilities(known)`; without it they are
 pattern-checked only. The `agentdef` CLI passes the shared vocabulary from
-[agent-contracts-leaf](https://github.com/hollis-labs/agent-contracts-leaf)
+[llm-core/contracts/capabilities](../../llm-core/contracts/capabilities)
 (`capabilities.Known`), so `agentdef validate` rejects a capability name outside
 it.
 
@@ -137,8 +136,8 @@ failed, 2 bad usage. There is no `--force`.
 
 This module is pre-1.0: minor releases may break the exported API, the
 frontmatter schema, the canonical form and the digest string format, with no
-promise of compatibility. There is no external consumer yet, so changes are
-clean breaks: no aliases, shims or deprecation periods. Pin an exact version and
+promise of compatibility. Version-1 and version-2 definitions remain
+separate: no aliases, shims or deprecation periods. Pin an exact version and
 read [CHANGELOG.md](./CHANGELOG.md) before upgrading.
 
 ## Out of scope
@@ -154,12 +153,13 @@ read [CHANGELOG.md](./CHANGELOG.md) before upgrading.
 ## Development
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+# from the mesh module directory
+gofmt -l agentdefv1
+go vet ./agentdefv1/...
+go test -race -count=1 ./agentdefv1/...
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+The repository mesh workflow is the current CI gate. Nested workflow files are retained source history, not active monorepo workflows.
 
 ## License
 
