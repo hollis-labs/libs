@@ -41,7 +41,7 @@ uses `vX.Y.Z`; the repository tag also includes the module directory.
 
 | Module requirement | Repository tag |
 |---|---|
-| `github.com/hollis-labs/libs/util@v0.2.0` | `util/v0.2.0` |
+| `github.com/hollis-labs/libs/util@v0.2.1` | `util/v0.2.1` |
 | `github.com/hollis-labs/libs/ui-go@v0.1.0` | `ui-go/v0.1.0` |
 | `github.com/hollis-labs/libs/workflow@v0.1.0` | `workflow/v0.1.0` |
 | `github.com/hollis-labs/libs/plugin-mcp@v0.1.1` | `plugin-mcp/v0.1.1` |
@@ -222,7 +222,7 @@ git diff -- go.mod go.sum
 git diff --check
 ```
 
-Use `util@v0.2.0` or `workflow@v0.1.0` when those modules are needed. Inspect
+Use `util@v0.2.1` or `workflow@v0.1.0` when those modules are needed. Inspect
 remaining old requirements: `tidy` removes a direct dependency only after all
 imports stop using it, and an unadopted upstream can still require it
 transitively. Do not blindly drop a module that still supplies a live API.
