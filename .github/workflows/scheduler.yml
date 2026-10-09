@@ -48,6 +48,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        # Preserve authored LF bytes on Windows before gofmt checks.
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: "false"
       - uses: actions/setup-go@v5
         with:
           go-version-file: util/go.mod
