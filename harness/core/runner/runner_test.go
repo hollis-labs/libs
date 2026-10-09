@@ -440,17 +440,19 @@ func TestRun_ExitError_SIGKILL_AfterWaitDelay(t *testing.T) {
 
 	// stubcli with -trap-sigterm swallows SIGTERM; cmd.WaitDelay then
 	// elapses and os/exec sends SIGKILL. ExitError should reflect
-	// Signal=9, Killed=true.
-	startedCh := make(chan struct{}, 1)
+	// Signal=9, Killed=true. Delayed installation exposes cancellation
+	// before readiness instead of relying on parent scheduling.
+	readyCh := make(chan struct{}, 1)
 	cfg := runner.Config{
 		Provider:  &stubAdapter{binPath: bin},
 		Workspace: workspace,
-		Args:      []string{"-count", "1", "-sleep", "30s", "-trap-sigterm"},
+		Args:      []string{"-count", "1", "-sleep", "30s", "-trap-sigterm", "-trap-delay", "300ms"},
 		WaitDelay: 500 * time.Millisecond,
 		OnEvent: func(ev runner.Event) {
-			if ev.Kind == runner.EventProcessStarted {
+			// stubcli emits deltas only after signal.Notify installs the trap.
+			if event, ok := ev.Payload["event"].(llmtypes.StreamEvent); ev.Kind == runner.EventProviderEvent && ok && event.Type == llmtypes.EventDelta && event.Content == "chunk-0 " {
 				select {
-				case startedCh <- struct{}{}:
+				case readyCh <- struct{}{}:
 				default:
 				}
 			}
@@ -465,13 +467,14 @@ func TestRun_ExitError_SIGKILL_AfterWaitDelay(t *testing.T) {
 	go func() { done <- result{err: runner.Run(ctx, cfg)} }()
 
 	select {
-	case <-startedCh:
+	case <-readyCh:
+	case res := <-done:
+		t.Fatalf("child exited before trap readiness: %v", res.err)
 	case <-time.After(5 * time.Second):
 		cancel()
-		t.Fatal("process did not start within 5s")
+		<-done // join the child even when readiness fails
+		t.Fatal("child did not emit trap readiness within 5s")
 	}
-	// Give the trap a moment to install.
-	time.Sleep(200 * time.Millisecond)
 
 	cancel()
 	res := <-done
