@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.4.0
+
 ### Fixed
 
 - Runner SIGKILL escalation test waits for child output proving SIGTERM trap
@@ -15,8 +17,6 @@ All notable changes to the `harness` module are documented here. The format foll
 
 - Runner test fixtures build on Windows: isolate POSIX resource-limit reporting
   and CPU-signal tests while retaining zero-limit and unsupported-limit coverage.
-
-## v0.4.0
 
 ### Added
 
