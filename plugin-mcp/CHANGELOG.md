@@ -12,6 +12,10 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ### Fixed
 
+- Keep host-service callback completion separate from request cancellation, so
+  successful results and policy refusals are not randomly replaced by cancellation
+  or unknown-outcome errors. Actual cancellation retains its existing semantics.
+
 - Select Go 1.26.9 for CI and release builds to include standard-library
   vulnerability fixes, retaining the Go 1.26.8 language floor.
 
