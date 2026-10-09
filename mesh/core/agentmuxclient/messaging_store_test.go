@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	agentmux "github.com/hollis-labs/go-agentmux-client"
-	messaging "github.com/hollis-labs/go-messaging"
-	"github.com/hollis-labs/go-messaging/memstore"
-	"github.com/hollis-labs/go-messaging/messagingtest"
+	agentmux "github.com/hollis-labs/substrate/mesh/agentmuxclient"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
 )
 
 // TestHTTPStore_Contract runs all 13 messaging.Store contract sub-tests against

@@ -44,7 +44,7 @@ This file was backfilled from the git history.
 - Initial Agent Mux client package (`agentmux`): session, launch and event API client with typed API errors.
 - `provider_id` on `LaunchResponse`.
 
-[Unreleased]: https://github.com/hollis-labs/go-agentmux-client/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/hollis-labs/go-agentmux-client/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/hollis-labs/go-agentmux-client/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/hollis-labs/go-agentmux-client/releases/tag/v0.1.0
+[Unreleased]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/releases/tag/v0.1.0

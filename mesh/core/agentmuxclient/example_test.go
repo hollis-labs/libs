@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	agentmux "github.com/hollis-labs/go-agentmux-client"
+	agentmux "github.com/hollis-labs/substrate/mesh/agentmuxclient"
 )
 
 func ExampleClient_CreateEnvelope_naniteHostChat() {

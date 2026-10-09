@@ -8,6 +8,20 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-09
+
+### Added
+
+- History-preserved `agentmuxclient`, retaining the `agentmux` package name,
+  legacy socket, session/broker/catalog endpoints, event DTOs, API errors and
+  messaging adapters. Existing `tetherclient` behavior is unchanged.
+
+### Changed
+
+- The old `github.com/hollis-labs/go-agentmux-client` import moves to
+  `github.com/hollis-labs/substrate/mesh/agentmuxclient`; messaging imports now
+  use the sibling `mesh/messaging` packages. Consumer adoption is separate.
+
 ## v0.1.1 — 2026-10-09
 
 ### Fixed

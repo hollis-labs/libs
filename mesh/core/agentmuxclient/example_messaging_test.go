@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	agentmux "github.com/hollis-labs/go-agentmux-client"
-	messaging "github.com/hollis-labs/go-messaging"
+	agentmux "github.com/hollis-labs/substrate/mesh/agentmuxclient"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
 // ExampleClient_AsDispatcher shows the canonical cross-system request/reply

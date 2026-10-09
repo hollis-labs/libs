@@ -1,42 +1,32 @@
-# go-agentmux-client
+# Legacy Agent Mux client
 
-## Replacement and repository retirement
-
-New development uses `github.com/hollis-labs/substrate/mesh/tetherclient` from the released module
-`github.com/hollis-labs/substrate/mesh v0.1.0`:
+`github.com/hollis-labs/substrate/mesh/agentmuxclient` preserves the historical
+`agentmux` Go package and HTTP protocol. Its complete source history is imported
+into mesh; the former repository's versions are not module tags here.
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.1.0
+go get github.com/hollis-labs/substrate/mesh@v0.2.0
 ```
-
-The successor is the Tether client. Adapt legacy mux names, socket defaults and endpoint contracts explicitly; this does not assert API equivalence or change existing consumer pins.
-
-This final redirect is followed by repository archival. Existing source, tags,
-versions and Git history remain available; nothing is deleted. The sections
-below describe the preserved standalone implementation.
-
-Deprecated. Use `github.com/hollis-labs/go-tether-client`.
-
-This module tracks the older Agent Mux naming and default socket path:
-
-```text
-unix:~/.agent-mux/run/muxd.sock
-```
-
-Tether is the successor daemon and client surface. New work should move to:
 
 ```go
-import tether "github.com/hollis-labs/go-tether-client"
+import agentmux "github.com/hollis-labs/substrate/mesh/agentmuxclient"
 ```
 
-Migration notes live in:
+The package retains its default address `unix:~/.agent-mux/run/muxd.sock`,
+legacy event fields (`ID`, `Event`), API errors, session/catalog/checkpoint
+operations, broker endpoints, and messaging adapters. Its messaging dependency
+is now the sibling mesh/messaging package. Consumer adoption is separate.
 
-- <https://github.com/hollis-labs/go-tether-client/blob/main/MIGRATION.md>
+This is a preserved legacy client, not an alias for mesh/tetherclient. It does
+not discover or attach Tether credentials, adopt newer endpoint contracts,
+or turn asserted addresses into authority. It requires a server implementing
+the legacy protocol; importing it does not establish compatibility with current
+Tether daemons.
 
-What remains here:
+New integrations use [mesh/tetherclient](../tetherclient/README.md).
+Follow its [migration guide](../tetherclient/MIGRATION.md) to account explicitly
+for renamed event fields, socket defaults, endpoint changes, identity and
+credentials. The existing Tether client is unchanged by this import.
 
-- compatibility for consumers that still import the old module
-- the historical `agentmux` package name
-- the legacy default socket path
-
-This repo is archived and retained only as a pointer to the successor module.
+Tests use private httptest servers and in-memory messaging; no daemon or provider
+is needed.
