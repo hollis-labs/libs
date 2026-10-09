@@ -540,6 +540,21 @@ func TestReverseCompletedPluginIDCannotReplayUnderLiveParent(t *testing.T) {
 	req := p.request()
 	reverseRequest(t, p, 1, HostStorageGet, req)
 	_ = p.frame()
+	// Observing the bytes does not mean the writer has returned and retired
+	// its receipt. An ID is still active until that physical ownership ends.
+	deadline := time.Now().Add(testWait)
+	for {
+		p.conn.mu.Lock()
+		active := p.conn.inboundActive[subprocess.NumberID(1)]
+		p.conn.mu.Unlock()
+		if !active {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("first reverse receipt not retired")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	reverseRequest(t, p, 1, HostStorageGet, req)
 	_ = p.frame()
 	if calls.Load() != 1 {

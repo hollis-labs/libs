@@ -176,6 +176,7 @@ export function childCases(profile, core, event, releases, negotiated = false) {
               return result;
             }),
           );
+          if (a.return_gate) await wait;
           return { action: "message", content: JSON.stringify(results) };
         }
         return { action: "noop" };

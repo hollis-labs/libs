@@ -23,6 +23,9 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
   rather than requiring child shutdown within 100 ms. A separate regression
   preserves the bounded state-store wait and refusal of timed-out acknowledgement.
 
+- Make reverse-ID replay and descendant-cancellation fixtures observe the actual
+  terminal ownership boundary, preserving duplicate rejection and sibling isolation.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added
