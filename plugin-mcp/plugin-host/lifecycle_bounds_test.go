@@ -179,7 +179,15 @@ func TestStateSaveFailuresRefuseLoadAndQuarantineDisposal(t *testing.T) {
 }
 func TestAcknowledgementStoreWaitDoesNotOwnTheOperationGate(t *testing.T) {
 	o := lifecycleOptions(t)
-	o.CleanupTimeout = 300 * time.Millisecond
+	o.CleanupTimeout = 5 * time.Second
+	revoked := make(chan struct{}, 1)
+	var observe atomic.Bool
+	o.Callbacks.Revoke = func(context.Context, pluginhost.Owner) error {
+		if observe.Load() {
+			revoked <- struct{}{}
+		}
+		return nil
+	}
 	store := &countedStateStore{entered: make(chan struct{}, 2), release: make(chan struct{})}
 	o.StateStore = store
 	var once sync.Once
@@ -194,26 +202,71 @@ func TestAcknowledgementStoreWaitDoesNotOwnTheOperationGate(t *testing.T) {
 	child := l.Current()
 	store.block.Store(true)
 	ack := make(chan error, 1)
-	go func() { ack <- l.AcknowledgeDisposal(context.Background(), old) }()
+	ackCtx, cancelAck := context.WithCancel(context.Background())
+	defer cancelAck()
+	go func() { ack <- l.AcknowledgeDisposal(ackCtx, old) }()
 	<-store.entered
+	observe.Store(true)
 	stopped := make(chan error, 1)
 	go func() { stopped <- l.Disable(context.Background()) }()
-	// The child must stop while the acknowledgement is STILL blocked, before
-	// its 300ms save bound can release a mistakenly held operation gate.
+	// Revoke runs only after Disable acquires the operation gate. Observe that
+	// boundary directly while Save is blocked, without timing child shutdown.
 	select {
-	case <-child.Exited():
-	case <-time.After(100 * time.Millisecond):
+	case <-revoked:
+	case err := <-ack:
+		t.Fatal("acknowledgement returned before Disable acquired the gate", err)
+	case <-time.After(time.Second):
 		unblock()
+		cancelAck()
 		<-ack
 		<-stopped
 		t.Fatal("acknowledgement held operation gate")
 	}
+	select {
+	case err := <-ack:
+		t.Fatal("blocked acknowledgement already returned", err)
+	default:
+	}
+	cancelAck()
+	if !errors.Is(awaitResult(t, ack), context.Canceled) {
+		t.Fatal("acknowledgement ignored caller cancellation")
+	}
+	unblock()
+	_ = awaitResult(t, stopped)
+	select {
+	case <-child.Exited():
+	default:
+		t.Fatal("Disable left child running")
+	}
+}
+
+func TestAcknowledgementStoreWaitRespectsCleanupTimeout(t *testing.T) {
+	o := lifecycleOptions(t)
+	store := &countedStateStore{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	owner := pluginhost.Owner{HostInstance: o.HostInstance, OwnerID: "fixture", OwnerGeneration: 1}
+	if err := store.Save(context.Background(), "fixture", pluginhost.LifecycleRecord{
+		HostInstance: o.HostInstance, Revision: 1, LastGeneration: 1,
+		Disposals: []pluginhost.DisposalReport{{ID: "completed", Owner: owner}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	o.StateStore = store
+	l := newController(t, o)
+	store.block.Store(true)
+	defer close(store.release)
+	ack := make(chan error, 1)
+	go func() { ack <- l.AcknowledgeDisposal(context.Background(), owner) }()
+	<-store.entered
 	if !errors.Is(awaitResult(t, ack), context.DeadlineExceeded) {
 		t.Fatal("acknowledgement ignored cleanup bound")
 	}
-	_ = awaitResult(t, stopped)
-	unblock()
+	for _, report := range l.Status().Disposals {
+		if report.Acknowledged {
+			t.Fatal("timed-out save acknowledged disposal")
+		}
+	}
 }
+
 func TestHungLoadCheckpointDoesNotLeakRepeatedStoreCalls(t *testing.T) {
 	o := lifecycleOptions(t)
 	store := &countedStateStore{entered: make(chan struct{}, 2), release: make(chan struct{})}

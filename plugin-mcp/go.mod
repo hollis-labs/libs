@@ -2,6 +2,8 @@ module github.com/hollis-labs/libs/plugin-mcp
 
 go 1.26.8
 
+toolchain go1.26.9
+
 require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/mark3labs/mcp-go v0.47.0
