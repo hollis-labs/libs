@@ -3,7 +3,7 @@ package tesseracttest
 import (
 	"encoding/json"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
 )
 
 // Opt adjusts a revision under construction.

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
 )
 
 // Route names accepted by Fake.Calls, Fake.Fail and Fake.Requests.

@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"time"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
-	"github.com/hollis-labs/go-tesseract-client/tesseracttest"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
+	"github.com/hollis-labs/libs/util/tesseractclient/tesseracttest"
 )
 
 // exampleFake serves two records for the examples; adopters point New at a

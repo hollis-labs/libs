@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
-	"github.com/hollis-labs/go-tesseract-client/tesseracttest"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
+	"github.com/hollis-labs/libs/util/tesseractclient/tesseracttest"
 )
 
 // A broken server or proxy can hand back a cursor the client has already used

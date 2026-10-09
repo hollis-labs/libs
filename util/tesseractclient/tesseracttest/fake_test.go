@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/go-tesseract-client/tesseracttest"
+	"github.com/hollis-labs/libs/util/tesseractclient/tesseracttest"
 )
 
 func do(t *testing.T, method, url, body string, hdr ...string) (int, string) {

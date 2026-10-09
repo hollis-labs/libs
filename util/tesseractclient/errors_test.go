@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
-	"github.com/hollis-labs/go-tesseract-client/tesseracttest"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
+	"github.com/hollis-labs/libs/util/tesseractclient/tesseracttest"
 )
 
 func TestA404MatchesErrNotFound(t *testing.T) {

@@ -9,7 +9,7 @@ Small shared HTTP client for Tesseract's memory API: recall, deprecate, point-re
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-tesseract-client
+go get github.com/hollis-labs/libs/util/tesseractclient
 ```
 
 There is no published release yet; until one exists, depend on a commit.
@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"log"
 
-	tesseract "github.com/hollis-labs/go-tesseract-client"
+	tesseract "github.com/hollis-labs/libs/util/tesseractclient"
 )
 
 func main() {
