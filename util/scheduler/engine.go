@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 )
@@ -127,6 +126,16 @@ type Engine struct {
 	dueBatchLimit int
 	claimLease    time.Duration
 	observer      Observer
+	concurrency   int
+	fireTimeout   time.Duration
+	slots         chan struct{}
+	lifecycleMu   sync.Mutex
+	workMu        sync.Mutex
+	workers       sync.WaitGroup
+	stopping      bool
+	active        map[string]bool
+	random        RandomSource
+	randomMu      sync.Mutex
 
 	mu      sync.Mutex
 	running bool
@@ -146,18 +155,28 @@ func New(store Store, runner Runner, options ...Option) *Engine {
 		tickCadence:   DefaultTickCadence,
 		dueBatchLimit: DefaultDueBatchLimit,
 		claimLease:    DefaultClaimLease,
+		concurrency:   DefaultConcurrency,
+		fireTimeout:   DefaultFireTimeout,
+		active:        make(map[string]bool),
+		random:        globalRandom{},
 	}
 	for _, option := range options {
 		if option != nil {
 			option(engine)
 		}
 	}
+	engine.slots = make(chan struct{}, engine.concurrency)
 	return engine
 }
 
 // Start launches the background tick loop. It is idempotent: calling Start on
 // an already-running Engine is a no-op.
 func (e *Engine) Start() {
+	e.lifecycleMu.Lock()
+	defer e.lifecycleMu.Unlock()
+	e.workMu.Lock()
+	e.stopping = false
+	e.workMu.Unlock()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.running {
@@ -169,27 +188,37 @@ func (e *Engine) Start() {
 	go e.loop(e.stopCh, e.doneCh)
 }
 
-// Stop halts the background tick loop and blocks until it has exited. It is
-// idempotent: calling Stop on a stopped Engine is a no-op.
+// Stop halts admission, waits for the background loop and drains admitted
+// Enqueue calls. Runners must honor their context deadlines. Stop is idempotent.
 func (e *Engine) Stop() {
+	e.lifecycleMu.Lock()
+	defer e.lifecycleMu.Unlock()
+	e.workMu.Lock()
+	e.stopping = true
+	e.workMu.Unlock()
 	e.mu.Lock()
-	if !e.running {
-		e.mu.Unlock()
-		return
+	running, stopCh, doneCh := e.running, e.stopCh, e.doneCh
+	e.mu.Unlock()
+	if running {
+		close(stopCh)
+		<-doneCh
 	}
-	stopCh := e.stopCh
-	doneCh := e.doneCh
+	e.workers.Wait()
+	e.mu.Lock()
 	e.running = false
 	e.mu.Unlock()
-
-	close(stopCh)
-	<-doneCh
+	e.workMu.Lock()
+	e.stopping = false
+	e.workMu.Unlock()
 }
 
-// TickNow runs a single tick synchronously using the configured Clock. It is
+// TickNow materializes a tick and waits for its admitted Enqueue calls. It is
 // independent of the background loop and is useful for deterministic tests.
 func (e *Engine) TickNow(ctx context.Context) error {
-	return e.tick(ctx, e.clock.Now().UTC())
+	var admitted sync.WaitGroup
+	err := e.tick(ctx, e.clock.Now().UTC(), &admitted)
+	admitted.Wait()
+	return err
 }
 
 // Status returns a snapshot of engine activity.
@@ -209,14 +238,14 @@ func (e *Engine) loop(stopCh, doneCh chan struct{}) {
 	for {
 		select {
 		case <-ticker.C():
-			_ = e.tick(context.Background(), e.clock.Now().UTC())
+			_ = e.tick(context.Background(), e.clock.Now().UTC(), nil)
 		case <-stopCh:
 			return
 		}
 	}
 }
 
-func (e *Engine) tick(ctx context.Context, now time.Time) error {
+func (e *Engine) tick(ctx context.Context, now time.Time, admitted *sync.WaitGroup) error {
 	e.mu.Lock()
 	e.status.LastTickAt = now
 	e.mu.Unlock()
@@ -242,69 +271,9 @@ func (e *Engine) tick(ctx context.Context, now time.Time) error {
 		if index >= e.dueBatchLimit {
 			break
 		}
-		e.dispatchFire(ctx, fire, now)
+		e.submitFire(ctx, fire, admitted)
 	}
 	return nil
-}
-
-func (e *Engine) materializeSchedule(ctx context.Context, schedule Schedule, now time.Time) {
-	if !schedule.Enabled {
-		e.skip(ctx, Fire{ScheduleID: schedule.ID}, now, "schedule_disabled")
-		return
-	}
-	if schedule.NextRun.IsZero() {
-		e.skip(ctx, Fire{ScheduleID: schedule.ID}, now, "schedule_unscheduled")
-		return
-	}
-	if err := schedule.Retry.Validate(); err != nil {
-		e.engineError(ctx, Fire{ScheduleID: schedule.ID}, now, "validate_retry_policy", err)
-		return
-	}
-
-	scheduledAt := schedule.NextRun.UTC()
-	oneTime := strings.TrimSpace(schedule.CronExpr) == ""
-	nextRun := now.Add(oneTimeHorizon)
-	if !oneTime {
-		var err error
-		nextRun, err = NextRun(schedule.CronExpr, now)
-		if err != nil {
-			e.engineError(ctx, Fire{ScheduleID: schedule.ID, ScheduledAt: scheduledAt}, now, "calculate_next_run", err)
-			return
-		}
-	}
-
-	fire := Fire{
-		ID:            DeriveFireID(schedule.ID, scheduledAt),
-		ScheduleID:    schedule.ID,
-		ScheduledAt:   scheduledAt,
-		Status:        FirePending,
-		NextAttemptAt: scheduledAt,
-		Retry:         schedule.Retry,
-		JobType:       schedule.JobType,
-		Payload:       append([]byte(nil), schedule.Payload...),
-	}
-	created, err := e.store.CreateFire(ctx, FireCreation{
-		ScheduleID:   schedule.ID,
-		ExpectedNext: scheduledAt,
-		NextRun:      nextRun.UTC(),
-		Fire:         fire,
-	})
-	if err != nil {
-		e.engineError(ctx, fire, now, "create_fire", err)
-		return
-	}
-	if !created {
-		e.skip(ctx, fire, now, "materialization_conflict")
-		return
-	}
-
-	if oneTime {
-		if err := e.store.DisableSchedule(ctx, schedule.ID); err != nil {
-			e.engineError(ctx, fire, now, "disable_schedule", err)
-			return
-		}
-		e.observe(ctx, ObserverEvent{Kind: ObserverDisable, At: now, Fire: fire})
-	}
 }
 
 func (e *Engine) dispatchFire(ctx context.Context, fire Fire, now time.Time) {
@@ -327,7 +296,11 @@ func (e *Engine) dispatchFire(ctx context.Context, fire Fire, now time.Time) {
 		return
 	}
 
-	claimExpiresAt := now.Add(e.claimLease)
+	lease := e.claimLease
+	if lease <= e.fireTimeout {
+		lease = e.fireTimeout + time.Second
+	}
+	claimExpiresAt := now.Add(lease)
 	claimed, won, err := e.store.ClaimFire(ctx, FireClaim{
 		FireID:          fire.ID,
 		ExpectedStatus:  fire.Status,
@@ -336,6 +309,12 @@ func (e *Engine) dispatchFire(ctx context.Context, fire Fire, now time.Time) {
 		ClaimedAt:       now,
 		ClaimExpiresAt:  claimExpiresAt,
 	})
+	if errors.Is(err, ErrScheduleBusy) {
+		if overlapPolicy(fire.Overlap) == OverlapSkip {
+			e.transitionSkipped(context.WithoutCancel(ctx), fire, now, nil, "overlap_skip")
+		}
+		return
+	}
 	if err != nil {
 		e.engineError(ctx, fire, now, "claim_fire", err)
 		return
@@ -366,11 +345,25 @@ func (e *Engine) dispatchFire(ctx context.Context, fire Fire, now time.Time) {
 		FiredAt:     claimed.FiredAt,
 		Attempt:     claimed.Attempt,
 	}
-	enqueueErr := e.runner.Enqueue(ctx, job)
+	runCtx, cancel := context.WithTimeout(ctx, e.fireTimeout)
+	startedAt := e.clock.Now()
+	enqueueErr := e.runner.Enqueue(runCtx, job)
+	if runCtx.Err() == context.DeadlineExceeded {
+		enqueueErr = runCtx.Err()
+	}
+	cancel()
 	finishedAt := e.clock.Now().UTC()
+	duration := finishedAt.Sub(startedAt)
+	if duration < 0 {
+		duration = 0
+	}
+	lag := startedAt.Sub(claimed.ScheduledAt)
+	if lag < 0 {
+		lag = 0
+	}
 	persistCtx := context.WithoutCancel(ctx)
 	if enqueueErr == nil {
-		e.transitionSuccess(persistCtx, claimed, finishedAt)
+		e.transitionSuccessObserved(persistCtx, claimed, finishedAt, duration, lag)
 		return
 	}
 
@@ -381,10 +374,14 @@ func (e *Engine) dispatchFire(ctx context.Context, fire Fire, now time.Time) {
 
 	e.engineError(ctx, claimed, finishedAt, "enqueue", enqueueErr)
 	if claimed.Retry.Exhausted(claimed.Attempt) {
-		e.transitionExhausted(persistCtx, claimed, finishedAt, enqueueErr, "maximum_attempts_reached")
+		if outcome, committed := e.transitionExhausted(persistCtx, claimed, finishedAt, enqueueErr, "maximum_attempts_reached"); committed {
+			e.observe(persistCtx, ObserverEvent{Kind: ObserverFailure, At: finishedAt, Fire: outcome, Err: enqueueErr, Duration: duration, Lag: lag, Reason: outcome.Reason})
+		}
 		return
 	}
-	e.transitionRetry(persistCtx, claimed, finishedAt, enqueueErr)
+	if outcome, committed := e.transitionRetry(persistCtx, claimed, finishedAt, enqueueErr); committed {
+		e.observe(persistCtx, ObserverEvent{Kind: ObserverFailure, At: finishedAt, Fire: outcome, Err: enqueueErr, Duration: duration, Lag: lag, Reason: outcome.Reason})
+	}
 }
 
 func validateClaim(before, claimed Fire, claimedAt, claimExpiresAt time.Time, recovering bool) error {
@@ -416,22 +413,32 @@ func validateClaim(before, claimed Fire, claimedAt, claimExpiresAt time.Time, re
 	return nil
 }
 
-func (e *Engine) transitionSuccess(ctx context.Context, fire Fire, now time.Time) {
+func (e *Engine) transitionSuccessObserved(ctx context.Context, fire Fire, now time.Time, duration, lag time.Duration) {
 	if !e.transition(ctx, fire, now, FireSucceeded, time.Time{}, nil, "") {
 		return
 	}
+	fire.ClaimExpiresAt = time.Time{}
 	fire.Status = FireSucceeded
 	fire.NextAttemptAt = time.Time{}
 	fire.LastError = ""
 	e.bumpDispatches()
-	e.observe(ctx, ObserverEvent{Kind: ObserverSuccess, At: now, Fire: fire})
+	e.observe(ctx, ObserverEvent{Kind: ObserverSuccess, At: now, Fire: fire, Duration: duration, Lag: lag})
 }
 
-func (e *Engine) transitionRetry(ctx context.Context, fire Fire, now time.Time, attemptErr error) {
-	retryAt := now.Add(fire.Retry.Backoff.DelayAfter(fire.Attempt))
-	if !e.transition(ctx, fire, now, FireRetrying, retryAt, attemptErr, "dispatch_failed") {
-		return
+func (e *Engine) transitionRetry(ctx context.Context, fire Fire, now time.Time, attemptErr error) (Fire, bool) {
+	delay := fire.Retry.Backoff.DelayAfter(fire.Attempt)
+	jitter := e.jitter(fire.Retry.Backoff.Jitter)
+	if jitter > time.Duration(1<<63-1)-delay {
+		delay = time.Duration(1<<63 - 1)
+	} else {
+		delay += jitter
 	}
+	retryAt := now.Add(delay)
+	if !e.transition(ctx, fire, now, FireRetrying, retryAt, attemptErr, "dispatch_failed") {
+		return fire, false
+	}
+	fire.ClaimExpiresAt = time.Time{}
+	fire.Reason = "dispatch_failed"
 	fire.Status = FireRetrying
 	fire.NextAttemptAt = retryAt
 	fire.LastError = attemptErr.Error()
@@ -440,13 +447,17 @@ func (e *Engine) transitionRetry(ctx context.Context, fire Fire, now time.Time, 
 		Kind: ObserverRetry, At: now, Fire: fire, RetryAt: retryAt,
 		Reason: "dispatch_failed", Err: attemptErr,
 	})
+	return fire, true
 }
 
 func (e *Engine) transitionSkipped(ctx context.Context, fire Fire, now time.Time, attemptErr error, reason string) {
 	if !e.transition(ctx, fire, now, FireSkipped, time.Time{}, attemptErr, reason) {
 		return
 	}
+	fire.ClaimExpiresAt = time.Time{}
+	fire.LastError = ""
 	fire.Status = FireSkipped
+	fire.Reason = reason
 	fire.NextAttemptAt = time.Time{}
 	if attemptErr != nil {
 		fire.LastError = attemptErr.Error()
@@ -454,10 +465,13 @@ func (e *Engine) transitionSkipped(ctx context.Context, fire Fire, now time.Time
 	e.skip(ctx, fire, now, reason)
 }
 
-func (e *Engine) transitionExhausted(ctx context.Context, fire Fire, now time.Time, attemptErr error, reason string) {
+func (e *Engine) transitionExhausted(ctx context.Context, fire Fire, now time.Time, attemptErr error, reason string) (Fire, bool) {
 	if !e.transition(ctx, fire, now, FireExhausted, time.Time{}, attemptErr, reason) {
-		return
+		return fire, false
 	}
+	fire.ClaimExpiresAt = time.Time{}
+	fire.Reason = reason
+	fire.LastError = ""
 	fire.Status = FireExhausted
 	fire.NextAttemptAt = time.Time{}
 	if attemptErr != nil {
@@ -467,6 +481,7 @@ func (e *Engine) transitionExhausted(ctx context.Context, fire Fire, now time.Ti
 	e.observe(ctx, ObserverEvent{
 		Kind: ObserverExhaustion, At: now, Fire: fire, Reason: reason, Err: attemptErr,
 	})
+	return fire, true
 }
 
 func (e *Engine) transition(

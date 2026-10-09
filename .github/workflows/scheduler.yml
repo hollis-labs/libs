@@ -1,0 +1,69 @@
+# Native scheduler checks; the util workflow remains the full Linux module gate.
+name: scheduler
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "util/scheduler/**"
+      - "util/go.mod"
+      - "util/go.sum"
+      - ".github/workflows/scheduler.yml"
+  pull_request:
+    paths:
+      - "util/scheduler/**"
+      - "util/go.mod"
+      - "util/go.sum"
+      - ".github/workflows/scheduler.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduler-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scheduler:
+    name: scheduler (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            advisory: false
+          - os: macos-latest
+            advisory: false
+          - os: windows-latest
+            advisory: true
+    runs-on: ${{ matrix.os }}
+    # Windows results stay visible while native Windows support is evaluated.
+    continue-on-error: ${{ matrix.advisory }}
+    timeout-minutes: 20
+    env:
+      GOWORK: "off"
+    defaults:
+      run:
+        working-directory: util
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: util/go.mod
+          cache-dependency-path: |
+            util/go.mod
+            util/go.sum
+      - name: format
+        run: |
+          unformatted="$(gofmt -l scheduler)"
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: vet
+        run: go vet ./scheduler/...
+      - name: build
+        run: go build ./scheduler/...
+      - name: native race tests and store conformance
+        run: go test -race -count=1 ./scheduler/...

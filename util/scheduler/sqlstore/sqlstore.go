@@ -80,18 +80,42 @@ func splitStatements(script string) []string {
 
 // Store implements scheduler.Store over a *sql.DB.
 type Store struct {
-	db *sql.DB
+	db          *sql.DB
+	busyTimeout time.Duration
 }
 
 var _ scheduler.Store = (*Store)(nil)
 
 // New returns a Store over db. It does not apply the schema; call Migrate
 // first or manage the DDL from Schema yourself.
-func New(db *sql.DB) (*Store, error) {
+func New(db *sql.DB, options ...Option) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("sqlstore: nil database")
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db, busyTimeout: DefaultBusyTimeout}
+	for _, option := range options {
+		if option != nil {
+			option(s)
+		}
+	}
+	if s.busyTimeout < 0 {
+		return nil, errors.New("sqlstore: negative busy timeout")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	conn, err := s.connection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close() }()
+	var mode string
+	if err := conn.QueryRowContext(ctx, "PRAGMA journal_mode=WAL").Scan(&mode); err != nil {
+		return nil, err
+	}
+	if mode != "wal" && mode != "memory" {
+		return nil, fmt.Errorf("sqlstore: WAL unavailable: %s", mode)
+	}
+	return s, nil
 }
 
 // DB returns the underlying database handle.
@@ -110,19 +134,34 @@ func parseTime(s string) (time.Time, error) {
 // CreateSchedule inserts a schedule. The engine never creates schedules; this
 // is the application-facing seed operation. It fails if the ID already exists.
 func (s *Store) CreateSchedule(ctx context.Context, sch scheduler.Schedule) error {
+	if err := scheduler.ValidateSchedule(sch); err != nil {
+		return err
+	}
+	if err := scheduler.ValidatePolicies(sch); err != nil {
+		return err
+	}
 	retry, err := json.Marshal(sch.Retry)
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO gosched_schedules
-(id, cron_expr, last_run, next_run, enabled, job_type, payload, retry_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		sch.ID, sch.CronExpr, formatTime(sch.LastRun), formatTime(sch.NextRun),
-		boolInt(sch.Enabled), sch.JobType, sch.Payload, string(retry))
+	options, err := json.Marshal(scheduleOptionsFrom(sch))
 	if err != nil {
+		return err
+	}
+	tx, done, err := s.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	if _, err = tx.ExecContext(ctx, `INSERT INTO gosched_schedules
+(id, cron_expr, last_run, next_run, enabled, job_type, payload, retry_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, sch.ID, sch.CronExpr, formatTime(sch.LastRun), formatTime(sch.NextRun), boolInt(sch.Enabled), sch.JobType, sch.Payload, string(retry)); err != nil {
 		return fmt.Errorf("sqlstore: create schedule %q: %w", sch.ID, err)
 	}
-	return nil
+	if _, err = tx.ExecContext(ctx, `INSERT INTO gosched_schedule_options(schedule_id, options_json) VALUES(?,?)`, sch.ID, string(options)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // GetSchedule returns the schedule with the given ID, and false if absent.
@@ -150,11 +189,21 @@ func (s *Store) ListSchedules(ctx context.Context) ([]scheduler.Schedule, error)
 // DeleteSchedule removes a schedule. Fires already materialized are kept so
 // their stable IDs continue to deduplicate. Deleting a missing ID is a no-op.
 func (s *Store) DeleteSchedule(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM gosched_schedules WHERE id = ?`, id)
-	return err
+	tx, done, err := s.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	if _, err = tx.ExecContext(ctx, `DELETE FROM gosched_schedules WHERE id = ?`, id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM gosched_schedule_options WHERE schedule_id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-const scheduleSelect = `SELECT id, cron_expr, last_run, next_run, enabled, job_type, payload, retry_json FROM gosched_schedules`
+const scheduleSelect = `SELECT id, cron_expr, last_run, next_run, enabled, job_type, payload, retry_json, COALESCE((SELECT options_json FROM gosched_schedule_options WHERE schedule_id=gosched_schedules.id), '{}') FROM gosched_schedules`
 
 // ListDueSchedules returns up to limit enabled schedules whose NextRun is set
 // and at or before now, ordered by NextRun then ID.
@@ -173,9 +222,9 @@ func scanSchedules(rows *sql.Rows) ([]scheduler.Schedule, error) {
 	var out []scheduler.Schedule
 	for rows.Next() {
 		var sch scheduler.Schedule
-		var last, next, retry string
+		var last, next, retry, options string
 		var enabled int
-		if err := rows.Scan(&sch.ID, &sch.CronExpr, &last, &next, &enabled, &sch.JobType, &sch.Payload, &retry); err != nil {
+		if err := rows.Scan(&sch.ID, &sch.CronExpr, &last, &next, &enabled, &sch.JobType, &sch.Payload, &retry, &options); err != nil {
 			return nil, err
 		}
 		var err error
@@ -189,6 +238,11 @@ func scanSchedules(rows *sql.Rows) ([]scheduler.Schedule, error) {
 		if err := json.Unmarshal([]byte(retry), &sch.Retry); err != nil {
 			return nil, err
 		}
+		var opts scheduleOptions
+		if err := json.Unmarshal([]byte(options), &opts); err != nil {
+			return nil, err
+		}
+		opts.apply(&sch)
 		out = append(out, sch)
 	}
 	return out, rows.Err()
@@ -204,12 +258,33 @@ func (s *Store) CreateFire(ctx context.Context, creation scheduler.FireCreation)
 	if err != nil {
 		return false, err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, done, err := s.begin(ctx)
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer done()
 
+	// Acquire a write reservation before reading the permanent prune fence.
+	if _, err = tx.ExecContext(ctx, `UPDATE gosched_schedules SET next_run=next_run WHERE 0`); err != nil {
+		return false, err
+	}
+	pruned, err := isPrunedOccurrence(ctx, tx, creation)
+	if err != nil || pruned {
+		return false, err
+	}
+	if creation.Fire.Overlap == scheduler.OverlapQueue && creation.Fire.Status == scheduler.FirePending {
+		limit := creation.Fire.MaxQueuedFires
+		if limit == 0 {
+			limit = scheduler.DefaultMaxQueuedFires
+		}
+		var queued int
+		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM gosched_fires WHERE schedule_id=? AND status IN ('pending','retrying')`, creation.ScheduleID).Scan(&queued); err != nil {
+			return false, err
+		}
+		if queued >= limit {
+			return false, scheduler.ErrQueueFull
+		}
+	}
 	res, err := tx.ExecContext(ctx, `UPDATE gosched_schedules SET last_run = ?, next_run = ?
 WHERE id = ? AND enabled = 1 AND next_run = ?`,
 		formatTime(creation.Fire.ScheduledAt), formatTime(creation.NextRun),
@@ -233,13 +308,20 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
 	if n, rerr := res.RowsAffected(); rerr != nil || n != 1 {
 		return false, rerr // duplicate ID: rollback restores the schedule
 	}
+	options, err := json.Marshal(fireOptionsFrom(creation.Fire))
+	if err != nil {
+		return false, err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO gosched_fire_options(fire_id,options_json) VALUES(?,?)`, creation.Fire.ID, string(options)); err != nil {
+		return false, err
+	}
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-const fireColumns = `id, schedule_id, scheduled_at, fired_at, claim_expires_at, attempt, status, next_attempt_at, last_error, retry_json, job_type, payload`
+const fireColumns = `id, schedule_id, scheduled_at, fired_at, claim_expires_at, attempt, status, next_attempt_at, last_error, retry_json, job_type, payload, COALESCE((SELECT options_json FROM gosched_fire_options WHERE fire_id=gosched_fires.id), '{}')`
 
 // GetFire returns one fire by ID, and false if absent. It is not part of
 // scheduler.Store; it exists for inspection and tests.
@@ -261,10 +343,14 @@ func (s *Store) GetFire(ctx context.Context, id string) (scheduler.Fire, bool, e
 func (s *Store) ListDueFires(ctx context.Context, now time.Time, limit int) ([]scheduler.Fire, error) {
 	ts := formatTime(now)
 	rows, err := s.db.QueryContext(ctx, `SELECT `+fireColumns+` FROM gosched_fires
-WHERE (status IN (?, ?) AND next_attempt_at <= ?) OR (status = ? AND claim_expires_at <= ?)
+WHERE ((status IN (?, ?) AND next_attempt_at <= ?) OR (status = ? AND claim_expires_at <= ?))
+AND NOT (
+ COALESCE((SELECT json_extract(options_json,'$.Overlap') FROM gosched_fire_options WHERE fire_id=gosched_fires.id),'')='queue'
+ AND EXISTS(SELECT 1 FROM gosched_fires active WHERE active.schedule_id=gosched_fires.schedule_id AND active.id<>gosched_fires.id AND active.status='claimed' AND active.claim_expires_at>?)
+)
 ORDER BY CASE status WHEN ? THEN claim_expires_at ELSE next_attempt_at END, id LIMIT ?`,
 		string(scheduler.FirePending), string(scheduler.FireRetrying), ts,
-		string(scheduler.FireClaimed), ts, string(scheduler.FireClaimed), limit)
+		string(scheduler.FireClaimed), ts, ts, string(scheduler.FireClaimed), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -284,8 +370,8 @@ type rowScanner interface{ Scan(dest ...any) error }
 
 func scanFire(r rowScanner) (scheduler.Fire, error) {
 	var f scheduler.Fire
-	var scheduled, fired, expires, next, retry, status string
-	if err := r.Scan(&f.ID, &f.ScheduleID, &scheduled, &fired, &expires, &f.Attempt, &status, &next, &f.LastError, &retry, &f.JobType, &f.Payload); err != nil {
+	var scheduled, fired, expires, next, retry, status, options string
+	if err := r.Scan(&f.ID, &f.ScheduleID, &scheduled, &fired, &expires, &f.Attempt, &status, &next, &f.LastError, &retry, &f.JobType, &f.Payload, &options); err != nil {
 		return scheduler.Fire{}, err
 	}
 	f.Status = scheduler.FireStatus(status)
@@ -305,6 +391,11 @@ func scanFire(r rowScanner) (scheduler.Fire, error) {
 	if err := json.Unmarshal([]byte(retry), &f.Retry); err != nil {
 		return scheduler.Fire{}, err
 	}
+	var opts fireOptions
+	if err := json.Unmarshal([]byte(options), &opts); err != nil {
+		return scheduler.Fire{}, err
+	}
+	opts.apply(&f)
 	return f, nil
 }
 
@@ -314,6 +405,33 @@ func scanFire(r rowScanner) (scheduler.Fire, error) {
 // write are one statement, two racing claimants cannot both succeed, and a
 // stale ExpectedFiredAt is rejected by the database itself.
 func (s *Store) ClaimFire(ctx context.Context, claim scheduler.FireClaim) (scheduler.Fire, bool, error) {
+	tx, done, err := s.begin(ctx)
+	if err != nil {
+		return scheduler.Fire{}, false, err
+	}
+	defer done()
+	if _, err = tx.ExecContext(ctx, `UPDATE gosched_fires SET attempt=attempt WHERE 0`); err != nil {
+		return scheduler.Fire{}, false, err
+	}
+	before, err := scanFire(tx.QueryRowContext(ctx, `SELECT `+fireColumns+` FROM gosched_fires WHERE id=?`, claim.FireID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return scheduler.Fire{}, false, nil
+	}
+	if err != nil {
+		return scheduler.Fire{}, false, err
+	}
+	if before.Status != claim.ExpectedStatus || before.Attempt != claim.ExpectedAttempt || !before.FiredAt.Equal(claim.ExpectedFiredAt) {
+		return scheduler.Fire{}, false, nil
+	}
+	if before.Overlap != scheduler.OverlapAllow {
+		var active int
+		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM gosched_fires WHERE schedule_id=? AND id<>? AND status='claimed' AND claim_expires_at>?`, before.ScheduleID, before.ID, formatTime(claim.ClaimedAt)).Scan(&active); err != nil {
+			return scheduler.Fire{}, false, err
+		}
+		if active > 0 {
+			return scheduler.Fire{}, false, scheduler.ErrScheduleBusy
+		}
+	}
 	var query string
 	args := []any{
 		string(scheduler.FireClaimed), formatTime(claim.ClaimedAt), formatTime(claim.ClaimExpiresAt),
@@ -331,11 +449,14 @@ WHERE id = ? AND status = ? AND attempt = ? AND fired_at = ? AND claim_expires_a
 	default:
 		return scheduler.Fire{}, false, nil
 	}
-	fire, err := scanFire(s.db.QueryRowContext(ctx, query, args...))
+	fire, err := scanFire(tx.QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return scheduler.Fire{}, false, nil
 	}
 	if err != nil {
+		return scheduler.Fire{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
 		return scheduler.Fire{}, false, err
 	}
 	return fire, true, nil
@@ -345,7 +466,12 @@ WHERE id = ? AND status = ? AND attempt = ? AND fired_at = ? AND claim_expires_a
 // (matched against the stored FiredAt) still hold. Every success clears the
 // stored lease. The Reason field has no column: Fire carries no reason.
 func (s *Store) TransitionFire(ctx context.Context, tr scheduler.FireTransition) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE gosched_fires
+	tx, done, err := s.begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer done()
+	res, err := tx.ExecContext(ctx, `UPDATE gosched_fires
 SET status = ?, next_attempt_at = ?, last_error = ?, claim_expires_at = ?
 WHERE id = ? AND status = ? AND attempt = ? AND fired_at = ?`,
 		string(tr.To), formatTime(tr.NextAttemptAt), tr.Error, zeroTime,
@@ -354,13 +480,22 @@ WHERE id = ? AND status = ? AND attempt = ? AND fired_at = ?`,
 		return false, err
 	}
 	n, err := res.RowsAffected()
-	return n == 1, err
+	if err != nil || n != 1 {
+		return false, err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO gosched_fire_options(fire_id,options_json) VALUES(?,json_object('Reason',?)) ON CONFLICT(fire_id) DO UPDATE SET options_json=CASE WHEN ?='' THEN options_json ELSE json_set(options_json,'$.Reason',?) END`, tr.FireID, tr.Reason, tr.Reason, tr.Reason); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // DisableSchedule marks a schedule disabled. It returns an error if the
 // schedule does not exist. Disabling an already-disabled schedule succeeds.
 func (s *Store) DisableSchedule(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE gosched_schedules SET enabled = 0 WHERE id = ?`, id)
+	res, err := s.exec(ctx, `UPDATE gosched_schedules SET enabled = 0 WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}

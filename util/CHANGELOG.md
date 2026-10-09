@@ -8,6 +8,26 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.4.0 — 2026-10-09
+
+### Added
+
+- Scheduler hardening: durable terminal-fire pruning with non-recreatable
+  occurrence identities, per-schedule time zones, anchored intervals and jitter,
+  bounded overlap/concurrent dispatch and misfire/catch-up policies, and SQLite
+  connection defaults and contention coverage.
+- Dependency-free scheduler metrics observations and standard-library slog
+  adapters. Observer duration is enqueue latency, not job execution time;
+  failures count only after their durable retry/exhaustion outcome commits.
+- Native scheduler CI on Linux and macOS, plus a visible advisory Windows job;
+  a proposed scheduler v1 freeze checklist coordinated with the util module.
+
+### Changed
+
+- Custom scheduler Store implementations must add pruning and preserve the
+  documented policy/claim/identity semantics. See scheduler/MIGRATION.md;
+  scheduler conformance now verifies the hardening contracts.
+
 ## v0.2.1 — 2026-10-09
 
 ### Security

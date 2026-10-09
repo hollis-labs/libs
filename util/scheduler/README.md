@@ -10,18 +10,19 @@ semantics, event names, activation policy, persistence schemas, and execution.
 
 ## Status
 
-Pre-1.0. Version `v0.2.0` is a breaking `Store` migration from the
-schedule-row-only v0.1 contract to durable schedule plus fire contracts. The
-common constructor remains source-compatible as `New(store, runner)` and keeps
-the v0.1 polling defaults. See [MIGRATION.md](MIGRATION.md) for the exact store
-contract and downstream migration checklist, and pin `v0.2.0` in `go.mod`.
+The package is part of the pre-1 `github.com/hollis-labs/libs/util` module.
+The hardening release is `util/v0.4.0`; there is no separately versioned
+scheduler module. Custom stores must implement the updated persistence and
+pruning contracts before upgrading. See [MIGRATION.md](MIGRATION.md),
+[observation adapters](OBSERVABILITY.md), and the [v1 freeze plan](API_FREEZE.md).
+The historical standalone release notes remain in `CHANGELOG.md`.
 
 Documentation: [pkg.go.dev/github.com/hollis-labs/libs/util/scheduler](https://pkg.go.dev/github.com/hollis-labs/libs/util/scheduler).
 
 ## Install
 
 ```bash
-go get github.com/hollis-labs/libs/util/scheduler
+go get github.com/hollis-labs/libs/util/scheduler@v0.4.0
 ```
 
 ## Usage
@@ -95,6 +96,70 @@ func main() {
 }
 ```
 
+## Timing and bounded dispatch
+
+Set `Schedule.Location` to an IANA time zone for wall-clock cron schedules;
+the library embeds tzdata, so named zones do not depend on the host's zoneinfo
+installation. The ambient `Local` location is refused; use UTC or a named IANA
+zone. Use `ValidateSchedule` and `NextRunForSchedule` for the descriptor,
+including its zone and interval settings. A conflicting expression `CRON_TZ`
+or `TZ` and `Location` is refused. A missing spring-forward wall time is skipped;
+the repeated backward wall-clock span is not replayed, using persisted LastRun.
+Custom stores must retain that field across restarts.
+
+`Schedule.Interval` or an `@every` expression describes a fixed interval.
+`Anchor` fixes its phase (Unix epoch when omitted). `Jitter` adds a bounded
+nonnegative dispatch delay without changing the nominal occurrence or FireID;
+retry backoff has a separate jitter setting. For deterministic tests, inject
+`WithRandomSource` together with the clock. Do not set both Interval and
+CronExpr. The descriptor helper supports
+subsecond `@every` periods and anchored phase; the historical standalone
+`NextRun`/`ValidateCron` helpers still use robfig's relative, second-rounded
+`@every` semantics.
+
+The default worker bound is four Enqueue calls (`WithConcurrency`), with a
+cooperative thirty-second per-call deadline (`WithFireTimeout`). The effective
+claim lease is at least that timeout plus one second. A runner must honor its
+context; a deadline cannot terminate arbitrary application work. `Stop` waits
+for admitted calls to return. `TickNow` waits for work admitted by its own tick;
+the background loop uses bounded available capacity rather than an unbounded
+growing goroutine queue.
+
+Schedule overlap policies are `skip` (zero/default), `queue`, and `allow`.
+Non-allow stores must reject an overlapping unexpired schedule claim atomically
+with `ErrScheduleBusy`, across engine instances. Queued occurrences remain
+pending while an earlier claim is active. For the queue policy, `MaxQueuedFires`
+bounds pending/retrying occurrences (default 100); excess pending creations are
+refused with `ErrQueueFull`. The engine records that occurrence as skipped with
+`queue_full` through the original schedule compare-and-swap. This is attempt-dispatch overlap, not a guarantee about jobs already
+running in an external queue after Enqueue returns.
+
+Misfire policies are `skip`, `run_once` (zero/default), and `run_all`.
+`MisfireGrace` defaults to one minute. `run_once` coalesces missed occurrences;
+`run_all` materializes bounded catch-up (`MaxCatchUp`, default 100, also limited
+by the due batch). Excess history is recorded as a bounded coalesced span rather
+than an unbounded loop. See [dispatch and misfires](docs/dispatch-and-misfires.md)
+for durable reasons and policy details, and
+[run history and cancellation](docs/run-history-and-cancellation.md) for what
+stays application-owned.
+
+## Retention
+
+`Store.Prune(ctx, olderThan)` is explicit, returning the number removed.
+`Schedule.KeepLastN` protects the newest terminal records per schedule.
+Only terminal records whose ScheduledAt is strictly older than the cutoff
+are eligible; zero KeepLastN retains none beyond that cutoff. Pending,
+retrying and claimed records retain their obligations. No automatic TTL or
+background deletion is enabled by constructing the engine.
+
+A custom store must preserve a durable high-water/tombstone fence so removing a
+terminal row cannot recreate its occurrence's FireID. The reference SQLite
+store keeps a permanent per-schedule through-time fence; it also refuses older
+occurrences at or below that fence even after a schedule is replaced. The
+fence itself is not pruned. The store updates it within its pruning transaction;
+retention is a contract, not just deleting old rows. Run the portable conformance
+suite before adopting.
+
 ## Stable Fire Identity
 
 A schedule occurrence is identified by:
@@ -134,6 +199,8 @@ atomic behavior without prescribing tables or fields:
   before recording `retrying`, `succeeded`, `skipped`, or `exhausted`.
 - `DisableSchedule` disables a one-time schedule after its durable fire is
   materialized. The fire remains dispatchable.
+- `Prune` removes eligible terminal records while durably refusing recreation
+  of pruned occurrences; active obligations are preserved.
 
 Both materialization uniqueness and per-attempt claims are compare-and-swap
 boundaries. Two engines may list the same due records, but only one can create a
@@ -146,9 +213,11 @@ given fire and only one can dispatch a given attempt.
 `github.com/hollis-labs/libs/util/scheduler/sqlstore` implements `Store` over a small
 schema of its own (`gosched_schedules`, `gosched_fires`). It is for new
 adopters; applications with existing tables keep them and use `conformance`
-below instead. You open the `*sql.DB` with any SQLite driver, apply the schema
+below instead. You open the `*sql.DB` with a compatible SQLite driver, apply the schema
 with `Migrate` (or read the DDL from `Schema()`), and hand the store to the
-engine:
+engine. `New` selects WAL for a file database and applies a five-second
+busy timeout to each acquired write connection; `WithBusyTimeout` overrides
+that timeout. Pure in-memory databases retain SQLite's in-memory journal mode.
 
 ```go
 db, _ := sql.Open("sqlite", "file:sched.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
@@ -161,10 +230,11 @@ _ = store.CreateSchedule(ctx, scheduler.Schedule{
 engine := scheduler.New(store, runner)
 ```
 
-Each compare-and-swap is one SQL statement whose `WHERE` clause carries every
-precondition, including `ExpectedFiredAt` on `ClaimFire` and `ClaimedAt` on
-`TransitionFire`, so a stale owner loses inside the database rather than
-depending on a lock held by the caller. `ClaimFire` uses `UPDATE ... RETURNING`
+Compare-and-swap checks and policy metadata updates share a write transaction.
+Claim and transition SQL predicates carry their epoch preconditions, including
+`ExpectedFiredAt` on `ClaimFire` and `ClaimedAt` on `TransitionFire`, so a stale
+owner loses inside the database rather than depending on a caller-held lock.
+`ClaimFire` uses `UPDATE ... RETURNING`
 (SQLite 3.35 or newer). Timestamps are stored as fixed-width UTC text with
 nanosecond precision.
 
@@ -247,16 +317,22 @@ An optional `Observer` receives application-neutral events for:
 - `exhaustion`
 - `disable`
 - `engine_error`
+- `failure` (failed enqueue after its durable retry/exhaustion outcome)
+- `misfire` (committed policy decision)
 
 `ObserverEvent` supplies the current fire plus generic time, reason, operation,
 retry time, and error context where relevant. It does not define application
 event names or a persistence schema. Observer callbacks run synchronously, but
 returned errors and panics are isolated: they increment
 `Status.ObserverErrors` and do not alter claims, transitions, or dispatch
-outcomes.
+outcomes. `ObserverEvent.Duration` measures the Enqueue call, `Lag` is the
+nonnegative delay from occurrence to Enqueue start, and `MisfireCount` describes
+the bounded committed decision. Metrics and standard-library slog adapters are
+available; see [OBSERVABILITY.md](OBSERVABILITY.md).
 
 Ordering is deterministic for a claimed attempt: `claim`, `fire`, then either
-`success`; `skip`; or `engine_error` followed by `retry`/`exhaustion`. A
+`success`; `skip`; or `engine_error` followed by `retry`/`exhaustion` and committed
+`failure`. A
 one-time schedule's `disable` event occurs after materialization and before its
 claim events. An expired-claim recovery emits another `claim`/`fire` pair for
 the redelivery, with `Reason == "expired_claim_recovery"` on `claim`.
@@ -294,10 +370,9 @@ Existing runners may continue reading `Job.RunID` during migration, but should
 switch deduplication to `Job.FireID`. Unlike v0.1, `ErrDuplicateJob` terminates
 the fire as `skipped` instead of requeuing it indefinitely.
 
-The remote `v0.1.1` tag contains an earlier draft of the breaking durable-fire
-contract. It remains immutable but was never promoted as the supported GitHub
-Release. Use `v0.2.0`, which adds restart-safe leased claims and stale-owner
-fencing. See [MIGRATION.md](MIGRATION.md).
+The former standalone `v0.1.1` tag contains an earlier durable-fire draft and
+remains immutable. Its successor was standalone `v0.2.0`; current consumers
+use the util module version above. See [MIGRATION.md](MIGRATION.md).
 
 ## Dependencies
 
@@ -322,10 +397,11 @@ and race two engines over one database file.
 
 ## Compatibility
 
-This module is pre-1.0: minor releases may break the exported API, as v0.2.0
-did for `Store`. Pin an exact version and read [CHANGELOG.md](CHANGELOG.md)
-before upgrading. Additions such as `sqlstore` and `conformance` do not change
-the engine or `Store` contract. It needs Go 1.26.6 or newer (the `go` line of
+The util module is pre-1.0: minor releases may break the exported API.
+Pin an exact util version and read [the module changelog](../CHANGELOG.md)
+before upgrading. The package changelog records the former standalone history.
+The v0.4 hardening includes required Store pruning behavior; custom adapters
+must migrate and pass conformance. It needs Go 1.26.6 or newer (the `go` line of
 `go.mod`).
 
 ## Out of scope
@@ -346,7 +422,10 @@ go vet ./...
 go test -race -count=1 ./...
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+The repository's util workflow is the full Linux module gate. The dedicated
+scheduler workflow also runs native scheduler/store-conformance race checks on
+Linux and macOS, with a visible advisory Windows job. Windows support remains
+under evaluation; an advisory result does not certify it.
 
 ## License
 

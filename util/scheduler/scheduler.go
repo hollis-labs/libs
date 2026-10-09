@@ -19,14 +19,24 @@ import (
 // A Schedule with an empty CronExpr is a one-time schedule. JobType and
 // Payload are opaque to the engine and are copied to each materialized Fire.
 type Schedule struct {
-	ID       string    // stable schedule identifier
-	CronExpr string    // standard 5-field cron expression; empty means one-time
-	LastRun  time.Time // last scheduled fire time; zero means never run
-	NextRun  time.Time // next scheduled fire time; zero means unscheduled
-	Enabled  bool      // disabled schedules should be excluded by the Store
-	JobType  string    // opaque job-type tag, copied to Fire and Job
-	Payload  []byte    // opaque job payload, copied to Fire and Job
-	Retry    RetryPolicy
+	ID             string    // stable schedule identifier
+	CronExpr       string    // standard 5-field cron expression; empty means one-time
+	LastRun        time.Time // last scheduled fire time; zero means never run
+	NextRun        time.Time // next scheduled fire time; zero means unscheduled
+	Enabled        bool      // disabled schedules should be excluded by the Store
+	JobType        string    // opaque job-type tag, copied to Fire and Job
+	Payload        []byte    // opaque job payload, copied to Fire and Job
+	Retry          RetryPolicy
+	Location       string        // IANA zone for cron; empty preserves expression/default zone
+	Interval       time.Duration // fixed period; zero selects cron or one-time
+	Anchor         time.Time     // interval phase; zero means Unix epoch (UTC)
+	Jitter         time.Duration // maximum nonnegative activation delay
+	KeepLastN      int           // minimum newest terminal fires to retain; zero keeps none
+	Overlap        OverlapPolicy
+	Misfire        MisfirePolicy
+	MisfireGrace   time.Duration
+	MaxCatchUp     int
+	MaxQueuedFires int
 }
 
 // BackoffStrategy identifies an application-neutral retry delay algorithm.
@@ -50,12 +60,16 @@ type BackoffPolicy struct {
 	Strategy     BackoffStrategy `json:"strategy"`
 	InitialDelay time.Duration   `json:"initial_delay"`
 	MaxDelay     time.Duration   `json:"max_delay"`
+	Jitter       time.Duration   `json:"jitter,omitempty"`
 }
 
 // Validate reports invalid delay values or an unknown strategy.
 func (p BackoffPolicy) Validate() error {
 	if p.InitialDelay < 0 {
 		return fmt.Errorf("%w: initial delay must not be negative", ErrInvalidRetryPolicy)
+	}
+	if p.Jitter < 0 {
+		return fmt.Errorf("%w: jitter must not be negative", ErrInvalidRetryPolicy)
 	}
 	if p.MaxDelay < 0 {
 		return fmt.Errorf("%w: maximum delay must not be negative", ErrInvalidRetryPolicy)
@@ -158,18 +172,22 @@ const (
 // same Attempt but replaces FiredAt, fencing the stale owner. Pending fires
 // therefore begin at attempt zero.
 type Fire struct {
-	ID             string      `json:"id"`
-	ScheduleID     string      `json:"schedule_id"`
-	ScheduledAt    time.Time   `json:"scheduled_at"`
-	FiredAt        time.Time   `json:"fired_at"`
-	ClaimExpiresAt time.Time   `json:"claim_expires_at"`
-	Attempt        int         `json:"attempt"`
-	Status         FireStatus  `json:"status"`
-	NextAttemptAt  time.Time   `json:"next_attempt_at"`
-	LastError      string      `json:"last_error,omitempty"`
-	Retry          RetryPolicy `json:"retry"`
-	JobType        string      `json:"job_type"`
-	Payload        []byte      `json:"payload"`
+	Overlap          OverlapPolicy `json:"overlap"`
+	MaxQueuedFires   int           `json:"max_queued_fires"`
+	Reason           string        `json:"reason,omitempty"`
+	CoalescedThrough time.Time     `json:"coalesced_through,omitempty"`
+	ID               string        `json:"id"`
+	ScheduleID       string        `json:"schedule_id"`
+	ScheduledAt      time.Time     `json:"scheduled_at"`
+	FiredAt          time.Time     `json:"fired_at"`
+	ClaimExpiresAt   time.Time     `json:"claim_expires_at"`
+	Attempt          int           `json:"attempt"`
+	Status           FireStatus    `json:"status"`
+	NextAttemptAt    time.Time     `json:"next_attempt_at"`
+	LastError        string        `json:"last_error,omitempty"`
+	Retry            RetryPolicy   `json:"retry"`
+	JobType          string        `json:"job_type"`
+	Payload          []byte        `json:"payload"`
 }
 
 // DeriveFireID returns the stable identity for a schedule occurrence. Only
@@ -229,17 +247,29 @@ type FireTransition struct {
 // own schedule and fire records while preserving the documented atomicity.
 // Persistence schemas remain application-owned.
 type Store interface {
+	// Prune removes terminal fires scheduled strictly before olderThan, except
+	// the newest KeepLastN terminal fires per schedule. Nonterminal fires survive.
+	// A durable per-schedule high-water fence must prevent recreation even after
+	// deleting and recreating the schedule. Returns the number of removed fires.
+	Prune(ctx context.Context, olderThan time.Time) (int, error)
+
 	// ListDueSchedules returns up to limit enabled schedules whose NextRun is
 	// at or before now.
 	ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]Schedule, error)
 
 	// CreateFire atomically materializes a unique Fire and advances its
 	// schedule if the schedule's next-run still equals ExpectedNext.
+	// A pending OverlapQueue fire exceeding MaxQueuedFires returns false and
+	// ErrQueueFull without inserting or advancing. The engine may then CAS the
+	// same occurrence as FireSkipped with Reason queue_full; terminal creation
+	// bypasses the queue cap.
 	CreateFire(ctx context.Context, creation FireCreation) (bool, error)
 
 	// ListDueFires returns up to limit pending or retrying fires whose
 	// NextAttemptAt is at or before now, plus claimed fires whose claim lease
-	// has expired. Terminal fires and unexpired claims are not due.
+	// has expired. Terminal fires and unexpired claims are not due. Queued
+	// siblings behind another unexpired same-schedule claim must not consume
+	// the due batch.
 	ListDueFires(ctx context.Context, now time.Time, limit int) ([]Fire, error)
 
 	// ClaimFire performs the compare-and-swap described by FireClaim. For a
@@ -248,7 +278,9 @@ type Store interface {
 	// this redelivers the ambiguous attempt after a process crash without
 	// consuming another application-level retry. It must also verify that the
 	// stored lease is expired at claim. ExpectedFiredAt prevents a stale owner
-	// from winning after the lease has been replaced.
+	// from winning after the lease has been replaced. Unless OverlapAllow is
+	// set, an unexpired same-schedule sibling claim returns ErrScheduleBusy
+	// without changing either claim.
 	ClaimFire(ctx context.Context, claim FireClaim) (Fire, bool, error)
 
 	// TransitionFire atomically applies an attempt result if Attempt, From, and
@@ -297,19 +329,24 @@ const (
 	ObserverExhaustion  ObserverEventKind = "exhaustion"
 	ObserverDisable     ObserverEventKind = "disable"
 	ObserverEngineError ObserverEventKind = "engine_error"
+	ObserverFailure     ObserverEventKind = "failure"
+	ObserverMisfire     ObserverEventKind = "misfire"
 )
 
 // ObserverEvent is emitted after durable state changes, except ObserverFire,
 // which is emitted immediately before Runner.Enqueue. Err is provided for
 // in-process telemetry only and is not a persistence schema.
 type ObserverEvent struct {
-	Kind      ObserverEventKind
-	At        time.Time
-	Fire      Fire
-	RetryAt   time.Time
-	Reason    string
-	Operation string
-	Err       error
+	Kind         ObserverEventKind
+	Duration     time.Duration // elapsed Runner.Enqueue call, not job lifecycle
+	Lag          time.Duration // nonnegative dispatch start minus scheduled occurrence
+	MisfireCount int           // bounded occurrences in the committed materialization decision
+	At           time.Time
+	Fire         Fire
+	RetryAt      time.Time
+	Reason       string
+	Operation    string
+	Err          error
 }
 
 // Observer receives application-neutral lifecycle events. Observer failures

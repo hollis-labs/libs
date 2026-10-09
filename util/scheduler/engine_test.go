@@ -15,6 +15,7 @@ type fakeStore struct {
 
 	schedules map[string]Schedule
 	fires     map[string]Fire
+	pruned    map[string]time.Time
 
 	createCount              int
 	claimCount               int
@@ -84,8 +85,24 @@ func (f *fakeStore) CreateFire(_ context.Context, creation FireCreation) (bool, 
 	if !ok || !schedule.Enabled || !schedule.NextRun.Equal(creation.ExpectedNext) {
 		return false, nil
 	}
+	if through, ok := f.pruned[creation.ScheduleID]; ok && !creation.Fire.ScheduledAt.After(through) {
+		return false, nil
+	}
 	if _, exists := f.fires[creation.Fire.ID]; exists {
 		return false, nil
+	}
+	count := 0
+	for _, existing := range f.fires {
+		if existing.ScheduleID == creation.ScheduleID && (existing.Status == FirePending || existing.Status == FireRetrying) {
+			count++
+		}
+	}
+	limit := creation.Fire.MaxQueuedFires
+	if limit == 0 {
+		limit = 100
+	}
+	if creation.Fire.Overlap == OverlapQueue && creation.Fire.Status == FirePending && count >= limit {
+		return false, ErrQueueFull
 	}
 	fire := creation.Fire
 	fire.Payload = append([]byte(nil), creation.Fire.Payload...)
@@ -104,6 +121,18 @@ func (f *fakeStore) ListDueFires(_ context.Context, now time.Time, limit int) ([
 	for _, fire := range f.fires {
 		attemptDue := (fire.Status == FirePending || fire.Status == FireRetrying) && !fire.NextAttemptAt.After(now)
 		claimExpired := fire.Status == FireClaimed && !fire.ClaimExpiresAt.After(now)
+		if fire.Overlap == OverlapQueue {
+			blocked := false
+			for _, sibling := range f.fires {
+				if sibling.ID != fire.ID && sibling.ScheduleID == fire.ScheduleID && sibling.Status == FireClaimed && sibling.ClaimExpiresAt.After(now) {
+					blocked = true
+					break
+				}
+			}
+			if blocked {
+				continue
+			}
+		}
 		if attemptDue || claimExpired {
 			fire.Payload = append([]byte(nil), fire.Payload...)
 			due = append(due, fire)
@@ -136,6 +165,13 @@ func (f *fakeStore) ClaimFire(_ context.Context, claim FireClaim) (Fire, bool, e
 	if !ok || fire.Status != claim.ExpectedStatus || fire.Attempt != claim.ExpectedAttempt ||
 		!fire.FiredAt.Equal(claim.ExpectedFiredAt) {
 		return Fire{}, false, nil
+	}
+	if fire.Overlap != OverlapAllow {
+		for _, other := range f.fires {
+			if other.ID != fire.ID && other.ScheduleID == fire.ScheduleID && other.Status == FireClaimed && other.ClaimExpiresAt.After(claim.ClaimedAt) {
+				return Fire{}, false, ErrScheduleBusy
+			}
+		}
 	}
 	recovering := fire.Status == FireClaimed
 	if recovering && fire.ClaimExpiresAt.After(claim.ClaimedAt) {
@@ -175,6 +211,7 @@ func (f *fakeStore) TransitionFire(ctx context.Context, transition FireTransitio
 		return false, nil
 	}
 	fire.Status = transition.To
+	fire.Reason = transition.Reason
 	fire.ClaimExpiresAt = time.Time{}
 	fire.NextAttemptAt = transition.NextAttemptAt
 	fire.LastError = transition.Error
@@ -1108,8 +1145,8 @@ func TestRetryAndExhaustionObserverHooks(t *testing.T) {
 	}
 	want := []ObserverEventKind{
 		ObserverDisable,
-		ObserverClaim, ObserverFire, ObserverEngineError, ObserverRetry,
-		ObserverClaim, ObserverFire, ObserverEngineError, ObserverExhaustion,
+		ObserverClaim, ObserverFire, ObserverEngineError, ObserverRetry, ObserverFailure,
+		ObserverClaim, ObserverFire, ObserverEngineError, ObserverExhaustion, ObserverFailure,
 	}
 	if kinds := observer.kinds(); fmt.Sprint(kinds) != fmt.Sprint(want) {
 		t.Fatalf("observer event order = %v, want %v", kinds, want)
@@ -1132,4 +1169,31 @@ func findObserverEvent(events []ObserverEvent, kind ObserverEventKind, operation
 		}
 	}
 	return ObserverEvent{}, false
+}
+
+func (f *fakeStore) Prune(ctx context.Context, olderThan time.Time) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.pruned == nil {
+		f.pruned = map[string]time.Time{}
+	}
+	keep := map[string]int{}
+	for id, s := range f.schedules {
+		keep[id] = s.KeepLastN
+	}
+	fires := make([]Fire, 0, len(f.fires))
+	for _, fire := range f.fires {
+		fires = append(fires, fire)
+	}
+	candidates := PrunableFires(fires, keep, olderThan)
+	for _, fire := range candidates {
+		if fire.ScheduledAt.After(f.pruned[fire.ScheduleID]) {
+			f.pruned[fire.ScheduleID] = fire.ScheduledAt
+		}
+		delete(f.fires, fire.ID)
+	}
+	return len(candidates), nil
 }

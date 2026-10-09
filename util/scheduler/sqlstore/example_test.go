@@ -51,7 +51,7 @@ func ExampleMigrate() {
 func ExampleSchema() {
 	names, _ := fs.Glob(sqlstore.Schema(), "*.sql")
 	fmt.Println(names)
-	// Output: [001_init.sql]
+	// Output: [001_init.sql 002_retention.sql 003_options.sql]
 }
 
 func ExampleNew() {
