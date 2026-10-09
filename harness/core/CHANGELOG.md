@@ -8,6 +8,17 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.5.0
+
+### Added
+
+- `agentsessions.AttachOptions.OnSnapshot` reports the oldest retained byte
+  offset and exclusive head captured atomically with replay and live subscription.
+  The callback runs outside locks before stream bytes; refusal releases the
+  subscriber and attachment bookkeeping without writing bytes. Existing callers
+  retain their replay behavior. The snapshot describes the subscription boundary,
+  not subsequent ring movement or live subscriber drops.
+
 ## v0.4.0
 
 ### Fixed
