@@ -1,3 +1,4 @@
+import {currentGrantSet,grantState} from './grants-renewal.js';
 import { Buffer } from 'node:buffer';
 import { Correlation } from './correlation.js';
 import { linkRequestScope, requestBudget, requestScope, retainRequestWork } from './admission.js';
@@ -77,11 +78,12 @@ class HostClientImpl implements HostClient {
  constructor(context:Context,core:Correlation,input:InitParams,secrets:SecretTracker,bindingExpiry?:number) {
   this.#context=context;this.#core=core;this.#secrets=secrets;
   if(bindingExpiry!==undefined){const scope=requestScope(context)!;const end=performance.now()+(bindingExpiry-Date.now());scope.lease.end=Math.min(scope.lease.end??Infinity,end);}
-  this.#grants=new Map(input.grants.map(g=>[g.grant_id,g]));
+  this.#grants=new Map((currentGrantSet(context)??input.grants).map(g=>[g.grant_id,g]));
   this.#ceilings=Object.freeze({...input.host_services!.limits.method_timeout_ms});
  }
  async #invoke<T>(method:string,descriptor:string,args:{grant_id:string},options:HostCallOptions|undefined,build?:(params:Record<string,unknown>)=>Record<string,unknown>,metadata:CallMetadata={},accept?:(result:T,params:Record<string,unknown>,metadata:CallMetadata)=>void):Promise<T> {
   const started=performance.now(),scope=requestScope(this.#context),budget=requestBudget(this.#context);
+  if(grantState(this.#context)?.closed)throw new HostClientError('target_unavailable');
   if(!this.#core.readsReplies || !scope || !scope.acceptsResult() || this.#context.signal.aborted || ['hook/handle','hook/handle_batch'].includes(scope.request.method))throw new HostClientError('target_unavailable');
   if(['plugin/init','plugin/load','plugin/unload'].includes(scope.request.method)&&method!=='host/log')throw new HostClientError('target_unavailable');
   const ceiling=this.#ceilings[method];if(!Number.isSafeInteger(ceiling)||ceiling!<=0)throw new HostClientError('unsupported_capability');

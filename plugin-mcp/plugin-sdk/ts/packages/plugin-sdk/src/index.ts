@@ -28,3 +28,7 @@ export type { StorageGetResult, StoragePutResult, StorageDeleteResult, EgressReq
 
 export type { ReadonlyQueryArgs, MCPListToolsArgs, MCPCallToolArgs, MCPCancelCallArgs, BindingsRenewArgs, MCPToolCall } from './host-client.js';
 export type { ReadonlyQueryResult, MCPListToolsResult, MCPCallToolResult, MCPCancelCallResult, BindingsRenewResult, MCPTool, HostRPCRemainingBudgets } from './host-rpc.js';
+
+export {currentGrantSet,decodeGrantsRenewParams,decodeGrantsRenewResult} from './grants-renewal.js';
+export type {GrantsRenewalHandler} from './types.js';
+export type {GrantsRenewParams,GrantsRenewResult} from './wire.js';

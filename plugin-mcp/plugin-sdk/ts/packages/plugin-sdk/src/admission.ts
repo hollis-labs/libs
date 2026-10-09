@@ -139,7 +139,7 @@ export class Admission {
     readonly fence: (error: unknown) => void;
     constructor(writer: FrameWriter, core: Correlation, encode: (response: RPCResponse) => string, fence: (error: unknown) => void,limits:AdmissionLimits={}) {this.limits=admissionLimits(limits); this.writer = writer; this.core = core; this.encode = encode; this.fence = fence; }
     begin(context: Context, request: RPCRequest, received: number): RequestScope | undefined {
-        const control = ['plugin/init', 'plugin/load', 'plugin/unload'].includes(request.method);
+        const control = ['plugin/init', 'plugin/load', 'plugin/unload', 'plugin/grants/renew'].includes(request.method);
         if (control ? this.control >= this.limits.controlSlots : this.ordinary >= this.limits.forwardSlots)
             return;
         let credit: TerminalCredit | undefined;
@@ -200,4 +200,4 @@ export class Admission {
     }
 }
 
-function forwardMutationMethod(method:string):boolean{return ['plugin/init','plugin/load','plugin/unload','command/execute','event/handle','crud/create','crud/update','crud/delete','mcp/call_tool','http/handle','plugin/migrate','hook/handle','hook/handle_batch'].includes(method);}
+function forwardMutationMethod(method:string):boolean{return ['plugin/init','plugin/load','plugin/unload','command/execute','event/handle','crud/create','crud/update','crud/delete','mcp/call_tool','http/handle','plugin/migrate','plugin/grants/renew','hook/handle','hook/handle_batch'].includes(method);}

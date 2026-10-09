@@ -8,6 +8,17 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-09
+
+### Added
+
+- Opt-in acknowledged GrantSet renewal in the Go and TypeScript SDKs, preserving
+  exact authority and live runtime identity while replacing finite lease metadata.
+  Future reverse clients receive the accepted snapshot; existing clients and calls
+  retain their original deadline ceilings. Expiry, revocation and uncertain
+  acknowledgement fail closed. Host-owned opaque descriptor scopes remain distinct
+  from the shared normalized authority envelope.
+
 ## [0.1.1] - 2026-10-09
 
 ### Fixed

@@ -142,9 +142,10 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
   let stoppedResolve!: () => void;
   const stopped = new Promise<void>(resolve => { stoppedResolve = resolve; });
   const stop = (): void => {
-    controller.abort(); reader.abort(); stoppedResolve();
+    dispatcher.grants.end(); controller.abort(); reader.abort(); stoppedResolve();
     if (options.input === undefined) input.destroy();
   };
+  dispatcher.fence=(error)=>onOutputError(error);
   const onOutputError = (error: unknown): void => { transportError ??= error; writer.abort(error); core.close(error); stop(); };
   const signals = options.handleSignals ?? options.input === undefined;
   if (signals) { process.on('SIGTERM',stop); process.on('SIGINT',stop); }
@@ -205,7 +206,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
               if(request.id!==undefined) refuse({jsonrpc:'2.0',id:request.id,error:{code:-32602,message:error.message}});else scope.finish();
               continue;
             }
-            terminalReady=dispatcher.ready;terminal = request;terminalScope=scope; quiescing=true;controller.abort();stoppedResolve();continue;
+            dispatcher.grants.end();terminalReady=dispatcher.ready;terminal = request;terminalScope=scope; quiescing=true;controller.abort();stoppedResolve();continue;
           }
           if(request.method==='plugin/init') {
             if(typeof request.id!=='number'||!Number.isSafeInteger(request.id)||request.id<=0) {
@@ -225,7 +226,7 @@ export async function serveConnection(plugin: ServerPlugin, options: ServeOption
         }
       }
     } catch (error) { if (!reader.signal.aborted) inputError = error; }
-    finally {core.close(inputError??transportError);if(inputError)stop();}
+    finally {dispatcher.grants.end();core.close(inputError??transportError);if(inputError)stop();}
   })();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const cleanupController = new AbortController();

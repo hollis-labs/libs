@@ -321,6 +321,7 @@ loop:
 			ready := srv.initialized
 			srv.initMu.Unlock()
 			if req.Method == MethodUnload {
+				srv.grants.end()
 				if _, err := validateRuntimeParams(req.Method, req.Params); err != nil {
 					run(scope, func() { srv.writeError(req.ID, ErrCodeInvalidParams, err.Error(), scope) })
 					continue
@@ -357,6 +358,7 @@ loop:
 			}
 		}
 	}
+	srv.grants.end()
 	// Explicit unload keeps demux alive for pending replies through drain/cleanup.
 	if terminal != nil {
 		go func() {
@@ -500,6 +502,7 @@ loop:
 }
 
 func (s *server) beginUnload(ctx context.Context) <-chan struct{} {
+	s.grants.end()
 	s.unloadOnce.Do(func() {
 		go func() {
 			defer close(s.unloadDone)

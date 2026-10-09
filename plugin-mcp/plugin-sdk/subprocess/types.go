@@ -41,16 +41,17 @@ func (p *InitParams) ResolvedCacheDir() (string, error) {
 
 // InitParams is sent by the host during plugin/init.
 type InitParams struct {
-	Context            *ForwardContext            `json:"context,omitempty"`
-	PluginDir          string                     `json:"plugin_dir"`
-	DataDir            string                     `json:"data_dir"`
-	CacheDir           string                     `json:"cache_dir"`
-	Config             map[string]string          `json:"config"`
-	LogLevel           string                     `json:"log_level"`
-	HostInfo           HostInfo                   `json:"host_info"`
-	CapabilityContract int                        `json:"capability_contract"`
-	Incarnation        capability.RuntimeIdentity `json:"incarnation"`
-	Grants             capability.GrantSet        `json:"grants"`
+	Context              *ForwardContext            `json:"context,omitempty"`
+	PluginDir            string                     `json:"plugin_dir"`
+	DataDir              string                     `json:"data_dir"`
+	CacheDir             string                     `json:"cache_dir"`
+	Config               map[string]string          `json:"config"`
+	LogLevel             string                     `json:"log_level"`
+	HostInfo             HostInfo                   `json:"host_info"`
+	CapabilityContract   int                        `json:"capability_contract"`
+	Incarnation          capability.RuntimeIdentity `json:"incarnation"`
+	Grants               capability.GrantSet        `json:"grants"`
+	GrantsRenewalVersion *int                       `json:"grants_renewal_version,omitempty"`
 	// Identity is an optional opaque verified courier, never incarnation identity
 	// or an implicit initiating caller for subsequent requests.
 	Identity     json.RawMessage `json:"identity,omitempty"`
@@ -67,14 +68,15 @@ type HostInfo struct {
 // InitResult acknowledges the base contract and any selected optional profiles.
 // Serve owns acknowledgements: hooks requires an offer/handler, reverse an offer/opt-in.
 type InitResult struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	Version             string `json:"version"`
-	Description         string `json:"description"`
-	Protocol            int    `json:"protocol"`
-	CapabilityContract  int    `json:"capability_contract"`
-	ReverseRPCVersion   *int   `json:"reverse_rpc_version,omitempty"`
-	HooksProfileVersion *int   `json:"hooks_profile_version,omitempty"`
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	Version              string `json:"version"`
+	Description          string `json:"description"`
+	Protocol             int    `json:"protocol"`
+	CapabilityContract   int    `json:"capability_contract"`
+	GrantsRenewalVersion *int   `json:"grants_renewal_version,omitempty"`
+	ReverseRPCVersion    *int   `json:"reverse_rpc_version,omitempty"`
+	HooksProfileVersion  *int   `json:"hooks_profile_version,omitempty"`
 }
 
 // HooksProfile offers the independent hooks protocol. Serve requires HookHandler to acknowledge it.

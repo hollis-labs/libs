@@ -54,6 +54,8 @@ go get github.com/hollis-labs/libs/plugin-mcp/plugin-sdk
   and strict Grant/RuntimeIdentity DTOs. `capability/host` owns non-plugin scoped
   credentials, selective revocation and payload-free audit helpers. Hosts supply
   authentication and reviewed policy; see [host credentials](docs/capability-credentials.md).
+  Host-owned opaque descriptors and opt-in acknowledged discovery renewal are
+  documented in [grant scopes and renewal](docs/grant-renewal.md).
 - `subprocess/subprocesstest` — in-process test harness for driving
   plugins without spawning a real subprocess, with optional JSON
   roundtripping to catch wire-format bugs.

@@ -1,3 +1,5 @@
+import {GrantState,grantContext,decodeGrantsRenewParams} from './grants-renewal.js';
+import {requestParamsJSON} from './payload.js';
 import type { ReverseNegotiation } from './negotiation.js';
 import { requestScope } from "./admission.js";
 import { requestFailureResponse } from "./request-control.js";
@@ -7,7 +9,7 @@ import { encodeBoundedJSON, DEFAULT_FRAME_BYTES, FrameTooLargeError } from './fr
 import { PayloadError, decodeRuntimeParams, rememberParams, authoredResult, validateRuntimeResult } from './payload.js';
 import { inspectEnvelope } from './strict-json.js';
 import { decodeEnvelope } from './envelope.js';
-import { decodeInitParams, encodeInitParams, decodeInitResult, encodeInitResult, validateInitResult, InitError } from './init-contract.js';
+import { decodeInitParams, encodeInitParams, decodeInitResult, encodeInitResult, validateInitResult, cloneGrantSet, InitError } from './init-contract.js';
 import { validateJSON } from './strict-json.js';
 import { ConfigReader } from './config.js';
 import { pluginError } from './errors.js';
@@ -46,8 +48,10 @@ export class Dispatcher {
   private get outputBytes():number{return typeof this.outputLimit==='function'?this.outputLimit():this.outputLimit;}
   context: Context;
   get ready(): boolean { return this.initialized; }
-  private attempted = false;
+  readonly grants = new GrantState();
+ private attempted = false;
   private initialized = false;
+ fence?:(error:unknown)=>void;
   private hooksEnabled = false;
   private hookIncarnation?: Wire.RuntimeIdentity;
   private unloadAttempt?: Promise<void>;
@@ -69,18 +73,25 @@ export class Dispatcher {
   }
   /** Record the attempt before user code; failed cleanup is never retried. */
   shutdown(context: Context): Promise<void> {
-    return this.unloadAttempt ??= Promise.resolve().then(() => this.plugin.unload(context));
+    this.grants.end();
+ return this.unloadAttempt ??= Promise.resolve().then(() => this.plugin.unload(context));
   }
   private async call(req: Wire.RPCRequest, requestContext: Context): Promise<unknown> {
     const p = this.plugin;
-    let ctx: Context = {...requestContext,config:this.context.config,forwardContext:undefined};
+    let ctx: Context = grantContext({...requestContext,config:this.context.config,forwardContext:undefined},this.grants);
     if(req.method !== 'plugin/init' && !this.initialized) throw new RPCFault(-32600,'successful init required');
     let decoded: Record<string,unknown> | undefined;
-    const supported = req.method === 'plugin/load' || req.method === 'plugin/unload' || req.method === 'plugin/health' || req.method === 'command/execute' && p.command || req.method === 'event/handle' && p.eventHandle || ['crud/create','crud/read','crud/update','crud/delete','crud/list'].includes(req.method) && p.create && p.read && p.update && p.delete && p.list || req.method === 'mcp/call_tool' && p.mcpCallTool || req.method === 'http/handle' && p.httpHandle || req.method === 'plugin/migrate' && p.migrate;
+    const supported = req.method==='plugin/grants/renew' && p.grantsRenewed || req.method === 'plugin/load' || req.method === 'plugin/unload' || req.method === 'plugin/health' || req.method === 'command/execute' && p.command || req.method === 'event/handle' && p.eventHandle || ['crud/create','crud/read','crud/update','crud/delete','crud/list'].includes(req.method) && p.create && p.read && p.update && p.delete && p.list || req.method === 'mcp/call_tool' && p.mcpCallTool || req.method === 'http/handle' && p.httpHandle || req.method === 'plugin/migrate' && p.migrate;
     if(supported) { decoded=decodeRuntimeParams<Record<string,unknown>>(req); ctx={...ctx,forwardContext:decoded!.context as Context['forwardContext']}; }
-    if(req.method!=='plugin/init')ctx=this.reverse?.context(ctx)??ctx;
+    if(req.method!=='plugin/init'){ctx=this.reverse?.context(ctx)??ctx;grantContext(ctx,this.grants);}
     switch (req.method) {
-      case 'plugin/init': {
+      case 'plugin/grants/renew': {
+ if(typeof req.id!=='number'||!Number.isSafeInteger(req.id)||req.id<=0)throw new RPCFault(-32600,'renewal requires a positive request ID');
+ if(!p.grantsRenewed)throw new RPCFault(-32601,'grant renewal not supported');
+ const params=decodeGrantsRenewParams(requestParamsJSON(req)??'null');
+ try{const ack=await this.grants.renew(ctx,params,p);this.reverse?.acceptedGrants(params.grants);return ack;}catch(error){if(this.grants.closed)this.fence?.(error);throw error;}
+ }
+ case 'plugin/init': {
         if (typeof req.id !== 'number' || !Number.isSafeInteger(req.id) || req.id <= 0) throw new RPCFault(-32600,'init requires a positive safe integer id');
         if (this.attempted) throw new RPCFault(-32600,'init already attempted');
         this.attempted = true;
@@ -97,7 +108,7 @@ export class Dispatcher {
         } catch(error) { if(error instanceof InitError || error instanceof RPCFault) throw error; throw new InitError('invalid_init','params'); }
         ctx = {...ctx,forwardContext:input.context,config:new ConfigReader(input.config,this.secrets)};
         this.context = {...this.context,config:ctx.config};
-        const agreement=decodeInitParams(encodeInitParams(input));
+        const agreement=decodeInitParams(encodeInitParams(input));agreement.grants=cloneGrantSet(input.grants);
         // Capture the host's offer before author code can mutate its input.
         const hooksEnabled = input.hooks_profile?.hooks_profile_version === 1 && typeof p.hookHandle === 'function';
         ctx=this.reverse?.prepare(ctx,input)??ctx;
@@ -106,8 +117,8 @@ export class Dispatcher {
           const authored = await p.init(ctx, input);
           if(requestScope(ctx)?.acceptsResult()===false)throw ctx.signal.reason??new Error('initialization budget expired');
           encodeBoundedJSON(authored, this.outputBytes - 1);
-          const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, ...base} = authored;
-          const result = decodeInitResult(encodeInitResult({...base,...(this.reverse?.selected?{reverse_rpc_version:1 as const}:{}),...(hooksEnabled ? {hooks_profile_version:1 as const} : {})}));
+          const {reverse_rpc_version: _reverse, hooks_profile_version: _hooks, grants_renewal_version:_grants, ...base} = authored;
+          const result = decodeInitResult(encodeInitResult({...base,...(this.reverse?.selected?{reverse_rpc_version:1 as const}:{}),...(hooksEnabled ? {hooks_profile_version:1 as const} : {}),...(p.grantsRenewed&&agreement.grants_renewal_version===1?{grants_renewal_version:1 as const}:{})}));
           validateInitResult(agreement,result);
           await this.identity(agreement.identity,ctx);
           const commit=(response:Wire.RPCResponse)=>{
@@ -115,7 +126,8 @@ export class Dispatcher {
             this.hooksEnabled = hooksEnabled;
             this.hookIncarnation = agreement.incarnation;
             this.reverse?.activate(req.id as number);
-            this.initialized = true;
+            this.grants.activate(agreement.incarnation,agreement.grants,result.grants_renewal_version===1);
+ this.initialized = true;
           };
           const scope=requestScope(ctx);
           if(scope){if(!scope.acceptsResult()||!scope.observeReply(commit))throw ctx.signal.reason??new Error('initialization budget expired');}

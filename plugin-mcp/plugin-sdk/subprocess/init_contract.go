@@ -108,6 +108,9 @@ func (p InitParams) Validate() error {
 	default:
 		return initInvalid("log_level")
 	}
+	if p.GrantsRenewalVersion != nil && *p.GrantsRenewalVersion != GrantsRenewalVersion {
+		return initInvalid("grants_renewal_version")
+	}
 	if p.Grants.ValidateForRuntime(p.Incarnation) != nil {
 		return initInvalid("grants/incarnation")
 	}
@@ -138,7 +141,7 @@ func (p InitParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(plain(p))
 }
 func (p *InitParams) UnmarshalJSON(data []byte) error {
-	f, err := initFields(data, "params", []string{"plugin_dir", "data_dir", "cache_dir", "config", "log_level", "host_info", "capability_contract", "incarnation", "grants"}, []string{"identity", "host_services", "hooks_profile", "context"})
+	f, err := initFields(data, "params", []string{"plugin_dir", "data_dir", "cache_dir", "config", "log_level", "host_info", "capability_contract", "incarnation", "grants"}, []string{"identity", "host_services", "hooks_profile", "context", "grants_renewal_version"})
 	if err != nil {
 		return err
 	}
@@ -165,6 +168,15 @@ func (p *InitParams) UnmarshalJSON(data []byte) error {
 	}
 	if v, ok := f["context"]; ok && ValidateHostRPCDTO("ForwardContext", v) != nil {
 		return initInvalid("context")
+	}
+	if raw, ok := f["grants_renewal_version"]; ok {
+		version, err := initInteger(raw, "grants_renewal_version")
+		if err != nil {
+			return err
+		}
+		if version != GrantsRenewalVersion {
+			return initInvalid("grants_renewal_version")
+		}
 	}
 	type plain InitParams
 	var next plain
@@ -197,6 +209,9 @@ func (r InitResult) Validate() error {
 	if !utf8.ValidString(r.Description) {
 		return initInvalid("description")
 	}
+	if r.GrantsRenewalVersion != nil && *r.GrantsRenewalVersion != GrantsRenewalVersion {
+		return initInvalid("grants_renewal_version")
+	}
 	if r.ReverseRPCVersion != nil {
 		if err := initVersion(InitProfileMismatch, "reverse_rpc_version", *r.ReverseRPCVersion, 1); err != nil {
 			return err
@@ -219,6 +234,9 @@ func ValidateInitResult(p InitParams, r InitResult) error {
 	if err := r.Validate(); err != nil {
 		return err
 	}
+	if r.GrantsRenewalVersion != nil && p.GrantsRenewalVersion == nil {
+		return &InitError{Code: InitProfileMismatch, Field: "grants_renewal_version", Expected: 0, Received: *r.GrantsRenewalVersion}
+	}
 	if r.ReverseRPCVersion != nil && p.HostServices == nil {
 		return &InitError{Code: InitProfileMismatch, Field: "reverse_rpc_version", Expected: 0, Received: *r.ReverseRPCVersion}
 	}
@@ -235,7 +253,7 @@ func (r InitResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(plain(r))
 }
 func (r *InitResult) UnmarshalJSON(data []byte) error {
-	f, err := initFields(data, "result", []string{"id", "name", "version", "description", "protocol", "capability_contract"}, []string{"reverse_rpc_version", "hooks_profile_version"})
+	f, err := initFields(data, "result", []string{"id", "name", "version", "description", "protocol", "capability_contract"}, []string{"reverse_rpc_version", "hooks_profile_version", "grants_renewal_version"})
 	if err != nil {
 		return err
 	}
@@ -243,7 +261,7 @@ func (r *InitResult) UnmarshalJSON(data []byte) error {
 		field string
 		code  InitFailureCode
 		want  int
-	}{{"protocol", InitProtocolMismatch, ProtocolVersion}, {"capability_contract", InitCapabilityContractMismatch, capability.ContractVersion}, {"reverse_rpc_version", InitProfileMismatch, 1}, {"hooks_profile_version", InitProfileMismatch, 1}} {
+	}{{"protocol", InitProtocolMismatch, ProtocolVersion}, {"capability_contract", InitCapabilityContractMismatch, capability.ContractVersion}, {"reverse_rpc_version", InitProfileMismatch, 1}, {"hooks_profile_version", InitProfileMismatch, 1}, {"grants_renewal_version", InitProfileMismatch, 1}} {
 		raw, ok := f[v.field]
 		if !ok {
 			continue

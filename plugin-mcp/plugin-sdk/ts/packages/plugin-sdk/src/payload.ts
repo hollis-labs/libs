@@ -73,7 +73,11 @@ export function decodeRuntimeParams<T>(request: RPCRequest): T {
             add(base64, 'body');
             add(() => { }, 'identity');
             break;
-        case 'plugin/migrate':
+        case 'plugin/grants/renew':
+ required=['renewal_version','sequence','incarnation','grants','context'];
+ add(()=>{},'renewal_version','sequence','incarnation','grants');
+ break;
+ case 'plugin/migrate':
             required = ['from_version', 'to_version', 'data_dir'];
             add(string(true), ...required);
             break;

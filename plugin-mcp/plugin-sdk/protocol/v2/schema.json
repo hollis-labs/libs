@@ -200,6 +200,10 @@
         },
         "context": {
           "$ref": "host-rpc.schema.json#/$defs/ForwardContext"
+        },
+        "grants_renewal_version": {
+          "type": "integer",
+          "const": 1
         }
       },
       "required": [
@@ -243,6 +247,10 @@
           "const": 1
         },
         "hooks_profile_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "grants_renewal_version": {
           "type": "integer",
           "const": 1
         }
@@ -734,7 +742,7 @@
           "not": {
             "type": "null"
           },
-          "description": "Normalized descriptor-owned non-null JSON. Portable numeric tokens: integer-form within ±9007199254740991; all numbers finite. Larger integers must be string-encoded."
+          "description": "Normalized descriptor-owned non-null JSON. Portable numeric tokens: integer-form within \u00b19007199254740991; all numbers finite. Larger integers must be string-encoded."
         },
         "host_instance": {
           "type": "string",
@@ -903,6 +911,60 @@
       "minimum": -9007199254740991,
       "maximum": 9007199254740991,
       "description": "Integer IDs use decimal integer tokens only; no exponents or fractions."
+    },
+    "GrantsRenewParams": {
+      "type": "object",
+      "properties": {
+        "renewal_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "incarnation": {
+          "$ref": "#/$defs/RuntimeIdentity"
+        },
+        "grants": {
+          "$ref": "#/$defs/GrantSet"
+        },
+        "context": {
+          "$ref": "#/$defs/ForwardContext"
+        }
+      },
+      "required": [
+        "renewal_version",
+        "sequence",
+        "incarnation",
+        "grants",
+        "context"
+      ],
+      "additionalProperties": false
+    },
+    "GrantsRenewResult": {
+      "type": "object",
+      "properties": {
+        "renewal_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "incarnation": {
+          "$ref": "#/$defs/RuntimeIdentity"
+        }
+      },
+      "required": [
+        "renewal_version",
+        "sequence",
+        "incarnation"
+      ],
+      "additionalProperties": false
     }
   },
   "x-protocol-version": 2,

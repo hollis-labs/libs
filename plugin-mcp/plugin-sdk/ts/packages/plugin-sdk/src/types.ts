@@ -34,5 +34,7 @@ export interface HTTPRequest extends Omit<Wire.HTTPRequest, 'body'> { body?: Uin
 export interface HTTPResponse extends Omit<Wire.HTTPResponse, 'body'> { body?: Uint8Array; }
 export interface HTTPHandler { httpHandle(context: Context, params: HTTPRequest): Awaitable<HTTPResponse>; }
 export interface Migrator { migrate(context: Context, fromVersion: string, toVersion: string): Awaitable<void>; }
+/** Explicitly accepts SDK discovery replacement; host authorization stays separate. */
+export interface GrantsRenewalHandler { grantsRenewed(context:Context,grants:Wire.GrantSet):Awaitable<void>; }
 export interface IdentityAware { identity(context: Context, value: unknown): Awaitable<void>; }
-export type ServerPlugin = Plugin & Partial<HookHandler & CommandHandler & EventHandler & HealthChecker & CRUDHandler & MCPHandler & HTTPHandler & Migrator & IdentityAware>;
+export type ServerPlugin = Plugin & Partial<HookHandler & CommandHandler & EventHandler & HealthChecker & CRUDHandler & MCPHandler & HTTPHandler & Migrator & IdentityAware & GrantsRenewalHandler>;

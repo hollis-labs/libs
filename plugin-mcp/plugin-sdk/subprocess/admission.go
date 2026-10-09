@@ -60,7 +60,7 @@ func newAdmission(w *frameWriter, c *correlation, s *server) *admission {
 	return &admission{active: make(map[RPCID]*requestScope), writer: w, core: c, server: s, limits: AdmissionLimits{ForwardHandlerSlots, ReverseHandlerSlots, ControlHandlerSlots}}
 }
 func lifecycleMethod(method string) bool {
-	return method == MethodInit || method == MethodLoad || method == MethodUnload
+	return method == MethodInit || method == MethodLoad || method == MethodUnload || method == MethodGrantsRenew
 }
 func (a *admission) begin(parent context.Context, req RPCRequest, received time.Time) (*requestScope, error) {
 	control := lifecycleMethod(req.Method)
@@ -349,7 +349,7 @@ func forwardMutationMethod(method string) bool {
 	switch method {
 	case MethodHealth, MethodCRUDRead, MethodCRUDList:
 		return false
-	case MethodInit, MethodLoad, MethodUnload, MethodCommandExecute, MethodEventHandle, MethodCRUDCreate, MethodCRUDUpdate, MethodCRUDDelete, MethodMCPCallTool, MethodHTTPHandle, MethodMigrate, MethodHookHandle, MethodHookHandleBatch:
+	case MethodInit, MethodLoad, MethodUnload, MethodCommandExecute, MethodEventHandle, MethodCRUDCreate, MethodCRUDUpdate, MethodCRUDDelete, MethodMCPCallTool, MethodHTTPHandle, MethodMigrate, MethodGrantsRenew, MethodHookHandle, MethodHookHandleBatch:
 		return true
 	}
 	return false

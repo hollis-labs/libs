@@ -164,6 +164,9 @@ func validateRuntimeParams(method string, raw any) (*ForwardContext, error) {
 		add(payloadStrings, "query", "headers")
 		add(payloadBase64, "body")
 		add(payloadJSON, "identity")
+	case MethodGrantsRenew:
+		required = []string{"renewal_version", "sequence", "incarnation", "grants", "context"}
+		add(payloadJSON, "renewal_version", "sequence", "incarnation", "grants")
 	case MethodMigrate:
 		required = []string{"from_version", "to_version", "data_dir"}
 		add(payloadString(true), required...)
