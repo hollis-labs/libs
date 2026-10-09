@@ -83,6 +83,9 @@ func (s *HostSession) executeHostWithReply(ctx context.Context, id uint64, metho
 		return reply(nil, hostRefusal(capability.RateLimited, ""))
 	}
 	callCtx, cancel := context.WithDeadline(ctx, authority.Deadline)
+	// The reply path owns cancellation. Canceling in the backend goroutine
+	// after sending its outcome would race that outcome against callCtx.Done.
+	defer cancel()
 	// Registration is host-held and precedes callbacks; received parent metadata
 	// never creates a record. A duplicated active ID fences the whole session.
 	s.mu.Lock()
@@ -116,7 +119,6 @@ func (s *HostSession) executeHostWithReply(ctx context.Context, id uint64, metho
 	done := make(chan outcome, 1)
 	go func() {
 		defer permit.release()
-		defer cancel()
 		defer func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()

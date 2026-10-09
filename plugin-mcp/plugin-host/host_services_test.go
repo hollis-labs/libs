@@ -187,6 +187,46 @@ func TestHostClosedTypedServices(t *testing.T) {
 		})
 	}
 }
+func TestHostCallbackCompletionPreservesOutcome(t *testing.T) {
+	for _, denied := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "policy_denial"}[denied], func(t *testing.T) {
+			var calls atomic.Int32
+			services := hostTestServices()
+			services.StoragePut = func(_ context.Context, _ *HostCall, p subprocess.StoragePutParams) (subprocess.StoragePutResult, error) {
+				calls.Add(1)
+				return subprocess.StoragePutResult{OperationKey: p.OperationKey, Revision: "2"}, nil
+			}
+			policy := func(context.Context, HostAuthority) error {
+				if denied {
+					return hostRefusal(capability.ScopeDenied, "")
+				}
+				return nil
+			}
+			s, _ := hostTestSession(t, services, policy)
+			binding := hostTestBinding(t, s, HostStoragePut, HostBudgets{})
+			raw := hostTestRaw(t, HostStoragePut, binding)
+			var want capability.Code
+			if denied {
+				want = capability.ScopeDenied
+			}
+			// Exercise the completion/cancellation select repeatedly: a callback's
+			// own return must never be mistaken for caller cancellation.
+			for id := uint64(1); id <= 32; id++ {
+				if code := hostTestCode(t, hostTestExecute(t, s, id, HostStoragePut, raw)); code != want {
+					t.Fatalf("call %d: got %s, want %s", id, code, want)
+				}
+			}
+			wantCalls := int32(32)
+			if denied {
+				wantCalls = 0
+			}
+			if calls.Load() != wantCalls {
+				t.Fatalf("backend calls = %d, want %d", calls.Load(), wantCalls)
+			}
+		})
+	}
+}
+
 func TestHostParentForgeryNeverRunsBackend(t *testing.T) {
 	for _, kind := range []string{"unknown", "other_direction", "other_binding", "other_grant", "foreign_connection", "terminal", "expired", "revoked"} {
 		t.Run(kind, func(t *testing.T) {

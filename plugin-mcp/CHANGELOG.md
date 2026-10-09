@@ -8,6 +8,21 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-09
+
+### Fixed
+
+- Keep host-service callback completion separate from request cancellation, so
+  successful results and policy refusals are not randomly replaced by cancellation
+  or unknown-outcome errors. Actual cancellation retains its existing semantics.
+
+- Select Go 1.26.9 for CI and release builds to include standard-library
+  vulnerability fixes, retaining the Go 1.26.8 language floor.
+
+- Verify acknowledgement gate independence at the disposal callback boundary,
+  rather than requiring child shutdown within 100 ms. A separate regression
+  preserves the bounded state-store wait and refusal of timed-out acknowledgement.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added

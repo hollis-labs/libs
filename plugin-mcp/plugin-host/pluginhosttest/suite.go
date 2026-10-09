@@ -555,7 +555,20 @@ func (e *env) r12() {
 	inst, _ := e.start(BehaviourEcho)
 	const size = 7 << 20
 	var big struct{ Data string }
-	e.mustTool(inst, "big", map[string]any{"bytes": size}, &big)
+	// R12 checks payload correctness and frame limits, not throughput. Give
+	// the race-instrumented fixture/transport's bulk encoding and validation
+	// its own finite budget instead of borrowing the harness's Start bound.
+	bulkCtx, bulkCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	bulkStart := time.Now()
+	content, err := e.callTool(bulkCtx, inst, "big", map[string]any{"bytes": size})
+	bulkCancel()
+	e.t.Logf("7 MiB response delivery took %s", time.Since(bulkStart))
+	if err != nil {
+		e.t.Fatalf("7 MiB response: %v", err)
+	}
+	if err := json.Unmarshal(content, &big); err != nil {
+		e.t.Fatalf("decode 7 MiB response: %v", err)
+	}
 	if len(big.Data) != size {
 		e.t.Fatalf("got %d bytes of a %d byte response", len(big.Data), size)
 	}
