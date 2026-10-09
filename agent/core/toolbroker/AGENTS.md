@@ -24,13 +24,10 @@ never calls one, and it speaks no MCP transport.
 ## Commands
 
 ```bash
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-golangci-lint run
+scripts/check agent
 ```
 
-There is no CI workflow in this repo, so these are the only gate.
+Run from the repository root. CI uses the same module check.
 
 ## Boundaries
 

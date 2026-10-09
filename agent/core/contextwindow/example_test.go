@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	contextwindow "github.com/hollis-labs/go-context-window"
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	contextwindow "github.com/hollis-labs/substrate/agent/contextwindow"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func ExampleNewContextWindow() {

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
-	"github.com/hollis-labs/go-toolresult/memstore"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
+	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
 )
 
 var (

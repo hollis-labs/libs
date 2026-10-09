@@ -3,7 +3,7 @@ package profile_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/go-toolselect/profile"
+	"github.com/hollis-labs/substrate/agent/toolselect/profile"
 )
 
 func ExampleEvaluate() {

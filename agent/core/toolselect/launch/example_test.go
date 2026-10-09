@@ -3,10 +3,10 @@ package launch_test
 import (
 	"fmt"
 
-	contracts "github.com/hollis-labs/agent-contracts-leaf"
+	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
 
-	"github.com/hollis-labs/go-toolselect/launch"
-	"github.com/hollis-labs/go-toolselect/profile"
+	"github.com/hollis-labs/substrate/agent/toolselect/launch"
+	"github.com/hollis-labs/substrate/agent/toolselect/profile"
 )
 
 func ExampleFromAssignment() {

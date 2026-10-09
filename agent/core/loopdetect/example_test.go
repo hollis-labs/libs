@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	loopdetect "github.com/hollis-labs/go-loopdetect"
+	loopdetect "github.com/hollis-labs/substrate/agent/loopdetect"
 )
 
 func ExampleDetector_Record() {

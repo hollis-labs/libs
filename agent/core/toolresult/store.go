@@ -50,7 +50,7 @@ type Entry struct {
 }
 
 // Store is the persistence port. Implementations must be safe for concurrent
-// use. [github.com/hollis-labs/go-toolresult/storetest.Run] is the conformance
+// use. [github.com/hollis-labs/substrate/agent/toolresult/storetest.Run] is the conformance
 // suite.
 type Store interface {
 	// Put inserts e. It fails if e.ID already exists.

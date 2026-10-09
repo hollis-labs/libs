@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
 )
 
 func TestIsContextOverflow_Sentinel(t *testing.T) {

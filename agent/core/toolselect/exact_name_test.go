@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	toolselect "github.com/hollis-labs/go-toolselect"
+	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
 )
 
 func TestLiteralNameLeadsExactTierGolden(t *testing.T) {

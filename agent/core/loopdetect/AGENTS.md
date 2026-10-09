@@ -6,21 +6,19 @@ It is not a reflex engine, a retry or continuation policy, or a persistence laye
 
 ## Start Here
 
-- `loopdetect` package (module root) — the importable API; `doc.go` is the package documentation. `detector.go` (Detector, options, fingerprinting), `types.go` (constants and value types).
+- `loopdetect` package — the importable API; `doc.go` is the package documentation. `detector.go` (Detector, options, fingerprinting), `types.go` (constants and value types).
 - `detector_test.go` — the tests carried over from Nanite, byte-identical to the source. Do not edit them to make a change pass.
 - `sharp_edges_test.go` — pins degenerate-option and suppression behavior.
 - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- The repository-root workflows run the whole `agent` module gate.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+scripts/check agent
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+Run from the repository root. CI uses the same module check.
 
 ## Boundaries
 

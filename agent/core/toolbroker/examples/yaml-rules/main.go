@@ -15,7 +15,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/go-toolbroker/broker"
+	"github.com/hollis-labs/substrate/agent/toolbroker/broker"
 )
 
 const rulesYAML = `rules:

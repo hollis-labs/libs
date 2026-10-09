@@ -9,7 +9,7 @@ Fixed, ordered context-slot system with per-slot budgets, cache-key tracking and
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-context-window
+go get github.com/hollis-labs/substrate/agent/contextwindow
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 
-	contextwindow "github.com/hollis-labs/go-context-window"
+	contextwindow "github.com/hollis-labs/substrate/agent/contextwindow"
 )
 
 func main() {
@@ -69,19 +69,13 @@ every consumer's prompt cache and will be called out as such.
   budget and its position.
 - Any transport, provider client or storage. `Summarizer` and
   `CompactionEventWriter` are interfaces the consumer implements;
-  `ProviderSummarizer` adapts a `go-llm-contracts` provider.
+  `ProviderSummarizer` adapts an `llm-core/llmcontracts` provider.
 
 ## Development
 
-```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-```
-
-CI (`.github/workflows/check.yml`) is the full gate. Read [AGENTS.md](./AGENTS.md)
-before changing `slot.go`.
+From the repository root, run `scripts/check agent`. Read
+[AGENTS.md](./AGENTS.md) before changing `slot.go`.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see the [repository license](../../LICENSE).

@@ -15,7 +15,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hollis-labs/go-toolbroker/broker"
+	"github.com/hollis-labs/substrate/agent/toolbroker/broker"
 )
 
 // inMemoryEnricher is a trivial Enricher backed by a map. It satisfies the

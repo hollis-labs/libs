@@ -26,7 +26,7 @@ a real Nanite trace.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-reflexes
+go get github.com/hollis-labs/substrate/agent/reflexes
 ```
 
 ## Usage
@@ -43,7 +43,7 @@ import (
 	"fmt"
 	"log"
 
-	reflexes "github.com/hollis-labs/go-reflexes"
+	reflexes "github.com/hollis-labs/substrate/agent/reflexes"
 )
 
 // memory is a fake Source and KindCatalog: a real host reads these from its
@@ -202,14 +202,8 @@ breaking change.
 
 ## Development
 
-```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-```
-
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, run `scripts/check agent`.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see the [repository license](../../LICENSE).

@@ -6,22 +6,21 @@ It is not: a list paginator. Item lists, cursors and byte or token fitting of it
 
 ## Start Here
 
-- Root package `toolresult` — `preview.go`, `page.go` (`Select`, `ReadPage`, `SearchPage`) and `budget.go` are pure; `cache.go`, `store.go`, `handlers.go` and `spec.go` are the store-backed layers. `doc.go` is the package documentation.
+- Package `toolresult` — `preview.go`, `page.go` (`Select`, `ReadPage`, `SearchPage`) and `budget.go` are pure; `cache.go`, `store.go`, `handlers.go` and `spec.go` are the store-backed layers. `doc.go` is the package documentation.
 - `memstore/`, `sqlstore/` — the two `Store`s; `storetest/` — the conformance suite both run.
 - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
 - `testdata/golden/` — Nanite's own output for `golden_cases_test.go`; see its README.txt.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- The repository-root workflows run the whole `agent` module gate.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-go test -run '^$' -fuzz '^FuzzPreview$' -fuzztime 30s .   # also FuzzReadPage, FuzzSelect, FuzzSearchPage
+scripts/check agent
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+Run from the repository root. CI uses the same module check. Focused fuzzing
+remains available from this directory for FuzzPreview, FuzzReadPage, FuzzSelect
+and FuzzSearchPage.
 
 ## Boundaries
 

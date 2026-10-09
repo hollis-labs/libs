@@ -17,7 +17,7 @@ interface with an in-memory and a SQLite (`database/sql`) implementation.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-toolresult
+go get github.com/hollis-labs/substrate/agent/toolresult
 ```
 
 Requires Go 1.26.6 or newer. The only non-test dependency is
@@ -36,8 +36,8 @@ import (
 	"log"
 	"strings"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
-	"github.com/hollis-labs/go-toolresult/memstore"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
+	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
 )
 
 func main() {
@@ -126,18 +126,12 @@ built.
 - A background purger or scheduler: call `Cache.Purge` when your policy says
   to. Nothing purges automatically, and the default TTL is one hour.
 - Logging and metrics; the library has none.
-- An LLM client: the tool specs are data with no `go-llm-types` import.
+- An LLM client: the tool specs are data with no `llm-core/llmtypes` import.
 
 ## Development
 
-```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-```
-
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, run `scripts/check agent`.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see the [repository license](../../LICENSE).

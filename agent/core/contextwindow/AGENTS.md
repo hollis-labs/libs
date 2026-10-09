@@ -13,17 +13,15 @@ the handoff and overflow helpers built around them.
 - `slot.go` — slot names, `SlotOrder`, `DefaultBudgets`, `DefaultCompactable`. The most sensitive file; read Boundaries first.
 - `INVARIANTS.md` — the mechanism-level guarantees and which tests pin them.
 - `example_test.go` — the runnable examples; the README `## Usage` fence is a complete program in the same shape.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- The repository-root workflows run the whole `agent` module gate.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+scripts/check agent
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+Run from the repository root. CI uses the same module check.
 
 ## Boundaries
 
@@ -54,7 +52,8 @@ CI (`.github/workflows/check.yml`) is the full gate.
   `TestDefaults_MatchSeedSnapshot` pins the names and order.
 - The compaction event ID is an opaque random hex string, not a UUID. Do not
   reintroduce `google/uuid` or add a shape check on it.
-- Dependencies are `go-llm-types`, `go-llm-contracts` and `yaml.v3` only.
+- Dependencies are `substrate/llm-core/llmtypes`,
+  `substrate/llm-core/llmcontracts` and `yaml.v3` only.
   Every dependency's own `go` line must stay at or below this module's.
 - Do not add references to symbols or files in any consuming application.
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.

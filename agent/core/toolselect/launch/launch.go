@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	contracts "github.com/hollis-labs/agent-contracts-leaf"
+	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
 
-	"github.com/hollis-labs/go-toolselect/profile"
+	"github.com/hollis-labs/substrate/agent/toolselect/profile"
 )
 
 // noTools is an allow entry no real tool name matches. Tool names are never

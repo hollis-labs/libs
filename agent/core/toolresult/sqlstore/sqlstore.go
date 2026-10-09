@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
 )
 
 // Default table and scope column names (Nanite's schema).

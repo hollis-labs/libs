@@ -9,7 +9,7 @@ decides which tools of which servers a caller sees.
 |---|---|---|
 | `toolselect` | Ranks a catalog against a free-text query: an exact name always outranks a partial match, ties break by name, the same inputs always give the same order. Also applies the shared include / exclude / order rule schema. | standard library only |
 | `toolselect/profile` | Evaluates a profile (servers on or off, allow and deny globs, read-only, pinned order) against a catalog and reports the visible tools and why each hidden tool is hidden. | standard library only |
-| `toolselect/launch` | Derives a per-launch profile from an Assignment's `grants.mcp` ceiling and a base profile. | `profile`, `agent-contracts-leaf` |
+| `toolselect/launch` | Derives a per-launch profile from an Assignment's `grants.mcp` ceiling and a base profile. | `profile`, `llm-core/contracts` |
 
 It decides what a caller *sees*, not what it may *call*. Authorization belongs
 to go-permission.
@@ -21,12 +21,12 @@ to go-permission.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-toolselect
+go get github.com/hollis-labs/substrate/agent/toolselect
 ```
 
-`toolselect/launch` depends on `github.com/hollis-labs/agent-contracts-leaf`
-(v0.1.0), a private module: set `GOPRIVATE=github.com/hollis-labs`. Importing
-only `toolselect` or `toolselect/profile` pulls in nothing outside the standard
+`toolselect/launch` depends on
+`github.com/hollis-labs/substrate/llm-core/contracts` v0.1.0. Importing only
+`toolselect` or `toolselect/profile` pulls in nothing outside the standard
 library.
 
 ## Usage
@@ -39,8 +39,8 @@ import (
 	"fmt"
 	"log"
 
-	toolselect "github.com/hollis-labs/go-toolselect"
-	"github.com/hollis-labs/go-toolselect/profile"
+	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
+	"github.com/hollis-labs/substrate/agent/toolselect/profile"
 )
 
 func main() {
@@ -180,19 +180,13 @@ listed there.
 - Per-field weighting (BM25F). One concatenated document per tool.
 - A status tool that reports `HiddenReason`, and progressive-discovery protocol
   extensions.
-- Deriving a profile from anything but an `agent-contracts-leaf` Assignment,
+- Deriving a profile from anything but an `llm-core/contracts` Assignment,
   and server-level grants that need a catalog to resolve.
 
 ## Development
 
-```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-```
-
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, run `scripts/check agent`.
 
 ## License
 
-MIT, see [LICENSE](./LICENSE).
+MIT, see the [repository license](../../LICENSE).

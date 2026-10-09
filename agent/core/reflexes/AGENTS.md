@@ -6,19 +6,17 @@ It is not a store, a state collector, a seed catalog or an adapter for any one a
 
 ## Start Here
 
-- `reflexes` package (module root) — the importable API; its `doc.go` is the package documentation. `engine.go` (`Run`), `resolve.go`, `executor.go`, `evaluator.go`, `telemetry.go`, `recurrence.go`, `types.go`.
+- `reflexes` package — the importable API; its `doc.go` is the package documentation. `engine.go` (`Run`), `resolve.go`, `executor.go`, `evaluator.go`, `telemetry.go`, `recurrence.go`, `types.go`.
 - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- The repository-root workflows run the whole `agent` module gate.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+scripts/check agent
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+Run from the repository root. CI uses the same module check.
 
 ## Boundaries
 

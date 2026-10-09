@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	toolselect "github.com/hollis-labs/go-toolselect"
-	"github.com/hollis-labs/go-toolselect/profile"
+	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
+	"github.com/hollis-labs/substrate/agent/toolselect/profile"
 )
 
 func main() {

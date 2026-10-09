@@ -38,7 +38,7 @@
 // means the upstream did not declare the hint and is never coerced to false.
 // The package is pure: no I/O, no clock, no global state, standard library
 // only. The profile evaluator lives in the sibling package
-// github.com/hollis-labs/go-toolselect/profile, and the per-launch profile
-// derivation from an Assignment in github.com/hollis-labs/go-toolselect/launch,
+// github.com/hollis-labs/substrate/agent/toolselect/profile, and the per-launch profile
+// derivation from an Assignment in github.com/hollis-labs/substrate/agent/toolselect/launch,
 // the only package of the module with a non-standard-library import.
 package toolselect

@@ -6,26 +6,27 @@ It is not an authorizer, a config loader or a token-budget pruner. It decides wh
 
 ## Start Here
 
-- `toolselect` (module root): `index.go` (`NewIndex`, `Rank`, BM25), `rule.go` (Rule/Match/Action), `tokenize.go` (tokenizer and stopwords), `options.go`, `tool.go` (types and tiers).
+- `toolselect`: `index.go` (`NewIndex`, `Rank`, BM25), `rule.go` (Rule/Match/Action), `tokenize.go` (tokenizer and stopwords), `options.go`, `tool.go` (types and tiers).
 - `profile/`: `Evaluate` and its types. Standard library only, like the root.
-- `launch/`: `FromAssignment`, the only package that imports `agent-contracts-leaf` (pinned v0.1.0 in `go.mod`).
+- `launch/`: `FromAssignment`, the only package that imports
+  `substrate/llm-core/contracts`.
 - `examples/hello/main.go` — the runnable example; the README `## Usage` fence must stay identical to it.
-- `.github/workflows/check.yml` — the full CI gate; `release.yml` refuses a tag with no CHANGELOG heading.
+- The repository-root workflows run the whole `agent` module gate.
 
 ## Commands
 
 ```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
+scripts/check agent
 ```
 
-CI (`.github/workflows/check.yml`) is the full gate.
+Run from the repository root. CI uses the same module check.
 
 ## Boundaries
 
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
-- `toolselect` and `toolselect/profile` are standard library only (`go list -deps ./ ./profile` shows no non-stdlib import); only `toolselect/launch` may import `agent-contracts-leaf`, and nothing else may. Do not add a stand-in `Assignment` type.
+- `toolselect` and `toolselect/profile` are standard library only; only
+  `toolselect/launch` may import `substrate/llm-core/contracts`, and nothing
+  else may. Do not add a stand-in `Assignment` type.
 - `launch` is a ceiling, never an expansion (`TestNeverWidensBase`). An empty intersection must stay a non-empty allow list holding the never-matching entry, because an empty `ToolsAllow` allows everything (`TestEmptyIntersectionNeverBecomesEmptyAllowList`). Globs are intersected only via literals or identity; do not "improve" that with prefix heuristics (`path.Match("a_?*", "a_*")` is true but `a_*` is not inside `a_?*`). Grant entries are tool-name globs, not server ids.
 - Ordering is a total order with the tier compared before the score, never folded into it (`TestTierExactNameOutranksStuffedDescription`, `TestRankIsDeterministicAndCatalogOrderIndependent`). Do not add a boost to the BM25 score.
 - Equal-priority rules apply in declaration order, so the rule sort must stay `sort.SliceStable` (`TestEqualPriorityRulesApplyInDeclarationOrder`).

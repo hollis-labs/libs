@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
 )
 
 // t0 is the fake clock's start. It is whole-second so stores that truncate

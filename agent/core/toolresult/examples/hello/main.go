@@ -8,8 +8,8 @@ import (
 	"log"
 	"strings"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
-	"github.com/hollis-labs/go-toolresult/memstore"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
+	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
 )
 
 func main() {

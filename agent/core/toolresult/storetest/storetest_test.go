@@ -3,9 +3,9 @@ package storetest_test
 import (
 	"testing"
 
-	toolresult "github.com/hollis-labs/go-toolresult"
-	"github.com/hollis-labs/go-toolresult/memstore"
-	"github.com/hollis-labs/go-toolresult/storetest"
+	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
+	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
+	"github.com/hollis-labs/substrate/agent/toolresult/storetest"
 )
 
 // TestSuiteRunsAgainstMemstore keeps the suite itself compiled and exercised

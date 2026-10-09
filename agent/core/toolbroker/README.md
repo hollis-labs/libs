@@ -1,6 +1,6 @@
 # go-toolbroker
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/go-toolbroker.svg)](https://pkg.go.dev/github.com/hollis-labs/go-toolbroker)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/agent/toolbroker.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/agent/toolbroker)
 
 `go-toolbroker` is an in-process Go library for **intent-aware MCP tool selection**. Given a registry of MCP tool definitions and a priority-ordered set of rules, it selects the subset of tools relevant to a user's detected intent — replacing hardcoded exclude lists with a flexible rule engine. It also ships keyword-based intent detection, token-budget estimation, progressive-discovery scoring helpers, and an optional per-tool enrichment pipeline (`Hints` → markdown override block).
 
@@ -13,11 +13,11 @@ Pre-1.0. The public API is stable enough to be embedded in production code; expe
 ## Install
 
 ```bash
-go get github.com/hollis-labs/go-toolbroker
+go get github.com/hollis-labs/substrate/agent/toolbroker
 ```
 
 ```go
-import "github.com/hollis-labs/go-toolbroker/broker"
+import "github.com/hollis-labs/substrate/agent/toolbroker/broker"
 ```
 
 ## Quickstart
@@ -29,7 +29,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/hollis-labs/go-toolbroker/broker"
+    "github.com/hollis-labs/substrate/agent/toolbroker/broker"
 )
 
 func main() {
@@ -162,13 +162,11 @@ Everything else is the Go standard library (`context`, `encoding/json`, `embed`,
 
 ## Testing
 
-```bash
-go test ./...
-go test -race ./...
-```
-
-No external services, fixtures, or environment variables are required. Tests use `t.TempDir()` for any file I/O and cover broker selection, rule loading (JSON/YAML/YML), default rules, intent detection, scoring, token budgeting, and enrichment composition.
+From the repository root, run `scripts/check agent`. No external services,
+fixtures, or environment variables are required. Tests use `t.TempDir()` for
+file I/O and cover broker selection, rule loading (JSON/YAML/YML), default
+rules, intent detection, scoring, token budgeting, and enrichment composition.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see the [repository license](../../LICENSE).

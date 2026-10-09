@@ -11,7 +11,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hollis-labs/go-toolbroker/broker"
+	"github.com/hollis-labs/substrate/agent/toolbroker/broker"
 )
 
 func main() {

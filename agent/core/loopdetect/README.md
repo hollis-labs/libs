@@ -11,7 +11,7 @@ It answers one question: in this session, has the same tool been called with the
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-loopdetect
+go get github.com/hollis-labs/substrate/agent/loopdetect
 ```
 
 Requires Go 1.26.6 or newer. Standard library only.
@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	loopdetect "github.com/hollis-labs/go-loopdetect"
+	loopdetect "github.com/hollis-labs/substrate/agent/loopdetect"
 )
 
 func main() {
@@ -74,14 +74,8 @@ This module is pre-1.0 and unreleased: any release, including a minor one, may b
 
 ## Development
 
-```sh
-gofmt -l .
-go vet ./...
-go test -race -count=1 ./...
-```
-
-CI (`.github/workflows/check.yml`) is the full gate.
+From the repository root, run `scripts/check agent`.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see the [repository license](../../LICENSE).
