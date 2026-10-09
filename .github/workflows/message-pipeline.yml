@@ -1,0 +1,29 @@
+# Checks for the message-pipeline module only; runs when its files (or the shared module workflow) change.
+name: message-pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "message-pipeline/**"
+      - ".github/workflows/message-pipeline.yml"
+      - ".github/workflows/_module.yml"
+  pull_request:
+    paths:
+      - "message-pipeline/**"
+      - ".github/workflows/message-pipeline.yml"
+      - ".github/workflows/_module.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: message-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: message-pipeline
+      race: true
