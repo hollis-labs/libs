@@ -1,5 +1,20 @@
 # go-agentdef
 
+## Replacement and repository retirement
+
+New development uses `github.com/hollis-labs/substrate/mesh/agentdef` from the released module
+`github.com/hollis-labs/substrate/mesh v0.1.0`:
+
+```sh
+go get github.com/hollis-labs/substrate/mesh@v0.1.0
+```
+
+The replacement is the v2 definition contract. Its symbols, file schema and digest differ from this preserved v1 implementation; adapt the caller explicitly rather than rewriting an import blindly.
+
+This final redirect is followed by repository archival. Existing source, tags,
+versions and Git history remain available; nothing is deleted. The sections
+below describe the preserved standalone implementation.
+
 Parse, validate and fingerprint agent definition files: one markdown file per
 agent, strict YAML frontmatter above the instructions. Layered sources, Agent
 Skills resolution and hash-pinning, and an `agentdef` CLI for CI.
