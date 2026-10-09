@@ -9,6 +9,8 @@
 // Managed regular files have one apply engine: workspace/materialize. Credential
 // destinations are excluded from managed trees and manifests, including removal
 // selections. Credentials are authorized link effects, never planted bytes.
+// Managed directories preserve authored modes 0700, 0750 or 0755; an omitted
+// mode defaults to 0755. Other directory modes and special bits refuse.
 // Journals, receipts and stable locks are control files with a separate, narrow
 // atomicfile carve-out; this is not a second managed-artifact writer.
 //
