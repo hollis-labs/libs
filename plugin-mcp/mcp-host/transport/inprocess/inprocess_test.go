@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/plugin-mcp/mcp-host/config"
+	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
 	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/capability"
 	sdksub "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
 )
@@ -249,28 +250,33 @@ func TestSuperviseDisabled_DoesNotRestart(t *testing.T) {
 func fixtureInitFactory(t *testing.T) config.InprocessInitFactory {
 	t.Helper()
 	root := t.TempDir()
+	host, err := pluginhost.NewHostInstance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var generation atomic.Uint64
 	return func(context.Context) (config.InprocessInitialization, error) {
 		return config.InprocessInitialization{
 			Params: sdksub.InitParams{PluginDir: root, DataDir: root, CacheDir: root,
 				Config: map[string]string{}, LogLevel: "info",
-				HostInfo:           sdksub.HostInfo{Version: "test", Protocol: sdksub.ProtocolVersion},
+				HostInfo:           sdksub.HostInfo{Version: "0.1.0", Protocol: sdksub.ProtocolVersion},
 				CapabilityContract: capability.ContractVersion,
-				Incarnation:        capability.RuntimeIdentity{HostInstance: "fixture-host", OwnerID: "fixture", OwnerGeneration: generation.Add(1)},
+				Incarnation:        capability.RuntimeIdentity{HostInstance: host, OwnerID: "fixture", OwnerGeneration: generation.Add(1)},
 				Grants:             capability.GrantSet{}},
-			ExpectedID: "fixture", ExpectedVersion: "test",
+			ExpectedID: "fixture", ExpectedVersion: "0.1.0",
 		}, nil
 	}
 }
 
 func TestInitializationInvalidNeverSpawns(t *testing.T) {
 	cases := map[string]func(*config.InprocessInitialization){
-		"missing roots":       func(v *config.InprocessInitialization) { v.Params.DataDir = "" },
-		"missing incarnation": func(v *config.InprocessInitialization) { v.Params.Incarnation = capability.RuntimeIdentity{} },
-		"implicit grants":     func(v *config.InprocessInitialization) { v.Params.Grants = nil },
-		"wrong protocol":      func(v *config.InprocessInitialization) { v.Params.HostInfo.Protocol = 1 },
-		"wrong contract":      func(v *config.InprocessInitialization) { v.Params.CapabilityContract = 0 },
-		"reverse offer":       func(v *config.InprocessInitialization) { v.Params.HostServices = &sdksub.HostServices{} },
+		"invalid expected version": func(v *config.InprocessInitialization) { v.ExpectedVersion = "not-a-version" },
+		"missing roots":            func(v *config.InprocessInitialization) { v.Params.DataDir = "" },
+		"missing incarnation":      func(v *config.InprocessInitialization) { v.Params.Incarnation = capability.RuntimeIdentity{} },
+		"implicit grants":          func(v *config.InprocessInitialization) { v.Params.Grants = nil },
+		"wrong protocol":           func(v *config.InprocessInitialization) { v.Params.HostInfo.Protocol = 1 },
+		"wrong contract":           func(v *config.InprocessInitialization) { v.Params.CapabilityContract = 0 },
+		"reverse offer":            func(v *config.InprocessInitialization) { v.Params.HostServices = &sdksub.HostServices{} },
 		"hooks offer": func(v *config.InprocessInitialization) {
 			v.Params.HooksProfile = &sdksub.HooksProfile{HooksProfileVersion: 1}
 		},
@@ -450,5 +456,56 @@ func TestCloseCancelsPendingRestartInitialization(t *testing.T) {
 	}
 	if tr.Pid() != 0 || calls.Load() != 2 {
 		t.Fatal("closed transport restarted")
+	}
+}
+
+func TestDriverCancellationKeepsChildUsableAndCloseReaps(t *testing.T) {
+	tr, err := New(context.Background(), "clock", selfExecFixtureConfig(t, nil), testLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Close()
+	pid := tr.Pid()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := tr.CallTool(ctx, "wait", nil); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("call deadline: %v", err)
+	}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel2()
+	if _, err := tr.CallTool(ctx2, "ping", nil); err != nil {
+		t.Fatalf("child after cancelled call: %v", err)
+	}
+	if err := tr.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+		t.Fatalf("driver did not reap child pid%d: %v", pid, err)
+	}
+}
+
+// Controller recreation must obey the driver's canonical generation ledger,
+// not merely the adapter's per-transport initialization validation.
+func TestSharedDriverRefusesReusedGenerationAfterClose(t *testing.T) {
+	cfg := selfExecFixtureConfig(t, nil)
+	input, err := cfg.InitFactory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.InitFactory = func(context.Context) (config.InprocessInitialization, error) { return input, nil }
+	tr, err := New(context.Background(), "clock", cfg, testLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.Close(); err != nil {
+		t.Fatal(err)
+	}
+	again, err := New(context.Background(), "clock", cfg, testLogger())
+	if err == nil {
+		_ = again.Close()
+		t.Fatal("recreated adapter reused retired generation")
+	}
+	if !errors.Is(err, pluginhost.ErrInvalidGeneration) {
+		t.Fatalf("driver reservation cause lost: %v", err)
 	}
 }

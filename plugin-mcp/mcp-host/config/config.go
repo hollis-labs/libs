@@ -99,7 +99,7 @@ type InprocessInitFactory func(ctx context.Context) (InprocessInitialization, er
 
 // InprocessConfig backs an `inprocess`-mode logical server: a subprocess
 // plugin speaking plugin-sdk/subprocess's dialect. Always spawned and,
-// by default, supervised by mcp-host — there is no dial variant, since an
+// by default, supervised through plugin-host — there is no dial variant, since an
 // inprocess plugin never runs standalone.
 type InprocessConfig struct {
 	// InitFactory is programmatic trusted-host input, never YAML authority.

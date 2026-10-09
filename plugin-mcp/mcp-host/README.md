@@ -9,8 +9,7 @@ full design and the process/inprocess tradeoff.
 
 `github.com/hollis-labs/station` is the first real consumer — a small
 binary wrapping `mcphost.Run` with flag parsing and its own config. Its
-historical inprocess setup needs the protocol-2 owner initialization described
-below before use with this release.
+inprocess setup supplies the protocol-2 owner initialization described below.
 
 ## Status
 
@@ -149,10 +148,10 @@ Go-only for this host and don't need it to run anywhere else.
   `internal/mcp.Manager`.
 - `transport/process` — `process` mode: dial via `go-mcp/client.Pool`
   (URL) or host-owned spawn+supervision via `go-mcp/supervise` (Command).
-- `transport/inprocess` — `inprocess` mode: this library's own host-side
-  driver for plugin-sdk/subprocess's JSON-RPC dialect, plus the same
-  spawn+supervision shape as `transport/process`, plus a proactive
-  `plugin/health` poll on top of reactive crash detection. Tool discovery
+- `transport/inprocess` — `inprocess` mode: an MCP adapter over
+  `plugin-host.Supervisor` and its typed `Client`. Plugin-host owns spawning,
+  validated protocol-2 RPC, cancellation, bounded writes, health,
+  unload/kill/reap and restart budgeting. Tool discovery
   is manifest-driven (config-declared), never a live `mcp/list_tools` call
   — see "Process vs inprocess" above.
 - `serving` — bridges a registered logical server onto its own
@@ -196,8 +195,7 @@ package checks; use `scripts/check plugin-mcp` at the libs root for the module.
   spawn variant therefore owns its subprocess directly (`mcpsdk.IOTransport`
   over pipes it controls) rather than routing it through Pool; Pool is used
   only for the dial (URL) variant, where its reconnect/health-probe shape
-  is the right fit. `transport/inprocess` does the equivalent for
-  plugin-sdk's dialect, which has no Pool-equivalent to begin with.
+  is the right fit. `transport/inprocess` delegates subprocess ownership to `plugin-host`.
 
 ## License
 
@@ -229,3 +227,23 @@ contract plus the supplied expected plugin ID/version before proceeding. It is
 forward-only: reverse and hooks offers are refused, as are unsolicited profile
 acknowledgements. Missing factories fail closed before creating a process;
 existing inprocess configuration needs this programmatic migration.
+
+## Shared plugin driver
+
+Inprocess transport uses `plugin-host` in this same module; it has no second
+JSON-RPC codec, health loop, reaper or supervisor. `Transport.Status()` exposes
+the driver's typed exit, failure and exhaustion state. MCP tool conversion and
+the static catalog remain in mcp-host. Process-mode MCP servers are unchanged.
+
+The adapter explicitly permits bounded recovery from unexpected child exits:
+five attempts with 1s/2s/4s/8s/16s backoff, refilled after one minute of uptime.
+The driver still treats invalid initialization/protocol/identity as terminal.
+Its canonical generation reservation spans controller recreation, so factories
+must share their host epoch and generation issuer rather than reset generation
+for a reused tuple. Expected versions follow the driver's semantic-version
+contract. Close delegates graceful unload and bounded kill/reap to the driver.
+
+Station's clock plugin needs no reverse host calls: a non-nil empty grant set
+is its explicit policy. This adapter continues to refuse reverse/hooks offers;
+consolidating the driver does not grant plugins host services. Environment
+inheritance is mcp-host's explicit adapter policy, not a driver default.

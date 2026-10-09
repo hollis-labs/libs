@@ -64,7 +64,7 @@ workaround. Don't add a live discovery call back in "to keep the manifest
 in sync" — that's the exact pattern both this library and Tangent moved
 away from on purpose. One consequence worth knowing: it's also the only
 reason `examples/plugins/clock-plugin` can use plugin-sdk's own documented
-`subprocess.Serve` helper at all — verified against plugin-sdk v0.5.0,
+`subprocess.Serve` helper at all — verified against the consolidated SDK,
 `Serve`'s dispatch has no case for `mcp/list_tools` and no capability
 interface for it either, so a plugin that needed live discovery to work
 could never have used `Serve` regardless.
@@ -86,3 +86,6 @@ forward-only and refuses optional reverse/hooks offers.
 Process-mode MCP client identity remains fixed in the transport. Inprocess
 HostInfo and expected plugin identity/version are supplied by the trusted owner
 factory; the logical-server ID is a routing key, not incarnation authority.
+
+Inprocess process/lifecycle/RPC ownership belongs to plugin-host. Keep this
+transport an MCP adapter; do not add a second codec, health loop or reaper.
