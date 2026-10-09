@@ -254,7 +254,10 @@ async function baseCancel(s) {
 async function descendants(s, host) {
   const requests = [];
   for (const id of [2, 3]) {
-    await command(s, id, "get", { n: 2, key: "read" });
+    // Cancellation finishes the helpers. Keep the cancelled parent's author
+    // callback outstanding until its unknown-outcome terminal is observed;
+    // otherwise a completed callback may legitimately report committed state.
+    await command(s, id, "get", { n: 2, key: "read", return_gate: id === 2 });
     for (let n = 0; n < 2; n++)
       requests.push(
         host.request(await s.frame((v) => v.method === "host/storage/get")),
@@ -277,6 +280,7 @@ async function descendants(s, host) {
   for (const req of requests) await host.reply(s, req, { found: false });
   const surviving = JSON.parse((await response(s, 3)).result.content);
   assert.ok(surviving.every((r) => r.code === "ok"));
+  await release(s, 2);
   await finish(s);
 }
 async function deadline(s) {

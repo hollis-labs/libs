@@ -213,6 +213,7 @@ func (p *childCases) Command(ctx context.Context, v CommandRequest) (CommandResu
 			OperationKey string `json:"operation_key"`
 			ValueBytes   int    `json:"value_bytes"`
 			Gate         bool   `json:"gate"`
+			ReturnGate   bool   `json:"return_gate"`
 		}
 		if json.Unmarshal([]byte(v.Args), &a) != nil || a.N < 1 || a.N > 9 || a.ValueBytes < 0 || a.ValueBytes > 65536 {
 			return CommandResult{}, errors.New("fixture arguments")
@@ -250,6 +251,9 @@ func (p *childCases) Command(ctx context.Context, v CommandRequest) (CommandResu
 			}(i)
 		}
 		wg.Wait()
+		if a.ReturnGate {
+			<-g
+		}
 		raw, _ := json.Marshal(results)
 		return CommandResult{Action: "message", Content: string(raw)}, nil
 	}
