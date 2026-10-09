@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/go-messaging/mailbox"
+	messaging "github.com/hollis-labs/substrate/mesh/messaging/mailbox"
 
 	_ "modernc.org/sqlite"
 )

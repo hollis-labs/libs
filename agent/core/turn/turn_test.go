@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/go-llm-types"
+	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 
 func turnEvents(events ...llmtypes.StreamEvent) TurnStreamStarter {

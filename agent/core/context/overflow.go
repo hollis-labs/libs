@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	llmcontracts "github.com/hollis-labs/go-llm-contracts"
+	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
 )
 
 // ErrContextOverflow is a sentinel for "provider rejected the request because
