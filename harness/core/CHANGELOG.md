@@ -6,6 +6,15 @@ All notable changes to the `harness` module are documented here. The format foll
 `harness/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
+## v0.3.1
+
+### Fixed
+
+- Workspace artifact validation accepts private managed directories with authored
+  modes `0700` and `0750`, preserving their modes through create, refresh and
+  reconcile. The existing `0755` default, unsafe-mode refusal and inactive
+  artifact-authority requirements are unchanged.
+
 ## v0.3.0
 
 ### Changed

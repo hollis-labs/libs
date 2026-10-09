@@ -294,7 +294,7 @@ func validateManagedEntries(entries []artifact.Entry, credentialDestinations []s
 		}
 		paths[foldText(e.Path)] = true
 		ids[e.Ownership.EntryID] = true
-		if e.Mode&^e.Mode.Perm() != 0 || e.Kind == artifact.EntryFile && e.Mode.Perm()&0022 != 0 || e.Kind == artifact.EntryDirectory && e.Mode != 0 && e.Mode.Perm() != 0755 {
+		if e.Mode&^e.Mode.Perm() != 0 || e.Kind == artifact.EntryFile && e.Mode.Perm()&0022 != 0 || e.Kind == artifact.EntryDirectory && e.Mode != 0 && e.Mode != 0700 && e.Mode != 0750 && e.Mode != 0755 {
 			return refuse(CodeUnsafeArtifactMode, "artifacts", Conflict)
 		}
 		folded := strings.ToLower(e.Path)
