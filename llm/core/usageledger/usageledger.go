@@ -3,6 +3,7 @@ package usageledger
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -211,16 +212,165 @@ func (u Usage) Validate() error {
 // recorded. It mirrors the five rates of a model catalog's pricing type by
 // value, not by import, and is inert data: this package never multiplies it
 // against a Usage.
+//
+// Source, AsOf and UnknownRates describe where the rates came from. They are
+// optional and omitted from JSON when empty, so a snapshot written before they
+// existed decodes and re-encodes unchanged.
 type PriceSnapshot struct {
 	InputPerMillion      float64 `json:"input_per_million"`
 	OutputPerMillion     float64 `json:"output_per_million"`
 	CacheWritePerMillion float64 `json:"cache_write_per_million,omitempty"`
 	CacheReadPerMillion  float64 `json:"cache_read_per_million,omitempty"`
 	ReasoningPerMillion  float64 `json:"reasoning_per_million,omitempty"`
+
+	// Source names the price table the rates were read from (for example
+	// "models.dev" or the name of an override table). Empty means not recorded.
+	Source string `json:"source,omitempty"`
+	// AsOf is when the source's data was fetched or published. Zero means not
+	// recorded.
+	AsOf time.Time `json:"as_of,omitzero"`
+	// UnknownRates marks the rates the source did not know. A marked rate
+	// field is 0 and means "unknown", not "free". An unmarked rate of 0 is
+	// free, or the source cannot tell the two apart.
+	UnknownRates UnknownRates `json:"unknown_rates,omitzero"`
 }
 
-// Row is one durable usage-ledger record: identity, the disjoint Usage, and
-// an optional price snapshot. There is deliberately no cost field.
+// UnknownRates flags, per core component, a rate the price source did not
+// know. Each field's JSON name is the Usage JSON tag of the component it
+// covers. The zero value means every rate is known. It is a struct of flags
+// rather than a list so that PriceSnapshot stays comparable with ==.
+type UnknownRates struct {
+	UncachedInput bool `json:"uncached_input_tokens,omitempty"`
+	CacheRead     bool `json:"cache_read_tokens,omitempty"`
+	CacheWrite    bool `json:"cache_write_tokens,omitempty"`
+	Output        bool `json:"output_tokens,omitempty"`
+	Reasoning     bool `json:"reasoning_tokens,omitempty"`
+}
+
+// Any reports whether at least one rate is marked unknown.
+func (u UnknownRates) Any() bool { return u != UnknownRates{} }
+
+// RateKnown reports whether the snapshot knows the rate for the core
+// component named by its Usage JSON tag (for example "cache_read_tokens").
+// It returns false for a component marked in UnknownRates and for a name
+// that is not a core component.
+func (p PriceSnapshot) RateKnown(component string) bool {
+	u := p.UnknownRates
+	switch component {
+	case "uncached_input_tokens":
+		return !u.UncachedInput
+	case "cache_read_tokens":
+		return !u.CacheRead
+	case "cache_write_tokens":
+		return !u.CacheWrite
+	case "output_tokens":
+		return !u.Output
+	case "reasoning_tokens":
+		return !u.Reasoning
+	}
+	return false
+}
+
+// coreComponentNames are the Usage JSON tags of the five core components, in
+// field order.
+var coreComponentNames = []string{
+	"uncached_input_tokens",
+	"cache_read_tokens",
+	"cache_write_tokens",
+	"output_tokens",
+	"reasoning_tokens",
+}
+
+// CoreComponentNames returns the Usage JSON tags of the five core components,
+// in field order. RateKnown and the JSON names of UnknownRates use them. The
+// slice is a fresh copy on every call.
+func CoreComponentNames() []string {
+	return append([]string(nil), coreComponentNames...)
+}
+
+// rateFor returns the snapshot's rate for the core component named by its
+// Usage JSON tag.
+func (p PriceSnapshot) rateFor(component string) float64 {
+	switch component {
+	case "uncached_input_tokens":
+		return p.InputPerMillion
+	case "cache_read_tokens":
+		return p.CacheReadPerMillion
+	case "cache_write_tokens":
+		return p.CacheWritePerMillion
+	case "output_tokens":
+		return p.OutputPerMillion
+	case "reasoning_tokens":
+		return p.ReasoningPerMillion
+	}
+	return 0
+}
+
+// Validate rejects a snapshot with a negative or non-finite rate, or with a
+// rate marked unknown that carries a non-zero value. All problems are
+// reported, joined.
+func (p PriceSnapshot) Validate() error {
+	var errs []error
+	for _, n := range coreComponentNames {
+		r := p.rateFor(n)
+		if math.IsNaN(r) || math.IsInf(r, 0) || r < 0 {
+			errs = append(errs, fmt.Errorf("usageledger: price: rate for %s is %v (must be finite and non-negative)", n, r))
+			continue
+		}
+		if !p.RateKnown(n) && r != 0 {
+			errs = append(errs, fmt.Errorf("usageledger: price: rate for %s is marked unknown but set to %v (must be 0)", n, r))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// CostKind says what a cost derived from a Row stands for. It is a label on
+// the row, not a cost: the package still carries no cost field.
+//
+// The zero value ("") is CostKindUnspecified, which is what every row recorded
+// before the field existed decodes to. Only CostKindAPIBilled is a bill; the
+// other kinds are estimates or equivalents and must not be presented as money
+// owed.
+type CostKind string
+
+const (
+	// CostKindUnspecified means the row does not say. Treat its cost as an
+	// estimate, never as a bill.
+	CostKindUnspecified CostKind = ""
+	// CostKindAPIBilled means the provider bills this call by the token at
+	// the recorded rates: the cost is what was (or will be) charged.
+	CostKindAPIBilled CostKind = "api_billed"
+	// CostKindAPIEstimated means the call is billed per token, but the figure
+	// is computed locally (from estimated tokens or a rate table) rather than
+	// taken from the provider's bill.
+	CostKindAPIEstimated CostKind = "api_estimated"
+	// CostKindSubscriptionEquivalent means the call ran under a flat-rate
+	// subscription. The figure is what the same tokens would cost at API
+	// rates; nobody is charged it.
+	CostKindSubscriptionEquivalent CostKind = "subscription_equivalent"
+	// CostKindLocalCompute means the model ran on hardware the caller owns.
+	// Any figure is an attributed compute cost, not a provider charge.
+	CostKindLocalCompute CostKind = "local_compute"
+)
+
+// Valid reports whether k is one of the defined kinds, including
+// CostKindUnspecified.
+func (k CostKind) Valid() bool {
+	switch k {
+	case CostKindUnspecified, CostKindAPIBilled, CostKindAPIEstimated,
+		CostKindSubscriptionEquivalent, CostKindLocalCompute:
+		return true
+	}
+	return false
+}
+
+// IsBill reports whether a cost of this kind is money a provider charges. It
+// is true only for CostKindAPIBilled.
+func (k CostKind) IsBill() bool { return k == CostKindAPIBilled }
+
+// Row is one durable usage-ledger record: identity, the disjoint Usage, an
+// optional price snapshot and the kind of cost it supports. There is
+// deliberately no cost field.
 type Row struct {
 	SessionID  string         `json:"session_id"`
 	MessageID  string         `json:"message_id,omitempty"`
@@ -228,5 +378,24 @@ type Row struct {
 	Model      string         `json:"model"`
 	Usage      Usage          `json:"usage"`
 	Price      *PriceSnapshot `json:"price,omitempty"` // nil = not priced
+	CostKind   CostKind       `json:"cost_kind,omitempty"`
 	RecordedAt time.Time      `json:"recorded_at"`
+}
+
+// Validate checks the row's Usage, its CostKind and, when present, its Price.
+// It does not check identity fields. All problems are reported, joined.
+func (r Row) Validate() error {
+	var errs []error
+	if err := r.Usage.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+	if !r.CostKind.Valid() {
+		errs = append(errs, fmt.Errorf("usageledger: cost_kind: invalid value %q", string(r.CostKind)))
+	}
+	if r.Price != nil {
+		if err := r.Price.Validate(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }

@@ -8,6 +8,12 @@ All notable changes to the `llm-core` module are documented here. The format fol
 
 ## [Unreleased]
 
+### Added
+
+- `llm-core/usageledger`: cost kinds on `Row` (`api_billed`, `api_estimated`, `subscription_equivalent`, `local_compute`) and price-snapshot provenance (`Source`, `AsOf`, `UnknownRates`), all omitted when empty; `Row.Validate`.
+- `llm-core/costcalc`: the `PriceSource` seam, `PriceFromSource`, and partial costs (`UnpricedTokens`, `Partial`) with `Kind`/`IsBill` on `Cost`.
+- `llm-core/pricesource`: new package of price sources (models.dev adapter, override tables, LiteLLM-style parser, chain, atomic swap, offline file cache) with migration notes.
+
 ## v0.1.0 — 2026-10-03
 
 First release of the llm-core module: the packages of seven former Hollis Labs modules, moved in with their git history.

@@ -45,6 +45,12 @@ func main() {
 
 The same program lives in [`examples/hello`](./examples/hello/main.go). Start from `NewUsage()`: it marks every core component `unknown`, so a component you never set cannot read as "measured 0". A `Usage` built by bare struct literal fails `Validate()`.
 
+## Cost kinds and price snapshots
+
+`Row.CostKind` labels what a cost figure for the row means: `api_billed` (the provider charges it), `api_estimated`, `subscription_equivalent` (what the usage would cost at API rates under a flat subscription) or `local_compute`. Rows written before the field existed decode as `CostKindUnspecified`. `CostKind.IsBill()` is true only for `api_billed`, so a subscription-equivalent figure is never presented as a bill. The kind is a label: `Row` still has no cost field.
+
+`PriceSnapshot` records where its rates came from (`Source`, `AsOf`) and which rates were unknown (`UnknownRates`, one flag per core component, with the component's JSON tag). An unknown rate is stored as 0 and `RateKnown` reports false for it, so a pricer can report the cost as partial instead of free. All new fields are omitted when empty: an old row round-trips byte for byte.
+
 ## Why
 
 The same defect turned up in four Hollis Labs apps: Nanite stores a `total_tokens` of input plus output while cache tokens sit in their own columns; Nanite, Torque and Tesseract price only input and output (Torque folds cache tokens into the prompt count as a workaround); Tether's Anthropic adapter leaves reasoning tokens at Go's zero value, indistinguishable from "used none". This library keeps the components disjoint, derives the total, and makes "not reported" a first-class state. `TestUsage_TotalTokens_SumsAllFiveAndDims` and `TestUsage_UnreportedIsNotMeasuredZero` are the regression tests: the naive shapes fail them, this one passes.
@@ -63,7 +69,7 @@ This module is pre-1.0 and unreleased: any release, including a minor one, may b
 - Sums are plain `int64` addition and do not check for overflow.
 - `Validate()` is not called for you: `Row` has no constructor and nothing validates on unmarshal. Call `Usage.Validate()` before persisting or trusting a decoded value. A decoded `Usage` with an absent component has empty provenance and fails validation.
 - `PriceSnapshot` copies the shape of a model catalog's pricing type by value. If the catalog adds a rate, this type does not follow until someone changes it; a parity test belongs in the library that imports both.
-- `Row` and `PriceSnapshot` are not validated at all (no check for negative rates or empty identity).
+- `Row.Validate()` checks the usage, the cost kind and the price snapshot (finite, non-negative rates; a rate marked unknown must be 0). It does not check identity fields, and nothing calls it on unmarshal.
 - `Dims` names are free-form apart from the collision and empty-name rules; nothing normalizes their case, so `"Audio"` and `"audio"` are two dimensions.
 
 ## Out of scope

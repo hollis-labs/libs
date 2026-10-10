@@ -46,6 +46,10 @@ func main() {
 
 The same program lives in [`examples/hello`](./examples/hello/main.go). `PriceModel(cat, providerID, modelID, usage)` does the same after looking the model up in a `Catalog` (a `*modelsdev.Client` satisfies it), and `PriceRow(row)` prices a recorded `usageledger.Row` at the `Price` snapshot stored on it. Take the snapshot for a new row with `SnapshotPrice`.
 
+`PriceFromSource(src, providerID, modelID, usage)` looks the model up in any `PriceSource` (one method, `Snapshot(providerID, modelID)`); the `llm-core/pricesource` package provides models.dev, override-table, LiteLLM-style and chained sources with an offline cache.
+
+A snapshot may mark rates unknown (`PriceSnapshot.UnknownRates`). Tokens in such a component, and every `Dims` token, contribute $0 and are counted in `Cost.UnpricedTokens`; `Cost.Partial()` reports it, and the total is then a lower bound. `PriceRow` copies the row's `CostKind` onto `Cost.Kind`, and `Cost.IsBill()` is true only for a priced `api_billed` cost: never present a subscription-equivalent or estimated figure as a bill.
+
 Read `Cost.Priced` before treating a zero total as free, and read `Cost.Provenance` before treating the total as exact: it is `usage.TotalProvenance()`, and an unreported component contributes $0.
 
 ## Why
@@ -63,7 +67,7 @@ This module is pre-1.0 and unreleased: any release, including a minor one, may b
 ## Known limitations
 
 - Costs are unrounded `float64` USD. Rounding and display precision are the caller's concern.
-- A zero rate contributes $0. The catalog's pricing type cannot tell "free" from "rate not populated" for the optional cache and reasoning rates, and neither can this package.
+- A zero rate not marked unknown contributes $0. The catalog's pricing type cannot tell "free" from "rate not populated" for the optional cache and reasoning rates, so `PriceSnapshotFromPricing` never marks a rate unknown; a source with better data (an override table) can.
 - `Priced == false` covers both "model not in the catalog" and "the catalog's cache was never populated": `Catalog.Get` does not distinguish them. A caller that cares should check `modelsdev.Client.LastFetchedAt()` before pricing.
 - `Cost.Provenance` includes `Dims` entries even though they are never priced, so an uncertain extension dimension can make a fully priced total read `estimated` or `unknown`.
 - `Price` does not call `Usage.Validate`, and negative or non-finite rates or token counts are not rejected; garbage in gives garbage out (`FuzzPrice` covers the non-negative, finite, bounded domain).
@@ -75,7 +79,7 @@ This module is pre-1.0 and unreleased: any release, including a minor one, may b
 - Currency conversion or multiple currencies: everything is USD, as in the catalog.
 - Pricing `Usage.Dims` entries: `PriceSnapshot` has no rate for an arbitrary dimension.
 - Re-pricing a `Row` from a live catalog instead of its stored snapshot.
-- Fetching, caching or refreshing the catalog: the caller owns the `Catalog` (in practice a `*modelsdev.Client`).
+- Fetching, caching or refreshing the catalog or a price table: the caller owns the `Catalog` or `PriceSource` (see `llm-core/pricesource`).
 - Changes to `go-usage-ledger` or `go-modelsdev`, and adoption in any application.
 
 ## Development

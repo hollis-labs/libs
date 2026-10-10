@@ -3,6 +3,7 @@ package costcalc_test
 import (
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
@@ -151,9 +152,10 @@ func TestPrice_DimsNotPriced(t *testing.T) {
 }
 
 func TestPrice_TotalIsDerived(t *testing.T) {
-	// Cost has exactly five USD fields plus Priced and Provenance: no stored total.
+	// Cost has exactly five USD fields plus Priced, Provenance, Kind and
+	// UnpricedTokens: no stored total.
 	typ := reflect.TypeOf(costcalc.Cost{})
-	want := []string{"UncachedInputUSD", "CacheReadUSD", "CacheWriteUSD", "OutputUSD", "ReasoningUSD", "Priced", "Provenance"}
+	want := []string{"UncachedInputUSD", "CacheReadUSD", "CacheWriteUSD", "OutputUSD", "ReasoningUSD", "Priced", "Provenance", "Kind", "UnpricedTokens"}
 	if typ.NumField() != len(want) {
 		t.Fatalf("Cost has %d fields, want %d", typ.NumField(), len(want))
 	}
@@ -248,8 +250,16 @@ func TestPriceModel_Found(t *testing.T) {
 func TestPriceSnapshotFromPricing_FieldParity(t *testing.T) {
 	pt := reflect.TypeOf(modelsdev.Pricing{})
 	st := reflect.TypeOf(usageledger.PriceSnapshot{})
-	if pt.NumField() != st.NumField() {
-		t.Fatalf("modelsdev.Pricing has %d fields, usageledger.PriceSnapshot has %d: a pricing dimension was added on one side", pt.NumField(), st.NumField())
+	// Parity is about rates: count PriceSnapshot's ...PerMillion fields, not
+	// its source metadata (Source, AsOf, UnknownRates).
+	rates := 0
+	for i := range st.NumField() {
+		if strings.HasSuffix(st.Field(i).Name, "PerMillion") {
+			rates++
+		}
+	}
+	if pt.NumField() != rates {
+		t.Fatalf("modelsdev.Pricing has %d fields, usageledger.PriceSnapshot has %d rate fields: a pricing dimension was added on one side", pt.NumField(), rates)
 	}
 	// Give every Pricing field a distinct non-zero value, convert, and require
 	// each one to land in the PriceSnapshot field named <Name>PerMillion.
