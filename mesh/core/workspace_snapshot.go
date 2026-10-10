@@ -154,12 +154,16 @@ func (p WorkspaceSnapshotTaken) Validate() error {
 		}
 		reasons := make(map[string]bool)
 		for _, s := range r.Skipped {
-			if s.Count == 0 || reasons[s.Reason] || p.Complete {
+			if s.Count == 0 || reasons[s.Reason] {
 				return snapshotInvalid()
 			}
 			reasons[s.Reason] = true
 			switch s.Reason {
-			case "excluded", "oversize_untracked", "unsupported", "unobserved":
+			case "excluded", "git_metadata":
+			case "oversize_untracked", "unsupported", "unobserved":
+				if p.Complete {
+					return snapshotInvalid()
+				}
 			default:
 				return snapshotInvalid()
 			}

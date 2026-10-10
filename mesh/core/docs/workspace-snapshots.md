@@ -40,7 +40,12 @@ an active provider cannot be held consistently, defer or report a best-effort
 observation with `complete=false`; timestamps alone do not make it an atomic cut.
 Per-root intervals remain distinct even at an admitted boundary: no cross-root
 atomic filesystem snapshot is implied. `complete` describes the host's admitted
-coverage and is not proof available from this pure schema validator.
+coverage and is not proof available from this pure schema validator. Mandatory secret/Git
+metadata exclusions lie outside selected eligible scope: `excluded` and
+`git_metadata` counts may remain informational on an otherwise complete admitted
+result. Oversize, unsupported, unobserved content or failed roots always makes
+coverage incomplete. The host must bind those exclusions to the selected policy,
+not let event data decide what was eligible.
 
 Emission requires continuous verified fence/custody admission and actual bound
 capture/retention receipts. No automatic shim capture, live runtime integration,

@@ -131,9 +131,15 @@ func TestWorkspaceSnapshotLegitimateInitialAndCompleteObservation(t *testing.T) 
 	p.Roots = p.Roots[:1]
 	p.Roots[0].Skipped = []mesh.SnapshotSkipped{}
 	p.Complete = true
+	p.Roots[0].Skipped = []mesh.SnapshotSkipped{{Reason: "git_metadata", Count: 1}, {Reason: "excluded", Count: 2}}
 	if err := p.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	p.Roots[0].Skipped = append(p.Roots[0].Skipped, mesh.SnapshotSkipped{Reason: "oversize_untracked", Count: 1})
+	if p.Validate() == nil {
+		t.Fatal("oversize omission claimed complete eligible scope")
+	}
+	p.Roots[0].Skipped = p.Roots[0].Skipped[:2]
 	p.Boundary = "best_effort"
 	if p.Validate() == nil {
 		t.Fatal("best-effort observation claimed complete cut")
