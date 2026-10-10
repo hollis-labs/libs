@@ -94,6 +94,9 @@ func recordSnapshotEvent(ctx context.Context, retained retainedSnapshotEventLeas
 	}
 	fence, err := host.AcquireSnapshotEvent(ctx, intent)
 	if err != nil || fence == nil {
+		if fence != nil && fence.Close() != nil {
+			return result, ErrSnapshotEventUncertain
+		}
 		return result, ErrSnapshotEventRefused
 	}
 	defer func() {

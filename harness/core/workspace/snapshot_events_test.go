@@ -20,7 +20,7 @@ type snapshotEventModel struct {
 	trace                             []string
 	invalidRetained, invalidFence     bool
 	onAcquire, onAdmission, onPersist func()
-	persistErr                        error
+	persistErr, acquireErr, closeErr  error
 	encoded                           []byte
 }
 
@@ -50,7 +50,7 @@ func (m *snapshotEventModel) AcquireSnapshotEvent(context.Context, snapshot.Capt
 	if m.onAcquire != nil {
 		m.onAcquire()
 	}
-	return m, nil
+	return m, m.acquireErr
 }
 func (m *snapshotEventModel) Admission() SnapshotEventAdmission {
 	m.trace = append(m.trace, "admission")
@@ -74,7 +74,23 @@ func (m *snapshotEventModel) Persist(_ context.Context, _ snapshot.CaptureIntent
 	}
 	return "destination:99", m.persistErr
 }
-func (m *snapshotEventModel) Close() error { m.trace = append(m.trace, "close"); return nil }
+func (m *snapshotEventModel) Close() error { m.trace = append(m.trace, "close"); return m.closeErr }
+
+func TestSnapshotEventModelClosesPartialAdmission(t *testing.T) {
+	for _, closeFails := range []bool{false, true} {
+		m := eventModel()
+		m.acquireErr = errors.New("private partial admission failure")
+		expected := ErrSnapshotEventRefused
+		if closeFails {
+			m.closeErr = errors.New("private lock release failure")
+			expected = ErrSnapshotEventUncertain
+		}
+		result, err := recordSnapshotEvent(context.Background(), retainedEventModel{m}, "op", m)
+		if !errors.Is(err, expected) || result.Attempted || strings.Join(m.trace, ",") != "retained,acquire,close" {
+			t.Fatal("partial admission lost cleanup or reached persistence")
+		}
+	}
+}
 
 func TestSnapshotEventModelRecordsManifestAfterFenceChecks(t *testing.T) {
 	m := eventModel()
