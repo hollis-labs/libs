@@ -406,7 +406,7 @@ func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*Rea
 	return r.pin(ctx, owner, kind, true)
 }
 func (r *RetainedSet) pin(ctx context.Context, owner string, kind PinKind, acquireHost bool) (*ReadLease, error) {
-	if r == nil || r.admission == nil || owner == "" || !kind.valid() {
+	if ctx == nil || r == nil || r.admission == nil || owner == "" || !kind.valid() {
 		return nil, ErrAdmissionUnavailable
 	}
 	a := r.admission
@@ -422,7 +422,7 @@ func (r *RetainedSet) pin(ctx context.Context, owner string, kind PinKind, acqui
 			if intent.validate() != nil {
 				return nil, ErrAdmissionUnavailable
 			}
-			hostOp = SnapshotOperation{Kind: "read", Intent: intent, StoreID: a.isolation.storeID, IsolationDigest: a.isolation.Digest(), RequestDigest: r.digest, RedactionRevision: a.redactionRevision}
+			hostOp = SnapshotOperation{Kind: "read", Intent: intent, StoreID: a.isolation.storeID, IsolationDigest: a.isolation.Digest(), ProtectedDigest: a.isolation.ProtectedDigest(), RequestDigest: r.digest, RedactionRevision: a.redactionRevision}
 			var e error
 			hostLease, e = a.host.AcquireSnapshot(ctx, hostOp)
 			if e != nil || hostLease == nil {

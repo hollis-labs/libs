@@ -123,6 +123,7 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 		}
 	}()
 	byRoot := map[string]map[string]CapturedFile{}
+	var selectedBytes int64
 	seen := map[string]bool{}
 	for _, selection := range request.Selections {
 		if !safeCapturedPath(selection.Path) || !safeReceiptID(selection.TargetID) || seen[selection.TargetID+"\x00"+selection.Path] || (!selection.Expected.Present && selection.Expected.SHA256 != "") || (selection.Expected.Present && (len(selection.Expected.SHA256) != 64 || !validObjectID(selection.Expected.SHA256))) {
@@ -155,6 +156,10 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 		if !ok {
 			return result, ErrCoverageUnsupported
 		}
+		if int64(len(captured.Bytes)) > p.admission.policy.Budgets.MaxCaptureBytes-selectedBytes {
+			return result, ErrSnapshotBudget
+		}
+		selectedBytes += int64(len(captured.Bytes))
 		root, e := os.OpenRoot(scope.Binding.Root)
 		if e != nil {
 			return result, ErrCoverageUnsupported
@@ -165,7 +170,7 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 		if e != nil {
 			return result, e
 		}
-		if e = checkRestoreFile(f, p.admission.policy.Budgets.MaxRootBytes); e != nil {
+		if e = p.checkRestoreFile(f); e != nil {
 			return result, e
 		}
 	}
@@ -212,7 +217,7 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 	}
 	// Repeat the complete preflight after staging and before the first replace.
 	for _, f := range files {
-		if e = checkRestoreFile(f, p.admission.policy.Budgets.MaxRootBytes); e != nil {
+		if e = p.checkRestoreFile(f); e != nil {
 			return result, e
 		}
 	}
@@ -223,7 +228,7 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 		if e = verify(); e != nil {
 			return result, e
 		}
-		if e = checkRestoreFile(f, p.admission.policy.Budgets.MaxRootBytes); e != nil {
+		if e = p.checkRestoreFile(f); e != nil {
 			return result, e
 		}
 		record.Phase = "replace_intent"
@@ -270,7 +275,15 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 	return result, nil
 }
 
-func checkRestoreFile(f *restoreFile, max int64) error {
+func (p *GuardedProvider) checkRestoreFile(f *restoreFile) error {
+	max := p.admission.policy.Budgets.MaxRootBytes
+	// Resolve only immutable host-named credential metadata under the same
+	// writer fence. A newly linked credential must refuse BEFORE hashing bytes.
+	credentials, e := secretFileIdentities(p.plan.credentialPaths)
+	if e != nil {
+		return ErrCoverageUnsupported
+	}
+
 	current, e := os.Stat(f.scope.Binding.Root)
 	held, e2 := f.root.Stat(".")
 	if e != nil || e2 != nil || !physicalDirectory(f.scope.Binding.Root) || !os.SameFile(f.scope.identity, current) || !os.SameFile(current, held) {
@@ -298,6 +311,11 @@ func checkRestoreFile(f *restoreFile, max int64) error {
 	info, e = file.Stat()
 	if e != nil || !info.Mode().IsRegular() || !f.selection.Expected.Present || info.Size() > max {
 		return ErrRestoreConflict
+	}
+	for _, credential := range credentials {
+		if os.SameFile(info, credential) {
+			return ErrCoverageUnsupported
+		}
 	}
 	h := sha256.New()
 	n, e := io.Copy(h, io.LimitReader(file, max+1))

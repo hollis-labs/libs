@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,9 +23,23 @@ import (
 // freeze, process launch, namespace change or signal. Unsupported or incomplete
 // kernel evidence refuses; host authority and continuous admission are separate.
 func ObserveIsolation(ctx context.Context, req IsolationRequest) (*IsolationProof, error) {
-	if ctx == nil || req.ControlGroup == nil || req.ProcessID <= 0 || req.StartTime == 0 || req.Targets.Digest() == "" || !physicalDirectory(req.StorePath) {
+	if ctx == nil || req.ControlGroup == nil || req.ProcessID <= 0 || req.StartTime == 0 || req.Targets.Digest() == "" || len(req.ProtectedPaths) == 0 || !physicalDirectory(req.StorePath) {
 		return nil, ErrStoreCustodyUnsupported
 	}
+	independentControl := false
+	for _, path := range req.ProtectedPaths {
+		if path != req.StorePath {
+			independentControl = true
+		}
+	}
+	if !independentControl {
+		return nil, ErrStoreCustodyUnsupported
+	}
+	protected, err := observeProtectedRoots(req.StorePath, req.ProtectedPaths)
+	if err != nil {
+		return nil, err
+	}
+	req.ProtectedPaths = slices.Clone(req.ProtectedPaths)
 	fd, err := unix.FcntlInt(req.ControlGroup.Fd(), unix.F_DUPFD_CLOEXEC, 0)
 	if err != nil {
 		return nil, ErrStoreCustodyUnsupported
@@ -79,6 +94,10 @@ func ObserveIsolation(ctx context.Context, req IsolationRequest) (*IsolationProo
 		if e != nil || len(pids) == 0 || len(pids) > 1024 {
 			return ErrStoreCustodyUnsupported
 		}
+		metadata, e := protected.current(ctx)
+		if e != nil {
+			return e
+		}
 		found := false
 		var identities strings.Builder
 		for _, pid := range pids {
@@ -89,7 +108,7 @@ func ObserveIsolation(ctx context.Context, req IsolationRequest) (*IsolationProo
 			if pid == req.ProcessID {
 				found = ticks == req.StartTime
 			}
-			if e = isolatedProcess(ctx, pid, req.StorePath); e != nil {
+			if e = isolatedProtectedProcess(ctx, pid, protected, metadata); e != nil {
 				return e
 			}
 			fmt.Fprintf(&identities, "%d:%d;", pid, ticks)
@@ -114,7 +133,7 @@ func ObserveIsolation(ctx context.Context, req IsolationRequest) (*IsolationProo
 		if e != nil || !physicalDirectory(req.StorePath) {
 			return ErrStoreCustodyUnsupported
 		}
-		fmt.Fprintf(&identities, "%s:%s:%s", admissionStoreIdentity(current), admissionStoreIdentity(info), req.Targets.Digest())
+		fmt.Fprintf(&identities, "%s:%s:%s", admissionStoreIdentity(current), admissionStoreIdentity(info), req.Targets.Digest()+protected.digest)
 		sum := sha256.Sum256([]byte(identities.String()))
 		digest := hex.EncodeToString(sum[:])
 		if baseline == "" {
@@ -138,7 +157,7 @@ func ObserveIsolation(ctx context.Context, req IsolationRequest) (*IsolationProo
 		return nil, ErrStoreCustodyUnsupported
 	}
 	storeSum := sha256.Sum256([]byte(admissionStoreIdentity(storeInfo)))
-	proof := &IsolationProof{storeID: hex.EncodeToString(storeSum[:]), store: filepath.Clean(req.StorePath), targetDigest: req.Targets.Digest(), digest: baseline, check: check}
+	proof := &IsolationProof{storeID: hex.EncodeToString(storeSum[:]), store: filepath.Clean(req.StorePath), targetDigest: req.Targets.Digest(), digest: baseline, protectedDigest: protected.digest, check: check}
 	proof.close = func() error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -294,6 +313,17 @@ func pathWithin(child, parent string) bool {
 	return e == nil && r != ".." && !strings.HasPrefix(r, ".."+string(os.PathSeparator))
 }
 func isolatedProcess(ctx context.Context, pid int, store string) error {
+	protected, e := observeProtectedRoots(store, []string{store})
+	if e != nil {
+		return e
+	}
+	metadata, e := protected.current(ctx)
+	if e != nil {
+		return e
+	}
+	return isolatedProtectedProcess(ctx, pid, protected, metadata)
+}
+func isolatedProtectedProcess(ctx context.Context, pid int, protected *protectedRoots, metadata protectedMetadata) error {
 	tasks, e := os.ReadDir(fmt.Sprintf("/proc/%d/task", pid))
 	if e != nil || len(tasks) == 0 || len(tasks) > 4096 {
 		return ErrStoreCustodyUnsupported
@@ -302,13 +332,13 @@ func isolatedProcess(ctx context.Context, pid int, store string) error {
 		if _, e := strconv.Atoi(task.Name()); e != nil || !task.IsDir() {
 			return ErrStoreCustodyUnsupported
 		}
-		if e := isolatedThread(ctx, fmt.Sprintf("/proc/%d/task/%s", pid, task.Name()), store); e != nil {
+		if e := isolatedThread(ctx, fmt.Sprintf("/proc/%d/task/%s", pid, task.Name()), protected, metadata); e != nil {
 			return e
 		}
 	}
 	return nil
 }
-func isolatedThread(ctx context.Context, base string, store string) error {
+func isolatedThread(ctx context.Context, base string, protected *protectedRoots, metadata protectedMetadata) error {
 	if ctx.Err() != nil {
 		return ErrStoreCustodyUnsupported
 	}
@@ -347,23 +377,25 @@ func isolatedThread(ctx context.Context, base string, store string) error {
 	if e != nil {
 		return e
 	}
-	device, location, e := kernelStoreLocation(store)
-	if e != nil {
-		return e
-	}
 	for _, m := range mounts {
 		switch m.fs {
 		case "ext4", "xfs", "btrfs", "tmpfs", "proc", "sysfs", "devtmpfs", "devpts":
 		default:
 			return ErrStoreCustodyUnsupported
 		}
-		if m.device == device && (pathWithin(location, m.root) || pathWithin(m.root, location)) {
-			return ErrStoreCustodyUnsupported
+		for _, root := range protected.roots {
+			device, location, e := kernelStoreLocation(root.path)
+			if e != nil {
+				return e
+			}
+			if m.device == device && (pathWithin(location, m.root) || pathWithin(m.root, location)) {
+				return ErrStoreCustodyUnsupported
+			}
 		}
 	}
 	// A private PID namespace alone does not make a host proc mount private.
 	maps, mapErr := boundedMetadata(base + "/maps")
-	if mapErr != nil || strings.Contains(maps, "[aio]") {
+	if mapErr != nil || strings.Contains(maps, "[aio]") || metadata.exposedMapping(maps) {
 		return ErrStoreCustodyUnsupported
 	}
 	native, e := os.Readlink(base + "/ns/pid")
@@ -372,23 +404,12 @@ func isolatedThread(ctx context.Context, base string, store string) error {
 		return ErrStoreCustodyUnsupported
 	}
 	// Retained directory descriptors can bypass an otherwise correct mount view.
-	var ancestors []os.FileInfo
-	for path := store; ; path = filepath.Dir(path) {
-		info, e := os.Stat(path)
-		if e != nil {
-			return ErrStoreCustodyUnsupported
-		}
-		ancestors = append(ancestors, info)
-		if filepath.Dir(path) == path {
-			break
-		}
-	}
 	for _, name := range []string{"cwd", "root"} {
 		info, e := os.Stat(base + "/" + name)
-		if e != nil {
+		if e != nil || info.Mode()&os.ModeSocket != 0 || metadata.hasIdentity(info) {
 			return ErrStoreCustodyUnsupported
 		}
-		for _, ancestor := range ancestors {
+		for _, ancestor := range metadata.ancestors {
 			if os.SameFile(info, ancestor) {
 				return ErrStoreCustodyUnsupported
 			}
@@ -404,18 +425,18 @@ func isolatedThread(ctx context.Context, base string, store string) error {
 		if e != nil {
 			return ErrStoreCustodyUnsupported
 		}
-		if strings.Contains(link, "io_uring") || pathWithin(strings.TrimSuffix(link, " (deleted)"), store) || strings.HasPrefix(link, "mnt:[") || strings.HasPrefix(link, "user:[") {
+		if strings.Contains(link, "io_uring") || protected.contains(strings.TrimSuffix(link, " (deleted)")) || strings.Contains(link, ":[") && !strings.HasPrefix(link, "pipe:[") && !strings.HasPrefix(link, "anon_inode:[") {
 			return ErrStoreCustodyUnsupported
 		}
 		info, e := os.Stat(fd)
 		var fsInfo unix.Statfs_t
-		if unix.Statfs(fd, &fsInfo) != nil || uint64(fsInfo.Type) == uint64(unix.PROC_SUPER_MAGIC) {
+		if unix.Statfs(fd, &fsInfo) != nil || (uint64(fsInfo.Type) == uint64(unix.PROC_SUPER_MAGIC) || uint64(fsInfo.Type) == uint64(unix.CGROUP2_SUPER_MAGIC)) {
 			return ErrStoreCustodyUnsupported
 		}
-		if e != nil {
+		if e != nil || info.Mode()&os.ModeSocket != 0 || metadata.hasIdentity(info) {
 			return ErrStoreCustodyUnsupported
 		}
-		for _, ancestor := range ancestors {
+		for _, ancestor := range metadata.ancestors {
 			if os.SameFile(info, ancestor) {
 				return ErrStoreCustodyUnsupported
 			}

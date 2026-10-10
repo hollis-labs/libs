@@ -21,14 +21,24 @@ type ownedRestoreHost struct {
 	failPhase string
 	closed    bool
 	records   []SnapshotEffect
+	denyAfter string
+	denied    bool
 }
 
 func (h *ownedRestoreHost) AcquireSnapshot(context.Context, SnapshotOperation) (SnapshotAdmission, error) {
 	return h, nil
 }
-func (h *ownedRestoreHost) Verify(context.Context, SnapshotOperation) error { return nil }
+func (h *ownedRestoreHost) Verify(context.Context, SnapshotOperation) error {
+	if h.denied {
+		return ErrAdmissionUnavailable
+	}
+	return nil
+}
 func (h *ownedRestoreHost) Record(_ context.Context, _ SnapshotOperation, e SnapshotEffect) error {
 	h.records = append(h.records, e)
+	if e.Phase == h.denyAfter {
+		h.denied = true
+	}
 	if e.Phase == h.failPhase {
 		return ErrAdmissionUnavailable
 	}
@@ -41,7 +51,14 @@ func expectedBytes(b []byte) ExpectedFile {
 }
 func ownedRestoreFixture(t *testing.T) (*GuardedProvider, *RetainedSet, *ownedRestoreHost, string, RestoreRequest) {
 	t.Helper()
+	return ownedRestoreFixtureConfigured(t, nil)
+}
+func ownedRestoreFixtureConfigured(t *testing.T, configure func(*GuardedConfig)) (*GuardedProvider, *RetainedSet, *ownedRestoreHost, string, RestoreRequest) {
+	t.Helper()
 	config := ownedGuardedConfig(t)
+	if configure != nil {
+		configure(&config)
+	}
 	root := config.Targets.roots[0].Binding.Root
 	if e := os.WriteFile(filepath.Join(root, "other.txt"), []byte("captured second"), 0600); e != nil {
 		t.Fatal(e)
@@ -176,5 +193,56 @@ func TestSelectiveRestoreKernelPartialPersistenceRetainsEvidenceAndRefusesRetry(
 	host.failPhase = ""
 	if _, e = p.RestoreSelective(context.Background(), r, request); e == nil {
 		t.Fatal("uncertain operation repeated effect")
+	}
+}
+
+func TestSelectiveRestoreKernelNewCredentialHardlinkRefusesBeforeHashOrEffect(t *testing.T) {
+	var credential string
+	p, retained, _, root, request := ownedRestoreFixtureConfigured(t, func(config *GuardedConfig) {
+		root := config.Targets.roots[0].Binding.Root
+		credential = filepath.Join(root, ".codex", "auth.json")
+		plan, e := DeriveTargets(config.Access, TargetPolicy{Version: "owned-targets", Roots: config.Targets.Bindings(), CredentialPaths: []string{credential}})
+		if e != nil {
+			t.Fatal(e)
+		}
+		config.Targets = plan
+	})
+	if e := os.Mkdir(filepath.Dir(credential), 0700); e != nil {
+		t.Fatal(e)
+	}
+	fake := []byte("owned fake credential only")
+	if e := os.WriteFile(credential, fake, 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Remove(filepath.Join(root, "other.txt")); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Link(credential, filepath.Join(root, "other.txt")); e != nil {
+		t.Fatal(e)
+	}
+	request.Selections[1].Expected = expectedBytes(fake)
+	result, e := p.RestoreSelective(context.Background(), retained, request)
+	if !errors.Is(e, ErrCoverageUnsupported) || result.ChangedCount != 0 || result.Partial {
+		t.Fatalf("credential alias admitted: %+v %v", result, e)
+	}
+	first, e := os.ReadFile(filepath.Join(root, "source.txt"))
+	if e != nil || string(first) != "current source.txt" {
+		t.Fatal("earlier selection changed before credential refusal")
+	}
+}
+func TestSelectiveRestoreKernelLateAuthorityRefusalRetainsEffects(t *testing.T) {
+	p, retained, host, root, request := ownedRestoreFixture(t)
+	host.denyAfter = "file_replaced"
+	result, e := p.RestoreSelective(context.Background(), retained, request)
+	if !errors.Is(e, ErrRestoreUncertain) || result.ChangedCount != 1 || !result.Partial || result.Outcome != "uncertain" {
+		t.Fatalf("late authority refusal laundered: %+v %v", result, e)
+	}
+	second, e := os.ReadFile(filepath.Join(root, "other.txt"))
+	if e != nil || string(second) != "current other.txt" {
+		t.Fatal("effect continued after authority refusal")
+	}
+	ledger, e := p.admission.load()
+	if e != nil || ledger.Pins[pinKey(retained.ID(), request.Intent.OperationID, PinFork)].Completion != "" {
+		t.Fatal("late refusal completed uncertainty pin")
 	}
 }

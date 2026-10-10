@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -21,6 +22,16 @@ import (
 // does not issue host authority. Unavailable kernel prerequisites are explicit.
 func TestIsolationPublicOSFixture(t *testing.T) {
 	if os.Getenv("SNAPSHOT_ISOLATION_HELPER") == "1" {
+		if os.Getenv("SNAPSHOT_ISOLATION_MMAP") == "1" {
+			// Retain a protected file mapping but no descriptor. The actual observer
+			// must refuse the inode even though the FD inventory is now empty.
+			data, e := syscall.Mmap(3, 0, 4096, syscall.PROT_READ, syscall.MAP_SHARED)
+			if e != nil {
+				t.Fatal(e)
+			}
+			_ = syscall.Close(3)
+			_ = data // kept mapped until the owned helper exits
+		}
 		if e := os.WriteFile("/marker/ready", []byte("owned namespace helper"), 0600); e != nil {
 			t.Fatal(e)
 		}
@@ -28,7 +39,7 @@ func TestIsolationPublicOSFixture(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	for _, mode := range []string{"isolated", "store_alias", "host_proc", "inherited_store_fd"} {
+	for _, mode := range []string{"isolated", "store_alias", "host_proc", "inherited_store_fd", "control_alias", "inherited_control_fd", "control_hardlink_fd", "control_mmap"} {
 		t.Run(mode, func(t *testing.T) { runIsolationPublicFixture(t, mode) })
 	}
 }
@@ -69,6 +80,10 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	}
 	defer group.Close()
 	config := ownedGuardedConfig(t)
+	control := t.TempDir()
+	if e := os.WriteFile(filepath.Join(control, "journal"), []byte("owned control metadata"), 0600); e != nil {
+		t.Fatal(e)
+	}
 	marker := t.TempDir()
 	binary, e := os.Executable()
 	if e != nil {
@@ -84,6 +99,8 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	switch mode {
 	case "store_alias":
 		runtimeArgs = append(runtimeArgs, "--ro-bind", config.StorePath, "/apparently-innocent")
+	case "control_alias":
+		runtimeArgs = append(runtimeArgs, "--ro-bind", control, "/control-alias")
 	case "host_proc":
 		// Append after the private proc mount to deliberately replace that view.
 		index := len(args) - 2
@@ -92,8 +109,22 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	args = append(runtimeArgs, args...)
 	command := exec.Command(bwrap, args...)
 	command.Env = []string{"PATH=/usr/bin:/bin", "SNAPSHOT_ISOLATION_HELPER=1"}
-	if mode == "inherited_store_fd" {
-		inherited, e := os.Open(config.StorePath)
+	if mode == "inherited_store_fd" || mode == "inherited_control_fd" || mode == "control_hardlink_fd" || mode == "control_mmap" {
+		fdPath := config.StorePath
+		if mode != "inherited_store_fd" {
+			fdPath = filepath.Join(control, "journal")
+		}
+		if mode == "control_hardlink_fd" {
+			alias := filepath.Join(config.Targets.roots[0].Binding.Root, "innocent.txt")
+			if e := os.Link(fdPath, alias); e != nil {
+				t.Fatal(e)
+			}
+			fdPath = alias
+		}
+		if mode == "control_mmap" {
+			command.Env = append(command.Env, "SNAPSHOT_ISOLATION_MMAP=1")
+		}
+		inherited, e := os.Open(fdPath)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -168,8 +199,12 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	if payload == 0 {
 		t.Fatal("owned namespace helper process not located")
 	}
-	if mode == "inherited_store_fd" {
-		original, _ := os.Stat(config.StorePath)
+	if mode == "inherited_store_fd" || mode == "inherited_control_fd" || mode == "control_hardlink_fd" {
+		fdPath := config.StorePath
+		if mode != "inherited_store_fd" {
+			fdPath = filepath.Join(control, "journal")
+		}
+		original, _ := os.Stat(fdPath)
 		inherited, e := os.Stat(fmt.Sprintf("/proc/%d/fd/3", payload))
 		if e != nil || !os.SameFile(original, inherited) {
 			t.Skip("fixture launcher did not preserve actual inherited store descriptor; no FD-refusal credit")
@@ -195,7 +230,7 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	proof, e := ObserveIsolation(context.Background(), IsolationRequest{ProcessID: payload, StartTime: ticks, ControlGroup: group, StorePath: config.StorePath, Targets: config.Targets})
+	proof, e := ObserveIsolation(context.Background(), IsolationRequest{ProcessID: payload, StartTime: ticks, ControlGroup: group, StorePath: config.StorePath, ProtectedPaths: []string{control}, Targets: config.Targets})
 	if mode != "isolated" {
 		if proof != nil || !errors.Is(e, ErrStoreCustodyUnsupported) {
 			t.Fatal("unsafe actual OS exposure issued isolation")
@@ -208,6 +243,24 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	defer proof.Close()
 	if proof.Digest() == "" || proof.Verify(context.Background()) != nil {
 		t.Fatal("issued physical observation not revalidated")
+	}
+	if e := os.Rename(control, control+"-old"); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Mkdir(control, 0700); e != nil {
+		t.Fatal(e)
+	}
+	if e := proof.Verify(context.Background()); !errors.Is(e, ErrStoreCustodyUnsupported) {
+		t.Fatal("replaced control root retained isolation")
+	}
+	if e := os.Remove(control); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Rename(control+"-old", control); e != nil {
+		t.Fatal(e)
+	}
+	if e := proof.Verify(context.Background()); e != nil {
+		t.Fatal("original control identity did not revalidate")
 	}
 	config.Isolation = proof
 	if _, e = NewGuardedProvider(config); !errors.Is(e, ErrStoreCustodyUnsupported) {

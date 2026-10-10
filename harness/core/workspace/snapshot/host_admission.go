@@ -9,9 +9,9 @@ import (
 // SnapshotOperation binds a trusted host admission to exact mechanism inputs.
 // The observation digest proves physical facts, never fabric authority.
 type SnapshotOperation struct {
-	Kind                                                       string
-	Intent                                                     CaptureIntent
-	StoreID, IsolationDigest, RequestDigest, RedactionRevision string
+	Kind                                                                        string
+	Intent                                                                      CaptureIntent
+	StoreID, IsolationDigest, ProtectedDigest, RequestDigest, RedactionRevision string
 }
 
 // SnapshotHost is an independently implemented host authority boundary. The
@@ -57,7 +57,12 @@ type IsolationRequest struct {
 	StartTime    uint64
 	ControlGroup *os.File
 	StorePath    string
-	Targets      TargetPlan
+	// ProtectedPaths are the host's complete canonical control/journal/lock
+	// directory inventory. At least one independent control root is required.
+	// The observer checks physical exclusion; the host separately verifies that
+	// this inventory is complete for the current execution. Paths are not grants.
+	ProtectedPaths []string
+	Targets        TargetPlan
 }
 
 // IsolationProof is issued only by actual platform observations. It cannot be
@@ -67,12 +72,23 @@ type IsolationProof struct {
 	store                string
 	targetDigest, digest string
 	storeID              string
+	protectedDigest      string
 	check                func(context.Context) error
 	close                func() error
 }
 
 func (p *GuardedProvider) operation(kind string, intent CaptureIntent, digest string) SnapshotOperation {
-	return SnapshotOperation{Kind: kind, Intent: intent, StoreID: p.isolation.storeID, IsolationDigest: p.isolation.Digest(), RequestDigest: digest, RedactionRevision: p.redactionRevision}
+	return SnapshotOperation{Kind: kind, Intent: intent, StoreID: p.isolation.storeID, IsolationDigest: p.isolation.Digest(), ProtectedDigest: p.isolation.ProtectedDigest(), RequestDigest: digest, RedactionRevision: p.redactionRevision}
+}
+
+// ProtectedDigest binds the immutable protected-root inventory and native
+// identities. The independent host must reconcile it with its complete current
+// control-plane inventory; an omitted path cannot become authorized by a hash.
+func (p *IsolationProof) ProtectedDigest() string {
+	if p == nil {
+		return ""
+	}
+	return p.protectedDigest
 }
 
 func (p *IsolationProof) Digest() string {
