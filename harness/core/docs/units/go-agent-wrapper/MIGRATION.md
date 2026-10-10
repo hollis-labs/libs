@@ -30,7 +30,7 @@
 | `github.com/hollis-labs/go-agent-wrapper/internal/closegate` | `github.com/hollis-labs/substrate/harness/internal/closegate` | `closegate` |
 | `github.com/hollis-labs/go-agent-wrapper/sidebyside` | `github.com/hollis-labs/substrate/harness/internal/sidebyside` | `sidebyside` |
 | `github.com/hollis-labs/go-agent-wrapper/internal/testgate` | `github.com/hollis-labs/substrate/harness/internal/testgate` | `testgate` |
-| `github.com/hollis-labs/go-agent-wrapper/snapshot` | `github.com/hollis-labs/substrate/harness/sandbox/snapshot` | `snapshot` |
+| `github.com/hollis-labs/go-agent-wrapper/snapshot` | `github.com/hollis-labs/substrate/harness/workspace/snapshot` | `snapshot` |
 | `github.com/hollis-labs/go-agent-wrapper/sandbox` | `github.com/hollis-labs/substrate/harness/sandbox/wrapper` | `sandbox` |
 | `github.com/hollis-labs/go-agent-wrapper/plant` | `github.com/hollis-labs/substrate/harness/agentlaunch/planting` | `planting` |
 
@@ -47,3 +47,14 @@
 - **Files not carried to the new location** (git history still has them): `.github`, `.folio.yaml`, `.golangci.yml`, `.gitignore`, `go.mod`, `go.sum`.
 - **Adoption.** Original import history is retained. Current library consolidation does not migrate live consumers or establish native installed/runtime support.
 - **Codex lifecycle.** The wrapper consumes the session's typed terminal event for Codex JSON-RPC stdio turns, emitting one turn lifecycle and preserving the stop reason and failure diagnostic. The native turn-order test runs again.
+
+## Filesystem snapshot host port
+
+Use `workspace/snapshot` for new integration through `workspace.Ports.Snapshots`.
+The earlier `sandbox/snapshot` package remains unchanged for existing callers;
+it is not a second automatically selected provider. The new home retains only
+the original snapshot package history, tests and benchmarks. See its
+[host integration limits](../../../workspace/snapshot/README.md).
+
+The standalone repository already carries a migration pointer and is archived.
+This addition does not alter it, delete old refs or migrate a live consumer.

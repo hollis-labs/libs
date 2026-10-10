@@ -8,6 +8,16 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- Preserve the historical filesystem snapshot package and its Git history at
+  `workspace/snapshot`, including ShadowGit tests and benchmarks.
+  `workspace.Ports.Snapshots` accepts its unchanged capture/diff/preview/restore
+  interface. Nil disables capture; materialization never invokes it automatically.
+  Capture policy, finite budgets, secrecy, custody, pin-aware retention and guarded
+  restore remain host integration requirements. Existing `sandbox/snapshot` stays
+  available for compatibility.
+
 ## v0.5.0
 
 ### Added
