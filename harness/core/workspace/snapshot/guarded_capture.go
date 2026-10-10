@@ -41,6 +41,12 @@ func prepareMirror(ctx context.Context, scope plannedRoot, destination string, l
 		return usage, ErrCoverageUnsupported
 	}
 	defer source.Close()
+	if scope.identity != nil {
+		held, e := source.Stat(".")
+		if e != nil || !os.SameFile(scope.identity, held) {
+			return usage, ErrCoverageUnsupported
+		}
+	}
 	dest, err := os.OpenRoot(destination)
 	if err != nil {
 		return usage, ErrCoverageUnsupported
@@ -137,6 +143,12 @@ func prepareMirror(ctx context.Context, scope plannedRoot, destination string, l
 	})
 	if err != nil {
 		return usage, err
+	}
+	if scope.identity != nil {
+		named, e := os.Stat(scope.Binding.Root)
+		if e != nil || !physicalDirectory(scope.Binding.Root) || !os.SameFile(scope.identity, named) {
+			return usage, ErrCoverageUnsupported
+		}
 	}
 	if usage.Files == 0 { // Empty coverage cannot quietly become a whole-root add.
 		return usage, ErrCoverageUnsupported
