@@ -8,6 +8,26 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- `clone` repository attachment mode (`workspace/repositories`): an independent
+  private repository built copy on write (Linux FICLONE `reflink`, macOS
+  `clonefile`) from a source whose HEAD is the pinned base with no tracked
+  change. Capability is probed on the actual source/destination pair before any
+  mutation; required copy on write without a method is `Unsupported`, and
+  preferred copy on write falls back to a worktree only under a separate
+  explicit authorization on the shared Git metadata root. Receipts record the
+  requested mode, actual mode, method, fallback reason and fallback authority.
+  A failure after construction starts is `Partial` and retained; no plain copy
+  is ever substituted. Removing a clone is unsupported and retains it.
+- Separately authorized `repository_mergeback` effect: a fast-forward of one
+  source branch to a clone's head through a checked local fetch and an exact
+  old-value ref update. It refuses checked-out or moved targets and never
+  forces.
+- Real copy-on-write construction is unmeasured: this repository's checks run on
+  ext4, where the probe answers `none`/`reflink_unsupported`, and exercise the
+  positive path only with a test-only `fixture_copy` cloner whose receipts say so.
+
 ## v0.8.0
 
 ### Added

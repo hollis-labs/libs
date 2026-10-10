@@ -13,6 +13,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize"
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/substrate/harness/workspace/repositories"
 )
 
 // Refusal is a path- and content-free, machine-readable preparation failure.
@@ -147,8 +148,11 @@ func (s Spec) Validate() error {
 		}
 	}
 	for _, repo := range s.Repos {
-		if repo.Mode != Worktree && repo.Mode != Checkout && repo.Mode != Readonly {
+		if repo.Mode != Worktree && repo.Mode != Checkout && repo.Mode != Readonly && repo.Mode != Clone {
 			return refuse(CodeUnsupportedRepositoryMode, "repository", Unsupported)
+		}
+		if (repo.Mode == Clone) != (repo.Clone != "") || repo.Clone != "" && repo.Clone != repositories.CloneRequired && repo.Clone != repositories.ClonePreferred || repo.Mode == Clone && repo.Existing != nil {
+			return refuse(CodeInvalidRepository, "repository", Conflict)
 		}
 		if err := repo.DesiredRoot.Validate(); err != nil {
 			return err

@@ -30,11 +30,14 @@ type Port struct {
 	executable string
 	platform   string
 	trace      func([]string)
+	cow        cloner
 }
 
-func New(executable string) *Port { return &Port{executable: executable, platform: runtime.GOOS} }
+func New(executable string) *Port {
+	return &Port{executable: executable, platform: runtime.GOOS, cow: newCloner()}
+}
 func (p *Port) Supported(r repositories.Request) bool {
-	return p != nil && (p.platform == "linux" || p.platform == "darwin") && filepath.IsAbs(p.executable) && (r.Mode == repositories.Worktree || r.Mode == repositories.Readonly || r.Mode == repositories.Checkout && r.Existing)
+	return p != nil && (p.platform == "linux" || p.platform == "darwin") && filepath.IsAbs(p.executable) && (r.Mode == repositories.Worktree || r.Mode == repositories.Readonly || r.Mode == repositories.Checkout && r.Existing || r.Mode == repositories.Clone && !r.Existing && p.cow != nil)
 }
 
 type limitedBuffer struct{ bytes.Buffer }
@@ -180,12 +183,15 @@ func oid(s string) bool {
 	return true
 }
 func (p *Port) repository(ctx context.Context, r repositories.Request, path string) (repositories.Observation, error) {
+	return p.repositoryAt(ctx, r, path, r.Common.Path)
+}
+func (p *Port) repositoryAt(ctx context.Context, r repositories.Request, path, commonPath string) (repositories.Observation, error) {
 	top, _, e := p.run(ctx, path, "rev-parse", "--show-toplevel")
 	if e != nil || trim(top) != path {
 		return repositories.Observation{}, errGit
 	}
 	common, _, e := p.run(ctx, path, "rev-parse", "--path-format=absolute", "--git-common-dir")
-	if e != nil || trim(common) != r.Common.Path {
+	if e != nil || trim(common) != commonPath {
 		return repositories.Observation{}, errGit
 	}
 	if _, e = canonical(trim(common)); e != nil {
@@ -202,14 +208,14 @@ func (p *Port) repository(ctx context.Context, r repositories.Request, path stri
 	if code == 1 {
 		branch = ""
 	}
-	if p.refuseCheckoutCode(ctx, r, path) != nil {
+	if p.refuseCode(ctx, path, commonPath) != nil {
 		return repositories.Observation{}, errGit
 	}
 	status, _, e := p.run(ctx, path, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none")
 	if e != nil {
 		return repositories.Observation{}, errGit
 	}
-	return repositories.Observation{Exists: true, Path: path, CommonPath: r.Common.Path, RepositoryID: r.RepositoryID, SourceIdentity: r.SourceIdentity, CommonIdentity: r.CommonIdentity, Branch: trim(branch), Head: trim(head), Dirty: status != ""}, nil
+	return repositories.Observation{Exists: true, Path: path, CommonPath: commonPath, RepositoryID: r.RepositoryID, SourceIdentity: r.SourceIdentity, CommonIdentity: r.CommonIdentity, Branch: trim(branch), Head: trim(head), Dirty: status != ""}, nil
 }
 func (p *Port) Source(ctx context.Context, r repositories.Request) (repositories.Observation, error) {
 	q, e := openRoots(r)
@@ -300,6 +306,9 @@ func (p *Port) registration(ctx context.Context, r repositories.Request) (regist
 	return registration{}, false, nil
 }
 func (p *Port) Observe(ctx context.Context, r repositories.Request) (repositories.Observation, error) {
+	if r.Mode == repositories.Clone {
+		return p.observeClone(ctx, r)
+	}
 	q, e := openRoots(r)
 	if e != nil {
 		return repositories.Observation{}, e
@@ -337,6 +346,9 @@ func (p *Port) refuseCheckoutCode(ctx context.Context, r repositories.Request, p
 	if len(paths) > 0 {
 		dir = paths[0]
 	}
+	return p.refuseCode(ctx, dir, r.Common.Path)
+}
+func (p *Port) refuseCode(ctx context.Context, dir, commonPath string) error {
 	scopes := []string{"--local"}
 	configured, code, err := p.run(ctx, dir, "config", "--local", "--no-includes", "--bool", "--get", "extensions.worktreeConfig")
 	if err != nil && code != 1 {
@@ -352,17 +364,20 @@ func (p *Port) refuseCheckoutCode(ctx context.Context, r repositories.Request, p
 		}
 	}
 	for _, rel := range []string{"objects", "objects/info"} {
-		actual, e := filepath.EvalSymlinks(filepath.Join(r.Common.Path, rel))
-		if e != nil || actual != filepath.Join(r.Common.Path, rel) {
+		actual, e := filepath.EvalSymlinks(filepath.Join(commonPath, rel))
+		if e != nil || actual != filepath.Join(commonPath, rel) {
 			return errGit
 		}
 	}
-	if _, e := os.Lstat(filepath.Join(r.Common.Path, "objects/info/alternates")); !os.IsNotExist(e) {
+	if _, e := os.Lstat(filepath.Join(commonPath, "objects/info/alternates")); !os.IsNotExist(e) {
 		return errGit
 	}
 	return nil
 }
 func (p *Port) Create(ctx context.Context, r repositories.Request, validate func(context.Context) error) (repositories.Observation, bool, error) {
+	if r.Mode == repositories.Clone {
+		return p.createClone(ctx, r, validate)
+	}
 	if !p.Supported(r) || r.Mode != repositories.Worktree || r.Existing || r.Ownership != repositories.Owned || !r.Base.PrivateCustody || validate == nil {
 		return repositories.Observation{}, false, errGit
 	}

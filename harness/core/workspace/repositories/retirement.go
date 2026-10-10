@@ -67,7 +67,31 @@ func retirementCheck(ctx context.Context, r Retirement, c effects.PreflightConte
 	s, e := p.Safety(ctx, r.Attachment, retirementEntry(r))
 	return e == nil && safe(s, r.AcceptedHead) && ctx.Err() == nil && c.Validate(ctx) == nil && ctx.Err() == nil
 }
+
+// retirementAttachment rebinds a frozen clone request to its receipt. Only a
+// worktree fallback can retire here; removing a COW clone is unsupported and
+// the clone is retained.
+func retirementAttachment(r Retirement) (Retirement, bool) {
+	if r.Attachment.Mode != Clone {
+		return r, true
+	}
+	if len(r.Receipt.Attachments) != 1 {
+		return r, false
+	}
+	bound, ok := BindSelection(r.Attachment, r.Receipt.Attachments[0])
+	if !ok {
+		return r, false
+	}
+	r.Attachment = bound
+	return r, bound.Mode == Worktree
+}
 func CheckRetirement(ctx context.Context, r Retirement, c effects.PreflightContext, p Port) (PreparedRetirement, effects.Result) {
+	r, ok := retirementAttachment(r)
+	if !ok {
+		out := retirementResult(r, effects.Unsupported, "clone_retirement_unsupported")
+		out.Obligations = []effects.Obligation{{RootID: r.Attachment.Base.ID, Code: "retain_attachment"}}
+		return PreparedRetirement{}, out
+	}
 	if !retirementBinding(r, c) {
 		return PreparedRetirement{}, retirementResult(r, effects.Refused, "retirement_binding_refused")
 	}
@@ -126,7 +150,8 @@ func Retire(ctx context.Context, ticket PreparedRetirement, c effects.ApplyConte
 // InspectRetirement classifies bound evidence without repeating removal.
 // Missing work after interrupted removal does not erase its uncertainty.
 func InspectRetirement(ctx context.Context, r Retirement, c effects.PreflightContext, p Port, e effects.Evidence) effects.Result {
-	if !retirementBinding(r, c) || e.Header != r.Header || e.Kind != effects.RepositoryRetirement || e.RootID != r.Attachment.Base.ID || len(e.Attachments) != 1 || len(e.Links) != 0 || len(e.Trust) != 0 {
+	r, ok := retirementAttachment(r)
+	if !ok || !retirementBinding(r, c) || e.Header != r.Header || e.Kind != effects.RepositoryRetirement || e.RootID != r.Attachment.Base.ID || len(e.Attachments) != 1 || len(e.Links) != 0 || len(e.Trust) != 0 {
 		return retirementResult(r, effects.Refused, "evidence_refused")
 	}
 	a := e.Attachments[0]

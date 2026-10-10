@@ -20,6 +20,11 @@ func repositoryEvidenceBound(r repositories.Request, e effects.Evidence) bool {
 	if a.Outcome != e.Outcome {
 		return false
 	}
+	// A clone request's receipt records the construction actually selected.
+	r, ok := repositories.BindSelection(r, a)
+	if !ok {
+		return false
+	}
 	switch e.Phase {
 	case effects.IntentPhase:
 		if e.Outcome != effects.Pending || a.Created || a.Head != "" {
