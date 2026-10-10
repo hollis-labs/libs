@@ -123,6 +123,7 @@ type admissionLedger struct {
 	Runs                     map[string]runAccount
 	StorageBytes             int64
 	Collections              map[string]gcRecord
+	RetentionOperations      map[string]retentionOperation
 }
 
 // Admission is issued only by a guarded provider after its store/isolation
@@ -527,12 +528,13 @@ func (l *ReadLease) Close() error {
 		return nil
 	}
 	l.active = false
-	err := l.held.close()
-	l.held = nil
+	var err error
 	if l.hostLease != nil {
 		err = errors.Join(err, closeSnapshotAdmission(l.hostLease))
 		l.hostLease = nil
 	}
+	err = errors.Join(err, l.held.close())
+	l.held = nil
 	return err
 }
 func (l *ReadLease) Complete(ctx context.Context, completion *OwnerCompletion) error {

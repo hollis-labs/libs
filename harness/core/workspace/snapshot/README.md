@@ -52,6 +52,24 @@ construction requires independently observed OS exclusion and a genuine host
 admission port; missing or stale support refuses. The private GC kernel is
 verified in disposable zero-agent fixtures; it is not live GC.
 
+`ReadLease.CompleteFromHost` consumes a privately issued
+`SnapshotCompletionProof` from the already-held `SnapshotCompletionAdmission`.
+The typed request binds the exact physical operation, ledger store, set digest,
+pin owner/kind and completion operation. The host verifies durable completion
+and all owner obligations; decoded terminal data cannot release a pin.
+`GuardedProvider.CollectFromHost` similarly consumes `SnapshotGCProof` through
+`SnapshotGCAdmission`, with separate current deletion and noncooperating-reader
+authority. It reuses the guarded collector rather than exposing a grant factory.
+These are consumption contracts; no production proof issuer is supplied.
+
+Completion retains its pin until host recording and successful host closure.
+Both paths persist an uncertainty barrier before accounting/effects and hold
+the native store lock through host verification, recording and closure. Failed
+or stale proof, persistence failure and uncertain closure keep the barrier and
+block later capture/read/collection. Final completion bookkeeping happens only
+after successful host closure, under that same native lock; it authorizes no
+further source or object effects. Retrying an uncertain operation refuses.
+
 The kernel holds the store admission lock, verifies the complete owned Git
 reference/object map and records intent before mutation. It CAS-deletes only
 exact capture-created references and reclaims unreachable private objects.

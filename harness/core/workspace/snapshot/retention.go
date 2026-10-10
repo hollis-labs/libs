@@ -18,7 +18,7 @@ type OwnerCompletion struct {
 // ownerCompletion is intentionally private. Fork/capture/event owner adapters
 // must call it only after recording the corresponding full operation outcome.
 func (l *ReadLease) ownerCompletion(ctx context.Context, operationID string) (*OwnerCompletion, error) {
-	if operationID == "" {
+	if l == nil || l.admission == nil || l.admission.isolation != nil || operationID == "" {
 		return nil, ErrAdmissionUnavailable
 	}
 	if err := l.Verify(ctx); err != nil {
@@ -147,7 +147,7 @@ func (a *Admission) Purge(ctx context.Context) error {
 }
 
 func completeReadLease(ctx context.Context, l *ReadLease, c *OwnerCompletion) error {
-	if c == nil || c.admission != l.admission || c.setID != l.set.Intent.SetID || c.pin != l.pin || c.operationID == "" {
+	if l.admission == nil || l.admission.isolation != nil || c == nil || c.admission != l.admission || c.setID != l.set.Intent.SetID || c.pin != l.pin || c.operationID == "" {
 		return ErrAdmissionUnavailable
 	}
 	if err := l.Verify(ctx); err != nil {

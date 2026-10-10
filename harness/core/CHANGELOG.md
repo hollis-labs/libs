@@ -22,6 +22,11 @@ All notable changes to the `harness` module are documented here. The format foll
   native replacement and durable accounting. Partial effects retain originals,
   pins, evidence and uncertainty; recorded operations never automatically retry.
   No live adoption, full-metadata restore or GC authority is added.
+- Typed consumption of independent host completion/deletion proofs through
+  held admission, without a public grant factory. Completion pins and durable
+  uncertainty barriers survive failed accounting or host closure; KEEP,
+  outstanding pins and unknown journals still dominate collection. Genuine
+  production proof issuance remains a separate host integration.
 
 ## v0.9.0
 
