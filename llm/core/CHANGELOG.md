@@ -8,6 +8,10 @@ All notable changes to the `llm-core` module are documented here. The format fol
 
 ## [Unreleased]
 
+### Added
+
+- `llm-core/quota`: usage limits over explicit windows that never share a counter (calendar day, ISO week or month in a named time zone, following the local wall clock across daylight-saving changes; rolling; provider-reported with a reset time), in native units. `Limiter` offers `Check`, and `Reserve` / `Commit` / `Cancel` for estimate-then-reconcile on streaming responses, answering `Decision{Allowed, Remaining, RetryAfter, Reason}`, with an injectable clock. Stores: `MemoryStore`, `SeededStore` (seeded from the application's own history) and `SQLStore` (reads the application's events table through `database/sql`; never opens a database, writes or deletes rows). `llm-core/quota/quotatest` is a conformance suite for stores. The package README maps `llmcontracts.TokenRateTracker` and the rate and budget helpers elsewhere in the organization onto it; nothing existing changed.
+
 ## v0.1.0 — 2026-10-03
 
 First release of the llm-core module: the packages of seven former Hollis Labs modules, moved in with their git history.
