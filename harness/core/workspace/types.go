@@ -111,6 +111,9 @@ const (
 	Worktree RepoMode = "worktree"
 	Checkout RepoMode = "checkout"
 	Readonly RepoMode = "readonly"
+	// Clone attaches an independent copy-on-write private repository; Clone on
+	// RepoSpec says whether copy on write is required or preferred.
+	Clone RepoMode = "clone"
 )
 
 type RepoSpec struct {
@@ -121,6 +124,7 @@ type RepoSpec struct {
 	BaseRef, BaseCommit, BranchTemplate string
 	Existing                            *AttachmentReceipt
 	Retention                           RetentionPolicy
+	Clone                               repositories.CloneRequirement `json:",omitempty"`
 }
 
 // AccessRef reuses the sandbox access vocabulary rather than inventing grants.

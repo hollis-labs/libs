@@ -16,6 +16,9 @@ const (
 	Worktree Mode = "worktree"
 	Checkout Mode = "checkout"
 	Readonly Mode = "readonly"
+	// Clone attaches an independent private repository constructed copy on
+	// write. See CloneIntent for selection and fallback.
+	Clone Mode = "clone"
 )
 
 type Ownership string
@@ -41,6 +44,7 @@ type Request struct {
 	AuthorizationID, AuthorizationVersion, CandidateRootID                 string
 	UserWriteAuthorizationID, UserWriteAuthorizationVersion                string
 	Readonly                                                               ReadonlyEvidence
+	Clone                                                                  CloneIntent `json:",omitzero"`
 }
 type Observation struct {
 	Exists                                                                       bool
@@ -71,8 +75,8 @@ type Port interface {
 	Remove(context.Context, Request, effects.AttachmentEvidence, func(context.Context) error) (bool, error)
 }
 type Prepared struct {
-	request Request
-	valid   bool
+	request, frozen Request
+	valid           bool
 }
 
 func absolute(p string) bool {
@@ -98,7 +102,7 @@ func binding(r Request, c effects.PreflightContext) bool {
 		return false
 	}
 	roots := []effects.RootInput{r.Source, r.Common, r.Base}
-	for _, v := range []string{string(r.Mode), string(r.Ownership), r.Path, r.RepositoryID, r.SourceIdentity, r.CommonIdentity, r.Branch, r.BaseCommit, r.AuthorizationID, r.AuthorizationVersion, r.CandidateRootID, r.UserWriteAuthorizationID, r.UserWriteAuthorizationVersion} {
+	for _, v := range []string{string(r.Mode), string(r.Ownership), r.Path, r.RepositoryID, r.SourceIdentity, r.CommonIdentity, r.Branch, r.BaseCommit, r.AuthorizationID, r.AuthorizationVersion, r.CandidateRootID, r.UserWriteAuthorizationID, r.UserWriteAuthorizationVersion, string(r.Clone.Requirement), r.Clone.FallbackAuthorizationID, r.Clone.FallbackAuthorizationVersion, string(r.Clone.Method), r.Clone.FallbackReason} {
 		if !utf8.ValidString(v) || strings.ContainsRune(v, 0) {
 			return false
 		}
@@ -129,7 +133,12 @@ func binding(r Request, c effects.PreflightContext) bool {
 	if !r.Existing && (under(r.Path, r.Source.Path) || under(r.Path, r.Common.Path) || under(r.Source.Path, r.Path) || under(r.Common.Path, r.Path)) {
 		return false
 	}
+	if r.Clone != (CloneIntent{}) && !cloneShape(r, true) && !cloneShape(r, false) {
+		return false
+	}
 	switch r.Mode {
+	case Clone:
+		return true
 	case Worktree:
 		return !r.Existing && r.Ownership == Owned && r.Base.PrivateCustody && ValidBranch(r.Branch) && commit(r.BaseCommit)
 	case Checkout:
@@ -146,7 +155,16 @@ func sourceMatches(r Request, o Observation) bool {
 	return o.Exists && o.Path == r.Source.Path && o.CommonPath == r.Common.Path && o.RepositoryID == r.RepositoryID && o.SourceIdentity == r.SourceIdentity && o.CommonIdentity == r.CommonIdentity && commit(o.Head)
 }
 func matches(r Request, o Observation, resume bool) bool {
-	if !o.Exists || o.Path != r.Path || o.CommonPath != r.Common.Path || o.RepositoryID != r.RepositoryID || o.SourceIdentity != r.SourceIdentity || o.CommonIdentity != r.CommonIdentity || !commit(o.Head) {
+	if !o.Exists || o.Path != r.Path || o.RepositoryID != r.RepositoryID || o.SourceIdentity != r.SourceIdentity || !commit(o.Head) {
+		return false
+	}
+	if r.Mode == Clone {
+		// A clone owns private metadata: its Git directory is its own and must
+		// not share the source's common identity.
+		if o.CommonPath != clonedGitDir(r) || o.CommonIdentity == "" || o.CommonIdentity == r.CommonIdentity {
+			return false
+		}
+	} else if o.CommonPath != r.Common.Path || o.CommonIdentity != r.CommonIdentity {
 		return false
 	}
 	if !r.Existing {
@@ -155,7 +173,17 @@ func matches(r Request, o Observation, resume bool) bool {
 	return r.Branch == "" || o.Branch == r.Branch
 }
 func entry(r Request, o effects.Outcome) effects.AttachmentEvidence {
-	return effects.AttachmentEvidence{Owner: r.Base.Owner, UserWriteAuthorizationID: r.UserWriteAuthorizationID, UserWriteAuthorizationVersion: r.UserWriteAuthorizationVersion, ReadonlyProofID: r.Readonly.ID, ReadonlyProofRevision: r.Readonly.Revision, ReadonlyProvenance: r.Readonly.Provenance, Mode: string(r.Mode), Ownership: string(r.Ownership), Path: r.Path, SourcePath: r.Source.Path, CommonPath: r.Common.Path, RepositoryID: r.RepositoryID, SourceIdentity: r.SourceIdentity, CommonIdentity: r.CommonIdentity, Branch: r.Branch, BaseCommit: r.BaseCommit, AuthorizationID: r.AuthorizationID, AuthorizationVersion: r.AuthorizationVersion, Outcome: o}
+	e := effects.AttachmentEvidence{Owner: r.Base.Owner, UserWriteAuthorizationID: r.UserWriteAuthorizationID, UserWriteAuthorizationVersion: r.UserWriteAuthorizationVersion, ReadonlyProofID: r.Readonly.ID, ReadonlyProofRevision: r.Readonly.Revision, ReadonlyProvenance: r.Readonly.Provenance, Mode: string(r.Mode), Ownership: string(r.Ownership), Path: r.Path, SourcePath: r.Source.Path, CommonPath: r.Common.Path, RepositoryID: r.RepositoryID, SourceIdentity: r.SourceIdentity, CommonIdentity: r.CommonIdentity, Branch: r.Branch, BaseCommit: r.BaseCommit, AuthorizationID: r.AuthorizationID, AuthorizationVersion: r.AuthorizationVersion, Outcome: o}
+	if r.Clone != (CloneIntent{}) {
+		e.RequestedMode = string(Clone)
+		e.Method = string(r.Clone.Method)
+		e.FallbackReason = r.Clone.FallbackReason
+		if r.Mode == Worktree {
+			e.FallbackAuthorizationID = r.Clone.FallbackAuthorizationID
+			e.FallbackAuthorizationVersion = r.Clone.FallbackAuthorizationVersion
+		}
+	}
+	return e
 }
 func result(r Request, o effects.Outcome, code string) effects.Result {
 	return effects.Result{Outcome: o, Code: code, Evidence: effects.Evidence{Header: r.Header, Kind: effects.RepositoryAttachment, RootID: r.Base.ID, Phase: effects.PreflightPhase, Outcome: o, Attachments: []effects.AttachmentEvidence{entry(r, o)}}}
@@ -193,17 +221,33 @@ func precheck(ctx context.Context, r Request, c effects.PreflightContext, p Port
 	}
 	return o, ""
 }
+
+// frozen reports a caller request: clone selection fields are set only here.
+func frozen(r Request) bool {
+	return r.Clone.Method == "" && r.Clone.FallbackReason == "" && (r.Clone == (CloneIntent{}) || r.Mode == Clone)
+}
+
+// Preflight selects a clone construction before any mutation. Required COW
+// without a method is Unsupported; preferred COW attaches a worktree only with
+// the request's explicit fallback authorization, and records why.
 func Preflight(ctx context.Context, r Request, c effects.PreflightContext, p Port) (Prepared, effects.Result) {
-	if !binding(r, c) {
+	if !frozen(r) || !binding(r, c) {
 		return Prepared{}, result(r, effects.Refused, "binding_refused")
 	}
-	if p == nil || !p.Supported(r) {
+	if p == nil {
 		return Prepared{}, result(r, effects.Unsupported, "mode_unsupported")
 	}
-	if _, code := precheck(ctx, r, c, p); code != "" {
-		return Prepared{}, result(r, effects.Refused, code)
+	selected, o, code := selectAttachment(ctx, r, p)
+	if code != "" {
+		return Prepared{}, result(r, o, code)
 	}
-	return Prepared{request: r, valid: true}, result(r, effects.Prepared, "preflight_complete")
+	if !binding(selected, c) || !p.Supported(selected) {
+		return Prepared{}, result(selected, effects.Unsupported, "mode_unsupported")
+	}
+	if _, code := precheck(ctx, selected, c, p); code != "" {
+		return Prepared{}, result(selected, effects.Refused, code)
+	}
+	return Prepared{request: selected, frozen: r, valid: true}, result(selected, effects.Prepared, "preflight_complete")
 }
 func cleanup(ctx context.Context, c effects.ApplyContext) (context.Context, context.CancelFunc) {
 	d := 5 * time.Second
@@ -246,6 +290,10 @@ func Apply(ctx context.Context, prepared Prepared, c effects.ApplyContext, p Por
 	}
 	if p == nil || !p.Supported(r) {
 		return result(r, effects.Unsupported, "mode_unsupported")
+	}
+	// The capability is observed again; a changed pair never switches modes.
+	if again, _, code := selectAttachment(ctx, prepared.frozen, p); code != "" || again != r {
+		return finish(ctx, c, out, effects.Refused, effects.AbortedPhase, "clone_capability_changed", false)
 	}
 	if _, code := precheck(ctx, r, c.PreflightContext, p); code != "" {
 		return finish(ctx, c, out, effects.Refused, effects.AbortedPhase, code, false)
@@ -291,12 +339,20 @@ func receiptBound(r Request, e effects.Evidence) bool {
 	}
 	a := e.Attachments[0]
 	want := entry(r, a.Outcome)
+	if a.RequestedMode != want.RequestedMode || a.Method != want.Method || a.FallbackReason != want.FallbackReason || a.FallbackAuthorizationID != want.FallbackAuthorizationID || a.FallbackAuthorizationVersion != want.FallbackAuthorizationVersion || a.TargetBranch != "" || a.TargetBefore != "" {
+		return false
+	}
 	return a.OriginHeader == want.OriginHeader && a.ShippedProofID == "" && a.ShippedProofRevision == "" && a.UnusedProofID == "" && a.UnusedProofRevision == "" && a.RetirementProvenance == "" && !a.SafetyComplete && a.Owner == want.Owner && a.UserWriteAuthorizationID == want.UserWriteAuthorizationID && a.UserWriteAuthorizationVersion == want.UserWriteAuthorizationVersion && a.ReadonlyProofID == want.ReadonlyProofID && a.ReadonlyProofRevision == want.ReadonlyProofRevision && a.ReadonlyProvenance == want.ReadonlyProvenance && a.Mode == want.Mode && a.Ownership == want.Ownership && a.Path == want.Path && a.SourcePath == want.SourcePath && a.CommonPath == want.CommonPath && a.RepositoryID == want.RepositoryID && a.SourceIdentity == want.SourceIdentity && a.CommonIdentity == want.CommonIdentity && a.BaseCommit == want.BaseCommit && a.AuthorizationID == want.AuthorizationID && a.AuthorizationVersion == want.AuthorizationVersion && (r.Existing && r.Branch == "" || a.Branch == want.Branch)
 }
 
 // InspectResume never re-evaluates a branch template or resets to the base.
 // A completed owned attachment can advance HEAD or contain legitimate dirty work.
 func InspectResume(ctx context.Context, r Request, c effects.PreflightContext, p Port, e effects.Evidence) effects.Result {
+	if len(e.Attachments) == 1 && frozen(r) {
+		if bound, ok := BindSelection(r, e.Attachments[0]); ok {
+			r = bound
+		}
+	}
 	if !binding(r, c) || !receiptBound(r, e) {
 		return result(r, effects.Refused, "evidence_refused")
 	}

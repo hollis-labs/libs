@@ -16,6 +16,7 @@ const CredentialLinks Kind = "credential_links"
 const Trust Kind = "trust"
 const RepositoryAttachment Kind = "repository_attachment"
 const RepositoryRetirement Kind = "repository_retirement"
+const RepositoryMergeBack Kind = "repository_mergeback"
 
 type Phase string
 
@@ -105,6 +106,16 @@ type AttachmentEvidence struct {
 	AuthorizationID, AuthorizationVersion                       string
 	Created                                                     bool
 	Outcome                                                     Outcome
+
+	// RequestedMode, Method and FallbackReason record the construction actually
+	// performed for a clone request; FallbackAuthorization names the explicit
+	// grant behind a worktree fallback. They are artifact receipts, not a policy
+	// or custody capability.
+	RequestedMode, Method, FallbackReason                 string `json:",omitempty"`
+	FallbackAuthorizationID, FallbackAuthorizationVersion string `json:",omitempty"`
+	// TargetBranch and TargetBefore bind a merge-back's source ref and its
+	// exact prior value; empty TargetBefore means the ref was absent.
+	TargetBranch, TargetBefore string `json:",omitempty"`
 }
 
 func (e Evidence) Clone() Evidence {

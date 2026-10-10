@@ -28,6 +28,12 @@ and includes exact source/common/base keys in the complete lock union. Every loc
 namespace lies outside those roots. Missing inputs and private checkout creation
 refuse; user-owned writable attachments need a separate write grant, and readonly
 attachments need explicit enforcement evidence. There is no ambient discovery.
+A `clone` `RepoSpec` names `required` or `preferred` copy on write and binds to a
+frozen clone request; a worktree fallback needs its own granted repository
+effect on the common root. Construction is selected under the locks at apply
+and recorded in the attachment evidence, which resume and recovery bind back to
+the frozen request (see `repositories/README.md`). Merge-back is a separate
+repository effect and is not run by `Materialize`.
 
 `Receipt.RepositoryRequests` retains original operation-bound requests beside
 versioned attachment evidence. `Receipt.RepositoryOrigins` preserves the trusted
