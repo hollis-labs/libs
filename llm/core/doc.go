@@ -12,9 +12,12 @@
 //     LiteLLM-style tables, an offline cache).
 //   - contracts (with capabilities and runtimes): the shared contract types for
 //     launching an agent.
+//   - quota (and quotatest): usage limits over calendar, rolling and
+//     provider-reported windows, with Check / Reserve / Commit and pluggable
+//     stores.
 //
 // Each package directory carries its own README.md, AGENTS.md and CHANGELOG.md from
 // the repository it was imported from, and a MIGRATION.md with the old and new
-// import paths. The module is released with module-prefixed tags of the form
-// llm-core/vX.Y.Z.
+// import paths. Packages written in this module have at least a README.md. The
+// module is released with module-prefixed tags of the form llm-core/vX.Y.Z.
 package llmcore
