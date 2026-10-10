@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.8.0
+
 ### Added
 
 - Per-root age/count retention overrides with whole-set KEEP and dominant
