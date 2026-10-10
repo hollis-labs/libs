@@ -20,7 +20,7 @@ type CaptureLimits struct {
 var ErrCaptureLimit = errors.New("snapshot: capture limit reached")
 
 type mirrorUsage struct {
-	Bytes             int64
+	Bytes, InputBytes int64
 	Entries, Excluded int
 	Files             int
 }
@@ -29,6 +29,9 @@ type mirrorUsage struct {
 // reach the private mirror. Callers must hold actual store/source custody and
 // budget admission through mirror ingestion, Git effects and accounting.
 func prepareMirror(ctx context.Context, scope plannedRoot, destination string, limits CaptureLimits, secretIdentities []fs.FileInfo) (mirrorUsage, error) {
+	return prepareMirrorRedacted(ctx, scope, destination, limits, secretIdentities, nil)
+}
+func prepareMirrorRedacted(ctx context.Context, scope plannedRoot, destination string, limits CaptureLimits, secretIdentities []fs.FileInfo, redactor ContentRedactor) (mirrorUsage, error) {
 	usage := mirrorUsage{}
 	if limits.MaxBytes <= 0 || limits.MaxFileBytes <= 0 || limits.MaxEntries <= 0 || limits.MaxFileBytes > limits.MaxBytes {
 		return usage, ErrCaptureLimit
@@ -104,7 +107,7 @@ func prepareMirror(ctx context.Context, scope plannedRoot, destination string, l
 				return nil
 			}
 		}
-		if before.Size() > limits.MaxFileBytes || before.Size() > limits.MaxBytes-usage.Bytes {
+		if before.Size() > limits.MaxFileBytes || before.Size() > limits.MaxBytes-usage.InputBytes {
 			return ErrCaptureLimit
 		}
 		input, err := openCaptureFile(source, filepath.FromSlash(rel))
@@ -121,23 +124,43 @@ func prepareMirror(ctx context.Context, scope plannedRoot, destination string, l
 		if before.Mode()&0111 != 0 {
 			mode = 0700
 		}
+		data, err := io.ReadAll(io.LimitReader(input, min(limits.MaxFileBytes, limits.MaxBytes-usage.InputBytes)+1))
+		if err != nil {
+			return ErrCoverageUnsupported
+		}
+		if int64(len(data)) > limits.MaxFileBytes || int64(len(data)) > limits.MaxBytes-usage.InputBytes {
+			return ErrCaptureLimit
+		}
+		after, statErr := input.Stat()
+		if statErr != nil || int64(len(data)) != before.Size() || after.Size() != before.Size() || !after.ModTime().Equal(before.ModTime()) {
+			return ErrCoverageUnsupported
+		}
+		if redactor != nil {
+			data, err = redactor.RedactSnapshot(ctx, data)
+			if err != nil {
+				return ErrCoverageUnsupported
+			}
+			if int64(len(data)) > limits.MaxFileBytes || int64(len(data)) > limits.MaxBytes-usage.InputBytes {
+				return ErrCaptureLimit
+			}
+		}
 		output, err := dest.OpenFile(filepath.FromSlash(rel), os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 		if err != nil {
 			return ErrCoverageUnsupported
 		}
-		n, copyErr := io.Copy(output, io.LimitReader(input, min(limits.MaxFileBytes, limits.MaxBytes-usage.Bytes)+1))
+		n, copyErr := output.Write(data)
 		closeErr := output.Close()
-		after, statErr := input.Stat()
-		if copyErr != nil || closeErr != nil || statErr != nil {
+		if copyErr != nil || closeErr != nil || n != len(data) {
 			return ErrCoverageUnsupported
 		}
-		if n > limits.MaxFileBytes || n > limits.MaxBytes-usage.Bytes {
+		if int64(n) > limits.MaxFileBytes || int64(n) > limits.MaxBytes-usage.InputBytes {
 			return ErrCaptureLimit
 		}
-		if n != before.Size() || after.Size() != before.Size() || !after.ModTime().Equal(before.ModTime()) {
-			return ErrCoverageUnsupported
+		if int64(n) > limits.MaxBytes-usage.Bytes {
+			return ErrCaptureLimit
 		}
-		usage.Bytes += n
+		usage.InputBytes += before.Size()
+		usage.Bytes += int64(n)
 		usage.Files++
 		return nil
 	})
