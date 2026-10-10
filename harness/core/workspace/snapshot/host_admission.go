@@ -131,9 +131,16 @@ func (p *GuardedProvider) acquireHost(ctx context.Context, op SnapshotOperation)
 		return nil, ErrAdmissionUnavailable
 	}
 	if err := p.verifyHost(ctx, h, op); err != nil {
-		return nil, errors.Join(err, h.Close())
+		return nil, errors.Join(err, closeSnapshotAdmission(h))
 	}
 	return h, nil
+}
+
+func closeSnapshotAdmission(h SnapshotAdmission) error {
+	if h != nil && h.Close() != nil {
+		return ErrAdmissionUnavailable
+	}
+	return nil
 }
 func (p *GuardedProvider) verifyHost(ctx context.Context, h SnapshotAdmission, op SnapshotOperation) error {
 	if h == nil || p == nil || p.isolation == nil {

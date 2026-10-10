@@ -8,6 +8,19 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- Observed Linux frozen payload isolation with protected control/store mount,
+  proc, inherited descriptor, hard-link and mapping exclusions. Guarded capture
+  requires a separate current host admission port, finite policy and bounded
+  pre-ingestion redaction; absent or stale support refuses. No production host,
+  owner-completion or deletion issuer is supplied.
+- Selective captured-file restore with expected-current presence/SHA256,
+  complete selection preflight and the same actual host writer fence through
+  native replacement and durable accounting. Partial effects retain originals,
+  pins, evidence and uncertainty; recorded operations never automatically retry.
+  No live adoption, full-metadata restore or GC authority is added.
+
 ## v0.9.0
 
 ### Added

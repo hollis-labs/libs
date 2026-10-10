@@ -26,8 +26,9 @@ file content; neither hashes nor Git isolation prove secret exclusion.
 
 The original `Restore` warns and overwrites differing content. It does not
 implement expected-current-hash CAS or host authority revalidation. Empty paths
-restore nothing. An authorized guarded restore and a captured-tree fork into a
-new owned root remain separate integrations.
+restore nothing. The guarded `RestoreSelective` path below requires expected-current presence
+and hash plus a continuously held host writer fence. A captured-tree fork into
+a new owned root remains a separate integration.
 
 Default retention is KEEP. Pins for journal replay, exports and forks dominate
 all GC limits; exhausted pinned budgets stop or defer captures. The low-level
@@ -46,9 +47,10 @@ export and fork pins always dominate these rules.
 
 `GuardedProvider.Collect` accepts an operation-bound opaque `GCGrant`; policy,
 JSON, elapsed age and decoded completion data cannot issue that authority. This
-release has no production enforced-isolation, deletion or owner-completion
-issuer. Public protected construction remains Unsupported. The callable private
-kernel is verified in disposable zero-agent fixtures; it is not live GC.
+release has no production host, deletion or owner-completion issuer. Protected
+construction requires independently observed OS exclusion and a genuine host
+admission port; missing or stale support refuses. The private GC kernel is
+verified in disposable zero-agent fixtures; it is not live GC.
 
 The kernel holds the store admission lock, verifies the complete owned Git
 reference/object map and records intent before mutation. It CAS-deletes only
@@ -71,3 +73,57 @@ current issued authority and record redacted outcomes. Scheduling requires a
 positive interval, per-attempt timeout and finite attempt count, and stops on
 the first refusal or uncertain result. These helpers install no app scheduler,
 shim policy or live cleanup authority. Legacy raw cleanup APIs remain separate.
+
+## Observed isolation and admitted capture
+
+`ObserveIsolation` observes an already-frozen provider-only Linux cgroup v2 and
+its canonical payload. It does not launch, freeze, signal or thaw a process.
+The request includes the exact payload PID/start time, opened cgroup directory,
+immutable target plan, private store and complete canonical protected control,
+journal and lock directory inventory. The host must independently reconcile
+that inventory with its current execution; a supplied path or digest is not
+authority. The sealed proof rechecks namespaces, thread capabilities, mounts,
+private proc, inherited descriptors, protected file mappings and physical root
+identities. Unsupported evidence, missing control inventory, thaw, process loss
+or changed custody refuses. Other platforms have no supported observer yet.
+
+`NewGuardedProvider` additionally requires a genuine `SnapshotHost`, an explicit
+finite policy and a version-bound `ContentRedactor`. Construction is effectless;
+first capture acquires host admission before creating ledger or Git state.
+The host must independently verify current principal, policy, binding,
+incarnation/controller and the exact operation, and continuously hold every
+submission/source-writer and in-flight-I/O boundary. A callback returning nil,
+policy fields or the observation alone supplies no host authority.
+
+Eligible source bytes pass the existing credential exclusions and bounded
+redaction adapter before any mirror write or Git ingestion. Redaction adapts
+host-resolved values without credential discovery; it promises no universal PII
+or arbitrary-secret detection. Read pins also require current physical and host
+admission. An uncertain effect retains its evidence and pin, and host closure
+must keep writer admission fenced rather than thaw on cancellation.
+
+## Selective restore
+
+`RestoreSelective` accepts a bound issued retained set and explicit
+`RestoreSelection` values naming target, relative path and expected current
+presence/SHA256. It refuses empty/duplicate/out-of-scope selections, symlinks,
+credential hard-link aliases, stale roots and conflicts. All selections are
+checked before staging; hashing, per-file replacement and durable accounting
+share the same actual host writer/custody fence. Advisory flock and a final hash
+comparison cannot supply that fence.
+
+The Linux kernel records intent before atomic no-replace creation or exchange.
+Exchange retains original content under its recorded staging name in the selected root;
+there is no automatic deletion or compensation. Multi-file restore is not an
+atomic transaction. `RestoreResult` preserves changed count, partial/uncertain
+outcome and inspection/pin/fence obligations after late refusal or persistence
+failure. Reusing a recorded operation refuses instead of blindly repeating an
+effect. Only captured regular-file bytes and executable status are restored;
+full filesystem metadata, crash recovery and automatic completion are absent.
+Other platforms refuse native replacement.
+
+The actual owned OS fixture proves the observer and its exposure refusals.
+Private zero-agent controls exercise ingestion and restore accounting; neither
+is a genuine production host issuer or real-agent acceptance. Tether's
+provider-only handle and continuous writer admission producer remain separate
+host integration requirements. See the consumer guide for acceptance boundaries.

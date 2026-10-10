@@ -444,7 +444,7 @@ func (r *RetainedSet) pin(ctx context.Context, owner string, kind PinKind, acqui
 	fail := func(e error) (*ReadLease, error) {
 		var closeErr error
 		if hostLease != nil {
-			closeErr = hostLease.Close()
+			closeErr = closeSnapshotAdmission(hostLease)
 		}
 		return nil, errors.Join(e, h.close(), closeErr)
 	}
@@ -530,7 +530,7 @@ func (l *ReadLease) Close() error {
 	err := l.held.close()
 	l.held = nil
 	if l.hostLease != nil {
-		err = errors.Join(err, l.hostLease.Close())
+		err = errors.Join(err, closeSnapshotAdmission(l.hostLease))
 		l.hostLease = nil
 	}
 	return err

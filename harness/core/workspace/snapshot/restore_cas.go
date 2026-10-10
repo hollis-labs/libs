@@ -89,18 +89,20 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 	if e != nil {
 		return result, e
 	}
+	pinned := false
 	defer func() {
-		if closeErr := host.Close(); closeErr != nil {
+		if closeErr := closeSnapshotAdmission(host); closeErr != nil {
 			err = errors.Join(err, ErrRestoreUncertain)
 			result.Outcome = "uncertain"
 			result.Partial = true
-			result.Obligations = []string{"restore_inspection_required", "retained_set_pinned", "writer_admission_fenced"}
+			result.Obligations = restoreObligations(pinned)
 		}
 	}()
 	lease, e := retained.pin(ctx, request.Intent.OperationID, PinFork, false)
 	if e != nil {
 		return result, e
 	}
+	pinned = true
 	defer func() { err = errors.Join(err, lease.Close()) }()
 	verify := func() error {
 		if e := lease.Verify(ctx); e != nil {
@@ -200,7 +202,7 @@ func (p *GuardedProvider) RestoreSelective(ctx context.Context, retained *Retain
 		if err != nil && started {
 			result.Outcome = "uncertain"
 			result.Partial = true
-			result.Obligations = []string{"restore_inspection_required", "retained_set_pinned", "writer_admission_fenced"}
+			result.Obligations = restoreObligations(pinned)
 			err = errors.Join(err, ErrRestoreUncertain)
 		}
 	}()
@@ -381,4 +383,12 @@ func writeRestoreRecord(lease *ReadLease, name string, record restoreRecord, ini
 		}
 	}
 	return lease.admission.syncDirectory()
+}
+
+func restoreObligations(pinned bool) []string {
+	pin := "retained_set_pin_required"
+	if pinned {
+		pin = "retained_set_pinned"
+	}
+	return []string{"restore_inspection_required", pin, "writer_admission_fenced"}
 }

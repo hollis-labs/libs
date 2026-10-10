@@ -23,6 +23,7 @@ type ownedRestoreHost struct {
 	records   []SnapshotEffect
 	denyAfter string
 	denied    bool
+	failClose bool
 }
 
 func (h *ownedRestoreHost) AcquireSnapshot(context.Context, SnapshotOperation) (SnapshotAdmission, error) {
@@ -44,7 +45,13 @@ func (h *ownedRestoreHost) Record(_ context.Context, _ SnapshotOperation, e Snap
 	}
 	return nil
 }
-func (h *ownedRestoreHost) Close() error { h.closed = true; return nil }
+func (h *ownedRestoreHost) Close() error {
+	h.closed = true
+	if h.failClose {
+		return errors.New("fake sensitive host close diagnostic")
+	}
+	return nil
+}
 func expectedBytes(b []byte) ExpectedFile {
 	sum := sha256.Sum256(b)
 	return ExpectedFile{Present: true, SHA256: hex.EncodeToString(sum[:])}
@@ -244,5 +251,21 @@ func TestSelectiveRestoreKernelLateAuthorityRefusalRetainsEffects(t *testing.T) 
 	ledger, e := p.admission.load()
 	if e != nil || ledger.Pins[pinKey(retained.ID(), request.Intent.OperationID, PinFork)].Completion != "" {
 		t.Fatal("late refusal completed uncertainty pin")
+	}
+}
+
+func TestSelectiveRestoreKernelCloseUncertaintyDoesNotClaimUnissuedPin(t *testing.T) {
+	p, retained, host, _, request := ownedRestoreFixture(t)
+	host.failClose = true
+	retained.digest = "unissued altered receipt"
+	result, e := p.RestoreSelective(context.Background(), retained, request)
+	if !errors.Is(e, ErrRestoreUncertain) || result.ChangedCount != 0 || result.Outcome != "uncertain" {
+		t.Fatalf("lost close uncertainty: %+v %v", result, e)
+	}
+	if strings.Contains(e.Error(), "sensitive") {
+		t.Fatal("host diagnostic escaped")
+	}
+	if strings.Join(result.Obligations, ",") != "restore_inspection_required,retained_set_pin_required,writer_admission_fenced" {
+		t.Fatal("failed acquisition claimed durable pin")
 	}
 }
