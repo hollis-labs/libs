@@ -130,32 +130,47 @@ func TestGuardHalfOpenSingleProbe(t *testing.T) {
 	_ = g.Do(context.Background(), keyA1, fail(conn))
 	clk.advance(10 * time.Second)
 
+	const callers = 64
 	var (
 		admitted atomic.Int64
+		refused  atomic.Int64
 		wg       sync.WaitGroup
 		start    = make(chan struct{})
 		release  = make(chan struct{})
 	)
-	for range 64 {
+	for range callers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			<-start
-			_ = g.Do(context.Background(), keyA1, func(context.Context) error {
+			err := g.Do(context.Background(), keyA1, func(context.Context) error {
 				admitted.Add(1)
 				<-release
 				return nil
 			})
+			if errors.Is(err, ErrRefused) {
+				refused.Add(1)
+			}
 		}()
 	}
 	close(start)
-	for g.Check(keyA1).Reason != ReasonProbeInFlight {
+	// Hold the probe until every other caller has been turned away, so none
+	// can arrive after the probe legitimately closes the circuit.
+	for refused.Load() < callers-1 && admitted.Load() < 2 {
 		time.Sleep(time.Millisecond)
+	}
+	if n := admitted.Load(); n != 1 {
+		close(release)
+		wg.Wait()
+		t.Fatalf("half-open guard admitted %d concurrent calls, want 1", n)
+	}
+	if d := g.Check(keyA1); d.Reason != ReasonProbeInFlight {
+		t.Fatalf("while the probe is outstanding Check = %+v, want probe-in-flight", d)
 	}
 	close(release)
 	wg.Wait()
-	if n := admitted.Load(); n != 1 {
-		t.Fatalf("half-open guard admitted %d concurrent calls, want 1", n)
+	if n, r := admitted.Load(), refused.Load(); n != 1 || r != callers-1 {
+		t.Fatalf("admitted %d, refused %d; want 1 and %d", n, r, callers-1)
 	}
 	if g.State(keyA1) != CircuitClosed {
 		t.Fatal("the probe's success must close the breaker")
