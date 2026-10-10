@@ -4,10 +4,13 @@ package snapshot
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 	"time"
 )
@@ -33,11 +36,13 @@ func openAdmission(name string, policy CapturePolicy) (*Admission, error) {
 		return nil, ErrAdmissionUnavailable
 	}
 	// Verify every existing component without resolving a symlink into authority.
+	ancestry := map[string]os.FileInfo{}
 	for p := name; ; p = filepath.Dir(p) {
 		info, e := os.Lstat(p)
 		if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return nil, ErrAdmissionUnavailable
 		}
+		ancestry[p] = info
 		if p == filepath.Dir(p) {
 			break
 		}
@@ -50,7 +55,7 @@ func openAdmission(name string, policy CapturePolicy) (*Admission, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &Admission{root: name, directory: root, identity: info, policy: policy}
+	a := &Admission{root: name, directory: root, identity: info, ancestry: ancestry, policy: policy}
 	if err = a.checkRoot(); err != nil {
 		root.Close()
 		return nil, err
@@ -69,17 +74,13 @@ func (a *Admission) checkRoot() error {
 	if !privateAdmission(opened, true) || !privateAdmission(named, true) || !os.SameFile(a.identity, opened) || !os.SameFile(opened, named) {
 		return ErrAdmissionUnavailable
 	}
-	// An ancestry replacement, even when the held root itself survives, is not a
-	// new grant. This supplements confinement; it does not claim isolation.
-	for p := filepath.Dir(a.root); ; p = filepath.Dir(p) {
-		info, e := os.Lstat(p)
-		if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+	for p, before := range a.ancestry {
+		now, e := os.Lstat(p)
+		if e != nil || !now.IsDir() || now.Mode()&os.ModeSymlink != 0 || !os.SameFile(before, now) {
 			return ErrAdmissionUnavailable
 		}
-		if p == filepath.Dir(p) {
-			break
-		}
 	}
+
 	return nil
 }
 func (a *Admission) checkFile(f *os.File, name string) error {
@@ -183,4 +184,17 @@ func admissionStoreIdentity(info os.FileInfo) string {
 		return ""
 	}
 	return fmt.Sprintf("%d:%d:%d", st.Dev, st.Ino, st.Uid)
+}
+
+func (a *Admission) storeOriginIdentity() string {
+	keys := make([]string, 0, len(a.ancestry))
+	for p := range a.ancestry {
+		keys = append(keys, p)
+	}
+	sort.Strings(keys)
+	h := sha256.New()
+	for _, p := range keys {
+		fmt.Fprintf(h, "%s\x00%s\x00", p, admissionStoreIdentity(a.ancestry[p]))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }

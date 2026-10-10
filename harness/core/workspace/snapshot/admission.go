@@ -62,7 +62,7 @@ type CaptureIntent struct {
 }
 
 func (i CaptureIntent) validate() error {
-	if i.ControllerEpoch == 0 || len(i.InputDigest) != 64 || len(i.TargetMapDigest) != 64 || !validObjectID(i.InputDigest) || !validObjectID(i.TargetMapDigest) {
+	if !safeReceiptID(i.OperationID) || !safeReceiptID(i.RunID) || i.ControllerEpoch == 0 || len(i.InputDigest) != 64 || len(i.TargetMapDigest) != 64 || !validObjectID(i.InputDigest) || !validObjectID(i.TargetMapDigest) {
 		return ErrAdmissionUnavailable
 	}
 	for _, s := range []string{i.SetID, i.OperationID, i.RunID, i.InstanceID, i.InputDigest, i.TargetMapDigest, i.PolicyRevision, i.BindingFence, i.BootGeneration, i.RuntimeGeneration} {
@@ -120,6 +120,7 @@ type Admission struct {
 	root      string
 	directory *os.Root
 	identity  os.FileInfo
+	ancestry  map[string]os.FileInfo
 	policy    CapturePolicy
 	storeID   string
 }
@@ -183,7 +184,9 @@ func newAdmission(root string, policy *CapturePolicy) (*Admission, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := a.lock(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), policy.Budgets.MaxDuration)
+	defer cancel()
+	h, err := a.lock(ctx)
 	if err != nil {
 		a.directory.Close()
 		return nil, err
@@ -212,7 +215,7 @@ func newAdmission(root string, policy *CapturePolicy) (*Admission, error) {
 		if e != nil {
 			return nil, e
 		}
-		state = admissionLedger{Version: 1, StoreID: id, StorePath: a.root, StoreIdentity: admissionStoreIdentity(a.identity), Sets: map[string]setAccount{}, Pins: map[string]pinRecord{}, Runs: map[string]runAccount{}}
+		state = admissionLedger{Version: 1, StoreID: id, StorePath: a.root, StoreIdentity: a.storeOriginIdentity(), Sets: map[string]setAccount{}, Pins: map[string]pinRecord{}, Runs: map[string]runAccount{}}
 		if err = a.save(h, state); err != nil {
 			a.directory.Close()
 			return nil, err
@@ -368,6 +371,7 @@ type ReadLease struct {
 	set       setAccount
 	pin       string
 	active    bool
+	deadline  time.Time
 }
 
 func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*ReadLease, error) {
@@ -396,14 +400,17 @@ func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*Rea
 	if err = a.save(h, state); err != nil {
 		return fail(err)
 	}
-	return &ReadLease{admission: a, held: h, set: set, pin: key, active: true}, nil
+	return &ReadLease{admission: a, held: h, set: set, pin: key, active: true, deadline: time.Now().Add(a.policy.Budgets.MaxDuration)}, nil
 }
 func (l *ReadLease) Verify(ctx context.Context) error {
-	if l == nil || !l.active || l.held == nil {
+	if ctx == nil || l == nil || !l.active || l.held == nil {
 		return ErrAdmissionUnavailable
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if !time.Now().Before(l.deadline) {
+		return ErrSnapshotBudget
 	}
 	if err := l.held.check(); err != nil {
 		return err
@@ -472,7 +479,7 @@ func (a *Admission) load() (admissionLedger, error) {
 	if dec.Decode(&extra) != io.EOF {
 		return state, ErrAdmissionUnavailable
 	}
-	if state.Version != 1 || state.StoreID == "" || state.StorePath != a.root || state.StoreIdentity != admissionStoreIdentity(a.identity) || state.Sets == nil || state.Pins == nil || state.Runs == nil || state.StorageBytes < 0 {
+	if state.Version != 1 || state.StoreID == "" || state.StorePath != a.root || state.StoreIdentity != a.storeOriginIdentity() || state.Sets == nil || state.Pins == nil || state.Runs == nil || state.StorageBytes < 0 {
 		return state, ErrAdmissionUnavailable
 	}
 	if err = a.validateLedger(state); err != nil {

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 
 	"time"
 	"unicode"
@@ -22,6 +23,9 @@ type RetainedRootOutcome struct {
 	RootID, StoreID, TreeHash, CommitHash, Code string
 	Observation                                 SnapshotInterval
 	Skipped                                     []RetainedSkip
+	// References are exact capture-owned Git refs. They are private retention
+	// evidence, never event payload or deletion authority. Absence keeps objects.
+	References []string
 }
 type RetainedSkip struct {
 	Reason string
@@ -57,6 +61,7 @@ func detachedManifest(m RetainedManifest) RetainedManifest {
 	out.Roots = append([]RetainedRootOutcome(nil), m.Roots...)
 	for i := range out.Roots {
 		out.Roots[i].Skipped = append([]RetainedSkip(nil), m.Roots[i].Skipped...)
+		out.Roots[i].References = append([]string(nil), m.Roots[i].References...)
 	}
 	return out
 }
@@ -71,6 +76,16 @@ func (m RetainedManifest) validate(set SnapshotSet, storeID string) error {
 			return ErrAdmissionUnavailable
 		}
 		seen[r.RootID] = true
+		refs := map[string]bool{}
+		if len(r.References) > 1024 || (r.Code != "" && len(r.References) != 0) {
+			return ErrAdmissionUnavailable
+		}
+		for _, ref := range r.References {
+			if !validRetainedReference(ref) || refs[ref] {
+				return ErrAdmissionUnavailable
+			}
+			refs[ref] = true
+		}
 		source, ok := set.Roots[r.RootID]
 		switch r.Code {
 		case "":
@@ -107,6 +122,22 @@ func (m RetainedManifest) validate(set SnapshotSet, storeID string) error {
 	}
 	return nil
 }
+func validRetainedReference(ref string) bool {
+	if !strings.HasPrefix(ref, "refs/snapshots/") || len(ref) > 512 || strings.HasSuffix(ref, ".") || strings.Contains(ref, "..") || strings.Contains(ref, "@{") || strings.ContainsAny(ref, " ~^:?*[\\\x00") {
+		return false
+	}
+	for _, part := range strings.Split(ref, "/") {
+		if part == "" || strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
+			return false
+		}
+		for _, r := range part {
+			if unicode.IsControl(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
 func accountDigest(storeID string, s setAccount) (string, error) {
 	encoded, err := json.Marshal(struct {
 		StoreID        string
@@ -130,11 +161,19 @@ func (l *ReadLease) Manifest() RetainedManifest {
 }
 func (a *Admission) validateLedger(s admissionLedger) error {
 	var total int64
+	runs := map[string]runAccount{}
 	for id, set := range s.Sets {
 		if id != set.Intent.SetID || set.Intent.validate() != nil || set.PolicyRevision != set.Intent.PolicyRevision || set.Bytes < 0 || set.Bytes > int64(^uint64(0)>>1)-total {
 			return ErrAdmissionUnavailable
 		}
 		total += set.Bytes
+		run := runs[set.Intent.RunID]
+		if set.Bytes > int64(^uint64(0)>>1)-run.Bytes {
+			return ErrAdmissionUnavailable
+		}
+		run.Captures++
+		run.Bytes += set.Bytes
+		runs[set.Intent.RunID] = run
 		if !set.Pending {
 			if set.Set.ID != id || set.Manifest.validate(set.Set, s.StoreID) != nil {
 				return ErrAdmissionUnavailable
@@ -154,8 +193,11 @@ func (a *Admission) validateLedger(s admissionLedger) error {
 			return ErrAdmissionUnavailable
 		}
 	}
+	if len(runs) != len(s.Runs) {
+		return ErrAdmissionUnavailable
+	}
 	for id, run := range s.Runs {
-		if !safeReceiptID(id) || run.Captures < 0 || run.Bytes < 0 {
+		if !safeReceiptID(id) || run != runs[id] {
 			return ErrAdmissionUnavailable
 		}
 	}

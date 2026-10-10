@@ -91,6 +91,67 @@ func TestAdmissionStableLockSerializesAcrossHandles(t *testing.T) {
 		t.Fatalf("uncertain reservations did not dominate budget: %v", err)
 	}
 }
+func TestAdmissionConstructorHasFiniteLockWait(t *testing.T) {
+	a := testAdmission(t)
+	l, err := a.beginCapture(context.Background(), testCaptureIntent("held"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.retainUncertain()
+	p := testCapturePolicy()
+	p.Budgets.MaxDuration = 15 * time.Millisecond
+	if _, err = newAdmission(a.root, p); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("unbounded constructor wait: %v", err)
+	}
+}
+func TestAdmissionExpiredReaderRetainsPin(t *testing.T) {
+	a := testAdmission(t)
+	r := testReceipt(t, a, "one")
+	l, err := r.Pin(context.Background(), "reader", PinFork)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.deadline = time.Now().Add(-time.Second)
+	if err = l.Verify(context.Background()); !errors.Is(err, ErrSnapshotBudget) {
+		t.Fatalf("expired reader admitted: %v", err)
+	}
+	if err = l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Purge(context.Background()); !errors.Is(err, ErrSnapshotPinned) {
+		t.Fatal("timeout released durable pin")
+	}
+}
+
+func TestAdmissionRunAccountingCannotBeResetOnReload(t *testing.T) {
+	for _, field := range []string{"bytes", "captures"} {
+		t.Run(field, func(t *testing.T) {
+			a := testAdmission(t)
+			testReceipt(t, a, "one")
+			state, err := a.load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			run := state.Runs["run"]
+			if field == "bytes" {
+				run.Bytes = 0
+			} else {
+				run.Captures = 0
+			}
+			state.Runs["run"] = run
+			data, err := json.Marshal(state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(a.root, "admission.json"), data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = a.beginCapture(context.Background(), testCaptureIntent("two")); !errors.Is(err, ErrAdmissionUnavailable) {
+				t.Fatalf("reset run accounting admitted: %v", err)
+			}
+		})
+	}
+}
 func TestAdmissionPinsDominateRetentionAndRestart(t *testing.T) {
 	a := testAdmission(t)
 	a.policy.Retention = RetentionPolicy{MaxAge: time.Nanosecond, MaxSnapshotSets: 1}
