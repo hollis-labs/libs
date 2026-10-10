@@ -1,12 +1,11 @@
-github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
 github.com/hollis-labs/substrate/agent v0.1.0 h1:KAf3hQOe1EO88KU08V29UmyViHnVfY98m5dqXRV7G3c=
 github.com/hollis-labs/substrate/agent v0.1.0/go.mod h1:NGtnJ+6am7s5SpR7mnoYnb3bOLhysCphSiXh/aNlelk=
 github.com/hollis-labs/substrate/llm-core v0.1.0 h1:nsNpY3OzpuvHKC9zLzqFKmwMXt856PXOUfaVpGP8pFY=
 github.com/hollis-labs/substrate/llm-core v0.1.0/go.mod h1:055xZrH5gLwodrVMu2SHQzfIcTXhjDGBXfJ1kdy/eSo=
-github.com/hollis-labs/substrate/mesh v0.1.0 h1:CkUvYdoXSGVcSlXhVgc+0AYzyhXdd49c+AV47z0XvOs=
-github.com/hollis-labs/substrate/mesh v0.1.0/go.mod h1:akUYHGaDVmF2Gwyr784nk8HuNr0KBsl1x97ApvTxcAM=
+github.com/hollis-labs/substrate/mesh v0.3.0 h1:IG+EgDiJ/quMITxDFkr/B7qRgy6AIaoti4ohUYuIP34=
+github.com/hollis-labs/substrate/mesh v0.3.0/go.mod h1:bNoNk0iDKq8QpOwRybpctoS0nlm1ppsk5htbO/KbIcM=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
