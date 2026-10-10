@@ -1,11 +1,13 @@
 package quota_test
 
 import (
+	"context"
 	"testing"
 	"time"
 	_ "time/tzdata" // the DST cases must not depend on the host's zone database
 
 	"github.com/hollis-labs/substrate/llm-core/quota"
+	"github.com/hollis-labs/substrate/llm-core/quota/quotatest"
 )
 
 func mustLoad(t *testing.T, name string) *time.Location {
@@ -122,5 +124,68 @@ func TestWindowValidate(t *testing.T) {
 		if err := w.Validate(); err == nil {
 			t.Errorf("Validate(%#v) = nil; want an error", w)
 		}
+	}
+}
+
+// TestCalendarDSTThroughLimiter drives a Limiter with an injected clock across
+// spring-forward, fall-back and a skipped local midnight.
+func TestCalendarDSTThroughLimiter(t *testing.T) {
+	ctx := context.Background()
+	utc := func(y int, m time.Month, d, h, min int) time.Time { return time.Date(y, m, d, h, min, 0, 0, time.UTC) }
+	type usage struct {
+		at     time.Time
+		amount int64
+	}
+	tests := []struct {
+		name    string
+		loc     *time.Location
+		now     time.Time
+		history []usage
+		amount  int64
+		want    quota.Decision
+		advance time.Duration
+		after   quota.Decision
+	}{
+		{
+			// 2026-03-08 in Chicago is 23 hours: 06:00Z to 05:00Z.
+			name: "spring forward", loc: mustLoad(t, "America/Chicago"), now: utc(2026, 3, 9, 4, 30), // 23:30 CDT
+			history: []usage{{utc(2026, 3, 8, 5, 59), 50}, {utc(2026, 3, 8, 6, 30), 4}}, // 23:59 CST the day before; 00:30 CST
+			amount:  7, want: quota.Decision{Remaining: 6, RetryAfter: 30 * time.Minute, Reason: quota.ReasonExhausted},
+			advance: 30 * time.Minute, after: quota.Decision{Allowed: true, Remaining: 10},
+		},
+		{
+			// 2026-11-01 in Chicago is 25 hours: 05:00Z to 06:00Z.
+			name: "fall back", loc: mustLoad(t, "America/Chicago"), now: utc(2026, 11, 2, 5, 0), // 23:00 CST
+			history: []usage{{utc(2026, 11, 1, 5, 10), 4}}, // 00:10 CDT
+			amount:  7, want: quota.Decision{Remaining: 6, RetryAfter: time.Hour, Reason: quota.ReasonExhausted},
+			advance: time.Hour, after: quota.Decision{Allowed: true, Remaining: 10},
+		},
+		{
+			// 2026-03-08 in Havana starts at 01:00 CDT (05:00Z); 00:00 does not exist.
+			name: "skipped midnight", loc: mustLoad(t, "America/Havana"), now: utc(2026, 3, 8, 5, 0),
+			history: []usage{{utc(2026, 3, 8, 4, 59), 50}, {utc(2026, 3, 8, 5, 0), 4}}, // 23:59 CST the day before; 01:00 CDT
+			amount:  7, want: quota.Decision{Remaining: 6, RetryAfter: 23 * time.Hour, Reason: quota.ReasonExhausted},
+			advance: 23 * time.Hour, after: quota.Decision{Allowed: true, Remaining: 10},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clk := quotatest.NewClock(tc.now)
+			store := quota.NewMemoryStore()
+			l := quota.New(store, quota.WithClock(clk))
+			lim := quota.Limit{Key: "k", Unit: "u", Window: quota.Calendar(quota.Day, tc.loc), Max: 10}
+			for _, u := range tc.history {
+				if err := store.Record(ctx, lim.Counter(), quota.Entry{At: u.at, Amount: u.amount}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got, err := l.Check(ctx, lim, tc.amount); err != nil || got != tc.want {
+				t.Fatalf("Check = %+v, %v; want %+v", got, err, tc.want)
+			}
+			clk.Advance(tc.advance)
+			if got, err := l.Check(ctx, lim, tc.amount); err != nil || got != tc.after {
+				t.Fatalf("after %s: Check = %+v, %v; want %+v", tc.advance, got, err, tc.after)
+			}
+		})
 	}
 }
