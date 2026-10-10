@@ -18,20 +18,28 @@ never the legacy convention that an empty path list means the whole root.
 
 ## Production availability
 
-`NewGuardedProvider` currently returns `ErrStoreCustodyUnsupported` after
-validating finite policy. It creates no directory, admission record or Git
-object. There is no production issuer for the complete enforced isolation and
-custody needed by this path. A requested confinement mode, a backend name,
-same-user ownership or mode `0700` cannot establish confidentiality from an
-agent running as that same user.
+`NewGuardedProvider` validates finite policy and remains effectless. It now
+requires an opaque actual OS observation, a separate genuine current host
+admission port and a version-bound redaction adapter. Missing or stale support
+returns an unavailable/refused error before ingestion. The Linux observer checks
+an already-frozen provider-only group, namespaces, physical roots and protected
+store/control reachability through mounts, proc, inherited descriptors and file
+mappings. It performs no process or freezer operation. Other platforms have no
+supported observer yet. See the package README for the concrete public seam.
 
-The private package-owned kernel is exercised with disposable filesystem and
-Git fixtures. Those results demonstrate ingestion and durable accounting;
-they do not demonstrate live agent isolation. A future host producer must
-bind actual backend enforcement, launch/effective-policy identity, physical
-source/store custody and the current host binding fence, and preserve that
-exclusion through content ingestion and accounting. No caller boolean or
-exported test proof can substitute for this producer.
+A requested confinement mode, a backend name, same-user ownership or mode
+`0700` cannot establish confidentiality from an agent running as that same
+user. The host must independently hold actual submission/source-writer and
+in-flight-I/O fences, validate current principal/policy/binding/incarnation and
+reconcile the complete protected-root inventory. Neither an OS observation nor
+a callback returning nil grants that authority.
+
+Actual owned zero-agent OS controls demonstrate observation and exposure
+refusals. The private kernel exercises ingestion and durable accounting with
+disposable filesystem/Git fixtures. Neither supplies the genuine production
+host producer, which remains a separate integration requirement. Physical and
+host custody must remain held through ingestion, replacement and accounting;
+unsupported guarded capture has no production fallback.
 
 The existing `ShadowGit` provider and its four-method snapshot port remain
 available for their original callers. Passing `TargetPlan.Targets()` to raw
@@ -58,7 +66,11 @@ Mandatory name exclusions include `.env*`, credential/provider configuration
 and key/token paths. They are intentionally conservative. They are **not** a
 secret-value detector: a secret copied into an otherwise ordinary source file
 is not discoverable from its filename alone. Hosts must supply the full known
-credential path inventory and an appropriate eligible content policy.
+credential path inventory and an appropriate eligible content policy. The
+guarded production path additionally invokes its bounded, version-bound
+redaction adapter before mirror writes or Git ingestion. This adapts known
+host-resolved values; it does not promise arbitrary-secret or universal PII
+detection.
 
 Only regular eligible mirror content reaches Git. Inherited Git control
 variables, global/system configuration and initialization templates cannot
