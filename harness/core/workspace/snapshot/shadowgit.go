@@ -62,6 +62,7 @@ type ShadowGit struct {
 	gitBin            string
 	logger            *slog.Logger
 	maxUntrackedBytes int64
+	guarded           bool // private safe-mirror construction; never a live custody proof
 
 	mu     sync.Mutex
 	target map[string]*sync.Mutex // per-target-ID in-process serialization
@@ -551,7 +552,14 @@ func (sg *ShadowGit) ensureShadowRepo(ctx context.Context, targetID string) (str
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return "", fmt.Errorf("%w: create shadow store for target %q: %w", ErrShadowStoreUnavailable, targetID, err)
 	}
-	if out, err := sg.runGitRaw(ctx, root, nil, "-c", "init.defaultBranch=snapshot", "init", "--quiet", "--bare", gitDir); err != nil {
+	initArgs := []string{"-c", "init.defaultBranch=snapshot", "init", "--quiet", "--bare"}
+	if sg.guarded {
+		// Ambient templates may contain files or executable hooks. They must
+		// not be copied into a confidential, newly admitted object store.
+		initArgs = append(initArgs, "--template=")
+	}
+	initArgs = append(initArgs, gitDir)
+	if out, err := sg.runGitRaw(ctx, root, nil, initArgs...); err != nil {
 		return "", fmt.Errorf("%w: init shadow git dir for target %q: %w (%s)", ErrShadowStoreUnavailable, targetID, err, out)
 	}
 	meta := shadowMeta{TargetID: targetID, CreatedAt: time.Now().UTC()}
@@ -775,6 +783,9 @@ func (sg *ShadowGit) runGit(ctx context.Context, gitDir, workTree string, extraE
 // repository, e.g. if this package is ever invoked from inside a git hook
 // context).
 func (sg *ShadowGit) runGitRaw(ctx context.Context, cwd string, extraEnv []string, args ...string) ([]byte, error) {
+	if sg.guarded {
+		extraEnv = append(append([]string(nil), extraEnv...), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull)
+	}
 	cmd := exec.CommandContext(ctx, sg.gitBin, args...) //nolint:gosec // G204: gitBin is the git binary checked at construction, and this package builds args
 	cmd.Dir = cwd
 	cmd.Env = isolatedEnv(extraEnv)

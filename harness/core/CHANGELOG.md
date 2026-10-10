@@ -8,6 +8,34 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.7.0
+
+### Added
+
+- Defensive target plans derived from effective write grants and host bindings,
+  mandatory credential/Git exclusions, descriptor-relative private ingestion
+  and finite capture/storage/run admission before reading candidate bytes.
+- Durable set accounting and sanitized outcome manifests, held multi-root read
+  leases and journal/export/fork pins. KEEP is the default; pins and uncertain
+  reservations prevent age/count eligibility. Closing a read lease retains its
+  pin; explicit owner completion requires an issued durable completion receipt.
+- Receipt-bound snapshot event coordination with independent current host
+  admission, atomic authority/idempotency persistence and honest coalesced source
+  intervals. Failed captures without a retained receipt emit no taken event;
+  persistence uncertainty retains obligations.
+- Bounded pinned captured-object reads and separate new-root materialization
+  through `ForkSnapshot` and the sole workspace `ApplyTree` engine. Source pins
+  remain retained and full partial/error results survive failures. This is not
+  COW cloning, Git-worktree fallback, repository attachment or full filesystem
+  metadata preservation; those capabilities are not earned by materialization.
+
+### Changed
+
+- Pin published `mesh` v0.3.0 for the versioned snapshot schema and raise the Go
+  floor to 1.26.9. Legacy raw ShadowGit behavior and nil-disabled snapshot ports
+  remain unchanged; protected production capture is Unsupported until a trusted
+  enforced-isolation/custody producer exists. No live adoption is included.
+
 ## v0.6.0
 
 ### Added

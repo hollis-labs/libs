@@ -2,8 +2,8 @@
 
 The Cairn library foundation for provider projections, launch preparation,
 sessions and managed workspace artifacts. Import packages from
-`github.com/hollis-labs/substrate/harness` with Go 1.26.6. The module pins
-`llm-core` and `mesh` at v0.1.0; it needs no workspace or local replacement.
+`github.com/hollis-labs/substrate/harness` with Go 1.26.9. The module pins
+`llm-core` at v0.1.0 and `mesh` at v0.3.0; it needs no workspace or local replacement.
 
 ## Package boundaries
 
@@ -29,6 +29,21 @@ sessions and managed workspace artifacts. Import packages from
 - `workspace/snapshot` preserves the historical ShadowGit filesystem mechanism.
   Hosts inject it through optional `workspace.Ports.Snapshots`; materialization
   never captures automatically. See [snapshot integration limits](workspace/snapshot/README.md).
+  The guarded capture kernel adds explicit target/exclusion plans, finite
+  pre-capture budgets and durable complete-set pins. Its production constructor
+  remains Unsupported until actual enforced isolation and custody are available;
+  private native fixtures do not establish that support. See
+  [scope and confidential ingestion](workspace/snapshot/docs/target-policy-and-secrecy.md).
+- `workspace.RecordSnapshotEvent` projects only a verified retained manifest
+  while its journal read lease stays held. An independent host supplies current
+  authority, authenticated source replay and atomic event persistence. Missing
+  ports refuse; uncertain persistence retains pins and reconciliation obligations.
+  No automatic capture, fabricated detached tool history or host issuer is supplied.
+- `workspace.ForkSnapshot` materializes pinned captured content into a separately
+  authorized new inactive root through `ApplyTree`, preserving partial accounting.
+  It does not attach a repository, create a Git worktree, perform a COW/native
+  clone, copy source Git metadata or restore a live conversation. Native clone
+  capability negotiation and required-COW refusal remain separate attachment work.
 - `workspace/render`, `workspace/keymerge` and `workspace/install` provide pure
   rendering, owned-key merge and installed-target planning.
 - `interception/hooks` preserves the eleven-event hooks contract, pure layer
