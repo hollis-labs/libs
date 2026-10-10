@@ -8,6 +8,16 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- Per-root age/count retention overrides with whole-set KEEP and dominant
+  journal/export/fork pins. Guarded GC records intent before exact-reference CAS
+  deletion, preserves run-budget tombstones and retains interrupted journals.
+- On-demand and cancellable finite host GC scheduling with opaque deletion
+  authority and redacted outcome recording. Private disposable-fixture controls
+  exercise object reclamation and pinned shared-object survival; no production
+  isolation/deletion/completion issuer or live cleanup is supplied.
+
 ## v0.7.0
 
 ### Added

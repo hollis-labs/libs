@@ -56,47 +56,63 @@ func (a *Admission) retentionDecision(ctx context.Context) (RetentionDecision, e
 	if state.StoreID != a.storeID {
 		return out, ErrAdmissionUnavailable
 	}
-	type entry struct {
-		id string
-		at time.Time
-	}
-	var ordered []entry
-	for id, set := range state.Sets {
-		ordered = append(ordered, entry{id, set.Set.CapturedAt})
-	}
-	sort.Slice(ordered, func(i, j int) bool {
-		if ordered[i].at.Equal(ordered[j].at) {
-			return ordered[i].id < ordered[j].id
+	return a.retentionDecisionLocked(state, time.Now()), h.check()
+}
+
+// retentionDecisionLocked requires the complete store ledger under its stable
+// lock. Root overrides cannot split a set or override any outstanding pin.
+func (a *Admission) retentionDecisionLocked(state admissionLedger, now time.Time) RetentionDecision {
+	out := RetentionDecision{Bytes: state.StorageBytes}
+	ids := make([]string, 0, len(state.Sets))
+	for id, s := range state.Sets {
+		if !s.Collected {
+			ids = append(ids, id)
 		}
-		return ordered[i].at.After(ordered[j].at)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		x, y := state.Sets[ids[i]].Set.CapturedAt, state.Sets[ids[j]].Set.CapturedAt
+		if x.Equal(y) {
+			return ids[i] < ids[j]
+		}
+		return x.After(y)
 	})
-	p := a.policy.Retention
-	now := time.Now()
-	out.Bytes = state.StorageBytes
-	for i, item := range ordered {
-		set := state.Sets[item.id]
+	ranks := map[string]int{}
+	for global, id := range ids {
+		s := state.Sets[id]
 		pinned := false
-		for _, pin := range state.Pins {
-			if pin.SetID == item.id && pin.Completion == "" {
+		for _, p := range state.Pins {
+			if p.SetID == id && p.Completion == "" {
 				pinned = true
 				break
 			}
 		}
-		if set.Pending || manifestUncertain(set.Manifest) {
+		uncertain := s.Pending || manifestUncertain(s.Manifest) || collectionPending(state)
+		if uncertain {
 			out.Uncertain++
 		}
 		if pinned {
 			out.Pinned++
 		}
-		expired := p.MaxAge > 0 && !set.Set.CapturedAt.IsZero() && now.Sub(set.Set.CapturedAt) > p.MaxAge
-		overCount := p.MaxSnapshotSets > 0 && i >= p.MaxSnapshotSets
-		if !set.Pending && !manifestUncertain(set.Manifest) && !pinned && (expired || overCount) {
-			out.Eligible = append(out.Eligible, item.id)
+		eligible := len(s.Set.Roots) > 0
+		for root := range s.Set.Roots {
+			age, count, rank := a.policy.Retention.MaxAge, a.policy.Retention.MaxSnapshotSets, global
+			if override, ok := a.policy.Retention.Roots[root]; ok {
+				age, count, rank = override.MaxAge, override.MaxSnapshotSets, ranks[root]
+			}
+			expired := age > 0 && !s.Set.CapturedAt.IsZero() && now.Sub(s.Set.CapturedAt) > age
+			excess := count > 0 && rank >= count
+			if !expired && !excess {
+				eligible = false
+			}
+			ranks[root]++
+		}
+		if eligible && !pinned && !uncertain {
+			out.Eligible = append(out.Eligible, id)
 		} else {
-			out.Keep = append(out.Keep, item.id)
+			out.Keep = append(out.Keep, id)
 		}
 	}
-	return out, h.check()
+	return out
 }
 
 // Cleanup and Purge are deliberately not routed to the legacy unguarded

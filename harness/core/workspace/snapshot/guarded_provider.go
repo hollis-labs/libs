@@ -178,6 +178,15 @@ func (p *GuardedProvider) CaptureBound(ctx context.Context, intent CaptureIntent
 		if err = p.guard.check(); err != nil {
 			return result, err
 		}
+		refsBefore := map[string]string{}
+		if dir, e := p.git.openShadowRepo(scope.Binding.ID); e == nil {
+			refsBefore, e = snapshotRefs(bounded, p.git, dir, b.MaxCaptureEntries)
+			if e != nil {
+				return result, e
+			}
+		} else if _, e := p.guard.root.Stat(filepath.Join("targets", filepath.Base(p.git.shadowKeyDir(scope.Binding.ID)), "shadow.git")); !errors.Is(e, fs.ErrNotExist) {
+			return result, ErrAdmissionUnavailable
+		}
 		rs, e := p.git.captureOne(bounded, Target{ID: scope.Binding.ID, Root: mirror})
 		if e != nil {
 			d.Code = CaptureFailed
@@ -185,6 +194,10 @@ func (p *GuardedProvider) CaptureBound(ctx context.Context, intent CaptureIntent
 		}
 		if err = p.verifyObjects(bounded, rs); err != nil {
 			d.Code = CaptureFailed
+			return result, err
+		}
+		rootResult.references, err = captureReferences(bounded, p.git, scope.Binding.ID, rs.CommitHash, refsBefore, b.MaxCaptureEntries)
+		if err != nil {
 			return result, err
 		}
 		if err = p.guard.check(); err != nil {

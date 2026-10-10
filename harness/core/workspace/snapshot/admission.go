@@ -34,6 +34,13 @@ type CaptureBudgets struct {
 type RetentionPolicy struct {
 	MaxAge          time.Duration
 	MaxSnapshotSets int
+	// A present zero override means KEEP for that root. Omitted roots inherit
+	// the set policy. A multi-root set is eligible only if every root agrees.
+	Roots map[string]RootRetention
+}
+type RootRetention struct {
+	MaxAge          time.Duration
+	MaxSnapshotSets int
 }
 
 type CapturePolicy struct {
@@ -47,6 +54,11 @@ func (p *CapturePolicy) Validate() error {
 		return ErrCaptureDisabled
 	}
 	b := p.Budgets
+	for id, r := range p.Retention.Roots {
+		if !safeReceiptID(id) || r.MaxAge < 0 || r.MaxSnapshotSets < 0 {
+			return ErrCaptureDisabled
+		}
+	}
 	if p.Revision == "" || b.MaxCaptureBytes <= 0 || b.MaxRootBytes <= 0 || b.MaxStorageBytes <= 0 || b.MaxRunBytes <= 0 || b.MaxCaptureEntries <= 0 || b.MaxRoots <= 0 || b.MaxRunCaptures <= 0 || b.MaxDuration <= 0 || b.MaxRootBytes > b.MaxCaptureBytes || b.MaxCaptureBytes > b.MaxStorageBytes || b.MaxCaptureBytes > b.MaxRunBytes || p.Retention.MaxAge < 0 || p.Retention.MaxSnapshotSets < 0 {
 		return ErrCaptureDisabled
 	}
@@ -98,6 +110,7 @@ type setAccount struct {
 	Set            SnapshotSet
 	Bytes          int64
 	Pending        bool
+	Collected      bool
 	Digest         string
 	Manifest       RetainedManifest
 }
@@ -109,6 +122,7 @@ type admissionLedger struct {
 	Pins                     map[string]pinRecord
 	Runs                     map[string]runAccount
 	StorageBytes             int64
+	Collections              map[string]gcRecord
 }
 
 // Admission is issued only by a guarded provider after its store/isolation
@@ -180,7 +194,12 @@ func newAdmission(root string, policy *CapturePolicy) (*Admission, error) {
 	if err := policy.Validate(); err != nil {
 		return nil, err
 	}
-	a, err := openAdmission(root, *policy)
+	detached := *policy
+	detached.Retention.Roots = make(map[string]RootRetention, len(policy.Retention.Roots))
+	for id, r := range policy.Retention.Roots {
+		detached.Retention.Roots[id] = r
+	}
+	a, err := openAdmission(root, detached)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +269,9 @@ func (a *Admission) beginCapture(ctx context.Context, intent CaptureIntent) (*Ca
 		return fail(err)
 	}
 	if state.StoreID != a.storeID {
+		return fail(ErrAdmissionUnavailable)
+	}
+	if collectionPending(state) {
 		return fail(ErrAdmissionUnavailable)
 	}
 	if _, ok := state.Sets[intent.SetID]; ok {
@@ -389,7 +411,7 @@ func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*Rea
 		return fail(err)
 	}
 	set, ok := state.Sets[r.setID]
-	if !ok || set.Pending || set.Digest != r.digest || state.StoreID != a.storeID {
+	if !ok || set.Pending || set.Collected || collectionPending(state) || set.Digest != r.digest || state.StoreID != a.storeID {
 		return fail(ErrAdmissionUnavailable)
 	}
 	key := pinKey(r.setID, owner, kind)
@@ -421,7 +443,7 @@ func (l *ReadLease) Verify(ctx context.Context) error {
 	}
 	s, ok := state.Sets[l.set.Intent.SetID]
 	p, pok := state.Pins[l.pin]
-	if state.StoreID != l.admission.storeID || !ok || s.Pending || s.Digest != l.set.Digest || !pok || p.Completion != "" {
+	if state.StoreID != l.admission.storeID || !ok || s.Pending || s.Collected || collectionPending(state) || s.Digest != l.set.Digest || !pok || p.Completion != "" {
 		return ErrAdmissionUnavailable
 	}
 	return nil
