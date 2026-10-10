@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.9.0
+
 ### Added
 
 - `clone` repository attachment mode (`workspace/repositories`): an independent
