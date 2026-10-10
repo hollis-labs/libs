@@ -14,7 +14,16 @@ go-messaging dependency is now the sibling
 `github.com/hollis-labs/substrate/mesh/messaging` package, so it no longer
 requires another Hollis Labs module. The source history is preserved, but old
 repository tags are not carried into the monorepo. The first consolidated
-release is planned as `mesh/v0.1.0`.
+release was `mesh/v0.1.0`. Pin the parent module for current client features:
+
+```sh
+go get github.com/hollis-labs/substrate/mesh@v0.4.0
+```
+
+This requires Go 1.26.9 or newer. Remote environment connections and supervised
+streams were added in `mesh/v0.4.0`; use the
+[client guide](README.md#remote-environments) for their explicit identity,
+credential-reference and retry requirements.
 
 No consumer import is changed as part of the relocation.
 

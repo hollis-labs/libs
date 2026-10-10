@@ -8,6 +8,40 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.4.0 — 2026-10-10
+
+### Added
+
+- `tetherclient.EnvironmentTarget` and `NewEnvironmentClient` accept an explicit
+  environment UUID, authority display name, ordered HTTP(S) routes and credential
+  reference. Public descriptor identity/protocol checks precede credential
+  resolution; typed identity, authentication and protocol errors preserve refusal.
+- Supervised environment and session streams resume with `after_seq`, deduplicate
+  delivered sequence numbers, expose gaps before snapshot replacement and keep
+  transport health separate from data freshness. Reconnect backoff, offline/auth
+  wakeups, authenticated route promotion and injected clock/jitter are supported.
+
+### Fixed
+
+- AI chat and messaging subscriptions parse complete SSE blocks with
+  `go-ssekit v0.2.0`: multiline data, supported line endings and BOM/control fields
+  are handled; an unfinished block at EOF is discarded. These two readers bound
+  each raw event block to 1 MiB; the separate channel and environment readers keep
+  their existing limits and cursor contracts.
+- Remote mutations through standard HTTP transports use fresh HTTP/1 connections
+  to prevent internal keyed-POST/HTTP2 replay after a lost response. Read transports
+  keep connection reuse; custom transports must avoid retries themselves. An
+  uncertain mutation outcome requires an explicit caller-owned retry decision.
+
+### Notes
+
+- The environment client requires an explicitly resolved device credential with
+  `read` for connection preflight, snapshots and streams. Authority labels,
+  `operate` and `admin` do not confer `read` or execution/custody authority.
+- This is a library release. It does not install or enroll workers, implement hub
+  management/delegation, or establish real-worker acceptance. Existing client and
+  messaging surfaces remain available; consumers adopt the module independently.
+
 ## v0.3.0 — 2026-10-10
 
 ### Added

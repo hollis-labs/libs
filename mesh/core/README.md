@@ -15,7 +15,7 @@ how an agent is defined.
 | `mesh/agentdefv1` | Preserved version-1 parser, layered authoring/skills utilities, generated-span validation, linting and CLI, without changing the version-2 schema. |
 | `mesh/agentdef` | Parsing, validation and digests for the version-2 agent definition file. |
 | `mesh/agentmuxclient` | Preserved legacy Agent Mux client (package `agentmux`), with its original socket, DTOs and endpoint contracts; new integrations use `mesh/tetherclient`. |
-| `mesh/messaging`, `mesh/federation`, `mesh/hitl`, `mesh/tetherclient` | Durable messaging, cross-host federation, human-in-the-loop requests and the HTTP client for the Tether daemon. |
+| `mesh/messaging`, `mesh/federation`, `mesh/hitl`, `mesh/tetherclient` | Durable messaging, cross-host federation, human-in-the-loop requests and the HTTP client for the Tether daemon, including explicit remote environment connections and supervised streams. |
 
 Packages under `internal/` are not part of the module's API.
 
@@ -43,6 +43,18 @@ Parts of the surface are expected to change once a provider implements them. In
 particular the `task.lookup` and `event.follow` verbs, the capability identifiers
 `urn:hollis-labs:mesh:dispatch/v1` and `urn:hollis-labs:mesh:spawn/v1`, and the result
 schema `urn:hollis-labs:mesh:result/v1` are provisional.
+
+## Install
+
+```sh
+go get github.com/hollis-labs/substrate/mesh@v0.4.0
+```
+
+The typed Tether client is imported as
+`github.com/hollis-labs/substrate/mesh/tetherclient` (package `tether`). Its
+[remote environment guide](tetherclient/README.md#remote-environments) describes
+explicit credential references, identity checks, stream cursors and caller-owned
+mutation retries. The new environment API requires `v0.4.0` or newer.
 
 ## Requirements
 
