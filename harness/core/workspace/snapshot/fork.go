@@ -70,6 +70,10 @@ func (l *ReadLease) ReadFiles(ctx context.Context, targetID string) ([]CapturedF
 		return nil, ErrAdmissionUnavailable
 	}
 	// Commit and tree must be the recorded pair, not independently supplied IDs.
+	commit, err := boundedSnapshotGit(ctx, a.shadow, dir, 1<<20, "cat-file", "commit", root.CommitHash)
+	if err != nil || gitCapturedHash("commit", commit, len(root.CommitHash)) != root.CommitHash || !bytes.HasPrefix(commit, []byte("tree "+root.TreeHash+"\n")) {
+		return nil, ErrAdmissionUnavailable
+	}
 	tree, err := boundedSnapshotGit(ctx, a.shadow, dir, 128, "rev-parse", root.CommitHash+"^{tree}")
 	if err != nil || strings.TrimSpace(string(tree)) != root.TreeHash {
 		return nil, ErrAdmissionUnavailable

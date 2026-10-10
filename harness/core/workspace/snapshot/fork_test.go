@@ -3,11 +3,15 @@
 package snapshot
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/hollis-labs/substrate/harness/sandbox"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -137,5 +141,78 @@ func TestCapturedReadPathValidation(t *testing.T) {
 	}
 	if !safeCapturedPath("a space/normal.txt") {
 		t.Fatal("ordinary path refused")
+	}
+}
+
+func TestPinnedCapturedReadRejectsCorruptObjects(t *testing.T) {
+	for _, kind := range []string{"commit", "tree", "blob"} {
+		t.Run(kind, func(t *testing.T) {
+			a, r, _ := capturedReadFixture(t, map[string]string{"code": "captured"})
+			l, err := r.Pin(context.Background(), "reader", PinFork)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer l.Close()
+			root := l.Set().Roots["r1"]
+			dir, err := a.shadow.openShadowRepo("r1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			oid := root.CommitHash
+			if kind == "tree" {
+				oid = root.TreeHash
+			}
+			if kind == "blob" {
+				oid = gitCapturedHash("blob", []byte("captured"), 40)
+			}
+			raw, err := boundedSnapshotGit(context.Background(), a.shadow, dir, 1<<20, "cat-file", kind, oid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Replace only a disposable fixture object at its old object name.
+			// Git cat-file decodes it; the reader must independently verify identity.
+			raw = append(raw, 'x')
+			var compressed bytes.Buffer
+			w := zlib.NewWriter(&compressed)
+			if _, err = w.Write(append([]byte(kind+" "+fmt.Sprint(len(raw))+"\x00"), raw...)); err != nil {
+				t.Fatal(err)
+			}
+			if err = w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			objectPath := filepath.Join(dir, "objects", oid[:2], oid[2:])
+			if err = os.Chmod(objectPath, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(objectPath, compressed.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = l.ReadFiles(context.Background(), "r1"); !errors.Is(err, ErrAdmissionUnavailable) {
+				t.Fatalf("corrupt %s admitted: %v", kind, err)
+			}
+		})
+	}
+}
+
+func TestCapturedReferenceValidation(t *testing.T) {
+	for _, ref := range []string{"refs/heads/main", "refs/snapshots/../escape", "refs/snapshots/a.lock", "refs/snapshots/a@{b", "refs/snapshots/a\n", "refs/snapshots/a//b"} {
+		if validRetainedReference(ref) {
+			t.Fatalf("unsafe ref admitted: %q", ref)
+		}
+	}
+	if !validRetainedReference("refs/snapshots/20261010T010000.123456789Z-abcdef") {
+		t.Fatal("owned ref refused")
+	}
+	a := testAdmission(t)
+	m := testManifest(a, "capture")
+	m.Roots[0].References = []string{"refs/snapshots/owned"}
+	d := detachedManifest(m)
+	d.Roots[0].References[0] = "refs/snapshots/foreign"
+	if strings.Contains(m.Roots[0].References[0], "foreign") {
+		t.Fatal("receipt refs alias caller")
+	}
+	m.Roots[0].References = append(m.Roots[0].References, m.Roots[0].References[0])
+	if err := m.validate(testSet("capture"), a.storeID); err == nil {
+		t.Fatal("duplicate owned ref admitted")
 	}
 }

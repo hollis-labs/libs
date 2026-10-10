@@ -184,7 +184,9 @@ func newAdmission(root string, policy *CapturePolicy) (*Admission, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := a.lock(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), policy.Budgets.MaxDuration)
+	defer cancel()
+	h, err := a.lock(ctx)
 	if err != nil {
 		a.directory.Close()
 		return nil, err
@@ -401,7 +403,7 @@ func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*Rea
 	return &ReadLease{admission: a, held: h, set: set, pin: key, active: true, deadline: time.Now().Add(a.policy.Budgets.MaxDuration)}, nil
 }
 func (l *ReadLease) Verify(ctx context.Context) error {
-	if l == nil || !l.active || l.held == nil {
+	if ctx == nil || l == nil || !l.active || l.held == nil {
 		return ErrAdmissionUnavailable
 	}
 	if err := ctx.Err(); err != nil {
