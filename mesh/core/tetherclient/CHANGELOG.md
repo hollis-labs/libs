@@ -6,6 +6,23 @@ this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
+## Unreleased
+
+### Added
+
+- Explicit remote `EnvironmentTarget` records and `NewEnvironmentClient`:
+  anonymous descriptor verification before credential-reference resolution,
+  ordered HTTP(S) routes with a deferred silent pass, protocol negotiation,
+  authenticated read preflight, and typed identity/authentication/update errors.
+- Supervised environment and session subscriptions with cursor deduplication,
+  explicit gap delivery before snapshot replacement, filtered global cursor
+  synchronization, separate transport/data freshness, cancellable backpressure,
+  jittered reconnects, offline/authentication wakeups, authenticated better-route
+  preflights, and cooldowns for answering routes that fail establishment.
+- Injected supervision clock/jitter and synthetic HTTP/stream tests for route
+  identity, protocol refusal, credential isolation, drop/resume, gaps, route
+  promotion, cooldown, and cancellation. Mutation retries remain caller-owned.
+
 ## v0.10.0 — 2026-10-02
 
 ### Added
