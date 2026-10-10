@@ -31,6 +31,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - A `Dims` key may not equal a core JSON tag, case-insensitively, or `TotalTokens` would double-count (`TestUsage_Validate_RejectsDimsCollision`). `FuzzValidate` must never panic.
 - The five core fields map one to one to a model catalog's five rates. A sixth core field is a design decision (D-27), not a convenience; extras go in `Dims`.
 - `Row` has no cost field and `Price` is only ever set by the caller (`TestRow_PriceNilByDefault`). `PriceSnapshot` is inert data; never multiply it against a `Usage` here.
-- JSON tags are the wire format; `omitempty` on `Dims`, `Price` and `MessageID` is pinned by `TestRow_JSONRoundTrip`. Do not hand-roll marshalers.
+- `Row.CostKind` is a label, not a cost; `IsBill` is true only for `api_billed` (`TestCostKind_ValidAndIsBill`). `PriceSnapshot` stays comparable with `==`, which is why `UnknownRates` is a struct of bools, not a slice or map (`TestPriceSnapshot_Comparable`).
+- JSON tags are the wire format; `omitempty` on `Dims`, `Price` and `MessageID` is pinned by `TestRow_JSONRoundTrip`, and the cost-kind and snapshot provenance fields are omitted when empty so a legacy row re-encodes byte for byte (`TestRow_LegacyJSONDecodesAndReencodesUnchanged`). `UnknownRates` JSON tags equal the core `Usage` tags. Do not hand-roll marshalers.
 - Behavioral equivalence with any application is not claimed: nothing was ported. The app code was read, not run.
 - Out of scope: cost and pricing math, persistence, provider adapters, adoption in an application.
