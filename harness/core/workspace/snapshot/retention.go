@@ -82,7 +82,7 @@ func (a *Admission) retentionDecision(ctx context.Context) (RetentionDecision, e
 				break
 			}
 		}
-		if set.Pending {
+		if set.Pending || manifestUncertain(set.Manifest) {
 			out.Uncertain++
 		}
 		if pinned {
@@ -90,7 +90,7 @@ func (a *Admission) retentionDecision(ctx context.Context) (RetentionDecision, e
 		}
 		expired := p.MaxAge > 0 && !set.Set.CapturedAt.IsZero() && now.Sub(set.Set.CapturedAt) > p.MaxAge
 		overCount := p.MaxSnapshotSets > 0 && i >= p.MaxSnapshotSets
-		if !set.Pending && !pinned && (expired || overCount) {
+		if !set.Pending && !manifestUncertain(set.Manifest) && !pinned && (expired || overCount) {
 			out.Eligible = append(out.Eligible, item.id)
 		} else {
 			out.Keep = append(out.Keep, item.id)

@@ -39,7 +39,7 @@ func testReceipt(t *testing.T, a *Admission, id string) *RetainedSet {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := l.finish(context.Background(), testSet(id), 50)
+	r, err := l.finish(context.Background(), testSet(id), 50, testManifest(a, id))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestAdmissionLostLockCustodyCannotRecordOrCompensate(t *testing.T) {
 	if err = os.WriteFile(filepath.Join(a.root, "admission.lock"), []byte("foreign"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = l.finish(context.Background(), testSet("one"), 50); !errors.Is(err, ErrAdmissionUnavailable) {
+	if _, err = l.finish(context.Background(), testSet("one"), 50, testManifest(a, "one")); !errors.Is(err, ErrAdmissionUnavailable) {
 		t.Fatalf("lost inode recorded: %v", err)
 	}
 	l.retainUncertain()
@@ -182,5 +182,88 @@ func TestAdmissionNoExistingStoreAdoption(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "admission.json")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("minted ledger over unaccounted store")
+	}
+}
+
+func testManifest(a *Admission, id string) RetainedManifest {
+	now := time.Now()
+	return RetainedManifest{Observation: SnapshotInterval{StartedAt: now.Add(-time.Hour), FinishedAt: now.Add(time.Hour)}, Complete: true, Roots: []RetainedRootOutcome{{RootID: "r1", StoreID: rootStoreID(a.storeID, "r1"), TreeHash: strings.Repeat("a", 40), CommitHash: strings.Repeat("b", 40), Observation: SnapshotInterval{StartedAt: now.Add(-time.Minute), FinishedAt: now.Add(time.Minute)}}}}
+}
+
+func TestAdmissionForeignLedgerCannotMintStoreOrigin(t *testing.T) {
+	a := testAdmission(t)
+	testReceipt(t, a, "one")
+	dir := filepath.Join(t.TempDir(), "foreign-store")
+	os.Mkdir(dir, 0700)
+	data, e := os.ReadFile(filepath.Join(a.root, "admission.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(filepath.Join(dir, "admission.json"), data, 0600); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = newAdmission(dir, testCapturePolicy()); !errors.Is(e, ErrAdmissionUnavailable) {
+		t.Fatalf("foreign durable origin adopted: %v", e)
+	}
+}
+func TestAdmissionPartialManifestPersistedAndDetached(t *testing.T) {
+	a := testAdmission(t)
+	l, e := a.beginCapture(context.Background(), testCaptureIntent("partial"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	m := testManifest(a, "partial")
+	m.Complete = false
+	m.Roots[0].Skipped = []RetainedSkip{{Reason: "excluded", Count: 2}}
+	m.Roots = append(m.Roots, RetainedRootOutcome{RootID: "r2", StoreID: rootStoreID(a.storeID, "r2"), Code: "coverage_unavailable", Observation: m.Roots[0].Observation})
+	r, e := l.finish(context.Background(), testSet("partial"), 50, m)
+	if e != nil {
+		t.Fatal(e)
+	}
+	m.Roots[1].Code = "foreign"
+	m.Roots[0].Skipped[0].Count = 999
+	lease, e := r.Pin(context.Background(), "reader", PinExport)
+	if e != nil {
+		t.Fatal(e)
+	}
+	saved := lease.Manifest()
+	if saved.Roots[1].Code != "coverage_unavailable" || saved.Roots[0].Skipped[0].Count != 2 {
+		t.Fatal("caller mutated earned outcomes")
+	}
+	saved.Roots[1].Code = "mutated"
+	if e = lease.Verify(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	lease.Close()
+	reopened, e := newAdmission(a.root, testCapturePolicy())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer reopened.directory.Close()
+	h, e := reopened.lock(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	state, e := reopened.load()
+	h.close()
+	if e != nil || state.Sets["partial"].Manifest.Roots[1].Code != "coverage_unavailable" {
+		t.Fatal("partial outcome lost across restart", e)
+	}
+	d, e := reopened.Cleanup(context.Background())
+	if e != nil || d.Uncertain != 1 || len(d.Eligible) != 0 {
+		t.Fatalf("partial effects not retained: %+v %v", d, e)
+	}
+}
+func TestAdmissionAllFailedDoesNotIssueRetainedSuccess(t *testing.T) {
+	a := testAdmission(t)
+	l, e := a.beginCapture(context.Background(), testCaptureIntent("failed"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer l.retainUncertain()
+	s := testSet("failed")
+	s.Roots = map[string]RootSnapshot{}
+	if r, e := l.finish(context.Background(), s, 0, testManifest(a, "failed")); r != nil || e == nil {
+		t.Fatal("all-failed attempt minted retained success")
 	}
 }

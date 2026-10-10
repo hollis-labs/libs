@@ -19,3 +19,7 @@ func (h *admissionLock) check() error                 { return ErrAdmissionUnava
 func (h *admissionLock) close() error                 { return nil }
 
 func (a *Admission) openLedger() (*os.File, error) { return nil, ErrAdmissionUnavailable }
+
+func (a *Admission) checkRoot() error { return ErrAdmissionUnavailable }
+
+func admissionStoreIdentity(os.FileInfo) string { return "" }

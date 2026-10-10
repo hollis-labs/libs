@@ -5,6 +5,7 @@ package snapshot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -174,4 +175,12 @@ func (a *Admission) openLedger() (*os.File, error) {
 		return nil, ErrAdmissionUnavailable
 	}
 	return a.directory.OpenFile("admission.json", os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+}
+
+func admissionStoreIdentity(info os.FileInfo) string {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d:%d", st.Dev, st.Ino, st.Uid)
 }

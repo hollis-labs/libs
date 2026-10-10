@@ -99,20 +99,24 @@ type setAccount struct {
 	Bytes          int64
 	Pending        bool
 	Digest         string
+	Manifest       RetainedManifest
 }
 type admissionLedger struct {
-	Version      int
-	StoreID      string
-	Sets         map[string]setAccount
-	Pins         map[string]pinRecord
-	Runs         map[string]runAccount
-	StorageBytes int64
+	Version                  int
+	StoreID                  string
+	StorePath, StoreIdentity string
+	Sets                     map[string]setAccount
+	Pins                     map[string]pinRecord
+	Runs                     map[string]runAccount
+	StorageBytes             int64
 }
 
 // Admission is issued only by a guarded provider after its store/isolation
 // checks. There is deliberately no public constructor or decoded capability.
 // Its stable lock serializes capture, complete-set pin admission, reads and GC.
 type Admission struct {
+	shadow    *ShadowGit
+	guard     *storeGuard
 	root      string
 	directory *os.Root
 	identity  os.FileInfo
@@ -208,7 +212,7 @@ func newAdmission(root string, policy *CapturePolicy) (*Admission, error) {
 		if e != nil {
 			return nil, e
 		}
-		state = admissionLedger{Version: 1, StoreID: id, Sets: map[string]setAccount{}, Pins: map[string]pinRecord{}, Runs: map[string]runAccount{}}
+		state = admissionLedger{Version: 1, StoreID: id, StorePath: a.root, StoreIdentity: admissionStoreIdentity(a.identity), Sets: map[string]setAccount{}, Pins: map[string]pinRecord{}, Runs: map[string]runAccount{}}
 		if err = a.save(h, state); err != nil {
 			a.directory.Close()
 			return nil, err
@@ -286,7 +290,7 @@ func setDigest(s SnapshotSet) (string, error) {
 
 // finish is a same-package boundary used by the guarded capture implementation,
 // after actual tree/object verification and bounded store measurement.
-func (l *CaptureLease) finish(ctx context.Context, set SnapshotSet, bytes int64) (*RetainedSet, error) {
+func (l *CaptureLease) finish(ctx context.Context, set SnapshotSet, bytes int64, manifest RetainedManifest) (*RetainedSet, error) {
 	if err := l.check(ctx); err != nil {
 		return nil, err
 	}
@@ -301,8 +305,8 @@ func (l *CaptureLease) finish(ctx context.Context, set SnapshotSet, bytes int64)
 			return nil, ErrAdmissionUnavailable
 		}
 	}
-	digest, err := setDigest(set)
-	if err != nil {
+	manifest = detachedManifest(manifest)
+	if err := manifest.validate(set, l.admission.storeID); err != nil {
 		return nil, err
 	}
 	s := l.ledger.Sets[l.intent.SetID]
@@ -310,6 +314,11 @@ func (l *CaptureLease) finish(ctx context.Context, set SnapshotSet, bytes int64)
 	s.Set = set
 	s.Bytes = bytes
 	s.Pending = false
+	s.Manifest = manifest
+	digest, err := accountDigest(l.admission.storeID, s)
+	if err != nil {
+		return nil, err
+	}
 	s.Digest = digest
 	l.ledger.Sets[l.intent.SetID] = s
 	l.ledger.StorageBytes -= reserved - bytes
@@ -463,8 +472,11 @@ func (a *Admission) load() (admissionLedger, error) {
 	if dec.Decode(&extra) != io.EOF {
 		return state, ErrAdmissionUnavailable
 	}
-	if state.Version != 1 || state.StoreID == "" || state.Sets == nil || state.Pins == nil || state.Runs == nil || state.StorageBytes < 0 {
+	if state.Version != 1 || state.StoreID == "" || state.StorePath != a.root || state.StoreIdentity != admissionStoreIdentity(a.identity) || state.Sets == nil || state.Pins == nil || state.Runs == nil || state.StorageBytes < 0 {
 		return state, ErrAdmissionUnavailable
+	}
+	if err = a.validateLedger(state); err != nil {
+		return state, err
 	}
 	return state, nil
 }
