@@ -10,10 +10,19 @@ All notable changes to the `llm-core` module are documented here. The format fol
 
 ### Added
 
+- `llm-core/guard`: call admission for LLM resources. `CircuitBreaker` admits exactly one half-open probe, ignores results from calls admitted before a state change, and reclaims a probe that never reports after `ProbeTimeout`. `Classify`, `HTTPError` and `ParseRetryAfter` sort errors into quota, auth, transient, request, connection and canceled, with the provider's retry-after (`Retry-After` in seconds or as a date, or `retry-after-ms`). `Cooldown` records per resource, account and model when a key may next be tried, using the retry-after or a capped exponential `Backoff`; a request-scoped error sets none and an auth error covers the whole account. `Guard` combines the cooldown, an optional `QuotaCheck` and a breaker per resource and account into one `Decision`. Standard library only; state is in memory.
 - `llm-core/usageledger`: cost kinds on `Row` (`api_billed`, `api_estimated`, `subscription_equivalent`, `local_compute`) and price-snapshot provenance (`Source`, `AsOf`, `UnknownRates`), all omitted when empty; `Row.Validate`.
 - `llm-core/costcalc`: the `PriceSource` seam, `PriceFromSource`, and partial costs (`UnpricedTokens`, `Partial`) with `Kind`/`IsBill` on `Cost`.
 - `llm-core/pricesource`: new package of price sources (models.dev adapter, override tables, LiteLLM-style parser, chain, atomic swap, offline file cache) with migration notes.
 - `llm-core/quota`: usage limits over explicit windows that never share a counter (calendar day, ISO week or month in a named time zone, following the local wall clock across daylight-saving changes; rolling; provider-reported with a reset time), in native units. `Limiter` offers `Check`, and `Reserve` / `Commit` / `Cancel` for estimate-then-reconcile on streaming responses, answering `Decision{Allowed, Remaining, RetryAfter, Reason}`, with an injectable clock. Stores: `MemoryStore`, `SeededStore` (seeded from the application's own history) and `SQLStore` (reads the application's events table through `database/sql`; never opens a database, writes or deletes rows). `llm-core/quota/quotatest` is a conformance suite for stores. The package README maps `llmcontracts.TokenRateTracker` and the rate and budget helpers elsewhere in the organization onto it; nothing existing changed.
+
+### Changed
+
+- `llmcontracts.CircuitBreaker` runs on `guard.CircuitBreaker`. This changes behaviour for existing callers. Half-open used to admit every caller that called `IsOpen` until a result arrived. It now admits one probe and refuses everyone else until the probe reports, or until one cooldown has passed without a report. A caller that is admitted and never calls `RecordSuccess` or `RecordFailure` now holds other callers off for one cooldown. The API is unchanged.
+
+### Deprecated
+
+- `llmcontracts.CircuitBreaker`: use `guard.CircuitBreaker` or `guard.Guard`.
 
 ## v0.1.0 — 2026-10-03
 

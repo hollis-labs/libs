@@ -8,6 +8,8 @@
 //   - usageledger: the disjoint LLM token-usage record.
 //   - modelsdev: a cached client for the models.dev model catalog.
 //   - costcalc: prices a usageledger Usage with modelsdev Pricing.
+//   - guard: call admission for LLM resources: one circuit breaker, per-key
+//     cooldowns with provider retry-after, and error classification.
 //   - pricesource: price sources for costcalc (models.dev, override tables,
 //     LiteLLM-style tables, an offline cache).
 //   - contracts (with capabilities and runtimes): the shared contract types for

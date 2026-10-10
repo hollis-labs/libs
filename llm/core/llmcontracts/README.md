@@ -71,7 +71,16 @@ Runnable examples for each major surface live under [`examples/`](examples/):
   `DefaultCacheStrategy`
 - Rate-budget primitives: `TokenRateTracker`, `CircuitBreaker`,
   `ErrRequestExceedsRateBudget`, `PacingWait`, `CircuitState`,
-  `DefaultCooldown`
+  `DefaultCooldown`. `CircuitBreaker` is deprecated and runs on
+  [`llm-core/guard`](../guard), which adds cooldowns, retry-after and error
+  classification.
+- **Behaviour change for existing `CircuitBreaker` callers.** Half-open used to
+  admit every caller whose `IsOpen` ran before a result arrived. It now
+  admits one probe: every other `IsOpen` returns true until the probe calls
+  `RecordSuccess` or `RecordFailure`, or until one cooldown passes without a
+  report, after which the next caller becomes the probe. A caller that sees
+  `IsOpen() == false` and then never reports a result holds every other caller
+  off for one cooldown.
 - Conformance suite: `contracttest.Run` (package `contracttest`) verifies the
   `StreamChat`/`Complete` channel-protocol invariants of any `Provider` against
   a deterministic double

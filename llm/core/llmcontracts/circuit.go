@@ -1,8 +1,9 @@
 package llmcontracts
 
 import (
-	"sync"
 	"time"
+
+	"github.com/hollis-labs/substrate/llm-core/guard"
 )
 
 // CircuitState represents the circuit breaker state.
@@ -23,90 +24,69 @@ const DefaultCooldown = 30 * time.Second
 // CircuitBreaker tracks consecutive failures and trips when a threshold is reached.
 // It supports closed → open → half-open → closed state transitions.
 // It is safe for concurrent use.
+//
+// It is implemented by guard.CircuitBreaker. Half-open admits exactly one
+// probe: after the cooldown the first IsOpen returns false and every later
+// IsOpen returns true until the probe reports with RecordSuccess or
+// RecordFailure. A probe that never reports holds the slot for one cooldown,
+// after which the next caller becomes the probe.
+//
+// Deprecated: use guard.CircuitBreaker, whose Admit returns an Admission that
+// ignores results from calls admitted before a state change and can release
+// an unused probe slot, or guard.Guard, which also applies cooldowns and
+// error classification.
 type CircuitBreaker struct {
-	mu               sync.Mutex
-	state            CircuitState
-	consecutiveFails int
-	threshold        int           // trips after this many consecutive failures
-	openedAt         time.Time     // when the circuit last opened
-	cooldown         time.Duration // how long to wait before probing (half-open)
+	b *guard.CircuitBreaker
 }
 
 // NewCircuitBreaker creates a circuit breaker that trips after `threshold` consecutive failures.
 func NewCircuitBreaker(threshold int) *CircuitBreaker {
+	return newCircuitBreaker(threshold, DefaultCooldown, nil)
+}
+
+func newCircuitBreaker(threshold int, cooldown time.Duration, clk guard.Clock) *CircuitBreaker {
 	if threshold <= 0 {
 		threshold = 3
 	}
-	return &CircuitBreaker{
-		state:     CircuitClosed,
-		threshold: threshold,
-		cooldown:  DefaultCooldown,
-	}
+	return &CircuitBreaker{b: guard.NewCircuitBreaker(guard.BreakerConfig{
+		Threshold: threshold,
+		Cooldown:  cooldown,
+		Clock:     clk,
+	})}
 }
 
 // RecordFailure records a failure. Returns true if the circuit just tripped open.
 func (cb *CircuitBreaker) RecordFailure() bool {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-
-	cb.consecutiveFails++
-
-	// Half-open probe failed — go back to open.
-	if cb.state == CircuitHalfOpen {
-		cb.state = CircuitOpen
-		cb.openedAt = time.Now()
-		return false // already tripped
-	}
-
-	if cb.consecutiveFails >= cb.threshold && cb.state == CircuitClosed {
-		cb.state = CircuitOpen
-		cb.openedAt = time.Now()
-		return true
-	}
-	return false
+	return cb.b.RecordFailure()
 }
 
 // RecordSuccess records a success, resetting the consecutive failure counter.
+// A success in any state closes the circuit.
 func (cb *CircuitBreaker) RecordSuccess() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-
-	cb.consecutiveFails = 0
-	// A success in any state closes the circuit.
-	cb.state = CircuitClosed
+	cb.b.RecordSuccess()
 }
 
 // Reset reopens the circuit (moves from open back to closed) and resets counters.
 func (cb *CircuitBreaker) Reset() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-
-	cb.state = CircuitClosed
-	cb.consecutiveFails = 0
+	cb.b.Reset()
 }
 
 // IsOpen returns true if the circuit breaker is blocking requests.
-// An open circuit transitions to half-open after the cooldown period,
-// allowing one probe request through.
+// An open circuit transitions to half-open after the cooldown period and
+// lets exactly one probe request through; it blocks every other request
+// until that probe reports.
 func (cb *CircuitBreaker) IsOpen() bool {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-
-	if cb.state == CircuitOpen {
-		if time.Since(cb.openedAt) >= cb.cooldown {
-			// Cooldown expired — transition to half-open, allow one probe.
-			cb.state = CircuitHalfOpen
-			return false
-		}
-		return true
-	}
-	return false
+	return !cb.b.Allow()
 }
 
 // State returns the current circuit state.
 func (cb *CircuitBreaker) State() CircuitState {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-
-	return cb.state
+	switch cb.b.State() {
+	case guard.CircuitOpen:
+		return CircuitOpen
+	case guard.CircuitHalfOpen:
+		return CircuitHalfOpen
+	default:
+		return CircuitClosed
+	}
 }

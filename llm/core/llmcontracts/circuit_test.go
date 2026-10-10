@@ -177,8 +177,8 @@ func TestCircuitBreaker_State(t *testing.T) {
 }
 
 func TestCircuitBreaker_HalfOpen(t *testing.T) {
-	cb := NewCircuitBreaker(1)
-	cb.cooldown = 10 * time.Millisecond // very short for testing
+	clk := &fakeClock{t: time.Unix(0, 0)}
+	cb := newCircuitBreaker(1, 10*time.Millisecond, clk)
 
 	// Trip the circuit.
 	cb.RecordFailure()
@@ -186,8 +186,8 @@ func TestCircuitBreaker_HalfOpen(t *testing.T) {
 		t.Fatal("expected circuit to be open")
 	}
 
-	// Wait for cooldown to expire.
-	time.Sleep(20 * time.Millisecond)
+	// Let the cooldown expire.
+	clk.advance(20 * time.Millisecond)
 
 	// Should transition to half-open (IsOpen returns false to allow probe).
 	if cb.IsOpen() {
@@ -205,14 +205,14 @@ func TestCircuitBreaker_HalfOpen(t *testing.T) {
 }
 
 func TestCircuitBreaker_HalfOpenProbeFailure(t *testing.T) {
-	cb := NewCircuitBreaker(1)
-	cb.cooldown = 10 * time.Millisecond
+	clk := &fakeClock{t: time.Unix(0, 0)}
+	cb := newCircuitBreaker(1, 10*time.Millisecond, clk)
 
 	// Trip the circuit.
 	cb.RecordFailure()
 
-	// Wait for cooldown.
-	time.Sleep(20 * time.Millisecond)
+	// Let the cooldown expire.
+	clk.advance(20 * time.Millisecond)
 
 	// Transition to half-open.
 	cb.IsOpen() // triggers transition
@@ -222,4 +222,90 @@ func TestCircuitBreaker_HalfOpenProbeFailure(t *testing.T) {
 	if cb.State() != CircuitOpen {
 		t.Fatalf("expected CircuitOpen after failed probe, got %d", cb.State())
 	}
+}
+
+// TestCircuitBreaker_HalfOpenAdmitsOneProbe is the regression test for the
+// half-open thundering herd: once the cooldown elapses, a burst of concurrent
+// callers must see exactly one IsOpen()==false (the probe), and the rest must
+// be refused until the probe reports.
+func TestCircuitBreaker_HalfOpenAdmitsOneProbe(t *testing.T) {
+	clk := &fakeClock{t: time.Unix(0, 0)}
+	cb := newCircuitBreaker(1, time.Second, clk)
+	cb.RecordFailure()
+	clk.advance(2 * time.Second)
+
+	const callers = 64
+	var (
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		admitted int
+		start    = make(chan struct{})
+	)
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if !cb.IsOpen() {
+				mu.Lock()
+				admitted++
+				mu.Unlock()
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if admitted != 1 {
+		t.Fatalf("half-open admitted %d of %d concurrent callers, want exactly 1", admitted, callers)
+	}
+	if cb.State() != CircuitHalfOpen {
+		t.Fatalf("state = %d, want CircuitHalfOpen while the probe is outstanding", cb.State())
+	}
+
+	// The probe succeeds: the circuit closes and admits everyone again.
+	cb.RecordSuccess()
+	for i := 0; i < 3; i++ {
+		if cb.IsOpen() {
+			t.Fatal("expected closed circuit after successful probe")
+		}
+	}
+}
+
+// TestCircuitBreaker_UnreportedProbeIsReclaimed checks that a probe that never
+// reports does not wedge the breaker half-open: after one cooldown the next
+// caller becomes the probe.
+func TestCircuitBreaker_UnreportedProbeIsReclaimed(t *testing.T) {
+	clk := &fakeClock{t: time.Unix(0, 0)}
+	cb := newCircuitBreaker(1, time.Second, clk)
+	cb.RecordFailure()
+	clk.advance(time.Second)
+
+	if cb.IsOpen() {
+		t.Fatal("expected the first caller after the cooldown to be the probe")
+	}
+	if !cb.IsOpen() {
+		t.Fatal("expected a second caller to be refused while the probe is outstanding")
+	}
+	clk.advance(time.Second)
+	if cb.IsOpen() {
+		t.Fatal("expected the probe slot to be reclaimed after one cooldown")
+	}
+}
+
+type fakeClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = c.t.Add(d)
 }
