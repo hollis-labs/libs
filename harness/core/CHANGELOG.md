@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here. The format foll
 
 ## [Unreleased]
 
+## v0.6.0
+
 ### Added
 
 - Preserve the historical filesystem snapshot package and its Git history at
