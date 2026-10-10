@@ -23,3 +23,5 @@ func (a *Admission) openLedger() (*os.File, error) { return nil, ErrAdmissionUna
 func (a *Admission) checkRoot() error { return ErrAdmissionUnavailable }
 
 func admissionStoreIdentity(os.FileInfo) string { return "" }
+
+func (a *Admission) storeOriginIdentity() string { return "" }
