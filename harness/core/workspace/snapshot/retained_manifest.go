@@ -166,7 +166,12 @@ func (a *Admission) validateLedger(s admissionLedger) error {
 		if id != set.Intent.SetID || set.Intent.validate() != nil || set.PolicyRevision != set.Intent.PolicyRevision || set.Bytes < 0 || set.Bytes > int64(^uint64(0)>>1)-total {
 			return ErrAdmissionUnavailable
 		}
-		total += set.Bytes
+		if !set.Collected {
+			total += set.Bytes
+		}
+		if set.Collected && set.Pending {
+			return ErrAdmissionUnavailable
+		}
 		run := runs[set.Intent.RunID]
 		if set.Bytes > int64(^uint64(0)>>1)-run.Bytes {
 			return ErrAdmissionUnavailable
@@ -192,12 +197,47 @@ func (a *Admission) validateLedger(s admissionLedger) error {
 		if !ok || set.Pending || !p.Kind.valid() || !safeReceiptID(p.Owner) || key != pinKey(p.SetID, p.Owner, p.Kind) {
 			return ErrAdmissionUnavailable
 		}
+		if set.Collected && p.Completion == "" {
+			return ErrAdmissionUnavailable
+		}
 	}
 	if len(runs) != len(s.Runs) {
 		return ErrAdmissionUnavailable
 	}
 	for id, run := range s.Runs {
 		if !safeReceiptID(id) || run != runs[id] {
+			return ErrAdmissionUnavailable
+		}
+	}
+	collected := map[string]bool{}
+	for id, r := range s.Collections {
+		if !safeReceiptID(id) || r.Intent.OperationID != id || r.Intent.validate() != nil || r.Digest != gcDigest(r.Intent) || (r.Phase != "prepared" && r.Phase != "refs_deleted" && r.Phase != "complete") {
+			return ErrAdmissionUnavailable
+		}
+		seen := map[string]bool{}
+		for _, setID := range r.Sets {
+			set, ok := s.Sets[setID]
+			if !ok || seen[setID] || set.Pending || (r.Phase == "complete") != set.Collected {
+				return ErrAdmissionUnavailable
+			}
+			seen[setID] = true
+			if r.Phase == "complete" {
+				if collected[setID] {
+					return ErrAdmissionUnavailable
+				}
+				collected[setID] = true
+			}
+		}
+		if r.Phase == "complete" {
+			if !r.Result.Complete || r.Result.Partial || r.Result.OperationID != id || r.Result.RemovedSets != len(r.Sets) || r.Result.ReclaimedBytes < 0 {
+				return ErrAdmissionUnavailable
+			}
+		} else if r.Result.Complete || r.Result.RemovedSets != 0 {
+			return ErrAdmissionUnavailable
+		}
+	}
+	for id, set := range s.Sets {
+		if set.Collected != collected[id] {
 			return ErrAdmissionUnavailable
 		}
 	}

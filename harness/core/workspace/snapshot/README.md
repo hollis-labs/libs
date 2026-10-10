@@ -35,3 +35,39 @@ all GC limits; exhausted pinned budgets stop or defer captures. The low-level
 Do not expose or invoke them as host GC until those prerequisites are established.
 No automatic retention duration, COW capability, runtime adoption or live capture
 is supplied by this package move.
+
+## Guarded host retention
+
+`CapturePolicy.Retention.Roots` optionally overrides age/count selection for a
+stable root ID. An explicit zero override means KEEP; omitted roots inherit the
+global rule. Root counts rank sets containing that root. A multi-root set is
+eligible only when every root permits collection, and outstanding journal,
+export and fork pins always dominate these rules.
+
+`GuardedProvider.Collect` accepts an operation-bound opaque `GCGrant`; policy,
+JSON, elapsed age and decoded completion data cannot issue that authority. This
+release has no production enforced-isolation, deletion or owner-completion
+issuer. Public protected construction remains Unsupported. The callable private
+kernel is verified in disposable zero-agent fixtures; it is not live GC.
+
+The kernel holds the store admission lock, verifies the complete owned Git
+reference/object map and records intent before mutation. It CAS-deletes only
+exact capture-created references and reclaims unreachable private objects.
+Pinned captures and shared reachable objects survive. Captures from before
+exact reference accounting, unknown references/objects and uncertain captures
+refuse collection. `GCPurge` also obeys KEEP and pins; it never force-deletes a
+store directory or invokes legacy `ShadowGit.Purge`.
+
+Completed operations are durably idempotent. Reusing an operation ID with
+changed input refuses; a recorded no-op remains a historical no-op even when
+later pin state changes. Tombstones preserve consumed run budgets. Reclaimed
+bytes describe measured file-size change, not allocated disk blocks or an OS
+quota. Interrupted effects retain a journal and block later capture/read/GC
+admission. No crash recovery or automatic destructive retry is provided.
+
+The root `workspace.CollectSnapshots` and `workspace.RunSnapshotGC` helpers
+support explicit on-demand and cancellable finite schedules. Hosts supply
+current issued authority and record redacted outcomes. Scheduling requires a
+positive interval, per-attempt timeout and finite attempt count, and stops on
+the first refusal or uncertain result. These helpers install no app scheduler,
+shim policy or live cleanup authority. Legacy raw cleanup APIs remain separate.

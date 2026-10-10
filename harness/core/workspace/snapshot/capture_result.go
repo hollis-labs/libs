@@ -21,6 +21,7 @@ type CaptureRootDescription struct {
 	TreeHash, CommitHash  string
 	Code                  CaptureCode
 	Skipped               map[string]int
+	references            []string
 }
 
 // CaptureDescription is data, never capture authority. Complete is relative
@@ -44,6 +45,7 @@ func (r CaptureResult) Description() CaptureDescription {
 	d := r.description
 	d.Roots = append([]CaptureRootDescription(nil), d.Roots...)
 	for i, root := range d.Roots {
+		d.Roots[i].references = append([]string(nil), root.references...)
 		d.Roots[i].Skipped = make(map[string]int, len(root.Skipped))
 		for reason, n := range root.Skipped {
 			d.Roots[i].Skipped[reason] = n
@@ -65,6 +67,7 @@ func (d CaptureDescription) manifest() RetainedManifest {
 	m := RetainedManifest{Observation: SnapshotInterval{StartedAt: d.StartedAt, FinishedAt: d.FinishedAt}, Complete: d.Complete}
 	for _, r := range d.Roots {
 		out := RetainedRootOutcome{RootID: r.RootID, StoreID: r.StoreID, TreeHash: r.TreeHash, CommitHash: r.CommitHash, Code: string(r.Code), Observation: SnapshotInterval{StartedAt: r.StartedAt, FinishedAt: r.FinishedAt}}
+		out.References = append([]string(nil), r.references...)
 		keys := make([]string, 0, len(r.Skipped))
 		for reason := range r.Skipped {
 			keys = append(keys, reason)
