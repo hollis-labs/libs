@@ -11,6 +11,9 @@ All notable changes to the `llm-core` module are documented here. The format fol
 ### Added
 
 - `llm-core/guard`: call admission for LLM resources. `CircuitBreaker` admits exactly one half-open probe, ignores results from calls admitted before a state change, and reclaims a probe that never reports after `ProbeTimeout`. `Classify`, `HTTPError` and `ParseRetryAfter` sort errors into quota, auth, transient, request, connection and canceled, with the provider's retry-after (`Retry-After` in seconds or as a date, or `retry-after-ms`). `Cooldown` records per resource, account and model when a key may next be tried, using the retry-after or a capped exponential `Backoff`; a request-scoped error sets none and an auth error covers the whole account. `Guard` combines the cooldown, an optional `QuotaCheck` and a breaker per resource and account into one `Decision`. Standard library only; state is in memory.
+- `llm-core/usageledger`: cost kinds on `Row` (`api_billed`, `api_estimated`, `subscription_equivalent`, `local_compute`) and price-snapshot provenance (`Source`, `AsOf`, `UnknownRates`), all omitted when empty; `Row.Validate`.
+- `llm-core/costcalc`: the `PriceSource` seam, `PriceFromSource`, and partial costs (`UnpricedTokens`, `Partial`) with `Kind`/`IsBill` on `Cost`.
+- `llm-core/pricesource`: new package of price sources (models.dev adapter, override tables, LiteLLM-style parser, chain, atomic swap, offline file cache) with migration notes.
 
 ### Changed
 

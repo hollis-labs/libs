@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Write the entry for a release here BEFORE cutting its tag: the release workflow
 refuses a tag whose CHANGELOG has no heading for it.
 
+## [Unreleased]
+
+### Added
+
+- `CostKind` (`api_billed`, `api_estimated`, `subscription_equivalent`, `local_compute`, and the unspecified zero value) with `Valid` and `IsBill`, and `Row.CostKind` (`cost_kind`, omitted when empty).
+- `PriceSnapshot.Source`, `AsOf` and `UnknownRates` (omitted when empty), `PriceSnapshot.RateKnown` and `Validate`, `Row.Validate`, and `CoreComponentNames`.
+
+### Compatibility
+
+- Backwards compatible on the wire: a row without the new fields decodes as `CostKindUnspecified` with every rate known and re-encodes unchanged.
+
 ## v0.1.0 — 2026-09-29
 
 ### Added
