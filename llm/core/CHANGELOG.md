@@ -14,7 +14,7 @@ All notable changes to the `llm-core` module are documented here. The format fol
 
 ### Changed
 
-- `llmcontracts.CircuitBreaker` runs on `guard.CircuitBreaker`. Its half-open state admitted every caller that called `IsOpen` until a result arrived. It now admits one probe and refuses everyone else until the probe reports, or until one cooldown has passed without a report. The API is unchanged.
+- `llmcontracts.CircuitBreaker` runs on `guard.CircuitBreaker`. This changes behaviour for existing callers. Half-open used to admit every caller that called `IsOpen` until a result arrived. It now admits one probe and refuses everyone else until the probe reports, or until one cooldown has passed without a report. A caller that is admitted and never calls `RecordSuccess` or `RecordFailure` now holds other callers off for one cooldown. The API is unchanged.
 
 ### Deprecated
 
