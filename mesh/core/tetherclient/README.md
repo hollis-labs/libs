@@ -203,6 +203,13 @@ failure can leave a mutation's outcome unknown: use a caller-owned
 idempotency key where the daemon supports it, and decide whether to retry
 explicitly. The caller's own HTTP transport must also honor this rule.
 
+For standard `*http.Transport` clients, remote mutations use a separate fresh
+HTTP/1 connection. This prevents Go from internally replaying a keyed POST on
+a reused connection or retrying an HTTP/2 refused stream. Read requests retain
+the supplied transport's connection reuse and protocol settings; the supplied
+transport is cloned for mutations. Opaque custom RoundTrippers must themselves
+avoid mutation retries.
+
 ## Session bootstrap
 
 A launcher/host (e.g. agent-setup) can resolve and register a session's

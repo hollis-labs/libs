@@ -8,6 +8,13 @@ occur in minor (`0.y`) versions; they are called out explicitly below.
 
 ## Unreleased
 
+### Fixed
+
+- Remote mutations on standard HTTP transports use fresh HTTP/1 connections,
+  preventing Go's internal keyed-POST/HTTP2 stream replay after a lost response.
+  Idempotency keys still reach the daemon; retries remain caller-owned. Read
+  streams retain connection reuse and the caller's transport remains unchanged.
+
 ### Added
 
 - Explicit remote `EnvironmentTarget` records and `NewEnvironmentClient`:
