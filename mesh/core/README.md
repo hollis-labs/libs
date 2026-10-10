@@ -19,6 +19,12 @@ how an agent is defined.
 
 Packages under `internal/` are not part of the module's API.
 
+The root package also defines the closed
+[`workspace.snapshot.taken.v1` payload](docs/workspace-snapshots.md). Hosts use
+verified durable capture and retention receipts before publishing this event;
+schema validation does not supply custody, capture authority or quiescence.
+Its source-journal interval is distinct from `Event.Cursor`.
+
 ## Versioning and stability
 
 Releases are tagged `mesh/vX.Y.Z`. The first release is `v0.1.0`.

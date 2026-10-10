@@ -8,6 +8,18 @@ All notable changes to the `mesh` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.3.0 — 2026-10-10
+
+### Added
+
+- Closed, versioned `workspace.snapshot.taken.v1` event payload with per-root
+  outcomes and observation intervals, policy-relative coverage, bound capture
+  identities and explicit coalesced source-journal gaps. Destination replay
+  cursors remain independent of source journal positions.
+- Bounded strict decoding and envelope validation reject unsupported versions,
+  unknown or duplicate keys, numeric overflow and inconsistent coverage. This
+  pure contract supplies no capture authority, retention pins or host producer.
+
 ## v0.2.0 — 2026-10-09
 
 ### Added
