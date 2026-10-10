@@ -39,15 +39,17 @@ type TargetPolicy struct {
 // private exclusions must be honored before ingestion by a guarded provider.
 // Targets alone are unsuitable for passing to the legacy raw ShadowGit.
 type TargetPlan struct {
-	roots  []plannedRoot
-	digest string
+	roots           []plannedRoot
+	digest          string
+	credentialPaths []string
 }
 
 type plannedRoot struct {
-	Binding RootBinding
-	Aliases []RootBinding
-	Include []string
-	Exclude []string
+	Binding  RootBinding
+	Aliases  []RootBinding
+	Include  []string
+	Exclude  []string
+	identity os.FileInfo
 }
 
 // Digest binds scope and provenance, not current authority or physical custody.
@@ -96,7 +98,8 @@ func DeriveTargets(access sandbox.ResolvedAccessPolicy, policy TargetPolicy) (Ta
 		return strings.Compare(a.ID, b.ID)
 	})
 	seenID, seenRoot := map[string]bool{}, map[string]int{}
-	plan := TargetPlan{}
+	plan := TargetPlan{credentialPaths: slices.Clone(policy.CredentialPaths)}
+	slices.Sort(plan.credentialPaths)
 	for _, b := range bindings {
 		if b.ID == "" || b.Provenance == "" || seenID[b.ID] || !physicalDirectory(b.Root) {
 			return TargetPlan{}, ErrCoverageUnsupported
@@ -106,7 +109,11 @@ func DeriveTargets(access sandbox.ResolvedAccessPolicy, policy TargetPolicy) (Ta
 			plan.roots[index].Aliases = append(plan.roots[index].Aliases, b)
 			continue
 		}
-		r := plannedRoot{Binding: b}
+		identity, err := os.Stat(b.Root)
+		if err != nil {
+			return TargetPlan{}, ErrCoverageUnsupported
+		}
+		r := plannedRoot{Binding: b, identity: identity}
 		for _, grant := range access.FS.Write {
 			if !cleanAbsolute(grant.Path) {
 				return TargetPlan{}, ErrCoverageUnsupported
@@ -182,7 +189,8 @@ func DeriveTargets(access sandbox.ResolvedAccessPolicy, policy TargetPolicy) (Ta
 	encoded, _ := json.Marshal(struct {
 		Version, Access string
 		Roots           []plannedRoot
-	}{policy.Version, access.ID, plan.roots})
+		CredentialPaths []string
+	}{policy.Version, access.ID, plan.roots, plan.credentialPaths})
 	sum := sha256.Sum256(encoded)
 	plan.digest = hex.EncodeToString(sum[:])
 	return plan, nil
