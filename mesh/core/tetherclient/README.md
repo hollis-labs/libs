@@ -14,10 +14,11 @@ versions; see [CHANGELOG.md](./CHANGELOG.md).
 ## Install
 
 ```bash
-go get github.com/hollis-labs/substrate/mesh/tetherclient
+go get github.com/hollis-labs/substrate/mesh@v0.4.0
 ```
 
-Requires Go 1.26.6 or newer.
+Requires Go 1.26.9 or newer. The package is versioned with the `mesh` module;
+`mesh/v0.4.0` introduces the remote environment API below.
 
 ## Default transport
 
@@ -86,6 +87,16 @@ opaque to the library; the daemon verifies them and applies its configured
 identity mode. `WithSelfURN` still supplies the messaging address; it does not
 establish verified identity.
 
+## SSE framing
+
+`AIChatStream` and messaging-store `Subscribe` parse complete SSE event blocks,
+including multiline data, LF/CRLF/CR endings and an initial BOM. They dispatch only
+when a blank line completes the block and discard an incomplete block at EOF.
+Each raw block is bounded to 1 MiB, including fields, comments and line endings.
+AI stream errors reach its error channel; messaging-store subscriptions close on
+read errors. These APIs do not automatically reconnect. The separate channel and
+environment stream limits and resume rules are described below.
+
 ## Remote environments
 
 `NewEnvironmentClient` takes an explicit environment record: stable
@@ -96,7 +107,7 @@ reference through the caller's secret store; keep the secret out of the record.
 
 ```go
 remote, err := tether.NewEnvironmentClient(tether.EnvironmentTarget{
-    EnvironmentID: "env-worker",
+    EnvironmentID: "302c1198-1399-47e3-ab36-51e80a86cc61", // expected UUID from authorized enrollment
     Authority: "Worker environment",
     Routes: []tether.EnvironmentRoute{
         {BaseURL: "https://worker.example.test"},
@@ -404,7 +415,9 @@ in the path. Honor `grantedSeconds` rather than what you requested; the
 daemon clamps. A non-retryable `NackMessage` dead-letters and returns a
 **nil** error, so read `RecipientDelivery.Status` for the outcome.
 
-Requires `go-messaging` v0.5.2 or newer.
+The delivery types are supplied by the sibling
+`github.com/hollis-labs/substrate/mesh/messaging/delivery` package; a separate
+`go-messaging` module pin is not required.
 
 ## Migration
 

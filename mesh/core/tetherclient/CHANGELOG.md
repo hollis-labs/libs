@@ -1,15 +1,22 @@
 # Changelog
 
-All notable changes to `go-tether-client` are documented here. The format is
-loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+All notable changes to `tetherclient` are documented here. Releases now use the
+parent `mesh` module tags; standalone version sections below preserve history.
+The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project follows [Semantic Versioning](https://semver.org/). While the
 major version is `0.x`, the API is considered pre-1.0 and breaking changes may
 occur in minor (`0.y`) versions; they are called out explicitly below.
 
 ## Unreleased
 
+## mesh/v0.4.0 — 2026-10-10
+
 ### Fixed
 
+- AI chat and messaging-store subscriptions decode complete SSE blocks with
+  `go-ssekit v0.2.0`, including multiline data and supported line endings. Incomplete
+  blocks are discarded at EOF; each raw block is limited to 1 MiB. These readers
+  do not automatically reconnect.
 - Remote mutations on standard HTTP transports use fresh HTTP/1 connections,
   preventing Go's internal keyed-POST/HTTP2 stream replay after a lost response.
   Idempotency keys still reach the daemon; retries remain caller-owned. Read
