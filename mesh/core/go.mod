@@ -9,6 +9,8 @@ require (
 	modernc.org/sqlite v1.34.5
 )
 
+require github.com/hollis-labs/go-ssekit v0.2.0
+
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/hollis-labs/substrate/llm-core v0.1.0
