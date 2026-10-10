@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -318,7 +319,7 @@ func (e *EnvironmentClient) authenticate(ctx context.Context, index int, descrip
 	}
 	hc := *e.http
 	hc.Timeout = e.opts.ConnectTimeout
-	hc.Transport = &environmentTransport{base: base, token: token, scheme: u.Scheme, host: u.Host}
+	hc.Transport = newEnvironmentTransport(base, token, u.Scheme, u.Host)
 	c := &Client{baseURL: baseURL, http: &hc, selfURN: e.opts.SelfURN}
 	resp, err := environmentGET(ctx, &hc, baseURL+"/auth/context")
 	if err != nil {
@@ -334,7 +335,28 @@ func (e *EnvironmentClient) authenticate(ctx context.Context, index int, descrip
 
 type environmentTransport struct {
 	base                http.RoundTripper
+	mutations           *http.Transport
 	token, scheme, host string
+}
+
+func newEnvironmentTransport(base http.RoundTripper, token, scheme, host string) *environmentTransport {
+	t := &environmentTransport{base: base, token: token, scheme: scheme, host: host}
+	if standard, ok := base.(*http.Transport); ok {
+		// Go can replay a keyed POST on a reused connection, and HTTP/2 can
+		// retry a refused stream. Mutations must instead leave an uncertain
+		// outcome with the caller. A separate fresh HTTP/1 connection prevents
+		// these internal retries without disrupting long-lived read streams.
+		t.mutations = standard.Clone()
+		t.mutations.DisableKeepAlives = true
+		t.mutations.ForceAttemptHTTP2 = false
+		t.mutations.Protocols = new(http.Protocols)
+		t.mutations.Protocols.SetHTTP1(true)
+		t.mutations.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		if t.mutations.TLSClientConfig != nil {
+			t.mutations.TLSClientConfig.NextProtos = []string{"http/1.1"}
+		}
+	}
+	return t
 }
 
 func (t *environmentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -344,7 +366,15 @@ func (t *environmentTransport) RoundTrip(req *http.Request) (*http.Response, err
 	r := req.Clone(req.Context())
 	r.Header.Set("Authorization", "Bearer "+t.token)
 	r.Header.Set("Tether-Protocol", fmt.Sprint(EnvironmentProtocol))
-	resp, err := t.base.RoundTrip(r)
+	base := t.base
+	switch r.Method {
+	case "", http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
+	default:
+		if t.mutations != nil {
+			base = t.mutations
+		}
+	}
+	resp, err := base.RoundTrip(r)
 	if err != nil {
 		if req.Context().Err() != nil {
 			return nil, req.Context().Err()
@@ -357,6 +387,9 @@ func (t *environmentTransport) RoundTrip(req *http.Request) (*http.Response, err
 func (t *environmentTransport) CloseIdleConnections() {
 	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
 		closer.CloseIdleConnections()
+	}
+	if t.mutations != nil {
+		t.mutations.CloseIdleConnections()
 	}
 }
 

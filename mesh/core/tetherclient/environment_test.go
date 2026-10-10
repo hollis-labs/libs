@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -251,6 +252,88 @@ func TestEnvironmentMutationIsNotReplayed(t *testing.T) {
 	_, err = conn.Client.CreateSessionWithInput(context.Background(), LaunchRequest{IdempotencyKey: "caller-key"})
 	if err == nil || mutations.Load() != 1 {
 		t.Fatalf("err=%v mutations=%d", err, mutations.Load())
+	}
+}
+
+func TestEnvironmentKeyedMutationIsNotTransportReplayed(t *testing.T) {
+	var mutations atomic.Int32
+	srv := testEnvironmentServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.Header.Get("Idempotency-Key") != "caller-key" {
+			t.Error("missing keyed mutation")
+		}
+		_, _ = io.Copy(io.Discard, r.Body)
+		if mutations.Add(1) == 1 {
+			// The server has received the mutation but loses its response. Go's
+			// default transport replays a keyed POST on a reused connection.
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			_ = conn.Close()
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = fmt.Fprint(w, `{}`)
+	})
+	conn, err := testEnvironment(t, []string{srv.URL}, EnvironmentOptions{}).Connect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Client.Reply(context.Background(), "message-test", "body", ReplyOptions{IdempotencyKey: "caller-key"})
+	if err == nil || mutations.Load() != 1 {
+		t.Fatalf("mutation outcome=%v attempts=%d; mutation must be caller-retried", err, mutations.Load())
+	}
+}
+
+func TestEnvironmentTLSReadsRetainHTTP2AndMutationsUseHTTP1(t *testing.T) {
+	var readProtocol, writeProtocol atomic.Int32
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == EnvironmentDescriptorPath {
+			if r.Header.Get("Authorization") != "" {
+				t.Error("credential on TLS discovery")
+			}
+			writeTestDescriptor(w, "env-test", 1)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-secret" || r.Header.Get("Tether-Protocol") != "1" {
+			t.Error("missing TLS authentication/protocol")
+		}
+		if r.URL.Path == "/auth/context" {
+			readProtocol.Store(int32(r.ProtoMajor))
+			return
+		}
+		writeProtocol.Store(int32(r.ProtoMajor))
+		if r.Header.Get("Idempotency-Key") != "caller-key" {
+			t.Error("lost caller key")
+		}
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = fmt.Fprint(w, `{}`)
+	}))
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	defer srv.Close()
+	hc := srv.Client()
+	base := hc.Transport.(*http.Transport).Clone()
+	base.ForceAttemptHTTP2 = true
+	base.Protocols = new(http.Protocols)
+	base.Protocols.SetHTTP1(true)
+	base.Protocols.SetHTTP2(true)
+	hc.Transport = base
+	conn, err := testEnvironment(t, []string{srv.URL}, EnvironmentOptions{HTTPClient: hc}).Connect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Client.Reply(context.Background(), "message-test", "body", ReplyOptions{IdempotencyKey: "caller-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readProtocol.Load() != 2 || writeProtocol.Load() != 1 {
+		t.Fatalf("read HTTP/%d mutation HTTP/%d", readProtocol.Load(), writeProtocol.Load())
+	}
+	if base.DisableKeepAlives || !base.Protocols.HTTP2() {
+		t.Fatal("modified caller transport")
 	}
 }
 
