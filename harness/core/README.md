@@ -39,6 +39,11 @@ sessions and managed workspace artifacts. Import packages from
   authority, authenticated source replay and atomic event persistence. Missing
   ports refuse; uncertain persistence retains pins and reconciliation obligations.
   No automatic capture, fabricated detached tool history or host issuer is supplied.
+- `workspace.ForkSnapshot` materializes pinned captured content into a separately
+  authorized new inactive root through `ApplyTree`, preserving partial accounting.
+  It does not attach a repository, create a Git worktree, perform a COW/native
+  clone, copy source Git metadata or restore a live conversation. Native clone
+  capability negotiation and required-COW refusal remain separate attachment work.
 - `workspace/render`, `workspace/keymerge` and `workspace/install` provide pure
   rendering, owned-key merge and installed-target planning.
 - `interception/hooks` preserves the eleven-event hooks contract, pure layer

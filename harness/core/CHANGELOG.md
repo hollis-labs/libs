@@ -23,6 +23,11 @@ All notable changes to the `harness` module are documented here. The format foll
   admission, atomic authority/idempotency persistence and honest coalesced source
   intervals. Failed captures without a retained receipt emit no taken event;
   persistence uncertainty retains obligations.
+- Bounded pinned captured-object reads and separate new-root materialization
+  through `ForkSnapshot` and the sole workspace `ApplyTree` engine. Source pins
+  remain retained and full partial/error results survive failures. This is not
+  COW cloning, Git-worktree fallback, repository attachment or full filesystem
+  metadata preservation; those capabilities are not earned by materialization.
 
 ### Changed
 
