@@ -13,7 +13,8 @@ adapters compose these without taking on a transport dependency.
 - `provider.go` declares `Provider`; `cacheable.go`, `ratelimited.go` and
   `usage.go` declare the optional capability extensions.
 - `ratelimit.go` owns `TokenRateTracker`, `PacingWait` and
-  `ErrRequestExceedsRateBudget`; `circuit.go` owns `CircuitBreaker`.
+  `ErrRequestExceedsRateBudget`; `circuit.go` keeps the deprecated
+  `CircuitBreaker` API on top of `llm-core/guard`, which owns the algorithm.
 - `cache.go` owns the default cache strategy; `reasoning.go` carries
   reasoning config through context.
 - `contracttest/` is the reusable `Provider` conformance suite; its own tests
@@ -34,7 +35,9 @@ is no CI workflow in this repo.
 
 Contracts and pure algorithms only. A concrete provider, an HTTP client or an
 SDK dependency landing here would break the reason adapters can share this
-module cheaply. `go-llm-types` is the one dependency, and it is types-only.
+module cheaply. `go-llm-types` is the one dependency, and it is types-only;
+within the module, `circuit.go` also imports `llm-core/guard`, which uses only
+the standard library.
 
 The rate-budget primitives are shared mutable state and are documented safe for
 concurrent use. `TestTokenRateTracker_ConcurrentAccess` and
@@ -47,6 +50,7 @@ than retry. Turning it into a retryable error produces an infinite wait.
 
 `TokenRateTracker` is a sliding window whose availability never goes negative
 (`TestTokenRateTracker_Available_NeverNegative`), and the circuit breaker's
-open state lets exactly one probe through after cooldown rather than
-reopening the floodgates (`TestCircuitBreaker_HalfOpen`,
-`TestCircuitBreaker_HalfOpenProbeFailure`).
+half-open state lets exactly one probe through after cooldown rather than
+reopening the floodgates (`TestCircuitBreaker_HalfOpenAdmitsOneProbe`,
+`TestCircuitBreaker_UnreportedProbeIsReclaimed`). New breaker behaviour goes in
+`llm-core/guard`, not here.

@@ -8,6 +8,18 @@ All notable changes to the `llm-core` module are documented here. The format fol
 
 ## [Unreleased]
 
+### Added
+
+- `llm-core/guard`: call admission for LLM resources. `CircuitBreaker` admits exactly one half-open probe, ignores results from calls admitted before a state change, and reclaims a probe that never reports after `ProbeTimeout`. `Classify`, `HTTPError` and `ParseRetryAfter` sort errors into quota, auth, transient, request, connection and canceled, with the provider's retry-after (`Retry-After` in seconds or as a date, or `retry-after-ms`). `Cooldown` records per resource, account and model when a key may next be tried, using the retry-after or a capped exponential `Backoff`; a request-scoped error sets none and an auth error covers the whole account. `Guard` combines the cooldown, an optional `QuotaCheck` and a breaker per resource and account into one `Decision`. Standard library only; state is in memory.
+
+### Changed
+
+- `llmcontracts.CircuitBreaker` runs on `guard.CircuitBreaker`. Its half-open state admitted every caller that called `IsOpen` until a result arrived. It now admits one probe and refuses everyone else until the probe reports, or until one cooldown has passed without a report. The API is unchanged.
+
+### Deprecated
+
+- `llmcontracts.CircuitBreaker`: use `guard.CircuitBreaker` or `guard.Guard`.
+
 ## v0.1.0 — 2026-10-03
 
 First release of the llm-core module: the packages of seven former Hollis Labs modules, moved in with their git history.

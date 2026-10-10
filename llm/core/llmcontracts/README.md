@@ -71,7 +71,9 @@ Runnable examples for each major surface live under [`examples/`](examples/):
   `DefaultCacheStrategy`
 - Rate-budget primitives: `TokenRateTracker`, `CircuitBreaker`,
   `ErrRequestExceedsRateBudget`, `PacingWait`, `CircuitState`,
-  `DefaultCooldown`
+  `DefaultCooldown`. `CircuitBreaker` is deprecated and runs on
+  [`llm-core/guard`](../guard), which adds cooldowns, retry-after and error
+  classification; its half-open state admits one probe at a time.
 - Conformance suite: `contracttest.Run` (package `contracttest`) verifies the
   `StreamChat`/`Complete` channel-protocol invariants of any `Provider` against
   a deterministic double
