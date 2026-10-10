@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hollis-labs/go-ssekit"
 	messaging "github.com/hollis-labs/substrate/mesh/messaging"
 )
 
@@ -190,15 +190,12 @@ func (s *httpStore) Subscribe(ctx context.Context, to messaging.Address, f messa
 		defer close(ch)
 		defer func() { _ = resp.Body.Close() }()
 
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
-				continue
+		for event, err := range ssekit.Read(resp.Body) {
+			if err != nil {
+				return
 			}
-			data := strings.TrimPrefix(line, "data: ")
 			var env messaging.Envelope
-			if err := json.Unmarshal([]byte(data), &env); err != nil {
+			if err := json.Unmarshal(event.Data, &env); err != nil {
 				continue
 			}
 			select {
