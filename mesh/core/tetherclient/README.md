@@ -86,6 +86,123 @@ opaque to the library; the daemon verifies them and applies its configured
 identity mode. `WithSelfURN` still supplies the messaging address; it does not
 establish verified identity.
 
+## Remote environments
+
+`NewEnvironmentClient` takes an explicit environment record: stable
+`environmentId`, an authority display name, ordered HTTP(S) `baseURL` routes,
+and a credential reference. It never consults the local catalog, default
+socket, `TETHER_TOKEN`, or the operator's default token file. Resolve the
+reference through the caller's secret store; keep the secret out of the record.
+
+```go
+remote, err := tether.NewEnvironmentClient(tether.EnvironmentTarget{
+    EnvironmentID: "env-worker",
+    Authority: "Worker environment",
+    Routes: []tether.EnvironmentRoute{
+        {BaseURL: "https://worker.example.test"},
+        {BaseURL: "https://relay.example.test"},
+    },
+    CredentialReference: "worker-device-credential",
+}, tether.EnvironmentOptions{
+    ResolveCredential: resolveCredential, // func(context.Context, string) (string, error)
+    SelfURN: callerURN,                    // needed for messaging reads
+})
+if err != nil { return err }
+
+connection, err := remote.Connect(ctx)
+if err != nil { return err }
+// connection.Client offers the ordinary typed operations on the verified route.
+```
+
+Connection discovery reads `/.well-known/tether/environment` anonymously with
+a 2.5-second timeout and verifies the configured environment ID and protocol
+`1` before resolving or sending a credential. Answered routes are attempted in
+preference order; silent routes get a deferred second descriptor pass with a
+15-second deadline. A deferred route must still verify identity before
+authentication. Caller cookie jars are excluded. No redirect is followed, and
+authenticated requests are bound to the selected scheme and host. Supplied HTTP transports must be
+credential-free: an arbitrary caller transport must not inject a bearer or
+other secret into public discovery. Use HTTPS routes when transport identity
+and confidentiality are required; the public descriptor supplies the
+environment coordinate, not a new grant.
+
+The authenticated preflight uses `GET /auth/context`, which requires the
+credential's **read** scope. Snapshot and event-stream reads have the same
+requirement. `operate` and `admin` do not imply `read`. The authority name and
+`SelfURN` do not grant scopes. `*ProtocolMismatchError` stops the route walk
+and carries `RequiredProtocol` and an advisory `UpdateHint`.
+`*EnvironmentIdentityError` refuses a wrong environment;
+`*EnvironmentAuthenticationError` identifies a rejected or unresolved
+credential. Connection errors exclude raw transport errors and response
+bodies; the library does not log credentials.
+
+### Supervised environment and session streams
+
+```go
+subscription, err := remote.Subscribe(ctx, tether.EnvironmentStreamOptions{
+    SessionID: sessionID, // empty subscribes to the entire environment
+    // nil AfterSeq obtains a snapshot first; &zero explicitly replays from 0.
+})
+if err != nil { return err }
+defer subscription.Close()
+for update := range subscription.Updates {
+    switch {
+    case update.Gap != nil:
+        // Notify the caller that its projection is incomplete.
+    case update.Snapshot != nil:
+        // Replace the projection with this snapshot.
+    case update.Event != nil:
+        // Apply the mesh event. Unknown kinds and payloads remain available.
+    }
+    // Persist update.State.AfterSeq only after processing the update.
+    // Transport and Freshness are separate: connected is not yet fresh.
+}
+return <-subscription.Errors // terminal error, including caller cancellation
+```
+
+Subscriptions resume with the last delivered `after_seq` and suppress
+duplicate or older sequence numbers. A `gap` reaches the caller before a
+replacement snapshot is fetched; only the snapshot's high-water cursor resets
+the subscription. The `synchronized` marker advances the global environment
+cursor even for a filtered session stream. Stream sequence numbers are not
+provider cursors or raw terminal byte offsets. Shell sessions use the same
+durable session-event stream; raw `AttachSession` output remains a separate
+surface. Snapshot fields distinguish unknown pending-question/approval state
+from an observed clear state.
+
+`State.Transport` reports connecting, connected, disconnected, offline, or
+blocked. `State.Freshness` reports unknown, catching_up, fresh, stale, or gap;
+only synchronization marks data fresh. Updates apply backpressure without
+dropping events. A cursor is committed when its update reaches the consumer,
+not when the consumer durably stores it, so callers must persist progress after
+processing and resume a new subscription from that persisted cursor after a
+process restart. This is sequence deduplication within a subscription, not an
+exactly-once application transaction.
+
+Transient disconnects use jittered exponential backoff (1-second base,
+5-minute cap), reset after a connection stays established for 30 seconds.
+Authentication failure waits for `subscription.Wake()` after credential
+rotation. `SetOnline(false)` pauses connection attempts until an online wakeup.
+A fallback connection preflights better routes every minute and on `Wake()`;
+it authenticates a preferred route before switching. Answering routes that
+fail authentication/transport establishment receive a 5-minute cooldown.
+Protocol mismatch or an identity failure on the active stream/snapshot
+terminates the subscription. A wrong-environment preferred route is refused
+without sending a credential or replacing a verified fallback. `EnvironmentOptions`
+allows an injected clock and jitter for deterministic supervision tests.
+Credential resolvers and supplied transports must respect cancellation.
+Resolvers, clocks, transports, and jitter callbacks must be safe for concurrent
+subscriptions.
+
+Stream lifetimes use caller context; establishment and supervised snapshots
+have bounded deadlines. Ordinary operations on `connection.Client` use the
+connection timeout; its existing long-lived methods use caller context.
+`Connect`, `Snapshot`, and supervised reads may contact several routes.
+Mutations are **never automatically replayed** by supervision. A transport
+failure can leave a mutation's outcome unknown: use a caller-owned
+idempotency key where the daemon supports it, and decide whether to retry
+explicitly. The caller's own HTTP transport must also honor this rule.
+
 ## Session bootstrap
 
 A launcher/host (e.g. agent-setup) can resolve and register a session's
