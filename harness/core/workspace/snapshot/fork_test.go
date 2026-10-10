@@ -216,3 +216,47 @@ func TestCapturedReferenceValidation(t *testing.T) {
 		t.Fatal("duplicate owned ref admitted")
 	}
 }
+
+func TestPinnedCapturedReadComposesGuardedCapture(t *testing.T) {
+	config := ownedGuardedConfig(t)
+	root := config.Targets.roots[0].Binding.Root
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("fake-excluded-secret"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := newOwnedGuardedProvider(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Close()
+	intent := testCaptureIntent("fork-guarded")
+	intent.TargetMapDigest = config.Targets.Digest()
+	capture, err := p.CaptureBound(context.Background(), intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := capture.Retained()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "source.txt"), []byte("later source edit"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := r.Pin(context.Background(), "new-root-fork", PinFork)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	files, err := l.ReadFiles(context.Background(), "root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Path != "source.txt" || string(files[0].Bytes) != "eligible owned content\n" {
+		t.Fatal("guarded fork read lost captured bytes or included excluded secret")
+	}
+	if err = l.ValidateForkDestination(context.Background(), root); err == nil {
+		t.Fatal("source accepted as new root")
+	}
+	if err = l.ValidateForkDestination(context.Background(), filepath.Join(t.TempDir(), "new-root")); err != nil {
+		t.Fatal(err)
+	}
+}

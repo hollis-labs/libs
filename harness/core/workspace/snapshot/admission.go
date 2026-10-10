@@ -62,7 +62,7 @@ type CaptureIntent struct {
 }
 
 func (i CaptureIntent) validate() error {
-	if i.ControllerEpoch == 0 || len(i.InputDigest) != 64 || len(i.TargetMapDigest) != 64 || !validObjectID(i.InputDigest) || !validObjectID(i.TargetMapDigest) {
+	if !safeReceiptID(i.OperationID) || !safeReceiptID(i.RunID) || i.ControllerEpoch == 0 || len(i.InputDigest) != 64 || len(i.TargetMapDigest) != 64 || !validObjectID(i.InputDigest) || !validObjectID(i.TargetMapDigest) {
 		return ErrAdmissionUnavailable
 	}
 	for _, s := range []string{i.SetID, i.OperationID, i.RunID, i.InstanceID, i.InputDigest, i.TargetMapDigest, i.PolicyRevision, i.BindingFence, i.BootGeneration, i.RuntimeGeneration} {

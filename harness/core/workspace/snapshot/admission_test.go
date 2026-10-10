@@ -122,6 +122,36 @@ func TestAdmissionExpiredReaderRetainsPin(t *testing.T) {
 		t.Fatal("timeout released durable pin")
 	}
 }
+
+func TestAdmissionRunAccountingCannotBeResetOnReload(t *testing.T) {
+	for _, field := range []string{"bytes", "captures"} {
+		t.Run(field, func(t *testing.T) {
+			a := testAdmission(t)
+			testReceipt(t, a, "one")
+			state, err := a.load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			run := state.Runs["run"]
+			if field == "bytes" {
+				run.Bytes = 0
+			} else {
+				run.Captures = 0
+			}
+			state.Runs["run"] = run
+			data, err := json.Marshal(state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(a.root, "admission.json"), data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = a.beginCapture(context.Background(), testCaptureIntent("two")); !errors.Is(err, ErrAdmissionUnavailable) {
+				t.Fatalf("reset run accounting admitted: %v", err)
+			}
+		})
+	}
+}
 func TestAdmissionPinsDominateRetentionAndRestart(t *testing.T) {
 	a := testAdmission(t)
 	a.policy.Retention = RetentionPolicy{MaxAge: time.Nanosecond, MaxSnapshotSets: 1}

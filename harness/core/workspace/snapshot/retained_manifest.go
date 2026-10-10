@@ -161,11 +161,19 @@ func (l *ReadLease) Manifest() RetainedManifest {
 }
 func (a *Admission) validateLedger(s admissionLedger) error {
 	var total int64
+	runs := map[string]runAccount{}
 	for id, set := range s.Sets {
 		if id != set.Intent.SetID || set.Intent.validate() != nil || set.PolicyRevision != set.Intent.PolicyRevision || set.Bytes < 0 || set.Bytes > int64(^uint64(0)>>1)-total {
 			return ErrAdmissionUnavailable
 		}
 		total += set.Bytes
+		run := runs[set.Intent.RunID]
+		if set.Bytes > int64(^uint64(0)>>1)-run.Bytes {
+			return ErrAdmissionUnavailable
+		}
+		run.Captures++
+		run.Bytes += set.Bytes
+		runs[set.Intent.RunID] = run
 		if !set.Pending {
 			if set.Set.ID != id || set.Manifest.validate(set.Set, s.StoreID) != nil {
 				return ErrAdmissionUnavailable
@@ -185,8 +193,11 @@ func (a *Admission) validateLedger(s admissionLedger) error {
 			return ErrAdmissionUnavailable
 		}
 	}
+	if len(runs) != len(s.Runs) {
+		return ErrAdmissionUnavailable
+	}
 	for id, run := range s.Runs {
-		if !safeReceiptID(id) || run.Captures < 0 || run.Bytes < 0 {
+		if !safeReceiptID(id) || run != runs[id] {
 			return ErrAdmissionUnavailable
 		}
 	}
