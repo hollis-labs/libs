@@ -16,6 +16,7 @@ import (
 	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/harness/workspace/publication"
 	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
 	"github.com/hollis-labs/substrate/harness/workspace/trust"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
@@ -422,6 +423,12 @@ type Ports struct {
 	Credentials  credentials.LinkPort
 	Trust        trust.Port
 	Repositories repositories.Port
+
+	// Snapshots is an optional host-supplied filesystem mechanism. Nil disables
+	// capture. Materialize never calls this port automatically. Supplying it
+	// grants no capture/restore authority, policy, finite budgets, custody,
+	// secret exclusions or retention pins; the host must establish those first.
+	Snapshots snapshot.FilesystemSnapshotProvider
 }
 type Clock interface{ Now() time.Time }
 type IDs interface {

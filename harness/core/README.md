@@ -26,6 +26,9 @@ sessions and managed workspace artifacts. Import packages from
   union and preflights all groups before mutation. The concrete
   `workspace/materialize` engine writes managed artifacts; credentials,
   repositories and trust use typed handlers and one external receipt store.
+- `workspace/snapshot` preserves the historical ShadowGit filesystem mechanism.
+  Hosts inject it through optional `workspace.Ports.Snapshots`; materialization
+  never captures automatically. See [snapshot integration limits](workspace/snapshot/README.md).
 - `workspace/render`, `workspace/keymerge` and `workspace/install` provide pure
   rendering, owned-key merge and installed-target planning.
 - `interception/hooks` preserves the eleven-event hooks contract, pure layer
