@@ -398,6 +398,14 @@ func isolatedThread(ctx context.Context, base string, protected *protectedRoots,
 	if mapErr != nil || strings.Contains(maps, "[aio]") || metadata.exposedMapping(maps) {
 		return ErrStoreCustodyUnsupported
 	}
+	for _, root := range protected.roots {
+		// Deleted mappings still hold readable/writable content after their
+		// inode disappears from the current directory inventory. Refuse the
+		// kernel-reported protected name too; never infer absence from unlink.
+		if strings.Contains(maps, root.path+"/") {
+			return ErrStoreCustodyUnsupported
+		}
+	}
 	native, e := os.Readlink(base + "/ns/pid")
 	proc, e2 := os.Readlink(base + "/root/proc/1/ns/pid")
 	if e != nil || e2 != nil || native != proc {

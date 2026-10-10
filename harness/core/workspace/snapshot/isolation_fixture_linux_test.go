@@ -39,7 +39,7 @@ func TestIsolationPublicOSFixture(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	for _, mode := range []string{"isolated", "store_alias", "host_proc", "inherited_store_fd", "control_alias", "inherited_control_fd", "control_hardlink_fd", "control_mmap"} {
+	for _, mode := range []string{"isolated", "store_alias", "host_proc", "inherited_store_fd", "control_alias", "inherited_control_fd", "control_hardlink_fd", "control_mmap", "control_unopened_hardlink", "control_mmap_deleted"} {
 		t.Run(mode, func(t *testing.T) { runIsolationPublicFixture(t, mode) })
 	}
 }
@@ -84,6 +84,11 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	if e := os.WriteFile(filepath.Join(control, "journal"), []byte("owned control metadata"), 0600); e != nil {
 		t.Fatal(e)
 	}
+	if mode == "control_unopened_hardlink" {
+		if e := os.Link(filepath.Join(control, "journal"), filepath.Join(config.Targets.roots[0].Binding.Root, "innocent.txt")); e != nil {
+			t.Fatal(e)
+		}
+	}
 	marker := t.TempDir()
 	binary, e := os.Executable()
 	if e != nil {
@@ -109,7 +114,7 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 	args = append(runtimeArgs, args...)
 	command := exec.Command(bwrap, args...)
 	command.Env = []string{"PATH=/usr/bin:/bin", "SNAPSHOT_ISOLATION_HELPER=1"}
-	if mode == "inherited_store_fd" || mode == "inherited_control_fd" || mode == "control_hardlink_fd" || mode == "control_mmap" {
+	if mode == "inherited_store_fd" || mode == "inherited_control_fd" || mode == "control_hardlink_fd" || mode == "control_mmap" || mode == "control_mmap_deleted" {
 		fdPath := config.StorePath
 		if mode != "inherited_store_fd" {
 			fdPath = filepath.Join(control, "journal")
@@ -121,7 +126,7 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 			}
 			fdPath = alias
 		}
-		if mode == "control_mmap" {
+		if mode == "control_mmap" || mode == "control_mmap_deleted" {
 			command.Env = append(command.Env, "SNAPSHOT_ISOLATION_MMAP=1")
 		}
 		inherited, e := os.Open(fdPath)
@@ -171,6 +176,11 @@ func runIsolationPublicFixture(t *testing.T, mode string) {
 			t.Fatal("owned helper did not become ready")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if mode == "control_mmap_deleted" {
+		if e := os.Remove(filepath.Join(control, "journal")); e != nil {
+			t.Fatal(e)
+		}
 	}
 	var payload int
 	var visit func(int, int)

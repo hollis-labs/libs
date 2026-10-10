@@ -45,7 +45,7 @@ func observeProtectedRoots(store string, paths []string) (*protectedRoots, error
 	p := &protectedRoots{}
 	var binding strings.Builder
 	for _, path := range all {
-		if !physicalDirectory(path) || path == string(os.PathSeparator) {
+		if !physicalDirectory(path) || path == string(os.PathSeparator) || strings.ContainsAny(path, "\n\r\t") {
 			return nil, ErrStoreCustodyUnsupported
 		}
 		info, e := os.Stat(path)
@@ -104,6 +104,13 @@ func (p *protectedRoots) current(ctx context.Context) (protectedMetadata, error)
 			}
 			info, e := entry.Info()
 			if e != nil {
+				return ErrStoreCustodyUnsupported
+			}
+			// A link outside the protected mount inventory is reachable even
+			// before the child opens it. Without full link-location custody,
+			// reject multiply linked protected files rather than infer privacy.
+			st, ok := info.Sys().(*syscall.Stat_t)
+			if !ok || !info.IsDir() && st.Nlink != 1 {
 				return ErrStoreCustodyUnsupported
 			}
 			key := protectedInode(info)
