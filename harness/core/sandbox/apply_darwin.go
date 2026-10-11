@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -119,9 +120,11 @@ func BuildSBPL(p Profile, workspace string) (string, error) {
 	}
 
 	// Explicit FS denies — take precedence over default allow.
-	if len(p.FS.Deny) > 0 {
+	// FS.Hide is a deny here: the profile is default-allow already.
+	denies := append(slices.Clone(p.FS.Deny), p.FS.Hide...)
+	if len(denies) > 0 {
 		b.WriteString("; Explicit FS denies.\n")
-		for i, raw := range p.FS.Deny {
+		for i, raw := range denies {
 			path, err := expandAndValidate(fmt.Sprintf("FS.Deny[%d]", i), raw, absWS)
 			if err != nil {
 				return "", err

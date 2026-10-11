@@ -27,6 +27,19 @@ type FSSpec struct {
 	// Linux protects paths that exist at Apply time and refuses one that does
 	// not exist where the session could create it; macOS protects by path.
 	Protect []string `yaml:"protect"`
+	// Hide lists paths the session must not even read, in a HostFilesystem
+	// profile, where Deny is refused on Linux because the whole host is
+	// visible (CW-20261001-0263). On Linux a directory is replaced by an empty
+	// tmpfs and any other existing path by a read-only bind of /dev/null, so
+	// the child sees an empty directory or an empty file. Hide covers what
+	// exists at Apply time: a missing path is skipped, since a mount cannot
+	// be placed over nothing. A path must be absolute (or ~/..., or
+	// workspace) and must not run through a symlink the child could
+	// re-point. Hide overrides Protect and any grant. It does not stop
+	// connect(2) on a Unix socket in a directory that stays visible, nor
+	// reads delegated to a same-uid service. Outside HostFilesystem Linux
+	// refuses it (use Deny); macOS treats it as Deny.
+	Hide []string `yaml:"hide"`
 }
 
 // Profile is a named sandbox configuration. Profiles are typically loaded

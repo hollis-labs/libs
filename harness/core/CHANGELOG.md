@@ -8,6 +8,20 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `sandbox.FSSpec.Hide` (yaml `hide`, CW-20261001-0263): paths a host-filesystem
+  profile makes unreadable. Linux bwrap puts an empty tmpfs over an existing
+  directory and a read-only `/dev/null` bind over any other existing path,
+  after the protect binds, so it also covers a protected directory or a file
+  inside one. A missing path is skipped; a relative path, `/`, a path through a
+  symlink the child could re-point, and any use outside `HostFilesystem` are
+  refused. macOS treats it as a deny (not claimed as a capability: unverified).
+  New capability `CapHidePaths` (Linux bwrap) and
+  `ResolvedAccessPolicy.WithHidden` (existing paths become denies).
+- `agentsessions.StartOptions.HiddenPaths`, merged like `ProtectedPaths`; the
+  launch fails with `ErrHiddenPathsUnsupported` where it cannot be enforced.
+
 ## v0.13.0 — 2026-10-16
 
 ### Changed
