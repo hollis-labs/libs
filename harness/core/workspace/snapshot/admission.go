@@ -123,20 +123,24 @@ type admissionLedger struct {
 	Runs                     map[string]runAccount
 	StorageBytes             int64
 	Collections              map[string]gcRecord
+	RetentionOperations      map[string]retentionOperation
 }
 
 // Admission is issued only by a guarded provider after its store/isolation
 // checks. There is deliberately no public constructor or decoded capability.
 // Its stable lock serializes capture, complete-set pin admission, reads and GC.
 type Admission struct {
-	shadow    *ShadowGit
-	guard     *storeGuard
-	root      string
-	directory *os.Root
-	identity  os.FileInfo
-	ancestry  map[string]os.FileInfo
-	policy    CapturePolicy
-	storeID   string
+	isolation         *IsolationProof
+	host              SnapshotHost
+	redactionRevision string
+	shadow            *ShadowGit
+	guard             *storeGuard
+	root              string
+	directory         *os.Root
+	identity          os.FileInfo
+	ancestry          map[string]os.FileInfo
+	policy            CapturePolicy
+	storeID           string
 }
 
 // RetainedSet is an issued data receipt. JSON or caller-created values cannot
@@ -144,6 +148,7 @@ type Admission struct {
 type RetainedSet struct {
 	admission     *Admission
 	setID, digest string
+	intent        CaptureIntent
 }
 
 func (r *RetainedSet) ID() string {
@@ -356,7 +361,7 @@ func (l *CaptureLease) finish(ctx context.Context, set SnapshotSet, bytes int64,
 	if err = l.admission.save(l.held, l.ledger); err != nil {
 		return nil, err
 	}
-	receipt := &RetainedSet{admission: l.admission, setID: l.intent.SetID, digest: digest}
+	receipt := &RetainedSet{admission: l.admission, setID: l.intent.SetID, digest: digest, intent: l.intent}
 	l.finished = true
 	err = l.held.close()
 	l.held = nil
@@ -388,24 +393,62 @@ func pinKey(set, owner string, kind PinKind) string {
 // Close retains the durable pin. Only Complete records explicit owner completion;
 // acknowledgments, deadlines and process death never release references.
 type ReadLease struct {
-	admission *Admission
-	held      *admissionLock
-	set       setAccount
-	pin       string
-	active    bool
-	deadline  time.Time
+	hostLease     SnapshotAdmission
+	hostOperation SnapshotOperation
+	admission     *Admission
+	held          *admissionLock
+	set           setAccount
+	pin           string
+	active        bool
+	deadline      time.Time
 }
 
 func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*ReadLease, error) {
-	if r == nil || r.admission == nil || owner == "" || !kind.valid() {
+	return r.pin(ctx, owner, kind, true)
+}
+func (r *RetainedSet) pin(ctx context.Context, owner string, kind PinKind, acquireHost bool) (*ReadLease, error) {
+	if ctx == nil || r == nil || r.admission == nil || owner == "" || !kind.valid() {
 		return nil, ErrAdmissionUnavailable
 	}
 	a := r.admission
+	var hostLease SnapshotAdmission
+	var hostOp SnapshotOperation
+	if a.isolation != nil {
+		if ctx == nil || a.host == nil || a.isolation.Verify(ctx) != nil {
+			return nil, ErrStoreCustodyUnsupported
+		}
+		if acquireHost {
+			intent := r.intent
+			intent.OperationID = owner
+			if intent.validate() != nil {
+				return nil, ErrAdmissionUnavailable
+			}
+			hostOp = SnapshotOperation{Kind: "read", Intent: intent, StoreID: a.isolation.storeID, IsolationDigest: a.isolation.Digest(), ProtectedDigest: a.isolation.ProtectedDigest(), RequestDigest: r.digest, RedactionRevision: a.redactionRevision}
+			var e error
+			hostLease, e = a.host.AcquireSnapshot(ctx, hostOp)
+			if e != nil || hostLease == nil {
+				return nil, ErrAdmissionUnavailable
+			}
+			if e = hostLease.Verify(ctx, hostOp); e != nil {
+				hostLease.Close()
+				return nil, ErrAdmissionUnavailable
+			}
+		}
+	}
 	h, err := a.lock(ctx)
 	if err != nil {
+		if hostLease != nil {
+			hostLease.Close()
+		}
 		return nil, err
 	}
-	fail := func(e error) (*ReadLease, error) { return nil, errors.Join(e, h.close()) }
+	fail := func(e error) (*ReadLease, error) {
+		var closeErr error
+		if hostLease != nil {
+			closeErr = closeSnapshotAdmission(hostLease)
+		}
+		return nil, errors.Join(e, h.close(), closeErr)
+	}
 	state, err := a.load()
 	if err != nil {
 		return fail(err)
@@ -422,7 +465,11 @@ func (r *RetainedSet) Pin(ctx context.Context, owner string, kind PinKind) (*Rea
 	if err = a.save(h, state); err != nil {
 		return fail(err)
 	}
-	return &ReadLease{admission: a, held: h, set: set, pin: key, active: true, deadline: time.Now().Add(a.policy.Budgets.MaxDuration)}, nil
+	lease := &ReadLease{admission: a, held: h, set: set, pin: key, active: true, deadline: time.Now().Add(a.policy.Budgets.MaxDuration), hostLease: hostLease, hostOperation: hostOp}
+	if e := lease.Verify(ctx); e != nil {
+		return fail(e)
+	}
+	return lease, nil
 }
 func (l *ReadLease) Verify(ctx context.Context) error {
 	if ctx == nil || l == nil || !l.active || l.held == nil {
@@ -430,6 +477,16 @@ func (l *ReadLease) Verify(ctx context.Context) error {
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if l.admission.isolation != nil {
+		if err := l.admission.isolation.Verify(ctx); err != nil {
+			return err
+		}
+		if l.hostLease != nil {
+			if err := l.hostLease.Verify(ctx, l.hostOperation); err != nil {
+				return ErrAdmissionUnavailable
+			}
+		}
 	}
 	if !time.Now().Before(l.deadline) {
 		return ErrSnapshotBudget
@@ -471,7 +528,12 @@ func (l *ReadLease) Close() error {
 		return nil
 	}
 	l.active = false
-	err := l.held.close()
+	var err error
+	if l.hostLease != nil {
+		err = errors.Join(err, closeSnapshotAdmission(l.hostLease))
+		l.hostLease = nil
+	}
+	err = errors.Join(err, l.held.close())
 	l.held = nil
 	return err
 }

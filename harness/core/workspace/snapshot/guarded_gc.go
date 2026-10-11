@@ -49,9 +49,11 @@ func (p *GuardedProvider) RetentionDigest() string {
 // reclamation. No public constructor, JSON or caller flag can issue one.
 // A real production backend/current-authority issuer is not supplied here.
 type GCGrant struct {
-	provider *GuardedProvider
-	digest   string
-	deadline time.Time
+	provider  *GuardedProvider
+	digest    string
+	deadline  time.Time
+	hostCheck func(context.Context) error
+	held      *admissionLock
 }
 
 func (g *GCGrant) verify(ctx context.Context, p *GuardedProvider, i GCIntent) error {
@@ -61,7 +63,17 @@ func (g *GCGrant) verify(ctx context.Context, p *GuardedProvider, i GCIntent) er
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.guard.check()
+	if err := p.guard.check(); err != nil {
+		return err
+	}
+	if g.hostCheck != nil {
+		return g.hostCheck(ctx)
+	}
+	// A production provider cannot use the package-private fixture grant.
+	if p.isolation != nil {
+		return ErrAdmissionUnavailable
+	}
+	return nil
 }
 
 type gcRecord struct {
@@ -72,6 +84,15 @@ type gcRecord struct {
 }
 
 func collectionPending(s admissionLedger) bool {
+	return collectionPendingExcept(s, "")
+}
+
+func collectionPendingExcept(s admissionLedger, operation string) bool {
+	for id, r := range s.RetentionOperations {
+		if id != operation && r.Phase != "complete" {
+			return true
+		}
+	}
 	for _, r := range s.Collections {
 		if r.Phase != "complete" {
 			return true
@@ -109,15 +130,23 @@ func (p *GuardedProvider) Collect(ctx context.Context, i GCIntent, grant *GCGran
 	}
 	bounded, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	h, err := p.admission.lock(bounded)
-	if err != nil {
+	h := grant.held
+	ownLock := h == nil
+	if ownLock {
+		h, err = p.admission.lock(bounded)
+		if err != nil {
+			return out, err
+		}
+	} else if err = h.check(); err != nil {
 		return out, err
 	}
 	defer func() {
-		if closeErr := h.close(); closeErr != nil {
-			out.Complete = false
-			out.Partial = out.Partial || out.RemovedSets > 0
-			err = errors.Join(err, closeErr)
+		if ownLock {
+			if closeErr := h.close(); closeErr != nil {
+				out.Complete = false
+				out.Partial = out.Partial || out.RemovedSets > 0
+				err = errors.Join(err, closeErr)
+			}
 		}
 	}()
 	state, err := p.admission.load()
@@ -133,10 +162,16 @@ func (p *GuardedProvider) Collect(ctx context.Context, i GCIntent, grant *GCGran
 		}
 		return detachedGCResult(prior.Result), h.check()
 	}
-	if collectionPending(state) {
+	if collectionPendingExcept(state, hostGCOperation(grant, i)) {
 		return out, ErrAdmissionUnavailable
 	}
-	out.Decision = p.admission.retentionDecisionLocked(state, time.Now())
+	decisionState := state
+	if grant.hostCheck != nil {
+		// The current host GC reservation is ours; every other pending outcome
+		// still dominates the retention decision.
+		decisionState.RetentionOperations = nil
+	}
+	out.Decision = p.admission.retentionDecisionLocked(decisionState, time.Now())
 	// Unknown captures may have ingested objects without a retained receipt.
 	// Even a no-op decision cannot account their disposition as complete.
 	if out.Decision.Uncertain > 0 {

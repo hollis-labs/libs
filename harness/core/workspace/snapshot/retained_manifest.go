@@ -160,6 +160,30 @@ func (l *ReadLease) Manifest() RetainedManifest {
 	return detachedManifest(l.set.Manifest)
 }
 func (a *Admission) validateLedger(s admissionLedger) error {
+	for id, r := range s.RetentionOperations {
+		if !safeReceiptID(id) || !validObjectID(r.Digest) || len(r.Digest) != 64 || (r.Phase != "prepared" && r.Phase != "complete") {
+			return ErrAdmissionUnavailable
+		}
+		switch r.Kind {
+		case "completion":
+			p, ok := s.Pins[r.PinID]
+			if !ok || p.SetID != r.SetID || (r.Phase == "complete" && p.Completion != id) || (r.Phase == "prepared" && p.Completion != "") {
+				return ErrAdmissionUnavailable
+			}
+		case "gc":
+			if r.SetID != "" || r.PinID != "" {
+				return ErrAdmissionUnavailable
+			}
+			if r.Phase == "complete" {
+				g, ok := s.Collections[id]
+				if !ok || g.Phase != "complete" {
+					return ErrAdmissionUnavailable
+				}
+			}
+		default:
+			return ErrAdmissionUnavailable
+		}
+	}
 	var total int64
 	runs := map[string]runAccount{}
 	for id, set := range s.Sets {
