@@ -4,6 +4,10 @@ Host-neutral forum, topic and threaded-post types, owner-only policy, bounded
 read responses, and service/store/search ports. The library depends only on the
 Go standard library. Tether is the first host.
 
+Install with `go get github.com/hollis-labs/go-forums@v0.1.0`.
+
+Released under the MIT license.
+
 Construct `forums.New(store, searcher, newID)` and call `Service.Execute` with
 an operation (`forum_create`, `forum_list`, `forum_get`, `topic_create`,
 `topic_list`, `topic_get`, `post_create`, `post_list`, `post_get`, `forum_search`)
