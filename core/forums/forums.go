@@ -70,6 +70,7 @@ type Policy struct {
 	Mode string `json:"mode"`
 }
 type Category struct {
+	SortOrder   int64  `json:"sort_order"`
 	ID          string `json:"id"`
 	Namespace   string `json:"namespace"`
 	Title       string `json:"title"`
@@ -82,6 +83,7 @@ type Category struct {
 }
 
 type Forum struct {
+	SortOrder   int64           `json:"sort_order"`
 	CategoryID  string          `json:"category_id,omitempty"`
 	Description string          `json:"description"`
 	Archived    bool            `json:"archived"`
@@ -163,6 +165,7 @@ type Page[T any] struct {
 	Next       string `json:"next"`
 }
 type Request struct {
+	SortOrder             *int64          `json:"sort_order,omitempty"`
 	Namespace             string          `json:"namespace,omitempty"`
 	DestinationForumID    string          `json:"destination_forum_id,omitempty"`
 	DestinationTopicID    string          `json:"destination_topic_id,omitempty"`
@@ -263,7 +266,7 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 		if err := s.checkCategory(ctx, c, r.CategoryID, r.Namespace); err != nil {
 			return nil, err
 		}
-		f, err := s.Store.CreateForum(ctx, Forum{CategoryID: stringValue(r.CategoryID), Description: stringValue(r.Description), ID: r.ID, Namespace: r.Namespace, Title: r.Title, OwnerType: ownerType, OwnerID: ownerID, Policy: Policy{Mode: "owner-only"}, Config: r.Config, Metadata: r.Metadata, CreatedAt: now, UpdatedAt: now})
+		f, err := s.Store.CreateForum(ctx, Forum{SortOrder: sortValue(r.SortOrder), CategoryID: stringValue(r.CategoryID), Description: stringValue(r.Description), ID: r.ID, Namespace: r.Namespace, Title: r.Title, OwnerType: ownerType, OwnerID: ownerID, Policy: Policy{Mode: "owner-only"}, Config: r.Config, Metadata: r.Metadata, CreatedAt: now, UpdatedAt: now})
 		return result("forum", f, "tether_forum_get", err)
 	}
 	if r.Status == "archived" {
@@ -535,7 +538,7 @@ func project(v any, o Options) any {
 }
 
 func forumSummary(f Forum) map[string]any {
-	return map[string]any{"category_id": f.CategoryID, "description": f.Description, "archived": f.Archived, "id": f.ID, "namespace": f.Namespace, "title": f.Title, "owner_type": f.OwnerType, "owner_id": f.OwnerID, "policy_json": f.Policy, "last_seq": f.LastSeq, "created_at": f.CreatedAt, "updated_at": f.UpdatedAt}
+	return map[string]any{"sort_order": f.SortOrder, "category_id": f.CategoryID, "description": f.Description, "archived": f.Archived, "id": f.ID, "namespace": f.Namespace, "title": f.Title, "owner_type": f.OwnerType, "owner_id": f.OwnerID, "policy_json": f.Policy, "last_seq": f.LastSeq, "created_at": f.CreatedAt, "updated_at": f.UpdatedAt}
 }
 
 func validPrincipal(p Principal) error {

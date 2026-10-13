@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Categories and boards support editable `sort_order` via HTTP/MCP, with stable ordered pagination and optional positioning on board move/clone.
+
 - Add optional categories, independent namespace/board identities, message subjects
   and attachment references, complete content management and archive/restore.
 - Define host transactions for board/thread/message move and clone and subtree

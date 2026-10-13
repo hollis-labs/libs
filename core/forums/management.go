@@ -41,7 +41,17 @@ func attachmentValue(p *[]Attachment) []Attachment {
 	}
 	return *p
 }
+func sortValue(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
 func validObjects(r Request) error {
+	if r.SortOrder != nil && (*r.SortOrder < -9007199254740991 || *r.SortOrder > 9007199254740991) {
+		return fmt.Errorf("%w: sort_order must be a JSON-safe integer", ErrInvalid)
+	}
 	for _, v := range []json.RawMessage{r.Config, r.Metadata} {
 		if len(v) > 0 && (len(v) > 16384 || !json.Valid(v) || strings.TrimSpace(string(v))[0] != '{') {
 			return fmt.Errorf("%w: config_json and metadata_json must be objects up to 16384 bytes", ErrInvalid)
