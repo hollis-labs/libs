@@ -22,11 +22,11 @@ var segment = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 
 func ValidateNamespace(ns, id string) error {
 	p := strings.Split(ns, "/")
-	if id == "topics" || id == "posts" {
+	if !segment.MatchString(id) || id == "topics" || id == "posts" || id == "categories" {
 		return fmt.Errorf("%w: forum id is reserved", ErrInvalid)
 	}
-	if len(p) != 4 || p[0] != "app" || p[2] != "forum" || !segment.MatchString(p[1]) || !segment.MatchString(p[3]) || p[3] != id {
-		return fmt.Errorf("%w: namespace must be app/<consumer>/forum/<id> and end with the forum id", ErrInvalid)
+	if len(p) != 4 || p[0] != "app" || p[2] != "forum" || !segment.MatchString(p[1]) || !segment.MatchString(p[3]) {
+		return fmt.Errorf("%w: namespace must be app/<consumer>/forum/<instance>", ErrInvalid)
 	}
 	return nil
 }
@@ -69,20 +69,37 @@ type ParticipantStore interface {
 type Policy struct {
 	Mode string `json:"mode"`
 }
+type Category struct {
+	ID          string `json:"id"`
+	Namespace   string `json:"namespace"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Archived    bool   `json:"archived"`
+	OwnerType   string `json:"owner_type"`
+	OwnerID     string `json:"owner_id"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
 type Forum struct {
-	ID        string          `json:"id"`
-	Namespace string          `json:"namespace"`
-	Title     string          `json:"title"`
-	OwnerType string          `json:"owner_type"`
-	OwnerID   string          `json:"owner_id"`
-	Config    json.RawMessage `json:"config_json"`
-	Policy    Policy          `json:"policy_json"`
-	Metadata  json.RawMessage `json:"metadata_json"`
-	CreatedAt string          `json:"created_at"`
-	UpdatedAt string          `json:"updated_at"`
-	LastSeq   int64           `json:"last_seq"`
+	CategoryID  string          `json:"category_id,omitempty"`
+	Description string          `json:"description"`
+	Archived    bool            `json:"archived"`
+	ID          string          `json:"id"`
+	Namespace   string          `json:"namespace"`
+	Title       string          `json:"title"`
+	OwnerType   string          `json:"owner_type"`
+	OwnerID     string          `json:"owner_id"`
+	Config      json.RawMessage `json:"config_json"`
+	Policy      Policy          `json:"policy_json"`
+	Metadata    json.RawMessage `json:"metadata_json"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
+	LastSeq     int64           `json:"last_seq"`
 }
 type Topic struct {
+	SourceTopicID  string    `json:"source_topic_id,omitempty"`
+	Archived       bool      `json:"archived"`
 	ID             string    `json:"id"`
 	ForumID        string    `json:"forum_id"`
 	Title          string    `json:"title"`
@@ -93,38 +110,50 @@ type Topic struct {
 	LastActivityAt string    `json:"last_activity_at"`
 	LastSeq        int64     `json:"last_seq"`
 }
+type Attachment struct {
+	Name      string `json:"name"`
+	URI       string `json:"uri"`
+	MediaType string `json:"media_type,omitempty"`
+}
+
 type Post struct {
-	ID           string     `json:"id"`
-	TopicID      string     `json:"topic_id"`
-	ForumID      string     `json:"forum_id"`
-	ParentPostID string     `json:"parent_post_id,omitempty"`
-	Seq          int64      `json:"seq"`
-	BodyMD       string     `json:"body_md,omitempty"`
-	BodyChars    int        `json:"body_chars"`
-	Provenance   Provenance `json:"provenance"`
-	CreatedAt    string     `json:"created_at"`
-	EditedAt     string     `json:"edited_at,omitempty"`
-	Depth        int        `json:"depth"`
-	ReplyCount   int        `json:"reply_count"`
-	Snippet      string     `json:"snippet,omitempty"`
-	Truncated    bool       `json:"truncated"`
-	TopicTitle   string     `json:"topic_title,omitempty"`
+	Subject      string       `json:"subject"`
+	Attachments  []Attachment `json:"attachments"`
+	SourcePostID string       `json:"source_post_id,omitempty"`
+	ID           string       `json:"id"`
+	TopicID      string       `json:"topic_id"`
+	ForumID      string       `json:"forum_id"`
+	ParentPostID string       `json:"parent_post_id,omitempty"`
+	Seq          int64        `json:"seq"`
+	BodyMD       string       `json:"body_md,omitempty"`
+	BodyChars    int          `json:"body_chars"`
+	Provenance   Provenance   `json:"provenance"`
+	CreatedAt    string       `json:"created_at"`
+	EditedAt     string       `json:"edited_at,omitempty"`
+	Depth        int          `json:"depth"`
+	ReplyCount   int          `json:"reply_count"`
+	Snippet      string       `json:"snippet,omitempty"`
+	Truncated    bool         `json:"truncated"`
+	TopicTitle   string       `json:"topic_title,omitempty"`
 }
 type Options struct {
-	Cursor        string `json:"cursor,omitempty"`
-	Limit         int    `json:"limit,omitempty"`
-	SinceSeq      int64  `json:"since_seq,omitempty"`
-	Status        string `json:"status,omitempty"`
-	Author        string `json:"author,omitempty"`
-	AuthorKind    string `json:"author_kind,omitempty"`
-	CreatedAfter  string `json:"created_after,omitempty"`
-	CreatedBefore string `json:"created_before,omitempty"`
-	HasReplies    *bool  `json:"has_replies,omitempty"`
-	WorkstreamID  string `json:"workstream_id,omitempty"`
-	ProjectID     string `json:"project_id,omitempty"`
-	Detail        string `json:"detail,omitempty"`
-	Fields        string `json:"fields,omitempty"`
-	MaxChars      int    `json:"max_chars,omitempty"`
+	NamespaceFilter string  `json:"-"`
+	CategoryID      *string `json:"category_id,omitempty"`
+	Archived        *bool   `json:"archived,omitempty"`
+	Cursor          string  `json:"cursor,omitempty"`
+	Limit           int     `json:"limit,omitempty"`
+	SinceSeq        int64   `json:"since_seq,omitempty"`
+	Status          string  `json:"status,omitempty"`
+	Author          string  `json:"author,omitempty"`
+	AuthorKind      string  `json:"author_kind,omitempty"`
+	CreatedAfter    string  `json:"created_after,omitempty"`
+	CreatedBefore   string  `json:"created_before,omitempty"`
+	HasReplies      *bool   `json:"has_replies,omitempty"`
+	WorkstreamID    string  `json:"workstream_id,omitempty"`
+	ProjectID       string  `json:"project_id,omitempty"`
+	Detail          string  `json:"detail,omitempty"`
+	Fields          string  `json:"fields,omitempty"`
+	MaxChars        int     `json:"max_chars,omitempty"`
 }
 type Page[T any] struct {
 	Items      []T    `json:"items"`
@@ -134,22 +163,29 @@ type Page[T any] struct {
 	Next       string `json:"next"`
 }
 type Request struct {
-	PrincipalID   string          `json:"principal_id,omitempty"`
-	PrincipalKind string          `json:"principal_kind,omitempty"`
-	Access        string          `json:"access,omitempty"`
-	OwnerType     string          `json:"owner_type,omitempty"`
-	OwnerID       string          `json:"owner_id,omitempty"`
-	ForumID       string          `json:"forum_id,omitempty"`
-	TopicID       string          `json:"topic_id,omitempty"`
-	PostID        string          `json:"post_id,omitempty"`
-	ID            string          `json:"id,omitempty"`
-	Namespace     string          `json:"namespace,omitempty"`
-	Title         string          `json:"title,omitempty"`
-	Config        json.RawMessage `json:"config_json,omitempty"`
-	Metadata      json.RawMessage `json:"metadata_json,omitempty"`
-	ParentPostID  string          `json:"parent_post_id,omitempty"`
-	BodyMD        string          `json:"body_md,omitempty"`
-	Query         string          `json:"query,omitempty"`
+	Namespace             string          `json:"namespace,omitempty"`
+	DestinationForumID    string          `json:"destination_forum_id,omitempty"`
+	DestinationTopicID    string          `json:"destination_topic_id,omitempty"`
+	DestinationCategoryID *string         `json:"destination_category_id,omitempty"`
+	Description           *string         `json:"description,omitempty"`
+	Subject               *string         `json:"subject,omitempty"`
+	Attachments           *[]Attachment   `json:"attachments,omitempty"`
+	Cascade               bool            `json:"cascade,omitempty"`
+	PrincipalID           string          `json:"principal_id,omitempty"`
+	PrincipalKind         string          `json:"principal_kind,omitempty"`
+	Access                string          `json:"access,omitempty"`
+	OwnerType             string          `json:"owner_type,omitempty"`
+	OwnerID               string          `json:"owner_id,omitempty"`
+	ForumID               string          `json:"forum_id,omitempty"`
+	TopicID               string          `json:"topic_id,omitempty"`
+	PostID                string          `json:"post_id,omitempty"`
+	ID                    string          `json:"id,omitempty"`
+	Title                 string          `json:"title,omitempty"`
+	Config                json.RawMessage `json:"config_json,omitempty"`
+	Metadata              json.RawMessage `json:"metadata_json,omitempty"`
+	ParentPostID          string          `json:"parent_post_id,omitempty"`
+	BodyMD                string          `json:"body_md,omitempty"`
+	Query                 string          `json:"query,omitempty"`
 	Options
 }
 
@@ -188,8 +224,15 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 	if err := validateOptions(&r.Options); err != nil {
 		return nil, err
 	}
+	r.NamespaceFilter = r.Namespace
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z")
+	if isManagement(op) {
+		return s.manage(ctx, c, op, r, now)
+	}
 	if op == "forum_create" {
+		if err := validObjects(r); err != nil {
+			return nil, err
+		}
 		if !c.Operator {
 			return nil, fmt.Errorf("%w: only the operator can register forums; ask the owner to create one", ErrForbidden)
 		}
@@ -217,8 +260,16 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 		if (ownerType != "user" && ownerType != "agent") || strings.TrimSpace(ownerID) == "" || len(ownerID) > 512 {
 			return nil, fmt.Errorf("%w: owner_type must be user or agent and owner_id a principal", ErrInvalid)
 		}
-		f, err := s.Store.CreateForum(ctx, Forum{ID: r.ID, Namespace: r.Namespace, Title: r.Title, OwnerType: ownerType, OwnerID: ownerID, Policy: Policy{Mode: "owner-only"}, Config: r.Config, Metadata: r.Metadata, CreatedAt: now, UpdatedAt: now})
+		if err := s.checkCategory(ctx, c, r.CategoryID, r.Namespace); err != nil {
+			return nil, err
+		}
+		f, err := s.Store.CreateForum(ctx, Forum{CategoryID: stringValue(r.CategoryID), Description: stringValue(r.Description), ID: r.ID, Namespace: r.Namespace, Title: r.Title, OwnerType: ownerType, OwnerID: ownerID, Policy: Policy{Mode: "owner-only"}, Config: r.Config, Metadata: r.Metadata, CreatedAt: now, UpdatedAt: now})
 		return result("forum", f, "tether_forum_get", err)
+	}
+	if r.Status == "archived" {
+		archived := true
+		r.Archived = &archived
+		r.Status = ""
 	}
 	if op == "forum_list" {
 		p, err := s.Store.ListForums(ctx, c, r.Options)
@@ -308,6 +359,11 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 			return nil, ErrForbidden
 		}
 	}
+	if op == "topic_create" || op == "post_create" {
+		if err := s.writable(ctx, c, f); err != nil {
+			return nil, err
+		}
+	}
 	switch op {
 	case "forum_get":
 		var v any = forumSummary(f)
@@ -331,13 +387,16 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 		pg.Next = "tether_forum_post_get"
 		return project(map[string]any{"topic": t, "outline": pg, "next": "tether_forum_post_get"}, r.Options), e
 	case "post_create":
-		if t.Status != "open" {
+		if t.Archived || t.Status != "open" {
 			return nil, fmt.Errorf("%w: topic is not open", ErrForbidden)
 		}
 		if strings.TrimSpace(r.BodyMD) == "" || len([]rune(r.BodyMD)) > 100000 {
 			return nil, fmt.Errorf("%w: body_md must contain 1..100000 characters", ErrInvalid)
 		}
-		p, err = s.Store.CreatePost(ctx, Post{ID: s.NewID(), TopicID: t.ID, ForumID: f.ID, ParentPostID: r.ParentPostID, BodyMD: r.BodyMD, BodyChars: len([]rune(r.BodyMD)), Provenance: c.Provenance, CreatedAt: now})
+		if err := validMessage(r); err != nil {
+			return nil, err
+		}
+		p, err = s.Store.CreatePost(ctx, Post{Subject: stringValue(r.Subject), Attachments: attachmentValue(r.Attachments), ID: s.NewID(), TopicID: t.ID, ForumID: f.ID, ParentPostID: r.ParentPostID, BodyMD: r.BodyMD, BodyChars: len([]rune(r.BodyMD)), Provenance: c.Provenance, CreatedAt: now})
 		pg := Page[Post]{Items: []Post{p}}
 		compactPosts(&pg, Options{}, false)
 		return result("post", pg.Items[0], "tether_forum_post_get", err)
@@ -476,7 +535,7 @@ func project(v any, o Options) any {
 }
 
 func forumSummary(f Forum) map[string]any {
-	return map[string]any{"id": f.ID, "namespace": f.Namespace, "title": f.Title, "owner_type": f.OwnerType, "owner_id": f.OwnerID, "policy_json": f.Policy, "last_seq": f.LastSeq, "created_at": f.CreatedAt, "updated_at": f.UpdatedAt}
+	return map[string]any{"category_id": f.CategoryID, "description": f.Description, "archived": f.Archived, "id": f.ID, "namespace": f.Namespace, "title": f.Title, "owner_type": f.OwnerType, "owner_id": f.OwnerID, "policy_json": f.Policy, "last_seq": f.LastSeq, "created_at": f.CreatedAt, "updated_at": f.UpdatedAt}
 }
 
 func validPrincipal(p Principal) error {

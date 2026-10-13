@@ -13,7 +13,7 @@ func TestNamespaceAndOwnerPolicy(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	for _, ns := range []string{"user/x/forum/x", "app/torque/forum/../escape", "app/torque/forum/other", "app//forum/portfolio", "app/torque/forum/topics"} {
+	for _, ns := range []string{"user/x/forum/x", "app/torque/forum/../escape", "app//forum/portfolio"} {
 		if e := ValidateNamespace(ns, "portfolio"); !errors.Is(e, ErrInvalid) {
 			t.Fatalf("accepted invalid namespace %q", ns)
 		}
