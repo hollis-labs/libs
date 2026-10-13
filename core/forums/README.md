@@ -1,10 +1,10 @@
 # go-forums
 
-Host-neutral forum, topic and threaded-post types, owner-only policy, bounded
+Host-neutral forum, topic and threaded-post types, owner and explicit participant policy, bounded
 read responses, and service/store/search ports. The library depends only on the
 Go standard library. Tether is the first host.
 
-Install with `go get github.com/hollis-labs/go-forums@v0.1.0`.
+Install with `go get github.com/hollis-labs/go-forums@v0.2.0`.
 
 Released under the MIT license.
 
@@ -23,7 +23,14 @@ within-forum backend. Bodies are Markdown text; rendering belongs to clients.
 
 Registration requires the operator; ownership defaults to that user but can
 be assigned to another user or agent principal. Owner-only access includes the
-host's authenticated operator. Shared participant policies are future work.
+host's authenticated operator. Hosts may additionally implement ParticipantStore
+for operator-managed `participant_list`, `participant_add`, `participant_revoke`
+and `owner_set` operations. Grants use stable authenticated principal kind/id;
+`read` allows reads and discovery, `post` additionally allows topics and posts.
+Service checks the current grant on every request. ListForums must filter using
+the same current grants, including cursor continuation. Ownership changes do
+not invite the previous owner: add a grant before transferring ownership.
+Omitting both owner fields on `owner_set` selects the current operator.
 Config and metadata are opaque JSON objects; `config_json.ui` is reserved for
 consumer UI declarations and never interpreted by the service.
 

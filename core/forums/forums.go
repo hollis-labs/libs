@@ -50,6 +50,22 @@ type Caller struct {
 	Provenance
 	Operator bool
 }
+
+// Participant grants read access or read-and-post access to a stable principal.
+type Participant struct {
+	Principal
+	Access string `json:"access"`
+}
+
+// ParticipantStore is an optional host capability; absent hosts retain owner-only policy.
+type ParticipantStore interface {
+	GetParticipant(context.Context, string, Principal) (Participant, error)
+	ListParticipants(context.Context, string, Options) (Page[Participant], error)
+	SetParticipant(context.Context, string, Participant) error
+	RevokeParticipant(context.Context, string, Principal) error
+	SetOwner(context.Context, string, Principal, string) (Forum, error)
+}
+
 type Policy struct {
 	Mode string `json:"mode"`
 }
@@ -118,19 +134,22 @@ type Page[T any] struct {
 	Next       string `json:"next"`
 }
 type Request struct {
-	OwnerType    string          `json:"owner_type,omitempty"`
-	OwnerID      string          `json:"owner_id,omitempty"`
-	ForumID      string          `json:"forum_id,omitempty"`
-	TopicID      string          `json:"topic_id,omitempty"`
-	PostID       string          `json:"post_id,omitempty"`
-	ID           string          `json:"id,omitempty"`
-	Namespace    string          `json:"namespace,omitempty"`
-	Title        string          `json:"title,omitempty"`
-	Config       json.RawMessage `json:"config_json,omitempty"`
-	Metadata     json.RawMessage `json:"metadata_json,omitempty"`
-	ParentPostID string          `json:"parent_post_id,omitempty"`
-	BodyMD       string          `json:"body_md,omitempty"`
-	Query        string          `json:"query,omitempty"`
+	PrincipalID   string          `json:"principal_id,omitempty"`
+	PrincipalKind string          `json:"principal_kind,omitempty"`
+	Access        string          `json:"access,omitempty"`
+	OwnerType     string          `json:"owner_type,omitempty"`
+	OwnerID       string          `json:"owner_id,omitempty"`
+	ForumID       string          `json:"forum_id,omitempty"`
+	TopicID       string          `json:"topic_id,omitempty"`
+	PostID        string          `json:"post_id,omitempty"`
+	ID            string          `json:"id,omitempty"`
+	Namespace     string          `json:"namespace,omitempty"`
+	Title         string          `json:"title,omitempty"`
+	Config        json.RawMessage `json:"config_json,omitempty"`
+	Metadata      json.RawMessage `json:"metadata_json,omitempty"`
+	ParentPostID  string          `json:"parent_post_id,omitempty"`
+	BodyMD        string          `json:"body_md,omitempty"`
+	Query         string          `json:"query,omitempty"`
 	Options
 }
 
@@ -225,7 +244,7 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 		if err == nil {
 			f, err = s.Store.GetForum(ctx, p.ForumID)
 		}
-	case "forum_get", "topic_create", "topic_list", "forum_search":
+	case "forum_get", "topic_create", "topic_list", "forum_search", "participant_list", "participant_add", "participant_revoke", "owner_set":
 		f, err = s.Store.GetForum(ctx, r.ForumID)
 	default:
 		return nil, fmt.Errorf("%w: unknown forum operation", ErrInvalid)
@@ -233,8 +252,61 @@ func (s *Service) Execute(ctx context.Context, c Caller, op string, r Request) (
 	if err != nil {
 		return nil, err
 	}
+	management := op == "participant_list" || op == "participant_add" || op == "participant_revoke" || op == "owner_set"
+	if management {
+		if !c.Operator {
+			return nil, fmt.Errorf("%w: only the operator manages participants and ownership", ErrForbidden)
+		}
+		st, ok := s.Store.(ParticipantStore)
+		if !ok {
+			return nil, fmt.Errorf("%w: host does not support participants", ErrInvalid)
+		}
+		principal := Principal{ID: r.PrincipalID, Kind: r.PrincipalKind}
+		if op != "participant_list" && op != "owner_set" {
+			if err := validPrincipal(principal); err != nil {
+				return nil, err
+			}
+		}
+		switch op {
+		case "participant_list":
+			pg, err := st.ListParticipants(ctx, f.ID, r.Options)
+			return pg, err
+		case "participant_add":
+			if r.Access != "read" && r.Access != "post" {
+				return nil, fmt.Errorf("%w: access must be read or post", ErrInvalid)
+			}
+			v := Participant{Principal: principal, Access: r.Access}
+			return result("participant", v, "tether_forum_participant_list", st.SetParticipant(ctx, f.ID, v))
+		case "participant_revoke":
+			return result("revoked", principal, "tether_forum_participant_list", st.RevokeParticipant(ctx, f.ID, principal))
+		case "owner_set":
+			owner := Principal{ID: r.OwnerID, Kind: r.OwnerType}
+			if owner.ID == "" && owner.Kind == "" {
+				owner = c.Principal
+			}
+			if err := validPrincipal(owner); err != nil {
+				return nil, err
+			}
+			v, err := st.SetOwner(ctx, f.ID, owner, now)
+			return result("forum", v, "tether_forum_get", err)
+		}
+	}
 	if !CanAccess(f, c) {
-		return nil, fmt.Errorf("%w: use the forum owner principal", ErrForbidden)
+		st, ok := s.Store.(ParticipantStore)
+		if !ok {
+			return nil, ErrForbidden
+		}
+		grant, err := st.GetParticipant(ctx, f.ID, c.Principal)
+		if errors.Is(err, ErrNotFound) {
+			return nil, ErrForbidden
+		}
+		if err != nil {
+			return nil, err
+		}
+		write := op == "topic_create" || op == "post_create"
+		if grant.Access != "post" && (grant.Access != "read" || write) {
+			return nil, ErrForbidden
+		}
 	}
 	switch op {
 	case "forum_get":
@@ -405,4 +477,11 @@ func project(v any, o Options) any {
 
 func forumSummary(f Forum) map[string]any {
 	return map[string]any{"id": f.ID, "namespace": f.Namespace, "title": f.Title, "owner_type": f.OwnerType, "owner_id": f.OwnerID, "policy_json": f.Policy, "last_seq": f.LastSeq, "created_at": f.CreatedAt, "updated_at": f.UpdatedAt}
+}
+
+func validPrincipal(p Principal) error {
+	if (p.Kind != "user" && p.Kind != "agent") || strings.TrimSpace(p.ID) == "" || p.ID != strings.TrimSpace(p.ID) || len(p.ID) > 512 {
+		return fmt.Errorf("%w: principal kind must be user or agent with a nonempty stable id up to 512 bytes", ErrInvalid)
+	}
+	return nil
 }
