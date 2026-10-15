@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
-# One-way dependency rule: this repository must not reference FORBIDDEN_PREFIXES
-# (set in scripts/repo.conf). For libs that is github.com/hollis-labs/substrate:
-# substrate may depend on libs, never the reverse.
+# One-way dependency rules.
 #
-# Checked in every go.mod, go.sum and go.work (any mention) and in every Go file's
-# import declarations. Comments and documentation may still name the other repository.
+# 1. Forbidden prefixes: this repository must not reference FORBIDDEN_PREFIXES (set in
+#    scripts/repo.conf). For libs that is github.com/hollis-labs/substrate: substrate
+#    may depend on libs, never the reverse.
+#
+# 2. Group order (GROUP_RANKS in scripts/repo.conf):
+#      core < security < mcp, ui, workflow, llm < mesh < agent
+#    A module may reference modules of its own group and of groups of strictly lower
+#    rank. A reference to a higher group, or to a sibling group of the same rank, fails.
+#
+# 3. Sanity inside the monorepo: a reference to <group>/<module> must name a module that
+#    exists here, and the references among the modules of one group must not form a cycle.
+#
+# "Reference" means: any mention in a go.mod, go.sum or go.work, and a path in the import
+# declarations of a Go file. Comments and documentation may still name other modules.
+# Legacy flat modules (LEGACY_FLAT_MODULES) have no rank and are exempt from rules 2 and 3.
 #
 # Usage: scripts/check-one-way
 set -euo pipefail
@@ -12,15 +23,11 @@ set -euo pipefail
 # shellcheck source=_common.sh
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
-if [ -z "${FORBIDDEN_PREFIXES:-}" ]; then
-  echo "ok: $REPO_NAME forbids no module prefixes; nothing to check"
-  exit 0
-fi
-
 fail=0
 files="$(repo_files)"
 
-for prefix in $FORBIDDEN_PREFIXES; do
+# --- rule 1: forbidden prefixes ----------------------------------------------------------
+for prefix in ${FORBIDDEN_PREFIXES:-}; do
   esc="$(re_escape "$prefix")"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
@@ -48,7 +55,96 @@ $files
 EOF
 done
 
+# --- rules 2 and 3: group order and in-repo sanity ------------------------------------------
+pfx_esc="$(re_escape "$MODULE_PREFIX")"
+edges="$(mktemp "${TMPDIR:-/tmp}/check-one-way.XXXXXX")"
+trap 'rm -f -- "$edges"' EXIT
+nref=0
+
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  [ -e "$REPO_ROOT/$f" ] || continue
+  case "$f" in */testdata/*) continue ;; esac
+  # The module the file belongs to: <group>/<module>, from the first two path elements.
+  src_group="${f%%/*}"
+  [ "$src_group" != "$f" ] || continue
+  is_group "$src_group" || continue
+  is_legacy_flat "$src_group" && continue
+  rest="${f#*/}"
+  [ "$rest" != "${rest#*/}" ] || continue
+  src_mod="${rest%%/*}"
+  src="$src_group/$src_mod"
+  src_rank="$(group_rank "$src_group")"
+
+  refs=""
+  case "$f" in
+    */go.mod | */go.sum | */go.work)
+      refs="$(grep -noE "${pfx_esc}/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?" "$REPO_ROOT/$f" || true)"
+      ;;
+    *.go)
+      refs="$(grep -nE "^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?\"${pfx_esc}/" "$REPO_ROOT/$f" \
+        | sed -nE "s#^([0-9]+):.*\"(${pfx_esc}/[A-Za-z0-9._/-]*)\".*#\1:\2#p" || true)"
+      ;;
+  esac
+  [ -n "$refs" ] || continue
+
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    line="${r%%:*}"
+    path="${r#*:}"
+    rel="${path#"$MODULE_PREFIX"/}"
+    dst_group="${rel%%/*}"
+    is_group "$dst_group" || continue          # a legacy flat module or something else: not ranked
+    is_legacy_flat "$dst_group" && continue
+    if [ "$rel" = "$dst_group" ]; then
+      echo "FAIL: $f:$line: $path names the group '$dst_group', not a module in it" >&2
+      fail=1
+      continue
+    fi
+    dst_mod="${rel#*/}"
+    dst_mod="${dst_mod%%/*}"
+    dst="$dst_group/$dst_mod"
+    [ "$dst" != "$src" ] || continue            # the module's own path
+    nref=$((nref + 1))
+    dst_rank="$(group_rank "$dst_group")"
+
+    if [ "$dst_group" != "$src_group" ]; then
+      if [ "$dst_rank" -gt "$src_rank" ]; then
+        echo "FAIL: $f:$line: $src ($src_group) references $dst ($dst_group); $src_group may not depend on a higher group (order: $(groups | tr '\n' ' '))" >&2
+        fail=1
+        continue
+      elif [ "$dst_rank" -eq "$src_rank" ]; then
+        echo "FAIL: $f:$line: $src ($src_group) references $dst ($dst_group); $src_group and $dst_group are sibling groups of the same rank and may not depend on each other" >&2
+        fail=1
+        continue
+      fi
+    fi
+    if [ ! -f "$REPO_ROOT/$dst/go.mod" ]; then
+      echo "FAIL: $f:$line: $src references $dst, which is not a module here (no $dst/go.mod)" >&2
+      fail=1
+      continue
+    fi
+    if [ "$dst_group" = "$src_group" ]; then
+      echo "$src $dst" >> "$edges"
+    fi
+  done <<EOF
+$refs
+EOF
+done <<EOF
+$files
+EOF
+
+# Cycles among the modules of one group (edges only join modules of the same group).
+if [ -s "$edges" ]; then
+  sort -u "$edges" -o "$edges"
+  if ! tsort_out="$(tsort "$edges" 2>&1 >/dev/null)"; then
+    echo "FAIL: dependency cycle among modules of one group:" >&2
+    printf '%s\n' "$tsort_out" | sed 's/^/      /' >&2
+    fail=1
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   exit 1
 fi
-echo "ok: no reference to $FORBIDDEN_PREFIXES in go.mod, go.sum, go.work or imports"
+echo "ok: one-way rules (forbidden: ${FORBIDDEN_PREFIXES:-none}; $nref cross-module references obey $(groups | tr '\n' ' '))"

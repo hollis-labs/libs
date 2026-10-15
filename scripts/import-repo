@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Import an existing repository into a module subdirectory, keeping its history.
 #
-# Usage: scripts/import-repo [options] <source> <module>/<subdir>
+# Usage: scripts/import-repo [options] <source> <group>/<module>[/<subdir>]
 #
-#   <source>          path or URL of the repository; its default branch is imported
-#   <module>/<subdir> where the files land, relative to the repository root. The first
-#                     element must be an existing module (a directory holding a go.mod).
-#                     With --module-root, <module> alone.
+#   <source>                 path or URL of the repository; its default branch is imported
+#   <group>/<module>/<subdir>  where the files land, relative to the repository root.
+#                            <group> is one of the groups in scripts/repo.conf (core,
+#                            security, mcp, ...); <group>/<module> must already be a module
+#                            (a directory holding a go.mod); <subdir> is a package path in it.
+#   <group>/<module>         with --module-root: the module itself. It may not exist yet; the
+#                            import then creates it. The group directory carries no go.mod.
 #
 # Options:
 #   --target DIR        repository to import into (default: the repository this script is in)
@@ -15,28 +18,41 @@
 #   --path-rename O:N   rename a path inside the SOURCE before it is moved under <dest>.
 #                       Repeatable, applied in order. `--path-rename paths/:` lifts the
 #                       contents of paths/ to the top of <dest>.
-#   --module-root       <dest> is <module> itself: the source's files become the module's
-#                       own files (a source whose repo root is the package root of the
-#                       module). The skeleton's go.mod, doc.go and CHANGELOG.md may be
-#                       replaced by the source's in the merge commit; any other file that
-#                       exists on both sides aborts the import. The imported go.mod is
-#                       kept, with its module line rewritten to the module's path.
+#   --module-root       <dest> is <group>/<module> itself: the source's files become the
+#                       module's own files (a source whose repo root is the package root of
+#                       the module). If the module already exists, its go.mod, doc.go and
+#                       CHANGELOG.md may be replaced by the source's in the merge commit;
+#                       any other file that exists on both sides aborts the import. The
+#                       imported go.mod is kept, with its module line rewritten to
+#                       <MODULE_PREFIX>/<group>/<module>, and so is every occurrence of the
+#                       old module path in the module's .go and .md files.
+#   --import-map O=N    also rewrite the module path prefix O to N in the imported .go files
+#                       (the other standalone libraries the source imports, now at their
+#                       group paths). Repeatable. Requirements in go.mod stay as they were.
+#   --skip-source-scan  do not scan the source first (see below); the owner's decision only
+#   --source-allowlist F  allowlist file for the source scan (RULE-ID PATH-GLOB REASON lines;
+#                       paths are the source's own, not the destination's)
 #   --allow-main        allow the import while main is checked out
 #   -h, --help
 #
-# What it does: clones the source into a scratch directory, rewrites that clone with
-# git filter-repo so every path sits under <module>/<subdir> (original commits, authors
+# What it does: clones the source into a scratch directory, scans that clone with
+# scripts/scan-public (tip AND full history; findings stop the import), rewrites it with
+# git filter-repo so every path sits under <dest> (original commits, authors
 # and dates are kept; abbreviated hashes in messages are rewritten), then merges it into
 # the target with a merge commit that records the source name, its HEAD and its tags.
 # The source repository is only read. The target must be clean.
 #
 # Old tags are not carried. A bare v1.2.3 tag means nothing in a repository whose
-# modules are tagged <module>/vX.Y.Z, and a tag push is an owner decision. The tags
-# the source had are listed in the merge commit message instead.
+# modules are tagged <group>/<module>/vX.Y.Z, the commits it pointed at declare the old
+# module path, and a tag push is an owner decision. The tags the source had are listed in
+# the merge commit message with the tag name each would have here (tag prefix mapping).
+#
+# AGENTS.md, CLAUDE.md, LICENSE and lefthook.yml at the module root are dropped in a follow-up
+# commit (history keeps them).
 #
 # The imported go.mod and go.sum are removed in a follow-up commit (history keeps them)
 # because a go.mod inside a module carves the subtree out of it. Merge the old
-# requirements into <module>/go.mod afterwards, for example with go mod tidy.
+# requirements into <group>/<module>/go.mod afterwards, for example with go mod tidy.
 #
 # Work on a branch, not main: run this in a worktree and open a pull request.
 # Needs git-filter-repo: set GIT_FILTER_REPO to the executable, or put it on PATH
@@ -55,7 +71,10 @@ name=""
 keep_gomod=0
 allow_main=0
 module_root=0
+skip_scan=0
+source_allowlist=""
 renames=()
+imports=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --target) [ $# -ge 2 ] || die "--target needs a directory"; target="$2"; shift 2 ;;
@@ -63,6 +82,9 @@ while [ $# -gt 0 ]; do
     --keep-gomod) keep_gomod=1; shift ;;
     --path-rename) [ $# -ge 2 ] || die "--path-rename needs OLD:NEW"; renames+=("$2"); shift 2 ;;
     --module-root) module_root=1; shift ;;
+    --import-map) [ $# -ge 2 ] || die "--import-map needs OLD=NEW"; imports+=("$2"); shift 2 ;;
+    --skip-source-scan) skip_scan=1; shift ;;
+    --source-allowlist) [ $# -ge 2 ] || die "--source-allowlist needs a file"; source_allowlist="$2"; shift 2 ;;
     --allow-main) allow_main=1; shift ;;
     -h|--help) usage; exit 0 ;;
     --) shift; break ;;
@@ -76,18 +98,37 @@ dest="${2%/}"
 
 # --- validate the destination and the target repository -------------------------------
 case "$dest" in
-  /* | "" ) die "destination must be a relative path like <module>/<subdir>, got '$2'" ;;
-  */*) [ "$module_root" -eq 0 ] || die "--module-root takes just the module, not '$dest'" ;;
-  *) [ "$module_root" -eq 1 ] || die "destination must be <module>/<subdir>; '$dest' names a module but no subdirectory (use --module-root to import into the module itself)" ;;
+  /* | "") die "destination must be a relative path like <group>/<module>, got '$2'" ;;
 esac
-if printf '%s\n' "$dest" | grep -Eq '(^|/)\.\.?(/|$)'; then
-  die "destination must not contain '.' or '..' elements: '$dest'"
+if printf '%s\n' "$dest" | grep -Eq '(^|/)\.\.?(/|$)|//'; then
+  die "destination must not contain '.', '..' or empty elements: '$dest'"
+fi
+group="${dest%%/*}"
+is_group "$group" || die "'$group' is not a group (groups: $(groups | tr '\n' ' ')); destination is <group>/<module>[/<subdir>]"
+case "$dest" in
+  */*) ;;
+  *) die "destination must be <group>/<module>[/<subdir>]; '$dest' names only a group, and a group directory carries no go.mod" ;;
+esac
+modname="${dest#*/}"
+modname="${modname%%/*}"
+printf '%s\n' "$modname" | grep -Eq '^[a-z0-9][a-z0-9-]*$' || die "module name '$modname' must match [a-z0-9][a-z0-9-]* (lower case, digits, hyphens)"
+module="$group/$modname"
+if [ "$module_root" -eq 1 ]; then
+  [ "$dest" = "$module" ] || die "--module-root takes just <group>/<module>, not '$dest'"
+else
+  [ "$dest" != "$module" ] || die "destination must be <group>/<module>/<subdir>; '$dest' names a module but no subdirectory (use --module-root to import into the module itself)"
 fi
 
 target="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" || die "--target is not a git repository"
-module="${dest%%/*}"
-[ -f "$target/$module/go.mod" ] || die "'$module' is not a module in $target (no $module/go.mod)"
-[ "$module_root" -eq 1 ] || [ ! -e "$target/$dest" ] || die "$dest already exists in the target"
+if [ "$module_root" -eq 1 ]; then
+  if [ -e "$target/$group/$modname" ] && [ ! -f "$target/$module/go.mod" ]; then
+    die "$module exists in the target but has no go.mod; it is not a module"
+  fi
+else
+  [ -f "$target/$module/go.mod" ] || die "'$module' is not a module in $target (no $module/go.mod); import it first with --module-root"
+  [ ! -e "$target/$dest" ] || die "$dest already exists in the target"
+fi
+[ ! -f "$target/$group/go.mod" ] || die "$group/go.mod exists in the target; a group directory carries no go.mod"
 git -C "$target" rev-parse -q --verify HEAD >/dev/null || die "the target has no commits yet"
 [ -z "$(git -C "$target" status --porcelain)" ] || die "the target working tree is not clean; commit or stash first"
 
@@ -125,9 +166,32 @@ trap cleanup EXIT
 
 echo "cloning $name"
 git clone --quiet --no-hardlinks "$source_repo" "$work/src" || die "could not clone '$source_repo'"
+if [ "$skip_scan" -eq 0 ]; then
+  echo "scanning $name (tip and full history) for secrets, internal hosts and private paths"
+  scan_args=(--repo "$work/src")
+  if [ -n "$source_allowlist" ]; then
+    [ -f "$source_allowlist" ] || die "--source-allowlist '$source_allowlist' is not a file"
+    scan_args+=(--allowlist "$source_allowlist")
+  else
+    scan_args+=(--no-allowlist)
+  fi
+  "$SCRIPT_DIR/scan-public" "${scan_args[@]}" >"$work/scan.log" 2>&1 || {
+    cat "$work/scan.log" >&2
+    die "source scan failed; fix the source, or have the owner triage and pass --source-allowlist (reasons required) or --skip-source-scan"
+  }
+fi
 src_head="$(git -C "$work/src" rev-parse HEAD)"
 src_commits="$(git -C "$work/src" rev-list --count HEAD)"
 src_tags="$(git -C "$work/src" tag --merged HEAD | sort -V | tr '\n' ' ' | sed 's/ $//')"
+# Tag prefix mapping: the tag each old tag would have here. Informational only; see above.
+tag_map=""
+for t in $src_tags; do
+  case "$t" in
+    v[0-9]*) tag_map="$tag_map$t -> $module/$t, " ;;
+    *) tag_map="$tag_map$t -> (no mapping), " ;;
+  esac
+done
+tag_map="${tag_map%, }"
 
 echo "rewriting $src_commits commits under $dest/"
 filter_args=(--force)
@@ -148,6 +212,7 @@ msg="import: $name into $dest (history preserved)
 Source: $name
 Source HEAD: ${src_head:0:12} ($src_commits commits)
 Source tags, not carried: ${src_tags:-none}
+Tag prefix mapping (would be, if the owner ever re-tags): ${tag_map:-none}
 Imported with scripts/import-repo (git filter-repo ${renames[*]+--path-rename ${renames[*]} }--to-subdirectory-filter $dest)."
 
 if [ "$module_root" -eq 0 ]; then
@@ -182,6 +247,23 @@ EOF
   git -C "$target" commit --quiet -m "$msg" || { git -C "$target" merge --abort >/dev/null 2>&1 || true; die "commit failed; aborted"; }
 fi
 
+# rewrite_prefix OLD NEW DIR PATTERN...: replace the module path OLD by NEW in the tracked files of
+# DIR matching a pattern, wherever OLD stands as a whole path prefix; stage the changes.
+rewrite_prefix() {
+  local old="$1" newp="$2" dir="$3" esc f pat
+  shift 3
+  esc="$(re_escape "$old")"
+  for pat in "$@"; do
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      sed -E -i "s#${esc}([^A-Za-z0-9._-]|\$)#${newp}\\1#g" "$target/$f"
+      git -C "$target" add -- "$f"
+    done <<EOF
+$(git -C "$target" ls-files -- "$dir/$pat")
+EOF
+  done
+}
+
 requirements=""
 if [ "$module_root" -eq 1 ]; then
   requirements="$(awk '
@@ -193,14 +275,18 @@ if [ "$module_root" -eq 1 ]; then
   old_module="$(awk '$1 == "module" { print $2; exit }' "$target/$module/go.mod")"
   new_module="$MODULE_PREFIX/$module"
   if [ "$old_module" != "$new_module" ]; then
+    # The module line changes; so does every other mention of the old module path in the
+    # module's Go sources and Markdown (the module's packages import each other by it).
     awk -v new="$new_module" '$1 == "module" && !done { print "module " new; done = 1; next } { print }' \
       "$target/$module/go.mod" > "$work/go.mod.new"
     cp "$work/go.mod.new" "$target/$module/go.mod"
     git -C "$target" add -- "$module/go.mod"
+    rewrite_prefix "$old_module" "$new_module" "$module" '*.go' '*.md'
     git -C "$target" commit --quiet -m "import: module path of $name is now $new_module
 
-The imported go.mod is kept as the module's go.mod; only its module line changes
-(was $old_module). Requirements are untouched.
+The imported go.mod is kept as the module's go.mod. Its module line changes, and so does the
+old module path in the module's .go and .md files (was $old_module). Requirements are
+untouched.
 
 Requirements carried over:
 ${requirements:-  (none)}"
@@ -224,6 +310,32 @@ keeps the old files.
 
 Requirements of the dropped go.mod:
 ${requirements:-  (none)}"
+fi
+
+# Per-module instruction and licence files are not kept: this repository has one AGENTS.md,
+# one LICENSE and no CLAUDE.md or git hooks per module (history keeps the originals).
+strip_files=""
+for f in AGENTS.md CLAUDE.md LICENSE lefthook.yml; do
+  if [ -n "$(git -C "$target" ls-files -- "$dest/$f")" ]; then
+    git -C "$target" rm --quiet -f -- "$dest/$f"
+    strip_files="${strip_files:+$strip_files }$f"
+  fi
+done
+if [ -n "$strip_files" ]; then
+  git -C "$target" commit --quiet -m "import: drop $name's per-module files ($strip_files)
+
+This repository keeps a single AGENTS.md and LICENSE at the root and no per-module
+CLAUDE.md or hook config; the history keeps the originals."
+fi
+
+for m in ${imports[@]+"${imports[@]}"}; do
+  case "$m" in *=*) ;; *) die "--import-map wants OLD=NEW, got '$m'" ;; esac
+  rewrite_prefix "${m%%=*}" "${m#*=}" "$dest" '*.go'
+done
+if [ -n "$(git -C "$target" diff --cached --name-only)" ]; then
+  git -C "$target" commit --quiet -m "import: point $name's imports at their paths in this repository
+
+Rewritten (old=new): ${imports[*]}"
 fi
 
 echo
@@ -251,6 +363,15 @@ elif [ -n "$requirements" ]; then
     echo "  $r"
   done <<EOF
 $requirements
+EOF
+fi
+others="$(printf '%s\n' "$requirements" | grep -E "^github\.com/hollis-labs/" | grep -vE "^$(re_escape "$MODULE_PREFIX")/" || true)"
+if [ -n "$others" ]; then
+  echo "warning: requirements on other Hollis Labs modules; their paths here are <group>/<module> (use --import-map for the imports, then fix go.mod):" >&2
+  while IFS= read -r o; do
+    echo "  $o" >&2
+  done <<EOF
+$others
 EOF
 fi
 echo "next: merge requirements into $module/go.mod, fix import paths, run scripts/check $module and scripts/check-layout"

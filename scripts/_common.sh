@@ -21,13 +21,59 @@ die() {
   exit 1
 }
 
-# Print the module directories (top-level directories holding a go.mod), one per line.
-modules() {
-  local f
-  for f in "$REPO_ROOT"/*/go.mod; do
-    [ -e "$f" ] || continue
-    basename "$(dirname "$f")"
+# Print the groups, one per line, in rank order.
+groups() {
+  local pair
+  for pair in $GROUP_RANKS; do
+    echo "$pair"
+  done | sort -t: -k2,2n -k1,1 | cut -d: -f1
+}
+
+# group_rank GROUP: print the rank of GROUP, or nothing when it is not a group.
+group_rank() {
+  local pair
+  for pair in $GROUP_RANKS; do
+    if [ "${pair%%:*}" = "$1" ]; then
+      echo "${pair#*:}"
+      return 0
+    fi
   done
+  return 0
+}
+
+is_group() {
+  [ -n "$(group_rank "$1")" ]
+}
+
+is_legacy_flat() {
+  local m
+  for m in $LEGACY_FLAT_MODULES; do
+    [ "$m" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Print the module directories relative to the repository root, one per line:
+# <group>/<module> for every <group>/<module>/go.mod, then each legacy flat <module>.
+modules() {
+  local g f
+  for g in $(groups); do
+    for f in "$REPO_ROOT/$g"/*/go.mod; do
+      [ -e "$f" ] || continue
+      echo "$g/$(basename "$(dirname "$f")")"
+    done
+  done
+  for g in $LEGACY_FLAT_MODULES; do
+    [ -e "$REPO_ROOT/$g/go.mod" ] || continue
+    echo "$g"
+  done
+}
+
+# valid_module NAME: succeeds when NAME is a module directory that exists here.
+valid_module() {
+  local all
+  all="$(modules)" # not `modules | grep -q`: grep exiting early would fail the pipe under pipefail
+  [ -f "$REPO_ROOT/$1/go.mod" ] && printf '%s\n' "$all" | grep -qxF -- "$1"
 }
 
 # Print what a commit could contain: tracked files plus untracked files that are not ignored.

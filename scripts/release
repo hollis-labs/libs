@@ -9,20 +9,22 @@
 # Dry run is the default. This script never pushes: publishing a tag is a separate,
 # owner-approved step, and the command to run is printed at the end.
 #
-# Releases are per module and never lockstep. The tag is <module>/<version> (for
-# example harness/v0.3.2 or util/v1.0.0), which is how the Go tooling finds a module
-# in a subdirectory.
-# Checks: the module exists; the version is plain semver with a leading v; a v2+
-# major matches the module path suffix; the tag is new and newer than the module's
-# latest tag; <module>/CHANGELOG.md has a section for the version; the working tree
-# is clean; main is checked out. Any failed check exits non-zero, with or without --apply.
+# <module> is <group>/<module>, for example core/strutil. Releases are per module and
+# never lockstep. The tag is <group>/<module>/<version> (for example core/strutil/v0.3.2),
+# which is how the Go tooling finds a module in a subdirectory.
+# Checks: the module exists (a bare group is not a module); the version is plain semver
+# with a leading v; a v2+ major matches the module path suffix; the tag is new and newer
+# than the module's latest tag; every module of this repository that go.mod requires is
+# already tagged at the required version (dependency first); <module>/CHANGELOG.md has
+# a section for the version; the working tree is clean; main is checked out. Any failed
+# check exits non-zero, with or without --apply.
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=_common.sh
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
 usage() {
-  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 SEMVER_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+(\.[0-9A-Za-z-]+)*)?$'
@@ -78,7 +80,13 @@ done
 module="$1"
 version="$2"
 
-[ -f "$REPO_ROOT/$module/go.mod" ] || die "'$module' is not a module here (modules: $(modules | tr '\n' ' '))"
+module="${module%/}"
+if ! valid_module "$module"; then
+  if is_group "$module" && [ ! -f "$REPO_ROOT/$module/go.mod" ]; then
+    die "'$module' is a group, not a module; name it $module/<module> (modules: $(modules | tr '\n' ' '))"
+  fi
+  die "'$module' is not a module here (modules: $(modules | tr '\n' ' '))"
+fi
 [[ "$version" =~ $SEMVER_RE ]] || die "'$version' is not a valid version; want vMAJOR.MINOR.PATCH with an optional -prerelease (no module prefix, no +build metadata)"
 
 tag="$module/$version"
@@ -132,6 +140,27 @@ elif semver_gt "$version" "$latest"; then
 else
   nope "$version is not newer than the latest $module tag ($latest)"
 fi
+
+# Dependency order: a requirement on another module of this repository must name a
+# version that has been tagged, or a consumer's go get cannot resolve it.
+reqs="$(awk '
+  $1 == "require" && $2 == "(" { inblock = 1; next }
+  inblock && $1 == ")" { inblock = 0; next }
+  inblock { print $1, $2; next }
+  $1 == "require" { print $2, $3 }
+' "$REPO_ROOT/$module/go.mod")"
+while read -r rpath rver; do
+  [ -n "${rpath:-}" ] || continue
+  case "$rpath" in "$MODULE_PREFIX"/*) ;; *) continue ;; esac
+  rdir="$(printf '%s\n' "${rpath#"$MODULE_PREFIX"/}" | sed -E 's#/v[0-9]+$##')"
+  if git -C "$REPO_ROOT" rev-parse -q --verify "refs/tags/$rdir/$rver" >/dev/null 2>&1; then
+    ok "dependency $rdir is tagged $rver"
+  else
+    nope "go.mod requires $rpath $rver but tag $rdir/$rver does not exist; release the dependency first"
+  fi
+done <<EOF
+$reqs
+EOF
 
 bare="${version#v}"
 if grep -Eq "^##[[:space:]]+\\[?v?$(printf '%s' "$bare" | sed 's/\./\\./g')\\]?([[:space:]]|\$)" "$REPO_ROOT/$module/CHANGELOG.md" 2>/dev/null; then

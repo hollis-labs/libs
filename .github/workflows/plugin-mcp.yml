@@ -5,12 +5,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "plugin-mcp/**"
+      - "mcp/plugin-mcp/**"
       - ".github/workflows/plugin-mcp.yml"
       - ".github/workflows/_module.yml"
   pull_request:
     paths:
-      - "plugin-mcp/**"
+      - "mcp/plugin-mcp/**"
       - ".github/workflows/plugin-mcp.yml"
       - ".github/workflows/_module.yml"
 
@@ -25,7 +25,7 @@ jobs:
   module:
     uses: ./.github/workflows/_module.yml
     with:
-      module: plugin-mcp
+      module: mcp/plugin-mcp
       race: true
 
   ts:
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: plugin-mcp/plugin-sdk/ts
+        working-directory: mcp/plugin-mcp/plugin-sdk/ts
     steps:
       - uses: actions/checkout@v5
 
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: plugin-mcp/plugin-sdk/ts/package-lock.json
+          cache-dependency-path: mcp/plugin-mcp/plugin-sdk/ts/package-lock.json
 
       # `npm ci` runs plugin-registry's `prepare`, which builds dist/. That is
       # the same path a consumer's install takes, so a break in it is a break
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: plugin-mcp/plugin-sdk/ts
+        working-directory: mcp/plugin-mcp/plugin-sdk/ts
     steps:
       - uses: actions/checkout@v5
 
@@ -82,7 +82,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: plugin-mcp/plugin-sdk/ts/package-lock.json
+          cache-dependency-path: mcp/plugin-mcp/plugin-sdk/ts/package-lock.json
 
       - name: install
         run: npm ci
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: plugin-mcp/plugin-sdk/ts
+        working-directory: mcp/plugin-mcp/plugin-sdk/ts
     steps:
       - uses: actions/checkout@v5
 
@@ -116,7 +116,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: plugin-mcp/plugin-sdk/ts/package-lock.json
+          cache-dependency-path: mcp/plugin-mcp/plugin-sdk/ts/package-lock.json
 
       - uses: denoland/setup-deno@v2
         with:
@@ -148,12 +148,12 @@ jobs:
       GOWORK: "off"
     defaults:
       run:
-        working-directory: plugin-mcp/plugin-sdk
+        working-directory: mcp/plugin-mcp/plugin-sdk
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: plugin-mcp/go.mod
+          go-version-file: mcp/plugin-mcp/go.mod
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -173,12 +173,12 @@ jobs:
       GOWORK: "off"
     defaults:
       run:
-        working-directory: plugin-mcp
+        working-directory: mcp/plugin-mcp
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: plugin-mcp/go.mod
+          go-version-file: mcp/plugin-mcp/go.mod
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
@@ -191,12 +191,12 @@ jobs:
       GOWORK: "off"
     defaults:
       run:
-        working-directory: plugin-mcp/plugin-host
+        working-directory: mcp/plugin-mcp/plugin-host
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: plugin-mcp/go.mod
+          go-version-file: mcp/plugin-mcp/go.mod
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -240,7 +240,7 @@ jobs:
           # Current execution/module identity is separate from historical pins
           # retained in the imported test reports.
           git rev-parse HEAD > "$assets/consolidated-execution-head"
-          git rev-parse HEAD:plugin-mcp > "$assets/consolidated-module-tree"
+          git rev-parse HEAD:mcp/plugin-mcp > "$assets/consolidated-module-tree"
           go list -m -json > "$assets/consolidated-go-module.json"
           pwd > "$assets/consolidated-execution-workdir"
           echo "REVERSE_GO_CHILD=$assets/duplex-child" >> "$GITHUB_ENV"

@@ -16,17 +16,17 @@ concurrency:
 
 jobs:
   guards:
-    name: layout, one-way rule, public hygiene
+    name: layout, one-way rules, public hygiene
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # the public-hygiene scan reads the full history
 
-      - name: layout (no go.work, no replace, one go.mod per module)
+      - name: layout (groups hold modules, no go.work, no replace, one go.mod per module)
         run: scripts/check-layout
 
-      - name: one-way dependency rule
+      - name: one-way rules (substrate never; group order core < security < mcp/ui/workflow/llm < mesh < agent)
         run: scripts/check-one-way
 
       # Scoped to the revision under test (the pull request's merge commit, or the pushed
@@ -37,5 +37,5 @@ jobs:
 
       - name: scripts parse (shellcheck, python syntax)
         run: |
-          shellcheck -x scripts/repo.conf scripts/_common.sh scripts/check scripts/check-layout scripts/check-one-way scripts/release scripts/import-repo
+          shellcheck -x scripts/repo.conf scripts/_common.sh scripts/check scripts/check-layout scripts/check-one-way scripts/changed-modules scripts/release scripts/import-repo
           python3 -c "import ast; ast.parse(open('scripts/scan-public').read())"

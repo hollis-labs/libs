@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Fast local checks for one or more modules: gofmt, go vet, go build, go test.
 #
-# Usage: scripts/check [-race] [module...]
+# Usage: scripts/check [-race] [module|group...]
 #
-# With no module, every module in the repository is checked, one after another.
+# A module is <group>/<module> (for example core/strutil); a bare group name (core)
+# stands for every module in that group. With no argument, every module in the
+# repository is checked, one after another.
 # Modules are always built with GOWORK=off. CI runs the same steps per module.
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR
@@ -11,7 +13,7 @@ set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
 usage() {
-  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 race=""
@@ -26,14 +28,23 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $# -gt 0 ]; then
-  mods="$*"
+  mods=""
+  for a in "$@"; do
+    a="${a%/}"
+    if is_group "$a" && ! [ -f "$REPO_ROOT/$a/go.mod" ]; then
+      mods="$mods $(modules | grep -E "^$a/" || true)"
+    else
+      mods="$mods $a"
+    fi
+  done
+  mods="${mods# }"
 else
   mods="$(modules)"
 fi
 [ -n "$mods" ] || die "no modules found under $REPO_ROOT"
 
 for m in $mods; do
-  [ -f "$REPO_ROOT/$m/go.mod" ] || die "'$m' is not a module here (modules: $(modules | tr '\n' ' '))"
+  valid_module "$m" || die "'$m' is not a module here (modules: $(modules | tr '\n' ' '))"
 done
 
 status=0
