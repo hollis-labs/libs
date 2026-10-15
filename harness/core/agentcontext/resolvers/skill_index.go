@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
-	"github.com/hollis-labs/substrate/agent/agentcontext/skills"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext/skills"
 )
 
 // DefaultSkillIndexLimit caps the number of skills the

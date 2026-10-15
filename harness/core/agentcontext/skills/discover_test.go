@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 )
 
 // writeSkill writes a minimal skill file with the given slug,

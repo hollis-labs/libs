@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 )
 
 // Layer is one tier of skill discovery. Layers are processed in the

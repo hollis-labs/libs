@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 )
 
 // writeSkillFile is a thin helper that writes a skill file with

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 )
 
 // Cmd resolver defaults. Operators may override

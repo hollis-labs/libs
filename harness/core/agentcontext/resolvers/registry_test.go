@@ -3,7 +3,7 @@ package resolvers
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 )
 
 func TestDefault_RegisterAllSevenKinds(t *testing.T) {
