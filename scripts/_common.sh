@@ -71,7 +71,9 @@ modules() {
 
 # valid_module NAME: succeeds when NAME is a module directory that exists here.
 valid_module() {
-  [ -f "$REPO_ROOT/$1/go.mod" ] && modules | grep -qxF -- "$1"
+  local all
+  all="$(modules)" # not `modules | grep -q`: grep exiting early would fail the pipe under pipefail
+  [ -f "$REPO_ROOT/$1/go.mod" ] && printf '%s\n' "$all" | grep -qxF -- "$1"
 }
 
 # Print what a commit could contain: tracked files plus untracked files that are not ignored.
