@@ -1,0 +1,20 @@
+# build output
+bin/
+dist/
+
+# test artifacts
+coverage.out
+*.test
+*.out
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# agent / AI infra (must not appear in a public repo)
+.agentrc/
+.claude/
+agentrc.yaml
+agentrc.yml
+AUDIT_RESULTS.md
