@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 	"testing"
 )
 

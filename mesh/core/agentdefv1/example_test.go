@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing/fstest"
 
-	agentdef "github.com/hollis-labs/substrate/mesh/agentdefv1"
+	agentdef "github.com/hollis-labs/libs/mesh/core/agentdefv1"
 )
 
 const triage = `---

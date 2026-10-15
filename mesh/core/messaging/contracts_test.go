@@ -13,7 +13,7 @@ func TestMessagingVNextContractDocumentPinsG01Acceptance(t *testing.T) {
 	}
 	doc := string(data)
 	for _, want := range []string{
-		"github.com/hollis-labs/substrate/mesh/messaging` | Must not import `agentkit`",
+		"github.com/hollis-labs/libs/mesh/core/messaging` | Must not import `agentkit`",
 		"Root Store compatibility",
 		"Mailbox compatibility",
 		"Reliable delivery contract",

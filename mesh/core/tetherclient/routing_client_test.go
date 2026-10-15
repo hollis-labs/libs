@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
+	tether "github.com/hollis-labs/libs/mesh/core/tetherclient"
 )
 
 func TestRoutingCapabilities(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
 )
 
 // Store is an in-memory hitl.Store. The zero value is not usable; call New.

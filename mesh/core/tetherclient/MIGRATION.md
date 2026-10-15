@@ -6,18 +6,18 @@
 
 | Old import prefix | New import prefix |
 |---|---|
-| `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/substrate/mesh/tetherclient` |
+| `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/libs/mesh/core/tetherclient` |
 
 Replace the prefix for the root package and every subpackage. Package names,
 APIs, and the repository's internal layout are unchanged by this move. Its
 go-messaging dependency is now the sibling
-`github.com/hollis-labs/substrate/mesh/messaging` package, so it no longer
+`github.com/hollis-labs/libs/mesh/core/messaging` package, so it no longer
 requires another Hollis Labs module. The source history is preserved, but old
 repository tags are not carried into the monorepo. The first consolidated
 release was `mesh/v0.1.0`. Pin the parent module for current client features:
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.4.0
+go get github.com/hollis-labs/libs/mesh/core@v0.4.0
 ```
 
 This requires Go 1.26.9 or newer. Remote environment connections and supervised
@@ -30,10 +30,10 @@ No consumer import is changed as part of the relocation.
 ## Module
 
 - Old: `github.com/hollis-labs/go-agentmux-client`
-- New: `github.com/hollis-labs/substrate/mesh/tetherclient`
+- New: `github.com/hollis-labs/libs/mesh/core/tetherclient`
 
 ```go
-import tether "github.com/hollis-labs/substrate/mesh/tetherclient"
+import tether "github.com/hollis-labs/libs/mesh/core/tetherclient"
 ```
 
 ## Default socket

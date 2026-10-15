@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/uuid"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 //go:embed schema/*.sql

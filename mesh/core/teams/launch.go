@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 type LaunchState string

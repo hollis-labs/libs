@@ -4,7 +4,7 @@
 
 | Old import prefix | New import prefix |
 |---|---|
-| `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/substrate/mesh/hitl` |
+| `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/libs/mesh/core/hitl` |
 
 Replace the prefix for the root package and every subpackage. Package names,
 APIs, and the repository's internal layout are unchanged by this move. The

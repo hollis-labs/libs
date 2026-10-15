@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	gomsg "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore"
 )
 
 func freeAddr(t *testing.T) string {

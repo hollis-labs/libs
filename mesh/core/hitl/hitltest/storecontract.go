@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
 )
 
 // RunStoreContract checks that a hitl.Store keeps the guarantees Service

@@ -2,7 +2,7 @@
 
 Deprecated Go client for the Agent Mux daemon, package name `agentmux`. It is
 retained only so existing consumers of this import path keep compiling; the
-successor is `github.com/hollis-labs/substrate/mesh/tetherclient`. Nothing new should be
+successor is `github.com/hollis-labs/libs/mesh/core/tetherclient`. Nothing new should be
 built here.
 
 ## Start Here

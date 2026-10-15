@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	mesh "github.com/hollis-labs/substrate/mesh"
-	"github.com/hollis-labs/substrate/mesh/conformance"
-	"github.com/hollis-labs/substrate/mesh/fake"
+	mesh "github.com/hollis-labs/libs/mesh/core"
+	"github.com/hollis-labs/libs/mesh/core/conformance"
+	"github.com/hollis-labs/libs/mesh/core/fake"
 )
 
 func TestDispatchConformance(t *testing.T) {

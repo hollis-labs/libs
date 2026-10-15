@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
-	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore/httpstoretest"
+	"github.com/hollis-labs/libs/mesh/core/messaging/memstore"
 )
 
 // responder answers the first request addressed to `to` on ms after delay.

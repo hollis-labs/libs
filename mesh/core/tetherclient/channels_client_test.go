@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
+	tether "github.com/hollis-labs/libs/mesh/core/tetherclient"
 )
 
 func TestChannelHistoryAndList(t *testing.T) {

@@ -2,7 +2,7 @@ package mesh_test
 
 import (
 	"encoding/json"
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 	"math"
 	"testing"
 	"time"

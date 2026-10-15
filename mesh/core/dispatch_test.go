@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 )
 
 func TestDecodedDiagnosticWithoutCause(t *testing.T) {

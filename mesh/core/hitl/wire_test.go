@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
-	"github.com/hollis-labs/substrate/mesh/hitl/hitltest"
-	"github.com/hollis-labs/substrate/mesh/hitl/schema"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl/hitltest"
+	"github.com/hollis-labs/libs/mesh/core/hitl/schema"
 )
 
 func jsonEqual(t *testing.T, a, b []byte) bool {

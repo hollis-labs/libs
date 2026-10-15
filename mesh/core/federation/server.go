@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode"
 
-	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
+	gomsg "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 // BasePath is the route prefix the surface is mounted at. It matches

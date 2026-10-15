@@ -2,7 +2,7 @@
 
 ## Retirement — 2026-10-09
 
-- Redirect new development to `github.com/hollis-labs/substrate/mesh/tetherclient` in `github.com/hollis-labs/substrate/mesh v0.1.0`.
+- Redirect new development to `github.com/hollis-labs/libs/mesh/core/tetherclient` in `github.com/hollis-labs/libs/mesh/core v0.1.0`.
 - The successor is the Tether client. Adapt legacy mux names, socket defaults and endpoint contracts explicitly; this does not assert API equivalence or change existing consumer pins.
 - Archive after the final redirect merge; retain all historical source and tags.
 
@@ -44,7 +44,7 @@ This file was backfilled from the git history.
 - Initial Agent Mux client package (`agentmux`): session, launch and event API client with typed API errors.
 - `provider_id` on `LaunchResponse`.
 
-[Unreleased]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/hollis-labs/substrate/mesh/agentmuxclient/releases/tag/v0.1.0
+[Unreleased]: https://github.com/hollis-labs/libs/mesh/core/agentmuxclient/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hollis-labs/libs/mesh/core/agentmuxclient/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/hollis-labs/libs/mesh/core/agentmuxclient/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/hollis-labs/libs/mesh/core/agentmuxclient/releases/tag/v0.1.0

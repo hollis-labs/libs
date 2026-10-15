@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/sqlstore"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/sqlstore"
 )
 
 // torqueShapedConsume is an in-test copy of the Consume in Torque's private

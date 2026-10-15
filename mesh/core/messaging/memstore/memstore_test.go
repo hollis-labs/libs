@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 func newAddr(kind messaging.AddressKind, id string) messaging.Address {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/go-ssekit"
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 type framingTransport func(*http.Request) (*http.Response, error)

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 )
 
 // DispatchFixture supplies restart, grants and retention controls for reusable

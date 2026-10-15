@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 func TestNotifySendsWireKeysAndDecodesTheResult(t *testing.T) {

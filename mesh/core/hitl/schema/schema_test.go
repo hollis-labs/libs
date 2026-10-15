@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/mesh/hitl/schema"
+	"github.com/hollis-labs/libs/mesh/core/hitl/schema"
 )
 
 func TestEveryDefinitionCompiles(t *testing.T) {

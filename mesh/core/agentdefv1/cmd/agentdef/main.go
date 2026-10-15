@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
-	agentdef "github.com/hollis-labs/substrate/mesh/agentdefv1"
+	agentdef "github.com/hollis-labs/libs/mesh/core/agentdefv1"
 )
 
 func main() {

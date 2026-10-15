@@ -1,7 +1,7 @@
 package delivery
 
 import (
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 // EnvelopeEnqueueRequest projects a legacy root Envelope send into the reliable

@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 )
 
 func checkDispatchReview(t *testing.T, newFixture func(*testing.T) DispatchFixture) {

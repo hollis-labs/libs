@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
-	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
+	"github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/memstore"
+	"github.com/hollis-labs/libs/mesh/core/messaging/messagingtest"
 )
 
 // noInboxStore is a memstore whose Inbox and Subscribe are unavailable, the

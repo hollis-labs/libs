@@ -3,14 +3,14 @@
 ## Substrate relocation
 
 The complete version-1 library and command now live at
-`github.com/hollis-labs/substrate/mesh/agentdefv1` in `mesh/v0.2.0`.
+`github.com/hollis-labs/libs/mesh/core/agentdefv1` in `mesh/v0.2.0`.
 The Go package remains `agentdef`. This preserves the version-1 parser, layered
 loading, skill-tree pins/copying, linting and generated-span checks without
 changing the separate version-2 `mesh/agentdef` schema.
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.2.0
-go install github.com/hollis-labs/substrate/mesh/agentdefv1/cmd/agentdef@v0.2.0
+go get github.com/hollis-labs/libs/mesh/core@v0.2.0
+go install github.com/hollis-labs/libs/mesh/core/agentdefv1/cmd/agentdef@v0.2.0
 ```
 
 These schemas have no aliases or implicit conversion. The version-1 CLI uses
@@ -28,7 +28,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for what exists and what changed.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh/agentdefv1
+go get github.com/hollis-labs/libs/mesh/core/agentdefv1
 ```
 
 Install the command at the module version shown above, or build from the mesh module directory with `go build -o agentdef ./agentdefv1/cmd/agentdef`.
@@ -42,7 +42,7 @@ import (
 	"fmt"
 	"log"
 
-	agentdef "github.com/hollis-labs/substrate/mesh/agentdefv1"
+	agentdef "github.com/hollis-labs/libs/mesh/core/agentdefv1"
 )
 
 const file = `---

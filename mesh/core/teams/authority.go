@@ -3,7 +3,7 @@ package teams
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 // Authorize requires real roster members. The host supplies authenticated

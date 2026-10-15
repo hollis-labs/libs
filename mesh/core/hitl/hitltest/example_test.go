@@ -3,7 +3,7 @@ package hitltest_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/mesh/hitl/hitltest"
+	"github.com/hollis-labs/libs/mesh/core/hitl/hitltest"
 )
 
 func ExampleScenarios() {

@@ -2,7 +2,7 @@
 
 ## Retirement — 2026-10-09
 
-- Redirect new development to `github.com/hollis-labs/substrate/mesh/agentdef` in `github.com/hollis-labs/substrate/mesh v0.1.0`.
+- Redirect new development to `github.com/hollis-labs/libs/mesh/core/agentdef` in `github.com/hollis-labs/libs/mesh/core v0.1.0`.
 - The replacement is the v2 definition contract. Its symbols, file schema and digest differ from this preserved v1 implementation; adapt the caller explicitly rather than rewriting an import blindly.
 - Archive after the final redirect merge; retain all historical source and tags.
 

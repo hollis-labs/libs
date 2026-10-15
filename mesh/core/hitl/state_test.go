@@ -3,7 +3,7 @@ package hitl_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
 )
 
 // allowed spells out ADR 0001 section 6 independently of CanTransition, one

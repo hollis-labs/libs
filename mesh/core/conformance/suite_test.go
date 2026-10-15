@@ -2,7 +2,7 @@ package conformance
 
 import (
 	"context"
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 	"testing"
 )
 

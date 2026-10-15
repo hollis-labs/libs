@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
 )
 
 // ServiceAdapter adapts a *hitl.Service to Adapter, so the reference

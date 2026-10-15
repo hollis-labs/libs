@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 // RunSpawn verifies the observable guarantees of the bounded spawn claim.

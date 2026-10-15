@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore/httpstoretest"
-	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
-	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore/httpstoretest"
+	"github.com/hollis-labs/libs/mesh/core/messaging/memstore"
+	"github.com/hollis-labs/libs/mesh/core/messaging/messagingtest"
 )
 
 var (

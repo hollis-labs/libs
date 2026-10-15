@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
-	"github.com/hollis-labs/substrate/mesh/messaging/messagingtest"
+	"github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/memstore"
+	"github.com/hollis-labs/libs/mesh/core/messaging/messagingtest"
 )
 
 // delayedSubscription models a store that needs time to register its live

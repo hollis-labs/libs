@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 func validPermission(p Permission) bool {

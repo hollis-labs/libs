@@ -1,6 +1,6 @@
 # go-tether-client
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/mesh/tetherclient.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/mesh/tetherclient)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/mesh/core/tetherclient.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/mesh/core/tetherclient)
 
 A typed Go client for the Tether daemon control-plane API.
 
@@ -14,7 +14,7 @@ versions; see [CHANGELOG.md](./CHANGELOG.md).
 ## Install
 
 ```bash
-go get github.com/hollis-labs/substrate/mesh@v0.4.0
+go get github.com/hollis-labs/libs/mesh/core@v0.4.0
 ```
 
 Requires Go 1.26.9 or newer. The package is versioned with the `mesh` module;
@@ -43,7 +43,7 @@ package main
 import (
 	"context"
 
-	tether "github.com/hollis-labs/substrate/mesh/tetherclient"
+	tether "github.com/hollis-labs/libs/mesh/core/tetherclient"
 )
 
 func main() {
@@ -416,7 +416,7 @@ daemon clamps. A non-retryable `NackMessage` dead-letters and returns a
 **nil** error, so read `RecipientDelivery.Status` for the outcome.
 
 The delivery types are supplied by the sibling
-`github.com/hollis-labs/substrate/mesh/messaging/delivery` package; a separate
+`github.com/hollis-labs/libs/mesh/core/messaging/delivery` package; a separate
 `go-messaging` module pin is not required.
 
 ## Migration

@@ -13,7 +13,7 @@ Pre-1.0 and security-sensitive: the exported API may change in a minor release, 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh/federation
+go get github.com/hollis-labs/libs/mesh/core/federation
 ```
 
 ## Usage
@@ -24,8 +24,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/mesh/federation"
-	"github.com/hollis-labs/substrate/mesh/messaging/memstore"
+	"github.com/hollis-labs/libs/mesh/core/federation"
+	"github.com/hollis-labs/libs/mesh/core/messaging/memstore"
 )
 
 func main() {

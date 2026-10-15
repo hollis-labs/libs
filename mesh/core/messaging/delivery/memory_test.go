@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/messaging/delivery"
-	"github.com/hollis-labs/substrate/mesh/messaging/deliverytest"
+	"github.com/hollis-labs/libs/mesh/core/messaging/delivery"
+	"github.com/hollis-labs/libs/mesh/core/messaging/deliverytest"
 )
 
 func TestMemoryStoreContract(t *testing.T) {

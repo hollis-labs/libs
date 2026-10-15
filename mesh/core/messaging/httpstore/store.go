@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 // maxResponseBytes bounds a decoded response body. A body over it fails to

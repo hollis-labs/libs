@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
-	"github.com/hollis-labs/substrate/mesh/hitl/memstore"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl/memstore"
 )
 
 func Example() {

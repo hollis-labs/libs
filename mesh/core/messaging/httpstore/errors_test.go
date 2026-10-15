@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore"
 )
 
 // TestErrorTable is the package's one status-to-error table, exercised over

@@ -1,15 +1,15 @@
 # Legacy Agent Mux client
 
-`github.com/hollis-labs/substrate/mesh/agentmuxclient` preserves the historical
+`github.com/hollis-labs/libs/mesh/core/agentmuxclient` preserves the historical
 `agentmux` Go package and HTTP protocol. Its complete source history is imported
 into mesh; the former repository's versions are not module tags here.
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.2.0
+go get github.com/hollis-labs/libs/mesh/core@v0.2.0
 ```
 
 ```go
-import agentmux "github.com/hollis-labs/substrate/mesh/agentmuxclient"
+import agentmux "github.com/hollis-labs/libs/mesh/core/agentmuxclient"
 ```
 
 The package retains its default address `unix:~/.agent-mux/run/muxd.sock`,

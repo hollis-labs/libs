@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	mesh "github.com/hollis-labs/substrate/mesh"
+	mesh "github.com/hollis-labs/libs/mesh/core"
 )
 
 const LogURN mesh.URN = "msg://log/fake/events"

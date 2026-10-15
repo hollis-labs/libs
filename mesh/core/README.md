@@ -1,6 +1,6 @@
 # mesh
 
-`github.com/hollis-labs/substrate/mesh` holds the contracts and building blocks that
+`github.com/hollis-labs/libs/mesh/core` holds the contracts and building blocks that
 agents, hosts and providers use to talk to each other: who an actor is, what it may
 ask of another, how work is assigned and followed, how a team is formed and run, and
 how an agent is defined.
@@ -47,11 +47,11 @@ schema `urn:hollis-labs:mesh:result/v1` are provisional.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/mesh@v0.4.0
+go get github.com/hollis-labs/libs/mesh/core@v0.4.0
 ```
 
 The typed Tether client is imported as
-`github.com/hollis-labs/substrate/mesh/tetherclient` (package `tether`). Its
+`github.com/hollis-labs/libs/mesh/core/tetherclient` (package `tether`). Its
 [remote environment guide](tetherclient/README.md#remote-environments) describes
 explicit credential references, identity checks, stream cursors and caller-owned
 mutation retries. The new environment API requires `v0.4.0` or newer.

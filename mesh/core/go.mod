@@ -1,4 +1,4 @@
-module github.com/hollis-labs/substrate/mesh
+module github.com/hollis-labs/libs/mesh/core
 
 go 1.26.9
 

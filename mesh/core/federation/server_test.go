@@ -16,8 +16,8 @@ import (
 	"time"
 	"unicode"
 
-	gomsg "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/httpstore"
+	gomsg "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/httpstore"
 )
 
 // fixture: a server homing "local" that admits one peer, authoritative for "remote".

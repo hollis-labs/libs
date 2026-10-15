@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/go-ssekit"
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 // httpStore implements messaging.Store over the /messages/* HTTP routes.

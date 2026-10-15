@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 // EnvironmentEvent extends the mesh envelope with the durable environment

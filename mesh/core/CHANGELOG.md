@@ -72,9 +72,9 @@ All notable changes to the `mesh` module are documented here. The format follows
 - Minimum Go version is 1.26.9, including the standard-library security fixes
   absent from 1.26.6.
 - `github.com/hollis-labs/go-agentdef` imports move to
-  `github.com/hollis-labs/substrate/mesh/agentdefv1` (package `agentdef`).
+  `github.com/hollis-labs/libs/mesh/core/agentdefv1` (package `agentdef`).
 - The old `github.com/hollis-labs/go-agentmux-client` import moves to
-  `github.com/hollis-labs/substrate/mesh/agentmuxclient`; messaging imports now
+  `github.com/hollis-labs/libs/mesh/core/agentmuxclient`; messaging imports now
   use the sibling `mesh/messaging` packages. Consumer adoption is separate.
 
 ## v0.1.1 — 2026-10-09
@@ -138,16 +138,16 @@ All notable changes to the `mesh` module are documented here. The format follows
   supported versioned result envelope instead of a body-only result.
 - Task result content is encoded as bytes to preserve the exact digest input
   across JSON transport and snapshot reads.
-- The packages now share the `github.com/hollis-labs/substrate/mesh` module.
+- The packages now share the `github.com/hollis-labs/libs/mesh/core` module.
   Imports move as follows; no consumer adoption is included in this release
   preparation:
 
   | Old import prefix | New import prefix |
   |---|---|
-  | `github.com/hollis-labs/go-messaging` | `github.com/hollis-labs/substrate/mesh/messaging` |
-  | `github.com/hollis-labs/go-federation` | `github.com/hollis-labs/substrate/mesh/federation` |
-  | `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/substrate/mesh/tetherclient` |
-  | `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/substrate/mesh/hitl` |
+  | `github.com/hollis-labs/go-messaging` | `github.com/hollis-labs/libs/mesh/core/messaging` |
+  | `github.com/hollis-labs/go-federation` | `github.com/hollis-labs/libs/mesh/core/federation` |
+  | `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/libs/mesh/core/tetherclient` |
+  | `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/libs/mesh/core/hitl` |
 - Federation and tether-client now import messaging as a package in the same
   module rather than requiring the former `go-messaging` module.
 - Old repository tags are not carried into substrate.

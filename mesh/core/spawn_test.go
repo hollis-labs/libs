@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hollis-labs/substrate/mesh"
-	"github.com/hollis-labs/substrate/mesh/fake"
+	"github.com/hollis-labs/libs/mesh/core"
+	"github.com/hollis-labs/libs/mesh/core/fake"
 )
 
 func TestBoundedSpawnClaimRequiresItsGuarantees(t *testing.T) {

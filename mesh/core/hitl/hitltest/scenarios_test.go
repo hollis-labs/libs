@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/mesh/hitl"
+	"github.com/hollis-labs/libs/mesh/core/hitl"
 )
 
 // The brief lists these scenarios; each must exist under its name.

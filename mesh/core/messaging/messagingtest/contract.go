@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
 // ContractOption adjusts RunContract. The zero set of options runs the whole

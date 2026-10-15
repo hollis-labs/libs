@@ -10,8 +10,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging"
-	"github.com/hollis-labs/substrate/mesh/messaging/sqlstore"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/mesh/core/messaging/sqlstore"
 )
 
 func exampleDB() (*sql.DB, func()) {
