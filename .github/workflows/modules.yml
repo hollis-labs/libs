@@ -1,0 +1,50 @@
+# Checks for the grouped modules (<group>/<module>). One workflow for all of them: the
+# plan job lists the modules a change touches (scripts/changed-modules), then each one
+# runs through _module.yml. A change to scripts/ or to the shared workflows runs them all.
+# The legacy flat modules keep their own workflows (util.yml, ...) until they move.
+name: modules
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.plan.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the diff against the base needs its history
+
+      - id: plan
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: echo "modules=$(scripts/changed-modules --base "$BASE")" >> "$GITHUB_OUTPUT"
+
+  module:
+    name: ${{ matrix.module }}
+    needs: plan
+    if: needs.plan.outputs.modules != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.plan.outputs.modules) }}
+    uses: ./.github/workflows/_module.yml
+    with:
+      module: ${{ matrix.module }}
+      race: true

@@ -82,8 +82,8 @@ while IFS= read -r f; do
       refs="$(grep -noE "${pfx_esc}/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?" "$REPO_ROOT/$f" || true)"
       ;;
     *.go)
-      refs="$(sed -nE "s/^([0-9]+):.*\"(${pfx_esc}\/[A-Za-z0-9._\/-]*)\".*/\1:\2/p" < <(
-        grep -nE "^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?\"${pfx_esc}/" "$REPO_ROOT/$f" || true) || true)"
+      refs="$(grep -nE "^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?\"${pfx_esc}/" "$REPO_ROOT/$f" \
+        | sed -nE "s#^([0-9]+):.*\"(${pfx_esc}/[A-Za-z0-9._/-]*)\".*#\1:\2#p" || true)"
       ;;
   esac
   [ -n "$refs" ] || continue
@@ -96,7 +96,6 @@ while IFS= read -r f; do
     dst_group="${rel%%/*}"
     is_group "$dst_group" || continue          # a legacy flat module or something else: not ranked
     is_legacy_flat "$dst_group" && continue
-    nref=$((nref + 1))
     if [ "$rel" = "$dst_group" ]; then
       echo "FAIL: $f:$line: $path names the group '$dst_group', not a module in it" >&2
       fail=1
@@ -106,6 +105,7 @@ while IFS= read -r f; do
     dst_mod="${dst_mod%%/*}"
     dst="$dst_group/$dst_mod"
     [ "$dst" != "$src" ] || continue            # the module's own path
+    nref=$((nref + 1))
     dst_rank="$(group_rank "$dst_group")"
 
     if [ "$dst_group" != "$src_group" ]; then
