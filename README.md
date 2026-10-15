@@ -17,11 +17,12 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | `workflow` | Workflow engine and its host. |
 | `llm` | LLM-facing libraries. No module is present yet. |
 | `mesh` | Messaging and coordination between components. |
-| `agent` | Agent runtime. No module is present yet. |
+| `harness` | The layer that runs agent processes: launching, sandboxing, adapters, interception and brokering. Sits strictly below `agent`; imports `mesh`, `llm` and below. |
+| `agent` | Agent runtime built on the harness: context, turns, tools, approvals and reflexes. |
 
 ### Dependency order
 
-`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `agent`
+`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `harness` < `agent`
 
 A module may import only modules of its own group (no cycles) or of a
 lower-ranked group. `mcp`, `ui`, `workflow` and `llm` have the same rank and
