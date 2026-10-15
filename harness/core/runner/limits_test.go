@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/runner"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // TestResourceLimits_RlimitsApplied verifies the runner's argv wrap

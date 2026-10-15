@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // TestResolveAbs covers the helper that filepath.Abs-resolves a single

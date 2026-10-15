@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"

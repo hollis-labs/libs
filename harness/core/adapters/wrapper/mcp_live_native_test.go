@@ -17,7 +17,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/planting"
 	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/activity"
 	"github.com/hollis-labs/libs/harness/core/adapters/launch"

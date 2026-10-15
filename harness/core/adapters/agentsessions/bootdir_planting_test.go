@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // fakeBootDirAdapter satisfies both provider.CLIAdapter and

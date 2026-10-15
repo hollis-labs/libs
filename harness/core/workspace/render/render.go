@@ -23,7 +23,7 @@ import (
 	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	opencode "github.com/hollis-labs/libs/harness/core/adapters/opencode/nativefiles"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Render freezes resolved plan rows and content into an artifact tree and typed

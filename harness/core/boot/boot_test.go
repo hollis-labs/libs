@@ -22,7 +22,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // These ports are synthetic authority in private fixture roots. The managed

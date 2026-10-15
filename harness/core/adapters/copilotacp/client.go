@@ -24,7 +24,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/internal/childoutput"
 	"github.com/hollis-labs/libs/harness/core/internal/closegate"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // Errors returned by [Client]'s methods. Use [errors.Is] to detect.

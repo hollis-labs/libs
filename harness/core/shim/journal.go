@@ -15,7 +15,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 const segmentLimit = 1 << 20

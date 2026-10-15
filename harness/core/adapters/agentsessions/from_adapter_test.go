@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // echoAdapter is a minimal provider.CLIAdapter for end-to-end testing.

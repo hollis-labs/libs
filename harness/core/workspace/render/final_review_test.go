@@ -6,7 +6,7 @@ import (
 	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 	"io/fs"
 	"strings"
 	"testing"

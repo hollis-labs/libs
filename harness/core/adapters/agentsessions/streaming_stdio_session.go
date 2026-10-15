@@ -17,7 +17,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // streamingStdioRuntime is the agentsessions.Runtime backed by a long-lived

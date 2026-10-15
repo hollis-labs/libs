@@ -11,7 +11,7 @@ import (
 
 	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func TestClaudeStreamingUserFrame(t *testing.T) {

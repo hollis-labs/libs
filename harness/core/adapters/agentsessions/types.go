@@ -11,7 +11,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
 	"github.com/hollis-labs/libs/harness/core/workspace"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // State is the process-level lifecycle state the Manager records and

@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // jsonRpcStdioRuntime is the agentsessions.Runtime backed by a long-lived

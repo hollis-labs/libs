@@ -15,7 +15,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // Config configures a single Run. Provider, Workspace, and OnEvent are

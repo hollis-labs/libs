@@ -18,7 +18,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // ptyRuntime is the agentsessions.Runtime backed by a long-lived PTY-spawned

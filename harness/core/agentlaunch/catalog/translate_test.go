@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func TestResolve_InlineCatalog(t *testing.T) {

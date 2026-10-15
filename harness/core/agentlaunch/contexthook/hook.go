@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"

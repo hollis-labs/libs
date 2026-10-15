@@ -19,7 +19,7 @@ import (
 	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // The fake Codex app-server is this test binary re-executed with

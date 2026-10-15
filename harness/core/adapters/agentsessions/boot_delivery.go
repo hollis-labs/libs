@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"encoding/json"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 )

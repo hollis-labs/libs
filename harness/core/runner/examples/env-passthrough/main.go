@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/runner"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // echoAdapter is a minimal CLIAdapter for binaries that write

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // detect resolves runtime id's executable: the adapter's pinned binary when

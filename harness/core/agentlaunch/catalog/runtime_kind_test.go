@@ -3,7 +3,7 @@ package catalog
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // mapRuntimeKind is the one boundary that translates Tether's catalog

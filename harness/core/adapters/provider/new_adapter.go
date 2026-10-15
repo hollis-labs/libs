@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // ErrNoAdapter is returned by NewAdapter for a runtime and mode no adapter in

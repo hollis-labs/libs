@@ -20,8 +20,8 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // --- Codex app-server ------------------------------------------------------

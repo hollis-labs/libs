@@ -16,7 +16,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/launch"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/libs/harness/core/adapters/wrapper"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func main() {

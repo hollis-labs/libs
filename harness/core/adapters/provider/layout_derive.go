@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/layout"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // The built-in adapters derive every path, flag, environment variable and

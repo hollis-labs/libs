@@ -8,7 +8,7 @@ import (
 
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // The k-th marker stands for the k-th queued function, so a consumer that reads the

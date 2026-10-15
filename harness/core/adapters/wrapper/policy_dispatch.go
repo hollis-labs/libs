@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/libs/harness/core/interception/policy"

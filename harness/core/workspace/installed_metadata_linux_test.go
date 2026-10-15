@@ -7,7 +7,7 @@ import (
 	"errors"
 	"github.com/hollis-labs/libs/harness/core/workspace"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"

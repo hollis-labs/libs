@@ -18,7 +18,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 	"github.com/hollis-labs/libs/harness/core/workspace/trust"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 const SchemaVersion = "workspace.v1"

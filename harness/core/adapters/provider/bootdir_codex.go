@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/layout"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // BootDirSpec for the OpenAI Codex CLI.

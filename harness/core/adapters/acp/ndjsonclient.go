@@ -18,7 +18,7 @@ import (
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/libs/harness/core/internal/childoutput"
 	"github.com/hollis-labs/libs/harness/core/internal/closegate"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // ndjsonProtocolVersion is the integer protocolVersion NDJSONBridgeClient sends

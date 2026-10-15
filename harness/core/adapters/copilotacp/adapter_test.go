@@ -6,7 +6,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 func TestAdapter_Name(t *testing.T) {

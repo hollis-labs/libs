@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func TestResolveDefaultsComeFromTheRegistry(t *testing.T) {

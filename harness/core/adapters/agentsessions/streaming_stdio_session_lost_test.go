@@ -19,7 +19,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // These tests run the real Claude streaming adapter against go-providers'

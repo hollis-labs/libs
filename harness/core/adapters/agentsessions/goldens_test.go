@@ -11,7 +11,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func TestGoldenSessionPlant(t *testing.T) {

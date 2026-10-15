@@ -7,8 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmcontracts "github.com/hollis-labs/libs/llm/core/llmcontracts"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // ProviderRuntimeConfig configures a Runtime backed by a

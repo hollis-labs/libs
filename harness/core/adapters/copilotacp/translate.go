@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"
 )

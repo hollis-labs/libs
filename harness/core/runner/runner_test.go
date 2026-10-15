@@ -17,7 +17,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/runner"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // stubAdapter is a minimal CLIAdapter for the e2e test. It parses the

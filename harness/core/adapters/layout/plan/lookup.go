@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Table returns detached rows in authored order.

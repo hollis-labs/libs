@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func TestPrepareRuntime_CodexAuthUsesResolverAndNoAmbientFallback(t *testing.T) {

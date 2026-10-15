@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 type exampleProvider struct{}

@@ -4,7 +4,7 @@ import (
 	"reflect"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Variant names a runtime-specific launch variant: a flag that changes where

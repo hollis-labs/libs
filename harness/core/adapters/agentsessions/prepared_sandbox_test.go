@@ -19,7 +19,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 type preparedShellBootAdapter struct {

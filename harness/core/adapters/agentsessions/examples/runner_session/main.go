@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // echoAdapter is a stand-in CLIAdapter for the example. It treats

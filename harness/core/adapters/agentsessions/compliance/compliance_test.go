@@ -9,7 +9,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions/compliance"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // echoAdapter mirrors the test fixture in the agentsessions package — a

@@ -37,7 +37,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/planting"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/sessionshim"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func main() {

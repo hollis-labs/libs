@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // BudgetViolation represents a detected budget violation.

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // CodexAdapter implements CLIAdapter for the OpenAI Codex CLI.

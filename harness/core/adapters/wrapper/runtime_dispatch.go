@@ -7,7 +7,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Legacy runtime tokens, predating the [adapters.Descriptor]

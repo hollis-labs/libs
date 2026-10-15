@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // validPlanForPrepare returns a plan whose Compile succeeds AND whose

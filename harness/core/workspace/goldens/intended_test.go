@@ -15,7 +15,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // These snapshots write only test scratch. Production render returns a tree;

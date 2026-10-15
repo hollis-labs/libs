@@ -17,7 +17,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	sandboxprofile "github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"

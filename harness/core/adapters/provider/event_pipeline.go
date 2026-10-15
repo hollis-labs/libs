@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
-	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
+	llmcontracts "github.com/hollis-labs/libs/llm/core/llmcontracts"
 )
 
 // EventReactionConfig configures the behavior of the event reaction pipeline.

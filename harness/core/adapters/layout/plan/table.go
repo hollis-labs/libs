@@ -1,7 +1,7 @@
 package plan
 
 import (
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 const discovery = "adapters/provider/testdata/harness-discovery/2026-09-29-claude-2.1.285-codex-0.154.0-opencode-1.18.30.tsv"

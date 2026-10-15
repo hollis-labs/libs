@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 // Launch is already authorized host configuration. Env is the complete child

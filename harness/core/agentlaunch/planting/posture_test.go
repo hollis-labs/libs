@@ -9,7 +9,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"

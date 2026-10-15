@@ -8,7 +8,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"

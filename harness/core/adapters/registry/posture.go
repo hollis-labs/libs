@@ -7,7 +7,7 @@ import (
 	"slices"
 
 	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // ErrNoPostureMapping is returned by a Posture hook, and by

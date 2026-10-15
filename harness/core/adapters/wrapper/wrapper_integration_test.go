@@ -18,7 +18,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/activity"

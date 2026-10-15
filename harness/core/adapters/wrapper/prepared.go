@@ -14,7 +14,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	sandboxprofile "github.com/hollis-labs/libs/harness/core/sandbox"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/activity"
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"

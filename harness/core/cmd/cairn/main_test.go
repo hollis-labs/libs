@@ -21,7 +21,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // These are synthetic resolved observations in private fixtures, not native

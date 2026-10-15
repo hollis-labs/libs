@@ -8,7 +8,7 @@ import (
 	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // ResolvedContent contains frozen renderer output, never a loader or resolver.

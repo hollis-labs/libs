@@ -6,7 +6,7 @@ import (
 
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // translateStreamEvent converts one [llmtypes.StreamEvent] from the

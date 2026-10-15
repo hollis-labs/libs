@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // ScopeViolation represents a detected scope violation.

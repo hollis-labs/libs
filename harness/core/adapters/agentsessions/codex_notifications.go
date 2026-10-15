@@ -6,8 +6,8 @@ import (
 	"unicode/utf8"
 
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // Codex app-server's own phase words for an agent message. Its final answer is

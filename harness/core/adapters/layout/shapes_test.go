@@ -2,7 +2,7 @@ package layout_test
 
 import (
 	"github.com/hollis-labs/libs/harness/core/adapters/layout"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // The launch shapes the tests exercise. Claude print, Codex exec, OpenCode run

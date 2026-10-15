@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/mesh"
+	"github.com/hollis-labs/libs/mesh/core"
 )
 
 func rawController(t *testing.T, h *Host, spec Launch, minor int) (*net.UnixConn, Frame) {

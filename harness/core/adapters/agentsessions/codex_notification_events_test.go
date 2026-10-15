@@ -16,8 +16,8 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // codexCollector records what a session reports on both event surfaces.

@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // Harness configures a compliance run for one Runtime.

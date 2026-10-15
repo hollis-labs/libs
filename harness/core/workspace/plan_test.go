@@ -13,7 +13,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 func planInputs(t *testing.T) (workspace.Spec, workspace.ResolvedContent, workspace.Resources, workspace.Observations) {

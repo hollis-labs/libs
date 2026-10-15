@@ -8,7 +8,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // cliAdapterGlue is the [provider.CLIAdapter] [Adapter.CLIAdapter]

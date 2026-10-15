@@ -7,7 +7,7 @@ import (
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // A turn is a question or an approval only if it ended on the signal. In headless

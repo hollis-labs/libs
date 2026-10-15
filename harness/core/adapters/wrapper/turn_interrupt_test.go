@@ -12,7 +12,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"
 	"github.com/hollis-labs/libs/harness/core/adapters/activity"

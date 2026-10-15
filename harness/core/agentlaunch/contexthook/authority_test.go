@@ -2,7 +2,7 @@ package contexthook
 
 import (
 	"context"
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/internal/workspacetest"
 	"testing"

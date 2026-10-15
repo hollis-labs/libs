@@ -110,7 +110,7 @@ import (
 	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	opencode "github.com/hollis-labs/libs/harness/core/adapters/opencode/nativefiles"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Pin identifies a frozen content registration. Render never resolves it.

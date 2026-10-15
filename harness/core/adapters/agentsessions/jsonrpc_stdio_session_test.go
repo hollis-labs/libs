@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // writeJsonRpcEchoScript drops a shell script that:

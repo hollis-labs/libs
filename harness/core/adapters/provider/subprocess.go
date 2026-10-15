@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 
 	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )

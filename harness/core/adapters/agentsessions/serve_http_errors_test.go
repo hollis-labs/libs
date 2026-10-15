@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // The event shapes below are OpenCode 1.18.33's own: session.error carries

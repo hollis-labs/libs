@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Claude print and bare are one mode with different variants; their

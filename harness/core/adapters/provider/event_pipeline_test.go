@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // TestEventReactionPipelineBasic tests the basic functionality of the event reaction pipeline.

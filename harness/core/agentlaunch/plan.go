@@ -3,7 +3,7 @@ package agentlaunch
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // LaunchPlan is the declarative input to the launch pipeline. A

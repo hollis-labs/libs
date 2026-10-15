@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // finishedMemory is how many finished turn ids a Reducer remembers, so that an

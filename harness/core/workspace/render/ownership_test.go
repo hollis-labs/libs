@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 	"reflect"
 	"testing"
 )

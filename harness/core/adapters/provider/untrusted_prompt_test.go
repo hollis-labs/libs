@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
-	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 )
 
 // Turn text is untrusted: it can come from another agent, a wake or a
