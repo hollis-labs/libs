@@ -74,6 +74,7 @@ func TestValidateRefusesUnsafeOrIncompleteDeclarations(t *testing.T) {
 		{"traversal id", func(m *manifest.Manifest) { m.ID = "../bookmarks" }, "id must"},
 		{"empty segment", func(m *manifest.Manifest) { m.ID = "hollis..bookmarks" }, "id must"},
 		{"name", func(m *manifest.Manifest) { m.Name = " " }, "name is required"},
+		{"kind outside the closed set", func(m *manifest.Manifest) { m.Kind = "adapter" }, "kind must"},
 		{"version", func(m *manifest.Manifest) { m.Version = "v1.2.3" }, "version must"},
 		{"URL credentials", func(m *manifest.Manifest) { m.Repository = "https://token@github.com/repo" }, "repository must"},
 		{"host missing", func(m *manifest.Manifest) { m.Hosts = nil }, "hosts must"},
@@ -245,6 +246,34 @@ func TestDecodeExtensionStrictAndAtomic(t *testing.T) {
 	for _, dst := range []any{nil, nilBlock, block{}, new(string)} {
 		if err := manifest.DecodeExtension(json.RawMessage(`{}`), dst); err == nil {
 			t.Fatal("accepted invalid destination")
+		}
+	}
+}
+
+func TestKindIsOptionalAndClosed(t *testing.T) {
+	for _, kind := range []string{"", manifest.KindConnector, manifest.KindProvider, manifest.KindModule} {
+		m := example()
+		m.Kind = kind
+		var out bytes.Buffer
+		if err := manifest.Encode(&out, m); err != nil {
+			t.Fatalf("kind %q: %v", kind, err)
+		}
+		got, err := manifest.Decode(&out)
+		if err != nil {
+			t.Fatalf("kind %q: %v", kind, err)
+		}
+		if got.Kind != kind {
+			t.Fatalf("kind %q came back as %q", kind, got.Kind)
+		}
+		if kind == "" && strings.Contains(out.String(), `"kind"`) {
+			t.Fatalf("an unset kind must not be written")
+		}
+	}
+	for _, bad := range []string{"adapter", "client", "Connector", " module"} {
+		m := example()
+		m.Kind = bad
+		if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "kind must") {
+			t.Fatalf("kind %q must be refused, got %v", bad, err)
 		}
 	}
 }

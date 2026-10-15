@@ -51,6 +51,7 @@ func (m Manifest) Validate() error {
 	add(m.SchemaVersion == SchemaVersion, fmt.Sprintf("schema_version must be %d", SchemaVersion))
 	add(ValidID(m.ID), "id must contain lowercase alphanumeric segments separated by dots or dashes")
 	add(strings.TrimSpace(m.Name) != "", "name is required")
+	add(m.Kind == "" || ValidKind(m.Kind), `kind must be "connector", "provider" or "module" when set`)
 	add(ValidVersion(m.Version), "version must be SemVer without a leading v")
 	add(m.Protocol == RequiredProtocol, fmt.Sprintf("protocol must be %d", RequiredProtocol))
 	add(m.Runtime == Runtime, `runtime must be "subprocess"`)
