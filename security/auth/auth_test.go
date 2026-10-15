@@ -557,3 +557,16 @@ func TestChain(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOnRequestSeesRequestPrincipalAndEvent(t *testing.T) {
+	var gotPath, gotID, gotAuth string
+	g, err := New(Config{Mode: ModeEnforce, Verifier: NewAPIKeyVerifier(APIKey{Hash: HashKey("k"), ID: "svc/k", Scopes: []string{"*"}}),
+		OnRequest: func(r *http.Request, p Principal, ev Event) { gotPath, gotID, gotAuth = r.URL.Path, p.ID, ev.Authentication }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	do(g.Middleware(okHandler()), "GET", "/x", "Bearer k")
+	if gotPath != "/x" || gotID != "svc/k" || gotAuth != StateVerified {
+		t.Fatalf("got %q %q %q", gotPath, gotID, gotAuth)
+	}
+}

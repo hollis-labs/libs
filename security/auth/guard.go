@@ -37,6 +37,12 @@ type Config struct {
 	Audit    func(Event)       // optional; called for every guarded request
 	Logger   *slog.Logger      // default slog.Default()
 	OpenPath func(string) bool // paths that skip auth; default only "/health"
+	// OnRequest, optional, is called by Middleware (not AuthorizeTool) for every
+	// guarded request, after the decision and before the handler or the error
+	// response, with the request, the principal that will be stamped (zero when
+	// none) and the audit event. It lets an app attach request-scoped audit
+	// without re-parsing the request. Audit, if set, is still called.
+	OnRequest func(*http.Request, Principal, Event)
 }
 
 // Guard applies the mode logic to HTTP requests and MCP tool calls.
@@ -159,6 +165,9 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 		ev := Event{At: time.Now().UTC(), Mode: g.cfg.Mode, Authentication: state, Method: r.Method, Route: routeFamily(r.URL.Path)}
 		p, stamp, status, code := g.decision(p, state, required, unmapped, &ev)
 		g.emit(ev)
+		if g.cfg.OnRequest != nil {
+			g.cfg.OnRequest(r, p, ev)
+		}
 		if status != 0 {
 			writeError(w, status, code, required)
 			return
