@@ -18,16 +18,16 @@ Each module has its own `go.mod`, its own version and its own tags.
 
 | Module | Import path | Scope |
 |---|---|---|
-| `util` | `github.com/hollis-labs/libs/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler and a Tesseract memory API client. |
-| `ui-go` | `github.com/hollis-labs/libs/ui-go` | Streaming and web UI building blocks for Go services: server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
-| `workflow` | `github.com/hollis-labs/libs/workflow` | The workflow engine and its host. |
-| `plugin-mcp` | `github.com/hollis-labs/libs/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
-| `message-pipeline` | `github.com/hollis-labs/libs/message-pipeline` | Portable immutable message stages, bounded annotations/traces and durable store interfaces. |
+| `util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler and a Tesseract memory API client. |
+| `ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Streaming and web UI building blocks for Go services: server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
+| `workflow` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |
+| `plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
+| `message-pipeline` | `github.com/hollis-labs/libs/mesh/pipeline` | Portable immutable message stages, bounded annotations/traces and durable store interfaces. |
 
 Use a module the usual way, once it has a release:
 
 ```sh
-go get github.com/hollis-labs/libs/util@latest
+go get github.com/hollis-labs/libs/core/util@latest
 ```
 
 ## Adopt the consolidated packages
@@ -42,10 +42,10 @@ uses `vX.Y.Z`; the repository tag also includes the module directory.
 
 | Module requirement | Repository tag |
 |---|---|
-| `github.com/hollis-labs/libs/util@v0.2.1` | `util/v0.2.1` |
-| `github.com/hollis-labs/libs/ui-go@v0.1.0` | `ui-go/v0.1.0` |
-| `github.com/hollis-labs/libs/workflow@v0.1.0` | `workflow/v0.1.0` |
-| `github.com/hollis-labs/libs/plugin-mcp@v0.1.1` | `plugin-mcp/v0.1.1` |
+| `github.com/hollis-labs/libs/core/util@v0.2.1` | `util/v0.2.1` |
+| `github.com/hollis-labs/libs/ui/ui-go@v0.1.0` | `ui-go/v0.1.0` |
+| `github.com/hollis-labs/libs/workflow/engine@v0.1.0` | `workflow/v0.1.0` |
+| `github.com/hollis-labs/libs/mcp/plugin-mcp@v0.1.1` | `plugin-mcp/v0.1.1` |
 
 Use a supported toolchain that satisfies the selected modules' Go directives;
 Go 1.26.9 was used for the current app adoptions. Read each selected release's
@@ -58,33 +58,33 @@ suffixes unless the linked migration note gives a more specific rule.
 
 | Old import prefix | New import prefix |
 |---|---|
-| `go-apppaths/paths` | `libs/util/apppaths` (package `paths`) |
-| `go-localdaemon` | `libs/util/localdaemon` |
-| `go-otel` | `libs/util/otel` |
-| `go-queue` | `libs/util/queue` |
-| `go-scheduler` | `libs/util/scheduler` |
-| `go-sftpsync` | `libs/util/sftpsync` |
-| `go-sqlite` | `libs/util/sqlite` |
-| `go-sqlite-backup` | `libs/util/sqlitebackup` |
-| `go-strutil` | `libs/util/strutil` |
-| `go-svcerr` | `libs/util/svcerr` |
-| `go-tesseract-client` | `libs/util/tesseractclient` (package `tesseract`) |
-| `go-transportparity` | `libs/util/transportparity` |
-| `go-worktree` | `libs/util/worktree` |
-| `go-chatstream` | `libs/ui-go/chatstream` |
-| `go-directives` | `libs/ui-go/directives` |
-| `go-envelopes` | `libs/ui-go/envelopes` |
-| `go-ssekit` | `libs/ui-go/ssekit` |
-| `go-streamhub` | `libs/ui-go/streamhub` |
-| `go-webui` | `libs/ui-go/webui` |
-| `go-workflow-host` | `libs/workflow/host` |
-| `go-workflow` | `libs/workflow` |
-| `plugin-sdk` | `libs/plugin-mcp/plugin-sdk` |
-| `plugin-host` | `libs/plugin-mcp/plugin-host` |
-| `mcp-host` | `libs/plugin-mcp/mcp-host` |
-| `go-mcp-sanitize` | `libs/plugin-mcp/go-mcp-sanitize` |
-| `go-mcp` | `libs/plugin-mcp/go-mcp` |
-| `api-projection` | `libs/plugin-mcp/api-projection` |
+| `go-apppaths/paths` | `libs/core/util/apppaths` (package `paths`) |
+| `go-localdaemon` | `libs/core/util/localdaemon` |
+| `go-otel` | `libs/core/util/otel` |
+| `go-queue` | `libs/core/util/queue` |
+| `go-scheduler` | `libs/core/util/scheduler` |
+| `go-sftpsync` | `libs/core/util/sftpsync` |
+| `go-sqlite` | `libs/core/util/sqlite` |
+| `go-sqlite-backup` | `libs/core/util/sqlitebackup` |
+| `go-strutil` | `libs/core/util/strutil` |
+| `go-svcerr` | `libs/core/util/svcerr` |
+| `go-tesseract-client` | `libs/core/util/tesseractclient` (package `tesseract`) |
+| `go-transportparity` | `libs/core/util/transportparity` |
+| `go-worktree` | `libs/core/util/worktree` |
+| `go-chatstream` | `libs/ui/ui-go/chatstream` |
+| `go-directives` | `libs/ui/ui-go/directives` |
+| `go-envelopes` | `libs/ui/ui-go/envelopes` |
+| `go-ssekit` | `libs/ui/ui-go/ssekit` |
+| `go-streamhub` | `libs/ui/ui-go/streamhub` |
+| `go-webui` | `libs/ui/ui-go/webui` |
+| `go-workflow-host` | `libs/workflow/engine/host` |
+| `go-workflow` | `libs/workflow/engine` |
+| `plugin-sdk` | `libs/mcp/plugin-mcp/plugin-sdk` |
+| `plugin-host` | `libs/mcp/plugin-mcp/plugin-host` |
+| `mcp-host` | `libs/mcp/plugin-mcp/mcp-host` |
+| `go-mcp-sanitize` | `libs/mcp/plugin-mcp/go-mcp-sanitize` |
+| `go-mcp` | `libs/mcp/plugin-mcp/go-mcp` |
+| `api-projection` | `libs/mcp/plugin-mcp/api-projection` |
 
 Package clauses can differ from the last path component: keep existing aliases
 and selectors. See the per-package `MIGRATION.md` files, the
@@ -113,9 +113,9 @@ moves; extend it from the tables and per-unit notes, not by inventing a blanket
 scratch=$(mktemp -d)
 cat > "$scratch/imports.json" <<'JSON'
 {
-  "github.com/hollis-labs/plugin-sdk": "github.com/hollis-labs/libs/plugin-mcp/plugin-sdk",
-  "github.com/hollis-labs/plugin-host": "github.com/hollis-labs/libs/plugin-mcp/plugin-host",
-  "github.com/hollis-labs/go-webui": "github.com/hollis-labs/libs/ui-go/webui",
+  "github.com/hollis-labs/plugin-sdk": "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk",
+  "github.com/hollis-labs/plugin-host": "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-host",
+  "github.com/hollis-labs/go-webui": "github.com/hollis-labs/libs/ui/ui-go/webui",
   "github.com/hollis-labs/go-embed-contracts": "github.com/hollis-labs/substrate/llm-core/embedcontracts",
   "github.com/hollis-labs/agent-contracts-leaf": "github.com/hollis-labs/substrate/llm-core/contracts"
 }
@@ -216,8 +216,8 @@ change the contract a test is supposed to exercise. For example,
 Then, **in each affected consumer module**, add only the releases it uses:
 
 ```sh
-GOWORK=off go get github.com/hollis-labs/libs/plugin-mcp@v0.1.1 \
-  github.com/hollis-labs/libs/ui-go@v0.1.0
+GOWORK=off go get github.com/hollis-labs/libs/mcp/plugin-mcp@v0.1.1 \
+  github.com/hollis-labs/libs/ui/ui-go@v0.1.0
 GOWORK=off go mod tidy
 git diff -- go.mod go.sum
 git diff --check
@@ -289,7 +289,7 @@ When a change spans two modules, land it in dependency order, one module at a
 time. For example, when `workflow` needs something new in `util`:
 
 1. Change `util`, merge it, and release it (`util/vX.Y.Z`, see below).
-2. In `workflow`, run `go get github.com/hollis-labs/libs/util@vX.Y.Z`, then make
+2. In `workflow`, run `go get github.com/hollis-labs/libs/core/util@vX.Y.Z`, then make
    the change that uses it.
 
 To try an unreleased change before releasing it, point the consumer at your
@@ -297,9 +297,9 @@ local copy with a `replace`, and drop it again before you commit:
 
 ```sh
 cd workflow
-go mod edit -replace github.com/hollis-labs/libs/util=../util
+go mod edit -replace github.com/hollis-labs/libs/core/util=../util
 # ... work, run scripts/check workflow ...
-go mod edit -dropreplace github.com/hollis-labs/libs/util
+go mod edit -dropreplace github.com/hollis-labs/libs/core/util
 ```
 
 `scripts/check-layout` fails on any committed `replace`, so a forgotten one is

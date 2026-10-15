@@ -1,7 +1,7 @@
 # Checks for the grouped modules (<group>/<module>). One workflow for all of them: the
 # plan job lists the modules a change touches (scripts/changed-modules), then each one
 # runs through _module.yml. A change to scripts/ or to the shared workflows runs them all.
-# The legacy flat modules keep their own workflows (util.yml, ...) until they move.
+
 name: modules
 
 on:

@@ -1,19 +1,19 @@
-# Native scheduler checks; the util workflow remains the full Linux module gate.
+# Native scheduler checks; the core/util module gate in modules.yml remains the full Linux module gate.
 name: scheduler
 
 on:
   push:
     branches: [main]
     paths:
-      - "util/scheduler/**"
-      - "util/go.mod"
-      - "util/go.sum"
+      - "core/util/scheduler/**"
+      - "core/util/go.mod"
+      - "core/util/go.sum"
       - ".github/workflows/scheduler.yml"
   pull_request:
     paths:
-      - "util/scheduler/**"
-      - "util/go.mod"
-      - "util/go.sum"
+      - "core/util/scheduler/**"
+      - "core/util/go.mod"
+      - "core/util/go.sum"
       - ".github/workflows/scheduler.yml"
 
 permissions:
@@ -44,7 +44,7 @@ jobs:
       GOWORK: "off"
     defaults:
       run:
-        working-directory: util
+        working-directory: core/util
         shell: bash
     steps:
       - uses: actions/checkout@v4
@@ -55,10 +55,10 @@ jobs:
           GIT_CONFIG_VALUE_0: "false"
       - uses: actions/setup-go@v5
         with:
-          go-version-file: util/go.mod
+          go-version-file: core/util/go.mod
           cache-dependency-path: |
-            util/go.mod
-            util/go.sum
+            core/util/go.mod
+            core/util/go.sum
       - name: format
         run: |
           unformatted="$(gofmt -l scheduler)"
