@@ -6,9 +6,10 @@ points at it rather than keeping a second copy that drifts.
 
 ## Before your first change
 
-`README.md` explains the modules, the rules and how to work on one module, or
-across two, without a `go.work`. `AGENTS.md` is the fastest orientation to the
-layout and the boundaries that are not obvious from reading the code.
+`README.md` explains the groups, the modules, the rules and how to work on one
+module, or across two, without a `go.work`. `AGENTS.md` is the fastest
+orientation to the layout and the boundaries that are not obvious from reading
+the code.
 
 You need Go (the version in the modules' `go.mod`), `git` and a POSIX shell. For
 importing history you also need
@@ -22,11 +23,15 @@ importing history you also need
 2. **Change one thing, in one module where you can.** Modules are released
    independently, so a branch that touches two of them forces two releases and an
    order. If a change needs both, say so in the description and list the order.
+   Respect the group order (`core` < `security` < `mcp`/`ui`/`workflow`/`llm` <
+   `mesh` < `agent`): a module never imports a higher group or a sibling group.
 3. **Run the checks when the change is done**, not on every commit:
-   `scripts/check <module>` (add `-race` for concurrent code),
-   `scripts/check-layout` and `scripts/check-one-way`.
-4. **Push and open a pull request.** CI runs the touched modules and the repository
-   guards. Do not wait on CI to tell you what the scripts above already said.
+   `scripts/check <group>/<module>` (add `-race` for concurrent code),
+   `scripts/check-layout`, `scripts/check-one-way` and
+   `python3 scripts/scan-public --ref HEAD`.
+4. **Push and open a pull request.** CI plans the touched modules
+   (`modules.yml`) and runs the repository guards (`guards.yml`). Do not wait on
+   CI to tell you what the scripts above already said.
 
 Commit subjects use the conventional-commit shape: a type, an optional scope, a
 colon, then the summary. To see what is actually in use:
@@ -48,26 +53,29 @@ it. A figure nobody can re-derive costs the reviewer more than it saves.
 
 **A pushed tag.** The Go module proxy caches every version it serves, so a tag
 that has been fetched once cannot be reused, moved or withdrawn, only superseded.
-Tags are `<module>/vX.Y.Z` and only a maintainer pushes them.
-`scripts/release` validates a release and prints the tag; it never pushes.
-Write the module's `CHANGELOG.md` section before tagging.
+Tags are `<group>/<module>/vX.Y.Z` (for example `core/util/v0.1.0`) and only a
+maintainer pushes them. `scripts/release` validates a release and prints the
+tag; it never pushes. Write the module's `CHANGELOG.md` section before tagging.
 
 The second thing that cannot be undone is **anything committed to a public
 repository**. Secrets, internal host names, internal addresses and personal paths
-stay in history even after a later commit removes them. Run `scripts/scan-public`
-before you push.
+stay in history even after a later commit removes them. Run
+`scripts/scan-public` before you push, and do not add an allowlist entry to make
+a finding pass without a stated reason.
 
 ## Things that surprise people
 
 - **There is no `go.work`, and a committed `replace` is rejected.** Use a local
-  `replace` while you experiment and drop it before committing (README, "Developing
-  across modules").
-- **Imports keep history.** Bring existing code in with `scripts/import-repo`; do
-  not copy files in. Old tags are not carried, and the imported `go.mod`
-  requirements must be merged at their original versions.
-- **Libs never depend on substrate.** Substrate may depend on `libs`, never the
-  reverse; `scripts/check-one-way` fails on any reference to it. If a lib seems to
-  need something from substrate, the shared part moves down into `libs`.
+  `replace` while you experiment and drop it before committing (README,
+  "Developing across modules").
+- **Groups are folders, not modules.** A `go.mod` lives at
+  `<group>/<module>/go.mod` and nowhere else.
+- **Imports keep history.** Bring existing code in with `scripts/import-repo`
+  (`--module-root` for a whole repository that becomes a module); do not copy
+  files in. Old tags are not carried, and the imported `go.mod` requirements must
+  be merged at their original versions.
+- **Clean break.** No shims, aliases, redirects or deprecation stubs for old
+  module paths; consumers update their imports.
 - **The license file lives at the repository root only.** It covers every module.
 
 ## What this does not cover
