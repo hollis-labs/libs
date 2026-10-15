@@ -14,7 +14,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 func main() {

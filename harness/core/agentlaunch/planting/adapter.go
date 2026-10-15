@@ -3,10 +3,10 @@ package planting
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/matrix"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/matrix"
 )
 
 // AdapterResolver maps a CompiledLaunch to the go-providers adapter whose

@@ -101,15 +101,15 @@ package render
 
 import (
 	"fmt"
-	"github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/interception/permission"
 	"io/fs"
 
-	claude "github.com/hollis-labs/substrate/harness/adapters/claude/nativefiles"
-	codex "github.com/hollis-labs/substrate/harness/adapters/codex/nativefiles"
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
-	opencode "github.com/hollis-labs/substrate/harness/adapters/opencode/nativefiles"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	claude "github.com/hollis-labs/libs/harness/core/adapters/claude/nativefiles"
+	codex "github.com/hollis-labs/libs/harness/core/adapters/codex/nativefiles"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
+	opencode "github.com/hollis-labs/libs/harness/core/adapters/opencode/nativefiles"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

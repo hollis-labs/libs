@@ -3,8 +3,8 @@ package provider
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

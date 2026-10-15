@@ -27,12 +27,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/matrix"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/matrix"
 )
 
 // ErrHeadlessClaudeNeedsPermission is returned by Compile when a claude

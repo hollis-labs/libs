@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 func TestMaterializerAuthorityBeforeRenderer(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

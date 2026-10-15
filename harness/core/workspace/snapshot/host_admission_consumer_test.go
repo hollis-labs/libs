@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 )
 
 // This host deliberately refuses: it is not a production authority issuer.

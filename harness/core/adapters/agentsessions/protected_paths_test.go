@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 // CW-20260930-0237: StartOptions.ProtectedPaths write-protects a host's

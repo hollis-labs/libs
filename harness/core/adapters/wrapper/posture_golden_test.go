@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
 )
 
 var updateNativePosture = flag.Bool("update-native-posture", false, "rewrite testdata/native_empty_posture.json from this tree")

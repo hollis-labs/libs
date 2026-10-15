@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
-	"github.com/hollis-labs/substrate/harness/internal/testgate"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
+	"github.com/hollis-labs/libs/harness/core/internal/testgate"
 )
 
 // TestLiveLaunchEveryInstalledRuntimeThroughSelect is the live counterpart of

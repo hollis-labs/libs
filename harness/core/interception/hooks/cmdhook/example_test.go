@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
-	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
+	hooks "github.com/hollis-labs/libs/harness/core/interception/hooks"
+	"github.com/hollis-labs/libs/harness/core/interception/hooks/cmdhook"
 )
 
 func ExampleRunner_Run() {

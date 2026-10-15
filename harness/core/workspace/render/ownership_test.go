@@ -2,8 +2,8 @@ package render
 
 import (
 	"encoding/json"
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	"reflect"
 	"testing"

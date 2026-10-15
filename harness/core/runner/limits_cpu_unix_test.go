@@ -5,7 +5,7 @@ package runner_test
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/runner"
+	"github.com/hollis-labs/libs/harness/core/runner"
 	"os"
 	"path/filepath"
 	"syscall"

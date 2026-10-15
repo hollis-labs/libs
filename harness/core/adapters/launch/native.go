@@ -3,12 +3,12 @@ package launch
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters"
 )
 
 // nativeSpec is how the wrapper drives one native (runtime, mode): the wire

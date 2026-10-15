@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 // ParseLineEvents implements EventParser for the Claude Code CLI.

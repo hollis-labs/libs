@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
+	hooks "github.com/hollis-labs/libs/harness/core/interception/hooks"
 )
 
 // inputTypes maps each event to a constructor for its *Input type. A missing

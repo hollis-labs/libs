@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/internal/testgate"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/internal/testgate"
 )
 
 // ---------------------------------------------------------------------

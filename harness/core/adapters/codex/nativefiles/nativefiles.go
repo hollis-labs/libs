@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
+	"github.com/hollis-labs/libs/harness/core/adapters/internal/owner"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 )
 
 var serializerOwner = owner.New("codex")

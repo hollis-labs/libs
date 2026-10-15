@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // CW-20261001-0238: Client.call and Prompt write their request under the

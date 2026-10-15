@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 func ownedGuardedConfig(t *testing.T) GuardedConfig {

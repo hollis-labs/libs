@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 // platformCloner uses FICLONE. Support is proved per filesystem pair by a

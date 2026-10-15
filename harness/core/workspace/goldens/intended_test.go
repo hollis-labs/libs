@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
-	"github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/workspace/goldens"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
+	"github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

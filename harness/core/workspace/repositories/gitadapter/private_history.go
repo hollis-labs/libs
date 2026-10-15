@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 const maxPrivateHistoryOIDs = 256

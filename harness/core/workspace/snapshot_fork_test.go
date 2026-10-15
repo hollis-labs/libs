@@ -3,8 +3,8 @@ package workspace
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 	"testing"
 )
 

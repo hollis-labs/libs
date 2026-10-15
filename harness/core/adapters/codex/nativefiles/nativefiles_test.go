@@ -2,7 +2,7 @@ package nativefiles
 
 import (
 	"encoding/json"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	"strings"
 	"testing"
 )

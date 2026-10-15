@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 func existingPinFixture(t *testing.T) (*ports, workspace.LockKey, *heldUnion, pinInode, string) {

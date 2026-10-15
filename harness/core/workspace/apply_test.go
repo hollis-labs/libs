@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 	"io/fs"
 	"os"
 	"path/filepath"

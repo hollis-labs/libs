@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/hollis-labs/substrate/harness/interception/egress"
+	"github.com/hollis-labs/libs/harness/core/interception/egress"
 )
 
 // ExampleResolveAndPin shows the pinning contract: validate every address

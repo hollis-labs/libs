@@ -2,7 +2,7 @@ package agentcomposition
 
 import (
 	"github.com/hollis-labs/substrate/agent/agentcontext"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 // AuthoredRecipe is the app-neutral composition input for callers that want

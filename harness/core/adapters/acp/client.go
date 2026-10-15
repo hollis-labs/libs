@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 // InitializeResult is the validated subset of ACP's initialize response that

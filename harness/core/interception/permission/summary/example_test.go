@@ -3,8 +3,8 @@ package summary_test
 import (
 	"fmt"
 
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/interception/permission/summary"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/interception/permission/summary"
 )
 
 func ExampleRenderPermissionSummary() {

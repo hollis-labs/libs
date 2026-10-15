@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/internal/childoutput"
-	"github.com/hollis-labs/substrate/harness/internal/closegate"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/internal/childoutput"
+	"github.com/hollis-labs/libs/harness/core/internal/closegate"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

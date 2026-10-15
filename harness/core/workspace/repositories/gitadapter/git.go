@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 var errGit = errors.New("repository Git operation refused")

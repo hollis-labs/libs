@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // Apply must refuse on its own when its context does not bind (not rely on the caller's earlier Preflight).

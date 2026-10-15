@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/local"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/local"
 )
 
 type Authorizer func(context.Context, string) (workspace.TreeRequest, workspace.Ports, func() error, error)

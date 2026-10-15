@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // fakeClient is a no-op Client implementation used to prove the

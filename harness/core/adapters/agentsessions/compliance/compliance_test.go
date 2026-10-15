@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
-	"github.com/hollis-labs/substrate/harness/adapters/agentsessions/compliance"
+	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
+	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions/compliance"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

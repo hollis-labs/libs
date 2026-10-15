@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 func TestEarlierUncertainPinSurvivesSuccessfulArtifactOnlyAttempt(t *testing.T) {

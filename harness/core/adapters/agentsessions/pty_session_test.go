@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

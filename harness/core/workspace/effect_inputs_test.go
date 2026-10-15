@@ -3,9 +3,9 @@ package workspace
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace/credentials"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 func credentialPlanInputs(t *testing.T) (Spec, ResolvedContent, Resources, Observations) {

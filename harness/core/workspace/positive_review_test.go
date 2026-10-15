@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 )
 
 func relocateObservations(o *workspace.Observations) {

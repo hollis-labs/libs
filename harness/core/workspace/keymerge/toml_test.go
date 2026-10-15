@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/keymerge"
+	"github.com/hollis-labs/libs/harness/core/workspace/keymerge"
 )
 
 func mergeTOML(t *testing.T, desired, existing string, owned ...keymerge.KeyPath) keymerge.TOMLMerge {

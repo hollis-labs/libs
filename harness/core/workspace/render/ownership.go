@@ -3,9 +3,9 @@ package render
 import (
 	"encoding/json"
 	"errors"
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"slices"
 )
 

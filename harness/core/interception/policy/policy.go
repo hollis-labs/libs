@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // Recommendation names the advisory interpretation of an observed command or

@@ -31,7 +31,7 @@ import (
     "path/filepath"
 
     llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
-    "github.com/hollis-labs/substrate/harness/adapters/provider"
+    "github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 func main() {
@@ -170,7 +170,7 @@ The one list of agent CLI runtimes (Claude Code, Codex, OpenCode, Copilot CLI, P
 In addition to the `<-chan llmtypes.StreamEvent` a bridge's `StreamChat` returns, CLI/PTY bridges can fire a richer typed-event taxonomy when a callback is wired into the spawn context. The two surfaces are parallel: typed events do not replace `StreamEvent`; they augment it with information the legacy union struct can't carry (per-tool `ToolResult`, sub-agent spawn detection, `SubprocessStderr` lines, `Heartbeat` ticks, `PermissionDenied` refusals).
 
 ```go
-import "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+import "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 
 ctx := provider.WithEvents(ctx, func(ev events.Event) {
     switch e := ev.(type) {
@@ -435,7 +435,7 @@ CLI bridges use a two-level abstraction: a `CLIAdapter` (one per CLI tool) defin
 - `github.com/hollis-labs/substrate/llm-core/contracts` — the `runtimes` vocabulary (runtime ids, modes, capabilities).
 - `github.com/hollis-labs/substrate/llm-core/llmcontracts` — the `Provider` interface.
 - `github.com/hollis-labs/substrate/llm-core/llmtypes` — request, message, event and usage types.
-- `github.com/hollis-labs/substrate/harness/interception/permission` — the permission posture `Mode`.
+- `github.com/hollis-labs/libs/harness/core/interception/permission` — the permission posture `Mode`.
 
 ### External (direct)
 
@@ -471,7 +471,7 @@ Tests are pure-Go unit tests. PTY/subprocess tests do not spawn real CLI binarie
 `providertest` gives any test a fake agent CLI that replays what the real one writes, so libraries and apps test against one shared, captured wire format instead of hand-written scripts:
 
 ```go
-import "github.com/hollis-labs/substrate/harness/adapters/providertest"
+import "github.com/hollis-labs/libs/harness/core/adapters/providertest"
 
 fake := providertest.New(t, "claude",
     providertest.Replay("claude/print_turn1"),

@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/claude"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/claude"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // CW-20260930-0137 slice a (root cause of CW-20261001-0019). A native turn

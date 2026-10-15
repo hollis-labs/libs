@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	"github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

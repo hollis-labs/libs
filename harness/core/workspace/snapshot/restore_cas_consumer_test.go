@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
+	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 )
 
 func TestConsumerRestoreCannotUseUnissuedProviderOrReceipt(t *testing.T) {

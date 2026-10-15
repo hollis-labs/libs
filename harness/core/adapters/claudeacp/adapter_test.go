@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 func TestAdapterNameDistinctFromNativeClaude(t *testing.T) {

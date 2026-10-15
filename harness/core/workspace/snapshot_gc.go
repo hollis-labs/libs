@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
+	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 )
 
 type SnapshotGCReason string

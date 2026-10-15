@@ -3,7 +3,7 @@ package nativefiles
 import (
 	"encoding/json"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
+	"github.com/hollis-labs/libs/harness/core/adapters/internal/owner"
 	"testing"
 )
 

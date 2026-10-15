@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

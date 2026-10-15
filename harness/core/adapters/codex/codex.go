@@ -3,9 +3,9 @@ package codex
 import (
 	"errors"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // Adapter is the wrapper adapter for Codex's app-server (JSON-RPC

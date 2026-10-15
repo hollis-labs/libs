@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

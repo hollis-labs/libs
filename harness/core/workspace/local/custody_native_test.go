@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 func custodyFixture(t *testing.T) (*ports, workspace.LockKey, string) {

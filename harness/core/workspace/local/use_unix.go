@@ -12,7 +12,7 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 // heldUnion is private local custody, never a caller-authored proof. The root

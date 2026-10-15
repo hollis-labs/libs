@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/catalog"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/catalog"
 )
 
 // NormalizedPlan is the launch-identity projection both resolution paths

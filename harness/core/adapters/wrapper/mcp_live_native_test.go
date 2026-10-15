@@ -11,17 +11,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/planting"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
-	"github.com/hollis-labs/substrate/harness/internal/testgate"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
+	"github.com/hollis-labs/libs/harness/core/internal/testgate"
 )
 
 // The native half of the CW-20260930-0136 acceptance (see mcp_live_test.go):

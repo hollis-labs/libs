@@ -5,7 +5,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

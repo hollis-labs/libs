@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	sandboxprofile "github.com/hollis-labs/libs/harness/core/sandbox"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/copilotacp"
-	"github.com/hollis-labs/substrate/harness/adapters/opencodeacp"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/copilotacp"
+	"github.com/hollis-labs/libs/harness/core/adapters/opencodeacp"
 )
 
 // CW-20260930-0237: Config.ProtectedPaths write-protects a host's

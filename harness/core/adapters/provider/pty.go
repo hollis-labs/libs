@@ -14,7 +14,7 @@ import (
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
 	"github.com/creack/pty"
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 // PTYBridge is a provider that wraps CLI tools in pseudo-terminals.

@@ -16,7 +16,7 @@ import (
 
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 )
 
 // Fake is a fake CLI binary for one runtime, serving the runs given to

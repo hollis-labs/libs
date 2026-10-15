@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // Adapter is the provider-integration contract. One Adapter instance

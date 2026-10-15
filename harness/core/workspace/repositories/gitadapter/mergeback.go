@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 // TargetRef observes refs/heads/<branch> in the source and whether any source

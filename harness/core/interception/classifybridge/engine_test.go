@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/interception/filters/classify"
-	"github.com/hollis-labs/substrate/harness/interception/policy"
+	"github.com/hollis-labs/libs/harness/core/interception/filters/classify"
+	"github.com/hollis-labs/libs/harness/core/interception/policy"
 )
 
 func TestObserverSatisfiesPolicyObserverInterface(t *testing.T) {

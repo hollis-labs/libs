@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/credentials"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // The provider home is a symlink; it is retargeted (to a lookalike tree) between Preflight and Apply.

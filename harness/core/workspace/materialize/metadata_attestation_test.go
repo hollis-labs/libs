@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/keymerge"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/keymerge"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 // This fixture is SYNTHETIC PRIVATE CONSUMER evidence. It never calls native

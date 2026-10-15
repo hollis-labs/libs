@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"errors"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 // ErrTurnNotStarted means the session can cancel turns but has not yet tracked

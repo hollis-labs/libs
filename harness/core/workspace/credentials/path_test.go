@@ -1,8 +1,8 @@
 package credentials_test
 
 import (
-	"github.com/hollis-labs/substrate/harness/workspace/credentials"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"strings"
 	"testing"
 )

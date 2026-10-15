@@ -7,7 +7,7 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 // agy `--output-format stream-json` line mapping (agy 1.2.7). Each line is

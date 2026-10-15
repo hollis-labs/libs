@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 var ErrRemoteSandboxUnsupported = errors.New("acp: required sandbox policy cannot be verified for remote or pre-existing endpoint")

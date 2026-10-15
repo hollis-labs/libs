@@ -3,17 +3,17 @@ package workspace
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 // Refusal is a path- and content-free, machine-readable preparation failure.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 // Prepare plans before touching host ports, then forwards the complete engine

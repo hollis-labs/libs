@@ -8,9 +8,9 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/runner"
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/runner"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 var (

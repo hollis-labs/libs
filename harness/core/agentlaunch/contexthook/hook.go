@@ -7,8 +7,8 @@ import (
 
 	"github.com/hollis-labs/substrate/agent/agentcontext"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 // New returns an agentlaunch.ContextHook that assembles mechanical

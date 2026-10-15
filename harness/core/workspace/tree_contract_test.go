@@ -1,8 +1,8 @@
 package workspace
 
 import (
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"testing"
 )
 

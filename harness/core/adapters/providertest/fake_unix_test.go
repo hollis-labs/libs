@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 )
 
 // waitForSignal polls the call record until the fake has recorded a

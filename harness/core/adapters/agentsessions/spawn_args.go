@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 // spawnArgs is a spawn's argv after the binary. With a launch template (a

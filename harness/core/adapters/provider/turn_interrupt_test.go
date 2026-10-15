@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 )
 
 var _ TurnInterrupter = (*ClaudeAdapter)(nil)

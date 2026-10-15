@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

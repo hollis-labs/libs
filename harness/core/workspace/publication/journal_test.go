@@ -2,7 +2,7 @@ package publication
 
 import (
 	"encoding/json"
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 	"path/filepath"
 	"strings"
 	"testing"

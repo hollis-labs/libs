@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

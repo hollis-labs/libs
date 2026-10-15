@@ -8,11 +8,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 // Planter lays down per-session boot files into a boot dir the wrapper

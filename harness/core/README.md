@@ -2,7 +2,7 @@
 
 The Cairn library foundation for provider projections, launch preparation,
 sessions and managed workspace artifacts. Import packages from
-`github.com/hollis-labs/substrate/harness` with Go 1.26.9. The module pins
+`github.com/hollis-labs/libs/harness/core` with Go 1.26.9. The module pins
 `llm-core` at v0.1.0 and `mesh` at v0.3.0; it needs no workspace or local replacement.
 
 ## Package boundaries

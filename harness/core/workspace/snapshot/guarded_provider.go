@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 type GuardedConfig struct {

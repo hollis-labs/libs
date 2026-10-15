@@ -3,8 +3,8 @@ package codexacp
 import (
 	"encoding/json"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // handleNotification routes one inbound ACP notification (a JSON-RPC

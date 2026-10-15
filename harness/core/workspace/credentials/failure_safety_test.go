@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // A port whose CreateExclusive creates the link but reports a bare error with no observation.

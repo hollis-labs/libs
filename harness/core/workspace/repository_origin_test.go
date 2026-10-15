@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 func TestRootRepositoryOriginRejectsCoherentSplice(t *testing.T) {

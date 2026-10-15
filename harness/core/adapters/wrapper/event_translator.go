@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

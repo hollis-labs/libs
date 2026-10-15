@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/codex"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/codex"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // CW-20260930-0139: the native Codex app-server path answers Codex's

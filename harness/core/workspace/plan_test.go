@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	claude "github.com/hollis-labs/substrate/harness/adapters/claude/nativefiles"
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	claude "github.com/hollis-labs/libs/harness/core/adapters/claude/nativefiles"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

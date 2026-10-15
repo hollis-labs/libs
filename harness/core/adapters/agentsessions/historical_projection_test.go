@@ -2,8 +2,8 @@ package agentsessions
 
 import (
 	"fmt"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/workspace/goldens"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
 	"path/filepath"
 	"sort"
 )

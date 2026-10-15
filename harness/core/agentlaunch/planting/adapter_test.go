@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 )
 
 func TestDefaultResolver_Claude(t *testing.T) {

@@ -9,7 +9,7 @@ The proxy spawns on `127.0.0.1` (random port by default), exposes its address vi
 Pre-1.0 — API may shift before `v1` (see [CHANGELOG.md](./CHANGELOG.md)), but the security-critical
 behaviours (SSRF guard, CONNECT TLS-port allowlist, hijacked-conn drain on
 `Stop`, `Host`-header scrub) are non-optional and covered by tests. See
-[godoc](https://pkg.go.dev/github.com/hollis-labs/substrate/harness/interception/egress)
+[godoc](https://pkg.go.dev/github.com/hollis-labs/libs/harness/core/interception/egress)
 for the package reference.
 
 ## Install
@@ -28,8 +28,8 @@ import (
     "os"
     "os/exec"
 
-    "github.com/hollis-labs/substrate/harness/interception/egress"
-    // import "github.com/hollis-labs/substrate/harness/sandbox" — see examples/
+    "github.com/hollis-labs/libs/harness/core/interception/egress"
+    // import "github.com/hollis-labs/libs/harness/core/sandbox" — see examples/
 )
 
 func main() {
@@ -79,7 +79,7 @@ import (
     "fmt"
     "net/http"
 
-    "github.com/hollis-labs/substrate/harness/interception/egress"
+    "github.com/hollis-labs/libs/harness/core/interception/egress"
 )
 
 func main() {

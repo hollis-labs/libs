@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 func TestPlanIsDeterministicAndNonMutating(t *testing.T) {

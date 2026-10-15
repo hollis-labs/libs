@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
+	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

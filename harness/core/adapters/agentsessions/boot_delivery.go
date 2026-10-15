@@ -5,7 +5,7 @@ import (
 
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 )
 
 // ClaudeStreamingUserFrame is the NDJSON object Claude Code's streaming stdio

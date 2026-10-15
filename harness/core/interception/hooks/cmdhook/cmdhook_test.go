@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
-	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
+	hooks "github.com/hollis-labs/libs/harness/core/interception/hooks"
+	"github.com/hollis-labs/libs/harness/core/interception/hooks/cmdhook"
 )
 
 // script writes an executable shell script and returns a command hook for it.

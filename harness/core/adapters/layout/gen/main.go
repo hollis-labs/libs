@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 )
 
 const (

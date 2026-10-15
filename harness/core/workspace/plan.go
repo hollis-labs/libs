@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"slices"
 
-	layout "github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/harness/sandbox"
-	"github.com/hollis-labs/substrate/harness/workspace/install"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
+	"github.com/hollis-labs/libs/harness/core/workspace/install"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 type ActionKind string

@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	agy "github.com/hollis-labs/substrate/harness/adapters/antigravity/nativefiles"
-	claude "github.com/hollis-labs/substrate/harness/adapters/claude/nativefiles"
-	codex "github.com/hollis-labs/substrate/harness/adapters/codex/nativefiles"
-	contract "github.com/hollis-labs/substrate/harness/adapters/nativefiles"
-	oc "github.com/hollis-labs/substrate/harness/adapters/opencode/nativefiles"
+	agy "github.com/hollis-labs/libs/harness/core/adapters/antigravity/nativefiles"
+	claude "github.com/hollis-labs/libs/harness/core/adapters/claude/nativefiles"
+	codex "github.com/hollis-labs/libs/harness/core/adapters/codex/nativefiles"
+	contract "github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
+	oc "github.com/hollis-labs/libs/harness/core/adapters/opencode/nativefiles"
 )
 
 func TestTOMLStringBytes(t *testing.T) {

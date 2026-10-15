@@ -3,7 +3,7 @@ package repositories
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 func cloneRequest(requirement CloneRequirement) Request {

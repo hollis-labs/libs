@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 )
 
 // Materialize prepares inactive artifacts under the full planned lock set.

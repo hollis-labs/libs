@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 func TestResourceGrantTupleOrderWithEmbeddedNul(t *testing.T) {

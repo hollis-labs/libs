@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/agentcomposition"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 func TestResolvePreparation_ResolvedCompositionInstallsDocumentsAndArtifacts(t *testing.T) {

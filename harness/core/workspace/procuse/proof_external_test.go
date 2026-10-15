@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/procuse"
+	"github.com/hollis-labs/libs/harness/core/workspace/procuse"
 )
 
 func TestHandBuiltResultIsNotProof(t *testing.T) {

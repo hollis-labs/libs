@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/launch"
-	"github.com/hollis-labs/substrate/harness/adapters/turnoutput"
-	"github.com/hollis-labs/substrate/harness/adapters/wrapper"
-	"github.com/hollis-labs/substrate/harness/internal/testgate"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/launch"
+	"github.com/hollis-labs/libs/harness/core/adapters/turnoutput"
+	"github.com/hollis-labs/libs/harness/core/adapters/wrapper"
+	"github.com/hollis-labs/libs/harness/core/internal/testgate"
 )
 
 // TestLiveEveryInstalledRuntimeReducesOneFinalTurn launches each installed

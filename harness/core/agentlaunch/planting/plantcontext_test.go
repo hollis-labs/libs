@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 )
 
 func TestPlantContextFor_Mapping(t *testing.T) {

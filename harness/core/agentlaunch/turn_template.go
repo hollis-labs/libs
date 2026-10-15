@@ -1,6 +1,6 @@
 package agentlaunch
 
-import "github.com/hollis-labs/substrate/harness/adapters/provider"
+import "github.com/hollis-labs/libs/harness/core/adapters/provider"
 
 // TurnTemplate is a provider's launch convention bound to the roots it was
 // resolved against, with the caller's extra arguments. A prepared launch's

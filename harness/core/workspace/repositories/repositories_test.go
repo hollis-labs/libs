@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 	"testing"
 )
 

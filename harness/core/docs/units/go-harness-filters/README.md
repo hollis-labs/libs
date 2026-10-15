@@ -40,7 +40,7 @@ Module path: `github.com/hollis-labs/go-harness-filters`
 ### Parse a directive
 
 ```go
-import "github.com/hollis-labs/substrate/harness/interception/filters/directive"
+import "github.com/hollis-labs/libs/harness/core/interception/filters/directive"
 
 d, err := directive.Parse(`@fragment:capture kind=decision title="Use Cerberus for Nanite deploys"`)
 if err != nil { /* ... */ }
@@ -53,7 +53,7 @@ if err != nil { /* ... */ }
 ### Classify a command against rules
 
 ```go
-import "github.com/hollis-labs/substrate/harness/interception/filters/classify"
+import "github.com/hollis-labs/libs/harness/core/interception/filters/classify"
 
 rules := classify.NewRuleSet(classify.NaniteDeployRule)
 result := rules.Classify(classify.Input{
@@ -72,8 +72,8 @@ The classifier output feeds wrapper policy via
 
 ```go
 import (
-    "github.com/hollis-labs/substrate/harness/interception/classifybridge"
-    "github.com/hollis-labs/substrate/harness/interception/filters/classify"
+    "github.com/hollis-labs/libs/harness/core/interception/classifybridge"
+    "github.com/hollis-labs/libs/harness/core/interception/filters/classify"
 )
 
 rules  := classify.NewRuleSet(classify.NaniteDeployRule)

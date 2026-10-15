@@ -9,13 +9,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
-	"github.com/hollis-labs/substrate/harness/adapters/nativefiles"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	"github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 func TestParseCodexStreamLine_Empty(t *testing.T) {

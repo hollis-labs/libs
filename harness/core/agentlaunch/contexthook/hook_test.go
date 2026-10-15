@@ -12,8 +12,8 @@ import (
 	"github.com/hollis-labs/substrate/agent/agentcontext/resolvers"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/contexthook"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/contexthook"
 )
 
 // newCompiled builds a minimal CompiledLaunch suitable for driving the

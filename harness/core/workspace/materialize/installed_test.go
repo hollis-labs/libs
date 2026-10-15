@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 func TestInstalledExistingUserDirectoryIsTraversalNotOwnership(t *testing.T) {

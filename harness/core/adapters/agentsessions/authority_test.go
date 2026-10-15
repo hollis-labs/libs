@@ -2,9 +2,9 @@ package agentsessions
 
 import (
 	"context"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/internal/workspacetest"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/internal/workspacetest"
 	"path/filepath"
 	"testing"
 )

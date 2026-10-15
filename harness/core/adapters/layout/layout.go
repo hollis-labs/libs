@@ -3,7 +3,7 @@ package layout
 import (
 	"reflect"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

@@ -5,9 +5,9 @@ package workspace_test
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 	"os"
 	"path/filepath"
 	"slices"

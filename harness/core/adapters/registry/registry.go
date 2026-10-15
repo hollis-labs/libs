@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

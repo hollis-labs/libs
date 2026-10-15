@@ -1,6 +1,6 @@
 package adapters
 
-import "github.com/hollis-labs/substrate/harness/adapters/provider"
+import "github.com/hollis-labs/libs/harness/core/adapters/provider"
 
 // RuntimeAdapter is an optional [Adapter] capability that exposes the
 // go-providers CLIAdapter the wrapper hands to

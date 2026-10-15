@@ -15,7 +15,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 )
 
 const Version = "workspace.publication.v1"

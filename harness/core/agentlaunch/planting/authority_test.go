@@ -3,9 +3,9 @@ package planting
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/internal/workspacetest"
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/internal/workspacetest"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 	"os"
 	"testing"
 )

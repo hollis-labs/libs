@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 	"io/fs"
 	"path/filepath"
 	"reflect"
@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 type publicationAdapterPorts struct {

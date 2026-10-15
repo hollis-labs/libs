@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
+	hooks "github.com/hollis-labs/libs/harness/core/interception/hooks"
 )
 
 // BlockExitCode is the exit code that signals an intentional block.

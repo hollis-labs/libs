@@ -5,9 +5,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/interception/filters"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/interception/filters"
 )
 
 // streamWriter is an io.Writer that surfaces a child-process byte

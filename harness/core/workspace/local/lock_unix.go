@@ -5,7 +5,7 @@ package local
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 	"io/fs"
 	"os"
 	"sync"

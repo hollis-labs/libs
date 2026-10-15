@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 type platformCloner struct{}

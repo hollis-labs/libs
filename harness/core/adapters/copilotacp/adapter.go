@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 // ErrPTYUnsupported is returned by [Adapter.Resolve] when the caller

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	hrepair "github.com/hollis-labs/substrate/harness/interception/filters/repair"
+	hrepair "github.com/hollis-labs/libs/harness/core/interception/filters/repair"
 )
 
 func TestRepairPipelineAppliesNonSemanticRepair(t *testing.T) {

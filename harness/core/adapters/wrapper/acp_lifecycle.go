@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	sandboxprofile "github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	sandboxprofile "github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 func (w *Wrapper) runACP(

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 const PinCreationVersion = "workspace.pin.creation.v1"

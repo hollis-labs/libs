@@ -3,10 +3,10 @@ package copilotacp
 import (
 	"encoding/json"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
 )
 
 // acpUpdate is the normalized, output-agnostic result of parsing one

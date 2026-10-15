@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 func TestResolveAccessPolicy_Table(t *testing.T) {

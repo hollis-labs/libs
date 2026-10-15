@@ -1,7 +1,7 @@
 # Interception hooks
 
 The historical `go-hooks` implementation now lives in the published
-`github.com/hollis-labs/substrate/harness` module. Its source history is preserved.
+`github.com/hollis-labs/libs/harness/core` module. Its source history is preserved.
 See [MIGRATION.md](MIGRATION.md) for import changes and the separate
 `plugin-hooks` catalog engine.
 
@@ -36,7 +36,7 @@ before relying on them for a real integration):
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/harness@v0.4.0
+go get github.com/hollis-labs/libs/harness/core@v0.4.0
 ```
 
 ## Usage
@@ -54,8 +54,8 @@ import (
 	"log"
 	"time"
 
-	hooks "github.com/hollis-labs/substrate/harness/interception/hooks"
-	"github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook"
+	hooks "github.com/hollis-labs/libs/harness/core/interception/hooks"
+	"github.com/hollis-labs/libs/harness/core/interception/hooks/cmdhook"
 )
 
 func main() {

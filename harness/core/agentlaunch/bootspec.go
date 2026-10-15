@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

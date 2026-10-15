@@ -11,8 +11,8 @@ import (
 
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 )
 
 var updateEmptyPosture = flag.Bool("update-empty-posture", false, "rewrite testdata/empty_posture.json from this tree")

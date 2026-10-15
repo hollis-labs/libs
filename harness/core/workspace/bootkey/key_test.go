@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/bootkey"
+	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 )
 
 func TestEncodeReadableExactIdentity(t *testing.T) {

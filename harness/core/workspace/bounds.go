@@ -1,7 +1,7 @@
 package workspace
 
 import (
-	"github.com/hollis-labs/substrate/harness/workspace/render"
+	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"reflect"
 	"strings"
 	"time"

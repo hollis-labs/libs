@@ -1,4 +1,4 @@
-module github.com/hollis-labs/substrate/harness
+module github.com/hollis-labs/libs/harness/core
 
 go 1.26.9
 

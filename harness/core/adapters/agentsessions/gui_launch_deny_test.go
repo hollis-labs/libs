@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 func TestDenyGUILaunch_OffIsANoOp(t *testing.T) {

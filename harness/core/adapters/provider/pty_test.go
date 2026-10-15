@@ -10,7 +10,7 @@ import (
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 )
 
 func TestNewPTYBridge_NilWhenMissing(t *testing.T) {

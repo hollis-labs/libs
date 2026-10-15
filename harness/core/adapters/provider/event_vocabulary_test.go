@@ -7,8 +7,8 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 )
 
 // CW-20260930-0137 (event vocabulary), CW-20260930-0228 (block boundaries,

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace/snapshot"
+	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 	"github.com/hollis-labs/substrate/mesh"
 )
 

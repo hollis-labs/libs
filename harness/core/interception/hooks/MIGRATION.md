@@ -1,17 +1,17 @@
 # Import migration
 
 The preserved eleven-event hooks contract is part of
-`github.com/hollis-labs/substrate/harness` starting at v0.4.0.
+`github.com/hollis-labs/libs/harness/core` starting at v0.4.0.
 
 ```sh
-go get github.com/hollis-labs/substrate/harness@v0.4.0
+go get github.com/hollis-labs/libs/harness/core@v0.4.0
 ```
 
 | Previous import | Published import |
 |---|---|
-| `github.com/hollis-labs/go-hooks` | `github.com/hollis-labs/substrate/harness/interception/hooks` |
-| `github.com/hollis-labs/go-hooks/cmdhook` | `github.com/hollis-labs/substrate/harness/interception/hooks/cmdhook` |
-| `github.com/hollis-labs/go-hooks/conformance` | `github.com/hollis-labs/substrate/harness/interception/hooks/conformance` |
+| `github.com/hollis-labs/go-hooks` | `github.com/hollis-labs/libs/harness/core/interception/hooks` |
+| `github.com/hollis-labs/go-hooks/cmdhook` | `github.com/hollis-labs/libs/harness/core/interception/hooks/cmdhook` |
+| `github.com/hollis-labs/go-hooks/conformance` | `github.com/hollis-labs/libs/harness/core/interception/hooks/conformance` |
 
 Update imports and remove the old module requirement when it is unused.
 The contract, command runner and fixtures retain their existing behavior.

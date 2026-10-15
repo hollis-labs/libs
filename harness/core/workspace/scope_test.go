@@ -1,7 +1,7 @@
 package workspace_test
 
 import (
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 	"path/filepath"
 	"testing"
 )

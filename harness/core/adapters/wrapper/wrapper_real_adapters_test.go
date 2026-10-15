@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/claude"
-	"github.com/hollis-labs/substrate/harness/adapters/codex"
-	"github.com/hollis-labs/substrate/harness/adapters/opencode"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/claude"
+	"github.com/hollis-labs/libs/harness/core/adapters/codex"
+	"github.com/hollis-labs/libs/harness/core/adapters/opencode"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // ---------------------------------------------------------------------

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

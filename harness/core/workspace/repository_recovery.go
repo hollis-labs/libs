@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 // Only nonsecret attachment evidence for this original request is acceptable.

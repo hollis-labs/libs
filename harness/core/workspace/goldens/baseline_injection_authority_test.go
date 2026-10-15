@@ -2,8 +2,8 @@ package goldens_test
 
 import (
 	"context"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/internal/workspacetest"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/internal/workspacetest"
 	"testing"
 )
 

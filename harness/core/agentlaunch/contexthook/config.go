@@ -3,7 +3,7 @@ package contexthook
 import (
 	"github.com/hollis-labs/substrate/agent/agentcontext"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 )
 
 // Config tunes the contexthook adapter. The zero value is a no-op hook:

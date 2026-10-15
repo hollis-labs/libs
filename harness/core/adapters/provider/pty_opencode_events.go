@@ -7,7 +7,7 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 // opencode `run --format json` line mapping (opencode 1.18.30):

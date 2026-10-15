@@ -1,6 +1,6 @@
 # Filesystem snapshots
 
-Import `github.com/hollis-labs/substrate/harness/workspace/snapshot`.
+Import `github.com/hollis-labs/libs/harness/core/workspace/snapshot`.
 This leaf preserves the six historical `go-agent-wrapper/snapshot` source,
 fixture and benchmark files with their history. It has no workspace-root or
 application dependency. Existing `harness/sandbox/snapshot` callers remain

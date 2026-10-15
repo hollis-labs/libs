@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 func TestBridgeBindsIdentity(t *testing.T) {

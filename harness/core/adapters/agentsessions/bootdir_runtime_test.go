@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

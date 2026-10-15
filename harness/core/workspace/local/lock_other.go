@@ -5,7 +5,7 @@ package local
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 func (p *ports) acquireFile(context.Context, string) (workspace.HeldLock, error) {

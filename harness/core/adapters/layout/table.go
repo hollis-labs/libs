@@ -3,7 +3,7 @@ package layout
 import (
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/layout/plan"
+	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 )
 
 // compatibilityTable is a mechanical view of the sole authored plan table.

@@ -13,8 +13,8 @@ imports the other. The module has no dependencies beyond the Go standard library
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/harness/sandbox/pathsafe
-go get github.com/hollis-labs/substrate/harness/sandbox/atomicfile
+go get github.com/hollis-labs/libs/harness/core/sandbox/pathsafe
+go get github.com/hollis-labs/libs/harness/core/sandbox/atomicfile
 ```
 
 ## pathsafe
@@ -33,7 +33,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hollis-labs/substrate/harness/sandbox/pathsafe"
+	"github.com/hollis-labs/libs/harness/core/sandbox/pathsafe"
 )
 
 func main() {
@@ -68,7 +68,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/substrate/harness/sandbox/atomicfile"
+	"github.com/hollis-labs/libs/harness/core/sandbox/atomicfile"
 )
 
 func main() {

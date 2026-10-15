@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

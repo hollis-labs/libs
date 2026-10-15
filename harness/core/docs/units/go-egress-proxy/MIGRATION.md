@@ -1,19 +1,19 @@
 # Migration: go-egress-proxy -> substrate/harness
 
-`github.com/hollis-labs/go-egress-proxy` moved into the substrate monorepo as packages of the `github.com/hollis-labs/substrate/harness` module, with its full git history (19 commits, 2026-04-27 to 2026-10-01; source HEAD `d19eb7563585`). Every package sits at its final home in the harness layout; the standalone module is no longer where new work happens.
+`github.com/hollis-labs/go-egress-proxy` moved into the substrate monorepo as packages of the `github.com/hollis-labs/libs/harness/core` module, with its full git history (19 commits, 2026-04-27 to 2026-10-01; source HEAD `d19eb7563585`). Every package sits at its final home in the harness layout; the standalone module is no longer where new work happens.
 
 ## Import paths
 
 | Old import path | New import path | Package |
 |---|---|---|
-| `github.com/hollis-labs/go-egress-proxy/egress` | `github.com/hollis-labs/substrate/harness/interception/egress` | `egress` |
-| `github.com/hollis-labs/go-egress-proxy/examples/sandbox_integration` | `github.com/hollis-labs/substrate/harness/interception/egress/examples/sandbox_integration` |  (command) |
+| `github.com/hollis-labs/go-egress-proxy/egress` | `github.com/hollis-labs/libs/harness/core/interception/egress` | `egress` |
+| `github.com/hollis-labs/go-egress-proxy/examples/sandbox_integration` | `github.com/hollis-labs/libs/harness/core/interception/egress/examples/sandbox_integration` |  (command) |
 
-`go get github.com/hollis-labs/substrate/harness@<version>` replaces `go get github.com/hollis-labs/go-egress-proxy@<version>`; the new module is `github.com/hollis-labs/substrate/harness`.
+`go get github.com/hollis-labs/libs/harness/core@<version>` replaces `go get github.com/hollis-labs/go-egress-proxy@<version>`; the new module is `github.com/hollis-labs/libs/harness/core`.
 
 ## What changed
 
-- **Module.** The code is now part of the `github.com/hollis-labs/substrate/harness` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4) were not carried over; no `harness/vX.Y.Z` tag exists yet.
+- **Module.** The code is now part of the `github.com/hollis-labs/libs/harness/core` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4) were not carried over; no `harness/vX.Y.Z` tag exists yet.
 - **Placement.** Each package is at the home ADR 0055 gives it. No package clause was renamed, so no importer needs an alias for the move. Examples and fixtures sit next to the package they exercise. The old repository's own files (README, AGENTS.md, CHANGELOG.md, LICENSE, ROADMAP and docs) are in this directory.
 - **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages, the history in `CHANGELOG.md` and prose that still describes the standalone repository are left as written.
 - **Layout.** The old module's root held no Go package; `egress` is now `harness/interception/egress/`.

@@ -33,12 +33,12 @@ Production-shaped schema with:
 See [ROADMAP.md](./ROADMAP.md) for deferred scope.
 
 Module path: `github.com/hollis-labs/go-runtime-events`
-Library package: `github.com/hollis-labs/substrate/harness/adapters/runtimeevents`
+Library package: `github.com/hollis-labs/libs/harness/core/adapters/runtimeevents`
 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/harness/adapters/runtimeevents
+go get github.com/hollis-labs/libs/harness/core/adapters/runtimeevents
 ```
 
 ## Producing events
@@ -46,7 +46,7 @@ go get github.com/hollis-labs/substrate/harness/adapters/runtimeevents
 ```go
 import (
     "context"
-    "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+    "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 em := &runtimeevents.Emitter{

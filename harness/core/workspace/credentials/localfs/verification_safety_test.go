@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/credentials"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // replaceLinkNewInode swaps a symlink for another one with the SAME target and a DIFFERENT inode.

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/runner"
+	"github.com/hollis-labs/libs/harness/core/runner"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

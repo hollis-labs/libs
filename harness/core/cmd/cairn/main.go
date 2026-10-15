@@ -16,7 +16,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/boot"
+	"github.com/hollis-labs/libs/harness/core/boot"
 )
 
 const maxResolvedBytes = 32 << 20

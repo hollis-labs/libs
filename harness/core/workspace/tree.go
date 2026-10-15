@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 // TreeRequest is an explicitly authorized artifact-only request. It carries no

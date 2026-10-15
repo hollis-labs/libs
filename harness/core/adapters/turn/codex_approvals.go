@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	agentsessions "github.com/hollis-labs/substrate/harness/adapters/agentsessions"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	agentsessions "github.com/hollis-labs/libs/harness/core/adapters/agentsessions"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 )
 
 // Codex app-server approval requests. For an action its approval policy

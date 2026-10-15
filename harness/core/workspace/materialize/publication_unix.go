@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 func preflightPublicationCustody(context.Context, PublishRequest) (*publicationCustody, error) {

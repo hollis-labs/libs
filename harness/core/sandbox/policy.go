@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/sandbox/pathsafe"
+	"github.com/hollis-labs/libs/harness/core/sandbox/pathsafe"
 )
 
 // ConfinementMode declares whether OS confinement is mandatory or explicitly

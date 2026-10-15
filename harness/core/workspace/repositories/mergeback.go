@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // MergeBackPort transfers a clone attachment's branch into its source

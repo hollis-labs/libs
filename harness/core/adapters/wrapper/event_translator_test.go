@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
 )
 
 func TestTranslateDelta(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/interception/filters"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/interception/filters"
 )
 
 func (w *Wrapper) filterStreamEvent(ctx context.Context, ev llmtypes.StreamEvent) llmtypes.StreamEvent {

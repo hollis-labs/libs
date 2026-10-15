@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/interception/permission/pathgrants"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/interception/permission/pathgrants"
 )
 
 // TestRenderPermissionSummary_EmptyInputProducesEmptyOutput asserts that an

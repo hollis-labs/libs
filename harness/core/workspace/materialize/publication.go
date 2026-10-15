@@ -5,7 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 // PublishRequest is a closed operation: the concrete engine may only move the

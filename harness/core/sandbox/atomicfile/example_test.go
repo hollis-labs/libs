@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hollis-labs/substrate/harness/sandbox/atomicfile"
+	"github.com/hollis-labs/libs/harness/core/sandbox/atomicfile"
 )
 
 func ExampleWriteFile() {

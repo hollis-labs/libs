@@ -22,7 +22,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace"
 )
 
 // Options is specific to one operation and its resolved resource set. The

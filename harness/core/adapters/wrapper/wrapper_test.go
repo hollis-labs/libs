@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
 )
 
 // stubAdapter implements [adapters.Adapter] but NOT

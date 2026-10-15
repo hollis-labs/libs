@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/workspace/trust"
+	"github.com/hollis-labs/libs/harness/core/workspace/trust"
 )
 
 const configName = ".claude.json"

@@ -3,7 +3,7 @@ package contexthook
 import (
 	"context"
 	"github.com/hollis-labs/substrate/agent/agentcontext"
-	"github.com/hollis-labs/substrate/harness/workspace/goldens"
+	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
 	"os"
 	"path/filepath"
 	"testing"

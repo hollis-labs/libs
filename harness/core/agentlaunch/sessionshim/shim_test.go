@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

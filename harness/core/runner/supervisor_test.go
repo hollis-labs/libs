@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/runner"
+	"github.com/hollis-labs/libs/harness/core/runner"
 )
 
 func TestSupervisor_IdleKill(t *testing.T) {

@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/acp"
-	"github.com/hollis-labs/substrate/harness/adapters/activity"
-	"github.com/hollis-labs/substrate/harness/adapters/claude"
-	"github.com/hollis-labs/substrate/harness/adapters/claudeacp"
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
-	"github.com/hollis-labs/substrate/harness/adapters/wrapper"
-	"github.com/hollis-labs/substrate/harness/internal/testgate"
+	"github.com/hollis-labs/libs/harness/core/adapters/acp"
+	"github.com/hollis-labs/libs/harness/core/adapters/activity"
+	"github.com/hollis-labs/libs/harness/core/adapters/claude"
+	"github.com/hollis-labs/libs/harness/core/adapters/claudeacp"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/harness/core/adapters/wrapper"
+	"github.com/hollis-labs/libs/harness/core/internal/testgate"
 )
 
 // ---------------------------------------------------------------------

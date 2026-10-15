@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

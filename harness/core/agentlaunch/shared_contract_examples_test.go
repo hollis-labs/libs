@@ -3,10 +3,10 @@ package agentlaunch_test
 import (
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/agentcomposition"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
 
 func TestSharedMaterializationContractsCoverEntrypoints(t *testing.T) {

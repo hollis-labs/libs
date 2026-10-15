@@ -3,10 +3,10 @@ package agentlaunch
 import (
 	"errors"
 
-	"github.com/hollis-labs/substrate/harness/agentcomposition"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize/artifact"
+	"github.com/hollis-labs/libs/harness/core/agentcomposition"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

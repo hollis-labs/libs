@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/provider/events"
-	"github.com/hollis-labs/substrate/harness/adapters/providertest"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider/events"
+	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )

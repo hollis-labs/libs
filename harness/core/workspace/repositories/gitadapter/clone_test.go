@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
 )
 
 // fixtureCloner is a plain byte copy for disposable test fixtures. It reports

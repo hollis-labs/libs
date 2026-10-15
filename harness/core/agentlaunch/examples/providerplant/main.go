@@ -33,10 +33,10 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/planting"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/sessionshim"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/planting"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/sessionshim"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 )
 

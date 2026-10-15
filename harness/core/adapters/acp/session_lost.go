@@ -1,7 +1,7 @@
 package acp
 
 import (
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 // SessionLoadUnsupportedReason is the session.lost reason for a launch that

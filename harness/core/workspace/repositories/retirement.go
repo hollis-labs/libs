@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
 )
 
 // Retirement requires separately authorized shipped-HEAD and unused-resource

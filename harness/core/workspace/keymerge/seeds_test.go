@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/workspace/keymerge"
+	"github.com/hollis-labs/libs/harness/core/workspace/keymerge"
 )
 
 // The archived installed-refresh seeds pin what the installer did to a

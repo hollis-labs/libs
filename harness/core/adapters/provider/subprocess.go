@@ -13,7 +13,7 @@ import (
 
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 
-	pevents "github.com/hollis-labs/substrate/harness/adapters/provider/events"
+	pevents "github.com/hollis-labs/libs/harness/core/adapters/provider/events"
 )
 
 // SubprocessBridge is a provider that wraps CLI tools using standard pipes

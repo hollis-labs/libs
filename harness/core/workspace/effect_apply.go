@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/workspace/credentials"
-	"github.com/hollis-labs/substrate/harness/workspace/effects"
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
-	"github.com/hollis-labs/substrate/harness/workspace/repositories"
-	"github.com/hollis-labs/substrate/harness/workspace/trust"
+	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
+	"github.com/hollis-labs/libs/harness/core/workspace/effects"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/repositories"
+	"github.com/hollis-labs/libs/harness/core/workspace/trust"
 )
 
 type preparedEffects struct {

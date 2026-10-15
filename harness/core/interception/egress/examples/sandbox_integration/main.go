@@ -13,7 +13,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/interception/egress"
+	"github.com/hollis-labs/libs/harness/core/interception/egress"
 )
 
 // applySandbox is a placeholder for go-sandbox.Apply. In real consumer

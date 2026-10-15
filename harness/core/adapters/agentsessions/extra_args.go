@@ -3,7 +3,7 @@ package agentsessions
 import (
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 // adapterArgs is an adapter's argv for one turn with extra added. An adapter

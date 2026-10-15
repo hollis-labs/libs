@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 )
 
 // Publication returns a detached desired request, never a custody capability or

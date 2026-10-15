@@ -2,7 +2,7 @@ package workspace
 
 import (
 	"encoding/hex"
-	"github.com/hollis-labs/substrate/harness/workspace/publication"
+	"github.com/hollis-labs/libs/harness/core/workspace/publication"
 	"slices"
 )
 

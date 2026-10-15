@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 )
 
 // notifyPipe reports entry to Write before using the real pollable stdin pipe.

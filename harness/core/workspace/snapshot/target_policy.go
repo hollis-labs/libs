@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 // ErrCoverageUnsupported means required content scope cannot be represented

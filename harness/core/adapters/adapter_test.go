@@ -3,7 +3,7 @@ package adapters
 import (
 	"testing"
 
-	runtimeevents "github.com/hollis-labs/substrate/harness/adapters/runtimeevents"
+	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 )
 
 type fakeAdapter struct{}

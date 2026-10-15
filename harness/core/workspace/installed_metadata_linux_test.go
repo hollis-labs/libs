@@ -5,8 +5,8 @@ package workspace_test
 import (
 	"context"
 	"errors"
-	"github.com/hollis-labs/substrate/harness/workspace"
-	"github.com/hollis-labs/substrate/harness/workspace/materialize"
+	"github.com/hollis-labs/libs/harness/core/workspace"
+	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 	"golang.org/x/sys/unix"
 	"os"

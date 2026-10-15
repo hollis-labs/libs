@@ -6,13 +6,13 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters"
 )
 
 // ErrPostureConflict is returned by [Wrapper.Run] when Config.PermissionPosture

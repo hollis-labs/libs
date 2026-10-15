@@ -19,7 +19,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/hollis-labs/substrate/harness/adapters/internal/owner"
+	"github.com/hollis-labs/libs/harness/core/adapters/internal/owner"
 	"sort"
 	"strings"
 )

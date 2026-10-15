@@ -3,8 +3,8 @@ package planting
 import (
 	"context"
 
-	"github.com/hollis-labs/substrate/harness/agentlaunch"
-	"github.com/hollis-labs/substrate/harness/agentlaunch/launcher"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch/launcher"
 )
 
 // prepareAndPlantConfig collects the two option families PrepareAndPlant

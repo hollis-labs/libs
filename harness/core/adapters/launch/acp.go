@@ -3,12 +3,12 @@ package launch
 import (
 	"github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
 
-	"github.com/hollis-labs/substrate/harness/adapters"
-	"github.com/hollis-labs/substrate/harness/adapters/claudeacp"
-	"github.com/hollis-labs/substrate/harness/adapters/codexacp"
-	"github.com/hollis-labs/substrate/harness/adapters/copilotacp"
-	"github.com/hollis-labs/substrate/harness/adapters/opencodeacp"
-	"github.com/hollis-labs/substrate/harness/adapters/piacp"
+	"github.com/hollis-labs/libs/harness/core/adapters"
+	"github.com/hollis-labs/libs/harness/core/adapters/claudeacp"
+	"github.com/hollis-labs/libs/harness/core/adapters/codexacp"
+	"github.com/hollis-labs/libs/harness/core/adapters/copilotacp"
+	"github.com/hollis-labs/libs/harness/core/adapters/opencodeacp"
+	"github.com/hollis-labs/libs/harness/core/adapters/piacp"
 )
 
 // acpFactories is every ACP (runtime, mode) the wrapper launches. Binary is

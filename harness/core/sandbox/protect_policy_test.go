@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/sandbox"
+	"github.com/hollis-labs/libs/harness/core/sandbox"
 )
 
 // CW-20260930-0237: write-protected control-plane paths.

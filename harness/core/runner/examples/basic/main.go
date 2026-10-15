@@ -26,8 +26,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/hollis-labs/substrate/harness/adapters/provider"
-	"github.com/hollis-labs/substrate/harness/runner"
+	"github.com/hollis-labs/libs/harness/core/adapters/provider"
+	"github.com/hollis-labs/libs/harness/core/runner"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/harness/adapters/registry"
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	"github.com/hollis-labs/libs/harness/core/adapters/registry"
+	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 )
 
 // A posture's flags go at the convention's extra-argument slot, so in every
