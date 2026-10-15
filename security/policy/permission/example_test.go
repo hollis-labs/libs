@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	permission "github.com/hollis-labs/substrate/harness/interception/permission"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 func ExampleEngine_Check() {
