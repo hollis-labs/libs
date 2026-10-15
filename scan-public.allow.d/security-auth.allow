@@ -1,0 +1,5 @@
+# go-auth import (security/auth): bind-address validation fixtures and docs; owner-reviewed 2026-10-15; no real hosts.
+internal-ip security/auth/mode.go The standard tailnet address range that defines the bind rule; not a real host.
+internal-ip security/auth/README.md Documents the accepted tailnet bind range.
+internal-ip security/auth/auth_test.go Made-up bind-address inputs for the ValidateBind table test, accepted and rejected cases.
+tailscale-host security/auth/auth_test.go Placeholder tailnet hostname used as a bind-address test input.
