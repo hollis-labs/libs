@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## v0.3.0 — 2026-10-15
+
+- Module path is now `github.com/hollis-labs/libs/core/forums` (was `github.com/hollis-labs/go-forums`); the standalone repository and its `v0.1.0`/`v0.2.0` tags are retired. Tags are `core/forums/vX.Y.Z`.
 
 - Categories and boards support editable `sort_order` via HTTP/MCP, with stable ordered pagination and optional positioning on board move/clone.
 
