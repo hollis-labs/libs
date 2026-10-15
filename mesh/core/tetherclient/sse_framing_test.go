@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/hollis-labs/go-ssekit"
+	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 

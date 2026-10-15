@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hollis-labs/go-ssekit"
+	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 )
 
 func (c *Client) AIChatStream(ctx context.Context, req ChatRequest) (<-chan AIStreamEvent, <-chan error, error) {

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
+	"github.com/hollis-labs/libs/llm/core/contracts/capabilities"
 	agentdef "github.com/hollis-labs/libs/mesh/core/agentdefv1"
 )
 
