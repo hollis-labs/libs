@@ -8,6 +8,8 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
 ### Added
 
 - `manifest.Manifest.Kind` (`connector`, `provider`, `module`; optional, closed set) with `manifest.ValidKind` and the `KindConnector`, `KindProvider` and `KindModule` constants. An unset kind is not written, so existing manifests and golden vectors are unchanged.
