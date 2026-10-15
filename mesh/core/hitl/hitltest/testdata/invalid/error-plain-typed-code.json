@@ -1,0 +1,9 @@
+{
+  "def": "HITLPlainErrorV1",
+  "name": "error-plain-typed-code",
+  "rejects_because": "/code",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "stale_revision"
+  }
+}

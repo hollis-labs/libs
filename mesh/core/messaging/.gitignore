@@ -1,0 +1,19 @@
+# Go
+*.test
+*.out
+*.prof
+/bin/
+/vendor/
+coverage.txt
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Agent / AI tooling — must not appear in this public repo
+.claude/
+.agentrc/
+agentrc.yaml
+agentrc.yml

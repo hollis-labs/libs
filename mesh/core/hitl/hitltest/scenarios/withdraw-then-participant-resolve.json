@@ -1,0 +1,49 @@
+{
+  "name": "withdraw-then-participant-resolve",
+  "description": "A resolve that lost to a withdrawal is refused with an error carrying the canceled outcome.",
+  "tangent_evidence": "T:/internal/hitl/service_test.go:766",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "withdraw",
+      "item": "a",
+      "as": "w",
+      "expect": {
+        "state": "canceled"
+      }
+    },
+    {
+      "op": "resolve",
+      "item": "a",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "expect": {
+        "code_in": [
+          "terminal_conflict",
+          "stale_revision"
+        ],
+        "outcome_state": "canceled",
+        "outcome_equals": "w"
+      }
+    }
+  ]
+}

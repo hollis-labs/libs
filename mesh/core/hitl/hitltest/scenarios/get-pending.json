@@ -1,0 +1,41 @@
+{
+  "name": "get-pending",
+  "description": "Get returns get/not_waited with a nonterminal item and no outcome.",
+  "tangent_evidence": "T:/internal/envelope/extensions/hitl_item_test.go hitlRetrievalFixture",
+  "requires": [],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r"
+      },
+      "expect": {}
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "mode": "get",
+        "wait_status": "not_waited",
+        "state_in": [
+          "submitted",
+          "validated",
+          "staged",
+          "presented",
+          "in_progress"
+        ],
+        "revision_same_as": "a"
+      }
+    }
+  ]
+}

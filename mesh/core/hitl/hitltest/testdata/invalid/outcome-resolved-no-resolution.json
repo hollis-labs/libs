@@ -1,0 +1,11 @@
+{
+  "def": "ResolvedTerminalOutcomeCoreV1",
+  "name": "outcome-resolved-no-resolution",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "resolved",
+    "item_id": "item_01",
+    "interaction_revision": 5
+  }
+}

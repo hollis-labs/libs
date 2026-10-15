@@ -1,0 +1,19 @@
+{
+  "def": "ResolutionRecordCoreV1",
+  "name": "resolution-core-with-projection",
+  "doc": {
+    "resolution_id": "resolution_01",
+    "response": {
+      "kind": "approval",
+      "decision": "approved"
+    },
+    "participant": {
+      "principal_ref": "local-operator",
+      "authority": "tangent-loopback",
+      "assurance": "loopback-unverified"
+    },
+    "resolved_at": "2026-09-04T03:30:00Z",
+    "interaction_revision": 5,
+    "presented_projection_revision": 3
+  }
+}

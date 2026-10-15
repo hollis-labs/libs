@@ -1,0 +1,11 @@
+{
+  "def": "HITLWithdrawCommandV1",
+  "name": "withdraw-min",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "caller": {
+      "application_id": "codex"
+    }
+  }
+}

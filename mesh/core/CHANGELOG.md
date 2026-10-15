@@ -1,0 +1,155 @@
+# Changelog
+
+All notable changes to the `mesh` module are documented here (the module was `mesh` in the substrate repository). The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
+`mesh/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`CHANGELOG.md`.
+
+## [Unreleased]
+
+## v0.4.0 — 2026-10-10
+
+- Module path is now `github.com/hollis-labs/libs/mesh/core` (was `github.com/hollis-labs/substrate/mesh`); the substrate path and its `mesh/vX.Y.Z` tags no longer exist. Tags are `mesh/core/vX.Y.Z`. The code is that of substrate `mesh/v0.4.0`; only the module path and its imports of `llm/core` and `ui/ui-go` (the former `go-ssekit`) changed.
+
+### Added
+
+- `tetherclient.EnvironmentTarget` and `NewEnvironmentClient` accept an explicit
+  environment UUID, authority display name, ordered HTTP(S) routes and credential
+  reference. Public descriptor identity/protocol checks precede credential
+  resolution; typed identity, authentication and protocol errors preserve refusal.
+- Supervised environment and session streams resume with `after_seq`, deduplicate
+  delivered sequence numbers, expose gaps before snapshot replacement and keep
+  transport health separate from data freshness. Reconnect backoff, offline/auth
+  wakeups, authenticated route promotion and injected clock/jitter are supported.
+
+### Fixed
+
+- AI chat and messaging subscriptions parse complete SSE blocks with
+  `go-ssekit v0.2.0`: multiline data, supported line endings and BOM/control fields
+  are handled; an unfinished block at EOF is discarded. These two readers bound
+  each raw event block to 1 MiB; the separate channel and environment readers keep
+  their existing limits and cursor contracts.
+- Remote mutations through standard HTTP transports use fresh HTTP/1 connections
+  to prevent internal keyed-POST/HTTP2 replay after a lost response. Read transports
+  keep connection reuse; custom transports must avoid retries themselves. An
+  uncertain mutation outcome requires an explicit caller-owned retry decision.
+
+### Notes
+
+- The environment client requires an explicitly resolved device credential with
+  `read` for connection preflight, snapshots and streams. Authority labels,
+  `operate` and `admin` do not confer `read` or execution/custody authority.
+- This is a library release. It does not install or enroll workers, implement hub
+  management/delegation, or establish real-worker acceptance. Existing client and
+  messaging surfaces remain available; consumers adopt the module independently.
+
+## v0.3.0 — 2026-10-10
+
+### Added
+
+- Closed, versioned `workspace.snapshot.taken.v1` event payload with per-root
+  outcomes and observation intervals, policy-relative coverage, bound capture
+  identities and explicit coalesced source-journal gaps. Destination replay
+  cursors remain independent of source journal positions.
+- Bounded strict decoding and envelope validation reject unsupported versions,
+  unknown or duplicate keys, numeric overflow and inconsistent coverage. This
+  pure contract supplies no capture authority, retention pins or host producer.
+
+## v0.2.0 — 2026-10-09
+
+### Added
+
+- History-preserved `agentdefv1` with the full version-1 parser, layered loading,
+  skill-tree resolution/copying, lint, generated-span validation, tests and CLI.
+  Version-2 `mesh/agentdef` is unchanged; schemas remain separate without aliases
+  or fallback. The command uses released `llm-core/contracts/capabilities`;
+  the library retains its caller-supplied capability resolver.
+- History-preserved `agentmuxclient`, retaining the `agentmux` package name,
+  legacy socket, session/broker/catalog endpoints, event DTOs, API errors and
+  messaging adapters. Existing `tetherclient` behavior is unchanged.
+
+### Changed
+
+- Minimum Go version is 1.26.9, including the standard-library security fixes
+  absent from 1.26.6.
+- `github.com/hollis-labs/go-agentdef` imports move to
+  `github.com/hollis-labs/libs/mesh/core/agentdefv1` (package `agentdef`).
+- The old `github.com/hollis-labs/go-agentmux-client` import moves to
+  `github.com/hollis-labs/libs/mesh/core/agentmuxclient`; messaging imports now
+  use the sibling `mesh/messaging` packages. Consumer adoption is separate.
+
+## v0.1.1 — 2026-10-09
+
+### Fixed
+
+- Messaging's shared request/reply contract waits for subscription registration
+  before sending, instead of a scheduling-dependent sleep. Subscription and
+  reply failures are reported directly; delayed stores retain the same outcome
+  assertions and request deadline.
+
+## v0.1.0 — 2026-10-03
+
+### Added
+
+- A module README stating the v0 stability policy, and the MIT license in the module
+  directory so it travels with the module.
+- Explicit bounded-spawn capabilities and conformance checks for lifetime child,
+  fanout, depth and budget ceilings, parent records and cascade cancellation.
+- Per-call work history, accepted-delegation result replies queued for the next
+  turn, run-scoped pool identity subsets and children-first termination recovery.
+
+- `agentdef`: strict version-2 definition parsing and validation, namespaced
+  extension negotiation, semantic and artifact digests, and conformance fixtures.
+  Harness permissions reference profile names; content pins are checked for
+  syntax and verified by the host resolver.
+- Initial module skeleton: `go.mod` and a package doc.
+- Portable mesh provider contracts: actor addresses and kinds, pinned definition
+  references, verbs, canonical task/session states, history policies and limits.
+- Live capability descriptors and exact version, verb and mode negotiation,
+  command/response types, execution instance views and a shared event envelope.
+- In-memory provider for host tests, with explicit slot membership, reply-to-sender,
+  approval grants, result delivery, bounded spawn lineage and cascading cancellation.
+- Reusable MVP provider conformance checks, including refusal of unclaimed verbs,
+  plus tests for event attribution, snapshot isolation and concurrent idempotency.
+- Portable `teams` configuration and flex-phase compiler, authority checks,
+  roster-version routing, bounded spawning and journaled launch recovery.
+- Enrolled stable pool identities and ephemeral fresh identities with keyed
+  cleanup, host interfaces and an in-memory host for contract tests.
+- Test-only composition check for the teams host and mesh provider contracts.
+- Shared enrollment, execution instance, session and binding lease records,
+  pinned resolution contracts and a glossary of distinct lease and fencing scopes.
+- Orthogonal instance and session state projection to task states and the A2A
+  wire vocabulary, retaining waiting reasons and connectivity metadata.
+- Durable assignment contract with actor-scoped intent keys, atomic receipts,
+  pinned team selection, current task lookup and typed admission diagnostics.
+- Authorized bounded log replay with atomic snapshot watermarks, explicit
+  retention gaps, visibility masking and live waits using opaque cursors.
+- Versioned result envelopes binding schema, media type and exact content digest;
+  unsupported schemas cannot complete work.
+- Fake restart checkpoints, queued delivery and reusable dispatch conformance.
+- The complete, history-preserved packages from `go-messaging`,
+  `go-federation`, `go-tether-client`, and `go-hitl`, including their tests,
+  examples, contracts, and package documentation.
+
+### Changed
+
+- Removed the unused MemberProvisioner.Stop method. Release ends stable sessions
+  and their binding leases; Retire also ends ephemeral enrollment.
+- Assign requires a caller-scoped idempotency key; ReportResult requires a
+  supported versioned result envelope instead of a body-only result.
+- Task result content is encoded as bytes to preserve the exact digest input
+  across JSON transport and snapshot reads.
+- The packages now share the `github.com/hollis-labs/libs/mesh/core` module.
+  Imports move as follows; no consumer adoption is included in this release
+  preparation:
+
+  | Old import prefix | New import prefix |
+  |---|---|
+  | `github.com/hollis-labs/go-messaging` | `github.com/hollis-labs/libs/mesh/core/messaging` |
+  | `github.com/hollis-labs/go-federation` | `github.com/hollis-labs/libs/mesh/core/federation` |
+  | `github.com/hollis-labs/go-tether-client` | `github.com/hollis-labs/libs/mesh/core/tetherclient` |
+  | `github.com/hollis-labs/go-hitl` | `github.com/hollis-labs/libs/mesh/core/hitl` |
+- Federation and tether-client now import messaging as a package in the same
+  module rather than requiring the former `go-messaging` module.
+- Old repository tags are not carried into substrate.

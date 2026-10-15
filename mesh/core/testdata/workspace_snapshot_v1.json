@@ -1,0 +1,25 @@
+{
+  "schema_version": "workspace.snapshot.taken.v1",
+  "set_id": "set-1",
+  "operation_id": "capture-1",
+  "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "target_map_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "policy_revision": "policy-1",
+  "run_id": "run-1",
+  "instance_id": "instance-1",
+  "observation": {"started_at":"2026-10-10T01:00:00Z", "finished_at":"2026-10-10T01:00:02Z"},
+  "journal": {"journal_id":"journal-1", "after":41, "through":53},
+  "binding_fence":"binding-7",
+  "controller_epoch":9,
+  "boot_generation":"boot-2",
+  "runtime_generation":"runtime-3",
+  "reason":"reattach",
+  "boundary":"quiescent",
+  "complete":false,
+  "coalesced":true,
+  "uncaptured":{"journal_id":"journal-1", "after":41, "through":52},
+  "roots":[
+    {"root_id":"root-1", "store_id":"store-1", "observation":{"started_at":"2026-10-10T01:00:00Z", "finished_at":"2026-10-10T01:00:01Z"}, "tree_hash":"cccccccccccccccccccccccccccccccccccccccc", "commit_hash":"dddddddddddddddddddddddddddddddddddddddd", "repository":{"head":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "branch":"feature/example", "detached":false, "observed_at":"2026-10-10T01:00:00Z"}, "skipped":[{"reason":"oversize_untracked","count":1}]},
+    {"root_id":"root-2", "store_id":"store-2", "observation":{"started_at":"2026-10-10T01:00:01Z", "finished_at":"2026-10-10T01:00:02Z"}, "skipped":[], "error_code":"capture_failed"}
+  ]
+}

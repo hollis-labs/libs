@@ -1,0 +1,7 @@
+{
+  "def": "CallerAssertionV1",
+  "name": "caller-min",
+  "doc": {
+    "application_id": "codex"
+  }
+}

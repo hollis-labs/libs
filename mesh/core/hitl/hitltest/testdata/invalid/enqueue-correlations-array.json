@@ -1,0 +1,15 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-correlations-array",
+  "rejects_because": "/correlations",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "k-1",
+    "source": {
+      "application_id": "codex",
+      "agent_id": "msg://agent/codex/worker-7"
+    },
+    "correlations": []
+  }
+}

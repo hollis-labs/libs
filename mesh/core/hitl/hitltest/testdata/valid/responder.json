@@ -1,0 +1,8 @@
+{
+  "def": "ResponderV1",
+  "name": "responder",
+  "doc": {
+    "kind": "human",
+    "ref": "operator@example.test"
+  }
+}
