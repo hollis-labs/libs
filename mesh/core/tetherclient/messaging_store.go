@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 )
 
 // httpStore implements messaging.Store over the /messages/* HTTP routes.

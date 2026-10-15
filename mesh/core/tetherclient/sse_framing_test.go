@@ -12,8 +12,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
+	"github.com/hollis-labs/libs/ui/ui-go/ssekit"
 )
 
 type framingTransport func(*http.Request) (*http.Response, error)
