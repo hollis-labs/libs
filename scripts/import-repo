@@ -47,6 +47,9 @@
 # module path, and a tag push is an owner decision. The tags the source had are listed in
 # the merge commit message with the tag name each would have here (tag prefix mapping).
 #
+# AGENTS.md, CLAUDE.md, LICENSE and lefthook.yml at the module root are dropped in a follow-up
+# commit (history keeps them).
+#
 # The imported go.mod and go.sum are removed in a follow-up commit (history keeps them)
 # because a go.mod inside a module carves the subtree out of it. Merge the old
 # requirements into <group>/<module>/go.mod afterwards, for example with go mod tidy.
@@ -307,6 +310,22 @@ keeps the old files.
 
 Requirements of the dropped go.mod:
 ${requirements:-  (none)}"
+fi
+
+# Per-module instruction and licence files are not kept: this repository has one AGENTS.md,
+# one LICENSE and no CLAUDE.md or git hooks per module (history keeps the originals).
+strip_files=""
+for f in AGENTS.md CLAUDE.md LICENSE lefthook.yml; do
+  if [ -n "$(git -C "$target" ls-files -- "$dest/$f")" ]; then
+    git -C "$target" rm --quiet -f -- "$dest/$f"
+    strip_files="${strip_files:+$strip_files }$f"
+  fi
+done
+if [ -n "$strip_files" ]; then
+  git -C "$target" commit --quiet -m "import: drop $name's per-module files ($strip_files)
+
+This repository keeps a single AGENTS.md and LICENSE at the root and no per-module
+CLAUDE.md or hook config; the history keeps the originals."
 fi
 
 for m in ${imports[@]+"${imports[@]}"}; do
