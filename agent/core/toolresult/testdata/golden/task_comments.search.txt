@@ -1,0 +1,6 @@
+=== search 0 error=false
+[Cached result <ID>; json_pointer="/data/comments/7/content"; matching lines=1; total_bytes=49; has_more=false; next_offset=49]
+
+--- Line 1; match bytes 11..19; context bytes 0..49; context_truncated=false ---
+DEPLOYMENT VERIFIED; current code fixes discovery
+

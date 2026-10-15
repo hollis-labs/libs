@@ -1,0 +1,6 @@
+[PARTIAL PREVIEW — not a complete read. Omitted content must be retrieved before making claims about it.]
+
+[OMITTED bytes 0..1500 (1500 bytes); ranges are end-exclusive]
+
+
+[TRUNCATED — result exceeded the 1000-byte storage cap. Only metadata was cached as tool_result://<ID>; full content is unavailable. Narrow the source query.]

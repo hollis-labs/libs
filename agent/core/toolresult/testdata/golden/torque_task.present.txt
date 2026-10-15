@@ -1,0 +1,45 @@
+[PARTIAL PREVIEW — not a complete read. Omitted content must be retrieved before making claims about it.]
+"": object (21 fields)
+"/ID": "CW-20260814-0015"
+"/Status": "todo"
+"/Title": "A2A: Task persistence + TaskManager"
+"/CreatedAt": "2026-08-14T23:31:34Z"
+"/Executor": "cli"
+"/Kind": "agent"
+"/Manual": true
+"/MaxRetries": 3
+"/OnDone": "review"
+"/OnDoneMerge": "none"
+"/OnFail": "retry"
+"/OnReview": "pause"
+"/Priority": 3
+"/Trust": "normal"
+"/UpdatedAt": "2026-08-14T23:31:34Z"
+"/DependsOn": object (2 fields)
+"/DependsOn/String": "[\"CW-20260814-0013\",\"CW-20260814-0014\"]"
+"/DependsOn/Valid": true
+
+"/Description": text (2420 UTF-8 bytes; offsets address decoded text)
+## What
+The core of A2A protocol adoption (CW-20260813-0002). Impleme
+[OMITTED bytes 69..2350 (2281 bytes); ranges are end-exclusive]
+esign docs in full. Downstream tickets all depend on this one landing.
+"/Environment": object (2 fields)
+"/Environment/String": ""
+"/Environment/Valid": false
+
+"/Permissions": object (2 fields)
+"/Permissions/String": ""
+"/Permissions/Valid": false
+
+"/ProjectID": object (2 fields)
+"/ProjectID/String": "PRJ-20260417-0002"
+"/ProjectID/Valid": true
+
+"/Tools": object (2 fields)
+"/Tools/String": ""
+"/Tools/Valid": false
+
+
+
+[TRUNCATED — full result cached as tool_result://<ID> (total_size=3201 bytes, expires_at=<EXPIRES>). Use fetch_tool_result({"id":"<ID>"}) for pages, optionally with json_pointer to select a field (for example /stdout). Use search_tool_result({"id":"<ID>","pattern":"..."}) for matching regions. Preview labels are JSON pointers; fetch offsets address the selected text.]

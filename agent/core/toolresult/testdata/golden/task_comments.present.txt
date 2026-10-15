@@ -1,0 +1,39 @@
+[PARTIAL PREVIEW — not a complete read. Omitted content must be retrieved before making claims about it.]
+"": object (2 fields)
+"/ok": true
+"/data": object (5 fields)
+"/data/id": "task-example"
+"/data/status": "review"
+"/data/title": "Repair discovery"
+"/data/comments": array (8 items; indices refer to original order)
+[OMITTED items 2..6, end-exclusive (4 items)]
+"/data/comments/0": object (1 fields)
+"/data/comments/0/content": text (5000 UTF-8 bytes; offsets address decoded text)
+historical investigation historical investigation historical investigation historical investigation historical inve
+[OMITTED bytes 115..4884 (4769 bytes); ranges are end-exclusive]
+l investigation historical investigation historical investigation historical investigation historical investigation 
+
+"/data/comments/1": object (1 fields)
+"/data/comments/1/content": text (5000 UTF-8 bytes; offsets address decoded text)
+historical investigation historical investigation historical investigation historical investigation historical investigat
+[OMITTED bytes 121..4878 (4757 bytes); ranges are end-exclusive]
+torical investigation historical investigation historical investigation historical investigation historical investigation 
+
+"/data/comments/6": object (1 fields)
+"/data/comments/6/content": text (5000 UTF-8 bytes; offsets address decoded text)
+historical investigation historical investigation historical investigation historical investigation historical investigation hist
+[OMITTED bytes 129..4870 (4741 bytes); ranges are end-exclusive]
+tion historical investigation historical investigation historical investigation historical investigation historical investigation 
+
+"/data/comments/7": object (1 fields)
+"/data/comments/7/content": "DEPLOYMENT VERIFIED; current code fixes discovery"
+
+
+"/data/description": text (13300 UTF-8 bytes; offsets address decoded text)
+Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Backgrou
+[OMITTED bytes 1072..12227 (11155 bytes); ranges are end-exclusive]
+ detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. Background detail. 
+
+
+
+[TRUNCATED — full result cached as tool_result://<ID> (total_size=48823 bytes, expires_at=<EXPIRES>). Use fetch_tool_result({"id":"<ID>"}) for pages, optionally with json_pointer to select a field (for example /stdout). Use search_tool_result({"id":"<ID>","pattern":"..."}) for matching regions. Preview labels are JSON pointers; fetch offsets address the selected text.]

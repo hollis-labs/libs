@@ -1,0 +1,4 @@
+=== fetch 0 error=false
+[Cached result <ID>; json_pointer="/299/id"; bytes 0..3 of 3 (end-exclusive); has_more=false; next_offset=3]
+
+299

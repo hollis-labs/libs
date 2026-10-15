@@ -1,0 +1,5 @@
+=== fetch 0 error=false
+[Cached result <ID>; json_pointer=""; bytes 0..45 of 300 (end-exclusive); has_more=true; next_offset=45]
+
+<ID>AAA
+BBBBBBBBBBBBBBB
