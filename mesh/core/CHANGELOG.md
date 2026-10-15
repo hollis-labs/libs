@@ -1,14 +1,16 @@
 # Changelog
 
-All notable changes to the `mesh` module are documented here. The format follows
+All notable changes to the `mesh` module are documented here (the module was `mesh` in the substrate repository). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`mesh/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`mesh/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
 
 ## v0.4.0 — 2026-10-10
+
+- Module path is now `github.com/hollis-labs/libs/mesh/core` (was `github.com/hollis-labs/substrate/mesh`); the substrate path and its `mesh/vX.Y.Z` tags no longer exist. Tags are `mesh/core/vX.Y.Z`. The code is that of substrate `mesh/v0.4.0`; only the module path and its imports of `llm/core` and `ui/ui-go` (the former `go-ssekit`) changed.
 
 ### Added
 
