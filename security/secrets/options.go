@@ -28,6 +28,7 @@ type config struct {
 	exec      execConfig
 	fileRoots []string
 	home      func() (string, error)
+	stateDir  func() (string, error)
 }
 
 func newConfig() *config {
@@ -105,6 +106,12 @@ func WithFileRoots(roots ...string) Option { return func(c *config) { c.fileRoot
 // database, not $HOME, because a launch's caller can set $HOME.
 func WithHome(fn func() (string, error)) Option { return func(c *config) { c.home = fn } }
 
+// WithStateDir sets the directory of the managed file store (file://<ns>/<key>).
+// The default is [StateDir]. For tests and for hosts with a different layout.
+func WithStateDir(dir string) Option {
+	return func(c *config) { c.stateDir = func() (string, error) { return dir, nil } }
+}
+
 func (c *config) build() *Resolver {
 	r := &Resolver{
 		backends:    map[string]Backend{},
@@ -125,7 +132,7 @@ func (c *config) build() *Resolver {
 	r.register(NewKeychainBackend(store, c.service, c.legacy...))
 	r.register(&HelperBackend{exec: ex, schemes: r.schemes})
 	r.register(&OpBackend{exec: ex, schemes: r.schemes})
-	r.register(&FileBackend{roots: c.fileRoots, home: c.home})
+	r.register(&FileBackend{roots: c.fileRoots, home: c.home, stateDir: c.stateDir})
 	if c.withEnv {
 		r.register(&EnvBackend{lookup: c.envLookup})
 	}

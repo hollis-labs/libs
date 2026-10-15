@@ -296,7 +296,7 @@ func TestFileScheme(t *testing.T) {
 	write("tok", 0o600, "  "+value+"\n")
 	write("loose", 0o644, value)
 	write("empty", 0o600, "\n")
-	r := secrets.New(secrets.WithStore(&secretstest.FakeStore{}), secrets.WithHome(func() (string, error) { return home, nil }))
+	r := secrets.New(secrets.WithStore(&secretstest.FakeStore{}), secrets.WithStateDir(filepath.Join(home, "state")), secrets.WithHome(func() (string, error) { return home, nil }))
 
 	for _, ref := range []string{"file://~/tok", "file://" + filepath.Join(home, "tok")} {
 		if got := mustResolve(t, r, ref); got.Secret.Reveal() != value || got.Source != "file" {
@@ -307,7 +307,7 @@ func TestFileScheme(t *testing.T) {
 		"file://~/loose":                         secrets.ErrInvalid,
 		"file://~/empty":                         secrets.ErrEmpty,
 		"file://~/missing":                       secrets.ErrNotFound,
-		"file://relative/path":                   secrets.ErrInvalid,
+		"file://relative":                        secrets.ErrInvalid, // managed form needs <ns>/<key>
 		"file://" + filepath.Join(home, "$HOME"): secrets.ErrNotFound,
 	} {
 		_, err := r.Resolve(ctx, ref)

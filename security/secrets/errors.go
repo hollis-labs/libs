@@ -3,6 +3,7 @@ package secrets
 import (
 	"errors"
 	"runtime"
+	"strings"
 )
 
 // Kind classifies why a secret could not be resolved. The values are stable
@@ -99,6 +100,9 @@ func (e *Error) Guidance() string {
 		case "darwin":
 			return "The credential backend is unavailable. Unlock the login keychain, or check that the helper is installed and on PATH."
 		case "linux":
+			if e.Source == "keychain" || strings.HasPrefix(e.Ref, "keychain://") || strings.HasPrefix(e.Ref, "keyring://") {
+				return "No Secret Service (gnome-keyring, KeePassXC) is reachable on this host, so keychain:// cannot be used here. On a headless host use a managed file reference, file://<namespace>/<key> (written 0600 under $XDG_STATE_HOME/hollis/secrets with `secrets set`), or an op:// reference."
+			}
 			return "The credential backend is unavailable. A Secret Service provider (for example gnome-keyring or KeePassXC) must be running and unlocked. On a headless host use a file:// reference or an explicit env:// reference instead."
 		case "windows":
 			return "The credential backend is unavailable. Check that Windows Credential Manager is reachable for this user."

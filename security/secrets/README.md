@@ -30,7 +30,8 @@ The grammar is always `<scheme>://<authority>[/<path>...]`.
 |---|---|---|
 | `keychain://<ns>/<key>` (alias `keyring://`) | OS credential store, service `hollis-labs`, account `<ns>/<key>` | `keychain`, `keychain:legacy:<svc>` |
 | `helper://<name>/<rest>` | runs `<name> resolve keychain://<rest>` | `helper:<name>` |
-| `file:///abs`, `file://~/p` | private credential file (`credfile` rules) | `file` |
+| `file:///abs`, `file://~/p` | private credential file (`credfile` rules); read-only | `file` |
+| `file://<ns>/<key>` | managed file store, `0600` in a `0700` tree under `$XDG_STATE_HOME/hollis/secrets` (go-apppaths `Resolve("hollis").StateDir()/secrets`). Readable and writable. **The default on headless Linux.** | `file` |
 | `op://vault/item/field` | `op read --no-newline` (1Password CLI) | `op` |
 | `env://VAR` | environment variable. **Off unless `WithEnv()`.** | `env:VAR` |
 
@@ -39,6 +40,18 @@ Another scheme (Vault, Infisical, a secrets service of our own) is a `Backend` a
 ### Helper protocol v0
 
 Exit 0 with the value on stdout; exit 2 not found; exit 3 denied; any other exit is unavailable. stderr is discarded, never read. The child's environment has every variable removed whose value is a reference. The helper name is a bare executable name (PATH, then `GOBIN`, `~/go/bin`, `~/.local/bin`, the executable's directory, `/opt/homebrew/bin`, `/usr/local/bin`). Output is capped at 64 KiB.
+
+## Headless Linux: the file store and `secrets set`
+
+Fleet hosts have no Secret Service, so `keychain://` returns `unavailable` there, with guidance pointing at `file://<ns>/<key>` or `op://`. The managed file store needs nothing running:
+
+```sh
+go install github.com/hollis-labs/go-secrets/cmd/secrets@latest
+printf %s "$KEY" | secrets set file://openai/work   # stdin only, never argv
+secrets check file://openai/work                    # prints the source, never the value
+```
+
+Writes are atomic (temp file, fsync, rename). Segments are plain names (no `..`, no leading `.`). In code: `r.Set(ctx, ref, reader)`, `r.Delete`, `secrets.StateDir()`, `secrets.WithStateDir(dir)`. Path-form `file:///abs` references are never written by this package.
 
 ## Errors
 
