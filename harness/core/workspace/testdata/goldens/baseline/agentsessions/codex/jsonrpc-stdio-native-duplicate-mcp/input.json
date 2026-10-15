@@ -1,0 +1,6 @@
+{
+  "provider": "codex",
+  "runtime": "jsonrpc-stdio",
+  "variant": "native",
+  "scenario": "duplicate-mcp"
+}

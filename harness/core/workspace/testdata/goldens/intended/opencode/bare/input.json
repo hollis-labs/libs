@@ -1,0 +1,6 @@
+{
+  "provider": "opencode",
+  "runtime": "subprocess-per-turn",
+  "variant": "bare",
+  "scenario": "bare"
+}

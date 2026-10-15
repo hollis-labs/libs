@@ -1,0 +1,24 @@
+{
+  "writer": "cairn",
+  "source_commit": "f08641f056911927bb01b1f0de1472de2290cfb2",
+  "external_seed_bundle_revision": {
+    "revision": "6da0e3864698c75bf4e00b115b1bc264a614c8d2",
+    "publicly_resolvable": false
+  },
+  "fixture": "neutral miniature bundle (not the legacy bundle)",
+  "bindings": {
+    "cwd_preference": "boot_dir",
+    "project_dir_arg": [
+      "--add-dir",
+      "{{.ProjectDir}}"
+    ],
+    "env_amendments": null,
+    "home_resource_paths": null
+  },
+  "exit_code": 0,
+  "diagnostics": [],
+  "ownership": {
+    "boot": "disposable tree",
+    "installed": "Cairn owned-key merge"
+  }
+}

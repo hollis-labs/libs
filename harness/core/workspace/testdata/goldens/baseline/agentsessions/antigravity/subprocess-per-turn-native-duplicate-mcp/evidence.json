@@ -1,0 +1,7 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "diagnostics": [
+    "agentsessions: plant .agents/plugins/tether/mcp_config.json: render: MCPServerSpec \"http\": duplicate name"
+  ]
+}

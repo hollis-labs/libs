@@ -1,0 +1,281 @@
+package registry
+
+import "github.com/hollis-labs/substrate/llm-core/contracts/runtimes"
+
+// The capabilities each mode declares are what the code that drives it does
+// today, not what the runtime could do: go-providers' adapters for the native
+// modes (EventParser, SessionLostClassifier, AuthFailureClassifier,
+// SessionResumeVerifier, Preflighter), and what go-agent-wrapper's ACP
+// adapters record as measured live for the ACP modes. An unmeasured
+// capability is not declared: over-claiming is the unsafe direction.
+// TestDeclaredCapabilitiesMatchAdapters in package provider checks the native
+// side.
+func init() {
+	const (
+		resume        = runtimes.CapResume
+		resumeKeepsID = runtimes.CapResumeKeepsID
+		typedEvents   = runtimes.CapTypedEvents
+		authClass     = runtimes.CapAuthClassifier
+		lostClass     = runtimes.CapSessionLostClassifier
+		approvals     = runtimes.CapApprovals
+	)
+	caps := func(c ...runtimes.Capability) []runtimes.Capability { return c }
+	const (
+		projected   = SupportProjected
+		explicit    = SupportExplicit
+		unsupported = SupportUnsupported
+	)
+
+	register(Descriptor{
+		ID:          runtimes.Claude,
+		Aliases:     []string{"claude-code", "claudecode"},
+		Binary:      "claude",
+		EnvOverride: "CLAUDE_CLI_PATH",
+		Modes: []ModeSupport{
+			// An unknown --resume id is classified from stderr ("No
+			// conversation found with session ID") in both modes, measured
+			// in providertest/fixtures/claude/print_resume_unknown_id and
+			// stream_resume_unknown_id (CW-20261001-0047).
+			{runtimes.ModeStreamingStdio, caps(resume, typedEvents, lostClass)},
+			{runtimes.ModeSubprocessPerTurn, caps(resume, typedEvents, lostClass)},
+			// The TUI: resumable with --resume, but its output is a
+			// terminal stream, not typed events, and a lost id there is
+			// not measured.
+			{runtimes.ModePTY, caps(resume)},
+			// Through the claude-agent-acp bridge (go-agent-wrapper
+			// claudeacp), which brings its own binary. No approvals: live
+			// runs executed shell tools without ever sending
+			// session/request_permission.
+			{runtimes.ModeACPStdio, caps(typedEvents)},
+		},
+		DefaultMode: runtimes.ModeStreamingStdio,
+		Posture:     claudePosture,
+		Projection: &ProjectionFacts{
+			TestedVersion: "2.1.285",
+			Features: map[Feature]Support{
+				FeatureInstructions: projected,
+				FeatureNativeConfig: projected,
+				FeatureMCP:          projected,
+				FeatureSkillTrees:   projected,
+				FeatureHooks:        explicit,
+				FeatureCommands:     explicit,
+				FeatureSubagents:    explicit,
+				FeatureCredential:   explicit,
+				FeatureTrust:        explicit,
+			},
+			Notes: map[runtimes.Mode]string{
+				"": "Claude project files are rooted at the boot directory; auth and trust preparation are explicit runtime effects.",
+			},
+			// Without --strict-mcp-config claude also loads the user's own
+			// servers (the top-level mcpServers of ~/.claude.json) next to the
+			// ones --mcp-config passes; with it, only the passed ones load, and
+			// with nothing passed none do. Measured by
+			// hack/probe-mcp-exclusive.sh on claude 2.1.286, by the servers
+			// system/init reports and the stdio markers that were spawned:
+			// per-turn MCP1/MCP2 (and MCP3, MCP4), bare MCP5/MCP6 (--bare
+			// already skips the user's servers; the flag changes nothing there),
+			// streaming MCP7/MCP8, PTY MCP9/MCP10. A .mcp.json in the working
+			// directory was left out the same way. Not measured, so not
+			// claimed: the claude.ai account connectors (they need a login),
+			// and managed or plugin servers. TestMCPExclusivityMatchesTheAdapters
+			// checks the flag.
+			MCPExclusive: map[runtimes.Mode]MCPExclusivity{
+				runtimes.ModeStreamingStdio:    MCPExclusivityFlag,
+				runtimes.ModeSubprocessPerTurn: MCPExclusivityFlag,
+				runtimes.ModePTY:               MCPExclusivityFlag,
+			},
+		},
+	})
+
+	register(Descriptor{
+		ID:          runtimes.Codex,
+		Binary:      "codex",
+		EnvOverride: "CODEX_CLI_PATH",
+		Modes: []ModeSupport{
+			// app-server. The default per D-74. It asks the host to
+			// approve, and it resumes: thread/resume was measured live
+			// (providertest/fixtures/codex/app_server_resume, a codex-cli
+			// 0.159.2 capture), and agentkit's turn.CodexAppServerSession
+			// sends it when ResumeThreadID is set (agentkit v0.11.0), with
+			// a lost or mismatched thread returned as a SessionLostError.
+			// The wrapper does not yet map its SessionIDPreset onto
+			// ResumeThreadID: apps drive turn.CodexAppServerCache
+			// themselves. No session-lost-classifier: the loss arrives as
+			// a JSON-RPC error, which agentkit's turn package classifies;
+			// CodexAdapter.IsSessionLost reads exec's stderr and never
+			// sees it.
+			{runtimes.ModeJSONRPCStdio, caps(resume, typedEvents, approvals)},
+			// codex exec --json. A turn given a thread id resumes it with
+			// `exec … --cd <project> resume <id> -- <prompt>`, every exec
+			// option in front of the subcommand (CW-20261001-0109).
+			// Measured live on codex-cli 0.159.2: the resumed turn keeps
+			// the thread id, runs in the --cd project, and takes -c
+			// overrides given before `resume`. Without --cd it runs in the
+			// process cwd, not the cwd it started in. Captured in
+			// providertest/fixtures/codex/exec_turn2_resume. An unknown id
+			// writes "no rollout found for thread id" to stderr and exits
+			// 1 (exec_resume_unknown_id), which IsSessionLost classifies.
+			{runtimes.ModeSubprocessPerTurn, caps(resume, typedEvents, lostClass)},
+			// Through the codex-acp bridge (go-agent-wrapper codexacp);
+			// session/request_permission has not been observed from it.
+			{runtimes.ModeACPStdio, caps(typedEvents)},
+		},
+		DefaultMode: runtimes.ModeJSONRPCStdio,
+		Posture:     codexPosture,
+		Projection: &ProjectionFacts{
+			TestedVersion: "0.154.0",
+			Features: map[Feature]Support{
+				FeatureInstructions: projected,
+				FeatureNativeConfig: projected,
+				FeatureMCP:          projected,
+				FeatureSkillTrees:   projected,
+				FeatureHooks:        explicit,
+				FeatureCommands:     unsupported,
+				FeatureSubagents:    explicit,
+				FeatureCredential:   explicit,
+				FeatureTrust:        unsupported,
+			},
+			Notes: map[runtimes.Mode]string{
+				runtimes.ModeSubprocessPerTurn: "Codex reads config from CODEX_HOME/config.toml; auth.json is a preparation effect, not a pure render input.",
+				runtimes.ModeJSONRPCStdio:      "Project root is supplied to the JSON-RPC thread layer rather than via --cd.",
+			},
+			// Codex reads MCP servers from $CODEX_HOME/config.toml only. With the
+			// layout's CODEX_HOME=<boot> the user's ~/.codex servers are not
+			// loaded; with CODEX_HOME unset they are. So the planted layout is
+			// exclusive by itself, but only where the launch sets that root:
+			// the value is "projected-layout", and the projection's launch
+			// convention must set CODEX_HOME (CheckMCPExclusive verifies it).
+			// Measured by hack/probe-mcp-exclusive.sh on codex-cli 0.159.3:
+			// `codex mcp list` MCP1-MCP4, servers spawned by `codex exec`
+			// MCP5/MCP6 and by `codex app-server` MCP7/MCP8. A project
+			// .codex/config.toml was not applied (MCP3), because Codex did not
+			// trust the project: the planted config.toml has no trust entry
+			// for it. A trusted project was not measured. Not measured, so not
+			// claimed: Codex account connectors and plugins.
+			MCPExclusive: map[runtimes.Mode]MCPExclusivity{
+				runtimes.ModeJSONRPCStdio:      MCPExclusivityProjectedLayout,
+				runtimes.ModeSubprocessPerTurn: MCPExclusivityProjectedLayout,
+			},
+		},
+	})
+
+	register(Descriptor{
+		ID:          runtimes.OpenCode,
+		Aliases:     []string{"open-code"},
+		Binary:      "opencode",
+		EnvOverride: "OPENCODE_CLI_PATH",
+		LookupDirs:  []string{"~/.opencode/bin"},
+		Modes: []ModeSupport{
+			// opencode run --format json --session <id>.
+			{runtimes.ModeSubprocessPerTurn, caps(resume, typedEvents, lostClass)},
+			// opencode serve: deferred as a default until its SSE and
+			// permission behaviour is probed.
+			{runtimes.ModeHTTPSSE, caps(typedEvents)},
+			// opencode acp (go-agent-wrapper opencodeacp): session/load
+			// resume confirmed live. No approvals: a live shell tool ran
+			// without a session/request_permission.
+			{runtimes.ModeACPStdio, caps(resume, typedEvents)},
+		},
+		DefaultMode: runtimes.ModeSubprocessPerTurn,
+		Posture:     opencodePosture,
+		Projection: &ProjectionFacts{
+			TestedVersion: "1.18.30",
+			Features: map[Feature]Support{
+				FeatureInstructions: projected,
+				FeatureNativeConfig: projected,
+				FeatureMCP:          projected,
+				FeatureSkillTrees:   projected,
+				FeatureHooks:        unsupported,
+				FeatureCommands:     explicit,
+				FeatureSubagents:    explicit,
+				FeatureCredential:   explicit,
+				FeatureTrust:        unsupported,
+			},
+			Notes: map[runtimes.Mode]string{
+				runtimes.ModeSubprocessPerTurn: "OpenCode uses OPENCODE_CONFIG_DIR for projected config and project cwd for work.",
+				runtimes.ModeHTTPSSE:           "OpenCode serve-http uses the same projected config and moves turn delivery to the HTTP runtime.",
+			},
+			// Measured to have no MCP-only switch. OPENCODE_CONFIG_DIR is merged
+			// with the user's ~/.config/opencode and the project's
+			// opencode.json, so both sets of servers load next to the planted
+			// ones (hack/probe-mcp-exclusive.sh opencode MCP1, confirmed by
+			// spawning with `opencode run`). The only things that removed them
+			// were whole-config isolations: XDG_CONFIG_HOME pointed at an empty
+			// directory (MCP2) and OPENCODE_DISABLE_PROJECT_CONFIG=1 (MCP3),
+			// together MCP4. Neither is MCP-specific: they also drop every other
+			// user and project setting (providers, models, permissions), and
+			// XDG_CONFIG_HOME is a variable other tools the agent runs read too.
+			// No MCP-only switch was found in opencode 1.18.33, so none is
+			// offered: a request for exclusivity is refused.
+			MCPExclusive: map[runtimes.Mode]MCPExclusivity{
+				runtimes.ModeSubprocessPerTurn: MCPExclusivityAbsent,
+				runtimes.ModeHTTPSSE:           MCPExclusivityAbsent,
+			},
+		},
+	})
+
+	// Copilot CLI is ACP-only: copilot --acp, over stdio or with --port N
+	// over TCP (go-agent-wrapper copilotacp). Approvals were measured live
+	// (a shell command produced a session/request_permission); resume has
+	// not been, so it is not declared.
+	register(Descriptor{
+		ID:          runtimes.Copilot,
+		Aliases:     []string{"copilot-cli"},
+		Binary:      "copilot",
+		EnvOverride: "COPILOT_CLI_PATH",
+		Modes: []ModeSupport{
+			{runtimes.ModeACPStdio, caps(typedEvents, approvals)},
+			{runtimes.ModeACPTCP, caps(typedEvents, approvals)},
+		},
+		DefaultMode: runtimes.ModeACPStdio,
+	})
+
+	// Pi is ACP-only, through the pi-acp bridge (go-agent-wrapper piacp). The
+	// binary is the bridge; when it is not installed the wrapper falls back to
+	// npx -y pi-acp. session/load resume was confirmed live; pi-acp sent no
+	// session/request_permission.
+	register(Descriptor{
+		ID:          runtimes.Pi,
+		Aliases:     []string{"pi-acp"},
+		Binary:      "pi-acp",
+		EnvOverride: "PIACP_CLI_PATH",
+		Modes: []ModeSupport{
+			{runtimes.ModeACPStdio, caps(resume, typedEvents)},
+		},
+		DefaultMode: runtimes.ModeACPStdio,
+	})
+
+	register(Descriptor{
+		ID:          runtimes.Antigravity,
+		Aliases:     []string{"agy"},
+		Binary:      "agy",
+		EnvOverride: "AGY_CLI_PATH",
+		Modes: []ModeSupport{
+			// agy -p: an unknown conversation id silently starts a new
+			// one, so resume-keeps-id is what detects it.
+			{runtimes.ModeSubprocessPerTurn, caps(resume, resumeKeepsID, typedEvents, authClass, lostClass)},
+		},
+		DefaultMode: runtimes.ModeSubprocessPerTurn,
+		Posture:     antigravityPosture,
+		Projection: &ProjectionFacts{
+			TestedVersion: "1.2.7",
+			Features: map[Feature]Support{
+				FeatureInstructions: projected,
+				FeatureNativeConfig: projected,
+				FeatureMCP:          projected,
+				FeatureSkillTrees:   projected,
+				FeatureHooks:        explicit,
+				FeatureCommands:     explicit,
+				FeatureSubagents:    explicit,
+				FeatureCredential:   explicit,
+				FeatureTrust:        unsupported,
+			},
+			Notes: map[runtimes.Mode]string{
+				"": "agy projects into the workspace customization root <boot>/.agents (cwd = boot, project via --add-dir); its global ~/.gemini/config is shared with the desktop app and not written. Credentials stay in ~/.gemini.",
+			},
+			// No MCPExclusive entry: not measured. agy will not start without a
+			// login, and a scratch HOME has none, so whether its user-level MCP
+			// servers load next to the planted plugin's could not be observed.
+		},
+	})
+}

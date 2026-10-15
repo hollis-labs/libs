@@ -1,0 +1,5 @@
+{
+  "provider": "codex",
+  "runtime": "subprocess-per-turn",
+  "scenario": "host-default"
+}

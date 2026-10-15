@@ -1,0 +1,173 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "run",
+        "--agent",
+        "fixture",
+        "--dir",
+        "/fixture/project"
+      ],
+      "environment": {
+        "OPENCODE_CONFIG_DIR": "<boot>"
+      },
+      "cwd": "/fixture/project",
+      "posture": {
+        "provider": "opencode",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
+      }
+    },
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": "boot"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "agents",
+      "ownership": {
+        "entry_id": "workspace.render:agents",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "agents/fixture.md",
+      "ownership": {
+        "entry_id": "workspace.render:agents/fixture.md",
+        "group_id": "workspace.render:opencode-agent"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "6543a949999148c2e1c897847a2530274295df601a4a1c13c67ea2d2c121ffe3"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
+      }
+    },
+    {
+      "path": "opencode.json",
+      "ownership": {
+        "entry_id": "workspace.render:opencode.json",
+        "group_id": "workspace.render:opencode-config"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[\"mcp\",\"permission\"]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+      }
+    },
+    {
+      "path": "skills",
+      "ownership": {
+        "entry_id": "workspace.render:skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/SKILL.md",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      }
+    },
+    {
+      "path": "skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      }
+    }
+  ]
+}

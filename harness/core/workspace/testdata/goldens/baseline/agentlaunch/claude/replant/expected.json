@@ -1,0 +1,62 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".claude",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"\",\n  \"roots\": {\n    \"boot_root\": \"\u003cboot\u003e\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".claude/skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"bootspec:injection:skill\",\n        \"group_id\": \"bootspec:injection\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.BootSpec\",\n        \"source_path\": \"skill\"\n      }\n    },\n    {\n      \"path\": \"AGENTS.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"f1434f6021413cc5b8568e6ad34fb3b1b0adb3d41bf832bb54e722ba6c71e005\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"bootspec:file:instructions\",\n        \"group_id\": \"bootspec:file\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.BootSpec\",\n        \"source_path\": \"instructions\"\n      }\n    },\n    {\n      \"path\": \"support/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"bootspec:injection:support\",\n        \"group_id\": \"bootspec:injection\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.BootSpec\",\n        \"source_path\": \"support\"\n      }\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Refreshed instructions.\n"
+  },
+  {
+    "path": "operator.txt",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Operator owned.\n"
+  },
+  {
+    "path": "support",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "support/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture instructions.\n"
+  },
+  {
+    "path": "notes",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "notes/empty.txt",
+    "kind": "file",
+    "mode": "0644"
+  },
+  {
+    "path": "skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\nname: sample\ndescription: Fixture skill.\n---\nFixture skill.\n"
+  },
+  {
+    "path": "skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0755",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

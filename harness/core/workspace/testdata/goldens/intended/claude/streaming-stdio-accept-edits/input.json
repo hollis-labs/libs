@@ -1,0 +1,6 @@
+{
+  "provider": "claude",
+  "runtime": "streaming-stdio",
+  "posture": "accept-edits",
+  "scenario": "native"
+}

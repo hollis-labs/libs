@@ -1,0 +1,32 @@
+package provider
+
+import llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+
+// CLIAdapter abstracts the differences between CLI tools (Claude, Codex,
+// OpenCode, Antigravity) so the PTY bridge and subprocess bridge can spawn and
+// parse any of them generically. NewAdapter returns the one for a native
+// runtime and mode.
+type CLIAdapter interface {
+	// Name returns the adapter identifier (e.g. "claude", "codex", "opencode").
+	Name() string
+
+	// BuildArgs constructs CLI arguments for a prompt. cliSessionID is empty
+	// on the first turn; non-empty triggers resume behavior.
+	BuildArgs(prompt, systemPrompt, cliSessionID string) []string
+
+	// ParseLine parses one line of structured output into StreamEvents.
+	ParseLine(line []byte) ([]llmtypes.StreamEvent, error)
+
+	// Detect checks if this adapter's CLI binary is available.
+	// Returns the resolved binary path and true if found.
+	Detect() (path string, ok bool)
+}
+
+// CLIConfig describes how to invoke a CLI tool. Reserved for future
+// user-configurable adapters beyond the built-in ones; nothing reads it yet.
+type CLIConfig struct {
+	Command    string   `json:"command"`     // binary name or path
+	Args       []string `json:"args"`        // default args (prepended)
+	OutputMode string   `json:"output_mode"` // "stream-json", "jsonl", "text"
+	Env        []string `json:"env"`         // additional env vars
+}

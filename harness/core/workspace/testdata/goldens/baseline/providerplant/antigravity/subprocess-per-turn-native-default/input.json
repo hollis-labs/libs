@@ -1,0 +1,7 @@
+{
+  "provider": "antigravity",
+  "runtime": "subprocess-per-turn",
+  "variant": "native",
+  "posture": "default",
+  "scenario": "create"
+}

@@ -1,0 +1,196 @@
+{
+  "writer": "providerplant",
+  "source": "substrate legacy provider projection",
+  "bindings": {
+    "Bindings": {
+      "argv": [
+        "opencode",
+        "serve",
+        "--port",
+        "0",
+        "--hostname",
+        "127.0.0.1"
+      ],
+      "launch": {
+        "convention": {
+          "executable": "opencode",
+          "mode": "http-sse",
+          "cwd": "project",
+          "config_root": "boot",
+          "argv": [
+            {
+              "kind": "literal",
+              "value": "serve"
+            },
+            {
+              "kind": "literal",
+              "value": "--port"
+            },
+            {
+              "kind": "literal",
+              "value": "0"
+            },
+            {
+              "kind": "literal",
+              "value": "--hostname"
+            },
+            {
+              "kind": "literal",
+              "value": "127.0.0.1"
+            },
+            {
+              "kind": "extra"
+            }
+          ],
+          "env": [
+            {
+              "name": "OPENCODE_CONFIG_DIR",
+              "value": "boot",
+              "operation": "set",
+              "precedence": "provider-wins"
+            }
+          ]
+        },
+        "roots": {
+          "ProjectRoot": "/fixture/project",
+          "BootRoot": "<boot>",
+          "ConfigRoot": "<boot>",
+          "StateRoot": "/fixture/state",
+          "ScratchRoot": "",
+          "CWD": "/fixture/project"
+        }
+      },
+      "env": {
+        "OPENCODE_CONFIG_DIR": {
+          "value": "<boot>",
+          "source": "provider",
+          "precedence": 20
+        },
+        "OPENCODE_PERMISSION": {
+          "value": "{\"edit\":\"ask\",\"bash\":\"ask\"}",
+          "source": "posture",
+          "precedence": 20
+        }
+      },
+      "cwd": "/fixture/project",
+      "config_root": "<boot>"
+    },
+    "First": [
+      "serve",
+      "--port",
+      "0",
+      "--hostname",
+      "127.0.0.1"
+    ],
+    "Resumed": [
+      "serve",
+      "--port",
+      "0",
+      "--hostname",
+      "127.0.0.1"
+    ]
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".mcp.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "b7147d366919d8aa20fe1dd9189578c358f0a7b58f2417dfaa19a285aa131ddd"
+      },
+      "ownership": {
+        "entry_id": "provider:opencode:.mcp.json",
+        "group_id": "provider:opencode:http-sse"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "mcp-mirror"
+      }
+    },
+    {
+      "path": "agents/fixture.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e7a14468ba792f527d3da5d0da4b844d027227c0b5f913ddb687744cc9b06f61"
+      },
+      "ownership": {
+        "entry_id": "provider:opencode:agents/fixture.md",
+        "group_id": "provider:opencode:http-sse"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "instructions"
+      }
+    },
+    {
+      "path": "boot.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
+      },
+      "ownership": {
+        "entry_id": "provider:opencode:boot.md",
+        "group_id": "provider:opencode:http-sse"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "boot"
+      }
+    },
+    {
+      "path": "opencode.json",
+      "kind": "file",
+      "mode": 384,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "2a10183f36617dc4c0dcc0de3bbe672ea5db64234145abed73f3445ec70afb9d"
+      },
+      "ownership": {
+        "entry_id": "provider:opencode:opencode.json",
+        "group_id": "provider:opencode:http-sse"
+      },
+      "provenance": {
+        "source": "go-providers",
+        "source_path": "native-config"
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      },
+      "ownership": {
+        "entry_id": "injection:native:skills/sample/SKILL.md",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "injection:native:skills/sample/scripts/run.sh",
+        "group_id": "injection:native"
+      },
+      "provenance": {
+        "source": "agentlaunch.NativeFile"
+      }
+    }
+  ]
+}

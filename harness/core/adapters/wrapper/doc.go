@@ -1,0 +1,41 @@
+// Package wrapper is the top-level entry point for go-agent-wrapper — a
+// shared harness for launching, observing, and governing CLI-agent
+// subprocesses across Hollis Labs apps.
+//
+// The wrapper composes the agentkit umbrella module
+// (github.com/hollis-labs/agentkit, which absorbed go-agent-sessions /
+// go-agent-launch / go-agent-runtime / go-agent-context / go-agent-broker
+// in v0.1.0, 2026-05-26) plus the still-standalone primitives
+// (github.com/hollis-labs/go-runner for process supervision,
+// github.com/hollis-labs/go-providers for provider adapters,
+// github.com/hollis-labs/go-sandbox for sandbox profiles) into a single
+// standardized execution boundary that owns:
+//
+//   - process launch (executable, args, env, cwd, process group, limits)
+//   - explicit child-environment inheritance, filtering, merge, and replacement
+//   - IO proxying (stdin, stdout, stderr, PTY, terminal resize)
+//   - planting (per-session boot dirs, MCP config, provider settings,
+//     hooks/plugins, recovery prompts) — see [plant]
+//   - pre-spawn go-sandbox confinement (Config.SandboxPolicy,
+//     SandboxProfile, ProtectedPaths) and a post-start applier — see
+//     [sandbox]
+//   - prepared launches handed over from agentkit (Config.PreparedExecution,
+//     PrepareRequest) and the session's permission posture
+//     (Config.PermissionPosture, MCPAllow)
+//   - ACP session lifecycle through [acp.Manager] — see [acp]
+//   - runtime activity event emission — see [activity]
+//   - post-hoc policy observation and advisory event emission — see [policy]
+//   - optional filter-pipeline integration (envelope repair, classifier,
+//     command normalization) — see [filters]
+//   - provider-specific adapters (Claude, Codex, OpenCode, ...) — see
+//     [adapters]; hosts usually pick one with launch.Select
+//
+// The wrapper does not prescribe prompt design, workflow logic, turn
+// semantics, or agent cognition. Apps that import this package keep
+// ownership of their own state machines and translate the wrapper's
+// emitted [github.com/hollis-labs/go-runtime-events.Event] stream into
+// their native event vocabulary.
+//
+// This file carries the package-level documentation; the exported API
+// lives in the sibling source files.
+package wrapper

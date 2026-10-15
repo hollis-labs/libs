@@ -1,0 +1,73 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"fixture-plan\",\n  \"roots\": {\n    \"project_root\": \"/fixture/project\",\n    \"boot_root\": \"\u003cboot\u003e\",\n    \"state_root\": \"/fixture/state\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".mcp.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:.mcp.json\",\n        \"group_id\": \"provider:opencode:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"mcp-mirror\"\n      }\n    },\n    {\n      \"path\": \"agents/fixture.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"c3798f8dc7ae211e425f4af5881e0ed9b323728c833c70c3e3ba9f524b1958af\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:agents/fixture.md\",\n        \"group_id\": \"provider:opencode:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"instructions\"\n      }\n    },\n    {\n      \"path\": \"boot.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:boot.md\",\n        \"group_id\": \"provider:opencode:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"boot\"\n      }\n    },\n    {\n      \"path\": \"opencode.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:opencode.json\",\n        \"group_id\": \"provider:opencode:subprocess-per-turn\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"native-config\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:skills/sample/SKILL.md\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/scripts/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:skills/sample/scripts/run.sh\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\"mcpServers\":{}}\n"
+  },
+  {
+    "path": "agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "agents/fixture.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\ndescription: Launch agent fixture\nmode: primary\n---\n\n# fixture\n\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644"
+  },
+  {
+    "path": "opencode.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{}\n"
+  },
+  {
+    "path": "skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": "skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

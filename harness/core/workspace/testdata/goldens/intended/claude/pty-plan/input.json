@@ -1,0 +1,6 @@
+{
+  "provider": "claude",
+  "runtime": "pty",
+  "posture": "plan",
+  "scenario": "native"
+}

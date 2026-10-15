@@ -1,0 +1,5 @@
+{
+  "provider": "claude",
+  "runtime": "install",
+  "scenario": "installed-refresh"
+}
