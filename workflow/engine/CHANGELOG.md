@@ -10,6 +10,7 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 ## v0.1.0 — 2026-10-03
 
+- Module path is now `github.com/hollis-labs/libs/workflow/engine` (was `github.com/hollis-labs/libs/workflow`); the previous path and its `workflow/vX.Y.Z` tags no longer exist. Tags are `workflow/engine/vX.Y.Z`. No code change besides the path.
 First release of the workflow module in the libs repository: the `go-workflow` engine as the module root and `go-workflow-host` as `host/`, both moved in with their git history.
 
 ### Added

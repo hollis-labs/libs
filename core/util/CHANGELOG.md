@@ -10,6 +10,7 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## v0.4.0 — 2026-10-09
 
+- Module path is now `github.com/hollis-labs/libs/core/util` (was `github.com/hollis-labs/libs/util`); the previous path and its `util/vX.Y.Z` tags no longer exist. Tags are `core/util/vX.Y.Z`. No code change besides the path.
 ### Added
 
 - Scheduler hardening: durable terminal-fire pruning with non-recreatable

@@ -10,6 +10,7 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [0.2.0] - 2026-10-09
 
+- Module path is now `github.com/hollis-labs/libs/mcp/plugin-mcp` (was `github.com/hollis-labs/libs/plugin-mcp`); the previous path and its `plugin-mcp/vX.Y.Z` tags no longer exist. Tags are `mcp/plugin-mcp/vX.Y.Z`. No code change besides the path.
 ### Added
 
 - Opt-in acknowledged GrantSet renewal in the Go and TypeScript SDKs, preserving

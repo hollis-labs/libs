@@ -10,6 +10,7 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## v0.1.0 — 2026-10-03
 
+- Module path is now `github.com/hollis-labs/libs/ui/ui-go` (was `github.com/hollis-labs/libs/ui-go`); the previous path and its `ui-go/vX.Y.Z` tags no longer exist. Tags are `ui/ui-go/vX.Y.Z`. No code change besides the path.
 First release of the ui-go module: the packages of six former Hollis Labs modules, moved in with their git history.
 
 ### Added
