@@ -11,7 +11,7 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | Group | Purpose |
 |---|---|
 | `core` | Small, general-purpose utilities that everything else may build on. |
-| `security` | Security building blocks: secrets handling, authentication and policy. Planned: `security/secrets`, `security/auth`, `security/policy`; none is present yet. |
+| `security` | Security building blocks: secrets handling and authentication, with policy planned. Present: `security/secrets`, `security/auth`. Planned: `security/policy`. |
 | `mcp` | Plugin and Model Context Protocol libraries. |
 | `ui` | Streaming and web UI building blocks for Go services. |
 | `workflow` | Workflow engine and its host. |
