@@ -22,6 +22,26 @@ const (
 	Runtime          = "subprocess"
 )
 
+// Plugin kinds: a closed set describing what a plugin is for. A connector talks
+// to an external system. A provider supplies a capability behind a port the host
+// defines. A module adds tools, UI or workflows to the host. The field is
+// optional in the SDK so existing generators keep working; the plugins
+// repository requires it for every plugin it carries.
+const (
+	KindConnector = "connector"
+	KindProvider  = "provider"
+	KindModule    = "module"
+)
+
+// ValidKind reports whether kind is one of the declared plugin kinds.
+func ValidKind(kind string) bool {
+	switch kind {
+	case KindConnector, KindProvider, KindModule:
+		return true
+	}
+	return false
+}
+
 // Manifest is the common plugin declaration. Host-specific registrations live
 // only in the corresponding extension object. No release signatures or builtin
 // runtime are part of this schema; distribution archives belong in a catalog.
@@ -30,6 +50,7 @@ type Manifest struct {
 	ID            string                         `json:"id"`
 	Name          string                         `json:"name"`
 	Description   string                         `json:"description,omitempty"`
+	Kind          string                         `json:"kind,omitempty"`
 	Version       string                         `json:"version"`
 	License       string                         `json:"license,omitempty"`
 	Homepage      string                         `json:"homepage,omitempty"`

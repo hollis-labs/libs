@@ -20,6 +20,11 @@ Serve speak protocol 2. Do not use this manifest with that older Serve.
 
 - Identity: `id`, `name`, `description`, `version`, `license`, `homepage`,
   `repository`. Versions are SemVer without a leading `v`; IDs may have dots.
+- Optional `kind`: what the plugin is for, one of `connector` (talks to an external
+  system), `provider` (supplies a capability behind a port the host defines) or
+  `module` (adds tools, UI or workflows to the host). The set is closed and the SDK
+  refuses any other value; the hosts a plugin targets are the keys of `hosts`. A plugin
+  repository may require `kind` for every plugin it carries (the plugins repository does).
 - Execution: `runtime: subprocess`, `protocol: 2`, and
   `server: {runtime, engines, entry}`. See the pinned layout and runtime contract
   below. No command arguments or raw runtime permission flags are accepted.
