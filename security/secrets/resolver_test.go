@@ -445,3 +445,19 @@ func TestAcceptanceTheValueReachesNoSurface(t *testing.T) {
 	_, notFound := r.Resolve(ctx, "keychain://a/missing")
 	secretstest.AssertNoLeak(t, value, got, got.Secret, notFound, set.Error(errors.New("failed with "+value)))
 }
+
+func TestKeychainSkipsALegacyLocationThatHasNoNameForTheReference(t *testing.T) {
+	store := &secretstest.FakeStore{}
+	r := secrets.New(secrets.WithStore(store),
+		secrets.WithLegacy("old", func(secrets.Ref) string { return "" }))
+
+	_, err := r.Resolve(context.Background(), "keychain://openai/work")
+	if secrets.KindOf(err) != secrets.KindNotFound {
+		t.Fatalf("got %v, want not_found", err)
+	}
+	for _, c := range store.Calls() {
+		if strings.Contains(c, "old") {
+			t.Fatalf("an empty legacy account must not reach the store: %v", store.Calls())
+		}
+	}
+}

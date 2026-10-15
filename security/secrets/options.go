@@ -48,7 +48,8 @@ func WithService(name string) Option { return func(c *config) { c.service = name
 // shared service has no entry, the keychain backend asks (service, account(ref))
 // before reporting not found, and reports Source "keychain:legacy:<service>".
 // Nothing is migrated and nothing is ever written to the legacy location.
-// Repeat for several old locations; they are tried in order.
+// Repeat for several old locations; they are tried in order. An account func that
+// returns "" means the old location has no entry for that reference and is skipped.
 func WithLegacy(service string, account func(Ref) string) Option {
 	return func(c *config) { c.legacy = append(c.legacy, legacy{service: service, account: account}) }
 }

@@ -54,7 +54,11 @@ func (b *KeychainBackend) Resolve(ctx context.Context, ref Ref) (Resolved, error
 		return Resolved{}, normalize(err, ref)
 	}
 	for _, l := range b.legacy {
-		lv, lerr := b.store.Get(ctx, l.service, l.account(ref))
+		acct := l.account(ref)
+		if acct == "" {
+			continue // the legacy scheme has no location for this reference
+		}
+		lv, lerr := b.store.Get(ctx, l.service, acct)
 		if lerr == nil {
 			return Resolved{Secret: lv, Source: "keychain:legacy:" + l.service}, nil
 		}
