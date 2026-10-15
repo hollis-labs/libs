@@ -1,0 +1,9 @@
+{
+  "def": "HITLTerminalConflictErrorV1",
+  "name": "terminal-conflict-no-outcome",
+  "rejects_because": "",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "terminal_conflict"
+  }
+}

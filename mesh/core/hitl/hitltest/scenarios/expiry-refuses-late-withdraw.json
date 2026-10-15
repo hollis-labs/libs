@@ -1,0 +1,36 @@
+{
+  "name": "expiry-refuses-late-withdraw",
+  "description": "A withdraw arriving after expires_at is a terminal_conflict carrying the expired outcome, without a sweeper.",
+  "tangent_evidence": "none",
+  "requires": [
+    "expiry-enforcement"
+  ],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-K",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r",
+        "expires_at": "2000-01-01T00:00:00Z"
+      },
+      "expect": {}
+    },
+    {
+      "op": "withdraw",
+      "item": "a",
+      "expect": {
+        "code": "terminal_conflict",
+        "outcome_state": "expired"
+      }
+    }
+  ]
+}

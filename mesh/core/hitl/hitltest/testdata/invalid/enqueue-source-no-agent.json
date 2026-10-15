@@ -1,0 +1,13 @@
+{
+  "def": "HITLEnqueueRequestCoreV1",
+  "name": "enqueue-source-no-agent",
+  "rejects_because": "/source",
+  "doc": {
+    "contract_version": "1.0",
+    "kind": "approval",
+    "idempotency_key": "k-1",
+    "source": {
+      "application_id": "codex"
+    }
+  }
+}

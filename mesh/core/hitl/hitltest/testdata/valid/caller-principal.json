@@ -1,0 +1,8 @@
+{
+  "def": "CallerAssertionV1",
+  "name": "caller-principal",
+  "doc": {
+    "application_id": "codex",
+    "principal_ref": "worker-9"
+  }
+}

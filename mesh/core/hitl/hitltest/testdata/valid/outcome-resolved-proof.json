@@ -1,0 +1,48 @@
+{
+  "def": "HITLTerminalOutcomeCoreV1",
+  "name": "outcome-resolved-proof",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "resolved",
+    "item_id": "item_01",
+    "interaction_revision": 5,
+    "resolution": {
+      "resolution_id": "resolution_01",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "participant": {
+        "responder": {
+          "kind": "human",
+          "ref": "operator@example.test"
+        },
+        "assurance": "authenticated",
+        "proof": {
+          "scheme": "webauthn",
+          "key_ref": "cred:3f9a",
+          "binds": [
+            {
+              "name": "approval_id",
+              "value": "appr_01"
+            },
+            {
+              "name": "plan_hash",
+              "value": "sha256:ab12"
+            },
+            {
+              "name": "operation",
+              "value": "deploy"
+            },
+            {
+              "name": "nonce",
+              "value": "n-77"
+            }
+          ]
+        }
+      },
+      "resolved_at": "2026-09-04T03:30:00Z",
+      "interaction_revision": 5
+    }
+  }
+}

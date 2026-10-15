@@ -1,0 +1,11 @@
+{
+  "def": "ParticipantCaptureCoreV1",
+  "name": "participant-core-open-assurance",
+  "doc": {
+    "responder": {
+      "kind": "service",
+      "ref": "svc-1"
+    },
+    "assurance": "adapter-verified"
+  }
+}

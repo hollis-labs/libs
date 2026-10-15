@@ -1,0 +1,12 @@
+{
+  "def": "HITLTerminalConflictErrorV1",
+  "name": "terminal-conflict-bad-outcome",
+  "rejects_because": "/terminal_outcome",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "terminal_conflict",
+    "terminal_outcome": {
+      "state": "presented"
+    }
+  }
+}

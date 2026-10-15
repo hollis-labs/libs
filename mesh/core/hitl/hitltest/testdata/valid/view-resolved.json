@@ -1,0 +1,43 @@
+{
+  "def": "HITLItemViewCoreV1",
+  "name": "view-resolved",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "state": "resolved",
+    "revision": 5,
+    "request_snapshot": {
+      "contract_version": "1.0",
+      "kind": "approval",
+      "idempotency_key": "k-1",
+      "source": {
+        "application_id": "codex",
+        "agent_id": "msg://agent/codex/worker-7"
+      }
+    },
+    "enqueued_at": "2026-09-04T03:28:00Z",
+    "updated_at": "2026-09-04T03:30:00Z",
+    "terminal_outcome": {
+      "contract_version": "1.0",
+      "state": "resolved",
+      "item_id": "item_01",
+      "interaction_revision": 5,
+      "resolution": {
+        "resolution_id": "resolution_01",
+        "response": {
+          "kind": "approval",
+          "decision": "approved"
+        },
+        "participant": {
+          "responder": {
+            "kind": "human",
+            "ref": "operator@example.test"
+          },
+          "assurance": "asserted"
+        },
+        "resolved_at": "2026-09-04T03:30:00Z",
+        "interaction_revision": 5
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "def": "CallerAssertionV1",
+  "name": "caller-empty-app",
+  "rejects_because": "/application_id",
+  "doc": {
+    "application_id": ""
+  }
+}

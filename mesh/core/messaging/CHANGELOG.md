@@ -1,0 +1,278 @@
+# Changelog
+
+All notable changes to `go-messaging` are documented here. The format
+is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project follows [Semantic Versioning](https://semver.org/).
+While the major version is `0.x`, the API is considered pre-1.0 and
+breaking changes may occur in minor (`0.y`) versions; they are called
+out explicitly below.
+
+## v0.7.0 — 2026-09-30
+
+### Added
+
+- **`sqlstore`: a reference SQLite `messaging.Store`.** A standalone
+  implementation of the root `Store` over a schema the package owns
+  (`messages` plus a per-recipient `message_deliveries` table), with
+  `New`, `Migrate`, `Schema() fs.FS` and `DB()`. It is for new adopters, such
+  as the durable `Store` behind an `httpstore` daemon; applications that keep
+  their own schema do not have to migrate. SQLite-specific, imports no SQL
+  driver, and needs no external transaction helper or `MaxOpenConns=1`: `Inbox`
+  claims envelopes with one `INSERT ... SELECT ... ON CONFLICT DO NOTHING
+  RETURNING` statement. It passes `messagingtest.RunContract` and
+  `RunRouterContract`. Delivery obligations, leases and receipts remain the
+  job of `delivery`.
+
+### Fixed (in the new `sqlstore` only)
+
+- **`Consume` is idempotent under concurrency.** The hand-written SQLite store
+  this package was derived from (Torque's private `internal/messaging`
+  `sqlstore.go`) implements `Consume` as an `UPDATE` followed, when it finds no
+  row, by a separate `INSERT`. Calling `Consume` before `Inbox` for the same
+  message, which the `Store` documentation allows, can therefore lose a race
+  with `Inbox`'s own insert and fail with a raw primary-key violation instead
+  of the idempotent success the contract promises. `sqlstore.Consume` is a
+  single `INSERT ... ON CONFLICT DO UPDATE` upsert. Nothing in this module's
+  existing packages changes; the private copy in Torque is tracked separately
+  (CW-20260930-0067). Covered by `TestConsumeInboxRaceDeterministic` and
+  `TestConsumeInboxRace`, with the failing shape reproduced in
+  `TestConsumeInboxRaceReproducedOnTorqueShape`.
+
+## v0.6.0 — 2026-09-29
+
+### Added
+
+- **`httpstore`: an HTTP-backed `messaging.Store` and `Dispatcher`.**
+  One client in place of the private copies that Tether, Torque, Hadron and
+  the Tether and agentmux client libraries each carry, and that had drifted
+  apart (a Subscribe that sent no `?as=`, a Get with no identity, a client that
+  could truncate an Inbox the server had already marked delivered). Wire
+  dialects are options, not a blessed protocol: `TetherProfile()` and
+  `TorqueFederationProfile()`. `WithHTTPClient` is the transport seam for
+  mutual-TLS, pinned-certificate or unix-socket clients and
+  `WithRequestHook` the place for auth headers and trace propagation. It
+  depends on the standard library and this module only. Subscribe connects
+  before it returns, reads the stream with a spec-correct SSE parser, and
+  reports undecodable frames through `WithOnFrameError`. Descriptive wire
+  notes are in `docs/http-wire.md`.
+- **`httpstore/httpstoretest`: a reference HTTP server and conformance
+  wiring.** `Handler` puts any `Store` behind a profile's routes;
+  `WithStrictIdentity` enforces Tether's `?as=` rules; `RunConformance` runs
+  `RunContract` and `RunRouterContract` against a client of it.
+- **`Router.LocalAuthority()`** returns the authority a Router was built with.
+- **`messagingtest.RunContract` takes options, and `messagingtest.Without`**
+  skips the sub-tests that need `Inbox` or `Subscribe`, for a Store that
+  legitimately lacks them (a federation hop). Skipped sub-tests are reported
+  as skipped. The new parameter is variadic, so existing callers are unchanged.
+
+### Changed
+
+- Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
+
+## v0.5.2 — 2026-09-12
+
+### Fixed
+
+- **A zero `Address` now round-trips through JSON.** `MarshalJSON`
+  composed `URN()` from empty parts, producing the malformed
+  `"msg:////"`, which `UnmarshalJSON` then handed to `ParseURN` and
+  rejected. A zero Address now encodes as `""` and decodes back to the
+  zero value; populated addresses are unchanged.
+
+  This made any struct carrying an **optional** `Address` encodable but
+  not decodable. `json:"...,omitempty"` does not rescue such a field —
+  `omitempty` has no effect on a struct value, so the field is always
+  written.
+
+  Concretely, `delivery.RecipientDelivery` and `delivery.Attempt` both
+  embed `BindingTarget`, whose `Address` carries no `omitempty`. Neither
+  type could be decoded whenever no binding was set. That is every
+  response from Tether's `POST /messages/{id}/ack|nack`, since nothing
+  in Tether ever constructs a `BindingTarget` — so a Go client could not
+  consume the durable-delivery surface at all. It went unnoticed because
+  the producer only ever serializes these types; the first consumer to
+  decode them found it.
+
+  `""` is the only newly accepted form. `"msg:////"`, `"msg://"`, a
+  bare `agent/x/y` and whitespace all still fail, so this widens the
+  zero case without loosening URN validation.
+
+### Changed
+
+- **Minimum Go raised from `1.22` to `1.26.2`**, with `toolchain
+  go1.26.6`. At the old floor and `GOTOOLCHAIN=auto` this module
+  resolved to a standard library carrying known vulnerabilities;
+  `govulncheck` is clean at the new floor. Every consumer in the
+  portfolio already requires more than this — Tether 1.26.2,
+  go-tether-client 1.26.2, Torque 1.26.6, Nanite 1.26.7 — so nothing is
+  constrained by the change. Closes CW-20260912-0016.
+
+## v0.5.1 — 2026-09-07
+
+### Fixed
+
+- `Nack` (both `SQLiteStore` and `MemoryStore`) could reverse a delivery
+  that had already reached `Delivered` via `Ack(StageConsumed)`, if the
+  Nack raced in afterward against the same (by-then-stale) lease
+  reference — e.g. a claimant that observes a failure condition (busy,
+  offline, send error) after a concurrent consumer already finished
+  consuming the same lease. The completed-idempotent lease-fencing
+  allowance (needed so a legitimate duplicate `Nack` of the same failure
+  stays idempotent) let this through, since it did not distinguish "the
+  outcome I'm replaying is the same one already recorded" from "the
+  outcome I'm recording contradicts a different terminal outcome already
+  reached." `Nack` now treats an already-`StageConsumed` attempt the same
+  as an already-`Failed`/`DeadLettered` one: a harmless no-op that
+  returns the current (still `Delivered`) state, never overwriting it to
+  `RetryScheduled`/`DeadLettered`. Covered by a new shared contract test
+  (`deliverytest`) exercised against both backends, for both retryable
+  and non-retryable late Nacks.
+
+## v0.5.0 — 2026-09-06
+
+### Added
+
+- Reliable at-least-once delivery core with immutable message bodies,
+  per-recipient obligations, fenced leases, attempts, staged receipts,
+  retries, deadlines, dead letters and explicit redrive.
+- Memory and SQLite stores with shared conformance coverage, transactional
+  idempotency, restart recovery and legacy mailbox migration primitives.
+- Replayable delivery pump and durable host-handoff extension points with
+  bounded workers, coalesced hints and explicit offline-owner behavior.
+- Exact-session and durable-actor destinations, frozen fanout recipient sets,
+  and compatibility projections for root Store and tuple-addressed mailbox.
+- Migration/rollback guidance and examples for standalone and hosted use.
+
+### Compatibility
+
+- Existing root Inbox behavior and mailbox read/resolved semantics remain
+  available through named compatibility surfaces. Attention state is separate
+  from transport receipts; a handoff receipt does not claim model understanding
+  or successful task completion.
+
+## v0.4.0 — 2026-09-05
+
+### Added
+- Optional `mailbox` subpackage for durable tuple-addressed inboxes with
+  unread/read/resolved lifecycle, priority and thread queries, bounded recent
+  history, in-process live subscriptions, caller identity, mailbox mutation
+  events, handoff coordination, notification/wake hooks, and a host-migrated
+  SQLite adapter. Host-owned event persistence, handoff transactions, agent
+  registration, and asynchronous lifecycle behavior enter through narrow
+  interfaces; the root `Store` contract is unchanged.
+- Live fan-out gives the sender, each subscriber, and each hook independently
+  owned message values (including reference fields), and `Service.Close` joins
+  subscription cleanup even when callers use non-cancelable contexts.
+
+## v0.3.0 — 2026-05-21
+
+### Added
+- `KindGroup` address kind for addressing a named collection of
+  recipients.
+- `Router` — an authority-routing `Store` decorator. It dispatches each
+  operation by the URN `Authority` segment: a registered foreign authority
+  goes to that route's `Store`, every other authority falls through to a
+  local `Store`. This promotes federated messaging into the shared library
+  so every consuming app gets it for free; a standalone install registers
+  no foreign routes and runs fully locally with no extra configuration.
+  - `NewRouter(local, localAuthority, opts...)` constructs one.
+  - `Register` / `Unregister` / `Authorities` manage foreign routes
+    (concurrency-safe; mutable while operations are in flight).
+  - `IsLocal` answers the single "internal vs external" routing question.
+  - `WithStrictRouting()` makes unknown authorities return `ErrNoRoute`
+    instead of falling through to the local `Store`.
+  - `Router` is itself a `Store`, so `NewDispatcher(router)` yields a
+    federated request/reply `Dispatcher`.
+- `ErrNoRoute` sentinel error, returned by a strict-mode `Router`.
+- `messagingtest.RunRouterContract` — a shared contract suite covering the
+  authority-routing guarantees (local fall-through, foreign dispatch,
+  recipient-keyed routing, strict-mode `ErrNoRoute`), which also asserts a
+  `Router` is itself a contract-conformant `Store`.
+
+## v0.2.1 — 2026-05-10
+
+### Changed
+- Public-release prep. Documentation and metadata polish only — there
+  are no public API changes from `v0.2.0`.
+- `README.md` rewritten for an external audience (install snippet,
+  godoc badge/link, CHANGELOG link, neutralized example URNs).
+- Package-level `doc.go` expanded so `pkg.go.dev` renders a useful
+  overview.
+- Test fixtures use generic authority names (`app`, `router`,
+  `scheduler`) instead of internal project names.
+
+### Added
+- `CHANGELOG.md` (this file). Entries for `v0.1.0`, `v0.1.1`, and
+  `v0.2.0` are backfilled from git history.
+- `examples/request-reply/` — standalone runnable program
+  demonstrating the canonical `Dispatcher.Request` / `Dispatcher.Reply`
+  flow against the in-memory reference Store.
+
+### Removed
+- Internal planning artifacts under `docs/` (epic and sprint notes)
+  that were never part of the public API surface.
+
+## v0.2.0 — 2026-04-21
+
+### Changed (BREAKING)
+- `Store.Subscribe` now takes an explicit recipient address:
+
+  ```go
+  // Before (v0.1.x):
+  Subscribe(ctx context.Context, f Filter) (<-chan Envelope, error)
+
+  // After (v0.2.0):
+  Subscribe(ctx context.Context, to Address, f Filter) (<-chan Envelope, error)
+  ```
+
+  The change brings `Subscribe` into symmetry with `Inbox(ctx, to, f)`
+  and lets HTTP-backed `Store` implementations scope an SSE stream to a
+  single recipient without leaking traffic across agents.
+
+  **Migration:** pass the subscriber's own `Address` as the new `to`
+  argument. The `Dispatcher.Request` helper has been updated to do this
+  internally; direct `Store.Subscribe` callers must update their call
+  sites.
+
+## v0.1.1 — 2026-04-21
+
+CI / build-tooling fixes only. No library code changes.
+
+### Fixed
+- `go.mod` `go` directive lowered to `1.22` to match the declared
+  minimum Go version (the module had drifted to a higher floor than
+  intended).
+- `golangci-lint-action` bumped to `v7` for `golangci-lint v2`
+  compatibility.
+- `actions/setup-go` pinned to `stable` so `govulncheck` runs against a
+  patched Go release.
+
+## v0.1.0 — 2026-04-21
+
+Initial release. Phase 1 of the messaging contract: a pure-Go library
+with no runtime, no HTTP, no SQL.
+
+### Added
+- Core types: `Envelope`, `Address` (+ canonical URN form
+  `msg://<kind>/<authority>/<id>[/<subid>]`), `AddressKind`, `Kind`,
+  `Channel`, `Filter`.
+- Address JSON marshaling round-trips through the URN form.
+- `Filter.Matches` with AND-across-fields, OR-within-slice semantics.
+- Interfaces: `Store` (`Send`, `Get`, `Inbox`, `Thread`, `Consume`,
+  `Cancel`, `Subscribe`) and `Dispatcher` (extends `Store` with
+  `Request` and `Reply`).
+- Error sentinels: `ErrNotFound`, `ErrRequestTimeout`, `ErrCanceled`,
+  `ErrStoreUnavailable`, `ErrPresetLifecycle`, `ErrInvalidAddress`.
+- `memstore` — in-memory reference `Store` implementation. Atomic
+  per-recipient delivery marking, idempotent `Consume`/`Cancel`,
+  read-only `Thread` queries, live-only `Subscribe` fan-out with
+  context-driven cleanup.
+- `messagingtest.RunContract` — shared contract test suite that any
+  third-party `Store` implementation can run against itself.
+- `Dispatcher.NewDispatcher` wrapping any `Store` with `Request` and
+  `Reply` helpers; `Request` correlates responses by `InReplyTo` and
+  honours context deadlines.
+- `example_test.go` — runnable end-to-end Request/Reply demo (visible
+  on pkg.go.dev).
+- GitHub Actions `check` workflow: `gofmt`, `go vet`, `golangci-lint`,
+  `go test -race`, `govulncheck`.

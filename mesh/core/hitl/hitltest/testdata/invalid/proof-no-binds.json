@@ -1,0 +1,9 @@
+{
+  "def": "ProofV1",
+  "name": "proof-no-binds",
+  "rejects_because": "",
+  "doc": {
+    "scheme": "webauthn",
+    "key_ref": "cred:1"
+  }
+}

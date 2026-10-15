@@ -1,0 +1,4 @@
+testdata/bad/unknown.md: model: unknown field (line 3)
+testdata/bad/badname.md: name: "Bad_Name" must match ^[a-z0-9]+(-[a-z0-9]+)*$
+testdata/bad/badname.md: identity: "durable" is not valid; the only legal value is "stable" (or omit it)
+testdata/bad/dangling.md: skills: agentdef: skill "absent-skill": open skills/absent-skill/SKILL.md: no such file or directory

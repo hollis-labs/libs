@@ -1,0 +1,3 @@
+# mesh/core: one imported commit message mentions an internal build machine name and a developer home path; owner-reviewed 2026-10-15.
+agent-box-host (commit-message)@d2314124a490 Internal build machine name in one commit message; reviewed by the owner 2026-10-15, not an access path.
+home-path-macos (commit-message)@d2314124a490 Developer home directory path in one commit message; reviewed by the owner 2026-10-15, no credential.

@@ -1,0 +1,10 @@
+{
+  "def": "ParticipantCaptureV1",
+  "name": "participant-tangent-open-assurance",
+  "rejects_because": "/assurance",
+  "doc": {
+    "principal_ref": "local-operator",
+    "authority": "tangent-loopback",
+    "assurance": "adapter-verified"
+  }
+}

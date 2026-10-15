@@ -1,0 +1,10 @@
+{
+  "def": "AttentionResponseV1",
+  "name": "response-attention",
+  "doc": {
+    "kind": "attention",
+    "decision": "acknowledged",
+    "note": "n",
+    "reply": "r"
+  }
+}

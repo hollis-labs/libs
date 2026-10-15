@@ -1,0 +1,25 @@
+{
+  "def": "ResolvedTerminalOutcomeCoreV1",
+  "name": "outcome-resolved-tangent",
+  "doc": {
+    "contract_version": "1.0",
+    "state": "resolved",
+    "item_id": "item_01",
+    "interaction_revision": 5,
+    "resolution": {
+      "resolution_id": "resolution_01",
+      "response": {
+        "kind": "approval",
+        "decision": "approved"
+      },
+      "participant": {
+        "principal_ref": "local-operator",
+        "authority": "tangent-loopback",
+        "assurance": "loopback-unverified"
+      },
+      "resolved_at": "2026-09-04T03:30:00Z",
+      "interaction_revision": 5,
+      "presented_projection_revision": 3
+    }
+  }
+}
