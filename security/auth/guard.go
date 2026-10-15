@@ -97,7 +97,7 @@ func (g *Guard) verify(ctx context.Context, tok string) (Principal, string) {
 // decision applies the mode to an authentication result and required scope.
 // It returns the principal to stamp (zero, false when none), and the HTTP
 // status and code if enforce rejects (status 0 = allow).
-func (g *Guard) decision(p Principal, state, required string, ev *Event) (Principal, bool, int, string) {
+func (g *Guard) decision(p Principal, state, required string, unmapped bool, ev *Event) (Principal, bool, int, string) {
 	stamp := state == StateVerified
 	deny, status, code, reason := false, 0, "", ""
 	switch {
@@ -105,6 +105,8 @@ func (g *Guard) decision(p Principal, state, required string, ev *Event) (Princi
 		deny, status, code, reason = true, http.StatusServiceUnavailable, "auth_unavailable", "verifier unavailable"
 	case state != StateVerified:
 		deny, status, code, reason = true, http.StatusUnauthorized, "unauthorized", "authentication "+state
+	case unmapped:
+		deny, status, code, reason = true, http.StatusForbidden, "route_not_mapped", "route or tool has no scope mapping"
 	case required != "" && !p.HasScope(required):
 		deny, status, code, reason = true, http.StatusForbidden, "scope_required", "missing scope "+required
 	}
@@ -152,9 +154,10 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		p, state := g.authenticate(r.Context(), r.Header.Values("Authorization"))
-		required, _ := g.cfg.Scopes.ForRoute(r.Method, r.URL.Path)
+		required, known := g.cfg.Scopes.ForRoute(r.Method, r.URL.Path)
+		unmapped := g.cfg.Scopes.denyUnmapped(known, required)
 		ev := Event{At: time.Now().UTC(), Mode: g.cfg.Mode, Authentication: state, Method: r.Method, Route: routeFamily(r.URL.Path)}
-		p, stamp, status, code := g.decision(p, state, required, &ev)
+		p, stamp, status, code := g.decision(p, state, required, unmapped, &ev)
 		g.emit(ev)
 		if status != 0 {
 			writeError(w, status, code, required)
@@ -172,7 +175,8 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 // WithPrincipal). In enforce mode it returns ErrUnauthenticated or an error
 // wrapping ErrForbidden; in permissive and off mode it logs and returns nil.
 func (g *Guard) AuthorizeTool(ctx context.Context, tool string) error {
-	required, _ := g.cfg.Scopes.ForTool(tool)
+	required, known := g.cfg.Scopes.ForTool(tool)
+	unmapped := g.cfg.Scopes.denyUnmapped(known, required)
 	p, ok := FromContext(ctx)
 	state := StateMissing
 	if ok && p.Verified {
@@ -182,7 +186,7 @@ func (g *Guard) AuthorizeTool(ctx context.Context, tool string) error {
 		p.Verified = true
 	}
 	ev := Event{At: time.Now().UTC(), Mode: g.cfg.Mode, Authentication: state, Tool: tool}
-	_, _, status, _ := g.decision(p, state, required, &ev)
+	_, _, status, _ := g.decision(p, state, required, unmapped, &ev)
 	g.emit(ev)
 	switch status {
 	case 0:

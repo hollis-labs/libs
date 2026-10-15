@@ -8,9 +8,19 @@ import "strings"
 type ScopeTable struct {
 	routes []route
 	tools  map[string]string
-	// Default is required for routes absent from the table. Empty means
-	// authentication alone suffices for unmapped routes.
+	// Default is the scope required for routes and tools absent from the
+	// table. When empty, unmapped routes and tools are denied in enforce mode
+	// (fail closed) unless AllowUnmapped is set.
 	Default string
+	// AllowUnmapped lets authenticated callers reach routes and tools with no
+	// mapping and no Default. Opt-in; the default is deny.
+	AllowUnmapped bool
+}
+
+// denyUnmapped reports whether a lookup that found no mapping must be denied.
+// A nil table means the app configured no scoping at all: authentication only.
+func (t *ScopeTable) denyUnmapped(known bool, required string) bool {
+	return t != nil && !known && required == "" && !t.AllowUnmapped
 }
 
 type route struct {

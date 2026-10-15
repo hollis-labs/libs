@@ -42,13 +42,13 @@ func callTool(ctx context.Context, name string, args json.RawMessage) (any, erro
 | --- | --- |
 | `off` | never rejects. A valid token is verified and stamped; otherwise the synthetic principal `operator(off-mode)` (unverified, scope `*`) is stamped and an audit event with `authentication=off-mode` is emitted. |
 | `permissive` | alias `observe`. Verifies, never rejects, logs and audits "would deny" with the required scope. |
-| `enforce` | 401 missing/invalid, 503 verifier unavailable, 403 missing scope. Routes absent from the table need authentication only unless `ScopeTable.Default` is set. |
+| `enforce` | 401 missing/invalid, 503 verifier unavailable, 403 missing scope. Routes and tools absent from the table are denied (fail closed) unless `ScopeTable.Default` names a scope or `AllowUnmapped` is set; a nil table means authentication only. |
 
 `ValidateBind(addr, mode)` refuses `off` and `permissive` unless the listener is loopback, tailnet (100.64.0.0/10, fd7a:115c:a1e0::/48, `*.ts.net`) or a unix socket. Wildcard binds (`:8080`, `0.0.0.0`) count as non-local.
 
 ## Verifiers
 
-- `JWTVerifier`: EdDSA only (any other `alg`, including `none`, is rejected); checks signature, `exp`/`nbf` (30s leeway), `iss` (if configured), `aud`, `sub`, and the deny-list (`jti`, `sub`, `sid`). `kid` rotation: unknown kid triggers a refetch (at most one per `MinRefresh`), and a refresh replaces the key set so rotated-out keys stop working. `BootstrapKeyFile` (JWKS JSON or PEM public key) is used until the first successful fetch. Issuer down with no key cached yields `ErrUnavailable` (503), not 401.
+- `JWTVerifier`: EdDSA only (any other `alg`, including `none`, is rejected); checks signature, `exp`/`nbf` (30s leeway), `iss` (if configured), `aud` (a single string equal to the app id; an aud array is rejected), `sub`, and the deny-list (`jti`, `sub`, `sid`). `kid` rotation: unknown kid triggers a refetch (at most one per `MinRefresh`), and a refresh replaces the key set so rotated-out keys stop working. `BootstrapKeyFile` (JWKS JSON or PEM public key) is used until the first successful fetch. Issuer down with no key cached yields `ErrUnavailable` (503), not 401.
 - `APIKeyVerifier`: static SHA-256-hashed keys (`HashKey`), same scope strings. Interim backend for root service credentials.
 - `Chain(v...)`: first success wins.
 

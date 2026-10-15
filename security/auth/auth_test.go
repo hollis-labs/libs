@@ -106,6 +106,8 @@ func TestJWTRejects(t *testing.T) {
 	cases := map[string]string{
 		"expired":        is.token("k1", claims(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})),
 		"wrong audience": is.token("k1", claims(map[string]any{"aud": "torque"})),
+		"aud array":      is.token("k1", claims(map[string]any{"aud": []string{aud}})),
+		"aud array two":  is.token("k1", claims(map[string]any{"aud": []string{aud, "torque"}})),
 		"wrong issuer":   is.token("k1", claims(map[string]any{"iss": "evil"})),
 		"no exp":         is.token("k1", claims(map[string]any{"exp": 0})),
 		"bad signature":  signJWT(other, "k1", "EdDSA", claims(nil)),
@@ -349,12 +351,36 @@ func TestEnforce(t *testing.T) {
 		{"POST", "/notes", "Bearer reader", 403},
 		{"POST", "/notes", "Bearer root", 200},
 		{"GET", "/admin/x/y", "Bearer reader", 403},
-		{"GET", "/unmapped", "Bearer reader", 200}, // authn only
+		{"GET", "/unmapped", "Bearer reader", 403}, // fail closed
 		{"GET", "/health", "", 200},
 	} {
 		if got := do(h, c.method, c.path, c.authz).Code; got != c.want {
 			t.Errorf("%s %s %q: got %d want %d", c.method, c.path, c.authz, got, c.want)
 		}
+	}
+}
+
+func TestEnforceUnmappedOptOutAndDefault(t *testing.T) {
+	for name, tc := range map[string]struct {
+		set  func(*ScopeTable)
+		want int
+	}{
+		"allow unmapped": {func(t *ScopeTable) { t.AllowUnmapped = true }, 200},
+		"default scope":  {func(t *ScopeTable) { t.Default = "tesseract.admin" }, 403},
+	} {
+		st := NewScopeTable()
+		tc.set(st)
+		g, err := New(Config{Mode: ModeEnforce, Verifier: NewAPIKeyVerifier(APIKey{Hash: HashKey("r"), ID: "r", Scopes: []string{"tesseract.read"}}), Scopes: st})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := do(g.Middleware(okHandler()), "GET", "/x", "Bearer r").Code; got != tc.want {
+			t.Errorf("%s: got %d want %d", name, got, tc.want)
+		}
+	}
+	h, _ := guardFixture(t, ModePermissive)
+	if c := do(h, "GET", "/unmapped", "Bearer reader").Code; c != 200 {
+		t.Errorf("permissive must not reject unmapped: %d", c)
 	}
 }
 

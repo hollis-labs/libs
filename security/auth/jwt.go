@@ -280,20 +280,11 @@ func decodePart(s string, dst any) error {
 	return json.Unmarshal(b, dst)
 }
 
+// audienceMatches accepts exactly one audience string equal to want. An aud
+// array is rejected, even a single-element one: tokens are minted for one app.
 func audienceMatches(raw json.RawMessage, want string) bool {
 	var one string
-	if json.Unmarshal(raw, &one) == nil {
-		return one == want
-	}
-	var many []string
-	if json.Unmarshal(raw, &many) == nil {
-		for _, a := range many {
-			if a == want {
-				return true
-			}
-		}
-	}
-	return false
+	return json.Unmarshal(raw, &one) == nil && one == want
 }
 
 func isInvalid(err error) bool { return errors.Is(err, ErrInvalidToken) }
