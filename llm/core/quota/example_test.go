@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/quota"
-	"github.com/hollis-labs/substrate/llm-core/quota/quotatest"
+	"github.com/hollis-labs/libs/llm/core/quota"
+	"github.com/hollis-labs/libs/llm/core/quota/quotatest"
 )
 
 // A per-minute input-token limit: hold an estimate while the request streams,

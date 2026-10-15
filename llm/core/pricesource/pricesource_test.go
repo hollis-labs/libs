@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
-	"github.com/hollis-labs/substrate/llm-core/modelsdev"
-	"github.com/hollis-labs/substrate/llm-core/pricesource"
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
+	"github.com/hollis-labs/libs/llm/core/modelsdev"
+	"github.com/hollis-labs/libs/llm/core/pricesource"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 type fakeCatalog map[string]modelsdev.Model

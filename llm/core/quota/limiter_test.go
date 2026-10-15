@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/quota"
-	"github.com/hollis-labs/substrate/llm-core/quota/quotatest"
+	"github.com/hollis-labs/libs/llm/core/quota"
+	"github.com/hollis-labs/libs/llm/core/quota/quotatest"
 )
 
 var ctx = context.Background()

@@ -4,7 +4,7 @@ Usage limits for LLM and API calls: windows, counters, limits, and a
 Check / Reserve / Commit flow with an injectable clock and pluggable stores.
 
 ```go
-import "github.com/hollis-labs/substrate/llm-core/quota"
+import "github.com/hollis-labs/libs/llm/core/quota"
 ```
 
 ## The model

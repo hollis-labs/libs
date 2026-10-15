@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 // FuzzPrice checks that pricing never panics and stays finite for any

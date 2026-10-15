@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hollis-labs/substrate/llm-core/modelsdev"
+	"github.com/hollis-labs/libs/llm/core/modelsdev"
 	"github.com/stretchr/testify/require"
 )
 

@@ -19,10 +19,10 @@ Pre-1.0 (`v0.x`). The surface may evolve until consumers settle.
 ## Install
 
 ```
-go get github.com/hollis-labs/substrate/llm-core/llmcontracts
+go get github.com/hollis-labs/libs/llm/core/llmcontracts
 ```
 
-Documentation: <https://pkg.go.dev/github.com/hollis-labs/substrate/llm-core/llmcontracts>
+Documentation: <https://pkg.go.dev/github.com/hollis-labs/libs/llm/core/llmcontracts>
 
 ## Quickstart
 
@@ -33,8 +33,8 @@ import (
     "context"
     "fmt"
 
-    llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
-    llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+    llmcontracts "github.com/hollis-labs/libs/llm/core/llmcontracts"
+    llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // myProvider is a stand-in for a real adapter.
@@ -88,7 +88,7 @@ Runnable examples for each major surface live under [`examples/`](examples/):
 ## Dependencies
 
 `go-llm-contracts` depends only on
-[`github.com/hollis-labs/substrate/llm-core/llmtypes`](https://github.com/hollis-labs/go-llm-types)
+[`github.com/hollis-labs/libs/llm/core/llmtypes`](https://github.com/hollis-labs/go-llm-types)
 for the transport-agnostic request, stream, and usage types referenced by its
 interfaces.
 

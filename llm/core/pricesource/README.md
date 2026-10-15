@@ -11,7 +11,7 @@ Price sources for `costcalc`: a models.dev adapter, override tables with explici
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/llm-core/pricesource
+go get github.com/hollis-labs/libs/llm/core/pricesource
 ```
 
 Requires Go 1.26.6 or newer. Depends on `llm-core/costcalc`, `llm-core/usageledger`, `llm-core/modelsdev` and the standard library.
@@ -26,9 +26,9 @@ import (
 	"log"
 	"time"
 
-	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
-	"github.com/hollis-labs/substrate/llm-core/pricesource"
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
+	"github.com/hollis-labs/libs/llm/core/pricesource"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 func main() {

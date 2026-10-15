@@ -3,9 +3,9 @@ package costcalc_test
 import (
 	"fmt"
 
-	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
-	"github.com/hollis-labs/substrate/llm-core/modelsdev"
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
+	"github.com/hollis-labs/libs/llm/core/modelsdev"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 func exampleUsage() usageledger.Usage {

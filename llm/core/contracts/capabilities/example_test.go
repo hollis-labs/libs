@@ -3,7 +3,7 @@ package capabilities_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
+	"github.com/hollis-labs/libs/llm/core/contracts/capabilities"
 )
 
 func ExampleCheck() {

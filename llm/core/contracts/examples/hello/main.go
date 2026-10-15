@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	agentcontracts "github.com/hollis-labs/substrate/llm-core/contracts"
+	agentcontracts "github.com/hollis-labs/libs/llm/core/contracts"
 )
 
 func main() {

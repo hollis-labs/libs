@@ -6,8 +6,8 @@ import (
 	"time"
 	_ "time/tzdata" // the DST cases must not depend on the host's zone database
 
-	"github.com/hollis-labs/substrate/llm-core/quota"
-	"github.com/hollis-labs/substrate/llm-core/quota/quotatest"
+	"github.com/hollis-labs/libs/llm/core/quota"
+	"github.com/hollis-labs/libs/llm/core/quota/quotatest"
 )
 
 func mustLoad(t *testing.T, name string) *time.Location {

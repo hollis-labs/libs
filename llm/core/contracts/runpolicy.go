@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
+	"github.com/hollis-labs/libs/llm/core/contracts/capabilities"
 )
 
 // Lifetime is how long an instance is meant to live.

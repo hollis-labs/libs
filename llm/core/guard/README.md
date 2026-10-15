@@ -1,6 +1,6 @@
 # guard
 
-`github.com/hollis-labs/substrate/llm-core/guard` decides whether a call to an
+`github.com/hollis-labs/libs/llm/core/guard` decides whether a call to an
 LLM resource may proceed, and learns from how each call ended. It keeps state
 in memory, imports only the standard library, and takes a `Clock` everywhere so
 tests can move time.

@@ -3,7 +3,7 @@ package llmcontracts
 import (
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/guard"
+	"github.com/hollis-labs/libs/llm/core/guard"
 )
 
 // CircuitState represents the circuit breaker state.

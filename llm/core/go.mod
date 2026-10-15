@@ -1,4 +1,4 @@
-module github.com/hollis-labs/substrate/llm-core
+module github.com/hollis-labs/libs/llm/core
 
 go 1.26.6
 

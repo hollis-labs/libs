@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/quota"
+	"github.com/hollis-labs/libs/llm/core/quota"
 )
 
 // Harness is one fresh, empty store under test.

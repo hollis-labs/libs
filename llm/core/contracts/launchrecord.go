@@ -3,7 +3,7 @@ package contracts
 import (
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/contracts/capabilities"
+	"github.com/hollis-labs/libs/llm/core/contracts/capabilities"
 )
 
 // Digests are the four content hashes a launch record pins: the definition, the

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	embedcontracts "github.com/hollis-labs/substrate/llm-core/embedcontracts"
+	embedcontracts "github.com/hollis-labs/libs/llm/core/embedcontracts"
 )
 
 type fake struct{ vec []float32 }

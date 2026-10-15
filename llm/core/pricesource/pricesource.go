@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	costcalc "github.com/hollis-labs/substrate/llm-core/costcalc"
-	"github.com/hollis-labs/substrate/llm-core/modelsdev"
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
+	"github.com/hollis-labs/libs/llm/core/modelsdev"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 // SourceModelsDev is the Source label of snapshots read from a models.dev

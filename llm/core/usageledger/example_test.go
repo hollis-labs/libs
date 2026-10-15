@@ -3,7 +3,7 @@ package usageledger_test
 import (
 	"fmt"
 
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 func ExampleNewUsage() {

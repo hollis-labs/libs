@@ -43,7 +43,7 @@ Each lib keeps its own `CHANGELOG.md` (the history of the old module, as written
 ### Changed
 
 - The old modules' release tags were not carried over; this is the first release of the module.
-- Import paths in code, documentation and tests moved to `github.com/hollis-labs/substrate/llm-core/...`, mechanically; no symbol was renamed or changed.
+- Import paths in code, documentation and tests moved to `github.com/hollis-labs/libs/llm/core/...`, mechanically; no symbol was renamed or changed.
 - The package clause of the root of `contracts` changed from `agentcontracts` to `contracts`, to match its directory. Callers that already import it under the alias `agentcontracts` need only the new import path.
 - The package of `go-modelsdev` lived in that repository's `modelsdev/` directory and is now `llm-core/modelsdev` itself.
 - No third-party requirement was raised: the merged `go.mod` carries the versions the old modules pinned (`github.com/cenkalti/backoff/v5` v5.0.3, `github.com/stretchr/testify` v1.11.1 and its indirect set).

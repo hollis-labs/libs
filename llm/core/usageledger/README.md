@@ -11,7 +11,7 @@ A `Usage` has five disjoint core components (uncached input, cache read, cache w
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/llm-core/usageledger
+go get github.com/hollis-labs/libs/llm/core/usageledger
 ```
 
 Requires Go 1.26.6 or newer. Standard library only.
@@ -24,7 +24,7 @@ package main
 import (
 	"fmt"
 
-	usageledger "github.com/hollis-labs/substrate/llm-core/usageledger"
+	usageledger "github.com/hollis-labs/libs/llm/core/usageledger"
 )
 
 func main() {

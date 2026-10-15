@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hollis-labs/substrate/llm-core/guard"
+	"github.com/hollis-labs/libs/llm/core/guard"
 )
 
 type stoppedClock struct{}

@@ -3,7 +3,7 @@ package contracts_test
 import (
 	"fmt"
 
-	agentcontracts "github.com/hollis-labs/substrate/llm-core/contracts"
+	agentcontracts "github.com/hollis-labs/libs/llm/core/contracts"
 )
 
 func ExampleAssignment_Validate() {
