@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/runloop"
+	"github.com/hollis-labs/libs/agent/core/runloop"
 )
 
 func TestRetryKeepsIterationAndContinueAdvances(t *testing.T) {

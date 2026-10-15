@@ -9,7 +9,7 @@ import (
 
 	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
 
-	"github.com/hollis-labs/substrate/agent/toolselect/profile"
+	"github.com/hollis-labs/libs/agent/core/toolselect/profile"
 )
 
 // noTools is an allow entry no real tool name matches. Tool names are never

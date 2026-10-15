@@ -10,7 +10,7 @@ The broker ships with embedded default rules. You can also load custom rules
 from a YAML or JSON file.
 
 ```go
-import "github.com/hollis-labs/substrate/agent/toolbroker/broker"
+import "github.com/hollis-labs/libs/agent/core/toolbroker/broker"
 
 // Option A: Use built-in defaults (recommended starting point).
 b := broker.NewLocalBroker(nil, broker.DefaultRules())
@@ -138,7 +138,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/hollis-labs/substrate/agent/toolbroker/broker"
+    "github.com/hollis-labs/libs/agent/core/toolbroker/broker"
 )
 
 func main() {

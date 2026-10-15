@@ -9,7 +9,7 @@ Fixed, ordered context-slot system with per-slot budgets, cache-key tracking and
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/agent/contextwindow
+go get github.com/hollis-labs/libs/agent/core/contextwindow
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 
-	contextwindow "github.com/hollis-labs/substrate/agent/contextwindow"
+	contextwindow "github.com/hollis-labs/libs/agent/core/contextwindow"
 )
 
 func main() {

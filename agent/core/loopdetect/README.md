@@ -11,7 +11,7 @@ It answers one question: in this session, has the same tool been called with the
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/agent/loopdetect
+go get github.com/hollis-labs/libs/agent/core/loopdetect
 ```
 
 Requires Go 1.26.6 or newer. Standard library only.
@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	loopdetect "github.com/hollis-labs/substrate/agent/loopdetect"
+	loopdetect "github.com/hollis-labs/libs/agent/core/loopdetect"
 )
 
 func main() {

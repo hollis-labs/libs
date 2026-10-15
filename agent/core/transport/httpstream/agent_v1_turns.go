@@ -16,7 +16,7 @@ import (
 	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
 	"github.com/hollis-labs/libs/ui-go/chatstream/sink/native"
 	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
-	agentservice "github.com/hollis-labs/substrate/agent/service"
+	agentservice "github.com/hollis-labs/libs/agent/core/service"
 )
 
 var ErrForeignRun = errors.New("canonical event belongs to a different run")

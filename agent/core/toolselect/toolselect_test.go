@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
+	toolselect "github.com/hollis-labs/libs/agent/core/toolselect"
 )
 
 func names(hits []toolselect.Hit) []string {

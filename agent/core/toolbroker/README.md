@@ -1,6 +1,6 @@
 # go-toolbroker
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/substrate/agent/toolbroker.svg)](https://pkg.go.dev/github.com/hollis-labs/substrate/agent/toolbroker)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hollis-labs/libs/agent/core/toolbroker.svg)](https://pkg.go.dev/github.com/hollis-labs/libs/agent/core/toolbroker)
 
 `go-toolbroker` is an in-process Go library for **intent-aware MCP tool selection**. Given a registry of MCP tool definitions and a priority-ordered set of rules, it selects the subset of tools relevant to a user's detected intent — replacing hardcoded exclude lists with a flexible rule engine. It also ships keyword-based intent detection, token-budget estimation, progressive-discovery scoring helpers, and an optional per-tool enrichment pipeline (`Hints` → markdown override block).
 
@@ -13,11 +13,11 @@ Pre-1.0. The public API is stable enough to be embedded in production code; expe
 ## Install
 
 ```bash
-go get github.com/hollis-labs/substrate/agent/toolbroker
+go get github.com/hollis-labs/libs/agent/core/toolbroker
 ```
 
 ```go
-import "github.com/hollis-labs/substrate/agent/toolbroker/broker"
+import "github.com/hollis-labs/libs/agent/core/toolbroker/broker"
 ```
 
 ## Quickstart
@@ -29,7 +29,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/hollis-labs/substrate/agent/toolbroker/broker"
+    "github.com/hollis-labs/libs/agent/core/toolbroker/broker"
 )
 
 func main() {

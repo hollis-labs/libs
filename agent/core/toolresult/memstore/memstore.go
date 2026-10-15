@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
 )
 
 // Store is an in-memory [toolresult.Store].

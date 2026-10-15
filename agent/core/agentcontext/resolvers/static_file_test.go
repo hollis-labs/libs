@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 )
 
 func writeTempFile(t *testing.T, dir, name, body string) string {

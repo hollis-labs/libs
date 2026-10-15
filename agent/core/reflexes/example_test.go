@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	reflexes "github.com/hollis-labs/substrate/agent/reflexes"
+	reflexes "github.com/hollis-labs/libs/agent/core/reflexes"
 )
 
 // rows is a fake Source and KindCatalog.

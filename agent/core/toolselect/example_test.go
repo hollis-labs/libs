@@ -3,7 +3,7 @@ package toolselect_test
 import (
 	"fmt"
 
-	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
+	toolselect "github.com/hollis-labs/libs/agent/core/toolselect"
 )
 
 func ExampleRank() {

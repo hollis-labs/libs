@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
-	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
+	"github.com/hollis-labs/libs/agent/core/toolresult/memstore"
 )
 
 func ExampleNew() {

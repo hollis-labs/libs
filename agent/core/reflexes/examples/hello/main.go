@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	reflexes "github.com/hollis-labs/substrate/agent/reflexes"
+	reflexes "github.com/hollis-labs/libs/agent/core/reflexes"
 )
 
 // memory is a fake Source and KindCatalog: a real host reads these from its

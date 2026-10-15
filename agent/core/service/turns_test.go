@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
-	"github.com/hollis-labs/substrate/agent/service"
+	"github.com/hollis-labs/libs/agent/core/service"
 )
 
 type output struct {

@@ -17,7 +17,7 @@ interface with an in-memory and a SQLite (`database/sql`) implementation.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/agent/toolresult
+go get github.com/hollis-labs/libs/agent/core/toolresult
 ```
 
 Requires Go 1.26.6 or newer. The only non-test dependency is
@@ -36,8 +36,8 @@ import (
 	"log"
 	"strings"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
-	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
+	"github.com/hollis-labs/libs/agent/core/toolresult/memstore"
 )
 
 func main() {

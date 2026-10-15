@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/agent/turn"
+	"github.com/hollis-labs/libs/agent/core/turn"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

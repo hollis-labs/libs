@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/toolselect/profile"
+	"github.com/hollis-labs/libs/agent/core/toolselect/profile"
 )
 
 func ptr(b bool) *bool { return &b }

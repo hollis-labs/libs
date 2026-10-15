@@ -15,9 +15,9 @@
 // [Cache.Put] stores without a preview, [Cache.Read] and [Cache.Search] serve
 // pages back, [Cache.HandleFetch] and [Cache.HandleSearch] execute the two
 // agent tools, and [Cache.Purge] deletes expired entries. Stores live in
-// [github.com/hollis-labs/substrate/agent/toolresult/memstore] and
-// [github.com/hollis-labs/substrate/agent/toolresult/sqlstore];
-// [github.com/hollis-labs/substrate/agent/toolresult/storetest] is the conformance suite
+// [github.com/hollis-labs/libs/agent/core/toolresult/memstore] and
+// [github.com/hollis-labs/libs/agent/core/toolresult/sqlstore];
+// [github.com/hollis-labs/libs/agent/core/toolresult/storetest] is the conformance suite
 // for any other implementation.
 //
 // Layer C is [Cache.FetchSpec] and [Cache.SearchSpec]: the agent-facing tool

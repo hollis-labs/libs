@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 )
 
 // frontmatterDelim is the literal "---" delimiter that opens and

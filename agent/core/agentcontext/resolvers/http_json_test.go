@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 )
 
 func jsonServer(t *testing.T, payload interface{}) *httptest.Server {

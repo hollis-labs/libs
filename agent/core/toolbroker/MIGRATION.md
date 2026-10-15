@@ -7,6 +7,6 @@ not carried.
 Rewrite the prefix mechanically:
 
 - `github.com/hollis-labs/go-toolbroker/broker` becomes
-  `github.com/hollis-labs/substrate/agent/toolbroker/broker`.
+  `github.com/hollis-labs/libs/agent/core/toolbroker/broker`.
 
 The `broker` package and its public symbols are unchanged.

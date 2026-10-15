@@ -7,8 +7,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
-	"github.com/hollis-labs/substrate/agent/toolresult/sqlstore"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
+	"github.com/hollis-labs/libs/agent/core/toolresult/sqlstore"
 )
 
 func ExampleNew() {

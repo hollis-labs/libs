@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 )
 
 func TestInlineResolver_Happy(t *testing.T) {

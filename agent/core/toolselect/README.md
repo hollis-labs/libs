@@ -21,7 +21,7 @@ to go-permission.
 ## Install
 
 ```sh
-go get github.com/hollis-labs/substrate/agent/toolselect
+go get github.com/hollis-labs/libs/agent/core/toolselect
 ```
 
 `toolselect/launch` depends on
@@ -39,8 +39,8 @@ import (
 	"fmt"
 	"log"
 
-	toolselect "github.com/hollis-labs/substrate/agent/toolselect"
-	"github.com/hollis-labs/substrate/agent/toolselect/profile"
+	toolselect "github.com/hollis-labs/libs/agent/core/toolselect"
+	"github.com/hollis-labs/libs/agent/core/toolselect/profile"
 )
 
 func main() {

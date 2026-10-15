@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	contextwindow "github.com/hollis-labs/substrate/agent/contextwindow"
+	contextwindow "github.com/hollis-labs/libs/agent/core/contextwindow"
 	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
 )
 

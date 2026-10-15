@@ -9,9 +9,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
-	"github.com/hollis-labs/substrate/agent/toolresult/sqlstore"
-	"github.com/hollis-labs/substrate/agent/toolresult/storetest"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
+	"github.com/hollis-labs/libs/agent/core/toolresult/sqlstore"
+	"github.com/hollis-labs/libs/agent/core/toolresult/storetest"
 )
 
 // nanite is migration 011 of Nanite, verbatim apart from comments.

@@ -3,9 +3,9 @@ package storetest_test
 import (
 	"testing"
 
-	toolresult "github.com/hollis-labs/substrate/agent/toolresult"
-	"github.com/hollis-labs/substrate/agent/toolresult/memstore"
-	"github.com/hollis-labs/substrate/agent/toolresult/storetest"
+	toolresult "github.com/hollis-labs/libs/agent/core/toolresult"
+	"github.com/hollis-labs/libs/agent/core/toolresult/memstore"
+	"github.com/hollis-labs/libs/agent/core/toolresult/storetest"
 )
 
 // ExampleRun shows the whole integration: hand Run a constructor that returns

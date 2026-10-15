@@ -12,7 +12,7 @@ import (
 	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
 	"github.com/hollis-labs/libs/ui-go/chatstream/hubbind"
 	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
-	"github.com/hollis-labs/substrate/agent/transport/httpstream"
+	"github.com/hollis-labs/libs/agent/core/transport/httpstream"
 )
 
 func TestStrictCursorRefusals(t *testing.T) {

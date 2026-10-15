@@ -1,4 +1,4 @@
-module github.com/hollis-labs/substrate/agent
+module github.com/hollis-labs/libs/agent/core
 
 go 1.26.6
 

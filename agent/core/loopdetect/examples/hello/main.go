@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	loopdetect "github.com/hollis-labs/substrate/agent/loopdetect"
+	loopdetect "github.com/hollis-labs/libs/agent/core/loopdetect"
 )
 
 func main() {

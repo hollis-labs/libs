@@ -8,8 +8,8 @@ import (
 
 	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
 
-	"github.com/hollis-labs/substrate/agent/toolselect/launch"
-	"github.com/hollis-labs/substrate/agent/toolselect/profile"
+	"github.com/hollis-labs/libs/agent/core/toolselect/launch"
+	"github.com/hollis-labs/libs/agent/core/toolselect/profile"
 )
 
 func assignment(allow, deny []string) contracts.Assignment {

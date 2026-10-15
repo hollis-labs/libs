@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hollis-labs/substrate/agent/agentcontext"
+	"github.com/hollis-labs/libs/agent/core/agentcontext"
 )
 
 // HTTPJSONResolver implements agentcontext.Resolver for
