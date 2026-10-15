@@ -7,3 +7,4 @@
 - `cmd/secrets`: `set` (stdin only, refuses a terminal), `check` (source, never the value), `delete`.
 - `keychain://` on a Linux host without Secret Service returns `unavailable` with guidance to `file://` / `op://`.
 - Behaviour change: `file://relative/path` is no longer invalid; it is a managed entry (`file://<ns>/<key>`).
+- `tokenfile` package (ported from go-tether-client's reader and Hadron's `localauth/token.go`): `Read` (final-component O_NOFOLLOW, regular file, mode exactly 0600, euid owner, size cap, optional validator), `Generate`, `Create` (O_EXCL), `Ensure`, atomic `Write`/`Rotate` (temp, fsync, rename, dir sync), `Watcher` (`Token`, `Verify`; stat-stamp re-read, digest compare, fail closed), `RefreshIfOlder` and `Keep` (refresh-in-place for short-lived tokens), `Equal`/`Digest`.

@@ -70,11 +70,12 @@ The environment is not a silent fallback. Use `env://VAR` (with `WithEnv()`), or
 - `secrets` (root): `Secret`, `Ref`, `Resolver`, `Backend`, `Store`, the schemes, `Error`.
 - `redact`: value redaction set (raw, URL-escaped and JSON-escaped forms; `Remember`; `Error` wrapper). Whole-text only.
 - `credfile`: the hardened credential-file reader.
+- `tokenfile`: bearer-token file lifecycle (strict `Read`, `Create`/`Ensure`, atomic `Write`/`Rotate`, `Watcher` with re-read on change and digest compare, `RefreshIfOlder`/`Keep` for short-lived tokens). Standard library only.
 - `secretstest`: `Install`, `FakeStore`, `FakeBackend`, `WriteHelper`, `AssertNoLeak`.
 
 ## Not in the MVP
 
-`Field` config type (authored-scheme-only: a value that becomes a reference only after `${VAR}` expansion stays literal); tail-mode redaction for cut stderr; pattern redaction (`sk-`, Bearer, PEM); token-file lifecycle (`tokenfile`); the `Exec` shim that resolves then `exec`s; a macOS write path that keeps the value off argv (unverified for go-keyring); caching. Headless Linux reports `not_found`/`unavailable` honestly; there is no file or `pass` fallback.
+`Field` config type (authored-scheme-only: a value that becomes a reference only after `${VAR}` expansion stays literal); tail-mode redaction for cut stderr; pattern redaction (`sk-`, Bearer, PEM); the `Exec` shim that resolves then `exec`s; a macOS write path that keeps the value off argv (unverified for go-keyring); caching. Headless Linux reports `not_found`/`unavailable` honestly; there is no file or `pass` fallback.
 
 ## Limits worth knowing
 
