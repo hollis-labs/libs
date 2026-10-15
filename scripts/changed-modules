@@ -37,11 +37,11 @@ grouped="$(modules | grep / || true)"
 
 changed=""
 if [ "$all" -eq 0 ]; then
-  if printf '%s\n' "$base" | grep -Eq '^0+$' || ! git -C "$REPO_ROOT" rev-parse -q --verify "$base^{commit}" >/dev/null 2>&1; then
+  if grep -Eq '^0+$' <<<"$base" || ! git -C "$REPO_ROOT" rev-parse -q --verify "$base^{commit}" >/dev/null 2>&1; then
     all=1
   else
     changed="$(git -C "$REPO_ROOT" diff --name-only "$base"...HEAD 2>/dev/null || git -C "$REPO_ROOT" diff --name-only "$base" HEAD)"
-    if printf '%s\n' "$changed" | grep -Eq '^(scripts/|\.github/workflows/(_module|modules)\.yml$)'; then
+    if grep -Eq '^(scripts/|\.github/workflows/(_module|modules)\.yml$)' <<<"$changed"; then
       all=1
     fi
   fi
@@ -50,7 +50,7 @@ fi
 out=""
 while IFS= read -r m; do
   [ -n "$m" ] || continue
-  if [ "$all" -eq 1 ] || printf '%s\n' "$changed" | grep -q "^$(re_escape "$m")/"; then
+  if [ "$all" -eq 1 ] || grep -q "^$(re_escape "$m")/" <<<"$changed"; then
     out="$out\"$m\","
   fi
 done <<EOF
