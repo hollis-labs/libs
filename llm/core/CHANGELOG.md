@@ -1,12 +1,16 @@
 # Changelog
 
-All notable changes to the `llm-core` module are documented here. The format follows
+All notable changes to the `llm-core` module are documented here (the module was `llm-core` in the substrate repository). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`llm-core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`llm/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-15
+
+- Module path is now `github.com/hollis-labs/libs/llm/core` (was `github.com/hollis-labs/substrate/llm-core`); the substrate path and its `llm-core/vX.Y.Z` tags no longer exist. Tags are `llm/core/vX.Y.Z`. Package paths below are relative to the module root; entries from before this release keep the former `llm-core/` prefix.
 
 ### Added
 
