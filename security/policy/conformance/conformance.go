@@ -7,7 +7,7 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/hollis-labs/substrate/policy"
+	"github.com/hollis-labs/libs/security/policy"
 )
 
 // Case binds a named host-projected request to a complete expected decision.

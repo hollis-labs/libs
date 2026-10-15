@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/policy"
+	"github.com/hollis-labs/libs/security/policy"
 )
 
 func request() policy.Request {

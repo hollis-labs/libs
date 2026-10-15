@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/substrate/policy"
-	"github.com/hollis-labs/substrate/policy/conformance"
+	"github.com/hollis-labs/libs/security/policy"
+	"github.com/hollis-labs/libs/security/policy/conformance"
 )
 
 type pdpFunc func(context.Context, policy.Request) (policy.Decision, error)

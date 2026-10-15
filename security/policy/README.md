@@ -1,6 +1,6 @@
 # Policy
 
-`github.com/hollis-labs/substrate/policy` provides a neutral policy boundary:
+`github.com/hollis-labs/libs/security/policy` provides a neutral policy boundary:
 host-projected requests, `allow` / `ask` / `deny` decisions, mandatory obligations,
 a swappable PDP, one evaluation audit event and explicit per-call failure policy.
 The module uses only the standard library.
