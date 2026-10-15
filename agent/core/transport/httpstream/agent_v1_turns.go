@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	chatstream "github.com/hollis-labs/libs/ui-go/chatstream"
-	"github.com/hollis-labs/libs/ui-go/chatstream/hubbind"
-	"github.com/hollis-labs/libs/ui-go/chatstream/sink"
-	"github.com/hollis-labs/libs/ui-go/chatstream/sink/native"
-	streamhub "github.com/hollis-labs/libs/ui-go/streamhub"
+	chatstream "github.com/hollis-labs/libs/ui/ui-go/chatstream"
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/hubbind"
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/sink"
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/sink/native"
+	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 	agentservice "github.com/hollis-labs/libs/agent/core/service"
 )
 

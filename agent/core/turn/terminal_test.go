@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/agent/core/turn"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 func TestCanonicalTurnRequiresProviderTerminal(t *testing.T) {

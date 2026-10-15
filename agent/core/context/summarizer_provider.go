@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	llmcontracts "github.com/hollis-labs/substrate/llm-core/llmcontracts"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmcontracts "github.com/hollis-labs/libs/llm/core/llmcontracts"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // ProviderSummarizer implements Summarizer against a llmcontracts.Provider. It

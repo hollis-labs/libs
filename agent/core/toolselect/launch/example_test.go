@@ -3,7 +3,7 @@ package launch_test
 import (
 	"fmt"
 
-	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
+	contracts "github.com/hollis-labs/libs/llm/core/contracts"
 
 	"github.com/hollis-labs/libs/agent/core/toolselect/launch"
 	"github.com/hollis-labs/libs/agent/core/toolselect/profile"

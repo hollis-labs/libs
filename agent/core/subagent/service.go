@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	messaging "github.com/hollis-labs/substrate/mesh/messaging/mailbox"
+	messaging "github.com/hollis-labs/libs/mesh/core/messaging/mailbox"
 )
 
 // DefaultTimeoutSeconds is the wall-clock BACKSTOP for a runner when

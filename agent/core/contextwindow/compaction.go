@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // CompactionMode determines how the summary prompt is shaped.

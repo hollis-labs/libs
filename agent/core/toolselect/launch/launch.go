@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	contracts "github.com/hollis-labs/substrate/llm-core/contracts"
+	contracts "github.com/hollis-labs/libs/llm/core/contracts"
 
 	"github.com/hollis-labs/libs/agent/core/toolselect/profile"
 )

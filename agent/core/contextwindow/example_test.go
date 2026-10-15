@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	contextwindow "github.com/hollis-labs/libs/agent/core/contextwindow"
-	llmtypes "github.com/hollis-labs/substrate/llm-core/llmtypes"
+	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 func ExampleNewContextWindow() {
