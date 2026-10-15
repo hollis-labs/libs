@@ -73,9 +73,13 @@ The environment is not a silent fallback. Use `env://VAR` (with `WithEnv()`), or
 - `tokenfile`: bearer-token file lifecycle (strict `Read`, `Create`/`Ensure`, atomic `Write`/`Rotate`, `Watcher` with re-read on change and digest compare, `RefreshIfOlder`/`Keep` for short-lived tokens). Standard library only.
 - `secretstest`: `Install`, `FakeStore`, `FakeBackend`, `WriteHelper`, `AssertNoLeak`.
 
-## Not in the MVP
+## macOS and argv
 
-`Field` config type (authored-scheme-only: a value that becomes a reference only after `${VAR}` expansion stays literal); tail-mode redaction for cut stderr; pattern redaction (`sk-`, Bearer, PEM); the `Exec` shim that resolves then `exec`s; a macOS write path that keeps the value off argv (unverified for go-keyring); caching. Headless Linux reports `not_found`/`unavailable` honestly; there is no file or `pass` fallback.
+Verified by reading `zalando/go-keyring` v0.2.8 `keyring_darwin.go` (not run on a macOS host, none available here): `Set` starts `/usr/bin/security -i` and writes `add-generic-password -U -s ... -a ... -w <value>` to the child's **stdin**. The secret is therefore not on any process's command line; argv is just `security -i`. `Get` uses `find-generic-password -wa`, which prints to stdout. So `keychain://` writes through this package keep the value off argv, and no replacement path is needed. Residual limits: the value is base64-wrapped (`go-keyring-base64:`), which is an encoding, not protection; the whole command is capped at 4096 bytes, so a value over about 3 KB is `too_large`; and in v0.2.8 the cap is checked after the child has started. Tether's own `tether-apikey-helper` darwin `set` does call `security add-generic-password ... -w <secret>` directly and does expose the secret in argv: moving it onto this package (or `security -i`) removes that (CW-20261015-0014).
+
+## Not yet
+
+`Exec` shim (resolve, then exec; Cerberus `run-secrets`); caching; `Field` config type (authored-scheme-only: a value that becomes a reference only after `${VAR}` expansion stays literal); tail-mode redaction for cut stderr; pattern redaction (`sk-`, Bearer, PEM); SDK-based `op` (the CLI is used). Headless Linux uses the managed file store; there is no `pass` or encrypted-file fallback.
 
 ## Limits worth knowing
 
