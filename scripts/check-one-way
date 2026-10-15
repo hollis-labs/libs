@@ -6,7 +6,7 @@
 #    may depend on libs, never the reverse.
 #
 # 2. Group order (GROUP_RANKS in scripts/repo.conf):
-#      core < security < mcp, ui, workflow, llm < mesh < agent
+#      core < security < mcp, ui, workflow, llm < mesh < harness < agent
 #    A module may reference modules of its own group and of groups of strictly lower
 #    rank. A reference to a higher group, or to a sibling group of the same rank, fails.
 #

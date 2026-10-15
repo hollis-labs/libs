@@ -24,7 +24,7 @@ importing history you also need
    independently, so a branch that touches two of them forces two releases and an
    order. If a change needs both, say so in the description and list the order.
    Respect the group order (`core` < `security` < `mcp`/`ui`/`workflow`/`llm` <
-   `mesh` < `agent`): a module never imports a higher group or a sibling group.
+   `mesh` < `harness` < `agent`): a module never imports a higher group or a sibling group.
 3. **Run the checks when the change is done**, not on every commit:
    `scripts/check <group>/<module>` (add `-race` for concurrent code),
    `scripts/check-layout`, `scripts/check-one-way` and
