@@ -1,4 +1,4 @@
-module github.com/hollis-labs/go-secrets
+module github.com/hollis-labs/libs/security/secrets
 
 go 1.26.6
 

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	secrets "github.com/hollis-labs/go-secrets"
-	"github.com/hollis-labs/go-secrets/redact"
-	"github.com/hollis-labs/go-secrets/secretstest"
+	secrets "github.com/hollis-labs/libs/security/secrets"
+	"github.com/hollis-labs/libs/security/secrets/redact"
+	"github.com/hollis-labs/libs/security/secrets/secretstest"
 )
 
 func Example() {

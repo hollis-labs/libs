@@ -18,7 +18,7 @@ import (
 	"io"
 	"os"
 
-	secrets "github.com/hollis-labs/go-secrets"
+	secrets "github.com/hollis-labs/libs/security/secrets"
 )
 
 func main() {

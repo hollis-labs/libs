@@ -19,7 +19,7 @@ import (
 	"sync"
 	"testing"
 
-	secrets "github.com/hollis-labs/go-secrets"
+	secrets "github.com/hollis-labs/libs/security/secrets"
 )
 
 // Install switches the keychain to an in-memory provider for the rest of the

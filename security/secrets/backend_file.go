@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hollis-labs/go-secrets/credfile"
-	"github.com/hollis-labs/go-secrets/internal/atomicfile"
+	"github.com/hollis-labs/libs/security/secrets/credfile"
+	"github.com/hollis-labs/libs/security/secrets/internal/atomicfile"
 )
 
 // FileBackend serves file:///abs/path and file://~/path from a private

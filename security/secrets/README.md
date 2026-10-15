@@ -9,7 +9,7 @@ Secret references, a `Secret` type that cannot leak, typed errors, redaction and
 ## Install
 
 ```sh
-go get github.com/hollis-labs/go-secrets
+go get github.com/hollis-labs/libs/security/secrets
 ```
 
 ## Usage
@@ -46,7 +46,7 @@ Exit 0 with the value on stdout; exit 2 not found; exit 3 denied; any other exit
 Fleet hosts have no Secret Service, so `keychain://` returns `unavailable` there, with guidance pointing at `file://<ns>/<key>` or `op://`. The managed file store needs nothing running:
 
 ```sh
-go install github.com/hollis-labs/go-secrets/cmd/secrets@latest
+go install github.com/hollis-labs/libs/security/secrets/cmd/secrets@latest
 printf %s "$KEY" | secrets set file://openai/work   # stdin only, never argv
 secrets check file://openai/work                    # prints the source, never the value
 ```

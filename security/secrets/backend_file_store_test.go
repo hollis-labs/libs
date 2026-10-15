@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	secrets "github.com/hollis-labs/go-secrets"
-	"github.com/hollis-labs/go-secrets/secretstest"
+	secrets "github.com/hollis-labs/libs/security/secrets"
+	"github.com/hollis-labs/libs/security/secrets/secretstest"
 )
 
 const fileValue = "file-store-value-0123456789"

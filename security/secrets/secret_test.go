@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	secrets "github.com/hollis-labs/go-secrets"
-	"github.com/hollis-labs/go-secrets/secretstest"
+	secrets "github.com/hollis-labs/libs/security/secrets"
+	"github.com/hollis-labs/libs/security/secrets/secretstest"
 )
 
 const value = "sk-live-0123456789abcdef"
