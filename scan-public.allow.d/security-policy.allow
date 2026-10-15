@@ -1,0 +1,7 @@
+# security/policy: imports of substrate policy and harness/interception/permission; owner-reviewed 2026-10-15; placeholders only.
+home-path-macos security/policy/permission/derivation.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
+home-path-macos security/policy/permission/derivation_test.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
+home-path-macos security/policy/permission/resolve.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
+home-path-macos security/policy/permission/resolve_test.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
+home-path-macos security/policy/permission/summary/summary.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
+home-path-macos security/policy/permission/summary/summary_test.go Placeholder user directory in path-handling code, doc comment or test of the permission engine; reviewed by the owner 2026-10-15, not a real path.
