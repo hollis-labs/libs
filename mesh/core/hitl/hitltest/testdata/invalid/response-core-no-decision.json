@@ -1,0 +1,8 @@
+{
+  "def": "HITLResponseCoreV1",
+  "name": "response-core-no-decision",
+  "rejects_because": "",
+  "doc": {
+    "kind": "approval"
+  }
+}

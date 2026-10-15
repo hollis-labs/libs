@@ -1,0 +1,15 @@
+{
+  "def": "HITLItemHandleCoreV1",
+  "name": "handle-tangent-extras",
+  "doc": {
+    "contract_version": "1.0",
+    "surface_id": "s",
+    "item_id": "item_01",
+    "state": "resolved",
+    "revision": 5,
+    "queue_sequence": 42,
+    "queue_position": null,
+    "inbox_url": "/hitl",
+    "item_url": "/hitl/items/item_01"
+  }
+}

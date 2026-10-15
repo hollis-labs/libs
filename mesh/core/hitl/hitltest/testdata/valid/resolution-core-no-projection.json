@@ -1,0 +1,20 @@
+{
+  "def": "ResolutionRecordCoreV1",
+  "name": "resolution-core-no-projection",
+  "doc": {
+    "resolution_id": "resolution_01",
+    "response": {
+      "kind": "approval",
+      "decision": "approved"
+    },
+    "participant": {
+      "responder": {
+        "kind": "human",
+        "ref": "operator@example.test"
+      },
+      "assurance": "asserted"
+    },
+    "resolved_at": "2026-09-04T03:30:00Z",
+    "interaction_revision": 5
+  }
+}

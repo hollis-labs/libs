@@ -1,0 +1,54 @@
+{
+  "name": "expiry-sweep",
+  "description": "ExpireDue materializes expiry; repeating it changes nothing.",
+  "tangent_evidence": "none",
+  "requires": [
+    "expiry-enforcement"
+  ],
+  "steps": [
+    {
+      "op": "enqueue",
+      "as": "a",
+      "doc": {
+        "contract_version": "1.0",
+        "kind": "approval",
+        "idempotency_key": "{{run}}-lapsed",
+        "source": {
+          "application_id": "conf-a",
+          "agent_id": "agent-1"
+        },
+        "title": "Approve change",
+        "summary": "s",
+        "request": "r",
+        "expires_at": "2000-01-01T00:00:00Z"
+      },
+      "expect": {}
+    },
+    {
+      "op": "expire",
+      "expect": {}
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "as": "g",
+      "expect": {
+        "state": "expired",
+        "outcome_state": "expired"
+      }
+    },
+    {
+      "op": "expire",
+      "expect": {}
+    },
+    {
+      "op": "get",
+      "item": "a",
+      "expect": {
+        "state": "expired",
+        "outcome_equals": "g",
+        "revision_same_as": "g"
+      }
+    }
+  ]
+}

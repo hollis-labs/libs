@@ -1,0 +1,9 @@
+{
+  "def": "HITLPlainErrorV1",
+  "name": "error-plain-not-found",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "not_found",
+    "message": "hitl: not found"
+  }
+}

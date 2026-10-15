@@ -1,0 +1,10 @@
+{
+  "def": "HITLIdempotencyConflictErrorV1",
+  "name": "idempotency-conflict",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "idempotency_conflict",
+    "idempotency_key": "k-1",
+    "existing_item_id": "item_01"
+  }
+}

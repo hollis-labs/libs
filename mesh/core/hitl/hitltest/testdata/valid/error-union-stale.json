@@ -1,0 +1,14 @@
+{
+  "def": "HITLErrorV1",
+  "name": "error-union-stale",
+  "doc": {
+    "contract_version": "1.0",
+    "code": "stale_revision",
+    "operation": "withdraw",
+    "item_id": "item_01",
+    "revision_kind": "interaction",
+    "expected_revision": 2,
+    "actual_revision": 3,
+    "current_state": "presented"
+  }
+}

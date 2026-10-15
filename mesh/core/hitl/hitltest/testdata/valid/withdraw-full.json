@@ -1,0 +1,13 @@
+{
+  "def": "HITLWithdrawCommandV1",
+  "name": "withdraw-full",
+  "doc": {
+    "contract_version": "1.0",
+    "item_id": "item_01",
+    "caller": {
+      "application_id": "codex"
+    },
+    "expected_revision": 2,
+    "reason": "no longer needed"
+  }
+}

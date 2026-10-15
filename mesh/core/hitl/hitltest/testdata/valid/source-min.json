@@ -1,0 +1,8 @@
+{
+  "def": "SourceAssertionV1",
+  "name": "source-min",
+  "doc": {
+    "application_id": "codex",
+    "agent_id": "msg://agent/codex/worker-7"
+  }
+}

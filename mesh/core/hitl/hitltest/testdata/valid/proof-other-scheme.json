@@ -1,0 +1,14 @@
+{
+  "def": "ProofV1",
+  "name": "proof-other-scheme",
+  "doc": {
+    "scheme": "x509",
+    "key_ref": "cn=ops",
+    "binds": [
+      {
+        "name": "nonce",
+        "value": "1"
+      }
+    ]
+  }
+}
