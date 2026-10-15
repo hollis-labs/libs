@@ -3,7 +3,7 @@
 Shared bearer auth for the Hollis mesh. One wire contract (`Authorization: Bearer <token>`, scope strings `<app>.<verb>`, a `Principal` in request context), one middleware, pluggable verifiers. Tether issues Ed25519 JWTs; apps verify them offline against its JWKS.
 
 ```
-go get github.com/hollis-labs/go-auth   # package name: auth
+go get github.com/hollis-labs/libs/security/go-auth   # package name: auth
 ```
 
 ## HTTP app
