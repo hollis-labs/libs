@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Scan a repository for content that must not become public.
 
-Usage: scripts/scan-public [--repo DIR] [--tree | --history] [--ref REV ...] [--no-gitleaks]
-                           [--allowlist FILE | --no-allowlist]
+Usage: scripts/scan-public [--repo DIR | --source PATH-OR-URL] [--tree | --history] [--ref REV ...]
+                           [--no-gitleaks] [--allowlist FILE | --no-allowlist]
 
 Scans the working tree (tracked files, and untracked files that are not ignored)
 AND the full history (every ref, every added line, every commit message), for:
@@ -29,6 +29,13 @@ counted, so nothing is suppressed silently. Without --allowlist, a scan-public.a
 file at the repository root and every scan-public.allow.d/*.allow file are used when they
 exist (one file per module, so branches do not conflict), so a local run and CI agree;
 --no-allowlist ignores them and shows every raw finding.
+
+--source PATH-OR-URL scans a repository that is about to be imported (a standalone
+repository on its way into a group): it is cloned into a scratch directory that is removed
+afterwards, and its tip AND its full history (every branch and tag the clone has) are
+scanned, never just the tip. The source's own scan-public.allow files, if any, and this
+repository's allowlists (their paths are not the source's) are not applied: every raw
+finding shows unless --allowlist FILE is given. scripts/import-repo runs this first.
 
 Exit status: 0 clean, 1 findings, 2 a scanner could not run.
 """
@@ -280,6 +287,7 @@ def allowed_by(rules, rule, path, commit=""):
 def main():
     ap = argparse.ArgumentParser(description="Scan a repository for content that must not become public.")
     ap.add_argument("--repo", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    ap.add_argument("--source", help="clone this path or URL into a scratch directory and scan its tip and full history")
     ap.add_argument("--tree", action="store_true", help="scan only the working tree")
     ap.add_argument("--history", action="store_true", help="scan only the history")
     ap.add_argument("--ref", action="append", default=[], help="scan history reachable from REV instead of every ref (repeatable)")
@@ -288,6 +296,31 @@ def main():
     ap.add_argument("--no-allowlist", action="store_true", help="ignore scan-public.allow and show every raw finding")
     args = ap.parse_args()
 
+    scratch = None
+    if args.source:
+        if args.tree and not args.history:
+            print("--source scans history too; drop --tree", file=sys.stderr)
+            return 2
+        scratch = tempfile.mkdtemp(prefix="scan-public-src.")
+        name = os.path.basename(args.source.rstrip("/"))
+        name = re.sub(r"\.git$", "", name) or "source"
+        clone = os.path.join(scratch, name)
+        r = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks", args.source, clone],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            shutil.rmtree(scratch, ignore_errors=True)
+            print("ERROR: could not clone the source: %s" % r.stderr.strip()[-300:], file=sys.stderr)
+            return 2
+        args.repo = clone
+        args.no_allowlist = args.no_allowlist or not args.allowlist
+    try:
+        return scan(args)
+    finally:
+        if scratch:
+            shutil.rmtree(scratch, ignore_errors=True)
+
+
+def scan(args):
     repo = os.path.realpath(args.repo)
     do_tree = args.tree or not args.history
     do_history = args.history or not args.tree

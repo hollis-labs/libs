@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Repository layout guard. Exits non-zero when:
 #   - a go.work or go.work.sum is tracked, or sits in the tree and is not ignored;
-#   - a go.mod exists anywhere but <module>/go.mod (none at the root, none nested);
-#   - a module path is not <MODULE_PREFIX>/<directory> (plus /vN for v2 and later);
+#   - a go.mod exists anywhere but <group>/<module>/go.mod, where <group> is one of the
+#     groups in repo.conf (none at the root, none in a group directory, none nested in a
+#     module, none in an unknown group); a LEGACY_FLAT_MODULES entry may still sit at
+#     <module>/go.mod while it is being moved into a group;
+#   - a module path is not <MODULE_PREFIX>/<group>/<module> (plus /vN for v2 and later);
 #   - a go.mod has no go directive, or contains a replace directive.
 #
-# Why: modules are released independently with module-prefixed tags. A go.work or a
+# Why: modules are released independently with tags <group>/<module>/vX.Y.Z. A go.work or a
 # replace directive makes a module build here and nowhere else, and a go.mod inside
 # another module silently carves that subtree out of it.
 #
@@ -33,14 +36,43 @@ while IFS= read -r f; do
       ;;
   esac
 
+  # Everything under a group belongs to a module: group/README.md is the only loose file.
+  top="${f%%/*}"
+  if [ "$top" != "$f" ] && is_group "$top" && ! is_legacy_flat "$top"; then
+    rest="${f#*/}"
+    case "$rest" in
+      */*) [ -f "$REPO_ROOT/$top/${rest%%/*}/go.mod" ] || bad "$f: not inside a module; $top/${rest%%/*}/go.mod is missing (group directories hold only modules)" ;;
+      README.md) ;;
+      *) bad "$f: loose file in the group directory '$top'; groups hold only <module>/ directories (and a README.md)" ;;
+    esac
+  fi
+
   case "$f" in */testdata/*) continue ;; esac
   case "$f" in
     go.mod)
-      bad "go.mod at the repository root; modules live one level down as <module>/go.mod"
+      bad "go.mod at the repository root; modules live at <group>/<module>/go.mod"
       ;;
     */go.mod)
-      case "${f%/go.mod}" in
-        */*) bad "$f: nested go.mod; a module's go.mod must be <module>/go.mod, never inside another module" ;;
+      d="${f%/go.mod}"
+      top="${d%%/*}"
+      case "$d" in
+        */*/*) bad "$f: nested go.mod; a module's go.mod must be <group>/<module>/go.mod, never inside another module" ;;
+        */*)
+          if is_legacy_flat "$top"; then
+            bad "$f: go.mod inside the legacy flat module '$top'; a module must not contain another module"
+          elif ! is_group "$top"; then
+            bad "$f: '$top' is not a group (groups: $(groups | tr '\n' ' '))"
+          fi
+          ;;
+        *)
+          if is_legacy_flat "$top"; then
+            :
+          elif is_group "$top"; then
+            bad "$f: a group directory carries no go.mod; put the module at $top/<module>/go.mod"
+          else
+            bad "$f: '$top' is neither a group nor a legacy module; modules live at <group>/<module>/go.mod (groups: $(groups | tr '\n' ' '))"
+          fi
+          ;;
       esac
       ;;
   esac
@@ -49,7 +81,7 @@ $files
 EOF
 
 mods="$(modules)"
-[ -n "$mods" ] || bad "no modules found (expected <module>/go.mod)"
+[ -n "$mods" ] || bad "no modules found (expected <group>/<module>/go.mod)"
 
 count=0
 for m in $mods; do
