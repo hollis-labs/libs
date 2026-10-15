@@ -2,7 +2,7 @@ package contexthook
 
 import (
 	"context"
-	"github.com/hollis-labs/libs/agent/core/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 	"github.com/hollis-labs/libs/harness/core/workspace/goldens"
 	"os"
 	"path/filepath"

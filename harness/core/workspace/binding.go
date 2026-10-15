@@ -2,8 +2,8 @@ package workspace
 
 import (
 	layout "github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
+	"github.com/hollis-labs/libs/security/policy/permission"
 	"path"
 	"slices"
 	"strings"

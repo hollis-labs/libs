@@ -14,7 +14,7 @@ import (
 // ACP bridge, `@agentclientprotocol/claude-agent-acp` (npm, spawned via
 // npx by default — see the package doc's "Node.js/npm/npx runtime
 // requirement" section). Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 //
 // Name() deliberately returns "claude-acp", distinct from the existing
 // native adapters/claude package's "claude" — both represent the same

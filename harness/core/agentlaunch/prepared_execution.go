@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/hollis-labs/libs/harness/core/agentcomposition"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 var (

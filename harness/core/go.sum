@@ -1,11 +1,11 @@
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
-github.com/hollis-labs/substrate/agent v0.1.0 h1:KAf3hQOe1EO88KU08V29UmyViHnVfY98m5dqXRV7G3c=
-github.com/hollis-labs/substrate/agent v0.1.0/go.mod h1:NGtnJ+6am7s5SpR7mnoYnb3bOLhysCphSiXh/aNlelk=
-github.com/hollis-labs/substrate/llm-core v0.1.0 h1:nsNpY3OzpuvHKC9zLzqFKmwMXt856PXOUfaVpGP8pFY=
-github.com/hollis-labs/substrate/llm-core v0.1.0/go.mod h1:055xZrH5gLwodrVMu2SHQzfIcTXhjDGBXfJ1kdy/eSo=
-github.com/hollis-labs/substrate/mesh v0.3.0 h1:IG+EgDiJ/quMITxDFkr/B7qRgy6AIaoti4ohUYuIP34=
-github.com/hollis-labs/substrate/mesh v0.3.0/go.mod h1:bNoNk0iDKq8QpOwRybpctoS0nlm1ppsk5htbO/KbIcM=
+github.com/hollis-labs/libs/llm/core v0.2.0 h1:jYjfC4gsLbxsUG5mQ4ougbmUB0b9rQpqb85Vmb4CwQg=
+github.com/hollis-labs/libs/llm/core v0.2.0/go.mod h1:Hl8R2j3sR/mxfX8S/XBSxqcm7VM+RSVzH924gYXTyGw=
+github.com/hollis-labs/libs/mesh/core v0.4.0 h1:c9VyyMzFGRuE9kVckgvvlt5U8VHLnpv5sf/4TwwSoKA=
+github.com/hollis-labs/libs/mesh/core v0.4.0/go.mod h1:K1a1oeFXakkaJDyKogI/I2j+2lpKklTZgdtzSw45Bss=
+github.com/hollis-labs/libs/security/policy v0.1.0 h1:XsksYYhpJ315wlr9QmWwxUKRfyDAJSSRiekBh7jpI70=
+github.com/hollis-labs/libs/security/policy v0.1.0/go.mod h1:vFJQekM6tI5OV+2rqK+mx/imNUSSJ26PkvAvgMmdQBo=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=

@@ -13,7 +13,7 @@ import (
 // Adapter is the wrapper adapter for Codex driven through the
 // agentclientprotocol/codex-acp bridge (`npx -y
 // @agentclientprotocol/codex-acp`). Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 //
 // Name() deliberately returns "codex-acp", distinct from the existing
 // native adapters/codex package's "codex" — both represent the same

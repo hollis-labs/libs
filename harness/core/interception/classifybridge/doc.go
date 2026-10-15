@@ -10,9 +10,9 @@
 // Wiring:
 //
 //	import (
-//	    "github.com/hollis-labs/go-agent-wrapper/classifybridge"
-//	    "github.com/hollis-labs/go-agent-wrapper/wrapper"
-//	    "github.com/hollis-labs/go-harness-filters/classify"
+//	    "github.com/hollis-labs/libs/harness/core/interception/classifybridge"
+//	    "github.com/hollis-labs/libs/harness/core/adapters/wrapper"
+//	    "github.com/hollis-labs/libs/harness/core/interception/filters/classify"
 //	)
 //
 //	rules := classify.NewRuleSet(classify.NaniteDeployRule)

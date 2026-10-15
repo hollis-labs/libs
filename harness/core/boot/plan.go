@@ -12,11 +12,11 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	"github.com/hollis-labs/libs/harness/core/adapters/nativefiles"
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/harness/core/workspace"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	"github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // Plan consumes finished content and explicit snapshots. It calls no Ports,

@@ -9,7 +9,7 @@ import (
 )
 
 // Adapter is the wrapper adapter for Claude Code's streaming-stdio
-// runtime. Construct via [New]; pass to [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// runtime. Construct via [New]; pass to [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 type Adapter struct {
 	binary string
 	extra  []string

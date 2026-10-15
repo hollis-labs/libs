@@ -1,6 +1,6 @@
 package agentlaunch
 
-import permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+import permission "github.com/hollis-labs/libs/security/policy/permission"
 
 // ProviderSpec names the provider adapter (claude / codex / opencode /
 // future) and carries the configuration the launcher needs to spawn it.

@@ -16,7 +16,7 @@ import (
 // exactly what this does and does not do — this is intentionally NOT a
 // full reimplementation of [Client]'s handshake; it exists so this
 // Adapter is structurally usable through
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Wrapper.Run]'s
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Wrapper.Run]'s
 // existing jsonrpc-stdio dispatch, with real (not placeholder) argv and
 // real (not placeholder) read-side translation.
 type cliAdapterGlue struct {

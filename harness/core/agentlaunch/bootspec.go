@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // RuntimeBinding is the frozen hot-path-readable runtime contract the

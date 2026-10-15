@@ -10,7 +10,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/providertest"
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/launch"
 )

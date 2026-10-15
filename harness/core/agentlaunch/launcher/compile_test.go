@@ -10,8 +10,8 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch/matrix"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // fixedTime is the pinned wall-clock value tests use to make Compile's

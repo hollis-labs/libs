@@ -10,7 +10,7 @@ import (
 
 // Adapter is the wrapper adapter for OpenCode's serve-http (HTTP/SSE)
 // runtime. Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 type Adapter struct {
 	binary string
 	extra  []string

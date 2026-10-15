@@ -101,7 +101,7 @@ package render
 
 import (
 	"fmt"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/security/policy/permission"
 	"io/fs"
 
 	claude "github.com/hollis-labs/libs/harness/core/adapters/claude/nativefiles"

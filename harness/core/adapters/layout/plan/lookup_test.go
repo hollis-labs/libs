@@ -2,7 +2,7 @@ package plan
 
 import (
 	"errors"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/security/policy/permission"
 
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 	"testing"

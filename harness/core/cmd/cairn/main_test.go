@@ -15,13 +15,13 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/layout/plan"
 	"github.com/hollis-labs/libs/harness/core/adapters/provider"
 	"github.com/hollis-labs/libs/harness/core/boot"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
 	"github.com/hollis-labs/libs/harness/core/workspace"
 	"github.com/hollis-labs/libs/harness/core/workspace/bootkey"
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 	"github.com/hollis-labs/libs/harness/core/workspace/render"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	"github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // These are synthetic resolved observations in private fixtures, not native

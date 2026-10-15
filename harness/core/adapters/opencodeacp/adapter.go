@@ -12,7 +12,7 @@ import (
 
 // Adapter is the wrapper adapter for OpenCode's native ACP subprocess
 // mode (`opencode acp`). Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 //
 // Name() deliberately returns "opencode-acp", distinct from the existing
 // native adapters/opencode package's "opencode" — both represent the

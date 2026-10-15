@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // The mappings measured live on 2026-10-01 (see the package doc). A change

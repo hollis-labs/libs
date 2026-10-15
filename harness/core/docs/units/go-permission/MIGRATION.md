@@ -6,9 +6,9 @@
 
 | Old import path | New import path | Package |
 |---|---|---|
-| `github.com/hollis-labs/go-permission` | `github.com/hollis-labs/libs/harness/core/interception/permission` | `permission` |
-| `github.com/hollis-labs/go-permission/pathgrants` | `github.com/hollis-labs/libs/harness/core/interception/permission/pathgrants` | `pathgrants` |
-| `github.com/hollis-labs/go-permission/summary` | `github.com/hollis-labs/libs/harness/core/interception/permission/summary` | `summary` |
+| `github.com/hollis-labs/go-permission` | `github.com/hollis-labs/libs/security/policy/permission` | `permission` |
+| `github.com/hollis-labs/go-permission/pathgrants` | `github.com/hollis-labs/libs/security/policy/permission/pathgrants` | `pathgrants` |
+| `github.com/hollis-labs/go-permission/summary` | `github.com/hollis-labs/libs/security/policy/permission/summary` | `summary` |
 
 `go get github.com/hollis-labs/libs/harness/core@<version>` replaces `go get github.com/hollis-labs/go-permission@<version>`; the new module is `github.com/hollis-labs/libs/harness/core`.
 

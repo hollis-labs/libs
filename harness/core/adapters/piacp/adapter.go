@@ -12,7 +12,7 @@ import (
 
 // Adapter is the wrapper adapter for Pi via the `pi-acp` bridge
 // (`npx -y pi-acp`). Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 //
 // Name() returns "pi-acp", not the bare upstream identity "pi" —
 // Descriptor.Provider (see [Describe]) carries "pi" as the upstream

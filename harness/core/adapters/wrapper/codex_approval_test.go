@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/activity"
 	"github.com/hollis-labs/libs/harness/core/adapters/codex"

@@ -15,9 +15,9 @@ import (
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
 	"github.com/hollis-labs/libs/harness/core/adapters/turn"
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
 	sandboxprofile "github.com/hollis-labs/libs/harness/core/sandbox"
 	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 
 	"github.com/hollis-labs/libs/harness/core/adapters"
 	"github.com/hollis-labs/libs/harness/core/adapters/acp"

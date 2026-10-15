@@ -435,7 +435,7 @@ CLI bridges use a two-level abstraction: a `CLIAdapter` (one per CLI tool) defin
 - `github.com/hollis-labs/substrate/llm-core/contracts` — the `runtimes` vocabulary (runtime ids, modes, capabilities).
 - `github.com/hollis-labs/substrate/llm-core/llmcontracts` — the `Provider` interface.
 - `github.com/hollis-labs/substrate/llm-core/llmtypes` — request, message, event and usage types.
-- `github.com/hollis-labs/libs/harness/core/interception/permission` — the permission posture `Mode`.
+- `github.com/hollis-labs/libs/security/policy/permission` — the permission posture `Mode`.
 
 ### External (direct)
 

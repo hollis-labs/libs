@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/registry"
-	permission "github.com/hollis-labs/libs/harness/core/interception/permission"
+	permission "github.com/hollis-labs/libs/security/policy/permission"
 )
 
 // A posture's flags go at the convention's extra-argument slot, so in every

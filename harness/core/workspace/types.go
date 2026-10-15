@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"time"
 
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
 	"github.com/hollis-labs/libs/harness/core/sandbox"
 	"github.com/hollis-labs/libs/harness/core/workspace/credentials"
 	"github.com/hollis-labs/libs/harness/core/workspace/effects"
@@ -19,6 +18,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/workspace/snapshot"
 	"github.com/hollis-labs/libs/harness/core/workspace/trust"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
+	"github.com/hollis-labs/libs/security/policy/permission"
 )
 
 const SchemaVersion = "workspace.v1"

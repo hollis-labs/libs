@@ -44,7 +44,7 @@ func WithAdapterExtraArgs(args ...string) AdapterOption {
 
 // Adapter is the wrapper [adapters.Adapter]/[adapters.RuntimeAdapter]
 // for GitHub Copilot CLI's native `--acp` mode. Construct via [New];
-// pass to [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter],
+// pass to [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter],
 // or drive its underlying [Client] directly via [Adapter.Client]. Wrapper owns
 // the protocol lifecycle through [Adapter.ACPClient] for both transports.
 type Adapter struct {

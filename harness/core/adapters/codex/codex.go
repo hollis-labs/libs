@@ -10,7 +10,7 @@ import (
 
 // Adapter is the wrapper adapter for Codex's app-server (JSON-RPC
 // stdio) runtime. Construct via [New]; pass to
-// [github.com/hollis-labs/go-agent-wrapper/wrapper.Config.Adapter].
+// [github.com/hollis-labs/libs/harness/core/adapters/wrapper.Config.Adapter].
 type Adapter struct {
 	binary string
 	extra  []string

@@ -2,7 +2,7 @@ package plan
 
 import (
 	"fmt"
-	"github.com/hollis-labs/libs/harness/core/interception/permission"
+	"github.com/hollis-labs/libs/security/policy/permission"
 	"maps"
 	"slices"
 	"strings"

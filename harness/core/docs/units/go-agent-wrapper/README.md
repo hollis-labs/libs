@@ -449,7 +449,7 @@ the complete symbol mapping.
   runtime activity event envelope.
 - `github.com/hollis-labs/substrate/llm-core/llmtypes` (v0.5.1) — stream events, usage and
   the stop-reason vocabulary.
-- `github.com/hollis-labs/libs/harness/core/interception/permission` (v0.1.0) — permission posture modes.
+- `github.com/hollis-labs/libs/security/policy/permission` (v0.1.0) — permission posture modes.
 - `github.com/hollis-labs/go-materialize` (v0.1.0) — artifact trees and the
   materialization engine behind `plant.SharedPlanter`.
 - `github.com/hollis-labs/libs/harness/core/interception/filters` (v0.1.1) —

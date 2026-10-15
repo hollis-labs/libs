@@ -1,14 +1,22 @@
 # Changelog
 
-All notable changes to the `harness` module are documented here. The format follows
+All notable changes to the `harness` module are documented here (the module was `harness` in the substrate repository). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`harness/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`harness/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
 
 ## v0.10.0
+
+### Changed (breaking)
+
+- Module path is now `github.com/hollis-labs/libs/harness/core` (was `github.com/hollis-labs/substrate/harness`); the substrate path and its `harness/vX.Y.Z` tags no longer exist. Tags are `harness/core/vX.Y.Z`. Entries below keep the former package names.
+- The harness is a layer of its own, strictly below the agent: this module no longer depends on the agent module, and the agent depends on it.
+- `interception/permission` (with `pathgrants` and `summary`) moved to `github.com/hollis-labs/libs/security/policy/permission` so that the agent and the harness share one permission contract. Import it from there.
+- `agentcontext` (with `resolvers` and `skills`) moved here from the agent module and is now `github.com/hollis-labs/libs/harness/core/agentcontext`. `agentcomposition` and `agentlaunch/contexthook` stay in this module and now import it from here.
+- Requires `llm/core` v0.2.0, `mesh/core` v0.4.0 and `security/policy` v0.1.0 (were the substrate `llm-core`, `mesh` and `agent` modules).
 
 ### Added
 

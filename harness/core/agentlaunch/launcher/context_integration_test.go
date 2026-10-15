@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hollis-labs/libs/agent/core/agentcontext"
-	"github.com/hollis-labs/libs/agent/core/agentcontext/resolvers"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext/resolvers"
 	"github.com/hollis-labs/libs/llm/core/contracts/runtimes"
 
 	"github.com/hollis-labs/libs/harness/core/agentlaunch"

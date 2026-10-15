@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hollis-labs/libs/agent/core/agentcontext"
+	"github.com/hollis-labs/libs/harness/core/agentcontext"
 
 	"github.com/hollis-labs/libs/harness/core/workspace/materialize/artifact"
 )
