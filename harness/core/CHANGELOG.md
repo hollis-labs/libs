@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.11.0 — 2026-10-16
+
 ### Added
 
 - `adapters/runtimeevents` envelope v1.1, additive (`SchemaVersion` stays "1"):
@@ -32,6 +34,12 @@ All notable changes to the `harness` module are documented here (the module was 
   calls (`ToolSchema`), and `selfreport.md` (event stream contract C4,
   CW-20261016-0132). `progress.checkpoint@1` now requires `effective_level`
   and records `detail_source`.
+
+- `adapters/runtimeevents/scope.md`: the `scope` dimension vocabulary, the
+  source of truth for each field and the data gaps producers must close first
+  (event stream contract C3, CW-20261016-0131). `catalog/mapping.md` reserves
+  `stream.*` for transport control signals such as `stream.gap`, which are
+  never registered as kinds, persisted or relayed.
 
 ### Changed
 
