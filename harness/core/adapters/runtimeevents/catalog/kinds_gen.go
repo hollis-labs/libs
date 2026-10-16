@@ -24,6 +24,7 @@ const (
 	KindAgentToolUse                  = "agent.tool_use"
 	KindAgentToolResult               = "agent.tool_result"
 	KindAgentSubagentSpawn            = "agent.subagent_spawn"
+	KindAgentSubagentStop             = "agent.subagent_stop"
 	KindAgentPermissionRequested      = "agent.permission_requested"
 	KindAgentPermissionResolved       = "agent.permission_resolved"
 	KindAgentPermissionDenied         = "agent.permission_denied"

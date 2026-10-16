@@ -8,6 +8,28 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `adapters/runtimeevents`: `Event.PayloadDigest` (`payload_digest`,
+  optional) and `Event.Tombstoned` mark an event whose payload a retention
+  pass removed (event retention D7, envelope tier). The value is `sha256:`
+  plus 64 lowercase hex digits over the stored payload bytes, or `withheld`
+  for PII. `Validate` and `JSONSchema` require the payload to be absent when
+  it is set and check its format; events without it validate as before.
+  `ToMesh` and `FromMesh` carry it to and from `mesh.Event.PayloadDigest`
+  (a tombstoned payload is absent here and `null` on mesh). New conformance
+  fixtures cover both directions (CW-20261016-0167).
+- `adapters/runtimeevents/catalog`: kind `agent.subagent_stop` (activity,
+  new) with payload schema `subagent_stop@1` (`subagent_id`, `outcome`
+  required); `parent_id` is the matching `agent.subagent_spawn` event.
+  `KindAgentSubagentStop` constant.
+- `Actor` documents the `device` kind for machine principals (mesh/core
+  `ActorDevice`, next mesh/core minor).
+
+### Changed
+
+- Requires `mesh/core` v0.6.0 (for `Event.PayloadDigest`).
+
 ## v0.11.0 — 2026-10-16
 
 ### Added

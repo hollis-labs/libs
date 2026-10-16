@@ -4,118 +4,341 @@
   "title": "runtimeevents Event envelope, schema_version 1 (v1.1 blocks)",
   "description": "Unknown kinds, fields and vocabulary values are allowed: consumers must tolerate them. Mirrors Event.Validate.",
   "type": "object",
-  "required": ["schema_version", "id", "kind", "time", "sequence", "source"],
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "time",
+    "sequence",
+    "source"
+  ],
   "properties": {
-    "schema_version": { "const": "1" },
-    "id": { "type": "string", "minLength": 1 },
-    "kind": { "type": "string", "minLength": 1 },
-    "time": { "type": "string", "format": "date-time" },
-    "app": { "type": "string" },
-    "session_id": { "type": "string" },
-    "turn_id": { "type": "string" },
-    "sequence": { "type": "integer", "minimum": 1 },
-    "parent_id": { "type": "string" },
-    "raw_offset": { "type": "integer", "minimum": 0 },
+    "schema_version": {
+      "const": "1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "app": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "parent_id": {
+      "type": "string"
+    },
+    "raw_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
     "process": {
       "type": "object",
       "properties": {
-        "pid": { "type": "integer" },
-        "provider": { "type": "string" },
-        "runtime": { "type": "string" },
-        "provider_session_id": { "type": "string" }
+        "pid": {
+          "type": "integer"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "provider_session_id": {
+          "type": "string"
+        }
       }
     },
     "source": {
       "type": "object",
-      "required": ["channel"],
+      "required": [
+        "channel"
+      ],
       "properties": {
-        "channel": { "type": "string", "minLength": 1 },
-        "confidence": { "type": "string" }
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "string"
+        }
       }
     },
     "payload": true,
-    "subject": { "type": "string" },
-    "generation": { "type": "integer", "minimum": 0 },
-    "recorded_at": { "type": "string", "format": "date-time" },
-    "cursor": { "type": "string" },
-    "content_type": { "type": "string" },
-    "truncated": { "type": "boolean" },
+    "subject": {
+      "type": "string"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cursor": {
+      "type": "string"
+    },
+    "content_type": {
+      "type": "string"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
     "scope": {
       "type": "object",
       "properties": {
-        "environment_id": { "type": "string" },
-        "authority": { "type": "string" },
-        "worker_id": { "type": "string" },
-        "host": { "type": "string" },
-        "project_id": { "type": "string" },
-        "workstream_id": { "type": "string" },
-        "epic_id": { "type": "string" },
-        "sprint_id": { "type": "string" },
-        "plan_id": { "type": "string" },
-        "phase_id": { "type": "string" },
-        "task_id": { "type": "string" },
-        "run_id": { "type": "string" },
-        "attempt": { "type": "integer", "minimum": 0 },
-        "launch_id": { "type": "string" },
-        "agent_urn": { "type": "string" },
-        "logical_agent_id": { "type": "string" },
-        "team_run_id": { "type": "string" }
+        "environment_id": {
+          "type": "string"
+        },
+        "authority": {
+          "type": "string"
+        },
+        "worker_id": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "workstream_id": {
+          "type": "string"
+        },
+        "epic_id": {
+          "type": "string"
+        },
+        "sprint_id": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "phase_id": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "launch_id": {
+          "type": "string"
+        },
+        "agent_urn": {
+          "type": "string"
+        },
+        "logical_agent_id": {
+          "type": "string"
+        },
+        "team_run_id": {
+          "type": "string"
+        }
       }
     },
     "corr": {
       "type": "object",
       "properties": {
-        "trace_id": { "type": "string" },
-        "span_id": { "type": "string" },
-        "traceparent": { "type": "string" },
-        "causation_id": { "type": "string" },
-        "correlation_id": { "type": "string" },
-        "thread_id": { "type": "string" },
-        "in_reply_to": { "type": "string" },
-        "idempotency_key": { "type": "string" },
-        "depth": { "type": "integer", "minimum": 0 }
+        "trace_id": {
+          "type": "string"
+        },
+        "span_id": {
+          "type": "string"
+        },
+        "traceparent": {
+          "type": "string"
+        },
+        "causation_id": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        },
+        "in_reply_to": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
-      "if": { "required": ["depth"], "properties": { "depth": { "minimum": 1 } } },
-      "then": { "required": ["causation_id"], "properties": { "causation_id": { "minLength": 1 } } }
+      "if": {
+        "required": [
+          "depth"
+        ],
+        "properties": {
+          "depth": {
+            "minimum": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "causation_id"
+        ],
+        "properties": {
+          "causation_id": {
+            "minLength": 1
+          }
+        }
+      }
     },
     "actor": {
       "type": "object",
-      "required": ["urn", "kind"],
+      "required": [
+        "urn",
+        "kind"
+      ],
       "properties": {
-        "urn": { "type": "string", "minLength": 1 },
-        "kind": { "type": "string", "minLength": 1 },
-        "role": { "type": "string" },
-        "on_behalf_of": { "type": "array", "items": { "type": "string" } },
-        "verified": { "type": "string" }
+        "urn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verified": {
+          "type": "string"
+        }
       }
     },
     "class": {
       "type": "object",
       "properties": {
-        "category": { "type": "string" },
-        "severity": { "type": "string" },
-        "sensitivity": { "type": "string" },
-        "pii": { "type": "boolean" },
-        "visibility": { "type": "string" },
-        "payload_schema": { "type": "string" },
-        "labels": { "type": "array", "items": { "type": "string" } },
-        "sanitized": { "type": "boolean" },
-        "redactions": { "type": "integer", "minimum": 0 }
+        "category": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "sensitivity": {
+          "type": "string"
+        },
+        "pii": {
+          "type": "boolean"
+        },
+        "visibility": {
+          "type": "string"
+        },
+        "payload_schema": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sanitized": {
+          "type": "boolean"
+        },
+        "redactions": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
+    },
+    "payload_digest": {
+      "type": "string",
+      "pattern": "^(sha256:[0-9a-f]{64}|withheld)$",
+      "description": "Set only by retention when the payload was removed (D7 envelope tier). When present, payload is absent."
     }
   },
   "allOf": [
     {
       "anyOf": [
-        { "required": ["session_id"], "properties": { "session_id": { "minLength": 1 } } },
-        { "required": ["subject"], "properties": { "subject": { "minLength": 1 } } }
+        {
+          "required": [
+            "session_id"
+          ],
+          "properties": {
+            "session_id": {
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "subject"
+          ],
+          "properties": {
+            "subject": {
+              "minLength": 1
+            }
+          }
+        }
       ]
     },
     {
       "if": {
-        "properties": { "kind": { "pattern": "^(process|session|turn|stdin|stdout|stderr|agent|policy|plant|sandbox|interrupt)\\." } }
+        "properties": {
+          "kind": {
+            "pattern": "^(process|session|turn|stdin|stdout|stderr|agent|policy|plant|sandbox|interrupt)\\."
+          }
+        }
       },
-      "then": { "required": ["session_id"], "properties": { "session_id": { "minLength": 1 } } }
+      "then": {
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "payload_digest"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "payload"
+          ]
+        }
+      }
     }
   ]
 }

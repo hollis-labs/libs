@@ -78,7 +78,17 @@ type Event struct {
 	Corr  *Corr  `json:"corr,omitempty"`
 	Actor *Actor `json:"actor,omitempty"`
 	Class *Class `json:"class,omitempty"`
+
+	// PayloadDigest marks an event whose payload a retention pass removed
+	// (event retention D7, envelope tier). It is "sha256:" plus 64 lowercase
+	// hex digits over the stored payload bytes, or "withheld" when no digest
+	// is kept (PII). When it is set Payload is absent. Producers never set
+	// it. See [Event.Tombstoned].
+	PayloadDigest string `json:"payload_digest,omitempty"`
 }
+
+// Tombstoned reports whether a retention pass removed the event's payload.
+func (e Event) Tombstoned() bool { return e.PayloadDigest != "" }
 
 // Process describes the subprocess the event pertains to. Zero values mean
 // "unknown" or "not yet assigned" — e.g., a plant.started event emitted

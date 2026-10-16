@@ -117,6 +117,13 @@
    "status": "stable"
   },
   {
+   "kind": "agent.subagent_stop",
+   "category": "activity",
+   "payload_schema": "urn:hollis-labs:events:subagent_stop@1",
+   "status": "new",
+   "note": "parent_id is the matching agent.subagent_spawn event id"
+  },
+  {
    "kind": "agent.permission_requested",
    "category": "approval",
    "status": "stable",
