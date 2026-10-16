@@ -23,6 +23,9 @@ type Columns struct {
 	SessionID    string
 	AgentURN     string
 	RunID        string
+	// Outcome is the payload's "outcome", or its "to" (a state change's new
+	// state), when present: the low-cardinality result retention rollups count by.
+	Outcome string
 }
 
 // Extractor lifts [Columns] out of an event. It must be pure and cheap, and
@@ -38,9 +41,10 @@ type Extractor func(streamhub.Event) Columns
 // zero Columns.
 func EnvelopeExtractor(e streamhub.Event) Columns {
 	var env struct {
-		SessionID  string `json:"session_id"`
-		Generation int64  `json:"generation"`
-		Visibility string `json:"visibility"` // mesh.Event keeps it top-level
+		SessionID  string          `json:"session_id"`
+		Generation int64           `json:"generation"`
+		Visibility string          `json:"visibility"` // mesh.Event keeps it top-level
+		Payload    json.RawMessage `json:"payload"`
 		Scope      struct {
 			ProjectID    string `json:"project_id"`
 			WorkstreamID string `json:"workstream_id"`
@@ -59,6 +63,15 @@ func EnvelopeExtractor(e streamhub.Event) Columns {
 	if len(e.Data) == 0 || json.Unmarshal(e.Data, &env) != nil {
 		return Columns{}
 	}
+	var pl struct {
+		Outcome string `json:"outcome"`
+		To      string `json:"to"`
+	}
+	_ = json.Unmarshal(env.Payload, &pl) // payload may be any JSON value; only an object can carry these
+	outcome := pl.Outcome
+	if outcome == "" {
+		outcome = pl.To
+	}
 	vis := env.Class.Visibility
 	if vis == "" {
 		vis = env.Visibility
@@ -68,6 +81,6 @@ func EnvelopeExtractor(e streamhub.Event) Columns {
 		Sensitivity: env.Class.Sensitivity, PII: env.Class.PII, Visibility: vis,
 		Generation: env.Generation, ProjectID: env.Scope.ProjectID,
 		WorkstreamID: env.Scope.WorkstreamID, TaskID: env.Scope.TaskID,
-		SessionID: env.SessionID, AgentURN: env.Scope.AgentURN, RunID: env.Scope.RunID,
+		SessionID: env.SessionID, AgentURN: env.Scope.AgentURN, RunID: env.Scope.RunID, Outcome: outcome,
 	}
 }
