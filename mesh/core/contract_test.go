@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	mesh "github.com/hollis-labs/libs/mesh/core"
 	"math"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,6 +36,41 @@ func TestEventRoundTripPreservesOrderingAndAttribution(t *testing.T) {
 	}
 	if got.Cursor != e.Cursor || got.SourceSequence != 1 || got.Generation != 2 || got.Actor != e.Actor || got.OnBehalfOf[0] != e.OnBehalfOf[0] || got.CausationID != e.CausationID || !got.Truncated {
 		t.Fatal("envelope lost ordering or provenance")
+	}
+}
+func TestEventV11BlocksRoundTripAndStayOptional(t *testing.T) {
+	off := int64(42)
+	at := time.Date(2026, 10, 16, 5, 0, 0, 0, time.UTC)
+	e := mesh.Event{SchemaVersion: "1", ID: "evt_1", Kind: "task.state_changed", Time: at, Actor: mesh.Actor{URN: "msg://service/torque/scheduler", Kind: mesh.ActorService}, Subject: "msg://task/torque/CW-1", Generation: 1, SourceSequence: 3, Cursor: "env:9", Visibility: "environment", Payload: json.RawMessage(`{}`),
+		RawOffset: &off, RecordedAt: &at, Depth: 2, ActorRole: "reaction", ActorVerified: "token",
+		Scope: &mesh.EventScope{ProjectID: "p1", TaskID: "CW-1", Attempt: 2},
+		Class: &mesh.EventClass{Category: "state", Severity: "info", Sensitivity: "private", PII: true, Labels: []string{"a"}, Sanitized: true, Redactions: 1}}
+	if err := e.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got mesh.Event
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, e) {
+		t.Fatalf("v1.1 blocks lost in round trip:\n got %+v\nwant %+v", got, e)
+	}
+
+	// An event without the new fields marshals with none of their keys, so
+	// v1 readers and stored v1 bytes see no change.
+	e.RawOffset, e.RecordedAt, e.Depth, e.ActorRole, e.ActorVerified, e.Scope, e.Class = nil, nil, 0, "", "", nil, nil
+	b, err = json.Marshal(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"raw_offset", "recorded_at", "depth", "actor_role", "actor_verified", "scope", "class"} {
+		if strings.Contains(string(b), `"`+key+`"`) {
+			t.Fatalf("unset v1.1 field %q was marshalled: %s", key, b)
+		}
 	}
 }
 func TestVocabularyRejectsInvalidActorsAndNonFiniteLimits(t *testing.T) {

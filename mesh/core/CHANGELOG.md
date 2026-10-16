@@ -8,6 +8,16 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- Envelope v1.1 fields on `Event`, all optional and additive (`SchemaVersion`
+  stays "1", `Validate` is unchanged): `RawOffset`, `RecordedAt` (set by the
+  durable log), `Depth` (reaction hop count), `ActorRole`, `ActorVerified`,
+  `Scope` (`EventScope` dimension block) and `Class` (`EventClass`
+  classification block). An event that sets none of them marshals exactly as
+  before. They let the harness `runtimeevents` envelope project onto `Event`
+  without loss (event stream contract C1, CW-20261016-0129).
+
 ## v0.4.0 — 2026-10-10
 
 - Module path is now `github.com/hollis-labs/libs/mesh/core` (was `github.com/hollis-labs/substrate/mesh`); the substrate path and its `mesh/vX.Y.Z` tags no longer exist. Tags are `mesh/core/vX.Y.Z`. The code is that of substrate `mesh/v0.4.0`; only the module path and its imports of `llm/core` and `ui/ui-go` (the former `go-ssekit`) changed.
