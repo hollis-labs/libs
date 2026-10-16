@@ -27,7 +27,7 @@ func TestGuardedReturnsTheAnswer(t *testing.T) {
 func TestGuardedRecoversAPanicAsAnError(t *testing.T) {
 	_, err := guard.Guarded(context.Background(), nil, "tool x", time.Second,
 		func(context.Context) (int, error) { panic("kaboom") })
-	if err == nil || !strings.Contains(err.Error(), "tool x panicked: kaboom") {
+	if err == nil || !strings.Contains(err.Error(), "tool x panicked: internal error (ref pnc_") || strings.Contains(err.Error(), "kaboom") {
 		t.Fatalf("err = %v", err)
 	}
 }
