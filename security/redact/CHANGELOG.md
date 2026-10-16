@@ -4,6 +4,8 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ## Unreleased
 
+## v0.1.0 — 2026-10-16
+
 ### Added
 
 - `Redactor` (`New`, `Default`, `Text`, `TextCount`, `Bytes`, `Scan`, `Tail`) over a span engine: every rule finds ranges, ranges are merged and replaced in the original text, so rules compose and redacting twice equals redacting once.
