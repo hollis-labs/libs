@@ -345,7 +345,8 @@ func (d *StepDispatcher) Dispatch(ctx context.Context, request DispatchRequest) 
 	if node.Inputs == nil {
 		// A legacy invalid Ready record must not be released back into the
 		// ready queue. Fence it into the existing unclaimable Blocked state
-		// before releasing the lease; the driver can then bind it normally.
+		// and clear its lease atomically; the driver can then bind it normally.
+		// A separate release would strand the blocked node if the worker crashes.
 		blocked, blockErr := d.store.TransitionNode(durableCtx, NodeTransitionRequest{
 			InvocationID: node.ID, ExpectedGeneration: node.Generation, To: NodeBlocked,
 			Blocked: &BlockedReason{Code: "inputs_unbound", Message: "node inputs require durable binding"},
@@ -356,7 +357,7 @@ func (d *StepDispatcher) Dispatch(ctx context.Context, request DispatchRequest) 
 			return prestart, dispatchError(DispatchValidateInput, request, errors.Join(ErrInputsUnbound, blockErr))
 		}
 		prestart.Node = blocked.Snapshot
-		return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, ErrInputsUnbound))
+		return prestart, dispatchError(DispatchValidateInput, request, ErrInputsUnbound)
 	}
 	inputs, err := d.store.LoadValues(ctx, *node.Inputs)
 	if err != nil {

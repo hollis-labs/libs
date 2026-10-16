@@ -14,7 +14,7 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 ### Fixed
 
-- Keep executable nodes unclaimable until their immutable inputs are durably bound, including when dependencies finish between driver and coordinator readiness checks. Dispatch demotes legacy unbound ready nodes to Blocked under the claim and generation fences before releasing the lease, so recovery can bind them without a re-claim loop.
+- Keep executable nodes unclaimable until their immutable inputs are durably bound, including when dependencies finish between driver and coordinator readiness checks. Dispatch demotes legacy unbound ready nodes to Blocked under the claim and generation fences, atomically clearing the lease and scheduler holders so recovery can bind them without a re-claim loop or a crash window between demotion and lease release.
 
 ### Changed
 

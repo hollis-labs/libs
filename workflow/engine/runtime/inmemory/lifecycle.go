@@ -156,7 +156,8 @@ func (s *Store) TransitionNode(ctx context.Context, request workflowruntime.Node
 	} else {
 		next.Blocked = nil
 	}
-	if request.To == workflowruntime.NodeWaiting || request.To.Terminal() {
+	if request.To == workflowruntime.NodeWaiting || request.To.Terminal() ||
+		(current.Status == workflowruntime.NodeReady && request.To == workflowruntime.NodeBlocked) {
 		next.Lease = nil
 	}
 	if err := next.Validate(); err != nil {
