@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
-	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/subprocess"
+	pluginhost "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-host"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // MaxRouteBody bounds buffered request bodies forwarded to a plugin.

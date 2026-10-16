@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/hollis-labs/libs/plugin-mcp/plugin-sdk/registry"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/registry"
 )
 
 // Delivery holds immutable reviewed bytes for one registry snapshot. No path is

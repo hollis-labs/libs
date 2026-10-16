@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	pluginhost "github.com/hollis-labs/libs/plugin-mcp/plugin-host"
+	pluginhost "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-host"
 )
 
 // Inventory contains only app-reviewed exact Specs. Discovery, secrets, grants,
