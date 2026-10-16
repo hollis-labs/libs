@@ -3,6 +3,7 @@ package eventstage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -235,5 +236,48 @@ func TestTombstonedRuntimeEventIsLeftAlone(t *testing.T) {
 	}
 	if e.Class.Sanitized || e.PayloadDigest != "withheld" || len(e.Payload) != 0 || e.Class.Category != "state" {
 		t.Fatalf("event = %+v class=%+v", e, e.Class)
+	}
+}
+
+// payload_digest is the producer's to set, like the payload. An event that sets
+// both is not a tombstone: it must not be a way past the sanitizer.
+func TestADigestDoesNotSkipSanitizingARealPayload(t *testing.T) {
+	const canary = "CANARY-token-value"
+	payload := json.RawMessage(`{"token":"` + canary + `"}`)
+	for _, mode := range []Mode{ModeProducer, ModeVerifyAndScrub} {
+		meshEvent := &mesh.Event{Kind: "message.sent", Payload: payload, PayloadDigest: "withheld", Class: &mesh.EventClass{Sanitized: true}}
+		rtEvent := &runtimeevents.Event{SchemaVersion: "1", ID: "evt_1", Kind: "message.sent", Subject: "msg://x", Sequence: 1, Payload: payload, PayloadDigest: "sha256:" + strings.Repeat("a", 64)}
+		mc, _ := NewChain(Config[mesh.Event]{Sanitize: MeshSanitize(panicSanitizer{}, mode), Classify: MeshClassify(loadDefault(t))})
+		rc, _ := NewChain(Config[runtimeevents.Event]{Sanitize: RuntimeEventsSanitize(panicSanitizer{}, mode), Classify: RuntimeEventsClassify(loadDefault(t))})
+		mrep, rrep := mc.Apply(t.Context(), meshEvent), rc.Apply(t.Context(), rtEvent)
+		for name, got := range map[string]struct {
+			payload json.RawMessage
+			digest  string
+			rep     Report
+		}{
+			"mesh":          {meshEvent.Payload, meshEvent.PayloadDigest, mrep},
+			"runtimeevents": {rtEvent.Payload, rtEvent.PayloadDigest, rrep},
+		} {
+			if strings.Contains(string(got.payload), canary) {
+				t.Errorf("%s mode %d: the canary survived: %s", name, mode, got.payload)
+			}
+			if string(got.payload) != string(ErrorPayload(ErrorClassTombstoneWithPayload)) {
+				t.Errorf("%s mode %d: payload = %s, want the fail-closed payload", name, mode, got.payload)
+			}
+			if got.digest != "" {
+				t.Errorf("%s mode %d: the digest was kept on an event that has a payload again", name, mode)
+			}
+			if !got.rep.Emit() || !got.rep.Steps[0].FailedClosed || !errors.Is(got.rep.Err(), ErrSanitize) {
+				t.Errorf("%s mode %d: report = %+v", name, mode, got.rep)
+			}
+		}
+		if meshEvent.Class.Sanitized || rtEvent.Class.Sanitized {
+			t.Errorf("mode %d: a failed-closed event is marked sanitized", mode)
+		}
+		// A tombstone with a JSON null payload is still a genuine tombstone.
+		null := &mesh.Event{Kind: "message.sent", Payload: json.RawMessage("null"), PayloadDigest: "withheld"}
+		if out, err := MeshSanitize(panicSanitizer{}, mode).Apply(t.Context(), null); err != nil || out.Note != NoteTombstoned {
+			t.Errorf("mode %d: null-payload tombstone: out=%+v err=%v", mode, out, err)
+		}
 	}
 }

@@ -157,6 +157,23 @@ func failClosedPayload(p []byte) bool {
 	return class == cleanClass(class)
 }
 
+// ErrorClassTombstoneWithPayload is the failure class of an event that claims to
+// be a retention tombstone (payload_digest set) yet still carries a payload. The
+// two fields are the producer's to set, so a digest must not be a way past the
+// sanitizer: such an event fails closed like any other that cannot be made safe.
+const ErrorClassTombstoneWithPayload = "tombstone_with_payload"
+
+// tombstoneOutcome decides what to do with an event whose payload_digest is set.
+// A genuine tombstone has no payload (empty or JSON null) and is left alone. One
+// that still has a payload is refused so the chain fails it closed; the payload
+// is never inspected, trusted or passed on.
+func tombstoneOutcome(payload []byte) (Outcome, error) {
+	if !emptyPayload(payload) {
+		return Outcome{}, classedError(ErrorClassTombstoneWithPayload)
+	}
+	return Outcome{Note: NoteTombstoned}, nil
+}
+
 func emptyPayload(p []byte) bool {
 	t := bytes.TrimSpace(p)
 	return len(t) == 0 || bytes.Equal(t, []byte("null"))
@@ -226,7 +243,7 @@ func (r rtSanitize) Name() string { return r.name }
 
 func (r rtSanitize) Apply(ctx context.Context, e *runtimeevents.Event) (Outcome, error) {
 	if e.Tombstoned() {
-		return Outcome{Note: NoteTombstoned}, nil
+		return tombstoneOutcome(e.Payload)
 	}
 	var cur classFields
 	if e.Class != nil {
@@ -248,6 +265,7 @@ func (r rtSanitize) Apply(ctx context.Context, e *runtimeevents.Event) (Outcome,
 // envelope so it is still emitted.
 func (r rtSanitize) FailClosed(e *runtimeevents.Event, cause error) {
 	e.Payload = ErrorPayload(classOf(cause))
+	e.PayloadDigest = "" // the payload is no longer removed: it is the error payload
 	e.Truncated = false
 	if e.Class == nil {
 		e.Class = &runtimeevents.Class{}
@@ -267,7 +285,7 @@ func (m meshSanitize) Name() string { return m.name }
 
 func (m meshSanitize) Apply(ctx context.Context, e *mesh.Event) (Outcome, error) {
 	if e.Tombstoned() {
-		return Outcome{Note: NoteTombstoned}, nil
+		return tombstoneOutcome(e.Payload)
 	}
 	var cur classFields
 	if e.Class != nil {
@@ -287,6 +305,7 @@ func (m meshSanitize) Apply(ctx context.Context, e *mesh.Event) (Outcome, error)
 
 func (m meshSanitize) FailClosed(e *mesh.Event, cause error) {
 	e.Payload = ErrorPayload(classOf(cause))
+	e.PayloadDigest = "" // the payload is no longer removed: it is the error payload
 	e.Truncated = false
 	if e.Class == nil {
 		e.Class = &mesh.EventClass{}
