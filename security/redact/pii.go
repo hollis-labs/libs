@@ -134,10 +134,18 @@ func findIPv6(_ *Redactor, s *scanText, add func(int, int)) {
 
 var nationalPhoneRE = regexp.MustCompile(`(?:\+?1[ .-]?)?(?:\([0-9]{3}\)|[0-9]{3})[ .-]?[0-9]{3}[ .-]?[0-9]{4}`)
 
+func phoneBounded(t string, a, b int) bool {
+	// Opening punctuation is itself a word boundary, even after a label.
+	if a < b && (t[a] == '(' || t[a] == '+') {
+		a++
+	}
+	return bounded(t, a, b)
+}
+
 func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 	t := s.t
 	for a := 0; a < len(t); {
-		if !digit(t[a]) && t[a] != '+' {
+		if !digit(t[a]) && t[a] != '+' && t[a] != '(' {
 			a++
 			continue
 		}
@@ -149,10 +157,10 @@ func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 		for end > a && !digit(t[end-1]) {
 			end--
 		}
-		if end > a && bounded(t, a, end) {
+		if end > a && phoneBounded(t, a, end) {
 			v := t[a:end]
 			for _, m := range nationalPhoneRE.FindAllStringIndex(v, -1) {
-				if bounded(t, a+m[0], a+m[1]) {
+				if phoneBounded(t, a+m[0], a+m[1]) {
 					add(a+m[0], a+m[1])
 				}
 			}

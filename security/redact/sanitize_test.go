@@ -430,3 +430,21 @@ func FuzzSanitizeKeys(f *testing.F) {
 		}
 	})
 }
+
+func TestSanitizeParenthesizedPhoneRuns(t *testing.T) {
+	s := sanitizerFor(t, Policy{Mode: Denylist})
+	for _, tc := range []struct {
+		input, want string
+		count       uint32
+	}{
+		{"call (202) 555-0123 (202) 555-0145", "call [REDACTED] [REDACTED]", 2},
+		{"call (202)555-0123 (202)555-0145", "call [REDACTED] [REDACTED]", 2},
+		{"call (202) 555-0123 (202)555-0145 (202) 555-0199", "call [REDACTED] [REDACTED] [REDACTED]", 3},
+		{"phone(202) 555-0123", "phone[REDACTED]", 1},
+	} {
+		out, r := s.Sanitize(jsonString(tc.input))
+		if !bytes.Equal(out, jsonString(tc.want)) || !r.PII || r.Redactions != tc.count {
+			t.Fatal("parenthesized phone run partially escaped")
+		}
+	}
+}
