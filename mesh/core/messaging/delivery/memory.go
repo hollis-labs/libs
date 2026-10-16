@@ -48,6 +48,7 @@ type MemoryStore struct {
 	byDelivery map[DeliveryID][]AttemptID
 	receipts   map[DeliveryID][]Receipt
 
+	transitions []Transition
 	idempotency map[string]idempotencyRecord
 }
 
@@ -151,7 +152,7 @@ func (s *MemoryStore) Enqueue(_ context.Context, req EnqueueRequest) (EnqueueRes
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		s.deliveries[deliveryID] = d
+		s.saveDeliveryLocked(d, "", TransitionCreated)
 		s.byMessage[msgID] = append(s.byMessage[msgID], deliveryID)
 		s.appendReceiptLocked(Receipt{MessageID: msgID, DeliveryID: deliveryID, Stage: StagePersisted, At: now})
 		deliveries = append(deliveries, cloneDelivery(d))
@@ -259,7 +260,7 @@ func (s *MemoryStore) Claim(_ context.Context, req ClaimRequest) (ClaimResult, e
 	d.LeaseExpiresAt = expires
 	d.Status = DeliveryLeased
 	d.UpdatedAt = now
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, attemptID, TransitionClaimed)
 	s.attempts[attemptID] = attempt
 	s.byDelivery[d.ID] = append(s.byDelivery[d.ID], attemptID)
 	s.appendReceiptLocked(Receipt{MessageID: d.MessageID, DeliveryID: d.ID, AttemptID: attemptID, Stage: StageLeaseAcquired, At: now})
@@ -283,7 +284,7 @@ func (s *MemoryStore) ExtendLease(_ context.Context, ref LeaseRef, until time.Ti
 	d.LeaseExpiresAt = until.UTC()
 	d.UpdatedAt = now
 	s.attempts[a.ID] = a
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, a.ID, "")
 	return cloneAttempt(a), nil
 }
 
@@ -350,7 +351,7 @@ func (s *MemoryStore) Ack(_ context.Context, req AckRequest) (RecipientDelivery,
 	d.UpdatedAt = at
 	s.appendReceiptLocked(Receipt{MessageID: d.MessageID, DeliveryID: d.ID, AttemptID: a.ID, Stage: req.Stage, At: at})
 	s.attempts[a.ID] = a
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, a.ID, TransitionConsumed)
 	return cloneDelivery(d), cloneAttempt(a), nil
 }
 
@@ -401,7 +402,7 @@ func (s *MemoryStore) Nack(_ context.Context, req NackRequest) (RecipientDeliver
 		s.appendReceiptLocked(Receipt{MessageID: d.MessageID, DeliveryID: d.ID, AttemptID: a.ID, Stage: StageDeadLettered, At: at, Detail: req.Error})
 	}
 	s.attempts[a.ID] = a
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, a.ID, nackTransitionReason(req, d))
 	if d.Status == DeliveryDeadLettered {
 		return cloneDelivery(d), cloneAttempt(a), ErrDeadLettered
 	}
@@ -430,7 +431,7 @@ func (s *MemoryStore) Redrive(_ context.Context, req RedriveRequest) (RecipientD
 	d.DeadlineAt = req.NewDeadlineAt.UTC()
 	d.DeadLetterReason = ""
 	d.UpdatedAt = at
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, "", TransitionRedriven)
 	return cloneDelivery(d), nil
 }
 
@@ -562,10 +563,11 @@ func (s *MemoryStore) expireLeaseLocked(d RecipientDelivery, a Attempt) {
 	d.NextAttemptAt = now
 	d.UpdatedAt = now
 	s.attempts[a.ID] = a
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, a.ID, TransitionLeaseExpired)
 }
 
 func (s *MemoryStore) deadLetterLocked(d RecipientDelivery, reason string) RecipientDelivery {
+	attemptID := d.ActiveAttemptID
 	d.Status = DeliveryDeadLettered
 	d.ActiveAttemptID = ""
 	d.ActiveLeaseToken = ""
@@ -573,7 +575,7 @@ func (s *MemoryStore) deadLetterLocked(d RecipientDelivery, reason string) Recip
 	d.LeaseExpiresAt = time.Time{}
 	d.DeadLetterReason = reason
 	d.UpdatedAt = s.now()
-	s.deliveries[d.ID] = d
+	s.saveDeliveryLocked(d, attemptID, TransitionDeadlineExceeded)
 	return d
 }
 

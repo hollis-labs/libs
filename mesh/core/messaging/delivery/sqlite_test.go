@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -72,6 +73,10 @@ func TestSQLiteStoreMultiHandleContention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("attempts: %v", err)
 	}
+	transitions, err := store1.Transitions(context.Background(), 0, 10)
+	if err != nil || len(transitions) != 2 || transitions[1].To != delivery.DeliveryLeased {
+		t.Fatalf("contending claims logged duplicates: %v %v", transitions, err)
+	}
 	if len(attempts) != 1 {
 		t.Fatalf("attempts=%d, want 1", len(attempts))
 	}
@@ -99,6 +104,10 @@ func TestSQLiteStorePersistsAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nack: %v", err)
 	}
+	beforeTransitions, err := store.Transitions(context.Background(), 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -106,6 +115,10 @@ func TestSQLiteStorePersistsAcrossRestart(t *testing.T) {
 	reopened := openSQLite(t, sqliteFileDSN(path, 5000))
 	t.Cleanup(func() { _ = reopened.Close() })
 	restarted := delivery.NewSQLiteStore(reopened, delivery.WithSQLiteClock(clock))
+	afterTransitions, err := restarted.Transitions(context.Background(), 0, 10)
+	if err != nil || !reflect.DeepEqual(beforeTransitions, afterTransitions) {
+		t.Fatalf("transition log not durable: %v %v", afterTransitions, err)
+	}
 	msg, err := restarted.GetMessage(context.Background(), res.Message.ID)
 	if err != nil {
 		t.Fatalf("get message after restart: %v", err)
@@ -152,7 +165,7 @@ func TestSQLiteStoreRollsBackCrashWindows(t *testing.T) {
 			if !errors.Is(err, crash) {
 				t.Fatalf("err=%v, want crash", err)
 			}
-			for _, table := range []string{"messaging_messages", "messaging_idempotency", "messaging_deliveries", "messaging_receipts"} {
+			for _, table := range []string{"messaging_messages", "messaging_idempotency", "messaging_deliveries", "messaging_receipts", "messaging_transitions"} {
 				if got := tableCount(t, db, table); got != 0 {
 					t.Fatalf("%s rows=%d, want rollback to 0", table, got)
 				}
@@ -186,6 +199,10 @@ func TestSQLiteStoreRollsBackClaimCrashWindow(t *testing.T) {
 	}
 	if del.Status != delivery.DeliveryPending || del.AttemptCount != 0 || del.ActiveLeaseToken != "" {
 		t.Fatalf("claim rollback left partial lease: %+v", del)
+	}
+	transitions, err := store.Transitions(context.Background(), 0, 10)
+	if err != nil || len(transitions) != 1 || transitions[0].To != delivery.DeliveryPending {
+		t.Fatalf("phantom claim transition: %v %v", transitions, err)
 	}
 	if got := tableCount(t, db, "messaging_attempts"); got != 0 {
 		t.Fatalf("attempts rows=%d, want 0", got)
@@ -320,6 +337,19 @@ func TestMigrateLegacyMailboxPreservesHistoryAndSafePolicy(t *testing.T) {
 	if again.Imported != 0 || again.Skipped != 2 {
 		t.Fatalf("migration not idempotent: %+v", again)
 	}
+	transitions, err := store.Transitions(context.Background(), 0, 10)
+	if err != nil || len(transitions) != 2 {
+		t.Fatalf("legacy import transitions: %v %v", transitions, err)
+	}
+	for _, tr := range transitions {
+		if tr.From != "" || tr.Reason != delivery.TransitionCreated || tr.AttemptID != "" {
+			t.Fatalf("invented legacy handoff: %+v", tr)
+		}
+		if (tr.DeliveryID == "legacy-unread" && tr.To != delivery.DeliveryDeadLettered) || (tr.DeliveryID == "legacy-resolved" && tr.To != delivery.DeliveryDelivered) {
+			t.Fatalf("legacy status: %+v", tr)
+		}
+	}
+
 }
 
 func openSQLite(t *testing.T, dsn string) *sql.DB {

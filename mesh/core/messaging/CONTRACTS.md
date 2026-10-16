@@ -177,3 +177,29 @@ These references were refreshed after the G00 local landing and are read-only in
 ## Versioning boundary
 
 G01 does not publish a version. Candidate version notes belong in G08 after implementation and review. G09 is the user-controlled landing gate before Tether begins.
+
+
+## Reliable delivery transition log
+
+`delivery.Store.Transitions(ctx, after, limit)` returns committed status changes
+in ascending store-wide ID order, strictly after the cursor. Start at zero,
+request a positive limit, and resume using the last successfully processed ID.
+IDs may have gaps; timestamps may repeat or regress. A read neither claims nor
+expires a delivery and does not delete or acknowledge log rows.
+
+The memory store appends under the same lock as the mutation. SQLite appends
+inside the mutation transaction, including automatic lease expiry and deadline
+handling; a log failure rolls back the associated state change. Each row carries
+message, delivery, and optional attempt IDs, previous and next status, a stable
+reason, and the mutation timestamp. Creation (including legacy import) starts
+from an empty status. Error text and lease credentials are not copied into the
+log. Same-status writes and idempotent replays produce no transition; receipt
+stages remain independently available through `Receipts`.
+
+Apply SQLite schema version 2 before using the new store. Upgrading creates an
+empty log and leaves existing delivery state intact; it does not invent past
+transitions. Rows have no cascading foreign keys, so deleting message content
+does not implicitly delete the transition history. Hosts own retention,
+publication checkpoints, and replay policy. Out-of-band SQL mutations are not
+instrumented; hosts must use the store operations for the logging guarantee.
+This library provides no event publisher, drainer, or cancellation API.

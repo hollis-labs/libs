@@ -13,7 +13,7 @@ import (
 	messaging "github.com/hollis-labs/libs/mesh/core/messaging"
 )
 
-const SQLiteSchemaVersion = 1
+const SQLiteSchemaVersion = 2
 
 // SQLiteMutationStep names durable transaction boundaries. Hooks are intended
 // for tests that prove a partially failed transaction leaves no committed
@@ -153,6 +153,16 @@ func applySQLiteSchemaTx(ctx context.Context, tx *sql.Tx) error {
 			at TEXT NOT NULL,
 			detail TEXT NOT NULL DEFAULT '',
 			UNIQUE(delivery_id, attempt_id, stage)
+		)`,
+		`CREATE TABLE IF NOT EXISTS messaging_transitions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			delivery_id TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			attempt_id TEXT NOT NULL DEFAULT '',
+			from_status TEXT NOT NULL,
+			to_status TEXT NOT NULL,
+			reason TEXT NOT NULL,
+			at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS messaging_idempotency (
 			scope TEXT PRIMARY KEY,
@@ -388,6 +398,12 @@ func (s *SQLiteStore) Claim(ctx context.Context, req ClaimRequest) (ClaimResult,
 	if n == 0 {
 		return ClaimResult{}, ErrAlreadyClaimed
 	}
+	changed := d
+	changed.Status = DeliveryLeased
+	changed.UpdatedAt = now
+	if err := sqliteAppendTransition(ctx, tx, changed, d.Status, attemptID, TransitionClaimed); err != nil {
+		return ClaimResult{}, err
+	}
 	if err := sqliteInsertAttempt(ctx, tx, attempt); err != nil {
 		return ClaimResult{}, err
 	}
@@ -466,6 +482,7 @@ func (s *SQLiteStore) Ack(ctx context.Context, req AckRequest) (RecipientDeliver
 		}
 		return cloneDelivery(d), cloneAttempt(a), nil
 	}
+	from := d.Status
 	at := req.At.UTC()
 	if at.IsZero() {
 		at = s.now()
@@ -529,6 +546,9 @@ func (s *SQLiteStore) Ack(ctx context.Context, req AckRequest) (RecipientDeliver
 	if err := sqliteUpdateDelivery(ctx, tx, d); err != nil {
 		return RecipientDelivery{}, Attempt{}, err
 	}
+	if err := sqliteAppendTransition(ctx, tx, d, from, a.ID, TransitionConsumed); err != nil {
+		return RecipientDelivery{}, Attempt{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return RecipientDelivery{}, Attempt{}, err
 	}
@@ -562,6 +582,7 @@ func (s *SQLiteStore) Nack(ctx context.Context, req NackRequest) (RecipientDeliv
 		}
 		return cloneDelivery(d), cloneAttempt(a), nil
 	}
+	from := d.Status
 	at := req.At.UTC()
 	if at.IsZero() {
 		at = s.now()
@@ -602,6 +623,9 @@ func (s *SQLiteStore) Nack(ctx context.Context, req NackRequest) (RecipientDeliv
 	if err := sqliteUpdateDelivery(ctx, tx, d); err != nil {
 		return RecipientDelivery{}, Attempt{}, err
 	}
+	if err := sqliteAppendTransition(ctx, tx, d, from, a.ID, nackTransitionReason(req, d)); err != nil {
+		return RecipientDelivery{}, Attempt{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return RecipientDelivery{}, Attempt{}, err
 	}
@@ -627,6 +651,7 @@ func (s *SQLiteStore) Redrive(ctx context.Context, req RedriveRequest) (Recipien
 	if d.Status != DeliveryDeadLettered {
 		return RecipientDelivery{}, ErrInvalidArgument
 	}
+	from := d.Status
 	at := req.At.UTC()
 	if at.IsZero() {
 		at = s.now()
@@ -637,6 +662,9 @@ func (s *SQLiteStore) Redrive(ctx context.Context, req RedriveRequest) (Recipien
 	d.DeadLetterReason = ""
 	d.UpdatedAt = at
 	if err := sqliteUpdateDelivery(ctx, tx, d); err != nil {
+		return RecipientDelivery{}, err
+	}
+	if err := sqliteAppendTransition(ctx, tx, d, from, "", TransitionRedriven); err != nil {
 		return RecipientDelivery{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -689,24 +717,32 @@ func (s *SQLiteStore) releaseExpired(ctx context.Context) error {
 	}
 	defer rollback(tx)
 	now := s.now()
-	rows, err := tx.QueryContext(ctx, `SELECT active_attempt_id FROM messaging_deliveries WHERE status = ? AND active_attempt_id != '' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?`, DeliveryLeased, timeString(now))
+	rows, err := tx.QueryContext(ctx, `SELECT id, message_id, active_attempt_id FROM messaging_deliveries WHERE status = ? AND active_attempt_id != '' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?`, DeliveryLeased, timeString(now))
 	if err != nil {
 		return err
 	}
-	ids := []AttemptID{}
+	expired := []RecipientDelivery{}
 	for rows.Next() {
-		var id AttemptID
-		if err := rows.Scan(&id); err != nil {
+		var d RecipientDelivery
+		if err := rows.Scan(&d.ID, &d.MessageID, &d.ActiveAttemptID); err != nil {
 			_ = rows.Close()
 			return err
 		}
-		ids = append(ids, id)
+		expired = append(expired, d)
 	}
 	if err := rows.Close(); err != nil {
 		return err
 	}
-	for _, id := range ids {
-		if _, err := tx.ExecContext(ctx, `UPDATE messaging_attempts SET stage = ?, failed_at = ?, error = ?, retryable = 1, next_attempt_at = ? WHERE id = ?`, StageFailed, timeString(now), "lease expired", timeString(now), id); err != nil {
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, d := range expired {
+		d.Status = DeliveryRetryScheduled
+		d.UpdatedAt = now
+		if err := sqliteAppendTransition(ctx, tx, d, DeliveryLeased, d.ActiveAttemptID, TransitionLeaseExpired); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE messaging_attempts SET stage = ?, failed_at = ?, error = ?, retryable = 1, next_attempt_at = ? WHERE id = ?`, StageFailed, timeString(now), "lease expired", timeString(now), d.ActiveAttemptID); err != nil {
 			return err
 		}
 	}
@@ -796,13 +832,16 @@ func sqliteInsertMessage(ctx context.Context, q sqliteQueryable, m Message) erro
 	return err
 }
 
-func sqliteInsertDelivery(ctx context.Context, q sqliteQueryable, d RecipientDelivery) error {
+func sqliteInsertDelivery(ctx context.Context, q *sql.Tx, d RecipientDelivery) error {
 	binding, err := json.Marshal(d.Binding)
 	if err != nil {
 		return err
 	}
 	_, err = q.ExecContext(ctx, `INSERT INTO messaging_deliveries(id, message_id, recipient_urn, binding_json, status, attempt_count, active_attempt_id, active_lease_token, lease_holder, lease_expires_at, next_attempt_at, deadline_at, dead_letter_reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, d.ID, d.MessageID, d.Recipient.URN(), string(binding), d.Status, d.AttemptCount, d.ActiveAttemptID, d.ActiveLeaseToken, d.LeaseHolder, nullableTime(d.LeaseExpiresAt), nullableTime(d.NextAttemptAt), nullableTime(d.DeadlineAt), d.DeadLetterReason, timeString(d.CreatedAt), timeString(d.UpdatedAt))
-	return err
+	if err != nil {
+		return err
+	}
+	return sqliteAppendTransition(ctx, q, d, "", d.ActiveAttemptID, TransitionCreated)
 }
 
 func sqliteInsertAttempt(ctx context.Context, q sqliteQueryable, a Attempt) error {
@@ -1025,7 +1064,8 @@ func sqliteSelectDelivery(ctx context.Context, q sqliteQueryable, now time.Time,
 	return id, nil
 }
 
-func sqliteDeadLetter(ctx context.Context, q sqliteQueryable, d RecipientDelivery, reason string, at time.Time) (RecipientDelivery, error) {
+func sqliteDeadLetter(ctx context.Context, q *sql.Tx, d RecipientDelivery, reason string, at time.Time) (RecipientDelivery, error) {
+	from, attemptID := d.Status, d.ActiveAttemptID
 	d.Status = DeliveryDeadLettered
 	d.ActiveAttemptID = ""
 	d.ActiveLeaseToken = ""
@@ -1034,6 +1074,9 @@ func sqliteDeadLetter(ctx context.Context, q sqliteQueryable, d RecipientDeliver
 	d.DeadLetterReason = reason
 	d.UpdatedAt = at.UTC()
 	if err := sqliteUpdateDelivery(ctx, q, d); err != nil {
+		return RecipientDelivery{}, err
+	}
+	if err := sqliteAppendTransition(ctx, q, d, from, attemptID, TransitionDeadlineExceeded); err != nil {
 		return RecipientDelivery{}, err
 	}
 	return d, nil

@@ -276,6 +276,9 @@ type Store interface {
 	Redrive(context.Context, RedriveRequest) (RecipientDelivery, error)
 	Attempts(context.Context, DeliveryID) ([]Attempt, error)
 	Receipts(context.Context, DeliveryID) ([]Receipt, error)
+	// Transitions reads committed status changes ordered by ID > after.
+	// after must be nonnegative and limit positive; reads have no side effects.
+	Transitions(ctx context.Context, after int64, limit int) ([]Transition, error)
 }
 
 func digestHex(sum [32]byte) Digest { return Digest(hex.EncodeToString(sum[:])) }
