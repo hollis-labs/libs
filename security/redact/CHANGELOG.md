@@ -15,6 +15,8 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
   the existing span engine, with classifications retained before overlap merging.
 - Fail-closed JSON tombstones for size, format, parse and depth errors;
   duplicate keys and invalid UTF-8 are rejected.
+- `ErrorClasses()` returns an independently owned copy of the closed sanitizer
+  failure-label set for consumers that recognize fail-closed tombstones.
 - Seeded event payload corpus, concurrency/idempotence/fuzz checks, and a
   4 KiB latency/allocation benchmark reporting sampled wall-clock p99.
 
