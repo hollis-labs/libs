@@ -691,3 +691,33 @@ func TestCurrentConfigGovernsEachPass(t *testing.T) {
 		t.Fatal("lengthening the age restored a tombstoned payload")
 	}
 }
+
+type oddStore struct {
+	retention.Store
+	mode retention.TrimMode
+}
+
+func (o oddStore) Caps() retention.Caps { return retention.Caps{Trim: o.mode} }
+
+// An unsupported or disallowed trim strategy fails explicitly and touches nothing.
+func TestUnsupportedTrimStrategyFailsExplicitly(t *testing.T) {
+	m := storetest.NewMem(retention.TrimPerRow)
+	seed(t, m, state(0, "x"))
+	for name, j := range map[string]*retention.Janitor{
+		"unknown mode":                 jan(t, oddStore{Store: m, mode: retention.TrimMode(99)}),
+		"per-row store, head-only job": jan(t, m, retention.WithTrimModes(retention.TrimHeadOnly)),
+	} {
+		rep, err := j.Run(context.Background(), base.Add(400*day))
+		if !errors.Is(err, retention.ErrUnsupportedTrim) || rep.Streams != 0 {
+			t.Fatalf("%s: err = %v, streams %d; want ErrUnsupportedTrim and no work", name, err, rep.Streams)
+		}
+		for _, r := range m.Rows("env") {
+			if r.Tombstoned || r.Rolled {
+				t.Fatalf("%s: a refused pass changed a row: %+v", name, r)
+			}
+		}
+	}
+	if _, err := jan(t, m, retention.WithTrimModes(retention.TrimPerRow)).Run(context.Background(), base.Add(400*day)); err != nil {
+		t.Fatalf("allowed mode refused: %v", err)
+	}
+}
