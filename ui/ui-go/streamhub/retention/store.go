@@ -13,11 +13,17 @@ const (
 	// the stream's pruned-through cursor, so readers behind it get an ordinary
 	// retention gap. Trim stops at the first row that is not eligible, which
 	// means a row of a class that is kept forever holds back everything after
-	// it ([Result.Held] counts what it holds back).
+	// it ([Result.Held] counts what it holds back); rows behind it can still
+	// be tombstoned and rolled up. This is the default for the libs streamlogs.
 	TrimHeadOnly TrimMode = iota
-	// TrimPerRow removes eligible rows wherever they sit. How consumers see
-	// the holes is the store's own gap story (for example opaque ids and a
-	// gap frame that does not advance the cursor).
+	// TrimPerRow (D7 rev 2.3) removes rows from the middle of a stream, only
+	// when ALL hold: the class is not R-audit; the row is past every tier
+	// (TrimSpec.Before); a covering rollup is committed first (TrimSpec.RequireRolled,
+	// the row's rolled flag, committed in the same or an earlier transaction);
+	// removal goes per class in cursor order (never a later row of a class
+	// while an earlier one stays); and the store persists a per-class
+	// watermark W_C (see [Store.Watermarks]). Cursors are never reused. A
+	// reader that starts below any W_C is told once with a [GapFrame].
 	TrimPerRow
 )
 
@@ -36,7 +42,11 @@ type Caps struct{ Trim TrimMode }
 type Op struct {
 	// Limit is the most rows the call may change. Zero means the store's own default.
 	Limit int
-	// MaxDuration stops the call early when exceeded. Zero means no time bound.
+	// MaxDuration is how long the call should run. A store that works row by
+	// row stops once it is exceeded, after making progress on at least one row
+	// (More reports the rest). A store that works in set-based statements
+	// bounds the call by Limit instead and may overrun by at most one batch.
+	// Zero means no time bound.
 	MaxDuration time.Duration
 	// DryRun counts what the call would change, without a Limit, and writes
 	// nothing. MaxDuration still applies to the count: a store that cannot
@@ -84,6 +94,23 @@ type ClassStat struct {
 // A store may keep any extra columns; the contract below is observable
 // behaviour, checked by package storetest.
 //
+// Every method must honour its context: a cancelled context returns the
+// context's error and writes nothing.
+//
+// A row can be on HOLD (a pending outbox entry that was not published yet, a
+// row of an unknown trusted kind, invalid metadata): a store must never
+// classify, roll up, tombstone or trim a held row. In a head-only store a held
+// row stops the trim prefix like any ineligible row; in a per-row store it
+// blocks later rows of its class from removal (cursor order).
+//
+// Rolled means "counted into the bucket set in force when it was rolled up".
+// Changing the configured buckets later applies to rows rolled afterwards
+// (forward only); already-rolled rows are not counted again, and a bucket size
+// added later does not get a history. A class with both hourly and daily
+// buckets rolls a row up when the DAILY bucket closes, so the hourly counts of
+// that class lag by up to a day: the buckets are a retention summary, not a
+// live metric.
+//
 // A spec matches rows by class. A store may keep the policy id a row was
 // admitted under, for audit; it plays no part in matching (D7 rev 2.2: the
 // current configuration governs every row).
@@ -109,11 +136,20 @@ type Store interface {
 	// tombstoned are skipped. Secret specs match sensitivity=secret in any class.
 	Tombstone(ctx context.Context, stream string, s TombstoneSpec, op Op) (Result, error)
 
-	// Trim removes rows that match any of specs (same policy id and class, at
-	// or before the spec's cutoff, rolled up if RequireRolled). A head-only
-	// store removes the longest contiguous prefix of eligible rows and
-	// advances pruned-through; a per-row store removes every eligible row.
+	// Trim removes rows that match any of specs (same class, at or before the
+	// spec's cutoff, rolled up if RequireRolled). A head-only store removes the
+	// longest contiguous prefix of eligible rows and advances pruned-through; a
+	// per-row store removes eligible rows per class in cursor order and raises
+	// the class watermark. Neither ever removes an R-audit row, even if a spec
+	// names the class.
 	Trim(ctx context.Context, stream string, specs []TrimSpec, op Op) (Result, error)
+
+	// Watermarks returns, for a TrimPerRow store, the per-class watermark W_C:
+	// the highest cursor removed for the class. Every row of the class at or
+	// below it is gone, and it never decreases. A TrimHeadOnly store returns
+	// an empty map (its pruned-through cursor plays that part). Readers use
+	// it through [ReadGap].
+	Watermarks(ctx context.Context, stream string) (map[string]uint64, error)
 
 	// Prune deletes rollup buckets that ended at or before the spec's cutoff.
 	Prune(ctx context.Context, stream string, s PruneSpec, op Op) (Result, error)
