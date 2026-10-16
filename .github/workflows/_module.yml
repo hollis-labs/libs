@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      postgres:
+        description: Start a disposable PostgreSQL server and export STREAMLOG_PG_DSN for the tests
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -56,6 +61,17 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           bwrap --ro-bind / / --unshare-net -- /bin/true
+
+      - name: Start PostgreSQL
+        if: ${{ inputs.postgres }}
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=test -p 127.0.0.1:5432:5432 postgres:17-alpine
+          for i in $(seq 1 60); do
+            docker exec pg pg_isready -U postgres -h 127.0.0.1 && break
+            sleep 1
+          done
+          docker exec pg pg_isready -U postgres -h 127.0.0.1
+          echo "STREAMLOG_PG_DSN=postgres://postgres:test@127.0.0.1:5432/postgres?sslmode=disable" >> "$GITHUB_ENV"
 
       - name: gofmt
         run: |
