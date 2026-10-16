@@ -150,6 +150,10 @@ type Report struct {
 	// the rows that would be: class-based counts for them are not in the
 	// report, because a dry run cannot classify.
 	Classified int64
+	// Partial is true when some count is only a lower bound or a read failed
+	// (see the classes' Partial): the budget cut a dry-run count short, or a
+	// store read at the end of the pass failed. It never looks like "zero".
+	Partial bool
 	// HeldByHead counts rows past their envelope age that a head-only trim
 	// could not remove because an earlier row must stay. Always zero for a
 	// TrimPerRow store.
@@ -230,6 +234,7 @@ type Summary struct {
 	DryRun       bool                    `json:"dry_run,omitempty"`
 	StoppedEarly bool                    `json:"stopped_early,omitempty"`
 	Skipped      bool                    `json:"skipped,omitempty"`
+	Partial      bool                    `json:"partial,omitempty"`
 	HeldByHead   int64                   `json:"held_by_head,omitempty"`
 	ElapsedMS    int64                   `json:"elapsed_ms"`
 	Classes      map[string]ClassSummary `json:"classes"`
@@ -252,7 +257,7 @@ type ClassSummary struct {
 // Summary returns the metadata-only view.
 func (r Report) Summary() Summary {
 	s := Summary{PolicyID: r.PolicyID, Streams: r.Streams, Classified: r.Classified, DryRun: r.DryRun, StoppedEarly: r.StoppedEarly,
-		Skipped: r.Skipped, HeldByHead: r.HeldByHead, ElapsedMS: r.Elapsed.Milliseconds(), Classes: map[string]ClassSummary{}}
+		Skipped: r.Skipped, Partial: r.Partial, HeldByHead: r.HeldByHead, ElapsedMS: r.Elapsed.Milliseconds(), Classes: map[string]ClassSummary{}}
 	for name, c := range r.Classes {
 		s.Classes[name] = ClassSummary{Scanned: c.Scanned, Tombstoned: c.Tombstoned, RolledUp: c.RolledUp, Trimmed: c.Trimmed,
 			RollupsPruned: c.RollupsPruned, BytesFreed: c.BytesFreed, Backlog: c.Backlog, Watermark: c.Watermark, Partial: c.Partial, Errors: c.Errors}
@@ -437,19 +442,20 @@ func (j *Janitor) resumeStream(token string) string {
 }
 
 // drain calls f until it reports no more work, the budget is spent, or ctx
-// ends. The budget is checked before the first call too.
-func (p *pass) drain(ctx context.Context, f func(Op) (rows int64, more bool, err error)) error {
+// ends, and returns whether the last call still had more. The budget is
+// checked before the first call too.
+func (p *pass) drain(ctx context.Context, f func(Op) (rows int64, more bool, err error)) (bool, error) {
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return false, err
 		}
 		if p.over() {
-			return nil
+			return false, nil
 		}
 		rows, more, err := f(p.op())
 		p.rows += rows
 		if err != nil || !more || p.j.dryRun {
-			return err
+			return more, err
 		}
 	}
 }
@@ -458,7 +464,9 @@ func (p *pass) stream(ctx context.Context, stream string, now time.Time) error {
 	j, rep := p.j, p.rep
 	st := j.store
 	fail := func(class string, err error) {
-		if err != nil && !errors.Is(err, context.Canceled) && !isDeadline(err) {
+		// Only the pass's own cancellation is silent; a store call that timed out
+		// or failed while the pass is healthy is counted.
+		if err != nil && ctx.Err() == nil {
 			ec := errorClass(err)
 			rep.class(class).fail(ec)
 			if j.onError != nil {
@@ -467,11 +475,22 @@ func (p *pass) stream(ctx context.Context, stream string, now time.Time) error {
 		}
 	}
 	step := func(class string, f func(Op) (int64, bool, error)) error {
-		err := p.drain(ctx, f)
+		more, err := p.drain(ctx, f)
 		if cerr := ctx.Err(); cerr != nil {
 			return cerr
 		}
 		fail(class, err)
+		if j.dryRun && more && err == nil {
+			// A dry-run count that stopped at its budget is a lower bound.
+			rep.Partial = true
+			if class == "" {
+				for _, name := range classOrder {
+					rep.class(name).Partial = true
+				}
+			} else {
+				rep.class(class).Partial = true
+			}
+		}
 		return nil
 	}
 	plan := j.planner.Plan(now)
@@ -574,8 +593,22 @@ func (p *pass) collect(ctx context.Context, stream string, plan Plan) error {
 	j, rep := p.j, p.rep
 	st := j.store
 	partial := func() {
+		rep.Partial = true
 		for _, name := range classOrder {
 			rep.class(name).Partial = true
+		}
+	}
+	// A failed or timed-out read is unknown, never zero: count it and mark the pass Partial.
+	readFailed := func(class string, err error) {
+		partial()
+		if ctx.Err() == nil && !isDeadline(err) {
+			ec := errorClass(err)
+			rep.class(class).fail(ec)
+			if j.onError != nil {
+				j.onError(stream, ec, err)
+			}
+		} else if ctx.Err() == nil {
+			rep.class(class).fail("timeout")
 		}
 	}
 	c, cancel, ok := p.bounded(ctx)
@@ -591,8 +624,8 @@ func (p *pass) collect(ctx context.Context, stream string, plan Plan) error {
 					cr.Watermark = v
 				}
 			}
-		} else if isDeadline(err) {
-			partial()
+		} else {
+			readFailed("", err)
 		}
 	}
 	if stats, err := st.Stats(c, stream); err == nil {
@@ -602,8 +635,8 @@ func (p *pass) collect(ctx context.Context, stream string, plan Plan) error {
 				cr.OldestRemaining = s.Oldest
 			}
 		}
-	} else if isDeadline(err) {
-		partial()
+	} else {
+		readFailed("", err)
 	}
 	if !j.dryRun {
 		for _, s := range plan.Tombstones {
@@ -616,9 +649,20 @@ func (p *pass) collect(ctx context.Context, stream string, plan Plan) error {
 			}
 			r, err := st.Tombstone(c, stream, s, op)
 			switch {
-			case err != nil && isDeadline(err), err == nil && r.More:
+			case err != nil:
 				rep.class(s.Class).Partial = true
-			case err == nil:
+				rep.Partial = true
+				if ctx.Err() == nil {
+					ec := errorClass(err)
+					rep.class(s.Class).fail(ec)
+					if j.onError != nil {
+						j.onError(stream, ec, err)
+					}
+				}
+			case r.More:
+				rep.class(s.Class).Partial = true
+				rep.Partial = true
+			default:
 				rep.class(s.Class).Backlog += r.Rows
 			}
 		}
