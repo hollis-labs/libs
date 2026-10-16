@@ -5,7 +5,7 @@ A durable `streamhub.Log` (from `ui/ui-go`) on SQLite, for daemons that need rep
 ```go
 l, err := streamlogsqlite.Open(ctx, "/var/lib/app/events.db", streamlogsqlite.Options{})
 rec, err := l.Append(ctx, environmentID, streamhub.Event{ID: "evt_…", Name: "task.state_changed", Data: envelopeJSON})
-cursor := streamlogsqlite.FormatCursor(rec.Epoch, rec.Seq) // hand this to the consumer
+cursor := logkit.FormatCursor(rec.Epoch, rec.Seq) // hand this to the consumer
 for r, err := range l.AfterCursor(ctx, environmentID, cursor) { … }
 ```
 
