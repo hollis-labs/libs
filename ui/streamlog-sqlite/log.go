@@ -16,6 +16,7 @@ import (
 	"github.com/hollis-labs/libs/core/util/sqlite/sqlitekit"
 	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 	"github.com/hollis-labs/libs/ui/ui-go/streamhub/logkit"
+	"github.com/hollis-labs/libs/ui/ui-go/streamhub/retention"
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
 )
 
@@ -56,6 +57,14 @@ type Options struct {
 	// never causes a false mismatch.
 	MarkerEvery time.Duration
 	// OnStorageMismatch is the restore policy; see [MismatchPolicy].
+	// Retention, when set, classifies each record at append (its retention
+	// class is stored beside it) and RetentionPolicyID is stamped on the
+	// record as the policy it was admitted under, for audit only: the janitor
+	// applies the current configuration to every row (D7 rev 2.2). Without
+	// Retention records are stored with no class and the first janitor pass
+	// classifies them.
+	Retention         *retention.Policy
+	RetentionPolicyID string
 	OnStorageMismatch MismatchPolicy
 	// OnIDConflict is called, after the counter is bumped, when an Event.ID
 	// is appended again with different content. Wire it to an alert.
@@ -89,6 +98,8 @@ type Log struct {
 	page       int
 	now        func() time.Time
 	extract    logkit.Extractor
+	policy     *retention.Policy
+	policyID   string
 	onConflict func(string, streamhub.Event)
 
 	epoch    string
@@ -118,7 +129,7 @@ func Open(ctx context.Context, path string, o Options) (*Log, error) {
 	}
 	l := &Log{
 		path: path, markerPath: o.MarkerPath, markerGap: o.MarkerEvery, page: o.PageSize,
-		now: o.Now, extract: o.Extractor, onConflict: o.OnIDConflict, heads: map[string]uint64{},
+		now: o.Now, extract: o.Extractor, policy: o.Retention, policyID: o.RetentionPolicyID, onConflict: o.OnIDConflict, heads: map[string]uint64{},
 	}
 	if l.markerPath == "" {
 		l.markerPath = path + ".hwm"
@@ -377,12 +388,16 @@ func (l *Log) Append(ctx context.Context, stream string, e streamhub.Event) (str
 	if e.ID != "" {
 		eid = e.ID
 	}
+	class := ""
+	if l.policy != nil {
+		class = l.policy.ClassOf(retention.Attrs{Category: cols.Category, Severity: cols.Severity, Sensitivity: cols.Sensitivity, PII: cols.PII})
+	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO records(stream, seq, event_id, kind, at_ns, size, data, digest,
+		`INSERT INTO records(stream, seq, event_id, kind, at_ns, size, data, digest, class, policy_id, outcome,
 			category, severity, sensitivity, pii, visibility, generation,
 			project_id, workstream_id, task_id, session_id, agent_urn, run_id)
-		 VALUES(?,?,?,?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?,?,?)`,
-		stream, seq, eid, e.Name, at.UnixNano(), len(e.Name)+len(data), data, digest,
+		 VALUES(?,?,?,?,?,?,?,?, ?,?,?, ?,?,?,?,?,?, ?,?,?,?,?,?)`,
+		stream, seq, eid, e.Name, at.UnixNano(), len(e.Name)+len(data), data, digest, class, l.policyID, cols.Outcome,
 		cols.Category, cols.Severity, cols.Sensitivity, cols.PII, cols.Visibility, cols.Generation,
 		cols.ProjectID, cols.WorkstreamID, cols.TaskID, cols.SessionID, cols.AgentURN, cols.RunID); err != nil {
 		return streamhub.Record{}, err

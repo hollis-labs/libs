@@ -7,6 +7,12 @@ All notable changes to the `streamlog-sqlite` module are documented here. The fo
 
 ## [Unreleased]
 
+### Added
+
+- `Log.RetentionStore()`: the log as a `retention.Store`, so a `retention.Janitor` can classify, roll up (counts per bucket with first and last cursor, flagged per row), tombstone payloads (`tier=1`, `payload_digest` `sha256:…` or `withheld`), trim from the head (advancing `pruned_through` like `Log.Trim`, only rolled-up rows, R-audit never) and prune rollups, in short bounded transactions. Passes `retention/storetest`.
+- `Options.Retention` / `RetentionPolicyID`: records are classified at append and stamped with the policy they were admitted under (audit only; the janitor applies the current configuration to every row, D7 rev 2.2).
+- Schema: `class`, `policy_id`, `rolled` and `outcome` columns on records; rollups keyed by class and bucket size.
+
 ### Changed
 
 - The cursor encoding, the duplicate-detection digest, the envelope extractor and the restore marker now come from `ui-go/streamhub/logkit` (shared with the Postgres log) instead of private copies. `FormatCursor`, `ParseCursor`, `ErrBadCursor`, `Columns`, `Extractor` and `EnvelopeExtractor` moved there; use `logkit.*`. Requires `ui/ui-go` v0.3.0.

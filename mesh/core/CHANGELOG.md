@@ -8,6 +8,25 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- Optional `teams.WorkflowRunIDPlanner` supplies a deterministic workflow ID
+  before eager member provisioning. The launch ledger retains `PlannedRunID`,
+  every initial intent receives it, retries reuse it, and a workflow ID mismatch
+  compensates the formation. External launch ledgers must persist `PlannedRunID`
+  and reject changes to it. Existing hosts and retained records remain unchanged
+  (CW-20261016-0247).
+
+## v0.7.1 — 2026-10-16
+
+### Fixed
+
+- `Dispatcher.Request` returns `ErrRequestTimeout` when the caller's deadline expires while the Store is still in the
+  `Subscribe` or `Send` that precede the wait, instead of the Store's own wrapped context error (the original error stays in the
+  chain, so `errors.Is` also matches `context.DeadlineExceeded`). A cancellation and any other Store error pass through
+  unchanged. Callers that test for `ErrRequestTimeout` no longer miss a timeout that a slow Store noticed first
+  (CW-20261016-0240).
+
 ## v0.7.0 — 2026-10-16
 
 ### Added

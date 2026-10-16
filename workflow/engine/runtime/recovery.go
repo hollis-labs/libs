@@ -881,6 +881,13 @@ func (c *RecoveryCoordinator) rebuildReady(ctx context.Context, run RunSnapshot,
 				}
 				return nil, driveErr
 			}
+			if driven.Recheck {
+				// The driver saw dependencies change after its preview without
+				// mutating the target. Rebuild expression context on the next
+				// bounded pass instead of waiting for another host recovery tick.
+				changed = true
+				continue
+			}
 			if driven.Progressed.Snapshot.Generation != snapshot.Generation || driven.Progressed.Snapshot.Status != snapshot.Status {
 				changed = true
 				result = append(result, driven.Progressed)
