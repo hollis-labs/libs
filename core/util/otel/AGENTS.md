@@ -34,7 +34,9 @@ purpose and supports `golangci-lint run --new` for changed lines.
 
 Prompt and completion content is sensitive. `redaction.Denylist` names
 `gen_ai.content.prompt` and `gen_ai.content.completion`, and redaction is
-driven by `HOLLIS_OTEL_REDACT_PROMPTS`. Adding a GenAI attribute that can
+driven by `HOLLIS_OTEL_REDACT_PROMPTS` and enforced by `redaction.Exporter`,
+which `Init` wraps around the trace exporter. `SpanProcessor` cannot redact
+(spans are read-only there) and is deprecated. Adding a GenAI attribute that can
 carry user content without adding it to the denylist exports that content to
 whatever backend is configured — `TestDenylist` is the guard.
 

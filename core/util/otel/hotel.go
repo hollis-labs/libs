@@ -21,6 +21,8 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/hollis-labs/libs/core/util/otel/redaction"
 )
 
 // Option configures Init.
@@ -38,13 +40,16 @@ type config struct {
 	logsEnabled          bool
 	runtimeMetrics       bool
 	resourceOptions      []resource.Option
+	spanRedaction        []redaction.ExporterOption
 }
 
 // defaultMetricExportInterval matches the SDK default; surfaced as a constant
 // so the no-export smoke test and downstream operators can rely on it.
 const defaultMetricExportInterval = 15 * time.Second
 
-// Init sets up a trace provider with an OTLP HTTP exporter and, when the
+// Init sets up a trace provider with an OTLP HTTP exporter (wrapped by
+// redaction.Exporter, so denylisted GenAI content never leaves the process
+// unless HOLLIS_OTEL_REDACT_PROMPTS=false; see WithSpanRedaction) and, when the
 // corresponding option is supplied, an OTLP HTTP metric exporter behind a
 // PeriodicReader-backed MeterProvider (WithMetricsEnabled) and/or an
 // OTLP HTTP log exporter behind a BatchProcessor-backed LoggerProvider
@@ -87,7 +92,7 @@ func Init(ctx context.Context, opts ...Option) (shutdown func(context.Context) e
 	}
 
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExporter),
+		sdktrace.WithBatcher(redaction.Exporter(traceExporter, cfg.spanRedaction...)),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(cfg.sampler),
 	)
@@ -331,4 +336,11 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// WithSpanRedaction passes options to the redaction.Exporter that Init wraps
+// around the trace exporter, for example redaction.WithValueRedactor to scrub
+// credentials from every exported string. Init always installs the wrapper.
+func WithSpanRedaction(opts ...redaction.ExporterOption) Option {
+	return func(c *config) { c.spanRedaction = append(c.spanRedaction, opts...) }
 }

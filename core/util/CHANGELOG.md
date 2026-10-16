@@ -8,6 +8,16 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `otel/redaction.Exporter`: a `sdktrace.SpanExporter` wrapper that forwards redacted copies of spans: denylisted attribute keys dropped (span, event, link), denylisted event names lose their attributes, and an injected `WithValueRedactor(func(string) string)` scrubs every exported string. `WithKeyFilter` replaces the key decision. Tested against a recording exporter.
+- `otel.WithSpanRedaction(...redaction.ExporterOption)`.
+
+### Changed
+- `otel.Init` now wraps its trace exporter with `redaction.Exporter`, so `gen_ai.content.prompt` and `gen_ai.content.completion` are dropped from exported spans by default, as `HOLLIS_OTEL_REDACT_PROMPTS` always documented; `HOLLIS_OTEL_REDACT_PROMPTS=false` exports them. Before this, `Init` exported them regardless. Callers that rely on the content reaching the backend must set the variable.
+
+### Deprecated
+- `otel/redaction.SpanProcessor` did nothing (`OnEnd` ignored the span; a processor only sees read-only spans) and gave no protection. It is kept for source compatibility; use `Exporter`.
+
 ## v0.4.0 — 2026-10-09
 
 - Module path is now `github.com/hollis-labs/libs/core/util` (was `github.com/hollis-labs/libs/util`); the previous path and its `util/vX.Y.Z` tags no longer exist. Tags are `core/util/vX.Y.Z`. No code change besides the path.
