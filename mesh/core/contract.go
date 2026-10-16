@@ -165,6 +165,65 @@ type Event struct {
 	Visibility     string          `json:"visibility"`
 	Truncated      bool            `json:"truncated"`
 	Payload        json.RawMessage `json:"payload"`
+
+	// Envelope v1.1 fields. All are optional and additive; Validate does not
+	// require them and SchemaVersion stays "1". They exist so the
+	// runtimeevents envelope projects onto Event without loss.
+
+	// RawOffset is the byte offset into the producer's raw log, when known.
+	RawOffset *int64 `json:"raw_offset,omitempty"`
+	// RecordedAt is set by the durable log on append, never by producers.
+	RecordedAt *time.Time `json:"recorded_at,omitempty"`
+	// Depth counts hops through reactions; a reaction effect carries its
+	// trigger's Depth plus one. CausationID names the trigger.
+	Depth uint32 `json:"depth,omitempty"`
+	// ActorRole refines Actor.Kind: operator, system, workflow, hook or
+	// reaction. Open vocabulary.
+	ActorRole string `json:"actor_role,omitempty"`
+	// ActorVerified records how Actor was identified: token, claimed or none.
+	ActorVerified string `json:"actor_verified,omitempty"`
+	// Scope holds verified dimension identifiers stamped by the producer.
+	Scope *EventScope `json:"scope,omitempty"`
+	// Class holds classification set by the sanitize and classify stages.
+	// Visibility and PayloadSchema stay top-level fields of Event.
+	Class *EventClass `json:"class,omitempty"`
+}
+
+// EventScope is the dimension block of an event: low-cardinality identifiers
+// only, each stamped from verified context and omitted when unverified.
+type EventScope struct {
+	EnvironmentID  string `json:"environment_id,omitempty"`
+	Authority      string `json:"authority,omitempty"`
+	WorkerID       string `json:"worker_id,omitempty"`
+	Host           string `json:"host,omitempty"`
+	ProjectID      string `json:"project_id,omitempty"`
+	WorkstreamID   string `json:"workstream_id,omitempty"`
+	EpicID         string `json:"epic_id,omitempty"`
+	SprintID       string `json:"sprint_id,omitempty"`
+	PlanID         string `json:"plan_id,omitempty"`
+	PhaseID        string `json:"phase_id,omitempty"`
+	TaskID         string `json:"task_id,omitempty"`
+	RunID          string `json:"run_id,omitempty"`
+	Attempt        uint32 `json:"attempt,omitempty"`
+	LaunchID       string `json:"launch_id,omitempty"`
+	AgentURN       string `json:"agent_urn,omitempty"`
+	LogicalAgentID string `json:"logical_agent_id,omitempty"`
+	TeamRunID      string `json:"team_run_id,omitempty"`
+}
+
+// EventClass is the classification block of an event. Category is one of
+// activity, state, progress, data, message, tool, approval, audit, alert,
+// fleet or step; Severity one of debug, info, notice, warning, error or
+// critical; Sensitivity one of public, private or secret. Consumers must
+// tolerate values outside these lists.
+type EventClass struct {
+	Category    string   `json:"category,omitempty"`
+	Severity    string   `json:"severity,omitempty"`
+	Sensitivity string   `json:"sensitivity,omitempty"`
+	PII         bool     `json:"pii,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+	Sanitized   bool     `json:"sanitized,omitempty"`
+	Redactions  uint32   `json:"redactions,omitempty"`
 }
 
 func (e Event) Validate() error {
