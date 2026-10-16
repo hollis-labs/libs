@@ -21,7 +21,11 @@
 // # Writers
 //
 // Appends to one stream serialize on that stream's row, so cursors are
-// gap-free and commit in order, from one process or from several.
+// gap-free and commit in order, from one process or from several. The epoch
+// is read inside every append and read transaction: when one instance
+// re-mints it (a restore detected at its Open), every other instance adopts
+// the new epoch on its next call instead of issuing cursors under the old
+// one, and rewrites its marker to match.
 //
 // # Restore detection
 //
@@ -32,9 +36,18 @@
 //     A different system identifier means a different cluster; a different
 //     timeline means a point-in-time recovery or a promotion. A failover
 //     therefore also re-mints, which is safe: readers get an epoch_changed
-//     gap and resume from the new epoch. Reading them needs the privilege to
-//     call pg_control_system() and pg_control_checkpoint(); without it the
-//     check is skipped and Open reports a warning.
+//     gap and resume from the new epoch. pg_control_system() and
+//     pg_control_checkpoint() may be restricted (hardened and managed installs
+//     revoke them from PUBLIC), so grant the
+//     log's role what it needs:
+//
+//     GRANT EXECUTE ON FUNCTION pg_control_system(), pg_control_checkpoint() TO <role>;
+//
+//     Without it the check is skipped, Open warns, and only the marker
+//     applies. [Options.RequireIdentityCheck] turns that into a startup error
+//     ([ErrIdentityUnavailable]); [Log.Status] and [Log.Recovery] report which
+//     checks are active.
+//
 //   - an external high-water marker file on the writer's host, which catches
 //     what the first check cannot: a pg_restore into the same cluster or a
 //     file-system or VM snapshot rollback, where neither identifier changes.

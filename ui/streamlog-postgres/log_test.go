@@ -461,3 +461,137 @@ func TestMaxAgeTrim(t *testing.T) {
 		t.Fatalf("head = %+v", h)
 	}
 }
+
+// roleDSN creates a login role that may create objects but is not a
+// superuser, and returns its DSN.
+func roleDSN(t *testing.T, e *env) (dsn, role string) {
+	t.Helper()
+	role = "lr_" + schemaName()
+	e.exec(`CREATE ROLE ` + role + ` LOGIN PASSWORD 'pw'`)
+	e.exec(`GRANT CREATE ON DATABASE postgres TO ` + role)
+	t.Cleanup(func() {
+		p, err := pgxpool.New(ctx, e.dsn)
+		if err != nil {
+			return
+		}
+		defer p.Close()
+		_, _ = p.Exec(ctx, `DROP SCHEMA IF EXISTS `+e.schema+` CASCADE`)
+		_, _ = p.Exec(ctx, `DROP OWNED BY `+role)
+		_, _ = p.Exec(ctx, `DROP ROLE IF EXISTS `+role)
+	})
+	cfg, err := pgxpool.ParseConfig(e.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("postgres://%s:pw@%s:%d/%s?sslmode=disable", role, cfg.ConnConfig.Host, cfg.ConnConfig.Port, cfg.ConnConfig.Database), role
+}
+
+// Without the grant the identity check degrades to marker-only, loudly.
+// PostgreSQL lets PUBLIC execute the pg_control_* functions by default;
+// hardened and managed installs revoke that, which is what this simulates
+// (and undoes afterwards: it is cluster-wide).
+func TestIdentityCheckDegradesWithoutGrant(t *testing.T) {
+	e := newEnv(t)
+	e.exec(`REVOKE EXECUTE ON FUNCTION pg_control_system(), pg_control_checkpoint() FROM PUBLIC`)
+	t.Cleanup(func() {
+		e.exec(`GRANT EXECUTE ON FUNCTION pg_control_system(), pg_control_checkpoint() TO PUBLIC`)
+	})
+	dsn, role := roleDSN(t, e)
+	var warned []string
+	opts := streamlog.Options{Schema: e.schema, MarkerPath: e.marker, MarkerEvery: -1, Warn: func(m string) { warned = append(warned, m) }}
+	l, err := streamlog.OpenDSN(ctx, dsn, opts)
+	if err != nil {
+		t.Fatalf("OpenDSN without grant: %v", err)
+	}
+	st := l.Status()
+	if st.Checks.ServerIdentity || !st.Checks.Marker || len(st.Warnings) == 0 || len(warned) == 0 {
+		t.Fatalf("status = %+v, warned %v; want identity off, marker on, a warning", st, warned)
+	}
+	l.Close()
+
+	// The requirement option turns the degradation into a startup error.
+	opts.RequireIdentityCheck = true
+	if _, err := streamlog.OpenDSN(ctx, dsn, opts); !errors.Is(err, streamlog.ErrIdentityUnavailable) {
+		t.Fatalf("RequireIdentityCheck err = %v, want ErrIdentityUnavailable", err)
+	}
+
+	// With the documented grant the check is active.
+	e.exec(`GRANT EXECUTE ON FUNCTION pg_control_system(), pg_control_checkpoint() TO ` + role)
+	opts.Warn = func(string) {}
+	l, err = streamlog.OpenDSN(ctx, dsn, opts)
+	if err != nil {
+		t.Fatalf("OpenDSN with grant: %v", err)
+	}
+	defer l.Close()
+	if st := l.Status(); !st.Checks.ServerIdentity || !st.Checks.Marker {
+		t.Fatalf("status with grant = %+v", st.Checks)
+	}
+}
+
+func TestStatusReportsActiveChecks(t *testing.T) {
+	e := newEnv(t)
+	l := e.open(streamlog.Options{})
+	defer l.Close()
+	if c := l.Status().Checks; !c.ServerIdentity || !c.Marker {
+		t.Fatalf("checks = %+v, want both on", c)
+	}
+	e2 := &env{t: t, dsn: e.dsn, schema: schemaName(), marker: filepath.Join(t.TempDir(), "x.hwm")}
+	t.Cleanup(func() { e2.exec(`DROP SCHEMA IF EXISTS ` + e2.schema + ` CASCADE`) })
+	l2 := e2.open(streamlog.Options{DisableMarker: true})
+	defer l2.Close()
+	if c := l2.Status().Checks; !c.ServerIdentity || c.Marker {
+		t.Fatalf("checks with marker disabled = %+v", c)
+	}
+}
+
+// If instance C re-mints (restore detected at its Open), instances A and B
+// must stop issuing cursors under the old epoch at once.
+func TestRemintByAnotherInstanceIsAdopted(t *testing.T) {
+	e := newEnv(t)
+	a := e.open(streamlog.Options{})
+	defer a.Close()
+	eB := &env{t: t, dsn: e.dsn, schema: e.schema, marker: filepath.Join(t.TempDir(), "b.hwm")}
+	b := eB.open(streamlog.Options{})
+	defer b.Close()
+	appendN(t, a, 2)
+	old := a.Epoch()
+	if b.Epoch() != old {
+		t.Fatalf("instances start with different epochs: %q %q", old, b.Epoch())
+	}
+
+	// A restore is detected when C opens: it re-mints.
+	e.exec(`UPDATE ` + e.schema + `.log_meta SET value='99' WHERE key='pg_timeline'`)
+	eC := &env{t: t, dsn: e.dsn, schema: e.schema, marker: filepath.Join(t.TempDir(), "c.hwm")}
+	c := eC.open(streamlog.Options{})
+	defer c.Close()
+	if c.Epoch() == old || !c.Recovery().Reminted {
+		t.Fatalf("C did not re-mint: %q %+v", c.Epoch(), c.Recovery())
+	}
+
+	// A's very next append carries the new epoch, not the old one.
+	r, err := a.Append(ctx, "env", streamhub.Event{Name: "after-remint"})
+	if err != nil || r.Epoch != c.Epoch() || a.Epoch() != c.Epoch() {
+		t.Fatalf("A append = %+v, %v; A epoch %q, want %q", r, err, a.Epoch(), c.Epoch())
+	}
+	// B, on a read, answers an old-epoch cursor with epoch_changed under the new epoch.
+	_, gerr := collect(b, "env", logkit.FormatCursor(old, 1))
+	if g := gapOf(t, gerr); g.Reason != streamhub.GapEpochChanged || g.Epoch != c.Epoch() {
+		t.Fatalf("B gap = %+v, want epoch_changed under %q", g, c.Epoch())
+	}
+	if b.Epoch() != c.Epoch() {
+		t.Fatalf("B epoch %q, want %q", b.Epoch(), c.Epoch())
+	}
+	if h, _ := a.Head(ctx, "env"); h.Epoch != c.Epoch() {
+		t.Fatalf("head epoch %q", h.Epoch)
+	}
+
+	// The adopting instance rewrote its marker: restarting it is not a mismatch.
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	a2 := e.open(streamlog.Options{OnStorageMismatch: streamlog.RefuseOnMismatch})
+	defer a2.Close()
+	if a2.Recovery().Reminted || a2.Epoch() != c.Epoch() {
+		t.Fatalf("restart of A: epoch %q recovery %+v", a2.Epoch(), a2.Recovery())
+	}
+}
