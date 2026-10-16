@@ -26,6 +26,13 @@ All notable changes to the `harness` module are documented here (the module was 
   TypeScript constants, and `mapping.md`, which maps the kinds every producer
   emits today onto the catalog (event stream contract C2, CW-20261016-0130).
 
+- `catalog` self-report contract: the `progress_detail` setting
+  (`EffectiveProgressDetail`, `ProgressDetail.Allows`), the input and output
+  schemas for the non-parking `torque_task_progress` and `torque_task_data_emit`
+  calls (`ToolSchema`), and `selfreport.md` (event stream contract C4,
+  CW-20261016-0132). `progress.checkpoint@1` now requires `effective_level`
+  and records `detail_source`.
+
 ### Changed
 
 - `runtimeevents.Event.SessionID` is now omitted from JSON when empty. Events

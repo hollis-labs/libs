@@ -2,20 +2,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hollis-labs:events:progress.checkpoint@1",
   "title": "progress.checkpoint@1",
-  "description": "Non-parking progress report at a detail level. Unknown fields are allowed.",
+  "description": "Non-parking progress report. detail_level is the level of this report; effective_level and detail_source record the setting that let it through. Unknown fields are allowed.",
   "type": "object",
   "required": [
     "detail_level",
+    "effective_level",
     "label"
   ],
   "properties": {
     "detail_level": {
-      "type": "string",
-      "description": "milestone, step or verbose"
+      "enum": [
+        "milestone",
+        "step",
+        "verbose"
+      ]
     },
     "label": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 80
     },
     "pct": {
       "type": "number",
@@ -36,6 +41,22 @@
     },
     "data_ref": {
       "type": "string"
+    },
+    "effective_level": {
+      "enum": [
+        "milestone",
+        "step",
+        "verbose"
+      ],
+      "description": "effective progress_detail when emitted; off never emits"
+    },
+    "detail_source": {
+      "enum": [
+        "launch",
+        "task",
+        "template",
+        "default"
+      ]
     }
   }
 }
