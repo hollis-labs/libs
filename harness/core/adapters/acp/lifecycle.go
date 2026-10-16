@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	runtimeevents "github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
+	"github.com/hollis-labs/libs/security/redact"
 )
 
 // ClientAdapter is implemented by an ACP-backed wrapper adapter that can
@@ -125,58 +126,34 @@ type Diagnostic struct {
 
 const maxDiagnosticBytes = 4096
 
-var (
-	sensitiveHeader = regexp.MustCompile(`(?im)(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*)([^\r\n]+)`)
-	sensitivePair   = regexp.MustCompile(`(?i)("?(?:authorization|proxy-authorization|cookie|set-cookie|api[_-]?key|token|password|secret)"?)(\s*[:=]\s*)(?:"[^"]*"|[^\s,;}]+)`)
-)
+var diagnosticRedactor = func() *redact.Redactor {
+	r, err := redact.New()
+	if err != nil {
+		panic(err) // New with no options cannot fail
+	}
+	return r
+}()
 
-// NewDiagnostic bounds and redacts a raw diagnostic before it can leave the
-// ACP implementation. JSON object keys with secret-shaped names and common
-// key=value/header spellings are replaced with "[REDACTED]".
+// NewDiagnostic redacts a raw diagnostic and then bounds it, before it can
+// leave the ACP implementation. Credentials (keyed values, headers, bearer
+// tokens, provider key shapes, URL userinfo) are replaced with "[REDACTED]".
 func NewDiagnostic(kind DiagnosticKind, message, raw string) Diagnostic {
 	return Diagnostic{Kind: kind, Message: redactDiagnostic(message), Raw: redactDiagnostic(raw)}
 }
 
+// redactDiagnostic redacts the whole text first and bounds the result: cutting
+// first would split a credential or an enclosing JSON document across the limit
+// and leave the cut-off half to the pattern rules, which cannot see it whole.
 func redactDiagnostic(in string) string {
-	if len(in) > maxDiagnosticBytes {
-		in = in[:maxDiagnosticBytes] + "…"
+	out := diagnosticRedactor.Text(in)
+	if len(out) <= maxDiagnosticBytes {
+		return out
 	}
-	var value any
-	if json.Unmarshal([]byte(in), &value) == nil {
-		redactJSON(value)
-		if encoded, err := json.Marshal(value); err == nil {
-			in = string(encoded)
-		}
+	cut := maxDiagnosticBytes
+	for cut > 0 && !utf8.RuneStart(out[cut]) {
+		cut--
 	}
-	in = sensitiveHeader.ReplaceAllString(in, `$1$2[REDACTED]`)
-	return sensitivePair.ReplaceAllString(in, `$1$2"[REDACTED]"`)
-}
-
-func redactJSON(value any) {
-	switch v := value.(type) {
-	case map[string]any:
-		for key, item := range v {
-			if isSensitiveKey(key) {
-				v[key] = "[REDACTED]"
-				continue
-			}
-			redactJSON(item)
-		}
-	case []any:
-		for _, item := range v {
-			redactJSON(item)
-		}
-	}
-}
-
-func isSensitiveKey(key string) bool {
-	key = strings.ToLower(strings.ReplaceAll(key, "-", "_"))
-	for _, marker := range []string{"authorization", "cookie", "api_key", "apikey", "token", "password", "secret"} {
-		if strings.Contains(key, marker) {
-			return true
-		}
-	}
-	return false
+	return out[:cut] + "…"
 }
 
 // Snapshot is an immutable view of a managed session's liveness and most
