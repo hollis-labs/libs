@@ -29,6 +29,14 @@ const (
 	ErrorDepth       ErrorClass = "depth"
 )
 
+// ErrorClasses returns the closed set of failure labels emitted by Sanitizer.
+// Consumers can use it to recognize fail-closed tombstones without accepting
+// arbitrary input-derived strings. The empty success class is not included.
+// Each call returns a new slice; callers cannot alter another consumer's set.
+func ErrorClasses() []ErrorClass {
+	return []ErrorClass{ErrorOversized, ErrorInvalidJSON, ErrorOpaque, ErrorDepth}
+}
+
 // Mode controls field retention. The zero value requires an explicit allowlist.
 type Mode uint8
 

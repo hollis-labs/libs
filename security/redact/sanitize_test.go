@@ -160,6 +160,13 @@ func TestSanitizeSecretKeysAndNumbers(t *testing.T) {
 }
 
 func TestSanitizeFailClosed(t *testing.T) {
+	classes := make(map[ErrorClass]bool)
+	for _, class := range ErrorClasses() {
+		if class == "" {
+			t.Fatal("success class must not be a failure label")
+		}
+		classes[class] = false
+	}
 	cases := []struct {
 		name  string
 		p     Policy
@@ -179,14 +186,35 @@ func TestSanitizeFailClosed(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			out, r := sanitizerFor(t, tc.p).Sanitize(tc.input)
+			if _, ok := classes[r.ErrorClass]; !ok {
+				t.Fatalf("emitted failure class %q is not exported", r.ErrorClass)
+			}
+			classes[r.ErrorClass] = true
 			if r.ErrorClass != tc.class || string(out) != `{"sanitize_error":"`+string(tc.class)+`"}` || r.Sensitivity != Secret || len(r.Paths) != 0 {
 				t.Fatal("failure did not return a safe tombstone")
 			}
 		})
 	}
+	for class, emitted := range classes {
+		if !emitted {
+			t.Errorf("exported failure class %q has no exercised tombstone", class)
+		}
+	}
 	for _, p := range []Policy{{Mode: 99}, {Format: 99}, {MaxBytes: -1}, {Sensitivity: "unknown"}, {AllowedPaths: []string{"not/pointer"}}, {AllowedPaths: []string{"/~2"}}} {
 		if _, err := NewSanitizer(p); err == nil {
 			t.Fatal("invalid policy accepted")
+		}
+	}
+}
+
+func TestErrorClassesCallerCannotMutateSharedSet(t *testing.T) {
+	classes := ErrorClasses()
+	for i := range classes {
+		classes[i] = "caller_controlled"
+	}
+	for _, class := range ErrorClasses() {
+		if class == "caller_controlled" {
+			t.Fatal("caller changed shared failure classes")
 		}
 	}
 }
