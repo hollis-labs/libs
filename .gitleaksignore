@@ -1,0 +1,30 @@
+# Exact reviewed synthetic fixtures only; no path-wide or rule-wide exclusions.
+# Native gitleaks fingerprints bind rule, path and line; history also binds the full commit.
+# The repository scanner continues applying its own rules and existing reasoned allowlists.
+
+# TestSecretScannerEncodingsAndSubstrings locally constructs a literal and encoded slices to exercise ContainsSecret detection.
+mcp/plugin-mcp/plugin-sdk/capability/host/hosttest/report_test.go:generic-api-key:128
+
+# TestEmbeddedBase64Alignments locally constructs a literal and shifted base64 slices to exercise ContainsSecret detection.
+mcp/plugin-mcp/plugin-sdk/capability/host/hosttest/report_test.go:generic-api-key:284
+
+# TestStderrIsBoundedAndRedacted plants a fixed literal in fixture stderr and verifies bounded redaction; not a credential source.
+mcp/plugin-mcp/plugin-host/process_test.go:generic-api-key:543
+
+# TestEmbeddedBase64Alignments locally constructs a literal and shifted base64 slices to exercise ContainsSecret detection.
+367b87d8a25e44cccf6c91e2dde8bb36c8167186:plugin-mcp/plugin-sdk/capability/host/hosttest/report_test.go:generic-api-key:284
+
+# TestSecretScannerEncodingsAndSubstrings locally constructs a literal and encoded slices to exercise ContainsSecret detection.
+ee40f097750f9ef64f1b1ec4c78fb39779324418:plugin-mcp/plugin-sdk/capability/host/hosttest/report_test.go:generic-api-key:126
+
+# secretDiagnosticProbe plants a fixed fixture marker into the diagnostic path and checks returned artifacts for disclosure.
+61beae7685edba18f60a7b3c20ad64e98ef52513:plugin-mcp/plugin-sdk/capability/host/hosttest/extra_probes.go:generic-api-key:195
+
+# The unsafe-install probe plants a fixed fixture marker, attempts forbidden access and checks artifacts for disclosure.
+123571bb4ff2d1042dad5d41e9b621614af77e67:plugin-mcp/plugin-sdk/capability/host/hosttest/suite.go:generic-api-key:389
+
+# TestStderrIsBoundedAndRedacted plants a fixed literal in fixture stderr and verifies bounded redaction; not a credential source.
+969d0b204e45451b3d2819fdd2193f7af0063a87:plugin-mcp/plugin-host/process_test.go:generic-api-key:537
+
+# TestStderrIsBoundedAndRedacted plants a fixed literal in fixture stderr and verifies bounded redaction; not a credential source.
+06f23805221a3f83ec4ca3db4d6cfefd56b5f918:plugin-mcp/plugin-host/process_test.go:generic-api-key:537
