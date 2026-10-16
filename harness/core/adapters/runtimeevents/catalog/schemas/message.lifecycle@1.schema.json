@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:message.lifecycle@1",
+  "title": "message.lifecycle@1",
+  "description": "Mailbox message lifecycle. Metadata and a body pointer only; never the body. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "message_id",
+    "from",
+    "to"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thread_id": {
+      "type": "string"
+    },
+    "in_reply_to": {
+      "type": "string"
+    },
+    "from": {
+      "type": "string",
+      "minLength": 1
+    },
+    "to": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "msg_kind": {
+      "type": "string"
+    },
+    "urgency": {
+      "type": "string"
+    },
+    "interrupt": {
+      "type": "boolean"
+    },
+    "delivery": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binding_generation": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "body_ref": {
+      "type": "string"
+    },
+    "body_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "content_type": {
+      "type": "string"
+    }
+  },
+  "not": {
+    "anyOf": [
+      {
+        "required": [
+          "body"
+        ]
+      },
+      {
+        "required": [
+          "payload"
+        ]
+      }
+    ]
+  }
+}

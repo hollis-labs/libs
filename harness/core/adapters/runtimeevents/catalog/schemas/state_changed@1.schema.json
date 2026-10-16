@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:state_changed@1",
+  "title": "state_changed@1",
+  "description": "State transition of an entity (task, run, session, checkpoint, sprint, phase, claim, delivery). Emitted only when the state changed: from differs from to, except a forced re-assertion (forced=true), which may repeat the current state. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "entity",
+    "to",
+    "trigger"
+  ],
+  "properties": {
+    "entity": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "human, agent, scheduler, hook, reaction or system"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "guard": {
+      "type": "object",
+      "required": [
+        "name",
+        "result"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "forced": {
+      "type": "boolean"
+    }
+  }
+}

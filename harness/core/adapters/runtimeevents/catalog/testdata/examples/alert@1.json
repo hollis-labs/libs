@@ -1,0 +1,1 @@
+{"rule_id": "loop-detect", "source_event_ids": ["evt_1", "evt_2"], "labels": ["loop"], "coalesce_key": "CW-1", "summary": "repeated tool call", "confidence": "derived"}

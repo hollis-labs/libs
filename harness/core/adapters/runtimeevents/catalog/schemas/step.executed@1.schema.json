@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:step.executed@1",
+  "title": "step.executed@1",
+  "description": "A deterministic step or reaction rule ran (outcome skipped in shadow mode). Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "step_id",
+    "outcome"
+  ],
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "trigger_event_id": {
+      "type": "string"
+    },
+    "input_digest": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "string",
+      "description": "ok, skipped or failed"
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

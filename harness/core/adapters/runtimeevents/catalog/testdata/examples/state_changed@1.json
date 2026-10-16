@@ -1,0 +1,1 @@
+{"entity": {"type": "task", "id": "CW-20261016-0130"}, "from": "todo", "to": "doing", "trigger": {"kind": "agent", "ref": "msg://agent/agent-mux/agt_oi85lf2zqa"}, "reason": "started", "forced": false}

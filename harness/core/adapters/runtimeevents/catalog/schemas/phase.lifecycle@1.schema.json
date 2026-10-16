@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:phase.lifecycle@1",
+  "title": "phase.lifecycle@1",
+  "description": "A plan phase started or completed. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "plan_id",
+    "phase_id"
+  ],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "progress": {
+      "type": "object",
+      "required": [
+        "done",
+        "total"
+      ],
+      "properties": {
+        "done": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

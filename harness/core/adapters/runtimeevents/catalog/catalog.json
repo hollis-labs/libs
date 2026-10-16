@@ -1,0 +1,649 @@
+{
+ "version": 1,
+ "naming": "<domain>.<noun>[.<verb>]",
+ "categories": [
+  "activity",
+  "state",
+  "progress",
+  "data",
+  "message",
+  "tool",
+  "approval",
+  "audit",
+  "alert",
+  "fleet",
+  "step"
+ ],
+ "kinds": [
+  {
+   "kind": "process.started",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "process.exited",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "session.ready",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "session.idle",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "session.processing",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "session.lost",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "session.auth_failed",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "session.heartbeat",
+   "category": "activity",
+   "status": "stable",
+   "note": "liveness only; never a stand-in for unknown state"
+  },
+  {
+   "kind": "turn.started",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "turn.completed",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "turn.failed",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "stdin.write",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "stdout.raw",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "stderr.raw",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "stdout.line",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "stderr.line",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "agent.delta",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "agent.tool_use",
+   "category": "tool",
+   "status": "stable"
+  },
+  {
+   "kind": "agent.tool_result",
+   "category": "tool",
+   "status": "stable"
+  },
+  {
+   "kind": "agent.subagent_spawn",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "agent.permission_requested",
+   "category": "approval",
+   "status": "stable",
+   "note": "maps to approval.requested/resolved on the bus"
+  },
+  {
+   "kind": "agent.permission_resolved",
+   "category": "approval",
+   "status": "stable",
+   "note": "maps to approval.requested/resolved on the bus"
+  },
+  {
+   "kind": "agent.permission_denied",
+   "category": "approval",
+   "status": "stable",
+   "note": "maps to approval.requested/resolved on the bus"
+  },
+  {
+   "kind": "policy.nudge",
+   "category": "alert",
+   "status": "stable",
+   "note": "observed finding; not evidence the producer acted"
+  },
+  {
+   "kind": "policy.rewrite",
+   "category": "alert",
+   "status": "stable",
+   "note": "observed finding; not evidence the producer acted"
+  },
+  {
+   "kind": "policy.block",
+   "category": "alert",
+   "status": "stable",
+   "note": "observed finding; not evidence the producer acted"
+  },
+  {
+   "kind": "policy.approval_requested",
+   "category": "approval",
+   "status": "stable",
+   "note": "maps to approval.requested on the bus"
+  },
+  {
+   "kind": "plant.started",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "plant.completed",
+   "category": "activity",
+   "status": "stable"
+  },
+  {
+   "kind": "sandbox.applied",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "interrupt.requested",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "interrupt.acknowledged",
+   "category": "state",
+   "status": "stable"
+  },
+  {
+   "kind": "task.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "run.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "session.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "stable",
+   "note": "Tether emits {from,to,exit_code,reason} today; add entity and trigger (CW-20261016-0136)"
+  },
+  {
+   "kind": "checkpoint.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "sprint.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "phase.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "claim.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "delivery.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "gate.evaluated",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:gate.evaluated@1",
+   "status": "new"
+  },
+  {
+   "kind": "phase.started",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:phase.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "phase.completed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:phase.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "progress.checkpoint",
+   "category": "progress",
+   "payload_schema": "urn:hollis-labs:events:progress.checkpoint@1",
+   "status": "new"
+  },
+  {
+   "kind": "data.emitted",
+   "category": "data",
+   "payload_schema": "urn:hollis-labs:events:data.emitted@1",
+   "status": "new"
+  },
+  {
+   "kind": "step.executed",
+   "category": "step",
+   "payload_schema": "urn:hollis-labs:events:step.executed@1",
+   "status": "new"
+  },
+  {
+   "kind": "tool.call.started",
+   "category": "tool",
+   "payload_schema": "urn:hollis-labs:events:tool.call.started@1",
+   "status": "new"
+  },
+  {
+   "kind": "tool.call.finished",
+   "category": "tool",
+   "payload_schema": "urn:hollis-labs:events:tool.call.finished@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.sent",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.queued",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.delivered",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.read",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.consumed",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.failed",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.dead_lettered",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.redriven",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.canceled",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.archived",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "message.purged",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:message.lifecycle@1",
+   "status": "new"
+  },
+  {
+   "kind": "wake.attempted",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:wake@1",
+   "status": "new"
+  },
+  {
+   "kind": "wake.outcome",
+   "category": "message",
+   "payload_schema": "urn:hollis-labs:events:wake@1",
+   "status": "new"
+  },
+  {
+   "kind": "approval.requested",
+   "category": "approval",
+   "payload_schema": "urn:hollis-labs:events:approval.requested@1",
+   "status": "new"
+  },
+  {
+   "kind": "approval.resolved",
+   "category": "approval",
+   "payload_schema": "urn:hollis-labs:events:approval.resolved@1",
+   "status": "new"
+  },
+  {
+   "kind": "fleet.node.down",
+   "category": "fleet",
+   "payload_schema": "urn:hollis-labs:events:fleet.node@1",
+   "status": "new"
+  },
+  {
+   "kind": "fleet.node.up",
+   "category": "fleet",
+   "payload_schema": "urn:hollis-labs:events:fleet.node@1",
+   "status": "new"
+  },
+  {
+   "kind": "fleet.node.restarted",
+   "category": "fleet",
+   "payload_schema": "urn:hollis-labs:events:fleet.node@1",
+   "status": "new"
+  },
+  {
+   "kind": "fleet.node.degraded",
+   "category": "fleet",
+   "payload_schema": "urn:hollis-labs:events:fleet.node@1",
+   "status": "new"
+  },
+  {
+   "kind": "event.classified",
+   "category": "alert",
+   "payload_schema": "urn:hollis-labs:events:alert@1",
+   "status": "new"
+  },
+  {
+   "kind": "alert.raised",
+   "category": "alert",
+   "payload_schema": "urn:hollis-labs:events:alert@1",
+   "status": "new"
+  },
+  {
+   "kind": "alert.cleared",
+   "category": "alert",
+   "payload_schema": "urn:hollis-labs:events:alert@1",
+   "status": "new"
+  },
+  {
+   "kind": "tool_call_start",
+   "category": "tool",
+   "status": "deprecated",
+   "successor": "tool.call.started",
+   "note": "Tether gateway; reports ok:false today, which the successor drops"
+  },
+  {
+   "kind": "tool_call_end",
+   "category": "tool",
+   "status": "deprecated",
+   "successor": "tool.call.finished",
+   "note": "Tether gateway"
+  },
+  {
+   "kind": "audit.recorded",
+   "category": "audit",
+   "payload_schema": "urn:hollis-labs:events:audit.recorded@1",
+   "status": "new",
+   "note": "generic audit fact: Tesseract audit actions, Cerberus intent/outcome/grant/brake records"
+  },
+  {
+   "kind": "session.turn_routed",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.turn_output",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.boot_dir_planted",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.stalled",
+   "category": "alert",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.shim_status",
+   "category": "state",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.output",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.started",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_started",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_completed",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_sessions_ended",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.sessions_swept",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.execution_policy_changed",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "ai.budget_rejected",
+   "category": "alert",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "sysop.session_stop",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.session_checkpoint",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.logical_agent_resume",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.session_cleanup",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.logical_agent_policy",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "workspace.snapshot.taken",
+   "category": "data",
+   "status": "stable",
+   "note": "mesh/core; payload schema workspace.snapshot.taken.v1 lives in mesh/core"
+  },
+  {
+   "kind": "session.turn_interrupt_requested",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "interrupt.requested",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.turn_interrupt_completed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "interrupt.acknowledged",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.request_status",
+   "category": "approval",
+   "status": "deprecated",
+   "successor": "approval.requested",
+   "note": "Tether; open maps to approval.requested, close to approval.resolved"
+  },
+  {
+   "kind": "session.force_closed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=human, reason=force_closed"
+  },
+  {
+   "kind": "session.shim_retired",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=human, reason=shim_retired"
+  },
+  {
+   "kind": "session.launch_failed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; to=failed, reason=launch_failed"
+  },
+  {
+   "kind": "session.reaper",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=system, reason=reaped"
+  },
+  {
+   "kind": "session.activity",
+   "category": "activity",
+   "status": "deprecated",
+   "successor": "session.heartbeat",
+   "note": "Tether"
+  },
+  {
+   "kind": "provider.session_lost",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.lost",
+   "note": "Tether"
+  },
+  {
+   "kind": "provider.permission_denied",
+   "category": "approval",
+   "status": "deprecated",
+   "successor": "agent.permission_denied",
+   "note": "Tether"
+  },
+  {
+   "kind": "broker.envelope_created",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.sent",
+   "note": "Tether broker"
+  },
+  {
+   "kind": "broker.envelope_replied",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.sent",
+   "note": "Tether broker; reply carries in_reply_to"
+  },
+  {
+   "kind": "routing.reply_delivered",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.delivered",
+   "note": "Tether"
+  },
+  {
+   "kind": "routing.reply_undeliverable",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.failed",
+   "note": "Tether"
+  }
+ ]
+}

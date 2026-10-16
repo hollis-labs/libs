@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:approval.requested@1",
+  "title": "approval.requested@1",
+  "description": "Notification that an approval was requested. go-hitl is the decision wire. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "request_id",
+    "hitl_ref"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "class": {
+      "type": "string"
+    },
+    "requester": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "hitl_ref": {
+      "type": "string",
+      "description": "URN of the decision record in the system that holds it: go-hitl, or the producer's own approval store (e.g. msg://approval/cerberus/<broker id>). Not a go-hitl id unless go-hitl holds the decision.",
+      "minLength": 1
+    }
+  }
+}

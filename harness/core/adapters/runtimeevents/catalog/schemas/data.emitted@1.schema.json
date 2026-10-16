@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:data.emitted@1",
+  "title": "data.emitted@1",
+  "description": "Structured data with a schema id; inline (size-capped) or by reference. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data": true,
+    "ref": {
+      "type": "string"
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "data"
+      ]
+    },
+    {
+      "required": [
+        "ref"
+      ]
+    }
+  ]
+}

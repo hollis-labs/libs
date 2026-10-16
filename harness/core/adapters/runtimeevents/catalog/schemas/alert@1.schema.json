@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:alert@1",
+  "title": "alert@1",
+  "description": "Classification or alert derived from other events. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "source_event_ids"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_event_ids": {
+      "type": "array",
+      "description": "ids of the canonical events this alert derives from. Empty when every source is local (never published); then payload source_refs holds the producer's local references. Never mint canonical ids for local observations.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "coalesce_key": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string"
+    }
+  }
+}

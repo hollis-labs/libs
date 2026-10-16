@@ -1,0 +1,1 @@
+{"gate": {"id": "ci", "kind": "ci_green"}, "subject": {"type": "task", "id": "CW-1"}, "result": "pass", "blocking": true, "evidence_ref": "https://example.test/run/1"}
