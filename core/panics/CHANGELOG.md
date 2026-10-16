@@ -4,6 +4,8 @@ This module is versioned independently with `core/panics/vX.Y.Z` tags.
 
 ## Unreleased
 
+## v0.1.0 — 2026-10-16
+
 ### Added
 
 - `Guard`, `Config`, `Record`, `Error`: panic containment that returns an error carrying a ref
