@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -386,6 +387,294 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 			t.Fatalf("TryLock after unlock = %v, %v", ok3, err)
 		}
 		unlock2()
+	}))
+
+	// --- D7 rev 2.3: every precondition of a removal, the watermark, the gap frame ---
+
+	t.Run("TrimNeverRemovesAudit", guard(func(t *testing.T) {
+		f := newFixture(t)
+		a := add(t, f, row(retention.ClassAudit, 0, "audit"))
+		d := add(t, f, row(retention.ClassDebug, time.Hour, "d"))
+		// Even a spec that names R-audit (a bug in a caller) cannot remove an audit row.
+		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{
+			{Class: retention.ClassAudit, Before: t0.Add(1000 * day)}, {Class: retention.ClassDebug, Before: t0.Add(1000 * day)}}, retention.Op{}))
+		left := f.Rows("s")
+		if byClass(left, a).Seq != a {
+			t.Fatalf("the audit row was removed: %+v", r)
+		}
+		if f.Store().Caps().Trim == retention.TrimPerRow && byClass(left, d).Seq != 0 {
+			t.Fatal("per-row: the debug row behind the audit row should go")
+		}
+		if marks := must(f.Store().Watermarks(ctx, "s")); marks[retention.ClassAudit] != 0 {
+			t.Fatalf("audit watermark = %d, want none", marks[retention.ClassAudit])
+		}
+	}))
+
+	t.Run("RowsNotPastEveryTierStay", guard(func(t *testing.T) {
+		f := newFixture(t)
+		old := add(t, f, row(retention.ClassDebug, 0, "old"))
+		young := add(t, f, row(retention.ClassDebug, 5*day, "young"))
+		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
+		left := f.Rows("s")
+		if byClass(left, old).Seq != 0 || byClass(left, young).Seq != young {
+			t.Fatalf("rows left = %+v: only the row past the cutoff may go", left)
+		}
+	}))
+
+	t.Run("NoRemovalWithoutACommittedCoveringRollup", guard(func(t *testing.T) {
+		f := newFixture(t)
+		a := add(t, f, row(retention.ClassActivity, 0, "a"))
+		spec := retention.TrimSpec{Class: retention.ClassActivity, Before: t0.Add(30 * day), RequireRolled: true}
+		if r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{spec}, retention.Op{})); r.Rows != 0 {
+			t.Fatalf("removed an unrolled row: %+v", r)
+		}
+		must(f.Store().Rollup(ctx, "s", retention.RollupSpec{Class: retention.ClassActivity, Buckets: []retention.Duration{retention.D(day)}, ClosedBefore: t0.Add(10 * day)}, retention.Op{}))
+		if r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{spec}, retention.Op{})); r.Rows != 1 || byClass(f.Rows("s"), a).Seq != 0 {
+			t.Fatalf("after the rollup the row should go: %+v", r)
+		}
+	}))
+
+	t.Run("PerRowRemovalGoesPerClassInCursorOrder", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if f.Store().Caps().Trim != retention.TrimPerRow {
+			t.Skip("store trims head-only")
+		}
+		var d, a []uint64
+		for i := range 4 {
+			d = append(d, add(t, f, row(retention.ClassDebug, time.Duration(2*i)*time.Hour, "d")))
+			a = append(a, add(t, f, row(retention.ClassActivity, time.Duration(2*i+1)*time.Hour, "a")))
+		}
+		specs := []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}
+		for step := 0; step < 6; step++ {
+			must(f.Store().Trim(ctx, "s", specs, retention.Op{Limit: 3}))
+			left := f.Rows("s")
+			// For each class what remains must be a suffix of its cursor order: no earlier row stays while a later one is gone.
+			for class, seqs := range map[string][]uint64{retention.ClassDebug: d, retention.ClassActivity: a} {
+				// A present row followed by a missing one is the violation.
+				seenPresent := false
+				for _, q := range seqs {
+					present := byClass(left, q).Seq == q
+					if seenPresent && !present {
+						t.Fatalf("step %d: %s row %d was removed before an earlier row of its class: %+v", step, class, q, left)
+					}
+					seenPresent = seenPresent || present
+				}
+			}
+			if len(left) == 0 {
+				break
+			}
+		}
+		if len(f.Rows("s")) != 0 {
+			t.Fatalf("rows left after repeated bounded calls: %+v", f.Rows("s"))
+		}
+	}))
+
+	t.Run("PerRowStopsAClassAtItsFirstRowThatMustStay", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if f.Store().Caps().Trim != retention.TrimPerRow {
+			t.Skip("store trims head-only")
+		}
+		e1 := add(t, f, row(retention.ClassActivity, 0, "e1"))
+		young := add(t, f, row(retention.ClassActivity, 10*day, "young")) // inside its tier: stays
+		e2 := add(t, f, row(retention.ClassActivity, time.Hour, "e2"))    // old enough, but behind a row that stays
+		o := add(t, f, row(retention.ClassDebug, 2*time.Hour, "other class"))
+		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassActivity, Before: t0.Add(day)}, {Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
+		left := f.Rows("s")
+		if byClass(left, e1).Seq != 0 || byClass(left, young).Seq != young || byClass(left, e2).Seq != e2 || byClass(left, o).Seq != 0 {
+			t.Fatalf("rows left = %+v: e1 and the other class go; young stays and holds back e2 (cursor order)", left)
+		}
+	}))
+
+	t.Run("WatermarkIsPerClassPersistedAndMonotonic", guard(func(t *testing.T) {
+		f := newFixture(t)
+		st := f.Store()
+		d1 := add(t, f, row(retention.ClassDebug, 0, "d1"))
+		a1 := add(t, f, row(retention.ClassActivity, time.Hour, "a1"))
+		d2 := add(t, f, row(retention.ClassDebug, 2*time.Hour, "d2"))
+		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(time.Hour)}}, retention.Op{}))
+		marks := must(st.Watermarks(ctx, "s"))
+		if st.Caps().Trim == retention.TrimHeadOnly {
+			if len(marks) != 0 {
+				t.Fatalf("a head-only store has no per-class watermarks: %v", marks)
+			}
+			return
+		}
+		if marks[retention.ClassDebug] != d1 || len(marks) != 1 {
+			t.Fatalf("watermarks = %v, want only debug at %d", marks, d1)
+		}
+		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}, retention.Op{}))
+		marks = must(st.Watermarks(ctx, "s"))
+		if marks[retention.ClassDebug] != d2 || marks[retention.ClassActivity] != a1 {
+			t.Fatalf("watermarks = %v, want debug %d and activity %d", marks, d2, a1)
+		}
+		// Never backwards: a call that removes nothing, or older rows only, leaves them.
+		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0}}, retention.Op{}))
+		if again := must(st.Watermarks(ctx, "s")); again[retention.ClassDebug] != d2 || again[retention.ClassActivity] != a1 {
+			t.Fatalf("watermarks moved: %v", again)
+		}
+		// Cursors are never reused: a new row gets a cursor above every removed one.
+		if n := add(t, f, row(retention.ClassDebug, 3*time.Hour, "n")); n <= d2 {
+			t.Fatalf("new cursor %d reuses the range at or below %d", n, d2)
+		}
+	}))
+
+	t.Run("WatermarkMovesAtomicallyWithTheRemoval", guard(func(t *testing.T) {
+		f := newFixture(t)
+		fx, ok := f.(Faulty)
+		if f.Store().Caps().Trim != retention.TrimPerRow || !ok {
+			t.Skip("needs a per-row store that can fail between the delete and the watermark")
+		}
+		add(t, f, row(retention.ClassDebug, 0, "d1"))
+		add(t, f, row(retention.ClassDebug, time.Hour, "d2"))
+		specs := []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}
+		boom := errors.New("injected")
+		fx.InjectFault(FaultTrim, boom)
+		if _, err := f.Store().Trim(ctx, "s", specs, retention.Op{}); !errors.Is(err, boom) {
+			t.Fatalf("Trim err = %v, want the injected fault", err)
+		}
+		if n := len(f.Rows("s")); n != 2 {
+			t.Fatalf("%d rows left after a failed trim: the delete must roll back with the watermark", n)
+		}
+		if marks := must(f.Store().Watermarks(ctx, "s")); len(marks) != 0 {
+			t.Fatalf("the watermark moved without the delete: %v", marks)
+		}
+		fx.InjectFault(FaultTrim, nil)
+		if r := must(f.Store().Trim(ctx, "s", specs, retention.Op{})); r.Rows != 2 {
+			t.Fatalf("replay = %+v", r)
+		}
+		if marks := must(f.Store().Watermarks(ctx, "s")); marks[retention.ClassDebug] != 2 {
+			t.Fatalf("watermarks = %v", marks)
+		}
+	}))
+
+	t.Run("RollupCountsAndFlagsMoveTogetherAndReplayDoesNotDoubleCount", guard(func(t *testing.T) {
+		f := newFixture(t)
+		fx, ok := f.(Faulty)
+		if !ok {
+			t.Skip("needs a store that can fail between the counts and the rolled flag")
+		}
+		add(t, f, row(retention.ClassState, 0, "a"))
+		add(t, f, row(retention.ClassState, time.Minute, "b"))
+		spec := retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}
+		boom := errors.New("injected")
+		fx.InjectFault(FaultRollup, boom)
+		if _, err := f.Store().Rollup(ctx, "s", spec, retention.Op{}); !errors.Is(err, boom) {
+			t.Fatalf("Rollup err = %v", err)
+		}
+		if len(f.Buckets("s")) != 0 {
+			t.Fatal("bucket counts survived a failed call")
+		}
+		for _, r := range f.Rows("s") {
+			if r.Rolled {
+				t.Fatal("a row was flagged rolled by a failed call")
+			}
+		}
+		fx.InjectFault(FaultRollup, nil)
+		must(f.Store().Rollup(ctx, "s", spec, retention.Op{}))
+		must(f.Store().Rollup(ctx, "s", spec, retention.Op{})) // replay
+		if bs := f.Buckets("s"); len(bs) != 1 || bs[0].Count != 2 {
+			t.Fatalf("buckets = %+v, want one bucket counting 2 rows exactly once", bs)
+		}
+	}))
+
+	t.Run("ReaderBelowAWatermarkSeesOneGapFrame", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if f.Store().Caps().Trim != retention.TrimPerRow {
+			t.Skip("store trims head-only")
+		}
+		d1 := add(t, f, row(retention.ClassDebug, 0, "d1"))
+		a1 := add(t, f, row(retention.ClassActivity, time.Hour, "a1"))
+		keep := add(t, f, row(retention.ClassActivity, 20*day, "keep"))
+		d2 := add(t, f, row(retention.ClassDebug, 2*time.Hour, "d2"))
+		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}, retention.Op{}))
+		marks := must(f.Store().Watermarks(ctx, "s"))
+		// Starting from the beginning: one frame, naming the highest watermark; no cursor advance.
+		g, ok := retention.ReadGap(marks, 0)
+		if !ok || g.Reason != "retention" || g.ThroughCursor != d2 || g.Class != retention.ClassDebug {
+			t.Fatalf("gap = %+v, %v; want retention through %d (debug)", g, ok, d2)
+		}
+		// Resuming from the cursor of a removed row is valid and still below the watermark: the same single frame.
+		if g2, ok := retention.ReadGap(marks, d1); !ok || g2 != g {
+			t.Fatalf("resume from a removed cursor: %+v, %v", g2, ok)
+		}
+		// At or past every watermark there is no frame.
+		if _, ok := retention.ReadGap(marks, d2); ok {
+			t.Fatal("a reader past every watermark got a gap frame")
+		}
+		_ = a1
+		_ = keep
+	}))
+
+	t.Run("RowsOnHoldAreNeverTouched", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if hs, ok := f.(HoldSupport); !ok || !hs.SupportsHold() {
+			t.Skip("fixture has no rows on hold")
+		}
+		st := f.Store()
+		pend := row("", 0, "pending")
+		pend.Hold = true
+		hp := add(t, f, pend)
+		held := row(retention.ClassDebug, 0, "held")
+		held.Hold = true
+		hh := add(t, f, held)
+		after := add(t, f, row(retention.ClassDebug, time.Hour, "after"))
+		must(st.Classify(ctx, "s", classOf, retention.Op{}))
+		must(st.Rollup(ctx, "s", retention.RollupSpec{Class: retention.ClassDebug, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}, retention.Op{}))
+		must(st.Tombstone(ctx, "s", retention.TombstoneSpec{Class: retention.ClassDebug, Before: t0.Add(day)}, retention.Op{}))
+		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
+		left := f.Rows("s")
+		for _, seq := range []uint64{hp, hh} {
+			r := byClass(left, seq)
+			if r.Seq != seq || r.Tombstoned || r.Rolled || string(r.Payload) == "" {
+				t.Fatalf("held row %d was touched: %+v", seq, r)
+			}
+		}
+		if byClass(left, hp).Class != "" {
+			t.Fatal("a pending row was classified")
+		}
+		// Cursor order: the row after a held row of its class must not be removed either (head-only stops at it too).
+		if byClass(left, after).Seq != after {
+			t.Fatalf("a row behind a held row of its class was removed: %+v", left)
+		}
+	}))
+
+	t.Run("OpsHonourACancelledContext", guard(func(t *testing.T) {
+		f := newFixture(t)
+		add(t, f, row(retention.ClassDebug, 0, "d"))
+		st := f.Store()
+		cctx, cancel := context.WithCancel(ctx)
+		cancel()
+		checks := map[string]error{}
+		_, checks["Streams"] = st.Streams(cctx)
+		_, checks["Stats"] = st.Stats(cctx, "s")
+		_, checks["Watermarks"] = st.Watermarks(cctx, "s")
+		_, checks["Classify"] = st.Classify(cctx, "s", classOf, retention.Op{})
+		_, checks["Rollup"] = st.Rollup(cctx, "s", retention.RollupSpec{Class: retention.ClassDebug, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}, retention.Op{})
+		_, checks["Tombstone"] = st.Tombstone(cctx, "s", retention.TombstoneSpec{Class: retention.ClassDebug, Before: t0.Add(day)}, retention.Op{})
+		_, checks["Trim"] = st.Trim(cctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{})
+		_, checks["Prune"] = st.Prune(cctx, "s", retention.PruneSpec{Class: retention.ClassDebug, Bucket: retention.D(time.Hour), Before: t0.Add(day)}, retention.Op{})
+		for name, err := range checks {
+			if err == nil {
+				t.Errorf("%s ignored a cancelled context", name)
+			}
+		}
+		if rows := f.Rows("s"); len(rows) != 1 || rows[0].Tombstoned {
+			t.Fatalf("a cancelled call wrote: %+v", rows)
+		}
+	}))
+
+	t.Run("RowByRowStoresHonourMaxDuration", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if tb, ok := f.(TimeBounded); !ok || !tb.HonoursMaxDuration() {
+			t.Skip("store bounds calls by Limit, not by time")
+		}
+		for range 20 {
+			add(t, f, row(retention.ClassState, 0, "x"))
+		}
+		r := must(f.Store().Tombstone(ctx, "s", retention.TombstoneSpec{Class: retention.ClassState, Before: t0.Add(day)}, retention.Op{MaxDuration: time.Nanosecond}))
+		if r.Rows < 1 || r.Rows >= 20 || !r.More {
+			t.Fatalf("Tombstone with a 1ns budget = %+v: it must make progress on at least one row, stop, and say More", r)
+		}
 	}))
 
 	t.Run("StreamsIncludesThoseWithOnlyRollups", guard(func(t *testing.T) {
