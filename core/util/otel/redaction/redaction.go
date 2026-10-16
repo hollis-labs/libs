@@ -25,8 +25,11 @@ func ShouldRedact(key string) bool {
 }
 
 // SpanProcessor returns a processor shell that preserves the denylist
-// decision. It does not mutate spans because sdktrace.ReadOnlySpan is
-// immutable; callers should consult ShouldRedact before export.
+// decision. It does nothing to spans: sdktrace.ReadOnlySpan is immutable, so a
+// processor cannot redact. Installing it gives no protection.
+//
+// Deprecated: use [Exporter], which wraps a span exporter and forwards redacted
+// copies. otel.Init already does this.
 func SpanProcessor() sdktrace.SpanProcessor {
 	return &redactProcessor{
 		enabled: shouldRedactEnabled(os.Getenv("HOLLIS_OTEL_REDACT_PROMPTS")),
