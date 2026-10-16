@@ -4,6 +4,30 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ## Unreleased
 
+## v0.2.0 — pending security and performance gates
+
+### Added
+
+- Immutable per-kind `Sanitizer` and `Policy`, typed sensitivity/error classes,
+  value-free reports with JSON pointers, default allowlist mode and explicit
+  denylist mode. Sensitive key policy still wins over an allowed path.
+- Deterministic email, phone, IP, Luhn-card and Nanite identifier PII rules on
+  the existing span engine, with classifications retained before overlap merging.
+- Fail-closed JSON tombstones for size, format, parse and depth errors;
+  duplicate keys and invalid UTF-8 are rejected.
+- Seeded event payload corpus, concurrency/idempotence/fuzz checks, and a
+  4 KiB latency/allocation benchmark reporting sampled wall-clock p99.
+
+### Changed
+
+- Normalize structured key names (strip format characters, then NFKC), and
+  recognize joined secret-key words. Adds the pinned x/text normalization dependency.
+- Mask all non-allowlisted report key segments, classify dropped fields from
+  inspection only, and exempt correlation/digest metadata from the 32-hex rule alone.
+- PII recognizes percent encoding, sentence-final IPv6 and adjacent national phones.
+- Provider-key patterns scan candidate tokens instead of the entire text;
+  reference-span checks retain the existing pattern semantics.
+
 ## v0.1.0 — 2026-10-16
 
 ### Added
