@@ -12,6 +12,14 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 - `gate.Option.Outcome` (`gate.OptionOutcome`: `pass`, `fail`, `skip`), an optional, closed declaration of what choosing a gate option means for the gate. Unset declares nothing, except that a `kind: skip` option implies skip; nothing is inferred from an option's id or label. `Option.Validate` rejects an unknown outcome, `pass`/`fail` on a skip option, and `skip` on a non-skip option. The `human_gate@v1` config accepts `options[].outcome` and its schema lists the three values; invalid values are load-time diagnostics. Additive: a checkpoint without outcomes is unchanged.
 
+### Fixed
+
+- Keep executable nodes unclaimable until their immutable inputs are durably bound, including when dependencies finish between driver and coordinator readiness checks. Dispatch demotes legacy unbound ready nodes to Blocked under the claim and generation fences, atomically clearing the lease and scheduler holders so recovery can bind them without a re-claim loop or a crash window between demotion and lease release.
+
+### Changed
+
+- Direct `ProgressNode` callers must supply a durable input reference, including for an empty input set. To progress a non-executable root fan-out aggregate, pass its matching plan node in `ProgressNodeRequest.Node`; a nil node retains the strict input fence and iteration children are never exempt. `DriveNodeResult.Recheck` signals concurrent dependency/control progress requiring a fresh bounded recovery pass.
+
 ## v0.1.0 — 2026-10-03
 
 - Module path is now `github.com/hollis-labs/libs/workflow/engine` (was `github.com/hollis-labs/libs/workflow`); the previous path and its `workflow/vX.Y.Z` tags no longer exist. Tags are `workflow/engine/vX.Y.Z`. No code change besides the path.

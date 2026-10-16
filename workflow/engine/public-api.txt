@@ -3538,6 +3538,7 @@ type DriveNodeRequest struct {
 	At                time.Time
 }
 type DriveNodeResult struct {
+	Recheck    bool                  `json:"recheck,omitempty"`
 	Binding    *BindNodeInputsResult `json:"binding,omitempty"`
 	Progressed ProgressNodeResult    `json:"progressed"`
 }
@@ -3977,6 +3978,7 @@ type ProgressControlNodeRequest struct {
 	At                time.Time
 }
 type ProgressNodeRequest struct {
+	Node              *graph.Node
 	InvocationID      NodeInvocationID
 	Dependencies      []DependencyRef
 	Rule              graph.ReadyRule
@@ -5067,6 +5069,7 @@ var ErrControlFlowPending = errors.New("workflow control flow is pending")
 var ErrFanOutIncomplete = errors.New("workflow fan-out is incomplete")
 var ErrFanOutLimit = errors.New("workflow fan-out concurrency limit reached")
 var ErrIdempotencyConflict = errors.New("workflow idempotency conflict")
+var ErrInputsUnbound = errors.New("workflow node inputs are not durably bound")
 var ErrInvalidCancellation = errors.New("invalid workflow cancellation")
 var ErrInvalidCompensation = errors.New("invalid compensation request")
 var ErrInvalidControlFlow = errors.New("invalid workflow control flow")
