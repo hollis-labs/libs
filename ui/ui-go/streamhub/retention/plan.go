@@ -1,10 +1,6 @@
 package retention
 
-import (
-	"slices"
-	"sort"
-	"time"
-)
+import "time"
 
 // RollupSpec says: count rows of Class into every one of Buckets (hour, day,
 // ...) once the LARGEST bucket they fall in has closed (its end is at or
@@ -12,7 +8,6 @@ import (
 // marked rolled up, so a row is never counted twice and a trim never sees a
 // half-rolled row.
 type RollupSpec struct {
-	PolicyID     string
 	Class        string
 	Buckets      []Duration // ascending
 	ClosedBefore time.Time
@@ -25,7 +20,6 @@ type RollupSpec struct {
 // sensitivity=secret, which are never meant to be stored and are tombstoned at
 // once; Class is empty for it.
 type TombstoneSpec struct {
-	PolicyID string
 	Class    string
 	PII      bool
 	Secret   bool
@@ -35,11 +29,10 @@ type TombstoneSpec struct {
 
 // TrimSpec says: rows of Class recorded at or before Before are past their
 // envelope age and may leave the head of the stream, once they are rolled up.
-// Trim is head-only: a store stops at the first row that is not eligible.
+// Trim is head-only unless the store declares otherwise. R-audit never has one.
 type TrimSpec struct {
-	PolicyID string
-	Class    string
-	Before   time.Time
+	Class  string
+	Before time.Time
 	// RequireRolled is true when the class has rollups configured: a row may
 	// only be trimmed after it was counted. A class without rollups has
 	// nothing to count and is trimmable on age alone.
@@ -49,93 +42,62 @@ type TrimSpec struct {
 // PruneSpec says: drop rollup buckets of Class/Bucket that ended at or
 // before Before.
 type PruneSpec struct {
-	PolicyID string
-	Class    string
-	Bucket   Duration
-	Before   time.Time
+	Class  string
+	Bucket Duration
+	Before time.Time
 }
 
 // Plan is what a pass should do at Now, as set operations over classes and
 // cutoff times. It names no row, so any store (SQLite, PostgreSQL, a hub's own
-// tables) can run it with one statement per spec.
+// tables) can run it with one statement per spec. The current configuration
+// governs every row: a shorter age reaches rows that already exist on the
+// next pass, a longer one never restores anything already tombstoned or
+// trimmed (D7 rev 2.2). A row's admitted policy id is kept for audit only and
+// plays no part here.
 type Plan struct {
 	Now        time.Time
 	Rollups    []RollupSpec
 	Tombstones []TombstoneSpec
 	Trims      []TrimSpec
 	Prunes     []PruneSpec
-	// Unresolved lists policy ids the resolver did not know. Their rows are
-	// left untouched: an unknown policy is never guessed.
-	Unresolved []string
 }
 
-// Resolver maps a policy id carried on a row to a policy. The empty id means
-// "the current policy". Return false for an id that is no longer known.
-type Resolver func(policyID string) (*Policy, bool)
+// Planner turns a policy into [Plan]s. It does no I/O and is deterministic.
+type Planner struct{ policy *Policy }
 
-// Planner turns policies into [Plan]s. It does no I/O and is deterministic.
-type Planner struct{ resolve Resolver }
+// NewPlanner returns a Planner for the current policy. A nil policy plans nothing.
+func NewPlanner(p *Policy) *Planner { return &Planner{policy: p} }
 
-// NewPlanner returns a Planner. A nil resolver is an error at Plan time, not
-// a panic: every id is then unresolved.
-func NewPlanner(resolve Resolver) *Planner { return &Planner{resolve: resolve} }
-
-// ClassOf classifies attributes with the current policy (policy id ""). It is
-// false when the resolver does not know the current policy.
+// ClassOf classifies attributes with the policy. It is false for a nil policy.
 func (pl *Planner) ClassOf(a Attrs) (string, bool) {
-	if pl == nil || pl.resolve == nil {
+	if pl == nil || pl.policy == nil {
 		return "", false
 	}
-	p, ok := pl.resolve("")
-	if !ok || p == nil {
-		return "", false
-	}
-	return p.ClassOf(a), true
-}
-
-// CurrentOnly is a [Resolver] that knows only the current policy: every row is
-// governed by p, whatever id it carries. This is D7 rev 2.1's reading, where a
-// configuration change reaches existing rows on the next pass.
-func CurrentOnly(p *Policy) Resolver { return func(string) (*Policy, bool) { return p, p != nil } }
-
-// Plan returns the work for the given policy ids (the distinct values found
-// on rows; include "" for rows with none). Ids are planned independently so
-// that rows keep the policy they were admitted under when the caller uses a
-// snapshot resolver.
-func (pl *Planner) Plan(now time.Time, policyIDs []string) Plan {
-	out := Plan{Now: now}
-	ids := slices.Clone(policyIDs)
-	sort.Strings(ids)
-	ids = slices.Compact(ids)
-	for _, id := range ids {
-		var p *Policy
-		ok := false
-		if pl != nil && pl.resolve != nil {
-			p, ok = pl.resolve(id)
-		}
-		if !ok || p == nil {
-			out.Unresolved = append(out.Unresolved, id)
-			continue
-		}
-		out.add(id, p, now)
-	}
-	return out
+	return pl.policy.ClassOf(a), true
 }
 
 var classOrder = []string{ClassAudit, ClassState, ClassActivity, ClassDebug}
 
-func (out *Plan) add(id string, p *Policy, now time.Time) {
+// Plan returns the work at now.
+func (pl *Planner) Plan(now time.Time) Plan {
+	out := Plan{Now: now}
+	if pl == nil || pl.policy == nil {
+		return out
+	}
+	p := pl.policy
+
 	// Secret payloads are never stored; if one is found it goes at once.
-	out.Tombstones = append(out.Tombstones, TombstoneSpec{PolicyID: id, Secret: true, Withhold: true, Before: now})
+	out.Tombstones = append(out.Tombstones, TombstoneSpec{Secret: true, Withhold: true, Before: now})
 
 	for _, name := range classOrder {
 		c, ok := p.Classes[name]
 		if !ok {
 			continue
 		}
-		// Payload age for ordinary rows: the class's Full (zero = forever).
+		// Payload age for ordinary rows: the class's Full (zero = forever). In
+		// R-audit a finite Full tombstones the payload only; the envelope stays.
 		if c.Full != 0 {
-			out.Tombstones = append(out.Tombstones, TombstoneSpec{PolicyID: id, Class: name, Before: now.Add(-time.Duration(c.Full))})
+			out.Tombstones = append(out.Tombstones, TombstoneSpec{Class: name, Before: now.Add(-time.Duration(c.Full))})
 		}
 		// PII rows: the shorter of the class's Full and the pii cap, in every
 		// class including R-audit; the payload only, the envelope follows the class.
@@ -144,24 +106,34 @@ func (out *Plan) add(id string, p *Policy, now time.Time) {
 			pii = c.Full
 		}
 		if pii != 0 {
-			out.Tombstones = append(out.Tombstones, TombstoneSpec{PolicyID: id, Class: name, PII: true, Withhold: true, Before: now.Add(-time.Duration(pii))})
+			out.Tombstones = append(out.Tombstones, TombstoneSpec{Class: name, PII: true, Withhold: true, Before: now.Add(-time.Duration(pii))})
 		}
-		// Head trim: only classes with a finite whole-row age and a finite envelope age.
-		if c.Full != 0 && c.Envelope != 0 {
-			out.Trims = append(out.Trims, TrimSpec{PolicyID: id, Class: name, Before: now.Add(-time.Duration(c.Envelope)), RequireRolled: len(c.Rollups) > 0})
+		// Head trim: only classes with a finite whole-row age and a finite
+		// envelope age, and never R-audit, whatever its configuration.
+		if name != ClassAudit && c.Full != 0 && c.Envelope != 0 {
+			out.Trims = append(out.Trims, TrimSpec{Class: name, Before: now.Add(-time.Duration(c.Envelope)), RequireRolled: len(c.Rollups) > 0})
 		}
 		if len(c.Rollups) > 0 {
 			buckets := make([]Duration, 0, len(c.Rollups))
 			for _, r := range c.Rollups {
 				buckets = append(buckets, r.Bucket)
 			}
-			slices.Sort(buckets)
-			out.Rollups = append(out.Rollups, RollupSpec{PolicyID: id, Class: name, Buckets: buckets, ClosedBefore: now})
+			sortDurations(buckets)
+			out.Rollups = append(out.Rollups, RollupSpec{Class: name, Buckets: buckets, ClosedBefore: now})
 		}
 		for _, r := range c.Rollups {
 			if r.Keep != 0 {
-				out.Prunes = append(out.Prunes, PruneSpec{PolicyID: id, Class: name, Bucket: r.Bucket, Before: now.Add(-time.Duration(r.Keep))})
+				out.Prunes = append(out.Prunes, PruneSpec{Class: name, Bucket: r.Bucket, Before: now.Add(-time.Duration(r.Keep))})
 			}
+		}
+	}
+	return out
+}
+
+func sortDurations(d []Duration) {
+	for i := 1; i < len(d); i++ {
+		for j := i; j > 0 && d[j] < d[j-1]; j-- {
+			d[j], d[j-1] = d[j-1], d[j]
 		}
 	}
 }

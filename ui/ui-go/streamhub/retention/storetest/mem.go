@@ -139,26 +139,6 @@ func (m *Mem) Streams(context.Context) ([]string, error) {
 	return out, nil
 }
 
-// PolicyIDs implements [retention.Store].
-func (m *Mem) PolicyIDs(_ context.Context, stream string) ([]string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	seen := map[string]bool{}
-	if s := m.streams[stream]; s != nil {
-		for _, r := range s.rows {
-			if !r.trimmed {
-				seen[r.PolicyID] = true
-			}
-		}
-	}
-	var out []string
-	for id := range seen {
-		out = append(out, id)
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
 // TryLock implements [retention.Store].
 func (m *Mem) TryLock(context.Context) (func(), bool, error) {
 	m.mu.Lock()
@@ -223,7 +203,7 @@ func (m *Mem) Rollup(_ context.Context, stream string, sp retention.RollupSpec, 
 			time.Unix(0, bucketStart(r.At, largest)+int64(largest)).Equal(sp.ClosedBefore)
 	}
 	rows, more := pick(s.rows, op, func(r *memRow) bool {
-		return !r.Rolled && r.Class == sp.Class && r.PolicyID == sp.PolicyID && closed(r)
+		return !r.Rolled && r.Class == sp.Class && closed(r)
 	})
 	res := retention.RollupResult{Rows: int64(len(rows)), More: more}
 	if op.DryRun {
@@ -254,7 +234,7 @@ func (m *Mem) Tombstone(_ context.Context, stream string, sp retention.Tombstone
 	defer m.mu.Unlock()
 	s := m.stream(stream)
 	rows, more := pick(s.rows, op, func(r *memRow) bool {
-		if r.Tombstoned || r.PolicyID != sp.PolicyID || r.At.After(sp.Before) {
+		if r.Tombstoned || r.At.After(sp.Before) {
 			return false
 		}
 		if sp.Secret {
@@ -286,7 +266,7 @@ func (m *Mem) Trim(_ context.Context, stream string, specs []retention.TrimSpec,
 	s := m.stream(stream)
 	eligible := func(r *memRow) bool {
 		for _, sp := range specs {
-			if r.PolicyID == sp.PolicyID && r.Class == sp.Class && !r.At.After(sp.Before) && (!sp.RequireRolled || r.Rolled) {
+			if r.Class == sp.Class && !r.At.After(sp.Before) && (!sp.RequireRolled || r.Rolled) {
 				return true
 			}
 		}

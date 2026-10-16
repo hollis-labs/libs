@@ -81,17 +81,15 @@ type ClassStat struct {
 // A store may keep any extra columns; the contract below is observable
 // behaviour, checked by package storetest.
 //
-// Row identity for a spec is (PolicyID, Class). A store without a per-row
-// policy id treats every row as PolicyID "".
+// A spec matches rows by class. A store may keep the policy id a row was
+// admitted under, for audit; it plays no part in matching (D7 rev 2.2: the
+// current configuration governs every row).
 type Store interface {
 	Caps() Caps
 
 	// Streams lists the streams that have rows or rollup buckets (a stream
 	// whose rows are all trimmed still has buckets to prune).
 	Streams(ctx context.Context) ([]string, error)
-	// PolicyIDs lists the distinct policy ids on rows in the stream; "" if rows carry none.
-	// Rollup buckets carry no policy id and are pruned by the current policy.
-	PolicyIDs(ctx context.Context, stream string) ([]string, error)
 	// TryLock takes the janitor lock for the whole store. ok is false, with no
 	// error, when another janitor holds it. Callers must call unlock.
 	TryLock(ctx context.Context) (unlock func(), ok bool, err error)
