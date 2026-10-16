@@ -8,8 +8,8 @@ github.com/hollis-labs/libs/mesh/core v0.6.0 h1:WQwxbGozmC+elJK96iNw275yNEKT+uC9
 github.com/hollis-labs/libs/mesh/core v0.6.0/go.mod h1:K1a1oeFXakkaJDyKogI/I2j+2lpKklTZgdtzSw45Bss=
 github.com/hollis-labs/libs/security/policy v0.1.0 h1:XsksYYhpJ315wlr9QmWwxUKRfyDAJSSRiekBh7jpI70=
 github.com/hollis-labs/libs/security/policy v0.1.0/go.mod h1:vFJQekM6tI5OV+2rqK+mx/imNUSSJ26PkvAvgMmdQBo=
-github.com/hollis-labs/libs/security/redact v0.0.0-20261016133205-412e30f6d73c h1:7B3LTF8PvSdrkWDGe2cSamX2Y9foLvhcw7hc2no0VDE=
-github.com/hollis-labs/libs/security/redact v0.0.0-20261016133205-412e30f6d73c/go.mod h1:WkIIK5n9hIoPY9Sm9yvPkmDYL1r93Obe1v4CsNmKU40=
+github.com/hollis-labs/libs/security/redact v0.1.0 h1:Tz6KMduh5cUJyWTsiEpWMOPErjGcW0FRDxNuyqqTEd8=
+github.com/hollis-labs/libs/security/redact v0.1.0/go.mod h1:WkIIK5n9hIoPY9Sm9yvPkmDYL1r93Obe1v4CsNmKU40=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
