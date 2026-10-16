@@ -38,8 +38,10 @@ type Op struct {
 	Limit int
 	// MaxDuration stops the call early when exceeded. Zero means no time bound.
 	MaxDuration time.Duration
-	// DryRun counts what the call would change, exactly and without a Limit,
-	// and writes nothing.
+	// DryRun counts what the call would change, without a Limit, and writes
+	// nothing. MaxDuration still applies to the count: a store that cannot
+	// finish it in time returns More=true and a Rows that is only a lower
+	// bound (zero is allowed), never an error.
 	DryRun bool
 }
 
@@ -53,7 +55,8 @@ type Result struct {
 	// More is true when matching rows remain after Limit or MaxDuration.
 	More bool
 	// Held (Trim only) counts rows that are past their envelope age but stay
-	// because a head-only trim stopped at an earlier row.
+	// because a head-only trim stopped at an earlier row. It is always zero
+	// for a [TrimPerRow] store.
 	Held int64
 	// ByClass (Trim only) splits Rows by class.
 	ByClass map[string]int64
