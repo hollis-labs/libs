@@ -167,11 +167,12 @@ func writeJSON(b *bytes.Buffer, v any) {
 }
 
 func writeString(b *bytes.Buffer, s string) {
-	var sb bytes.Buffer
-	enc := json.NewEncoder(&sb)
+	enc := json.NewEncoder(b)
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(s)
-	b.Write(bytes.TrimSuffix(sb.Bytes(), []byte("\n")))
+	// Encoding a string into bytes.Buffer cannot fail. Drop Encoder's trailing
+	// newline in place instead of allocating and copying an intermediate buffer.
+	b.Truncate(b.Len() - 1)
 }
 
 // --- argv and environment --------------------------------------------------------

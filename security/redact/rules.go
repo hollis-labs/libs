@@ -31,13 +31,22 @@ type scanText struct {
 }
 
 func newScanText(t string) *scanText {
-	b := []byte(t)
-	for i, c := range b {
-		if c >= 'A' && c <= 'Z' {
-			b[i] = c + 32
+	for i := 0; i < len(t); i++ {
+		if t[i] >= 'A' && t[i] <= 'Z' {
+			var b strings.Builder
+			b.Grow(len(t))
+			b.WriteString(t[:i])
+			for j := i; j < len(t); j++ {
+				c := t[j]
+				if c >= 'A' && c <= 'Z' {
+					c += 'a' - 'A'
+				}
+				b.WriteByte(c)
+			}
+			return &scanText{t: t, lower: b.String()}
 		}
 	}
-	return &scanText{t: t, lower: string(b)}
+	return &scanText{t: t, lower: t}
 }
 
 func (s *scanText) has(lowerWord string) bool { return strings.Contains(s.lower, lowerWord) }
