@@ -129,16 +129,26 @@ func moreRestrictive(a, b string) string {
 	return a
 }
 
-// failClosedPayload reports whether p is the payload a fail-closed sanitize
-// leaves behind, which tells an event that failed closed from one that was
-// never sanitized.
+// failClosedPayload reports whether p is exactly the payload a fail-closed
+// sanitize leaves behind: {"sanitize_error": <class>} where the class is a
+// cleaned token ([a-z0-9_], at most 32 characters, as [ErrorPayload] writes
+// it). Anything else, including a single sanitize_error key holding arbitrary
+// text, is not trusted: it could carry an unscrubbed value past the hub
+// backstop.
 func failClosedPayload(p []byte) bool {
 	var m map[string]json.RawMessage
-	if json.Unmarshal(p, &m) != nil {
+	if json.Unmarshal(p, &m) != nil || len(m) != 1 {
 		return false
 	}
-	_, ok := m["sanitize_error"]
-	return ok && len(m) == 1
+	raw, ok := m["sanitize_error"]
+	if !ok {
+		return false
+	}
+	var class string
+	if json.Unmarshal(raw, &class) != nil {
+		return false
+	}
+	return class == cleanClass(class)
 }
 
 func emptyPayload(p []byte) bool {

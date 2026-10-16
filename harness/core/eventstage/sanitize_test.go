@@ -146,3 +146,29 @@ func TestBackstopTellsAnUnsanitizedEventFromOneThatFailedClosed(t *testing.T) {
 		t.Fatalf("producer pass: out=%+v", out)
 	}
 }
+
+// A payload that merely looks like a fail-closed one must not get past the
+// hub backstop unscrubbed.
+func TestBackstopDoesNotTrustASpoofedFailClosedPayload(t *testing.T) {
+	hub := MeshSanitize(fakePayload{}, ModeVerifyAndScrub)
+	for name, payload := range map[string]string{
+		"free text":    `{"sanitize_error":"token=SECRET"}`,
+		"too long":     `{"sanitize_error":"` + strings.Repeat("a", maxErrorClass+1) + `"}`,
+		"upper case":   `{"sanitize_error":"Oversized"}`,
+		"not a string": `{"sanitize_error":{"x":"SECRET"}}`,
+		"empty class":  `{"sanitize_error":""}`,
+		"extra key":    `{"sanitize_error":"oversized","leak":"SECRET"}`,
+		"number":       `{"sanitize_error":1}`,
+	} {
+		e := &mesh.Event{Kind: "message.sent", Payload: json.RawMessage(payload)}
+		out, err := hub.Apply(t.Context(), e)
+		if err != nil || out.Note != NoteBackstopUnsanitized || !e.Class.Sanitized || strings.Contains(string(e.Payload), "SECRET") {
+			t.Errorf("%s: out=%+v err=%v payload=%s class=%+v", name, out, err, e.Payload, e.Class)
+		}
+	}
+	// The genuine article is still left alone.
+	genuine := &mesh.Event{Kind: "message.sent", Payload: ErrorPayload("oversized")}
+	if out, _ := hub.Apply(t.Context(), genuine); out.Note != NoteBackstopFailedClosed || genuine.Class != nil && genuine.Class.Sanitized {
+		t.Fatalf("genuine fail-closed payload: out=%+v class=%+v", out, genuine.Class)
+	}
+}
