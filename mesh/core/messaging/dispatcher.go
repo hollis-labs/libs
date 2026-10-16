@@ -3,6 +3,8 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 // dispatcher is the canonical Dispatcher implementation, wrapping any Store.
@@ -30,6 +32,17 @@ func (d *dispatcher) Reply(ctx context.Context, parent Envelope, payload json.Ra
 	return d.Send(ctx, resp)
 }
 
+// requestError applies Request's timeout contract to an error from the Store calls that come before the wait. When the
+// caller's deadline expires while the Store is still subscribing or sending (a slow store, a busy host), the Store reports its
+// own wrapped context error; the caller asked for a deadline and must get ErrRequestTimeout whichever step noticed it first.
+// The original error stays in the chain, so errors.Is matches both. Any other error, and a cancellation, pass through.
+func requestError(ctx context.Context, err error) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) && errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %w", ErrRequestTimeout, err)
+	}
+	return err
+}
+
 // Request sends an envelope as Kind=request and blocks until a matching
 // response (InReplyTo=<request id>) arrives or ctx expires.
 func (d *dispatcher) Request(ctx context.Context, env Envelope) (Envelope, error) {
@@ -44,12 +57,12 @@ func (d *dispatcher) Request(ctx context.Context, env Envelope) (Envelope, error
 
 	sub, err := d.Subscribe(subCtx, env.From, Filter{Kind: []Kind{MsgKindResponse}})
 	if err != nil {
-		return Envelope{}, err
+		return Envelope{}, requestError(ctx, err)
 	}
 
 	sent, err := d.Send(ctx, env)
 	if err != nil {
-		return Envelope{}, err
+		return Envelope{}, requestError(ctx, err)
 	}
 
 	for {

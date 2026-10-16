@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -129,5 +130,60 @@ func TestDispatcher_Request_OverwritesKindAndID(t *testing.T) {
 	}
 	if got[0].ID == "caller-set" {
 		t.Error("Request did not overwrite caller-provided ID")
+	}
+}
+
+// slowStore blocks in Send (or Subscribe) until the caller's context ends and then reports its own wrapped context error, as a
+// store behind a busy host does when the deadline expires before the call returns.
+type slowStore struct {
+	messaging.Store
+	slowSend, slowSubscribe bool
+}
+
+func (s slowStore) Send(ctx context.Context, e messaging.Envelope) (messaging.Envelope, error) {
+	if s.slowSend {
+		<-ctx.Done()
+		return messaging.Envelope{}, fmt.Errorf("messaging store: send: %w", ctx.Err())
+	}
+	return s.Store.Send(ctx, e)
+}
+
+func (s slowStore) Subscribe(ctx context.Context, to messaging.Address, f messaging.Filter) (<-chan messaging.Envelope, error) {
+	if s.slowSubscribe {
+		<-ctx.Done()
+		return nil, fmt.Errorf("messaging store: subscribe: %w", ctx.Err())
+	}
+	return s.Store.Subscribe(ctx, to, f)
+}
+
+// A deadline that expires inside the Store calls before the wait is still a request timeout: callers match ErrRequestTimeout.
+func TestDispatcher_Request_DeadlineInsideStoreCallIsATimeout(t *testing.T) {
+	for name, store := range map[string]slowStore{
+		"send":      {Store: memstore.New(), slowSend: true},
+		"subscribe": {Store: memstore.New(), slowSubscribe: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := messaging.NewDispatcher(store)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+			defer cancel()
+			_, err := d.Request(ctx, messaging.Envelope{From: addr(messaging.KindAgent, "rA"), To: addr(messaging.KindAgent, "rB")})
+			if !errors.Is(err, messaging.ErrRequestTimeout) {
+				t.Fatalf("err = %v, want ErrRequestTimeout", err)
+			}
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("err = %v lost the underlying deadline error", err)
+			}
+		})
+	}
+}
+
+// A cancellation, and a Store failure that is not the caller's deadline, are not timeouts.
+func TestDispatcher_Request_OtherStoreErrorsPassThrough(t *testing.T) {
+	d := messaging.NewDispatcher(slowStore{Store: memstore.New(), slowSend: true})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := d.Request(ctx, messaging.Envelope{From: addr(messaging.KindAgent, "rA"), To: addr(messaging.KindAgent, "rB")})
+	if errors.Is(err, messaging.ErrRequestTimeout) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled request: %v", err)
 	}
 }
