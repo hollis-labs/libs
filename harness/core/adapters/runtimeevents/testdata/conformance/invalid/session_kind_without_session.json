@@ -1,0 +1,1 @@
+{"schema_version":"1","id":"evt_bad1","kind":"turn.started","time":"2026-10-16T05:00:00Z","sequence":1,"source":{"channel":"pty"},"subject":"msg://task/torque/CW-1"}

@@ -23,6 +23,15 @@
 // not regenerate them. See [Sequencer], [Emitter], and [Sink] for the
 // producer-side helpers.
 //
+// # Envelope v1.1
+//
+// Version 1.1 adds optional blocks for dimensions ([Scope]), correlation
+// ([Corr]), attribution ([Actor]) and classification ([Class]), plus
+// [Event.Subject] for events that have no session and the log-assigned
+// [Event.Cursor] and [Event.RecordedAt]. [Event.Validate] and [JSONSchema]
+// encode the required fields. [ToMesh] and [FromMesh] project losslessly to
+// and from mesh.Event; projection.md in this directory has the field table.
+//
 // # Payload conventions
 //
 // Payloads stay opaque to this package, but producers share a few field

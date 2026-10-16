@@ -8,6 +8,25 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `adapters/runtimeevents` envelope v1.1, additive (`SchemaVersion` stays "1"):
+  optional `Subject`, `Generation`, `RecordedAt`, `Cursor`, `ContentType`,
+  `Truncated` and the `Scope`, `Corr`, `Actor` and `Class` blocks.
+  `Event.Validate` and `SessionBound` encode the required fields, and
+  `JSONSchema` (draft 2020-12) mirrors them. `ToMesh` and `FromMesh` project
+  losslessly to and from `mesh.Event`. Conformance fixtures are in
+  `adapters/runtimeevents/testdata/conformance`, and the field table is in
+  `adapters/runtimeevents/projection.md` (event stream contract C1,
+  CW-20261016-0129).
+
+### Changed
+
+- `runtimeevents.Event.SessionID` is now omitted from JSON when empty. Events
+  that are not tied to a session carry `Subject` instead. Producers that
+  always set a session ID emit the same bytes as before.
+- Requires `mesh/core` v0.5.0.
+
 ## v0.10.0
 
 ### Changed (breaking)
