@@ -8,6 +8,8 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-16
+
 ### Added
 
 - `gate.Option.Outcome` (`gate.OptionOutcome`: `pass`, `fail`, `skip`), an optional, closed declaration of what choosing a gate option means for the gate. Unset declares nothing, except that a `kind: skip` option implies skip; nothing is inferred from an option's id or label. `Option.Validate` rejects an unknown outcome, `pass`/`fail` on a skip option, and `skip` on a non-skip option. The `human_gate@v1` config accepts `options[].outcome` and its schema lists the three values; invalid values are load-time diagnostics. Additive: a checkpoint without outcomes is unchanged.
