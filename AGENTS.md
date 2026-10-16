@@ -1,6 +1,6 @@
 # libs
 
-General-purpose Go libraries from Hollis Labs, in one public repository organised into groups: `core`, `security`, `mcp`, `ui`, `workflow`, `llm`, `mesh`, `harness` and `agent`. Every module lives at `<group>/<module>/` with its own `go.mod`, version and tags. A group directory is only a folder: it never carries a `go.mod`.
+General-purpose Go libraries from Hollis Labs, in one public repository organised into groups: `core`, `security`, `mcp`, `ui`, `workflow`, `llm`, `mesh`, `harness`, `agent` and `app`. Every module lives at `<group>/<module>/` with its own `go.mod`, version and tags. A group directory is only a folder: it never carries a `go.mod`.
 
 It is not: a place for application code or deployment configuration, or a single Go module.
 
@@ -13,7 +13,7 @@ It is not: a place for application code or deployment configuration, or a single
 
 ## Groups and dependency order
 
-`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `harness` < `agent`
+`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `harness` < `agent` < `app`
 
 A module may import only modules in its own group or in a lower-ranked group. `mcp`, `ui`, `workflow` and `llm` have the same rank and are siblings: none of them may import another. Dependency cycles inside a group are rejected. If a lib seems to need something from a higher group, the shared part moves down.
 
