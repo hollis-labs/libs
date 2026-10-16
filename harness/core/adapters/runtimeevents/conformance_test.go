@@ -181,7 +181,7 @@ func TestV1EventMarshalsWithoutV11Keys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"subject", "generation", "recorded_at", "cursor", "content_type", "truncated", "scope", "corr", "actor", "class"} {
+	for _, key := range []string{"subject", "generation", "recorded_at", "cursor", "content_type", "truncated", "scope", "corr", "actor", "class", "payload_digest"} {
 		if bytes.Contains(b, []byte(`"`+key+`"`)) {
 			t.Fatalf("unset v1.1 field %q was marshalled: %s", key, b)
 		}

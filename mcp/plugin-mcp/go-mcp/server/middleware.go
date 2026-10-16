@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/hollis-labs/libs/core/panics"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,6 +22,8 @@ type options struct {
 	toolMW           []ToolMiddleware
 	receiving        []mcpsdk.Middleware
 	sanitize         bool
+	panicGuard       bool
+	panicGuardSet    *panics.Guard
 	sanitizeLogger   *slog.Logger
 	dup              DuplicatePolicy
 	behaviorRequired bool

@@ -1,0 +1,7 @@
+{
+  "subagent_id": "sub_1",
+  "agent_type": "Explore",
+  "parent_tool_use_id": "toolu_1",
+  "outcome": "completed",
+  "duration_ms": 4200
+}

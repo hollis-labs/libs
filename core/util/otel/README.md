@@ -167,7 +167,8 @@ OpenTelemetry GenAI semantic-convention helpers.
 
 - `Denylist() []string` — default attribute keys that should be removed by downstream exporters or wrappers.
 - `ShouldRedact(key string) bool` — true for denylisted keys when `HOLLIS_OTEL_REDACT_PROMPTS` is not set to `false`.
-- `SpanProcessor() sdktrace.SpanProcessor` — compatibility shim that preserves the denylist decision but does not mutate `sdktrace.ReadOnlySpan` (which is immutable). Real enforcement belongs in a wrapping exporter.
+- `Exporter(next sdktrace.SpanExporter, opts ...ExporterOption) sdktrace.SpanExporter` — wraps an exporter and forwards redacted copies of each span: denylisted attribute keys (span, event and link) are dropped, an event named by a denylisted key loses its attributes, and `WithValueRedactor(func(string) string)` scrubs every exported string (attribute values, span/event names, status description). `WithKeyFilter` replaces the key decision. `otel.Init` wraps its trace exporter with it; `otel.WithSpanRedaction(...)` passes options.
+- `SpanProcessor() sdktrace.SpanProcessor` — **deprecated, does nothing**: a processor sees only immutable `sdktrace.ReadOnlySpan`s and cannot redact. Use `Exporter`.
 
 ## Conventions
 
@@ -188,7 +189,7 @@ your own attribute schema.
 | `OTEL_METRIC_EXPORT_INTERVAL` | PeriodicReader interval for the metric exporter (read by the SDK; only meaningful when `WithMetricsEnabled`) | `15s` |
 | `OTEL_BLRP_SCHEDULE_DELAY` / `OTEL_BLRP_EXPORT_TIMEOUT` / `OTEL_BLRP_MAX_QUEUE_SIZE` / `OTEL_BLRP_MAX_EXPORT_BATCH_SIZE` | BatchProcessor tuning for the log exporter (read by the SDK; only meaningful when `WithLogsEnabled`) | SDK defaults |
 | `HOLLIS_OTEL_ENABLED` | read by `EnabledFromEnv` only (never by `Init`): when set non-blank it decides the gate alone (`1`/`true`/`yes`/`on` on, anything else off), acting as a portfolio-wide kill switch that overrides app vars; blank/unset defers to the app var | unset (disabled) |
-| `HOLLIS_OTEL_REDACT_PROMPTS` | when not `false`, `redaction.ShouldRedact` returns true for denylisted GenAI content keys | unset (treated as enabled) |
+| `HOLLIS_OTEL_REDACT_PROMPTS` | when not `false`, denylisted GenAI content keys are dropped from exported spans (`redaction.Exporter`, installed by `Init`); `false` exports them | unset (treated as enabled) |
 
 Options passed to `Init` always take precedence over environment variables.
 

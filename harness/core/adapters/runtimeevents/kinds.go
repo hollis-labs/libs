@@ -59,6 +59,7 @@ const (
 	KindAgentToolUse             EventKind = "agent.tool_use"
 	KindAgentToolResult          EventKind = "agent.tool_result"
 	KindAgentSubagentSpawn       EventKind = "agent.subagent_spawn"
+	KindAgentSubagentStop        EventKind = "agent.subagent_stop"
 	KindAgentPermissionRequested EventKind = "agent.permission_requested"
 	KindAgentPermissionResolved  EventKind = "agent.permission_resolved"
 

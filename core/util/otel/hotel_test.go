@@ -2,6 +2,7 @@ package hotel
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -13,8 +14,10 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/core/util/otel/internal"
+	"github.com/hollis-labs/libs/core/util/otel/redaction"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -357,5 +360,49 @@ func TestInitWithoutLogsDoesNotExportLogs(t *testing.T) {
 
 	if got := counter.logPosts.Load(); got != 0 {
 		t.Fatalf("expected 0 POSTs to /v1/logs with logs disabled, got %d", got)
+	}
+}
+
+// Init must put the redaction wrapper in front of the OTLP exporter: the
+// prompt text never reaches the collector, other attributes do.
+func TestInitRedactsGenAIContentOnTheWire(t *testing.T) {
+	run := func(t *testing.T, env string) string {
+		t.Setenv("HOLLIS_OTEL_REDACT_PROMPTS", env)
+		var mu sync.Mutex
+		var body []byte
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v1/traces" {
+				b, _ := io.ReadAll(r.Body)
+				mu.Lock()
+				body = append(body, b...)
+				mu.Unlock()
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(server.Close)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		shutdown, err := Init(ctx, WithServiceName("t"), WithOTLPEndpoint(strings.TrimPrefix(server.URL, "http://")),
+			WithSpanRedaction(redaction.WithValueRedactor(func(s string) string { return strings.ReplaceAll(s, "SECRETTOKEN", "[R]") })))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, span := StartSpan(ctx, "wire.span")
+		span.SetAttributes(attribute.String("gen_ai.content.prompt", "PROMPTBODY"), attribute.String("note", "keep SECRETTOKEN"))
+		span.End()
+		if err := shutdown(ctx); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		return string(body)
+	}
+
+	got := run(t, "")
+	if strings.Contains(got, "PROMPTBODY") || strings.Contains(got, "SECRETTOKEN") || !strings.Contains(got, "keep [R]") {
+		t.Fatalf("wire body not redacted as expected (len %d)", len(got))
+	}
+	if off := run(t, "false"); !strings.Contains(off, "PROMPTBODY") {
+		t.Fatal("with HOLLIS_OTEL_REDACT_PROMPTS=false the prompt should be exported")
 	}
 }

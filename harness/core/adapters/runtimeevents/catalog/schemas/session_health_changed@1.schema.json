@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:session_health_changed@1",
+  "title": "session_health_changed@1",
+  "description": "A session's health changed. Emitted only when to differs from from. reasons are closed producer codes, never free text. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "from",
+    "to"
+  ],
+  "properties": {
+    "from": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "unhealthy",
+        "unknown"
+      ]
+    },
+    "to": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "unhealthy",
+        "unknown"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    },
+    "since": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "not": {
+        "properties": {
+          "from": {
+            "const": "healthy"
+          },
+          "to": {
+            "const": "healthy"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "from": {
+            "const": "degraded"
+          },
+          "to": {
+            "const": "degraded"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "from": {
+            "const": "unhealthy"
+          },
+          "to": {
+            "const": "unhealthy"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "from": {
+            "const": "unknown"
+          },
+          "to": {
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "from": "healthy",
+  "to": "degraded",
+  "reasons": [
+    "heartbeat_late"
+  ],
+  "since": "2026-10-16T13:00:00Z"
+}

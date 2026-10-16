@@ -237,10 +237,11 @@ func WithLogger(logger *slog.Logger) Option {
 
 // NewServer creates a Server advertising the given name and version. Options
 // populate the underlying official-SDK ServerOptions and the kit's own
-// configuration; see Option. Nothing is installed by default: sanitization in
-// particular is opt-in (WithSanitize).
+// configuration; see Option. The panic guard is on by default (it only turns a
+// crash into an error; WithoutPanicGuard opts out). Sanitization, which
+// rewrites data, is opt-in (WithSanitize).
 func NewServer(name, version string, opts ...Option) *Server {
-	o := options{sanitize: sanitizeDefault}
+	o := options{sanitize: sanitizeDefault, panicGuard: panicGuardDefault}
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -249,6 +250,11 @@ func NewServer(name, version string, opts ...Option) *Server {
 	// one outside the earlier. Sanitize goes first (outermost) so it runs
 	// before every caller-supplied middleware and tool guard.
 	var recv []mcpsdk.Middleware
+	if o.panicGuard {
+		// Outermost on both paths, so it also covers the middleware below it.
+		recv = append(recv, RecoverPanicsReceiving(o.panicGuardSet))
+		o.toolMW = append([]ToolMiddleware{RecoverPanics(o.panicGuardSet)}, o.toolMW...)
+	}
 	if o.sanitize {
 		logger := o.sanitizeLogger
 		if logger == nil {

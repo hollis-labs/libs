@@ -72,7 +72,7 @@ A safety net, not a guarantee.
   identifiers, so it is off by default.
 - It does not detect personal data (email, phone, card, address). `Rule` is the extension
   point; nothing is built in.
-- No streaming `io.Writer` yet. `Tail` handles a chunk that was cut in the middle of a known value.
+- `Writer` redacts a stream line by line in bounded memory. A value longer than `WithHold` that straddles a forced flush of a very long unbroken line can be missed; `Tail` handles a single chunk that was cut in the middle of a known value.
 - Redact at the boundary, and prefer not to put secrets in text at all.
 
 ## Conformance
