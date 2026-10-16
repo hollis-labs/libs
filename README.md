@@ -19,10 +19,11 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | `mesh` | Messaging and coordination between components. |
 | `harness` | The layer that runs agent processes: launching, sandboxing, adapters, interception and brokering. Sits strictly below `agent`; imports `mesh`, `llm` and below. |
 | `agent` | Agent runtime built on the harness: context, turns, tools, approvals and reflexes. |
+| `app` | Reusable application assembly; consumers own product policy, identity and effects. |
 
 ### Dependency order
 
-`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `harness` < `agent`
+`core` < `security` < `mcp`, `ui`, `workflow`, `llm` < `mesh` < `harness` < `agent` < `app`
 
 A module may import only modules of its own group (no cycles) or of a
 lower-ranked group. `mcp`, `ui`, `workflow` and `llm` have the same rank and
@@ -38,6 +39,7 @@ something from a higher group, the shared part moves down. The ranks live in
 | `ui/ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `mcp/plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 | `workflow/engine` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |
+| `app/app-host` | `github.com/hollis-labs/libs/app/app-host` | HTTP/embedded SPA assembly, reviewed plugin registry delivery and process inventory. |
 | `mesh/pipeline` | `github.com/hollis-labs/libs/mesh/pipeline` | Portable immutable message stages, bounded annotations and traces, and durable store interfaces. |
 
 Subpackages sit below the module path, for example

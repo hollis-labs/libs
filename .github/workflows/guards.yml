@@ -37,7 +37,7 @@ jobs:
       - name: layout (groups hold modules, no go.work, no replace, one go.mod per module)
         run: scripts/check-layout
 
-      - name: one-way rules (substrate never; group order core < security < mcp/ui/workflow/llm < mesh < harness < agent)
+      - name: one-way rules (substrate never; group order core < security < mcp/ui/workflow/llm < mesh < harness < agent < app)
         run: scripts/check-one-way
 
       # Scoped to the revision under test (the pull request's merge commit, or the pushed
