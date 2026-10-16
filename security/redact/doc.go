@@ -33,5 +33,9 @@
 // ordinary text and has no label (a bare base64 blob); [WithHeuristics] adds the
 // one such shape that is common. [Sanitizer] adds deterministic PII detection,
 // per-kind field allowlists, classification and fail-closed payload limits.
+// [WithPII] enables the same deterministic rules on any Redactor, optionally
+// restricted by [PIIClasses]. [PIIName] identifies personal-data keys without
+// changing [SensitiveName]. Names, addresses and birth dates are key-only;
+// there is no inference of names, addresses or special categories from prose.
 // Redact where text leaves your control, and prefer not to log secrets at all.
 package redact

@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // PII rules are mandatory in Sanitizer and do not change Default's credential-only policy.
@@ -16,10 +17,6 @@ const (
 	RuleNaniteID = "pii-nanite-id"
 )
 
-var (
-	emailRE = regexp.MustCompile("[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+")
-)
-
 func piiRules() []rule {
 	rules := []rule{
 		{RuleEmail, findEmail},
@@ -28,6 +25,10 @@ func piiRules() []rule {
 		{RuleIPv6, findIPv6},
 		{RuleCard, findCard},
 		{RuleNaniteID, findNaniteID},
+		{RuleIBAN, findIBAN},
+		{RuleSSN, findSSN},
+		{RuleNINO, findNINO},
+		{RulePIIName, findPIIName},
 	}
 	for i := range rules {
 		rules[i].find = percentPII(rules[i].find)
@@ -35,13 +36,7 @@ func piiRules() []rule {
 	return rules
 }
 
-func isPIIRule(name string) bool {
-	switch name {
-	case RuleEmail, RulePhone, RuleIPv4, RuleIPv6, RuleCard, RuleNaniteID:
-		return true
-	}
-	return false
-}
+func isPIIRule(name string) bool { return piiRuleClass(name) != 0 }
 
 func asciiWord(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
@@ -61,14 +56,26 @@ func findEmail(_ *Redactor, s *scanText, add func(int, int)) {
 		at += offset
 		offset = at + 1
 		a, b := at, at+1
-		for a > 0 && (asciiAlphaNum(s.t[a-1]) || strings.ContainsRune(".!#$%&'*+/=?^_`{|}~-", rune(s.t[a-1]))) {
-			a--
+		for a > 0 {
+			r, n := utf8.DecodeLastRuneInString(s.t[:a])
+			if !emailLocalRune(r) {
+				break
+			}
+			a -= n
 		}
-		for b < len(s.t) && (asciiAlphaNum(s.t[b]) || s.t[b] == '-' || s.t[b] == '.') {
-			b++
+		for b < len(s.t) {
+			r, n := utf8.DecodeRuneInString(s.t[b:])
+			if !emailDomainRune(r) {
+				break
+			}
+			b += n
 		}
-		if m := emailRE.FindStringIndex(s.t[a:b]); m != nil {
-			add(a+m[0], a+m[1])
+		end := b
+		if end > at+1 && s.t[end-1] == '.' {
+			end--
+		}
+		if validEmail(s.t[a:end]) {
+			add(a, end)
 		}
 	}
 }
@@ -115,7 +122,7 @@ func findIPv6(_ *Redactor, s *scanText, add func(int, int)) {
 		}
 		if b < len(t) && t[b] == '%' {
 			b++
-			for b < len(t) && (asciiWord(t[b]) || t[b] == '-' || t[b] == '.') {
+			for b < len(t) && (asciiWord(t[b]) || t[b] == '-' || t[b] == '.' || t[b] == ':') {
 				b++
 			}
 		}
@@ -159,6 +166,39 @@ func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 		}
 		if end > a && phoneBounded(t, a, end) {
 			v := t[a:end]
+			// Inspect boundary-aligned prefixes too. Otherwise removing one
+			// adjacent number can expose a new 10/11-digit group on a second
+			// pass (for example groups of six, five and ten digits).
+			for start := a; start < end; start++ {
+				if start != a && t[start-1] != ' ' && t[start] != '(' {
+					continue
+				}
+				if !digit(t[start]) && t[start] != '(' && t[start] != '+' {
+					continue
+				}
+				digits, dots := 0, 0
+				minimum, maximum := 10, 11
+				if t[start] == '+' {
+					minimum, maximum = 7, 15
+				}
+				for stop := start; stop < end; stop++ {
+					if stop > start && t[stop] == '(' {
+						break
+					}
+					if digit(t[stop]) {
+						digits++
+					}
+					if t[stop] == '.' {
+						dots++
+					}
+					if digits > maximum {
+						break
+					}
+					if (digits >= minimum) && digit(t[stop]) && dots != 3 && phoneBounded(t, start, stop+1) {
+						add(start, stop+1)
+					}
+				}
+			}
 			for _, m := range nationalPhoneRE.FindAllStringIndex(v, -1) {
 				if phoneBounded(t, a+m[0], a+m[1]) {
 					add(a+m[0], a+m[1])
@@ -181,25 +221,26 @@ func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 }
 
 func findCard(_ *Redactor, s *scanText, add func(int, int)) {
-	// Maximal runs prevent accepting a valid prefix of an overlong number.
+	// Consider boundary-aligned digit groups so a neighboring identifier does
+	// not hide a card. Never accept a prefix of an overlong contiguous number.
 	t := s.t
-	for a := 0; a < len(t); {
-		if !digit(t[a]) {
-			a++
+	for a := 0; a < len(t); a++ {
+		if !digit(t[a]) || (a > 0 && asciiWord(t[a-1])) {
 			continue
 		}
-		b := a
-		for b < len(t) && (digit(t[b]) || t[b] == ' ' || t[b] == '-') {
-			b++
+		digits := 0
+		for b := a; b < len(t) && (digit(t[b]) || t[b] == ' ' || t[b] == '-'); b++ {
+			if !digit(t[b]) {
+				continue
+			}
+			digits++
+			if digits > 19 {
+				break
+			}
+			if digits >= 13 && bounded(t, a, b+1) && luhn(t[a:b+1]) {
+				add(a, b+1)
+			}
 		}
-		end := b
-		for end > a && !digit(t[end-1]) {
-			end--
-		}
-		if bounded(t, a, end) && luhn(t[a:end]) {
-			add(a, end)
-		}
-		a = b
 	}
 }
 
@@ -251,7 +292,8 @@ func percentPII(find finder) finder {
 		if v.orig == nil {
 			return
 		}
-		find(r, newScanText(v.text), func(a, b int) { add(v.at(a), v.at(b)) })
+		nv := piiView(v.text)
+		find(r, newScanText(nv.text), func(a, b int) { add(v.at(nv.at(a)), v.at(nv.at(b))) })
 	}
 }
 func percentView(s string) view {
@@ -284,4 +326,28 @@ func hexValue(c byte) byte {
 		return c - 'A' + 10
 	}
 	return c - 'a' + 10
+}
+
+// scanPII is separate only to leave the credential-only scan's allocation and
+// normalization path intact. Both consumers use the same catalog and finders.
+func (r *Redactor) scanPII(s string, raw []Finding, observe func(string), skip string) []Finding {
+	v := piiView(s)
+	st := newScanText(v.text)
+	name := ""
+	add := func(a, b int) {
+		if b > a {
+			raw = append(raw, Finding{name, v.at(a), v.at(b)})
+			if observe != nil {
+				observe(name)
+			}
+		}
+	}
+	for _, rl := range r.piiRules {
+		if rl.name == skip {
+			continue
+		}
+		name = rl.name
+		rl.find(r, st, add)
+	}
+	return raw
 }

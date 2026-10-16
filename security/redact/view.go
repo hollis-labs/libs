@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"golang.org/x/text/unicode/norm"
 	"unicode"
 	"unicode/utf8"
 )
@@ -70,4 +71,28 @@ func (v view) at(i int) int {
 		return v.orig[len(v.orig)-1]
 	}
 	return v.orig[i]
+}
+
+// piiView applies full NFKC after format stripping. Keep the credential view
+// unchanged. Normalization segments map complete source spans, including a
+// decomposed character or compatibility expansion, back to the original bytes.
+func piiView(s string) view {
+	base := newView(s)
+	if norm.NFKC.IsNormalString(base.text) {
+		return base
+	}
+	var it norm.Iter
+	it.InitString(norm.NFKC, base.text)
+	out := make([]byte, 0, len(base.text))
+	offsets := make([]int, 0, len(base.text)+1)
+	for !it.Done() {
+		start := it.Pos()
+		segment := it.Next()
+		out = append(out, segment...)
+		for range segment {
+			offsets = append(offsets, base.at(start))
+		}
+	}
+	offsets = append(offsets, len(s))
+	return view{text: string(out), orig: offsets}
 }

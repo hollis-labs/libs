@@ -250,3 +250,106 @@ func TestCorpus(t *testing.T) {
 		t.Errorf("the corpus shrank: %d redact cases, %d keep cases", redactCases, keepCases)
 	}
 }
+
+// PII corpus is separate: the original credential corpus remains byte-for-byte
+// compatible. Every PII-shaped test value is assembled at runtime.
+func piiCorpus() []Case {
+	var cases []Case
+	for id, value := range map[string]string{
+		"email":                 j("alice", "@", "example.test"),
+		"unicode-email":         j("δοκιμή", "@", "παράδειγμα.δοκιμή"),
+		"unicode-mark":          j("e\u0301lodie", "@", "exemple.test"),
+		"nfkc-email":            j("ⓐlice", "＠", "example.test"),
+		"ipv6-zone-colon":       j("::", "%0", "::"),
+		"phone-adjacent-plus":   j("D+", "000000000000 ", "000000000 ", "00"),
+		"phone-adjacent-paren":  j("0000000000", "(", "00000000000"),
+		"card-next-to-ssn":      j("4111 ", "1111 ", "1111 ", "1111 ", "219-", "09-", "9999"),
+		"phone-adjacent-groups": j("000000 ", "00000 ", "0000000000"),
+		"nfkc-key":              j("ⓔmail=", "opaque"),
+		"format-email":          j("al\u200dice", "@", "example.test"),
+		"phone":                 j("+44 ", "20 7946 ", "0958"),
+		"national-phone":        j("(212) ", "555-", "0199"),
+		"ipv4":                  j("192.0.", "2.23"),
+		"ipv6":                  j("2001:db8:", ":42"),
+		"card":                  j("4111 ", "1111 ", "1111 ", "1111"),
+		"nanite":                j("abcdef0123456789", "abcdef0123456789"),
+		"iban":                  j("GB82", "WEST", "123456", "98765432"),
+		"iban-spaces":           j("DE89 ", "3704 0044 ", "0532 0130 00"),
+		"ssn":                   j("219-", "09-", "9999"),
+		"nino":                  j("AB", "123456", "C"),
+		"nino-spaces":           j("ab ", "12 34 ", "56 c"),
+	} {
+		secret := value
+		if id == "phone-adjacent-plus" {
+			secret = strings.TrimPrefix(value, "D")
+		}
+		if id == "nfkc-key" {
+			secret = "opaque"
+		}
+		cases = append(cases, R(id, "PII", "before <"+value+"> after", []string{secret}, "before <", "> after"))
+	}
+	for id, value := range map[string]string{
+		"overlong-card":     j("4111", "1111", "1111", "1111", "1234"),
+		"bad-card":          j("4111 ", "1111 ", "1111 ", "1112"),
+		"bad-ipv4":          j("999.0.", "2.23"),
+		"bad-ipv6":          j("2001:db8:", ":xyz"),
+		"bad-iban-checksum": j("GB83", "WEST", "123456", "98765432"),
+		"bad-ssn-area-zero": j("000-", "09-", "9999"),
+		"bad-ssn-area-666":  j("666-", "09-", "9999"),
+		"bad-ssn-area-900":  j("900-", "09-", "9999"),
+		"bad-ssn-group":     j("219-", "00-", "9999"),
+		"bad-ssn-serial":    j("219-", "09-", "0000"),
+		"bad-nino-prefix":   j("BG", "123456", "A"),
+		"bad-nino-letter":   j("AQ", "123456", "A"),
+		"bad-nino-second-o": j("AO", "123456", "A"),
+		"phone-timestamp":   j("2026.10.", "16.120000"),
+		"bad-nino-suffix":   j("AB", "123456", "E"),
+		"order":             j("order=", "123456789"),
+		"hash":              j("commit ", "abcdef0123456789", "abcdef0123456789", "abcdef01"),
+		"uuid":              j("550e8400-", "e29b-41d4-", "a716-446655440000"),
+		"version":           "v1.22.3-rc.1+build.5",
+		"timestamp":         j("2026-10-16", "T12:34:56Z"),
+		"date":              j("2026-", "10-16"),
+		"metadata":          "email_count=42 phone_type=mobile first_name_count=3 birth_date_format=iso",
+		"unlabeled-prose":   "Jane Example lives on Example Street",
+		"bad-email-local":   j("a..b", "@", "example.test"),
+		"bad-email-domain":  j("a", "@", "-example.test"),
+	} {
+		cases = append(cases, K(id, "PII-negative", value))
+	}
+	for _, key := range []string{"email", "phone", "ssn", "address", "dob", "birth_date", "first_name", "last_name", "full_name", "email_value", "user_phone_data"} {
+		cases = append(cases, R("key-"+key, "PII-key", key+`="synthetic value"`, []string{"synthetic value"}, key))
+	}
+	return cases
+}
+
+func TestPIICorpus(t *testing.T) {
+	r := mustNew(t, redact.WithPII())
+	for _, c := range piiCorpus() {
+		t.Run(c.ID, func(t *testing.T) {
+			out := r.Text(c.Input)
+			if (strings.HasPrefix(c.ID, "phone-adjacent") || c.ID == "card-next-to-ssn") && strings.ContainsAny(out, "0123456789") {
+				t.Fatalf("adjacent PII fragment survived: %q", out)
+			}
+			if c.Expect == "keep" && out != c.Input {
+				t.Fatalf("false positive: %q -> %q", c.Input, out)
+			}
+			for _, value := range c.Secret {
+				if strings.Contains(out, value) {
+					t.Errorf("value survived: %q", out)
+				}
+			}
+			for _, keep := range c.Keep {
+				if !strings.Contains(out, keep) {
+					t.Errorf("collateral damage: %q", out)
+				}
+			}
+			if again := r.Text(out); again != out {
+				t.Errorf("not idempotent: %q -> %q", out, again)
+			}
+			if c.Expect == "redact" && redact.Default().Text(c.Input) != c.Input {
+				t.Errorf("credential default changed for %s", c.ID)
+			}
+		})
+	}
+}

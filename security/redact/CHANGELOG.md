@@ -4,6 +4,35 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ## Unreleased
 
+### Added
+
+- `WithPII(...PIIOption)` and `PIIClasses(...PIIClass)` opt a Redactor into all or
+  selected personal-data rules across text, bytes, JSON, argv, env, slog, errors,
+  Writer and Tail. Credential-only defaults and `SensitiveName` stay unchanged.
+- Shared Sanitizer/Redactor detectors for registered IBAN shapes and mod-97,
+  hyphenated US SSN validity rules, UK NINO prefix/suffix rules, and a documented
+  Unicode email dot-atom subset. PII text additionally uses NFKC normalization.
+- `PIIName` and class-aware key protection for email, phone, national IDs, IBAN,
+  cards, IPs, birth dates, names and postal addresses, with benign metadata
+  suffix handling. DOB, names and addresses are key-only; bare dates, free-form
+  names/addresses, other national IDs, health/special-category inference and
+  ML/NER remain outside scope.
+- PII corpus with look-alike negatives, byte-offset/idempotence tests, structured
+  path and streaming coverage, validator mutation check, and 4 KiB Text benchmarks.
+
+### Changed
+
+- Sanitizer forces the same PII catalog and key policy even when options attempt
+  to suppress rules or classes; PII keys raise Private, credential keys Secret.
+- Merged findings retain a representative PII rule when overlapping credentials.
+- Phone scanning retains adjacent valid digit groups on the first pass, and IPv6
+  zones retain colon-bearing suffixes, fixing idempotence cases found by fuzzing.
+  Card scanning recognizes Luhn-valid groups beside other identifiers rather than
+  hiding a card inside an overlong combined run.
+- Writer preserves key/quote context while holding multiline matches; PII quoted
+  values span lines. Tail scans enabled PII but cannot infer unknown cut fragments.
+
+
 ## v0.2.0 — 2026-10-16
 
 Performance: the primary gate (CPU p99 < 200 µs for a 4 KiB payload) was waived.

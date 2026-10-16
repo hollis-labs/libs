@@ -1,7 +1,8 @@
 # security/redact
 
-Credential redaction for text, JSON, command lines, environments and logs. Standard
-library only. It is the one redactor to use where text leaves your control: logs,
+Credential redaction, with opt-in PII detection, for text, JSON, command lines,
+environments and logs. Uses the standard library and `golang.org/x/text` for
+Unicode normalization. It is the one redactor to use where text leaves your control: logs,
 stored output, error messages, diagnostics, text sent to a model.
 
 ```go
@@ -70,8 +71,11 @@ A safety net, not a guarantee.
   Only a known value (`Scope`) protects it. `WithHeuristics()` adds the one common
   unlabeled shape (an AWS secret access key) and can match ordinary 40-character
   identifiers, so it is off by default.
-- The credential-only `Redactor` does not infer personal data. Use `Sanitizer`
-  for the deterministic PII rules described below.
+- `Default()` is credential-only. Opt in with `WithPII` for deterministic personal
+  data rules; `Sanitizer` always enables them. Neither infers personal names,
+  free-form postal addresses, health information or other special categories.
+  There is no ML or NER. Other national identifiers require explicit key policy
+  or a future rule with its own validator and negative corpus.
 - `Writer` redacts a stream line by line in bounded memory. A value longer than `WithHold` that straddles a forced flush of a very long unbroken line can be missed; `Tail` handles a single chunk that was cut in the middle of a known value.
 - Redact at the boundary, and prefer not to put secrets in text at all.
 
@@ -110,16 +114,12 @@ clean, report := s.Sanitize(payload)
 - Paths use RFC 6901 escaping (`~0`, `~1`); `*` matches an array index. Listing a
   container does not grant access to its descendants. List each retained leaf.
   Removed array elements become `null` so other indices remain stable.
-- Mandatory PII detectors cover ASCII email addresses, international phone
-  numbers (7–15 digits with `+`) and national numbers (10–11 digits), validated
-  IPv4/IPv6, 13–19 digit Luhn-valid cards, and Nanite's 32-hex identifiers.
-  PII also scans a single percent-decoded view, mapping replacements to the
-  original encoded bytes. The 32-hex rule alone exempts `trace_id`, `span_id`,
-  `traceparent`, `*_digest` and `*_hash` values; other rules still run.
-  Formats are deterministic, not a guarantee to recognize every personal datum.
-  Internationalized email addresses, names and inferred locale-specific PII
-  are not modeled. Use an allowlist for untrusted/new event kinds.
-- Secret rules and key matches raise sensitivity to `Secret`; PII raises it to
+- Mandatory PII uses exactly the same catalog, validators, normalization and
+  key-name rules as `WithPII()` (see below). The 32-hex rule alone exempts
+  `trace_id`, `span_id`, `traceparent`, `*_digest` and `*_hash` values;
+  other rules still run. Use an allowlist for untrusted/new event kinds.
+- Credential rules and credential key matches raise sensitivity to `Secret`; PII
+  value and key matches raise it to
   at least `Private`. Policy classification can only raise it. Overlapping
   matches and dropped subtrees retain both classifications.
 - Counts describe replaced spans or removed values; a whole dropped subtree
@@ -167,3 +167,105 @@ with `-benchtime=10000x -cpu=1`. It reports CPU median and p99 over 10,000
 individual calls using process user+system CPU with microsecond resolution.
 The sampling syscall overhead is included, not subtracted. These CPU samples
 are distinct from the wall-clock samples reported by `BenchmarkSanitize4KB`.
+
+## Opt-in PII for general text
+
+```go
+r, err := redact.New(redact.WithPII()) // all supported classes, including key rules
+// To retain IPs while enabling every other class:
+ops, err := redact.New(redact.WithPII(redact.PIIClasses(
+    redact.PIIAll &^ redact.PIIIP,
+)))
+```
+
+Use the configured instance's `Text`, `Bytes`, `Scan`, `JSON`, `Args`, `Env`,
+`Handler`, `ErrorText`, `Writer` or `Tail`. `Guidance` still trusts application
+prose and redacts only a wrapped cause. Package-level `Text`, `Default()` and
+`SensitiveName` remain credential-only. `PIIName` is the separate predicate for
+personal-data keys. Class constants can be combined with `|`; `PIIClasses()`
+selects none, unknown bits fail `New`, and the last `WithPII` selection wins.
+`WithoutRules` can suppress an individual text detector on a plain Redactor;
+class selection governs key protection. `NewSanitizer` forces every PII class
+and detector regardless of `WithPII`, `WithoutRules` or `WithBenignKeys`.
+
+| Class | Value detection and validation |
+|---|---|
+| `PIIEmail` | ASCII and Unicode `local@domain` dot-atom subset. Unicode letters, numbers and combining marks; ASCII atom punctuation locally; dot-separated DNS-style domain labels. Rejects empty atoms, adjacent local dots, invalid label edges and excessive byte lengths (64 local, 63 per label, 254 total). No quoted local parts, address literals, DNS lookup or mailbox verification. |
+| `PIIPhone` | Existing international `+` forms with 7–15 digits and national 10–11 digit forms; spaces, parentheses, dots and hyphens. Shape and boundaries only, no country allocation validation. Unlabeled 10-digit order numbers can be indistinguishable from phones; omit this class when those must survive. |
+| `PIIIP` | IPv4 and IPv6 parsed by `net/netip`, including IPv6 zones. |
+| `PIICard` | 13–19 digits with a nonzero Luhn-valid checksum, optionally separated by spaces or hyphens. No issuer verification. Adjacent digit groups are considered separately; an overlong contiguous number is not accepted by prefix. |
+| `PIIIBAN` | Electronic or standard four-character space-grouped forms; uppercase country code, registered national length and BBAN character shape, check digits 02–98 and mod-97. Shapes are pinned to [SWIFT registry release 103](https://www.swift.com/swift-resource/9606/download), September 2026; no account existence or domestic bank/checksum verification. |
+| `PIINationalID` | Hyphenated US SSN only: excludes area 000, 666 and 900–999, zero group and zero serial per [SSA](https://www.ssa.gov/employer/randomizationfaqs.html). UK NINO: two prefix letters, six digits and A–D suffix, optional spaces between pairs, case-insensitive; validates [HMRC prefix exclusions](https://www.gov.uk/hmrc-internal-manuals/national-insurance-manual/nim39110). Neither validates issuance. Bare nine-digit numbers and other national ID formats are not inferred. |
+| `PIINaniteID` | Bounded 32-hex identifiers. Such values are indistinguishable from other 32-hex hashes; longer commit hashes and hyphenated UUIDs are not this shape. |
+| `PIIDateOfBirth`, `PIIPersonalName`, `PIIPostalAddress` | **Key names only.** No bare-date, name or address detection in prose. |
+
+PII keys include `email`, `email_address`, `phone`, `phone_number`, `ssn`, `nino`,
+`national_id`, `iban`, `card_number`, `ip_address`, `dob`, `birth_date`,
+`date_of_birth`, `first_name`, `last_name`, `full_name`, `given_name`, `surname`,
+`address`, `postal_address`, `street_address` and `mailing_address`.
+CamelCase, separators, Unicode normalization and prefixed keys are supported.
+`email_count`, `phone_type`, `first_name_count` and `birth_date_format` stay
+metadata keys; their string values are still scanned. Selected classes govern
+both value detectors and key rules. Key matches remove a value without trying
+to validate it, including whole objects in JSON and groups in slog; booleans,
+nulls and existing placeholder/reference values keep the established behavior.
+`WithBenignKeys` customizes credential policy, not opted-in PII policy.
+
+PII scans strip Unicode format characters and apply NFKC, then also inspect one
+percent-decoded view with the same normalization. Replacements use original
+byte offsets. The credential-only text normalization stays unchanged. This is
+a supported syntax subset, not full email internationalization/IDNA validation.
+`Finding.Rule` contains a value-free rule name (`pii-email`, `pii-iban`,
+`pii-ssn`, `pii-nino`, `pii-key-name`, etc.). Merged overlapping/touching spans
+keep one representative PII rule in preference to a credential rule, so PII spans
+can be counted without values. It is not a count of every detector match;
+Sanitizer observes all raw matches for sensitivity classification.
+
+`Writer` holds incomplete lines across writes and retains the key/quote context
+of multiline values, including an unterminated quoted PII value at `Close`.
+Its existing forced-flush/hold-window limits still apply. `Tail` runs all enabled
+PII rules on complete values in the supplied tail; **unknown PII fragments cut
+at the edges cannot be reconstructed**. Only Scope-known values get fragment
+protection. Consumer adoption is a separate change after a maintainer release.
+
+Run `go test ./...` for the credential and PII corpora, streaming and structured
+paths. `python3 testdata/check_validators.py` replaces each new validator (plus
+Luhn) with unconditional acceptance in a disposable copy and requires the public
+detector's negative tests to fail. `go test -run '^$' -fuzz '^FuzzPIIText$'
+-fuzztime=30s` checks PII idempotence. No fixture contains a complete new
+PII-shaped literal: the corpus builds them at runtime with `j`.
+
+### Measured cost
+
+Measured on 2026-10-16, Linux/amd64, Go 1.26.9, Intel i5-11400F. These are
+measurements on a shared development host, not a universal latency guarantee.
+
+For default-path comparison, the new benchmark file was backported to clean
+base `a5fb9319` without enabling PII. Ten alternating before/after runs of
+`go test -run '^$' -bench '^BenchmarkText4KBDefault$|^BenchmarkText4KBMixed$/default$'
+-benchtime=15000x -cpu=1` gave these medians of run means:
+
+| PII off, 4 KiB | Before | After | Allocations before/after |
+|---|---:|---:|---:|
+| Ordinary prose | 41.84 µs | 38.91 µs | 152 B, 4 allocs |
+| Mixed text | 46.04 µs | 45.71 µs | 4,248 B, 5 allocs |
+
+No default-path regression was observed in these samples; timing ranges overlap.
+The credential-only scan does not construct PII views or run PII finders.
+
+On the final implementation, three runs of
+`go test -run '^$' -bench '^BenchmarkText4KB|^BenchmarkSanitize4KB(CPUSamples)?$'
+-benchtime=10000x -cpu=1 -count=3` during competing host tests measured:
+
+| PII on, 4 KiB | Median of run means | Run range | Median allocations |
+|---|---:|---:|---:|
+| Ordinary prose | 117.59 µs | 114.70–118.12 µs | 160 B, 5 allocs |
+| Mixed email/IBAN/SSN/NINO | 227.91 µs | 172.02–262.00 µs | 8,984 B, 17 allocs |
+
+The same run measured Sanitizer **CPU median 187–206 µs**, CPU p99 351–377 µs,
+and **wall p99 317–364 µs**, at 253 allocations per call. Earlier loaded runs
+reached CPU median 213–236 µs and wall p99 968 µs. The host had concurrent test
+processes and load averages above its CPU count: these results **do not establish
+the quiet-host release gate**, and not every CPU median is below 200 µs. Repeat
+the documented CPU-sample and wall-sample commands on a quiet host before
+accepting that gate. The earlier v0.2.0 waiver is not extended to this change.

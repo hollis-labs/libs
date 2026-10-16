@@ -426,7 +426,7 @@ func querySensitive(name string) bool {
 var keyFragments = []string{"pass", "pwd", "secret", "token", "cred", "cookie", "auth", "key", "bearer", "sig"}
 
 func maybeSensitive(lowerKey string, p *keyPolicy) bool {
-	if p != nil && len(p.extraSensitive) > 0 {
+	if p != nil && (len(p.extraSensitive) > 0 || p.piiOnly != 0) {
 		return true
 	}
 	for _, f := range keyFragments {
@@ -501,7 +501,7 @@ func findAssignment(r *Redactor, s *scanText, add func(a, b int)) {
 		for k < len(t) && (t[k] == ' ' || t[k] == '\t') {
 			k++
 		}
-		a, b, ok := parseValue(t, k)
+		a, b, ok := r.parseKeyValue(t, k)
 		if !ok {
 			continue
 		}
@@ -561,7 +561,7 @@ func findFlag(r *Redactor, s *scanText, add func(a, b int)) {
 		if !maybeSensitive(s.lower[j:k], r.policy) || !r.policy.sensitive(t[j:k]) {
 			continue
 		}
-		if a, b, ok := parseValue(t, m); ok && !r.isPlaceholder(t[a:b]) {
+		if a, b, ok := r.parseKeyValue(t, m); ok && !r.isPlaceholder(t[a:b]) {
 			add(a, b)
 		}
 	}

@@ -41,6 +41,9 @@ func (h *handler) WithGroup(name string) slog.Handler {
 
 func (h *handler) attr(a slog.Attr) slog.Attr {
 	v := a.Value.Resolve()
+	if v.Kind() == slog.KindGroup && h.r.piiName(a.Key) {
+		return slog.String(a.Key, h.r.marker)
+	}
 	if v.Kind() == slog.KindGroup {
 		group := v.Group()
 		red := make([]slog.Attr, len(group))
@@ -49,7 +52,7 @@ func (h *handler) attr(a slog.Attr) slog.Attr {
 		}
 		return slog.Attr{Key: a.Key, Value: slog.GroupValue(red...)}
 	}
-	if h.r.policy.sensitive(a.Key) && v.Kind() != slog.KindBool {
+	if h.r.sensitiveName(a.Key) && v.Kind() != slog.KindBool {
 		if s := fmt.Sprint(v.Any()); !h.r.isPlaceholder(s) {
 			return slog.String(a.Key, h.r.marker)
 		}
