@@ -8,6 +8,8 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+## v0.3.0 — 2026-10-16
+
 ### Added
 
 - `streamhub/retention`: `Planner` and `Plan`, the store-agnostic half of the retention janitor. `NewPlanner(policy).Plan(now)` turns the current policy into set specs per class (`RollupSpec`, `TombstoneSpec`, `TrimSpec`, `PruneSpec`) that any store can run. Pure, deterministic, no I/O. The current configuration governs every row (a shorter age reaches existing rows on the next pass; nothing is ever restored), and R-audit is never planned for trim, whatever its configuration (D7 rev 2.2).

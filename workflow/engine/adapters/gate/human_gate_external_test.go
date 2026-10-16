@@ -303,6 +303,40 @@ func gateOptions(authority workflowgate.AuthorityResolver, payloads workflowgate
 	return gateadapter.Options{Authority: authority, Payloads: payloads, Now: func() time.Time { return gateTime }}
 }
 
+func TestHumanGateOptionOutcomeIsValidatedAtLoad(t *testing.T) {
+	executor, _ := gateadapter.New(gateOptions(nil, nil))
+	with := func(option map[string]any) graph.Config {
+		config := gateConfig(true, true)
+		config["options"] = append([]any{option}, config["options"].([]any)[1:]...)
+		return config
+	}
+	for _, test := range []struct {
+		name   string
+		option map[string]any
+		ok     bool
+	}{
+		{"pass", map[string]any{"id": "approve", "label": "Approve", "outcome": "pass"}, true},
+		{"fail", map[string]any{"id": "approve", "label": "Approve", "outcome": "fail"}, true},
+		{"unknown", map[string]any{"id": "approve", "label": "Approve", "outcome": "maybe"}, false},
+		{"not a string", map[string]any{"id": "approve", "label": "Approve", "outcome": true}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			findings := executor.ValidateConfig(t.Context(), with(test.option))
+			if (len(findings) == 0) != test.ok {
+				t.Fatalf("diagnostics = %#v, want ok=%v", findings, test.ok)
+			}
+		})
+	}
+	skipPass := gateConfig(true, true)
+	skipPass["options"] = []any{
+		map[string]any{"id": "approve", "label": "Approve"},
+		map[string]any{"id": "skip", "label": "Skip", "kind": "skip", "outcome": "pass"},
+	}
+	if findings := executor.ValidateConfig(t.Context(), skipPass); len(findings) == 0 {
+		t.Fatal("a skip option declaring outcome pass was accepted")
+	}
+}
+
 func gateConfig(optional, blocking bool) graph.Config {
 	options := []any{
 		map[string]any{"id": "approve", "label": "Approve"},

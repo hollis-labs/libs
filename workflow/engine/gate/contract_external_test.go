@@ -100,3 +100,27 @@ func checkpoint(t *testing.T) gate.Checkpoint {
 		Correlation: "release-1", Behavior: gate.Behavior{Blocking: true},
 	}
 }
+
+func TestOptionOutcomeIsClosedOptionalAndConsistentWithKind(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		option gate.Option
+		ok     bool
+	}{
+		{"unset", gate.Option{ID: "a", Label: "A"}, true},
+		{"pass", gate.Option{ID: "a", Label: "A", Outcome: gate.OutcomePass}, true},
+		{"fail", gate.Option{ID: "a", Label: "A", Kind: gate.OptionDecision, Outcome: gate.OutcomeFail}, true},
+		{"skip kind unset outcome", gate.Option{ID: "s", Label: "S", Kind: gate.OptionSkip}, true},
+		{"skip kind skip outcome", gate.Option{ID: "s", Label: "S", Kind: gate.OptionSkip, Outcome: gate.OutcomeSkip}, true},
+		{"unknown outcome", gate.Option{ID: "a", Label: "A", Outcome: "maybe"}, false},
+		{"skip kind with pass", gate.Option{ID: "s", Label: "S", Kind: gate.OptionSkip, Outcome: gate.OutcomePass}, false},
+		{"skip kind with fail", gate.Option{ID: "s", Label: "S", Kind: gate.OptionSkip, Outcome: gate.OutcomeFail}, false},
+		{"skip outcome on decision", gate.Option{ID: "a", Label: "A", Outcome: gate.OutcomeSkip}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.option.Validate(); (err == nil) != test.ok {
+				t.Fatalf("Validate = %v, want ok=%v", err, test.ok)
+			}
+		})
+	}
+}
