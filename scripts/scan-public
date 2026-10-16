@@ -243,8 +243,10 @@ def run_gitleaks(repo, mode, tmpdir, refs=()):
     cmd = [
         "gitleaks", mode, "--no-banner", "--redact", "--report-format", "json",
         "--report-path", report,
-    ] + (["--log-opts", " ".join(refs)] if mode == "git" and refs else []) + [repo]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    ] + (["--log-opts", " ".join(refs)] if mode == "git" and refs else []) + ["."]
+    # Stable relative paths make exact fingerprints portable across checkouts.
+    # The target's own .gitleaksignore must apply, not the caller's directory.
+    r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True)
     if r.returncode not in (0, 1):
         return [], "gitleaks %s exited %d: %s" % (mode, r.returncode, r.stderr.strip()[-300:])
     if not os.path.exists(report):
