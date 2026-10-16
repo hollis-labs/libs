@@ -465,3 +465,162 @@ func (d *durStore) Tombstone(ctx context.Context, s string, sp retention.Tombsto
 	}
 	return d.Store.Tombstone(ctx, s, sp, op)
 }
+
+type limitStore struct {
+	retention.Store
+	mu         sync.Mutex
+	limits     []int
+	rollLimits []int
+	delay      time.Duration
+}
+
+func (l *limitStore) Tombstone(ctx context.Context, s string, sp retention.TombstoneSpec, op retention.Op) (retention.Result, error) {
+	if !op.DryRun {
+		l.mu.Lock()
+		l.limits = append(l.limits, op.Limit)
+		l.mu.Unlock()
+		time.Sleep(l.delay)
+	}
+	return l.Store.Tombstone(ctx, s, sp, op)
+}
+
+func (l *limitStore) Rollup(ctx context.Context, s string, sp retention.RollupSpec, op retention.Op) (retention.RollupResult, error) {
+	if !op.DryRun {
+		l.mu.Lock()
+		l.rollLimits = append(l.rollLimits, op.Limit)
+		l.mu.Unlock()
+	}
+	return l.Store.Rollup(ctx, s, sp, op)
+}
+
+// A call is capped by what is left of the pass budget, never by the slice alone.
+func TestPassBudgetCapsEachStoreCall(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	for range 10 {
+		r := state(0, "x")
+		r.Class = retention.ClassState // classified, so the row budget goes to the tombstones
+		seed(t, m, r)
+	}
+	h := &limitStore{Store: m}
+	rep, err := jan(t, h, retention.WithMaxTxRows(4), retention.WithBudget(retention.Budget{MaxRows: 6})).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := rep.Classes[retention.ClassState]
+	if st.RolledUp+st.Tombstoned != 6 || !rep.StoppedEarly {
+		t.Fatalf("changed %d rows (stopped early %v): a MaxRows budget of 6 must not be exceeded", st.RolledUp+st.Tombstoned, rep.StoppedEarly)
+	}
+	// One call per class spec (the empty audit class first), then 4 rows, then only the 2 that are left.
+	if n := len(h.rollLimits); n < 2 || h.rollLimits[n-2] != 4 || h.rollLimits[n-1] != 2 {
+		t.Fatalf("rollup call limits = %v, want the last two to be [4 2]: a call may only use what is left", h.rollLimits)
+	}
+	if len(h.limits) != 0 {
+		t.Fatalf("tombstone calls %v after the budget was spent", h.limits)
+	}
+}
+
+func TestReportCarriesElapsedPolicyAndClassified(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seedMixed(t, m)
+	h := &limitStore{Store: m, delay: 5 * time.Millisecond}
+	rep, err := jan(t, h, retention.WithPolicyID("cfg-7")).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Elapsed < 5*time.Millisecond {
+		t.Fatalf("Elapsed = %v: the deferred value must reach the caller", rep.Elapsed)
+	}
+	if rep.PolicyID != "cfg-7" || rep.Summary().PolicyID != "cfg-7" {
+		t.Fatalf("policy id = %q / %q", rep.PolicyID, rep.Summary().PolicyID)
+	}
+	if rep.Classified != 6 {
+		t.Fatalf("Classified = %d, want the 6 rows that had no class", rep.Classified)
+	}
+}
+
+// When the time budget is spent before the end-of-pass reads, backlog and
+// oldest are marked unknown (Partial), not left looking like zero.
+func TestSpentBudgetMarksTheTailReadsPartial(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seedMixedClass(t, m, true)
+	h := &limitStore{Store: m, delay: 30 * time.Millisecond}
+	rep, err := jan(t, h, retention.WithBudget(retention.Budget{MaxElapsed: 10 * time.Millisecond})).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.StoppedEarly {
+		t.Fatal("the pass should have stopped early")
+	}
+	for name, c := range rep.Classes {
+		if name == retention.SecretClass {
+			continue
+		}
+		if !c.Partial {
+			t.Fatalf("class %s: Partial = false after the budget ran out; its backlog %d would read as 'none'", name, c.Backlog)
+		}
+	}
+}
+
+func TestWatermarksReachTheReportAndSummary(t *testing.T) {
+	m := storetest.NewMem(retention.TrimPerRow)
+	a := seed(t, m, storetest.Row{At: base.Add(time.Hour), Payload: []byte("d"), Attrs: retention.Attrs{Category: "tool", Severity: "debug"}})
+	seed(t, m, storetest.Row{At: base.Add(2 * time.Hour), Payload: []byte("audit"), Attrs: retention.Attrs{Category: "audit"}})
+	b := seed(t, m, storetest.Row{At: base.Add(3 * time.Hour), Payload: []byte("d"), Attrs: retention.Attrs{Category: "tool", Severity: "debug"}})
+	rep, err := jan(t, m, retention.WithPolicyID("cfg-7")).Run(context.Background(), base.Add(20*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbg := rep.Classes[retention.ClassDebug]
+	if dbg.Watermark != b || dbg.Trimmed != 2 || rep.HeldByHead != 0 || a == b {
+		t.Fatalf("debug = %+v, held %d: per-row removes both debug rows around the audit row, W_C = %d", dbg, rep.HeldByHead, b)
+	}
+	sum := rep.Summary()
+	if sum.Classes[retention.ClassDebug].Watermark != b || sum.PolicyID != "cfg-7" {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if rep.Classes[retention.ClassAudit].Watermark != 0 {
+		t.Fatal("audit has a watermark")
+	}
+}
+
+func TestPassEventOnlyForPassesThatChangedSomething(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seed(t, m, state(0, "x"))
+	j := jan(t, m, retention.WithPolicyID("cfg-7"))
+	now := base.Add(400 * day)
+	rep, _ := j.Run(context.Background(), now)
+	ev, ok := rep.PassEvent()
+	if !ok || ev.Kind != "retention.pass" || ev.Category != "audit" || ev.Visibility != "private" || ev.Actor != "janitor" || ev.Summary.PolicyID != "cfg-7" {
+		t.Fatalf("event = %+v, %v", ev, ok)
+	}
+	if again, _ := j.Run(context.Background(), now); func() bool { _, ok := again.PassEvent(); return ok }() {
+		t.Fatal("a pass that changed nothing produced an event")
+	}
+	dry, _ := jan(t, storetest.NewMem(retention.TrimHeadOnly), retention.WithDryRun(true)).Run(context.Background(), now)
+	if _, ok := dry.PassEvent(); ok {
+		t.Fatal("a dry run produced an event")
+	}
+	unlock, _, _ := m.TryLock(context.Background())
+	skipped, _ := j.Run(context.Background(), now)
+	unlock()
+	if _, ok := skipped.PassEvent(); ok {
+		t.Fatal("a skipped pass produced an event")
+	}
+}
+
+func TestReadGapPicksTheHighestWatermarkOnce(t *testing.T) {
+	marks := map[string]uint64{retention.ClassDebug: 40, retention.ClassActivity: 90, retention.ClassState: 90}
+	g, ok := retention.ReadGap(marks, 10)
+	if !ok || g.Reason != "retention" || g.ThroughCursor != 90 || g.Class != retention.ClassActivity {
+		t.Fatalf("gap = %+v, %v; ties go to the class that sorts first", g, ok)
+	}
+	if _, ok := retention.ReadGap(marks, 90); ok {
+		t.Fatal("a reader at the highest watermark got a frame")
+	}
+	if g, ok := retention.ReadGap(marks, 50); !ok || g.ThroughCursor != 90 {
+		t.Fatalf("gap = %+v", g)
+	}
+	if _, ok := retention.ReadGap(nil, 0); ok {
+		t.Fatal("no watermarks, no frame")
+	}
+}
