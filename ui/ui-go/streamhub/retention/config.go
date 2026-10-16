@@ -157,6 +157,14 @@ func (c Config) Resolve() (*Policy, error) {
 	if piiMax < 0 {
 		errs = append(errs, errors.New("pii payload_max must not be negative"))
 	}
+	// A class with a finite whole-row and envelope age but no rollups is
+	// tombstoned and then stays: nothing is removed without a covering rollup.
+	for _, name := range names {
+		c := classes[name]
+		if name != ClassAudit && c.Full != 0 && c.Envelope != 0 && len(c.Rollups) == 0 {
+			warns = append(warns, fmt.Sprintf("class %s has no rollups; its rows are tombstoned but never removed", name))
+		}
+	}
 	// Guarded changes.
 	if piiMax == Forever || piiMax > D(DefaultPIIPayloadMax) {
 		if !c.Acknowledge {

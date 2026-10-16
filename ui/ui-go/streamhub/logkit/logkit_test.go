@@ -68,6 +68,19 @@ func TestEnvelopeExtractor(t *testing.T) {
 	if got := logkit.EnvelopeExtractor(mesh); got != want {
 		t.Fatalf("mesh columns = %+v", got)
 	}
+	out := streamhub.Event{Data: []byte(`{"payload":{"from":"todo","to":"doing"}}`)}
+	if got := logkit.EnvelopeExtractor(out).Outcome; got != "doing" {
+		t.Fatalf("outcome from payload.to = %q", got)
+	}
+	out2 := streamhub.Event{Data: []byte(`{"payload":{"outcome":"ok","to":"x"}}`)}
+	if got := logkit.EnvelopeExtractor(out2).Outcome; got != "ok" {
+		t.Fatalf("outcome should win over to, got %q", got)
+	}
+	for _, d := range []string{`{"payload":"text"}`, `{"payload":[1,2]}`, `{"payload":null}`} {
+		if got := logkit.EnvelopeExtractor(streamhub.Event{Data: []byte(d)}); got.Outcome != "" {
+			t.Fatalf("%s produced outcome %q", d, got.Outcome)
+		}
+	}
 	both := streamhub.Event{Data: []byte(`{"visibility":"mesh","class":{"visibility":"operator"}}`)}
 	if v := logkit.EnvelopeExtractor(both).Visibility; v != "operator" {
 		t.Fatalf("class.visibility should win, got %q", v)
