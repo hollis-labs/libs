@@ -1014,6 +1014,11 @@ func TestCompensationCompletesBeforeFinallyBecomesEligible(t *testing.T) {
 	if err != nil || progress.Ledger.Outcome != workflowruntime.CompensationOutcomeFailed {
 		t.Fatalf("retry rollback completion = %#v, %v", progress, err)
 	}
+	// Binding happens only after compensation has finished and the finalizer
+	// is eligible; pristine finalizers must still allow compensation retries.
+	if _, err := store.BindNodeInputs(ctx, workflowruntime.BindNodeInputsRequest{InvocationID: cleanup.ID, ExpectedGeneration: cleanup.Generation, IdempotencyKey: "cleanup-inputs", Values: values.ValueSet{}, At: base.Add(14 * time.Second)}); err != nil {
+		t.Fatal(err)
+	}
 	ready, err := control.ProgressFinally(ctx, workflow, cleanup.ID, values.ExpressionContext{}, values.ExpressionOptions{}, base.Add(14*time.Second))
 	if err != nil || ready.Snapshot.Status != workflowruntime.NodeReady {
 		t.Fatalf("finally after compensation = %#v, %v", ready, err)

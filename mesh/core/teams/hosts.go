@@ -34,6 +34,7 @@ type RosterStore interface {
 // It excludes terminal RoutingReady/Failed records and includes Aborting cleanup.
 // Put permits monotonic launch steps or transition to Aborting then Failed;
 // terminal records cannot be resurrected. Attempts and deadlines are durable.
+// PlannedRunID and each intent's Request are immutable after the first write.
 type LaunchLedger interface {
 	WithLease(context.Context, string, func(context.Context) error) error
 	GetLaunch(context.Context, string) (LaunchRecord, error)
@@ -82,6 +83,15 @@ type WorkflowLauncher interface {
 	// FailWorkflow fences this launch key, marks an existing run failed and
 	// prevents a lost-acknowledgement launch from reappearing during cleanup.
 	FailWorkflow(context.Context, string, string) error
+}
+
+// WorkflowRunIDPlanner optionally supplies the workflow identity before eager
+// members are provisioned. Planning must be deterministic and side-effect free:
+// for a key and definition, it must return the same nonempty ID that
+// LaunchWorkflow will return. The launcher calls it only for a new record;
+// retries and legacy records reuse their persisted plan without calling again.
+type WorkflowRunIDPlanner interface {
+	PlanWorkflowRunID(context.Context, string, WorkflowDefinition) (string, error)
 }
 type TriggerEvaluator interface {
 	Evaluate(context.Context, Trigger, Member) (bool, error)

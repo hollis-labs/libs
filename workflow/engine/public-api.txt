@@ -1781,6 +1781,9 @@ package github.com/hollis-labs/libs/workflow/engine/gate gate
 const AuthorityGatePolicy = "gate_policy"
 const OptionDecision OptionKind = "decision"
 const OptionSkip OptionKind = "skip"
+const OutcomeFail OptionOutcome = "fail"
+const OutcomePass OptionOutcome = "pass"
+const OutcomeSkip OptionOutcome = "skip"
 const PolicyEnvironment = "environment"
 func (b Behavior) Validate() error
 func (c Checkpoint) Validate() error
@@ -1789,6 +1792,7 @@ func (f AuthorityResolverFunc) ResolveGateAuthority(ctx context.Context, request
 func (f PayloadStoreFunc) StoreGatePayload(ctx context.Context, request PayloadRequest) (values.ValueSetRef, error)
 func (k OptionKind) Valid() bool
 func (o Option) Validate() error
+func (o OptionOutcome) Valid() bool
 func (s PolicySubject) Validate() error
 func CloneCheckpoint(checkpoint Checkpoint) Checkpoint
 type AuthorityResolver interface {
@@ -1823,8 +1827,11 @@ type Option struct {
 	ID    string     `json:"id"`
 	Label string     `json:"label"`
 	Kind  OptionKind `json:"kind,omitempty"`
+
+	Outcome OptionOutcome `json:"outcome,omitempty"`
 }
 type OptionKind string
+type OptionOutcome string
 type PayloadRequest struct {
 	RunID      string     `json:"run_id"`
 	NodeID     string     `json:"node_id"`
@@ -3531,6 +3538,7 @@ type DriveNodeRequest struct {
 	At                time.Time
 }
 type DriveNodeResult struct {
+	Recheck    bool                  `json:"recheck,omitempty"`
 	Binding    *BindNodeInputsResult `json:"binding,omitempty"`
 	Progressed ProgressNodeResult    `json:"progressed"`
 }
@@ -3970,6 +3978,7 @@ type ProgressControlNodeRequest struct {
 	At                time.Time
 }
 type ProgressNodeRequest struct {
+	Node              *graph.Node
 	InvocationID      NodeInvocationID
 	Dependencies      []DependencyRef
 	Rule              graph.ReadyRule
@@ -5060,6 +5069,7 @@ var ErrControlFlowPending = errors.New("workflow control flow is pending")
 var ErrFanOutIncomplete = errors.New("workflow fan-out is incomplete")
 var ErrFanOutLimit = errors.New("workflow fan-out concurrency limit reached")
 var ErrIdempotencyConflict = errors.New("workflow idempotency conflict")
+var ErrInputsUnbound = errors.New("workflow node inputs are not durably bound")
 var ErrInvalidCancellation = errors.New("invalid workflow cancellation")
 var ErrInvalidCompensation = errors.New("invalid compensation request")
 var ErrInvalidControlFlow = errors.New("invalid workflow control flow")
