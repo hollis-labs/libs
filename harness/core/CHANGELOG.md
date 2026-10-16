@@ -34,6 +34,11 @@ All notable changes to the `harness` module are documented here (the module was 
 ### Changed
 
 - Requires `mesh/core` v0.6.0 (for `Event.PayloadDigest`).
+- Requires `github.com/hollis-labs/libs/security/redact`.
+
+### Fixed
+
+- `adapters/acp.NewDiagnostic` redacted only keyed pairs and headers, and it bounded the text to 4096 bytes *before* redacting. Bare `Bearer` tokens, provider key shapes and URL userinfo passed through, and a credential straddling the bound was cut instead of matched. It now redacts the whole text with `security/redact` and then bounds the result (on a rune boundary). The auth scheme word (`Bearer`) is kept; only the credential is replaced.
 
 ## v0.11.0 — 2026-10-16
 

@@ -262,7 +262,8 @@ func TestManagerNormalizesDisconnectChildExitMalformedAndLaunchFailure(t *testin
 
 func TestDiagnosticRedaction(t *testing.T) {
 	d := NewDiagnostic(DiagnosticMalformedJSON, "Authorization: Bearer bearer-value", `{"authorization":"quoted-secret","token":"abc","nested":{"api_key":"def"},"ok":"visible"`)
-	if strings.Contains(d.Message, "bearer-value") || strings.Contains(d.Message, "Bearer") || strings.Contains(d.Raw, "quoted-secret") || strings.Contains(d.Raw, "abc") || strings.Contains(d.Raw, "def") {
+	// The auth scheme stays (it is not a secret); only the credential goes.
+	if strings.Contains(d.Message, "bearer-value") || strings.Contains(d.Raw, "quoted-secret") || strings.Contains(d.Raw, "abc") || strings.Contains(d.Raw, "def") {
 		t.Fatalf("diagnostic leaked secret: %+v", d)
 	}
 	if !strings.Contains(d.Raw, "visible") || !strings.Contains(d.Raw, "[REDACTED]") {
@@ -315,4 +316,28 @@ func waitForState(t *testing.T, session *Session, want State) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("session state = %q, want %q", session.Snapshot().State, want)
+}
+
+// Credentials the old keyed-pair patterns never saw are redacted, including in
+// text longer than the bound where cutting first would have split them.
+func TestDiagnosticRedactsBareCredentialsAndRedactsBeforeBounding(t *testing.T) {
+	provider := "sk-" + "ant-api03-Zx9Yw8Vu7Ts6Rq5Pn4Om3Lk2Ji1Hg0FeDcBa_XyWvUtSrQp-AAAA"
+	bearer := "Bearer " + "eyJ" + "hbGciOiJIUzI1NiJ9.eyJ" + "zdWIiOiJ4In0.c2lnbmF0dXJl"
+	url := "https://" + "user:hunter2pw" + "@example.test/path"
+	d := NewDiagnostic(DiagnosticMalformedJSON, "dial "+url+" with "+bearer, "key "+provider)
+	for _, leaked := range []string{"hunter2pw", "hbGciOiJIUz", "Zx9Yw8Vu7Ts6"} {
+		if strings.Contains(d.Message+d.Raw, leaked) {
+			t.Fatalf("diagnostic leaked %q: %+v", leaked, d)
+		}
+	}
+
+	// The credential starts before the 4096-byte bound and ends after it.
+	pad := strings.Repeat("x", maxDiagnosticBytes-30)
+	long := NewDiagnostic(DiagnosticMalformedJSON, "", pad+" "+provider+" tail")
+	if strings.Contains(long.Raw, "Zx9Yw8") || strings.Contains(long.Raw, "sk-ant") {
+		t.Fatalf("credential straddling the bound survived: ...%q", long.Raw[len(long.Raw)-60:])
+	}
+	if len(long.Raw) > maxDiagnosticBytes+len("…") {
+		t.Fatalf("diagnostic not bounded: %d", len(long.Raw))
+	}
 }
