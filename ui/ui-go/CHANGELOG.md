@@ -8,11 +8,12 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
-## v0.2.0 — 2026-10-16
-
 ### Added
 
 - `streamhub/retention`: configuration and decision model for tiered event retention (design D7 rev 2). Per-class `full` / `envelope` ages and rollup schedules (zero = forever), `Defaults()` with the proposed tiers, `Config.Resolve()` merging over defaults with validation (lengthening the pii payload cap or shortening the audit class below 400d needs `acknowledge` and yields a warning; storing secret payloads is always rejected), and `Policy.ClassOf` / `PayloadMax` / `TierAt` for a janitor or log to ask which tier an event of a given age is in. No storage code.
+- `streamhub/logkit`: shared pieces of a durable `streamhub.Log`, so backends agree on identity and deduplication: the opaque cursor `<epoch>:<seq>` (`FormatCursor`, `ParseCursor`, `ErrBadCursor`), the duplicate-detection `Digest` over Name and a canonical form of JSON Data (sorted keys, compact, number literals kept; non-JSON byte-exact), `Columns` / `Extractor` / `EnvelopeExtractor` for the indexed scope columns, and the external high-water `Marker` (`ReadMarker`, `WriteMarker`, `Marker.Behind`, `ErrMarkerUnreadable`) that detects a rolled-back or replaced store.
+
+## v0.2.0 — 2026-10-16
 
 ### Added
 
