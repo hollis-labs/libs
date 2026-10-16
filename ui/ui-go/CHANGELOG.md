@@ -8,6 +8,8 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-16
+
 ### Added
 
 - `streamhub`: `Event.ID`, an optional idempotency key. Appending the same ID with the same content returns the stored record and consumes no cursor; different content fails with `ErrEventIDConflict`. `Record.ID` echoes it.
