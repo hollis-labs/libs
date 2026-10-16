@@ -4,7 +4,7 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ## Unreleased
 
-## v0.2.0 — pending security and performance gates
+## v0.2.0 — 2026-10-16
 
 ### Added
 
