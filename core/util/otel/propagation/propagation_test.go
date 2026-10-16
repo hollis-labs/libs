@@ -2,6 +2,7 @@ package propagation
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -221,5 +222,87 @@ func TestExtractMCPWithoutPropagatorKeepsCallerContext(t *testing.T) {
 	}
 	if trace.SpanContextFromContext(got).IsValid() {
 		t.Error("a trace context appeared with no propagator configured")
+	}
+}
+
+// A real server supplies the deadline and flushing capabilities that a
+// ResponseRecorder cannot exercise. Keep the handler open until the client
+// receives the flushed bytes, then check the middleware's recorded status.
+func TestHTTPMiddlewareResponseController(t *testing.T) {
+	for _, explicitStatus := range []bool{false, true} {
+		name := "implicit OK"
+		wantStatus := http.StatusOK
+		if explicitStatus {
+			name = "explicit Accepted"
+			wantStatus = http.StatusAccepted
+		}
+		t.Run(name, func(t *testing.T) {
+			rec := &fakeHTTPRecorder{}
+			release := make(chan struct{})
+			done := make(chan struct{})
+			handler := HTTPMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				controller := http.NewResponseController(w)
+				if err := controller.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+					t.Errorf("SetWriteDeadline: %v", err)
+				}
+				if explicitStatus {
+					w.WriteHeader(wantStatus)
+				}
+				if _, err := io.WriteString(w, "data: ready\n\n"); err != nil {
+					t.Errorf("write: %v", err)
+				}
+				if err := controller.Flush(); err != nil {
+					t.Errorf("Flush: %v", err)
+				}
+				select {
+				case <-release:
+				case <-r.Context().Done():
+				}
+			}), WithMetricRecorder(rec))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handler.ServeHTTP(w, r)
+				close(done)
+			}))
+			defer server.Close()
+			// Release the handler even if a client assertion fails.
+			defer func() {
+				select {
+				case <-release:
+				default:
+					close(release)
+				}
+			}()
+			client := server.Client()
+			client.Timeout = 10 * time.Second
+			resp, err := client.Get(server.URL + "/events")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != wantStatus {
+				t.Errorf("HTTP status = %d, want %d", resp.StatusCode, wantStatus)
+			}
+			body := make([]byte, len("data: ready\n\n"))
+			if _, err := io.ReadFull(resp.Body, body); err != nil {
+				t.Fatalf("read flushed event before handler returns: %v", err)
+			}
+			if string(body) != "data: ready\n\n" {
+				t.Errorf("flushed event = %q", body)
+			}
+			close(release)
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("middleware did not finish")
+			}
+			rec.mu.Lock()
+			defer rec.mu.Unlock()
+			if len(rec.calls) != 1 {
+				t.Fatalf("recorder calls = %d, want 1", len(rec.calls))
+			}
+			if call := rec.calls[0]; call.code != wantStatus || call.route != "/events" {
+				t.Errorf("recorded request = %+v, want status %d on /events", call, wantStatus)
+			}
+		})
 	}
 }
