@@ -598,7 +598,7 @@ func TestPassEventOnlyForPassesThatChangedSomething(t *testing.T) {
 	now := base.Add(400 * day)
 	rep, _ := j.Run(context.Background(), now)
 	ev, ok := rep.PassEvent()
-	if !ok || ev.Kind != "retention.pass" || ev.Category != "audit" || ev.Visibility != "private" || ev.Actor != "janitor" || ev.Summary.PolicyID != "cfg-7" {
+	if !ok || ev.Kind != "retention.pass" || ev.Category != "audit" || ev.Visibility != "private" || ev.Summary.PolicyID != "cfg-7" {
 		t.Fatalf("event = %+v, %v", ev, ok)
 	}
 	if again, _ := j.Run(context.Background(), now); func() bool { _, ok := again.PassEvent(); return ok }() {
@@ -616,17 +616,19 @@ func TestPassEventOnlyForPassesThatChangedSomething(t *testing.T) {
 	}
 }
 
-func TestReadGapPicksTheHighestWatermarkOnce(t *testing.T) {
+func TestReadGapListsEveryAffectedClassSorted(t *testing.T) {
 	marks := map[string]uint64{retention.ClassDebug: 40, retention.ClassActivity: 90, retention.ClassState: 90}
 	g, ok := retention.ReadGap(marks, 10)
-	if !ok || g.Reason != "retention" || g.ThroughCursor != 90 || g.Class != retention.ClassActivity {
-		t.Fatalf("gap = %+v, %v; ties go to the class that sorts first", g, ok)
+	want := []retention.ClassGap{{Class: retention.ClassActivity, ThroughCursor: 90}, {Class: retention.ClassDebug, ThroughCursor: 40}, {Class: retention.ClassState, ThroughCursor: 90}}
+	if !ok || g.Reason != "retention" || len(g.Classes) != 3 || g.Classes[0] != want[0] || g.Classes[1] != want[1] || g.Classes[2] != want[2] {
+		t.Fatalf("gap = %+v, %v; want every class above the cursor, sorted: %+v", g, ok, want)
+	}
+	// Only the classes whose watermark is above the reader are listed.
+	if g, ok := retention.ReadGap(marks, 50); !ok || len(g.Classes) != 2 || g.Classes[0].Class != retention.ClassActivity || g.Classes[1].Class != retention.ClassState {
+		t.Fatalf("after 50: %+v, %v", g, ok)
 	}
 	if _, ok := retention.ReadGap(marks, 90); ok {
 		t.Fatal("a reader at the highest watermark got a frame")
-	}
-	if g, ok := retention.ReadGap(marks, 50); !ok || g.ThroughCursor != 90 {
-		t.Fatalf("gap = %+v", g)
 	}
 	if _, ok := retention.ReadGap(nil, 0); ok {
 		t.Fatal("no watermarks, no frame")
@@ -849,5 +851,58 @@ func TestPerCallTimeoutIsCounted(t *testing.T) {
 	}
 	if st := rep.Classes[retention.ClassState]; st.Errors == 0 || st.FirstError != "timeout" {
 		t.Fatalf("state = %+v: a timed-out call must be counted as a timeout", st)
+	}
+}
+
+type countingStore struct {
+	retention.Store
+	locks, lists int
+}
+
+func (c *countingStore) TryLock(ctx context.Context) (func(), bool, error) {
+	c.locks++
+	return c.Store.TryLock(ctx)
+}
+
+func (c *countingStore) Streams(ctx context.Context) ([]string, error) {
+	c.lists++
+	return c.Store.Streams(ctx)
+}
+
+// pr-3's probe: a nanosecond budget is spent before the pass starts, so neither
+// the lock nor the stream listing may be called, and the pass reports an early stop.
+func TestSpentBudgetStopsBeforeTheStoreIsCalled(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seed(t, m, state(0, "x"))
+	c := &countingStore{Store: m}
+	rep, err := jan(t, c, retention.WithBudget(retention.Budget{MaxElapsed: time.Nanosecond})).Run(context.Background(), base.Add(400*day))
+	if err != nil || !rep.StoppedEarly {
+		t.Fatalf("report = %+v, %v; want an early stop", rep, err)
+	}
+	if c.locks != 0 || c.lists != 0 {
+		t.Fatalf("TryLock called %d times, Streams %d times, with the budget already gone", c.locks, c.lists)
+	}
+}
+
+// An empty listing with the budget gone is an early stop, not a clean empty pass.
+func TestEmptyListingWithTheBudgetGoneIsAnEarlyStop(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly) // no streams
+	h := slowStreams{Store: m, d: 30 * time.Millisecond}
+	rep, err := jan(t, h, retention.WithBudget(retention.Budget{MaxElapsed: 10 * time.Millisecond})).Run(context.Background(), base.Add(400*day))
+	if err != nil || !rep.StoppedEarly {
+		t.Fatalf("report = %+v, %v", rep, err)
+	}
+}
+
+// A class with finite ages but no rollups is tombstoned and then stays: say so.
+func TestResolveWarnsAboutAClassWithNoRollups(t *testing.T) {
+	c := retention.Config{Classes: map[string]retention.ClassPolicy{
+		retention.ClassDebug: {Full: retention.D(7 * day), Envelope: retention.D(14 * day)}}}
+	p := mustResolve(t, c)
+	if len(p.Warnings) != 1 || !strings.Contains(p.Warnings[0], retention.ClassDebug) || !strings.Contains(p.Warnings[0], "never removed") {
+		t.Fatalf("warnings = %v", p.Warnings)
+	}
+	if p := mustResolve(t, retention.Config{}); len(p.Warnings) != 0 {
+		t.Fatalf("defaults warn: %v", p.Warnings)
 	}
 }

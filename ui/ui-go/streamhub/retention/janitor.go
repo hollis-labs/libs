@@ -266,14 +266,15 @@ func (r Report) Summary() Summary {
 }
 
 // PassEvent is the metadata-only record a hub emits for a pass that changed
-// something (D7 rev 2.3): category audit, visibility private, actor the
-// janitor service, plus the per-class counts, watermarks, bytes estimate,
-// effective policy id, stopped_early and errors in Summary.
+// something (D7 rev 2.3): category audit, visibility private, plus the
+// per-class counts, watermarks, bytes estimate, effective policy id,
+// stopped_early and errors in Summary. The actor is NOT set here: the host
+// stamps the service identity it runs the janitor as (a verified actor, not a
+// literal this library could claim).
 type PassEvent struct {
 	Kind       string
 	Category   string
 	Visibility string
-	Actor      string
 	Summary    Summary
 }
 
@@ -283,7 +284,7 @@ func (r Report) PassEvent() (PassEvent, bool) {
 	if !r.Changed() {
 		return PassEvent{}, false
 	}
-	return PassEvent{Kind: "retention.pass", Category: "audit", Visibility: "private", Actor: "janitor", Summary: r.Summary()}, true
+	return PassEvent{Kind: "retention.pass", Category: "audit", Visibility: "private", Summary: r.Summary()}, true
 }
 
 // pass is the state of one Run.
@@ -367,8 +368,13 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	// MaxElapsed is a whole-pass guarantee: the lock and the stream listing are
 	// bounded by it too. Running out of time there is an early stop, not a failure.
 	p := &pass{j: j, rep: &rep, start: t0}
-	pre, cancelPre, _ := p.bounded(ctx)
+	pre, cancelPre, inBudget := p.bounded(ctx)
 	defer cancelPre()
+	if !inBudget {
+		// The budget is already spent: stop before the store is called at all.
+		rep.StoppedEarly = true
+		return rep, nil
+	}
 	unlock, ok, err := j.store.TryLock(pre)
 	if err != nil {
 		if isDeadline(err) && ctx.Err() == nil {
@@ -392,6 +398,11 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 		return rep, err
 	}
 	sort.Strings(streams)
+	if len(streams) == 0 && p.over() {
+		// Nothing to do and no time to say so: an early stop, not a clean empty pass.
+		rep.StoppedEarly = true
+		return rep, nil
+	}
 	from := j.resumeStream(resume)
 	for _, stream := range streams {
 		if from != "" && stream < from {

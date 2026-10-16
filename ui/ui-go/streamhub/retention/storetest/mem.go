@@ -349,10 +349,8 @@ func (m *Mem) Trim(ctx context.Context, stream string, specs []retention.TrimSpe
 			return false
 		}
 		for _, sp := range specs {
-			// A per-row store fails closed: no removal without a committed covering
-			// rollup, whatever RequireRolled says (D7 rev 2.3).
-			needRolled := sp.RequireRolled || m.mode == retention.TrimPerRow
-			if r.Class == sp.Class && !r.At.After(sp.Before) && (!needRolled || r.Rolled) {
+			// No removal without a committed covering rollup, in either mode (D7 rev 2.3.1).
+			if r.Class == sp.Class && !r.At.After(sp.Before) && r.Rolled {
 				return true
 			}
 		}
