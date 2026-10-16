@@ -1,0 +1,275 @@
+{
+  "schema": "eventstage.rules/v1",
+  "id": "default",
+  "version": "2026-10-16.1",
+  "rules": [
+    {
+      "id": "task-blocked",
+      "match": {
+        "kind": [
+          "task.state_changed"
+        ],
+        "payload": [
+          {
+            "path": "/to",
+            "equals": "blocked"
+          }
+        ]
+      },
+      "set": {
+        "severity": "warning",
+        "labels": [
+          "blocked"
+        ]
+      }
+    },
+    {
+      "id": "tool-failed",
+      "match": {
+        "kind": [
+          "tool.call.finished"
+        ],
+        "payload": [
+          {
+            "path": "/ok",
+            "equals": "false"
+          }
+        ]
+      },
+      "set": {
+        "severity": "error",
+        "labels": [
+          "tool-failure"
+        ]
+      }
+    },
+    {
+      "id": "gate-failed",
+      "match": {
+        "kind": [
+          "gate.evaluated"
+        ],
+        "payload": [
+          {
+            "path": "/result",
+            "in": [
+              "fail",
+              "blocked"
+            ]
+          }
+        ]
+      },
+      "set": {
+        "severity": "warning",
+        "labels": [
+          "gate-not-passed"
+        ]
+      }
+    },
+    {
+      "id": "sanitize-failed",
+      "match": {
+        "kind": [
+          "*"
+        ],
+        "sanitized": false
+      },
+      "set": {
+        "severity": "warning",
+        "labels": [
+          "sanitize-failed"
+        ]
+      }
+    },
+    {
+      "id": "any-agent",
+      "match": {
+        "kind": [
+          "agent.*"
+        ]
+      },
+      "set": {
+        "labels": [
+          "agent"
+        ]
+      }
+    },
+    {
+      "id": "slow-call",
+      "match": {
+        "kind": [
+          "tool.call.finished"
+        ],
+        "payload": [
+          {
+            "path": "/duration_ms",
+            "matches": "^[0-9]{5,}$"
+          }
+        ]
+      },
+      "set": {
+        "labels": [
+          "slow"
+        ]
+      }
+    },
+    {
+      "id": "custom-alert",
+      "match": {
+        "kind": [
+          "custom.alert_raised"
+        ]
+      },
+      "set": {
+        "category": "alert",
+        "severity": "error",
+        "labels": [
+          "custom"
+        ]
+      }
+    }
+  ],
+  "tests": [
+    {
+      "name": "blocked task is a warning",
+      "event": {
+        "kind": "task.state_changed",
+        "payload": {
+          "to": "blocked"
+        }
+      },
+      "want": {
+        "category": "state",
+        "severity": "warning",
+        "labels": [
+          "blocked"
+        ]
+      }
+    },
+    {
+      "name": "task moving to done is untouched",
+      "event": {
+        "kind": "task.state_changed",
+        "severity": "info",
+        "payload": {
+          "to": "done"
+        }
+      },
+      "want": {
+        "severity": "info"
+      }
+    },
+    {
+      "name": "failed tool call is an error and slow when over 10s",
+      "event": {
+        "kind": "tool.call.finished",
+        "payload": {
+          "ok": false,
+          "duration_ms": 12000
+        }
+      },
+      "want": {
+        "category": "tool",
+        "severity": "error",
+        "labels": [
+          "slow",
+          "tool-failure"
+        ]
+      }
+    },
+    {
+      "name": "severity never falls",
+      "event": {
+        "kind": "gate.evaluated",
+        "severity": "critical",
+        "payload": {
+          "result": "fail"
+        }
+      },
+      "want": {
+        "category": "state",
+        "severity": "critical",
+        "labels": [
+          "gate-not-passed"
+        ]
+      }
+    },
+    {
+      "name": "an existing category is kept",
+      "event": {
+        "kind": "gate.evaluated",
+        "category": "audit",
+        "payload": {
+          "result": "blocked"
+        }
+      },
+      "want": {
+        "category": "audit",
+        "severity": "warning",
+        "labels": [
+          "gate-not-passed"
+        ]
+      }
+    },
+    {
+      "name": "fail-closed payload is labelled",
+      "event": {
+        "kind": "message.sent",
+        "sanitized": false,
+        "payload": {
+          "sanitize_error": "oversized"
+        }
+      },
+      "want": {
+        "category": "message",
+        "severity": "warning",
+        "labels": [
+          "sanitize-failed"
+        ]
+      }
+    },
+    {
+      "name": "kind wildcard",
+      "event": {
+        "kind": "agent.permission_requested"
+      },
+      "want": {
+        "labels": [
+          "agent"
+        ]
+      }
+    },
+    {
+      "name": "a rule can set a category for an uncatalogued kind",
+      "event": {
+        "kind": "custom.alert_raised"
+      },
+      "want": {
+        "category": "alert",
+        "severity": "error",
+        "labels": [
+          "custom"
+        ]
+      }
+    },
+    {
+      "name": "the catalog fills an empty category",
+      "event": {
+        "kind": "approval.requested"
+      },
+      "want": {
+        "category": "approval"
+      }
+    },
+    {
+      "name": "a tombstoned event has no payload to match",
+      "event": {
+        "kind": "task.state_changed",
+        "payload_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "want": {
+        "category": "state"
+      }
+    }
+  ]
+}
