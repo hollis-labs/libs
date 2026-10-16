@@ -29,6 +29,17 @@ func TestDurationRoundTrip(t *testing.T) {
 			t.Errorf("ParseDuration(%q) = %v, %v; want %v", in, got, err, want)
 		}
 	}
+	// Overflow is an error, never a wrapped negative duration.
+	for _, big := range []string{"300y", "106752d", "9999999999999999d", "1000000w", "15251w", "9223372036854775807d", "9223372036854775807y", "2562048h"} {
+		if d, err := retention.ParseDuration(big); err == nil {
+			t.Errorf("ParseDuration(%q) = %v, want an overflow error", big, d)
+		}
+	}
+	for _, edge := range []string{"290y", "106751d", "15250w"} { // just inside int64 nanoseconds (about 292 years)
+		if d, err := retention.ParseDuration(edge); err != nil || d <= 0 {
+			t.Errorf("ParseDuration(%q) = %v, %v", edge, d, err)
+		}
+	}
 	for _, bad := range []string{"-1d", "d", "1.5d", "10x", "abc"} {
 		if _, err := retention.ParseDuration(bad); err == nil {
 			t.Errorf("ParseDuration(%q) succeeded", bad)
@@ -228,5 +239,39 @@ func TestTierAt(t *testing.T) {
 	}
 	if got := p.PayloadMax(retention.Attrs{Category: "state"}); got != retention.D(180*retention.Day) {
 		t.Errorf("state payload max = %v", got)
+	}
+}
+
+// Struct literals bypass the parser, so Resolve rejects negative durations itself.
+func TestResolveRejectsNegativeDurations(t *testing.T) {
+	neg := retention.Duration(-time.Hour)
+	for name, c := range map[string]retention.Config{
+		"full":     {Classes: map[string]retention.ClassPolicy{retention.ClassState: {Full: neg}}},
+		"envelope": {Classes: map[string]retention.ClassPolicy{retention.ClassState: {Full: retention.D(retention.Day), Envelope: neg}}},
+		"rollup":   {Classes: map[string]retention.ClassPolicy{retention.ClassState: {Full: retention.D(retention.Day), Rollups: []retention.Rollup{{Bucket: retention.D(time.Hour), Keep: neg}}}}},
+		"pii":      {Overrides: &retention.Overrides{PII: retention.PIIOverride{PayloadMax: &neg}}, Acknowledge: true},
+		"audit":    {Classes: map[string]retention.ClassPolicy{retention.ClassAudit: {Full: neg}}, Acknowledge: true},
+	} {
+		if _, err := c.Resolve(); !errors.Is(err, retention.ErrInvalid) {
+			t.Errorf("%s: err = %v, want ErrInvalid", name, err)
+		}
+	}
+}
+
+// A typo in a class name must not silently leave the real class at its default.
+func TestUnknownClassNameIsRejected(t *testing.T) {
+	c := retention.Config{Classes: map[string]retention.ClassPolicy{"R-audt": {Full: retention.D(retention.Day)}}}
+	_, err := c.Resolve()
+	if !errors.Is(err, retention.ErrInvalid) || !strings.Contains(err.Error(), "R-audt") {
+		t.Fatalf("err = %v, want ErrInvalid naming the class", err)
+	}
+}
+
+func TestForeverFullWithFiniteEnvelopeWarns(t *testing.T) {
+	c := retention.Config{Classes: map[string]retention.ClassPolicy{
+		retention.ClassState: {Full: retention.Forever, Envelope: retention.D(retention.Year)}}}
+	p := mustResolve(t, c)
+	if len(p.Warnings) != 1 || !strings.Contains(p.Warnings[0], retention.ClassState) {
+		t.Fatalf("warnings = %v", p.Warnings)
 	}
 }

@@ -118,6 +118,7 @@ func (c Config) Resolve() (*Policy, error) {
 
 	var errs []error
 	var warns []string
+	known := []string{ClassAudit, ClassState, ClassActivity, ClassDebug}
 	names := make([]string, 0, len(classes))
 	for k := range classes {
 		names = append(names, k)
@@ -125,9 +126,21 @@ func (c Config) Resolve() (*Policy, error) {
 	sort.Strings(names)
 	for _, name := range names {
 		p := classes[name]
-		if name == "" {
-			errs = append(errs, errors.New("class name must not be empty"))
+		if !slices.Contains(known, name) {
+			errs = append(errs, fmt.Errorf("unknown class %q (events are only classified into %v)", name, known))
 			continue
+		}
+		if p.Full < 0 || p.Envelope < 0 {
+			errs = append(errs, fmt.Errorf("class %s: durations must not be negative", name))
+			continue
+		}
+		if p.Full == 0 && p.Envelope != 0 {
+			warns = append(warns, fmt.Sprintf("class %s keeps whole rows forever, so its envelope age %s never applies", name, p.Envelope))
+		}
+		for i, r := range p.Rollups {
+			if r.Keep < 0 {
+				errs = append(errs, fmt.Errorf("class %s: rollup %d keep must not be negative", name, i))
+			}
 		}
 		if p.Full != 0 && p.Envelope != 0 && p.Envelope < p.Full {
 			errs = append(errs, fmt.Errorf("class %s: envelope age %s is shorter than full age %s", name, p.Envelope, p.Full))
@@ -140,6 +153,9 @@ func (c Config) Resolve() (*Policy, error) {
 		if hasDuplicateBuckets(p.Rollups) {
 			errs = append(errs, fmt.Errorf("class %s: duplicate rollup bucket", name))
 		}
+	}
+	if piiMax < 0 {
+		errs = append(errs, errors.New("pii payload_max must not be negative"))
 	}
 	// Guarded changes.
 	if piiMax == Forever || piiMax > D(DefaultPIIPayloadMax) {

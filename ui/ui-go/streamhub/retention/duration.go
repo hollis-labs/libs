@@ -3,6 +3,7 @@ package retention
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,11 @@ func ParseDuration(s string) (Duration, error) {
 		n, err := strconv.ParseInt(s[:len(s)-1], 10, 64)
 		if err != nil || n < 0 {
 			return 0, fmt.Errorf("retention: bad duration %q", s)
+		}
+		// A product past MaxInt64 would wrap negative and make every row
+		// look expired the moment it is written.
+		if n > math.MaxInt64/int64(unit) {
+			return 0, fmt.Errorf("retention: duration %q is too long (the maximum is about 290 years)", s)
 		}
 		return Duration(time.Duration(n) * unit), nil
 	}
