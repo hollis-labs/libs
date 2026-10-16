@@ -377,11 +377,8 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 	var eargs []any
 	for i, sp := range specs {
 		by[sp.Class] = sp
-		c := `(class=$` + itoa(3+2*i) + ` AND at <= $` + itoa(4+2*i)
-		if sp.RequireRolled {
-			c += ` AND rolled`
-		}
-		conds = append(conds, c+`)`)
+		// A row is removed only once a covering rollup counted it (the rolled flag).
+		conds = append(conds, `(class=$`+itoa(3+2*i)+` AND at <= $`+itoa(4+2*i)+` AND rolled)`)
 		eargs = append(eargs, sp.Class, sp.Before.UTC())
 	}
 	anyEligible := strings.Join(conds, " OR ")
@@ -420,7 +417,7 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 				return 0, err
 			}
 			sp, ok := by[class]
-			if !ok || at.After(sp.Before) || (sp.RequireRolled && !rolled) {
+			if !ok || at.After(sp.Before) || !rolled {
 				stopped = true
 				break
 			}
