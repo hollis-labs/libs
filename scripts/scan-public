@@ -241,20 +241,29 @@ def run_gitleaks(repo, mode, tmpdir, refs=(), ignore_path=None):
     """Run gitleaks `dir` (tree) or `git` (history). Returns (entries, error or None)."""
     report = os.path.join(tmpdir, "gitleaks-%s.json" % mode)
     scan_repo = repo
+    original_paths = {}
     if ignore_path is None:
         ignore_path = os.path.join(tmpdir, "empty.gitleaksignore")
         with open(ignore_path, "w"):
             pass
         # Gitleaks also loads SOURCE/.gitleaksignore even when an explicit
         # empty ignore path is supplied. Never mutate the repository being
-        # inspected: scan a temporary tree without native ignore files, or
+        # inspected: scan a temporary tree with ignore files renamed as data, or
         # point history scanning at Git's metadata directory instead.
         if mode == "dir" and os.path.lexists(os.path.join(repo, ".gitleaksignore")):
             scan_repo = os.path.join(tmpdir, "raw-tree")
             shutil.copytree(
                 repo, scan_repo, symlinks=True,
-                ignore=shutil.ignore_patterns(".git", ".gitleaksignore"),
+                ignore=shutil.ignore_patterns(".git"),
             )
+            for directory, _, files in os.walk(scan_repo):
+                if ".gitleaksignore" not in files:
+                    continue
+                original = os.path.join(directory, ".gitleaksignore")
+                fd, neutral = tempfile.mkstemp(prefix=".scan-public-ignore-data-", dir=directory)
+                os.close(fd)
+                os.replace(original, neutral)
+                original_paths[os.path.relpath(neutral, scan_repo)] = os.path.relpath(original, scan_repo)
         elif mode == "git":
             gitdir = subprocess.run(
                 ["git", "-C", repo, "rev-parse", "--absolute-git-dir"],
@@ -276,7 +285,15 @@ def run_gitleaks(repo, mode, tmpdir, refs=(), ignore_path=None):
         return [], None
     try:
         with open(report) as fh:
-            return json.load(fh) or [], None
+            entries = json.load(fh) or []
+        for entry in entries:
+            path = entry.get("File", "")
+            if path in original_paths:
+                entry["File"] = original_paths[path]
+                fingerprint = entry.get("Fingerprint", "")
+                if fingerprint.startswith(path + ":"):
+                    entry["Fingerprint"] = original_paths[path] + fingerprint[len(path):]
+        return entries, None
     except ValueError as e:
         return [], "gitleaks %s wrote an unreadable report: %s" % (mode, e)
 
