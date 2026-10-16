@@ -1,0 +1,29 @@
+# security/redact: scripts/scan-public findings that were read and judged not to be exposure.
+# Every entry is a test of the redactor: the matched line is an invented, credential-shaped
+# string (or a placeholder path or host) that the test feeds to the redactor to prove it is
+# removed or left alone. Each line was read before it was listed. Credential-shaped values
+# that can be assembled at run time are (see corpus_test.go); the rest are plain text cases
+# whose shape is the point of the test.
+# Format: RULE-ID  PATH-GLOB  REASON (one line).
+
+bearer-token  security/redact/corpus_test.go  invented bearer-style value in a header-redaction case; made up, not issued by any service; test-only
+credentials-in-url  security/redact/corpus_test.go  made-up user info on the reserved example host, fed to the redactor to prove it is removed; test-only
+credentials-in-url  security/redact/redact_test.go  made-up user info on the reserved example host, fed to the redactor to prove it is removed; test-only
+credentials-in-url  security/redact/structured_test.go  made-up user info on a reserved example host inside an argv and environment redaction test; test-only
+curl-auth-header  security/redact/corpus_test.go  invented bearer-style value inside a sample curl command that the redactor must scrub; made up; test-only
+curl-auth-user  security/redact/corpus_test.go  invented user:password pair in a sample curl command that the redactor must scrub; made up; test-only
+generic-api-key  security/redact/corpus_test.go  invented key-shaped values in redaction conformance cases; each is labelled synthetic or is an obvious placeholder; test-only
+generic-api-key  security/redact/redact_test.go  invented key-shaped value in a redaction test; made up; test-only
+generic-api-key  security/redact/scope_test.go  invented assignment in a concurrency test of the redactor; made up; test-only
+generic-api-key  security/redact/structured_test.go  invented key-shaped values in JSON, argv and environment redaction tests; made up; test-only
+home-path-linux  security/redact/corpus_test.go  generic placeholder home directory in a false-positive case (text the redactor must leave alone); not a real user path
+home-path-linux  security/redact/structured_test.go  generic placeholder home directory value in an environment redaction test; not a real user path
+private-key  security/redact/corpus_test.go  PEM header and footer lines wrapped around obviously fake filler text, to test private-key redaction; no key material
+private-key  security/redact/fuzz_test.go  a PEM header with no body, as a fuzz seed for the private-key rule; no key material
+private-key  security/redact/redact_test.go  a PEM header with fake filler text, to test redaction of a truncated block; no key material
+secret-assignment  security/redact/corpus_test.go  invented password and secret assignments in redaction conformance cases; made up; test-only
+secret-assignment  security/redact/example_test.go  invented password in the package example that shows redaction; made up; test-only
+secret-assignment  security/redact/redact_test.go  invented password assignments in redaction tests; made up; test-only
+secret-assignment  security/redact/structured_test.go  invented password assignments in JSON redaction tests; made up; test-only
+stripe-access-token  security/redact/corpus_test.go  invented value shaped like a payment-provider key in a CLI-flag redaction case; made up, not issued; test-only
+stripe-key  security/redact/corpus_test.go  invented value shaped like a payment-provider key in a CLI-flag redaction case; made up, not issued; test-only
