@@ -42,6 +42,9 @@ func TestCatalogIsConsistent(t *testing.T) {
 		if !kindName.MatchString(e.Kind) && !legacyNames[e.Kind] {
 			t.Errorf("kind %q does not follow %s", e.Kind, c.Naming)
 		}
+		if strings.HasPrefix(e.Kind, "stream.") {
+			t.Errorf("kind %q uses the reserved transport-control prefix stream.", e.Kind)
+		}
 		if !slices.Contains(c.Categories, e.Category) {
 			t.Errorf("kind %q has unknown category %q", e.Kind, e.Category)
 		}

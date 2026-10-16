@@ -10,6 +10,8 @@ Every row has one of these outcomes:
 - **local**: the kind stays inside the producer (its own table, SSE or UI channel) and does not go on the shared bus in v1.1. A lane may propose promoting it later; promotion means a catalog PR.
 - **name pending**: the kind belongs on the bus, but its current name breaks the naming rule. The producer lane proposes a name in a catalog PR. Until then it stays local.
 
+**Reserved: `stream.*` is transport control, not events.** A `stream.*` signal (such as `stream.gap`, which carries `reason`, `earliest_available` and `high_water`) tells one subscriber about its own delivery. It is never registered in `catalog.json`, never persisted in a durable log, never given an `evt_` id, and never relayed or federated. A transport may carry it in its event frame shape so consumers can switch on the kind; consumers already tolerate kinds they do not know.
+
 When the old kind's meaning is a transition, the producer carries the old detail in the successor's payload: `reason`, `trigger.kind`, and `outcome` for approvals.
 
 Inventory sources, read 2026-10-16:
