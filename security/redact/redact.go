@@ -230,29 +230,27 @@ func (r *Redactor) scanExcept(s string, observe func(string), skip string) []Fin
 	v := newView(s)
 	st := newScanText(v.text)
 	var raw []Finding
+	name := ""
+	// Finders run synchronously. Reuse one callback per scan, instead of making
+	// an escaping closure for every rule and every JSON leaf.
+	add := func(a, b int) {
+		if b > a {
+			raw = append(raw, Finding{name, v.at(a), v.at(b)})
+			if observe != nil {
+				observe(name)
+			}
+		}
+	}
 	for _, rl := range r.rules {
 		if rl.name == skip {
 			continue
 		}
-		name := rl.name
-		rl.find(r, st, func(a, b int) {
-			if b > a {
-				raw = append(raw, Finding{name, v.at(a), v.at(b)})
-				if observe != nil {
-					observe(name)
-				}
-			}
-		})
+		name = rl.name
+		rl.find(r, st, add)
 	}
 	if r.scope != nil {
-		r.scope.find(v.text, func(a, b int) {
-			if b > a {
-				raw = append(raw, Finding{RuleScope, v.at(a), v.at(b)})
-				if observe != nil {
-					observe(RuleScope)
-				}
-			}
-		})
+		name = RuleScope
+		r.scope.find(v.text, add)
 	}
 	return merge(raw)
 }
