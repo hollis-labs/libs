@@ -422,3 +422,46 @@ func TestPrunesExpiredRollups(t *testing.T) {
 		t.Fatalf("buckets %d, report %+v", len(m.Buckets("env")), rep.Classes[retention.ClassDebug])
 	}
 }
+
+// A dry-run count gets the rest of the pass budget as its MaxDuration, so a
+// huge table cannot make a dry run unbounded.
+func TestDryRunCountsAreBoundedByTheElapsedBudget(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seed(t, m, state(0, "x"))
+	var got []time.Duration
+	h := &durStore{Store: m, got: &got}
+	_, err := jan(t, h, retention.WithDryRun(true), retention.WithBudget(retention.Budget{MaxElapsed: 5 * time.Second})).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) == 0 {
+		t.Fatal("no dry-run call seen")
+	}
+	for _, d := range got {
+		if d <= 0 || d > 5*time.Second {
+			t.Fatalf("dry-run MaxDuration = %v, want within (0, 5s]", d)
+		}
+	}
+	// And a normal pass keeps the per-transaction bound.
+	got = nil
+	if _, err := jan(t, h, retention.WithMaxTxDuration(40*time.Millisecond)).Run(context.Background(), base.Add(400*day)); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range got {
+		if d != 40*time.Millisecond {
+			t.Fatalf("write-call MaxDuration = %v, want 40ms", d)
+		}
+	}
+}
+
+type durStore struct {
+	retention.Store
+	got *[]time.Duration
+}
+
+func (d *durStore) Tombstone(ctx context.Context, s string, sp retention.TombstoneSpec, op retention.Op) (retention.Result, error) {
+	if !(op.DryRun && op.Limit == 0) { // ignore the report's own backlog counts
+		*d.got = append(*d.got, op.MaxDuration)
+	}
+	return d.Store.Tombstone(ctx, s, sp, op)
+}

@@ -186,7 +186,13 @@ func (p *pass) over() bool {
 }
 
 func (p *pass) op() Op {
-	return Op{Limit: p.j.txRows, MaxDuration: p.j.txDur, DryRun: p.j.dryRun}
+	op := Op{Limit: p.j.txRows, MaxDuration: p.j.txDur, DryRun: p.j.dryRun}
+	if p.j.dryRun && p.j.budget.MaxElapsed > 0 {
+		// A dry-run count is one statement over possibly millions of rows: it
+		// gets what is left of the pass budget, not the per-transaction slice.
+		op.MaxDuration = max(p.j.budget.MaxElapsed-p.j.elapsed().Sub(p.start), time.Millisecond)
+	}
+	return op
 }
 
 // Run does one pass over every stream. It returns a non-nil error only for
