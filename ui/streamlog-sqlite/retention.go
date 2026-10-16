@@ -368,12 +368,9 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 	eligibleSQL := make([]string, 0, len(specs))
 	var eargs []any
 	for _, sp := range specs {
-		cond := `(class=? AND at_ns <= ?`
+		// A row is removed only once a covering rollup counted it (the rolled flag).
+		eligibleSQL = append(eligibleSQL, `(class=? AND at_ns <= ? AND rolled=1)`)
 		eargs = append(eargs, sp.Class, sp.Before.UnixNano())
-		if sp.RequireRolled {
-			cond += ` AND rolled=1`
-		}
-		eligibleSQL = append(eligibleSQL, cond+`)`)
 	}
 	anyEligible := strings.Join(eligibleSQL, " OR ")
 
@@ -407,7 +404,7 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 				return err
 			}
 			sp, ok := by[class]
-			if !ok || at > sp.Before.UnixNano() || (sp.RequireRolled && !rolled) {
+			if !ok || at > sp.Before.UnixNano() || !rolled {
 				stopped = true
 				break
 			}
