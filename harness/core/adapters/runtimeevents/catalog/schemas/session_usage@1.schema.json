@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:session_usage@1",
+  "title": "session_usage@1",
+  "description": "Cumulative token usage of one session since it started, reported at turn end (the envelope turn_id is the turn just completed) and once at session end (final=true). Totals only ever grow, so a consumer that missed a report still sees the right totals on the next one. It is an observation: cost and pricing belong to the usage ledger, never to this event. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "input_tokens",
+    "output_tokens",
+    "turns"
+  ],
+  "properties": {
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cache_read_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cache_write_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reasoning_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "turns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "model": {
+      "type": "string"
+    },
+    "final": {
+      "type": "boolean"
+    },
+    "source": {
+      "enum": [
+        "provider",
+        "estimated"
+      ],
+      "description": "provider: counts reported by the provider; estimated: derived by the producer"
+    }
+  }
+}

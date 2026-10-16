@@ -39,6 +39,8 @@ const (
 	KindInterruptAcknowledged         = "interrupt.acknowledged"
 	KindTaskStateChanged              = "task.state_changed"
 	KindRunStateChanged               = "run.state_changed"
+	KindSessionUsage                  = "session.usage"
+	KindSessionHealthChanged          = "session.health_changed"
 	KindSessionStateChanged           = "session.state_changed"
 	KindCheckpointStateChanged        = "checkpoint.state_changed"
 	KindSprintStateChanged            = "sprint.state_changed"

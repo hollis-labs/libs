@@ -23,6 +23,11 @@ All notable changes to the `harness` module are documented here (the module was 
   new) with payload schema `subagent_stop@1` (`subagent_id`, `outcome`
   required); `parent_id` is the matching `agent.subagent_spawn` event.
   `KindAgentSubagentStop` constant.
+- `adapters/runtimeevents/catalog`: kinds `session.usage` (activity,
+  `session_usage@1`: cumulative token totals at turn end and session end; an
+  observation, never cost) and `session.health_changed` (state,
+  `session_health_changed@1`: healthy, degraded, unhealthy or unknown, emitted
+  only on change).
 - `Actor` documents the `device` kind for machine principals (mesh/core
   `ActorDevice`, next mesh/core minor).
 
