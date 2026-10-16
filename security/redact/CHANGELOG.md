@@ -20,6 +20,10 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ### Changed
 
+- Avoid intermediate JSON string buffers and redundant ASCII-lowercase copies
+  in the sanitizer hot path; returned buffers remain independently owned.
+- Reuse a synchronous scan callback across rules to reduce per-payload allocation;
+  add a Linux process-CPU benchmark alongside sampled wall-clock p99.
 - Normalize structured key names (strip format characters, then NFKC), and
   recognize joined secret-key words. Adds the pinned x/text normalization dependency.
 - Mask all non-allowlisted report key segments, classify dropped fields from
