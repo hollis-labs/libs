@@ -29,6 +29,10 @@ func dsn(t testing.TB) string {
 	t.Helper()
 	d := os.Getenv("STREAMLOG_PG_DSN")
 	if d == "" {
+		if os.Getenv("CI") == "true" {
+			// A missing server in CI must not turn into a green run that never ran the tests.
+			t.Fatal("STREAMLOG_PG_DSN is not set in CI: the PostgreSQL service did not start")
+		}
 		t.Skip("STREAMLOG_PG_DSN not set; skipping PostgreSQL tests")
 	}
 	return d
