@@ -151,13 +151,46 @@ func TestClassOf(t *testing.T) {
 	}
 }
 
-// Open question for the architect (see the PR): by the literal "most
-// restrictive wins" rule a debug-severity audit event is R-debug. This test
-// pins the current behaviour so a change is deliberate.
-func TestDebugAuditEventFollowsTheLiteralRule(t *testing.T) {
+// D7 rev 2.1: a severity tag never shortens audit retention, and debug moves
+// every other class to R-debug (even when an operator made R-debug longer).
+func TestDebugSeverityNeverDowngradesAudit(t *testing.T) {
 	p := mustResolve(t, retention.Config{})
-	if got := p.ClassOf(retention.Attrs{Category: "audit", Severity: "debug"}); got != retention.ClassDebug {
-		t.Fatalf("got %s", got)
+	for _, cat := range []string{"audit", "approval"} {
+		if got := p.ClassOf(retention.Attrs{Category: cat, Severity: "debug"}); got != retention.ClassAudit {
+			t.Errorf("%s with debug severity = %s, want R-audit", cat, got)
+		}
+		if got := p.TierAt(retention.Attrs{Category: cat, Severity: "debug"}, 10*retention.Year); got != retention.TierFull {
+			t.Errorf("%s debug at 10y = %v, want full", cat, got)
+		}
+	}
+	long := retention.Config{Classes: map[string]retention.ClassPolicy{
+		retention.ClassDebug: {Full: retention.D(400 * retention.Day), Envelope: retention.D(400 * retention.Day)}}}
+	pl := mustResolve(t, long)
+	if got := pl.ClassOf(retention.Attrs{Category: "state", Severity: "debug"}); got != retention.ClassDebug {
+		t.Errorf("debug state = %s, want R-debug even when R-debug is configured longer", got)
+	}
+}
+
+// The pii cap applies to the payload only; an audit event keeps its envelope
+// forever.
+func TestPIIAuditCapsPayloadKeepsEnvelopeForever(t *testing.T) {
+	p := mustResolve(t, retention.Config{})
+	a := retention.Attrs{Category: "audit", PII: true}
+	if got := p.PayloadMax(a); got != retention.D(30*retention.Day) {
+		t.Fatalf("payload max = %v, want 30d", got)
+	}
+	for age, want := range map[time.Duration]retention.Tier{
+		29 * retention.Day:  retention.TierFull,
+		31 * retention.Day:  retention.TierEnvelope,
+		50 * retention.Year: retention.TierEnvelope, // never trimmed: the envelope follows R-audit
+	} {
+		if got := p.TierAt(a, age); got != want {
+			t.Errorf("pii audit at %v = %v, want %v", age, got, want)
+		}
+	}
+	// A debug-severity pii audit event is still R-audit.
+	if got := p.ClassOf(retention.Attrs{Category: "audit", PII: true, Severity: "debug"}); got != retention.ClassAudit {
+		t.Errorf("class = %s", got)
 	}
 }
 
@@ -195,9 +228,5 @@ func TestTierAt(t *testing.T) {
 	}
 	if got := p.PayloadMax(retention.Attrs{Category: "state"}); got != retention.D(180*retention.Day) {
 		t.Errorf("state payload max = %v", got)
-	}
-	// A pii audit event gets a tombstoned payload even though its class is forever.
-	if got := p.TierAt(retention.Attrs{Category: "audit", PII: true}, 31*retention.Day); got != retention.TierEnvelope {
-		t.Errorf("pii audit at 31d = %v", got)
 	}
 }

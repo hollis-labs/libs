@@ -40,26 +40,27 @@ var categoryClass = map[string]string{
 	"activity": ClassActivity, "tool": ClassActivity, "progress": ClassActivity, "data": ClassActivity,
 }
 
-// ClassOf names the retention class of an event. Category picks a class; a
-// debug severity also matches R-debug. When several match, the most
-// restrictive wins: the one that keeps whole rows for the shortest time. An
-// unknown or empty category is R-activity, the shortest of the categorized
-// classes that is not debug-only, so nothing falls through unbounded.
+// ClassOf names the retention class of an event (D7 rev 2.1). The category
+// picks the class; an unknown or empty category is R-activity so nothing falls
+// through unbounded. A debug severity moves the event to R-debug for every
+// class except R-audit: a severity tag never shortens audit retention. The
+// "most restrictive wins" rule is not used here; it applies only to the
+// payload privacy overrides (see [Policy.PayloadMax]).
 func (p *Policy) ClassOf(a Attrs) string {
 	class, ok := categoryClass[a.Category]
 	if !ok {
 		class = ClassActivity
 	}
-	if a.Severity == "debug" {
-		if shorterThan(p.Classes[ClassDebug].Full, p.Classes[class].Full) {
-			class = ClassDebug
-		}
+	if a.Severity == "debug" && class != ClassAudit {
+		class = ClassDebug
 	}
 	return class
 }
 
 // PayloadMax is how long an event's payload may stay whole: the class's Full,
-// capped by the pii override when the event is flagged pii. Zero is forever.
+// capped by the pii override when the event is flagged pii (the most
+// restrictive of the two wins, in every class including R-audit). The cap
+// applies to the payload only; the envelope follows the class. Zero is forever.
 // Secret payloads are never stored; callers must not rely on this for them.
 func (p *Policy) PayloadMax(a Attrs) Duration {
 	full := p.Classes[p.ClassOf(a)].Full
