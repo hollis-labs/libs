@@ -15,6 +15,8 @@
 //	go test ./adapters/runtimeevents/catalog -run TestGenerated -update
 //
 // mapping.md maps the kinds each producer emits today onto this catalog.
+// selfreport.md, with [EffectiveProgressDetail] and [ToolSchema], is the
+// progress_detail setting and the agent self-report call contract.
 package catalog
 
 import (

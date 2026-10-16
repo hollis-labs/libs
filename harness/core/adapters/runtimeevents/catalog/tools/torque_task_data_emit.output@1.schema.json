@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:tools:torque_task_data_emit.output@1",
+  "title": "torque_task_data_emit output@1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "data_ref"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "data_ref": {
+      "type": "string"
+    },
+    "duplicate": {
+      "type": "boolean"
+    }
+  }
+}

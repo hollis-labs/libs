@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:tools:torque_task_data_emit.input@1",
+  "title": "torque_task_data_emit input@1",
+  "description": "Emit structured data for a task as data.emitted. Inline data is capped at 16 KiB serialized; larger bodies go in an artifact first and are referenced by artifact_id. Not gated by progress_detail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "schema"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "pattern": "^[^@\\s]+@[0-9]+$",
+      "description": "payload schema id@version"
+    },
+    "data": {
+      "type": "object",
+      "description": "inline data, at most 16384 bytes serialized"
+    },
+    "artifact_id": {
+      "type": "string",
+      "description": "existing artifact on the same task"
+    },
+    "label": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "idempotency_key": {
+      "type": "string",
+      "maxLength": 128
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "data"
+      ]
+    },
+    {
+      "required": [
+        "artifact_id"
+      ]
+    }
+  ]
+}

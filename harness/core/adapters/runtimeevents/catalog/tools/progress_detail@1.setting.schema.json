@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:settings:progress_detail@1",
+  "title": "progress_detail@1",
+  "description": "Progress detail setting on a launch, task or template. Effective level = first set value of launch, task, template, else the default milestone.",
+  "enum": [
+    "off",
+    "milestone",
+    "step",
+    "verbose"
+  ]
+}

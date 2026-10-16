@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:tools:torque_task_progress.input@1",
+  "title": "torque_task_progress input@1",
+  "description": "Non-parking progress report. Never changes task status, never parks, never creates a checkpoint. Dropped (emitted=false) when level is above the effective progress_detail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "label"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "level": {
+      "enum": [
+        "milestone",
+        "step",
+        "verbose"
+      ],
+      "default": "step",
+      "description": "level of this report"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "data_ref": {
+      "type": "string",
+      "description": "artifact id or data.emitted event id"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "maxLength": 128
+    }
+  }
+}

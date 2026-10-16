@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:tools:torque_task_progress.output@1",
+  "title": "torque_task_progress output@1",
+  "type": "object",
+  "required": [
+    "emitted",
+    "effective_level",
+    "detail_source"
+  ],
+  "properties": {
+    "emitted": {
+      "type": "boolean"
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "effective_level": {
+      "enum": [
+        "off",
+        "milestone",
+        "step",
+        "verbose"
+      ]
+    },
+    "detail_source": {
+      "enum": [
+        "launch",
+        "task",
+        "template",
+        "default"
+      ]
+    },
+    "suppressed_reason": {
+      "enum": [
+        "below_detail",
+        "rate_limited",
+        "duplicate"
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "emitted": {
+        "const": true
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "event_id"
+    ]
+  },
+  "else": {
+    "required": [
+      "suppressed_reason"
+    ]
+  }
+}
