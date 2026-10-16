@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -603,6 +605,64 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		}
 		_ = a1
 		_ = keep
+	}))
+
+	t.Run("ConcurrentCallsCountEachRowOnce", guard(func(t *testing.T) {
+		f := newFixture(t)
+		for i := range 12 {
+			add(t, f, row(retention.ClassState, time.Duration(i)*time.Minute, "x"))
+		}
+		st := f.Store()
+		roll := retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}
+		tomb := retention.TombstoneSpec{Class: retention.ClassState, Before: t0.Add(day)}
+		var wg sync.WaitGroup
+		var rolled, tombed atomic.Int64
+		for range 4 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r, err := st.Rollup(ctx, "s", roll, retention.Op{Limit: 5})
+				if err == nil {
+					rolled.Add(r.Rows)
+				}
+				for {
+					tr, err := st.Tombstone(ctx, "s", tomb, retention.Op{Limit: 5})
+					if err != nil {
+						return
+					}
+					tombed.Add(tr.Rows)
+					if !tr.More {
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+		// Finish whatever the racing calls left, then check totals: each row exactly once.
+		for {
+			r := must(st.Rollup(ctx, "s", roll, retention.Op{}))
+			rolled.Add(r.Rows)
+			if !r.More {
+				break
+			}
+		}
+		for {
+			r := must(st.Tombstone(ctx, "s", tomb, retention.Op{}))
+			tombed.Add(r.Rows)
+			if !r.More {
+				break
+			}
+		}
+		if rolled.Load() != 12 || tombed.Load() != 12 {
+			t.Fatalf("rolled %d, tombstoned %d; each of 12 rows must be counted exactly once across racing calls", rolled.Load(), tombed.Load())
+		}
+		var counted uint64
+		for _, b := range f.Buckets("s") {
+			counted += b.Count
+		}
+		if counted != 12 {
+			t.Fatalf("buckets count %d rows, want 12", counted)
+		}
 	}))
 
 	t.Run("RowsOnHoldAreNeverTouched", guard(func(t *testing.T) {

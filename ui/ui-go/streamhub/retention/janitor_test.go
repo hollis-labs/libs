@@ -320,13 +320,14 @@ func TestJanitorErrorsAreCountedAndThePassContinues(t *testing.T) {
 	m := storetest.NewMem(retention.TrimHeadOnly)
 	seed(t, m, state(0, "x"))
 	seed(t, m, storetest.Row{At: base, Payload: []byte("t"), Attrs: retention.Attrs{Category: "tool"}})
-	h := &hookStore{Store: m, fail: func(string) error { return errors.New("disk is on fire") }}
-	rep, err := jan(t, h).Run(context.Background(), base.Add(400*day))
+	h := &hookStore{Store: m, fail: func(string) error { return errors.New("disk is on fire: payload secret-token-123") }}
+	var raw []string
+	rep, err := jan(t, h, retention.WithErrorLog(func(stream, class string, err error) { raw = append(raw, stream+"|"+class+"|"+err.Error()) })).Run(context.Background(), base.Add(400*day))
 	if err != nil {
 		t.Fatalf("a failing store call must not fail the pass: %v", err)
 	}
 	st := rep.Classes[retention.ClassState]
-	if st.Errors != 1 || st.FirstError != "disk is on fire" || st.Tombstoned != 0 {
+	if st.Errors != 1 || st.FirstError != "store_error" || st.Tombstoned != 0 {
 		t.Fatalf("state report = %+v", st)
 	}
 	if rep.Classes[retention.ClassActivity].Tombstoned != 1 {
@@ -334,6 +335,13 @@ func TestJanitorErrorsAreCountedAndThePassContinues(t *testing.T) {
 	}
 	if st.Backlog != 1 {
 		t.Fatalf("state backlog = %d, want 1 (the row it could not tombstone)", st.Backlog)
+	}
+	// The report never echoes the store's message (it can carry row content); the caller's own log does.
+	if b, _ := json.Marshal(rep.Summary()); strings.Contains(string(b), "secret-token") || strings.Contains(st.FirstError, "disk") {
+		t.Fatalf("a store message reached the report: %s / %q", b, st.FirstError)
+	}
+	if len(raw) != 1 || raw[0] != "env|store_error|disk is on fire: payload secret-token-123" {
+		t.Fatalf("error log = %v", raw)
 	}
 }
 
@@ -622,5 +630,64 @@ func TestReadGapPicksTheHighestWatermarkOnce(t *testing.T) {
 	}
 	if _, ok := retention.ReadGap(nil, 0); ok {
 		t.Fatal("no watermarks, no frame")
+	}
+}
+
+// A Resume token is bound to the effective policy id: after a configuration
+// change the pass starts over instead of skipping streams the new config has not seen.
+func TestResumeTokenIsBoundToThePolicyID(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	for _, stream := range []string{"a", "b", "c"} {
+		r := state(0, "x")
+		r.Stream = stream
+		r.Class = retention.ClassState
+		seed(t, m, r)
+	}
+	now := base.Add(400 * day)
+	first, err := jan(t, m, retention.WithPolicyID("cfg-1"), retention.WithBudget(retention.Budget{MaxRows: 3}), retention.WithMaxTxRows(1)).Run(context.Background(), now)
+	if err != nil || !first.StoppedEarly || first.Resume == "" {
+		t.Fatalf("first = %+v, %v", first, err)
+	}
+	// Same policy id: continues. Different id: starts over (stream "a" is visited again).
+	same, _ := jan(t, m, retention.WithPolicyID("cfg-1"), retention.WithBudget(retention.Budget{MaxRows: 100})).RunFrom(context.Background(), now, first.Resume)
+	other, _ := jan(t, m, retention.WithPolicyID("cfg-2"), retention.WithBudget(retention.Budget{MaxRows: 100})).RunFrom(context.Background(), now, first.Resume)
+	if other.Streams != 3 || same.Streams >= other.Streams {
+		t.Fatalf("streams visited: same-policy resume %d, other-policy resume %d; the latter must start over (3)", same.Streams, other.Streams)
+	}
+}
+
+// D7 rev 2.2: the current configuration decides each pass. Shortening reaches
+// rows that already exist; lengthening again restores nothing.
+func TestCurrentConfigGovernsEachPass(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	r := storetest.Row{Class: retention.ClassActivity, At: base.Add(100 * day), Payload: []byte("tool"), Attrs: retention.Attrs{Category: "tool"}}
+	id := seed(t, m, r)
+	now := base.Add(110 * day) // the row is 10 days old
+	run := func(c retention.Config) {
+		t.Helper()
+		p := mustResolve(t, c)
+		if _, err := retention.NewJanitor(m, retention.NewPlanner(p)).Run(context.Background(), now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tombstoned := func() bool {
+		for _, row := range m.Rows("env") {
+			if row.Seq == id {
+				return row.Tombstoned
+			}
+		}
+		return false
+	}
+	run(retention.Config{}) // defaults: activity keeps whole rows 30 days
+	if tombstoned() {
+		t.Fatal("tombstoned inside its 30d full age")
+	}
+	run(retention.Config{Classes: map[string]retention.ClassPolicy{retention.ClassActivity: {Full: retention.D(5 * day), Envelope: retention.D(180 * day)}}})
+	if !tombstoned() {
+		t.Fatal("shortening the age did not reach the existing row")
+	}
+	run(retention.Config{}) // back to 30 days
+	if !tombstoned() {
+		t.Fatal("lengthening the age restored a tombstoned payload")
 	}
 }
