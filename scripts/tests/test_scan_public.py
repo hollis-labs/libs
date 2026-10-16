@@ -45,6 +45,16 @@ class NativeIgnoreBoundaryTests(unittest.TestCase):
     def test_no_allowlist_ignores_native_exclusions(self):
         self.assert_detected(self.scan("--tree", "--no-allowlist"))
 
+    def test_raw_scan_preserves_root_and_nested_ignore_file_contents(self):
+        (self.root / ".gitleaksignore").write_text(self.marker)
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / ".gitleaksignore").write_text(self.marker)
+        result = self.scan("--tree", "--no-allowlist")
+        self.assert_detected(result)
+        self.assertIn("  .gitleaksignore:1", result.stdout)
+        self.assertIn("  nested/.gitleaksignore:1", result.stdout)
+
     def test_external_repo_cannot_supply_native_exclusions(self):
         other = Path(self.scratch.name) / "external"
         other.mkdir()
@@ -64,12 +74,16 @@ class NativeIgnoreBoundaryTests(unittest.TestCase):
         commit = git("rev-parse", "HEAD")
         with (self.root / ".gitleaksignore").open("a") as output:
             output.write(commit + ":fixture.txt:generic-api-key:1\n")
+            output.write(self.marker)
         git("add", "--", ".gitleaksignore")
         git("commit", "-q", "-m", "test ignore file", "--", ".gitleaksignore")
         result = self.scan("--source", str(self.root))
         self.assert_detected(result)
         self.assertIn("[tree]", result.stdout)
         self.assertIn("[history]", result.stdout)
+        findings = result.stdout.splitlines()
+        self.assertTrue(any("[tree]" in line and "  .gitleaksignore:" in line for line in findings))
+        self.assertTrue(any("[history]" in line and "  .gitleaksignore:" in line for line in findings))
 
 
 if __name__ == "__main__":
