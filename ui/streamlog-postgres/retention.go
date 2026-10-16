@@ -357,6 +357,17 @@ type querier interface {
 // Trim removes the contiguous prefix of eligible rows after pruned-through.
 func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retention.TrimSpec, op retention.Op) (retention.Result, error) {
 	res := retention.Result{ByClass: map[string]int64{}}
+	if err := ctx.Err(); err != nil {
+		return res, err
+	}
+	// R-audit rows are never removed, even when a caller names the class.
+	kept := specs[:0:0]
+	for _, sp := range specs {
+		if sp.Class != retention.ClassAudit {
+			kept = append(kept, sp)
+		}
+	}
+	specs = kept
 	if len(specs) == 0 {
 		return res, nil
 	}
@@ -460,6 +471,15 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 		_ = s.l.flushMarker(true)
 	}
 	return res, err
+}
+
+// Watermarks implements [retention.Store]: a head-only store has none; its
+// pruned cursor plays that part.
+func (s *retentionStore) Watermarks(ctx context.Context, _ string) (map[string]uint64, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return map[string]uint64{}, nil
 }
 
 func (s *retentionStore) Prune(ctx context.Context, stream string, sp retention.PruneSpec, op retention.Op) (retention.Result, error) {
