@@ -1,0 +1,2 @@
+# agent/core: imports of substrate agent; findings reviewed by the owner 2026-10-15 (placeholders, fixtures, commit messages).
+home-path-macos agent/core/agentcontext/provider_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.

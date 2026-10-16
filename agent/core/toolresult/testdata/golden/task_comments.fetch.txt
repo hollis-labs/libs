@@ -1,0 +1,6 @@
+=== fetch 0 error=false
+[Cached result <ID>; json_pointer="/data/comments/7/content"; bytes 0..49 of 49 (end-exclusive); has_more=false; next_offset=49]
+
+DEPLOYMENT VERIFIED; current code fixes discovery
+=== fetch 1 error=true
+Error: JSON pointer "/data/comments/9": invalid array index "9"
