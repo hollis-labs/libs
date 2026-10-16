@@ -3,10 +3,12 @@
 All notable changes to the `util` module are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`util/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`core/util/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
+
+## v0.5.0 — 2026-10-16
 
 ### Added
 - `otel/redaction.Exporter`: a `sdktrace.SpanExporter` wrapper that forwards redacted copies of spans: denylisted attribute keys dropped (span, event, link), denylisted event names lose their attributes, and an injected `WithValueRedactor(func(string) string)` scrubs every exported string. `WithKeyFilter` replaces the key decision. Tested against a recording exporter.
@@ -17,6 +19,9 @@ All notable changes to the `util` module are documented here. The format follows
 
 ### Deprecated
 - `otel/redaction.SpanProcessor` did nothing (`OnEnd` ignored the span; a processor only sees read-only spans) and gave no protection. It is kept for source compatibility; use `Exporter`.
+
+### Fixed
+- `otel/propagation`: the HTTP middleware's status writer now implements `Unwrap`, so `http.ResponseController` (Flush, SetWriteDeadline, …) reaches the underlying writer through the middleware (#57).
 
 ## v0.4.0 — 2026-10-09
 
