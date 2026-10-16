@@ -192,3 +192,28 @@ func (s *Scope) edges(t string) (start, end int) {
 	}
 	return start, end
 }
+
+// heldNewlinePrefix returns how many trailing bytes of t are a proper prefix of a
+// known form that contains a newline. A value spanning lines cannot be matched
+// across a flush that ends between them, so the streaming writer keeps those bytes.
+func (s *Scope) heldNewlinePrefix(t string) int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	forms := s.sorted
+	s.mu.RUnlock()
+	best := 0
+	for _, f := range forms {
+		if !strings.Contains(f, "\n") {
+			continue
+		}
+		for k := min(len(f)-1, len(t)); k > best; k-- {
+			if strings.HasSuffix(t, f[:k]) {
+				best = k
+				break
+			}
+		}
+	}
+	return best
+}
