@@ -15,6 +15,7 @@
     },
     "source_event_ids": {
       "type": "array",
+      "description": "ids of the canonical events this alert derives from. Empty when every source is local (never published); then payload source_refs holds the producer's local references. Never mint canonical ids for local observations.",
       "items": {
         "type": "string",
         "minLength": 1

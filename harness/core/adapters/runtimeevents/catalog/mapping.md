@@ -95,14 +95,18 @@ This overlaps CW-20261014-0144, which resolves here. That task now implements th
 |---|---|
 | `run.status_changed` (workflow_events) | → `run.state_changed`, with `entity.type=workflow_run` |
 | `node.attempt_finished` | → `step.executed` |
+| Admission `PolicyEvaluation` (appworkflow, including a denial before a run exists) | → `gate.evaluated`, with `gate{id: hadron.admission, kind: custom}` and result `allow` → `pass`, `deny` → `fail`, `confirm` → `blocked`. The subject is the run (`msg://workflow_run/hadron/<run id>`), or the admission request (`msg://workflow_admission/hadron/<evaluation id>`) when no run exists. |
+| Human-gate wait (a wait on a human decision) | → `gate.evaluated` with `gate.kind=approval`: `blocked` when the wait starts, then `pass` or `fail` only when the resume carries an explicit decision. A resume without a decision (timeout, cancel) emits nothing global. If go-hitl holds the decision, `approval.*` comes from the go-hitl owner, not from Hadron. |
 | other `workflow_events` types (`node.*`, `control.*`, `compensation.*`, `external_operation.*`, `fanout.*`, `retry.*`, `service.*`, `wait.*`, `cancellation.resolved`, `run.cancellation_requested`, `run.terminal_intent_recorded`, `run.replay_created`, `run.fail_fast_triggered`) | local. They are served through Hadron's own subscription with a resume cursor (O2). |
 | Legacy pipeline `run_events` (`started`, `completed`, `step_*`, `hook_*` …) | local |
+
+Hadron run and node ids stay in `subject` and the payload: `scope.run_id` and `scope.attempt` are Torque's. The envelope `sequence` is the outbox's own producer-wide counter; the per-run workflow_events sequence goes in the payload as `run_sequence`.
 
 ## Cerberus
 
 | Today | Outcome |
 |---|---|
-| `approval_requested` | → `approval.requested` |
+| `approval_requested` | → `approval.requested`, with `request_id` the broker id and `hitl_ref` `msg://approval/cerberus/<broker id>` |
 | `approval_decided` | → `approval.resolved` (`approved` or `denied`) |
 | `approval_expired` | → `approval.resolved` (`expired`) |
 | `approval_revoked` | → `approval.resolved` (`withdrawn`) |
@@ -110,6 +114,8 @@ This overlaps CW-20261014-0144, which resolves here. That task now implements th
 | `chain_start`, `file_start`, `chain_break`, `chain_reanchored` | local (integrity of the chain itself); `chain_break` also raises `alert.raised` |
 | Schedule notifications: outbox `failure` / `recovery` | → `alert.raised` / `alert.cleared` |
 | Schedule notifications: `success`, `misfire` | local |
+
+`approval.*` is derived from Cerberus's approval store, which is authoritative for approvals, and `audit.recorded` from the audit chain. An approval event with no matching audit record raises `alert.raised` (`rule_id=cerberus.audit_gap`); a missing audit record is never synthesized. Audit and scheduling are separate sequence namespaces, told apart by `source.channel` (`audit`, `scheduling`). Schedule alerts whose sources stay local carry empty `source_event_ids` and payload `source_refs`.
 
 ## Tangent
 
