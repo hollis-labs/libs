@@ -8,6 +8,10 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+### Added
+
+- `streamhub/logkit`: shared pieces of a durable `streamhub.Log`, so backends agree on identity and deduplication: the opaque cursor `<epoch>:<seq>` (`FormatCursor`, `ParseCursor`, `ErrBadCursor`), the duplicate-detection `Digest` over Name and a canonical form of JSON Data (sorted keys, compact, number literals kept; non-JSON byte-exact), and `Columns` / `Extractor` / `EnvelopeExtractor` for the indexed scope columns.
+
 ## v0.2.0 — 2026-10-16
 
 ### Added
