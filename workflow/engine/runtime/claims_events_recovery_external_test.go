@@ -344,6 +344,18 @@ func TestRecoveryFiltersAndOrdering(t *testing.T) {
 
 func createNode(t *testing.T, store workflowruntime.StateStore, id workflowruntime.NodeInvocationID, status workflowruntime.NodeStatus, priority int, now time.Time) {
 	t.Helper()
+	createNodeWithInputs(t, store, id, status, priority, now, false)
+}
+
+// Readiness-only fixtures have no plan bindings; persist an explicit empty
+// input set so they exercise progression without bypassing the input fence.
+func createBoundNode(t *testing.T, store workflowruntime.StateStore, id workflowruntime.NodeInvocationID, status workflowruntime.NodeStatus, priority int, now time.Time) {
+	t.Helper()
+	createNodeWithInputs(t, store, id, status, priority, now, true)
+}
+
+func createNodeWithInputs(t *testing.T, store workflowruntime.StateStore, id workflowruntime.NodeInvocationID, status workflowruntime.NodeStatus, priority int, now time.Time, bound bool) {
+	t.Helper()
 	if _, loadErr := store.LoadRun(context.Background(), id.RunID); errors.Is(loadErr, workflowruntime.ErrNotFound) {
 		if _, _, createErr := store.CreateRun(context.Background(), workflowruntime.CreateRunRequest{ID: id.RunID, Plan: testPlan(), Status: workflowruntime.RunPending, StartIdempotencyKey: "fixture-run-" + string(id.RunID), CreatedAt: now}); createErr != nil {
 			t.Fatalf("CreateRun(%s): %v", id.RunID, createErr)
@@ -351,8 +363,16 @@ func createNode(t *testing.T, store workflowruntime.StateStore, id workflowrunti
 	} else if loadErr != nil {
 		t.Fatalf("LoadRun(%s): %v", id.RunID, loadErr)
 	}
+	var inputs *values.ValueSetRef
+	if bound {
+		ref, err := store.SaveValues(context.Background(), workflowruntime.SaveValuesRequest{Owner: workflowruntime.ValueOwner{Kind: "node-inputs", RunID: id.RunID, Invocation: &id}, Values: values.ValueSet{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		inputs = &ref
+	}
 	_, err := store.CreateNodeInvocation(context.Background(), workflowruntime.CreateNodeInvocationRequest{Snapshot: workflowruntime.NodeInvocationSnapshot{
-		ID: id, Status: workflowruntime.NodePending, Priority: priority, CreatedAt: now, UpdatedAt: now,
+		ID: id, Status: workflowruntime.NodePending, Inputs: inputs, Priority: priority, CreatedAt: now, UpdatedAt: now,
 	}})
 	if err != nil {
 		t.Fatalf("CreateNodeInvocation(%v): %v", id, err)

@@ -328,7 +328,7 @@ func (c *ControlFlowCoordinator) ProgressControlNode(ctx context.Context, reques
 		reason := &BlockedReason{Code: "control_route_not_selected", Message: "no owning control-flow route selected this node", Dependencies: preview.OwnerIDs, Details: map[string]string{"owners": fmt.Sprint(len(preview.OwnerIDs))}}
 		return NewProgressionCoordinator(c.Store, c.Evaluator).skipNode(ctx, snapshot, reason, false, false, request.At)
 	}
-	return NewProgressionCoordinator(c.Store, c.Evaluator).ProgressNode(ctx, ProgressNodeRequest{InvocationID: request.InvocationID, Dependencies: preview.Dependencies, Rule: preview.Target.ReadyWhen, Predicate: preview.Target.If, ExpressionContext: preview.Context, ExpressionOptions: request.ExpressionOptions, At: request.At})
+	return NewProgressionCoordinator(c.Store, c.Evaluator).progressNode(ctx, ProgressNodeRequest{InvocationID: request.InvocationID, Dependencies: preview.Dependencies, Rule: preview.Target.ReadyWhen, Predicate: preview.Target.If, ExpressionContext: preview.Context, ExpressionOptions: request.ExpressionOptions, At: request.At}, preview.Target.ForEach != nil && request.InvocationID.Iteration == "")
 }
 
 func mergeControlDependency(dependencies []DependencyRef, incoming DependencyRef) []DependencyRef {
