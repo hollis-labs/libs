@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -281,7 +282,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		a := add(t, f, row(retention.ClassActivity, 0, "a"))
 		b := add(t, f, row(retention.ClassActivity, time.Hour, "b"))
 		st := f.Store()
-		spec := retention.TrimSpec{Class: retention.ClassActivity, Before: t0.Add(10 * day), RequireRolled: true}
+		spec := retention.TrimSpec{Class: retention.ClassActivity, Before: t0.Add(10 * day)}
 		if r := must(st.Trim(ctx, "s", []retention.TrimSpec{spec}, retention.Op{})); r.Rows != 0 {
 			t.Fatalf("an unrolled row was trimmed: %+v", r)
 		}
@@ -298,25 +299,21 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		if f.Store().Caps().Trim == retention.TrimHeadOnly && f.PrunedThrough("s") != a {
 			t.Fatalf("pruned through %d, want %d", f.PrunedThrough("s"), a)
 		}
-		// A class without rollups is trimmable on age alone.
+		// A class with no rollups configured is not trimmable on age alone any more: it needs the rolled flag too.
 		c := add(t, f, row(retention.ClassDebug, 0, "c"))
+		debugOnly := []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}
+		if r := must(st.Trim(ctx, "s", debugOnly, retention.Op{})); r.Rows != 0 {
+			t.Fatalf("an unrolled row was removed: %+v", r)
+		}
+		rollAll(t, f)
+		r = must(st.Trim(ctx, "s", debugOnly, retention.Op{}))
 		if f.Store().Caps().Trim == retention.TrimHeadOnly {
 			// c sits behind b (a different class with no spec): head-only stops there.
-			r = must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 			if r.Rows != 0 || r.Held != 1 {
 				t.Fatalf("head-only behind an ineligible row: %+v, want 0 trimmed and 1 held", r)
 			}
-		} else {
-			// A per-row store fails closed without a covering rollup, even for a class with none configured.
-			r = must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
-			if r.Rows != 0 {
-				t.Fatalf("per-row trim removed an unrolled row: %+v", r)
-			}
-			rollAll(t, f)
-			r = must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
-			if r.Rows != 1 || byClass(f.Rows("s"), c).Seq != 0 {
-				t.Fatalf("per-row trim after the rollup: %+v", r)
-			}
+		} else if r.Rows != 1 || byClass(f.Rows("s"), c).Seq != 0 {
+			t.Fatalf("per-row trim after the rollup: %+v", r)
 		}
 	}))
 
@@ -453,7 +450,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	t.Run("NoRemovalWithoutACommittedCoveringRollup", guard(func(t *testing.T) {
 		f := newFixture(t)
 		a := add(t, f, row(retention.ClassActivity, 0, "a"))
-		spec := retention.TrimSpec{Class: retention.ClassActivity, Before: t0.Add(30 * day), RequireRolled: true}
+		spec := retention.TrimSpec{Class: retention.ClassActivity, Before: t0.Add(30 * day)}
 		if r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{spec}, retention.Op{})); r.Rows != 0 {
 			t.Fatalf("removed an unrolled row: %+v", r)
 		}
@@ -622,14 +619,19 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		rollAll(t, f)
 		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}, retention.Op{}))
 		marks := must(f.Store().Watermarks(ctx, "s"))
-		// Starting from the beginning: one frame, naming the highest watermark; no cursor advance.
+		// From the beginning: ONE frame listing EVERY affected class, sorted; no cursor advance.
+		want := []retention.ClassGap{{Class: retention.ClassActivity, ThroughCursor: a1}, {Class: retention.ClassDebug, ThroughCursor: d2}}
 		g, ok := retention.ReadGap(marks, 0)
-		if !ok || g.Reason != "retention" || g.ThroughCursor != d2 || g.Class != retention.ClassDebug {
-			t.Fatalf("gap = %+v, %v; want retention through %d (debug)", g, ok, d2)
+		if !ok || g.Reason != "retention" || !reflect.DeepEqual(g.Classes, want) {
+			t.Fatalf("gap = %+v, %v; want retention with %+v", g, ok, want)
 		}
-		// Resuming from the cursor of a removed row is valid and still below the watermark: the same single frame.
-		if g2, ok := retention.ReadGap(marks, d1); !ok || g2 != g {
+		// Resuming from the cursor of a removed row is valid and still below both watermarks: the same single frame.
+		if g2, ok := retention.ReadGap(marks, d1); !ok || !reflect.DeepEqual(g2, g) {
 			t.Fatalf("resume from a removed cursor: %+v, %v", g2, ok)
+		}
+		// Past one class's watermark only the other class is listed.
+		if g3, ok := retention.ReadGap(marks, a1); !ok || !reflect.DeepEqual(g3.Classes, want[1:]) {
+			t.Fatalf("after %d: %+v, %v; want only the debug class", a1, g3, ok)
 		}
 		// At or past every watermark there is no frame.
 		if _, ok := retention.ReadGap(marks, d2); ok {
@@ -682,19 +684,24 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		}
 	}))
 
-	t.Run("PerRowFailsClosedWithoutACoveringRollup", guard(func(t *testing.T) {
+	t.Run("TrimRequiresACoveringRollupInBothModes", guard(func(t *testing.T) {
 		f := newFixture(t)
-		if f.Store().Caps().Trim != retention.TrimPerRow {
-			t.Skip("store trims head-only")
-		}
 		a := add(t, f, row(retention.ClassDebug, 0, "d"))
-		// A class with no rollups configured plans RequireRolled=false; a per-row store still removes nothing unrolled.
-		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day), RequireRolled: false}}, retention.Op{}))
+		// A class with no rollups configured never gets rolled; nothing unrolled is removed,
+		// head-only or per-row (D7 rev 2.3.1).
+		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		if r.Rows != 0 || byClass(f.Rows("s"), a).Seq != a {
-			t.Fatalf("a per-row store removed an unrolled row: %+v", r)
+			t.Fatalf("%s store removed an unrolled row: %+v", f.Store().Caps().Trim, r)
 		}
 		if marks := must(f.Store().Watermarks(ctx, "s")); len(marks) != 0 {
 			t.Fatalf("watermarks moved without a removal: %v", marks)
+		}
+		if f.PrunedThrough("s") != 0 {
+			t.Fatalf("pruned-through moved without a removal: %d", f.PrunedThrough("s"))
+		}
+		rollAll(t, f)
+		if r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{})); r.Rows != 1 {
+			t.Fatalf("after the covering rollup the row should go: %+v", r)
 		}
 	}))
 
@@ -853,7 +860,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		add(t, f, row(retention.ClassDebug, 0, "a"))
 		st := f.Store()
 		must(st.Rollup(ctx, "s", retention.RollupSpec{Class: retention.ClassDebug, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}, retention.Op{}))
-		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day), RequireRolled: true}}, retention.Op{}))
+		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		if len(f.Rows("s")) != 0 {
 			t.Fatal("setup: the row should be trimmed")
 		}

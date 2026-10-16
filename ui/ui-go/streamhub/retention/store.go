@@ -18,8 +18,8 @@ const (
 	TrimHeadOnly TrimMode = iota
 	// TrimPerRow (D7 rev 2.3) removes rows from the middle of a stream, only
 	// when ALL hold: the class is not R-audit; the row is past every tier
-	// (TrimSpec.Before); a covering rollup is committed first (TrimSpec.RequireRolled,
-	// the row's rolled flag, committed in the same or an earlier transaction);
+	// (TrimSpec.Before); a covering rollup is committed first (the row's rolled flag,
+	// committed in the same or an earlier transaction);
 	// removal goes per class in cursor order (never a later row of a class
 	// while an earlier one stays); and the store persists a per-class
 	// watermark W_C (see [Store.Watermarks]). Cursors are never reused. A
@@ -137,9 +137,9 @@ type Store interface {
 	Tombstone(ctx context.Context, stream string, s TombstoneSpec, op Op) (Result, error)
 
 	// Trim removes rows that match any of specs (same class, at or before the
-	// spec's cutoff, rolled up if RequireRolled; a per-row store requires the
-	// rolled flag whatever RequireRolled says and fails closed: a class with no
-	// rollups configured is never removed by it). A head-only store removes the
+	// spec's cutoff, rolled up: every store, head-only or per-row, removes only rows that carry
+	// the rolled flag and fails closed, so a class with no rollups configured is
+	// never removed). A head-only store removes the
 	// longest contiguous prefix of eligible rows and advances pruned-through; a
 	// per-row store removes eligible rows per class in cursor order and raises
 	// the class watermark. Neither ever removes an R-audit row, even if a spec
