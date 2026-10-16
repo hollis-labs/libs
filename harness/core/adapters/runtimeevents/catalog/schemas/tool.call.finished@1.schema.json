@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:tool.call.finished@1",
+  "title": "tool.call.finished@1",
+  "description": "A tool call ended. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "tool",
+    "ok"
+  ],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "minLength": 1
+    },
+    "server": {
+      "type": "string"
+    },
+    "args_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "args_schema_fp": {
+      "type": "string"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "error_class": {
+      "type": "string"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "gateway_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "forward_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result_summary": {
+      "type": "string",
+      "description": "sanitized"
+    }
+  }
+}

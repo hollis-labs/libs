@@ -1,0 +1,1 @@
+{"message_id": "01a14322", "thread_id": "t1", "from": "msg://agent/agent-mux/agt_zqrt6j79jn", "to": ["msg://agent/agent-mux/agt_oi85lf2zqa"], "msg_kind": "request", "delivery": {"state": "delivered", "attempt": 1}, "body_ref": "tether://messages/01a14322", "body_bytes": 512, "content_type": "application/json"}

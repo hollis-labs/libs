@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:approval.resolved@1",
+  "title": "approval.resolved@1",
+  "description": "Notification that an approval was resolved. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "request_id",
+    "outcome",
+    "hitl_ref"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome": {
+      "type": "string",
+      "description": "approved, denied, expired or withdrawn"
+    },
+    "resolver": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hitl_ref": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:fleet.node@1",
+  "title": "fleet.node@1",
+  "description": "A fleet node changed availability. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "environment_id"
+  ],
+  "properties": {
+    "environment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority": {
+      "type": "string"
+    },
+    "worker_id": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

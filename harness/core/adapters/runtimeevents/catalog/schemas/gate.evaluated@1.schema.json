@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:gate.evaluated@1",
+  "title": "gate.evaluated@1",
+  "description": "A gate was evaluated against a subject. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "gate",
+    "subject",
+    "result"
+  ],
+  "properties": {
+    "gate": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "description": "deliverables, subtodos, ci_green, landing, approval or custom"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "result": {
+      "type": "string",
+      "description": "pass, fail, blocked or skipped"
+    },
+    "blocking": {
+      "type": "boolean"
+    },
+    "evidence_ref": {
+      "type": "string"
+    }
+  }
+}

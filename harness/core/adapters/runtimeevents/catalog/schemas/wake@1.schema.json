@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:wake@1",
+  "title": "wake@1",
+  "description": "A wake attempt for a message recipient and its outcome. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "message_id",
+    "target"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempted": {
+      "type": "boolean"
+    },
+    "delivered": {
+      "type": "boolean"
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}
