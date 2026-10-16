@@ -22,6 +22,13 @@ const FromLatest Seq = math.MaxUint64
 type Event struct {
 	Name string
 	Data []byte
+	// ID is an optional idempotency key, unique within one Log. When set, a
+	// Log appends the event at most once: appending the same ID again with
+	// the same Name and Data returns the stored Record and assigns no new
+	// Seq, and appending it with different content fails with
+	// [ErrEventIDConflict]. Producers must reuse the ID on retries and
+	// replays. Empty means no deduplication.
+	ID string
 }
 
 // Record is an Event after a Log has assigned it a cursor and a timestamp.
@@ -32,6 +39,11 @@ type Record struct {
 	Name string
 	Data []byte
 	At   time.Time
+	// ID is the Event.ID the record was appended with, if any.
+	ID string
+	// Epoch is the identity of the Log that assigned Seq; see [Head.Epoch].
+	// A Log that has no epoch leaves it empty.
+	Epoch string
 }
 
 // Head is a point-in-time summary of one stream in a Log.
@@ -46,6 +58,15 @@ type Head struct {
 	// Terminated reports that the stream has ended. A Log leaves it false;
 	// [Hub.Head] fills it from the hub's own view of the stream.
 	Terminated bool
+	// Epoch identifies the Log that assigned this stream's cursors. It is the
+	// identity of the log, NOT a producer restart counter (an envelope's
+	// generation): a durable log keeps its Seq counters across process
+	// restarts and keeps its epoch with them; the epoch changes only when the
+	// log's storage is recreated and Seq counters start over. A reader that
+	// remembers (Epoch, Seq) can tell "resume" from "the log was replaced".
+	// Empty when the Log has no epoch. An unknown stream reports the log's
+	// epoch with every other field zero.
+	Epoch string
 }
 
 // Retention bounds what a Log keeps for one stream. A zero field is
@@ -72,6 +93,10 @@ const (
 	GapCursorAhead
 	// GapDropped: this subscriber lost records to its slow-consumer policy.
 	GapDropped
+	// GapEpochChanged: the reader's remembered epoch is not the log's, so its
+	// cursor means nothing here. OldestAvailable and Latest describe the
+	// current log.
+	GapEpochChanged
 )
 
 func (r GapReason) String() string {
@@ -82,6 +107,8 @@ func (r GapReason) String() string {
 		return "cursor_ahead"
 	case GapDropped:
 		return "dropped"
+	case GapEpochChanged:
+		return "epoch_changed"
 	default:
 		return fmt.Sprintf("GapReason(%d)", int(r))
 	}
@@ -100,8 +127,11 @@ type Gap struct {
 	// Latest is the stream head when the gap was detected.
 	Latest Seq
 	// Missed is the number of records lost: exact for GapDropped and
-	// GapRetention, the distance past the head for GapCursorAhead.
+	// GapRetention, the distance past the head for GapCursorAhead. For
+	// GapEpochChanged it is 0: the lost range is unknown.
 	Missed uint64
+	// Epoch is the log's current epoch, when it has one.
+	Epoch string
 }
 
 // GapError carries a [Gap] as an error. It matches [ErrGap], and also
@@ -151,6 +181,9 @@ var (
 	ErrTerminated = errors.New("streamhub: stream terminated")
 	// ErrUnknownStream: the stream is not open (or its name is empty).
 	ErrUnknownStream = errors.New("streamhub: unknown stream")
+	// ErrEventIDConflict: an Event.ID was appended again with different
+	// content. That is a producer bug or a spoof, never a retry.
+	ErrEventIDConflict = errors.New("streamhub: event id reused with different content")
 	// ErrClosed: the hub, log or subscription is closed.
 	ErrClosed = errors.New("streamhub: closed")
 )

@@ -9,6 +9,7 @@ import (
 
 func memoryFactory(pageSize int) hubtest.Factory {
 	return hubtest.Factory{
+		Idempotent: true,
 		New: func(*testing.T) streamhub.Log {
 			return streamhub.NewMemoryLog(streamhub.WithPageSize(pageSize))
 		},

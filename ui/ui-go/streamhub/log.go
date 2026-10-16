@@ -19,7 +19,9 @@ import (
 type Log interface {
 	// Append atomically assigns the next Seq (starting at 1 per stream) and
 	// a timestamp, stores the record and returns it. Concurrent Appends to
-	// one stream must receive distinct, gap-free Seqs.
+	// one stream must receive distinct, gap-free Seqs. If e.ID is set and
+	// already stored, Append returns the stored Record without assigning a
+	// Seq when Name and Data match, and [ErrEventIDConflict] when they do not.
 	Append(ctx context.Context, stream string, e Event) (Record, error)
 
 	// After yields the records with Seq > after in ascending order, paging
@@ -31,7 +33,7 @@ type Log interface {
 	// caller stops ranging. An unknown stream is an empty stream.
 	After(ctx context.Context, stream string, after Seq) iter.Seq2[Record, error]
 
-	// Head reports the stream summary. An unknown stream yields the zero Head.
+	// Head reports the stream summary. An unknown stream yields a zero Head carrying only the log's Epoch.
 	Head(ctx context.Context, stream string) (Head, error)
 
 	// Trim removes records that fall outside r, oldest first, and advances
@@ -40,6 +42,16 @@ type Log interface {
 
 	// Close releases the log. Later calls return ErrClosed.
 	Close() error
+}
+
+// EpochReader is an optional extension of [Log] for logs that have an epoch
+// (see [Head.Epoch]). AfterEpoch is After for a reader that remembers the
+// epoch its cursor came from: when epoch is non-empty and differs from the
+// log's, it yields a *GapError with reason [GapEpochChanged] before any
+// record. An empty epoch means "unknown" and skips the check, exactly like
+// After.
+type EpochReader interface {
+	AfterEpoch(ctx context.Context, stream, epoch string, after Seq) iter.Seq2[Record, error]
 }
 
 // Forgetter is an optional extension of [Log]. A Hub calls Forget once a
