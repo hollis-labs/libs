@@ -187,7 +187,17 @@ type Event struct {
 	// Class holds classification set by the sanitize and classify stages.
 	// Visibility and PayloadSchema stay top-level fields of Event.
 	Class *EventClass `json:"class,omitempty"`
+	// PayloadDigest marks an event whose payload a retention pass removed
+	// (the envelope tier). It is "sha256:" plus 64 lowercase hex digits over
+	// the stored payload bytes, or "withheld" when no digest is kept (PII).
+	// When it is set Payload is JSON null. Producers never set it.
+	PayloadDigest string `json:"payload_digest,omitempty"`
 }
+
+var payloadDigestPattern = regexp.MustCompile(`^(sha256:[0-9a-f]{64}|withheld)$`)
+
+// Tombstoned reports whether a retention pass removed the event's payload.
+func (e Event) Tombstoned() bool { return e.PayloadDigest != "" }
 
 // EventScope is the dimension block of an event: low-cardinality identifiers
 // only, each stamped from verified context and omitted when unverified.
@@ -227,7 +237,17 @@ type EventClass struct {
 }
 
 func (e Event) Validate() error {
-	if e.SchemaVersion == "" || e.ID == "" || e.Kind == "" || e.Time.IsZero() || e.Cursor == "" || e.Generation == 0 || e.SourceSequence == 0 || !json.Valid(e.Payload) {
+	if e.SchemaVersion == "" || e.ID == "" || e.Kind == "" || e.Time.IsZero() || e.Cursor == "" || e.Generation == 0 || e.SourceSequence == 0 {
+		return NewError(ErrorInvalid, "incomplete event envelope")
+	}
+	if e.Tombstoned() {
+		if !payloadDigestPattern.MatchString(e.PayloadDigest) {
+			return NewError(ErrorInvalid, "malformed payload_digest")
+		}
+		if len(e.Payload) != 0 && string(e.Payload) != "null" {
+			return NewError(ErrorInvalid, "tombstoned event carries a payload")
+		}
+	} else if !json.Valid(e.Payload) {
 		return NewError(ErrorInvalid, "incomplete event envelope")
 	}
 	if err := e.Actor.Validate(); err != nil {

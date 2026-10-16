@@ -62,12 +62,12 @@ func TestEventV11BlocksRoundTripAndStayOptional(t *testing.T) {
 
 	// An event without the new fields marshals with none of their keys, so
 	// v1 readers and stored v1 bytes see no change.
-	e.RawOffset, e.RecordedAt, e.Depth, e.ActorRole, e.ActorVerified, e.Scope, e.Class = nil, nil, 0, "", "", nil, nil
+	e.RawOffset, e.RecordedAt, e.Depth, e.ActorRole, e.ActorVerified, e.Scope, e.Class, e.PayloadDigest = nil, nil, 0, "", "", nil, nil, ""
 	b, err = json.Marshal(e)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"raw_offset", "recorded_at", "depth", "actor_role", "actor_verified", "scope", "class"} {
+	for _, key := range []string{"raw_offset", "recorded_at", "depth", "actor_role", "actor_verified", "scope", "class", "payload_digest"} {
 		if strings.Contains(string(b), `"`+key+`"`) {
 			t.Fatalf("unset v1.1 field %q was marshalled: %s", key, b)
 		}
@@ -99,5 +99,44 @@ func TestToolActorAttribution(t *testing.T) {
 	tool.URN = "msg://service/test/search"
 	if tool.Validate() == nil {
 		t.Fatal("tool accepted another actor kind's address")
+	}
+}
+
+func TestTombstonedEventValidation(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("ab", 32)
+	base := mesh.Event{SchemaVersion: "1", ID: "evt_1", Kind: "task.state_changed", Time: time.Now().UTC(), Actor: mesh.Actor{URN: "msg://service/torque/scheduler", Kind: mesh.ActorService}, Subject: "msg://task/torque/CW-1", Generation: 1, SourceSequence: 3, Cursor: "env:9", Visibility: "environment"}
+	for _, c := range []struct {
+		name    string
+		digest  string
+		payload json.RawMessage
+		valid   bool
+	}{
+		{"digest, nil payload", digest, nil, true},
+		{"digest, null payload", digest, json.RawMessage(`null`), true},
+		{"withheld", "withheld", nil, true},
+		{"digest with payload", digest, json.RawMessage(`{}`), false},
+		{"uppercase hex", "sha256:" + strings.Repeat("AB", 32), nil, false},
+		{"unknown algorithm", "md5:" + strings.Repeat("ab", 16), nil, false},
+		{"no digest, nil payload", "", nil, false},
+	} {
+		e := base
+		e.PayloadDigest, e.Payload = c.digest, c.payload
+		if err := e.Validate(); (err == nil) != c.valid {
+			t.Errorf("%s: valid=%v, want %v (%v)", c.name, err == nil, c.valid, err)
+		}
+	}
+
+	e := base
+	e.PayloadDigest = digest
+	b, err := json.Marshal(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got mesh.Event
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.Tombstoned() || got.PayloadDigest != digest || got.Validate() != nil {
+		t.Fatalf("tombstone lost in round trip: %s", b)
 	}
 }
