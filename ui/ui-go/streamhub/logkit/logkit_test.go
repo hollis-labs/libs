@@ -3,6 +3,7 @@ package logkit_test
 import (
 	"bytes"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/hollis-labs/libs/ui/ui-go/streamhub"
@@ -75,5 +76,38 @@ func TestEnvelopeExtractor(t *testing.T) {
 		if got := logkit.EnvelopeExtractor(streamhub.Event{Data: []byte(d)}); got != (logkit.Columns{}) {
 			t.Errorf("%q produced %+v, want zero Columns", d, got)
 		}
+	}
+}
+
+func TestMarkerRoundTripAndBehind(t *testing.T) {
+	path := t.TempDir() + "/sub/log.hwm"
+	if m, err := logkit.ReadMarker(path); m != nil || err != nil {
+		t.Fatalf("missing marker = %v, %v", m, err)
+	}
+	if err := logkit.WriteMarker(path, logkit.Marker{Epoch: "e1", Streams: map[string]uint64{"s": 5}}); err != nil {
+		t.Fatal(err)
+	}
+	m, err := logkit.ReadMarker(path)
+	if err != nil || m.Epoch != "e1" || m.Streams["s"] != 5 {
+		t.Fatalf("read = %+v, %v", m, err)
+	}
+	if _, behind := m.Behind(map[string]uint64{"s": 5}); behind {
+		t.Error("equal head reported behind")
+	}
+	if s, behind := m.Behind(map[string]uint64{"s": 4}); !behind || s != "s" {
+		t.Errorf("Behind = %q, %v", s, behind)
+	}
+	if _, behind := m.Behind(map[string]uint64{}); !behind {
+		t.Error("missing stream (head 0) must be behind a marker of 5")
+	}
+	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := logkit.ReadMarker(path); !errors.Is(err, logkit.ErrMarkerUnreadable) {
+		t.Errorf("unreadable marker err = %v", err)
+	}
+	var nilm *logkit.Marker
+	if _, behind := nilm.Behind(nil); behind {
+		t.Error("nil marker is never behind")
 	}
 }
