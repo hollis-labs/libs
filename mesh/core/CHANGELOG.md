@@ -8,6 +8,8 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.7.1 — 2026-10-16
+
 ### Fixed
 
 - `Dispatcher.Request` returns `ErrRequestTimeout` when the caller's deadline expires while the Store is still in the
