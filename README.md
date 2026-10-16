@@ -11,7 +11,7 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | Group | Purpose |
 |---|---|
 | `core` | Small, general-purpose utilities that everything else may build on. |
-| `security` | Security building blocks: secrets handling and authentication, with policy planned. Present: `security/secrets`, `security/auth`. Planned: `security/policy`. |
+| `security` | Security building blocks: secrets handling and authentication, with policy planned. Present: `security/secrets`, `security/auth`, `security/policy` (the neutral decision contract) and `security/routepolicy` (its adapter for the `core/util/router` seam). |
 | `mcp` | Plugin and Model Context Protocol libraries. |
 | `ui` | Streaming and web UI building blocks for Go services. |
 | `workflow` | Workflow engine and its host. |
@@ -35,7 +35,7 @@ something from a higher group, the shared part moves down. The ranks live in
 
 | Module | Import path | Scope |
 |---|---|---|
-| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper and a Tesseract memory API client. |
+| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper, a Tesseract memory API client, a middleware kit (HTTP, queue jobs, conformance suite), a rule router and a decision ledger. |
 | `core/panics` | `github.com/hollis-labs/libs/core/panics` | Panic containment: recover at a boundary, return a ref and keep a redacted, bounded record. Goroutine, call and `net/http` guards; no dependencies. |
 | `security/redact` | `github.com/hollis-labs/libs/security/redact` | Credential redaction for text, JSON, command lines, environments and logs: pattern rules plus exact known values, one marker, idempotent. Standard library only. |
 | `ui/ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |

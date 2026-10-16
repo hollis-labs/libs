@@ -8,6 +8,15 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `mw`: one middleware contract (`Handler`, `Middleware`, `Chain`) with a descriptor per member checked at assembly (phase order, a required failure mode, observer/protector defaults that need a stated reason, mutation opt-in, required and provided context keys), shadow and off modes for any member, a `Fault` type owned by the guard that handled it, `Explain`, `RecoverMember` and `TimeoutMember`. Standard library only.
+- `mw/httpmw`: the `net/http` adapter, keeping the native `func(http.Handler) http.Handler` shape, with Recover, RequestID, AccessLog, BodyLimit, Timeout and CORS. Errors are written through `svcerr`.
+- `mw/jobmw`: the queue-job adapter. Typed outcomes (`ReleaseError`, `DropError`, `RetryError`, `PermanentError`) resolved by `Resolve`; `RateLimited`, `WithoutOverlapping` (fenced unlock), `UniqueByKey`, `ThrottleOnException` and `Classify` (attempt budget, backoff arrays with exact sub-second delays, jitter); `Limiter`, `Locker` and `Counter` interfaces with in-memory implementations.
+- `mw/conformance`: the scenario table every adapter must pass, with harnesses for the generic, job and HTTP adapters.
+- `router`: a declarative matcher with an explicit `first_match`/`fan_out` strategy, a confidence gate that treats unknown confidence as neither zero nor a pass, a policy seam (most restrictive wins; obligations carried; approval asks, dry-run flagged, unknown kinds deny), shadow policy, an escalation seam, a `Snapshot` hook for the stored input, and `Decision.LedgerRecord`.
+- `ledger`: the decision ledger record and append-only event log (dispositions, human corrections as labels, outcomes), an idempotency `Key`, per-stage retention (`snapshot`, `pointer` or hash only, TTL, sampling, redaction, `Keep`, HMAC hashing), the `Store` and `Expirer` interfaces, `MemStore`, and the `ledgertest` conformance suite.
+
 ## v0.5.0 — 2026-10-16
 
 ### Added
