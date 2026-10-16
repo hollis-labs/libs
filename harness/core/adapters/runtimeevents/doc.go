@@ -30,7 +30,8 @@
 // [Event.Subject] for events that have no session and the log-assigned
 // [Event.Cursor] and [Event.RecordedAt]. [Event.Validate] and [JSONSchema]
 // encode the required fields. [ToMesh] and [FromMesh] project losslessly to
-// and from mesh.Event; projection.md in this directory has the field table.
+// and from mesh.Event. In this directory, projection.md has the field
+// table and scope.md the dimension vocabulary and its sources of truth.
 //
 // # Payload conventions
 //

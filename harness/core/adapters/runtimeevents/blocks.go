@@ -11,7 +11,8 @@ import (
 // Scope is the dimension block: low-cardinality identifiers (project,
 // workstream, task, run, launch, agent, environment ...) stamped from
 // verified context. A value that cannot be verified is omitted, never
-// guessed. It is the same type as mesh.EventScope.
+// guessed. It is the same type as mesh.EventScope. scope.md in this
+// directory lists each field's source of truth and the producer gaps.
 type Scope = mesh.EventScope
 
 // Corr is the correlation block.
