@@ -179,11 +179,34 @@ func TestDispatcher_Request_DeadlineInsideStoreCallIsATimeout(t *testing.T) {
 
 // A cancellation, and a Store failure that is not the caller's deadline, are not timeouts.
 func TestDispatcher_Request_OtherStoreErrorsPassThrough(t *testing.T) {
-	d := messaging.NewDispatcher(slowStore{Store: memstore.New(), slowSend: true})
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	_, err := d.Request(ctx, messaging.Envelope{From: addr(messaging.KindAgent, "rA"), To: addr(messaging.KindAgent, "rB")})
-	if errors.Is(err, messaging.ErrRequestTimeout) || !errors.Is(err, context.Canceled) {
-		t.Fatalf("canceled request: %v", err)
-	}
+	req := messaging.Envelope{From: addr(messaging.KindAgent, "rA"), To: addr(messaging.KindAgent, "rB")}
+	t.Run("canceled", func(t *testing.T) {
+		d := messaging.NewDispatcher(slowStore{Store: memstore.New(), slowSend: true})
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := d.Request(ctx, req)
+		if errors.Is(err, messaging.ErrRequestTimeout) || !errors.Is(err, context.Canceled) {
+			t.Fatalf("canceled request: %v", err)
+		}
+	})
+	t.Run("store failure", func(t *testing.T) {
+		boom := errors.New("boom")
+		d := messaging.NewDispatcher(failingStore{Store: memstore.New(), err: boom})
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := d.Request(ctx, req)
+		if !errors.Is(err, boom) || errors.Is(err, messaging.ErrRequestTimeout) {
+			t.Fatalf("store failure: %v", err)
+		}
+	})
+}
+
+// failingStore fails Send with a fixed error that has nothing to do with the caller's context.
+type failingStore struct {
+	messaging.Store
+	err error
+}
+
+func (s failingStore) Send(context.Context, messaging.Envelope) (messaging.Envelope, error) {
+	return messaging.Envelope{}, s.err
 }
