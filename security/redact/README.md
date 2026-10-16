@@ -156,3 +156,9 @@ user+system CPU time (`getrusage`), including GC workers. Compare repeated runs
 with `benchstat`. This is mean CPU per call, not a percentile; keep it distinct
 from wall-clock p99. Returned JSON, reports and parse structures own their memory,
 so the API still allocates; it does not pool unredacted payload buffers.
+
+For per-call CPU percentiles, use `-bench '^BenchmarkSanitize4KBCPUSamples$'`
+with `-benchtime=10000x -cpu=1`. It reports CPU median and p99 over 10,000
+individual calls using process user+system CPU with microsecond resolution.
+The sampling syscall overhead is included, not subtracted. These CPU samples
+are distinct from the wall-clock samples reported by `BenchmarkSanitize4KB`.

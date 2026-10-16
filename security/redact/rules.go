@@ -51,6 +51,8 @@ func (s *scanText) hasAny(lowerWords ...string) bool {
 	return false
 }
 
+// A finder must call add synchronously; it must never retain or defer the callback
+// beyond its return, because the caller reuses it for the next rule.
 type finder func(r *Redactor, s *scanText, add func(a, b int))
 
 type rule struct {
