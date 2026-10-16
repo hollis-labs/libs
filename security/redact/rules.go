@@ -143,19 +143,37 @@ var providerPrefixes = []string{"sk-", "sk_", "rk_", "whsec_", "ghp_", "gho_", "
 	"AKIA", "ASIA", "AGPA", "AIDA", "AROA", "ANPA", "ANVA", "glpat-", "AIza", "npm_", "SG.", "ya29.", "hf_", "dop_v1_", "eyJ"}
 
 func findProviderKey(_ *Redactor, s *scanText, add func(a, b int)) {
-	found := false
-	for _, p := range providerPrefixes {
-		if strings.Contains(s.t, p) {
-			found = true
-			break
+	// Run the provider pattern only on credential-shaped words starting at a
+	// known prefix. Searching ordinary prose with the large alternation is costly.
+	for _, prefix := range providerPrefixes {
+		for offset := 0; offset < len(s.t); {
+			i := strings.Index(s.t[offset:], prefix)
+			if i < 0 {
+				break
+			}
+			a := offset + i
+			offset = a + len(prefix)
+			if a > 0 && asciiAlphaNum(s.t[a-1]) {
+				continue
+			}
+			b := a
+			for b < len(s.t) && (asciiAlphaNum(s.t[b]) || strings.ContainsRune("_.-", rune(s.t[b]))) {
+				b++
+			}
+			offset = b // the candidate scan below includes every provider shape in this word
+			start := a
+			if start > 0 {
+				start--
+			}
+			for _, m := range providerKeyRe.FindAllStringSubmatchIndex(s.t[start:b], -1) {
+				add(start+m[2], start+m[3])
+			}
 		}
 	}
-	if !found {
-		return
-	}
-	for _, m := range providerKeyRe.FindAllStringSubmatchIndex(s.t, -1) {
-		add(m[2], m[3])
-	}
+}
+
+func asciiAlphaNum(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 // --- Authorization -----------------------------------------------------------

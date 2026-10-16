@@ -189,7 +189,10 @@ func (r *Redactor) TextCount(s string) (string, int) {
 	if s == "" {
 		return s, 0
 	}
-	fs := r.Scan(s)
+	return r.replaceFindings(s, r.Scan(s))
+}
+
+func (r *Redactor) replaceFindings(s string, fs []Finding) (string, int) {
 	if len(fs) == 0 {
 		return s, 0
 	}
@@ -212,6 +215,11 @@ func (r *Redactor) TextCount(s string) (string, int) {
 // Scan reports what would be redacted in s, without the values. The findings are
 // merged: overlapping or touching ranges are one.
 func (r *Redactor) Scan(s string) []Finding {
+	return r.scan(s, nil)
+}
+
+// observe runs before merging so overlapping rules retain their classification.
+func (r *Redactor) scan(s string, observe func(string)) []Finding {
 	if s == "" {
 		return nil
 	}
@@ -223,6 +231,9 @@ func (r *Redactor) Scan(s string) []Finding {
 		rl.find(r, st, func(a, b int) {
 			if b > a {
 				raw = append(raw, Finding{name, v.at(a), v.at(b)})
+				if observe != nil {
+					observe(name)
+				}
 			}
 		})
 	}
@@ -230,6 +241,9 @@ func (r *Redactor) Scan(s string) []Finding {
 		r.scope.find(v.text, func(a, b int) {
 			if b > a {
 				raw = append(raw, Finding{RuleScope, v.at(a), v.at(b)})
+				if observe != nil {
+					observe(RuleScope)
+				}
 			}
 		})
 	}

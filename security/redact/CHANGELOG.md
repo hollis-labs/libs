@@ -8,6 +8,26 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 - `Redactor.Writer(dst, ...WriterOption)`: a streaming redactor. It emits whole lines, so the output equals `Text` of the whole stream however the input is split across `Write` calls (tested byte at a time, at every split of short inputs, and with random chunking). An open match at the end of the buffer (an unterminated private-key block) and a known value that spans lines are held until they close. Memory is bounded: `WithMaxPending` (default 64 KiB) forces a flush of an unbroken line, keeping `WithHold` (default 4 KiB) back; a value longer than the hold that straddles a forced flush can be missed. `Close` flushes and does not close `dst`.
 
+## v0.2.0 — pending security and performance gates
+
+### Added
+
+- Immutable per-kind `Sanitizer` and `Policy`, typed sensitivity/error classes,
+  value-free reports with JSON pointers, default allowlist mode and explicit
+  denylist mode. Sensitive key policy still wins over an allowed path.
+- Deterministic email, phone, IP, Luhn-card and Nanite identifier PII rules on
+  the existing span engine, with classifications retained before overlap merging.
+- Fail-closed JSON tombstones for size, format, parse and depth errors;
+  duplicate keys and invalid UTF-8 are rejected.
+- Seeded event payload corpus, concurrency/idempotence/fuzz checks, and a
+  4 KiB latency/allocation benchmark reporting sampled wall-clock p99.
+
+### Changed
+
+- Provider-key patterns scan candidate tokens instead of the entire text;
+  reference-span checks retain the existing pattern semantics.
+
+
 ## v0.1.0 — 2026-10-16
 
 ### Added
