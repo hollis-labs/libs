@@ -750,3 +750,104 @@ func TestSlowStreamListingStopsEarlyWithinTheBudget(t *testing.T) {
 		t.Fatalf("the pass took %v, far past its 50ms budget", time.Since(start))
 	}
 }
+
+type readFail struct {
+	retention.Store
+	stats, marks, backlog error
+	dryMore               bool
+}
+
+func (r readFail) Stats(ctx context.Context, s string) ([]retention.ClassStat, error) {
+	if r.stats != nil {
+		return nil, r.stats
+	}
+	return r.Store.Stats(ctx, s)
+}
+
+func (r readFail) Watermarks(ctx context.Context, s string) (map[string]uint64, error) {
+	if r.marks != nil {
+		return nil, r.marks
+	}
+	return r.Store.Watermarks(ctx, s)
+}
+
+func (r readFail) Tombstone(ctx context.Context, s string, sp retention.TombstoneSpec, op retention.Op) (retention.Result, error) {
+	if op.DryRun && r.backlog != nil {
+		return retention.Result{}, r.backlog
+	}
+	res, err := r.Store.Tombstone(ctx, s, sp, op)
+	if op.DryRun && r.dryMore {
+		res.More = true
+	}
+	return res, err
+}
+
+// A failed end-of-pass read must not look like "no backlog, no watermark".
+func TestFailedTailReadsAreUnknownNotZero(t *testing.T) {
+	for name, tc := range map[string]struct {
+		store func(retention.Store) retention.Store
+		mode  retention.TrimMode
+	}{
+		"stats":      {func(s retention.Store) retention.Store { return readFail{Store: s, stats: errors.New("db busy")} }, retention.TrimHeadOnly},
+		"watermarks": {func(s retention.Store) retention.Store { return readFail{Store: s, marks: errors.New("db busy")} }, retention.TrimPerRow},
+		"backlog":    {func(s retention.Store) retention.Store { return readFail{Store: s, backlog: errors.New("db busy")} }, retention.TrimHeadOnly},
+		"deadline":   {func(s retention.Store) retention.Store { return readFail{Store: s, stats: context.DeadlineExceeded} }, retention.TrimHeadOnly},
+	} {
+		m := storetest.NewMem(tc.mode)
+		r := state(0, "x")
+		r.Class = retention.ClassState
+		seed(t, m, r)
+		var raw int
+		rep, err := jan(t, tc.store(m), retention.WithErrorLog(func(string, string, error) { raw++ })).Run(context.Background(), base.Add(400*day))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		st := rep.Classes[retention.ClassState]
+		errs := 0
+		for _, c := range rep.Classes {
+			errs += c.Errors // a pass-level read belongs to no class: it is counted under ""
+		}
+		if !rep.Partial || !st.Partial || errs == 0 {
+			t.Fatalf("%s: report partial %v, class partial %v, errors %d; a failed read must be unknown and counted", name, rep.Partial, st.Partial, errs)
+		}
+		if name != "deadline" && raw == 0 {
+			t.Fatalf("%s: the raw error never reached the error log", name)
+		}
+		for _, c := range rep.Classes {
+			if c.FirstError == "db busy" {
+				t.Fatalf("%s: the store message reached the report", name)
+			}
+		}
+	}
+}
+
+// A dry-run count that stopped at its budget (More) is a lower bound: Partial.
+func TestDryRunMoreMarksTheClassPartial(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	r := state(0, "x")
+	r.Class = retention.ClassState
+	seed(t, m, r)
+	rep, err := jan(t, readFail{Store: m, dryMore: true}, retention.WithDryRun(true)).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.Partial || !rep.Classes[retention.ClassState].Partial {
+		t.Fatalf("dry run report = %+v / %+v: a count that stopped early looks complete", rep, rep.Classes[retention.ClassState])
+	}
+}
+
+// A store call that times out while the pass itself is healthy is counted, not dropped.
+func TestPerCallTimeoutIsCounted(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	r := state(0, "x")
+	r.Class = retention.ClassState
+	seed(t, m, r)
+	h := &hookStore{Store: m, fail: func(string) error { return context.DeadlineExceeded }}
+	rep, err := jan(t, h).Run(context.Background(), base.Add(400*day))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st := rep.Classes[retention.ClassState]; st.Errors == 0 || st.FirstError != "timeout" {
+		t.Fatalf("state = %+v: a timed-out call must be counted as a timeout", st)
+	}
+}
