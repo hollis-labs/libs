@@ -607,6 +607,49 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		_ = keep
 	}))
 
+	// The largest-bucket rule is explicit: while the daily bucket is open, nothing
+	// is counted hourly either. The buckets are a retention summary, not a live metric.
+	t.Run("LargestBucketDelaysTheSmallerBucketCounts", guard(func(t *testing.T) {
+		f := newFixture(t)
+		add(t, f, row(retention.ClassState, 5*time.Minute, "a"))
+		spec := retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(time.Hour), retention.D(day)}}
+		spec.ClosedBefore = t0.Add(3 * time.Hour) // the hour is closed, the day is not
+		if r := must(f.Store().Rollup(ctx, "s", spec, retention.Op{})); r.Rows != 0 || len(f.Buckets("s")) != 0 {
+			t.Fatalf("Rollup = %+v, buckets %v: nothing may be counted, even hourly, while the daily bucket is open", r, f.Buckets("s"))
+		}
+		spec.ClosedBefore = t0.Add(day)
+		if r := must(f.Store().Rollup(ctx, "s", spec, retention.Op{})); r.Rows != 1 || len(f.Buckets("s")) != 2 {
+			t.Fatalf("after the day closed: %+v, buckets %v; want the row in both the hourly and the daily bucket", r, f.Buckets("s"))
+		}
+	}))
+
+	// A change of the configured bucket set is forward only: a row already rolled
+	// up is not counted again (no history for a new size, no double counting),
+	// and rows rolled afterwards go into the new set.
+	t.Run("BucketSetChangesApplyForwardOnly", guard(func(t *testing.T) {
+		f := newFixture(t)
+		add(t, f, row(retention.ClassState, 5*time.Minute, "old"))
+		st := f.Store()
+		hourly := retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(day)}
+		must(st.Rollup(ctx, "s", hourly, retention.Op{}))
+		add(t, f, row(retention.ClassState, 2*time.Hour, "new"))
+		both := retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(time.Hour), retention.D(day)}, ClosedBefore: t0.Add(2 * day)}
+		if r := must(st.Rollup(ctx, "s", both, retention.Op{})); r.Rows != 1 {
+			t.Fatalf("Rollup after the change = %+v: only the new row is rolled", r)
+		}
+		var hours, days uint64
+		for _, b := range f.Buckets("s") {
+			if b.Size == retention.D(time.Hour) {
+				hours += b.Count
+			} else {
+				days += b.Count
+			}
+		}
+		if hours != 2 || days != 1 {
+			t.Fatalf("hourly buckets count %d rows, daily %d; want 2 and 1 (the old row has no daily history, and nothing is counted twice)", hours, days)
+		}
+	}))
+
 	t.Run("ConcurrentCallsCountEachRowOnce", guard(func(t *testing.T) {
 		f := newFixture(t)
 		for i := range 12 {
