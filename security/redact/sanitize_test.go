@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func sanitizerFor(t testing.TB, p Policy, opts ...Option) *Sanitizer {
@@ -117,7 +118,7 @@ func TestSanitizeAllowlist(t *testing.T) {
 	if string(out) != want || r.Redactions != 4 || r.Sensitivity != Secret {
 		t.Fatalf("unexpected allowlist result/report: %+v", r)
 	}
-	if !reflect.DeepEqual(r.Paths, []string{"/rows/0/extra", "/rows/1/status", "/password", "/unknown"}) {
+	if !reflect.DeepEqual(r.Paths, []string{"/rows/0/*", "/rows/1/*", "/password", "/*"}) {
 		t.Fatal("incorrect JSON pointers")
 	}
 	// Empty policy removes all undeclared members. Parent path is not a subtree grant.
@@ -269,6 +270,7 @@ func TestProviderCandidateScanPreservesRanges(t *testing.T) {
 		"gh" + "p_" + strings.Repeat("Q", 32),
 		"sk" + "-proj-" + strings.Repeat("K", 30),
 		"SG" + "." + strings.Repeat("a", 20) + "." + strings.Repeat("b", 20),
+		"sk-" + strings.Repeat("b", 20) + "_" + "eyJ" + strings.Repeat("c", 8) + "." + strings.Repeat("d", 8) + ".",
 		"eyJ" + strings.Repeat("a", 12) + "." + strings.Repeat("b", 12) + ".",
 	}
 	for _, key := range fixtures {
@@ -283,4 +285,148 @@ func TestProviderCandidateScanPreservesRanges(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestSanitizeCorrelationMetadata(t *testing.T) {
+	trace := strings.Repeat("a1", 16)
+	s := sanitizerFor(t, Policy{Mode: Denylist})
+	for _, key := range []string{"trace_id", "span_id", "traceparent", "payload_digest", "source_hash"} {
+		payload, _ := json.Marshal(map[string]any{key: trace, "event_id": "evt_" + trace, "sha256": strings.Repeat("a1", 32)})
+		out, r := s.Sanitize(payload)
+		if !bytes.Contains(out, []byte(trace)) || r.PII || r.Redactions != 0 {
+			t.Fatalf("correlation metadata scrubbed under %s", key)
+		}
+		// The exception never disables other PII or credential detectors.
+		for _, value := range []string{"reader@example.test", "gh" + "p_" + strings.Repeat("Q", 32)} {
+			payload, _ = json.Marshal(map[string]any{key: value})
+			out, r = s.Sanitize(payload)
+			if bytes.Contains(out, []byte(value)) || r.Redactions == 0 {
+				t.Fatalf("other detector disabled under %s", key)
+			}
+		}
+	}
+	payload, _ := json.Marshal(map[string]any{"tool_call": map[string]any{"trace_id": trace}, "customer_id": trace})
+	out, r := s.Sanitize(payload)
+	if !r.PII || r.Redactions != 1 || !bytes.Contains(out, []byte(`"trace_id":"`+trace+`"`)) {
+		t.Fatal("Nanite rule exception leaked to unrelated field")
+	}
+	// Dropping a container must not manufacture a PII hit from its trace metadata.
+	drop := sanitizerFor(t, Policy{})
+	payload, _ = json.Marshal(map[string]any{"tool_call": map[string]any{"trace_id": trace}})
+	_, r = drop.Sanitize(payload)
+	if r.PII {
+		t.Fatal("dropped correlation metadata classified PII")
+	}
+}
+
+func TestSanitizeSecurityReviewProbes(t *testing.T) {
+	t.Run("normalized and joined keys", func(t *testing.T) {
+		s := sanitizerFor(t, Policy{Mode: Denylist})
+		for _, key := range []string{"pass\u200bword", "ｐａｓｓｗｏｒｄ", "𝐩𝐚𝐬𝐬𝐰𝐨𝐫𝐝", "pass_word", "api_key", "apikey", "api-key"} {
+			value := "synthetic-" + "fixture-value"
+			payload, _ := json.Marshal(map[string]string{key: value})
+			out, r := s.Sanitize(payload)
+			if bytes.Contains(out, []byte(value)) || r.Sensitivity != Secret || r.Redactions != 1 {
+				t.Fatal("normalized/joined secret key evaded policy")
+			}
+		}
+	})
+	t.Run("private dropped key never reported", func(t *testing.T) {
+		for _, mode := range []Mode{Allowlist, Denylist} {
+			s := sanitizerFor(t, Policy{Mode: mode, AllowedPaths: []string{"/msg"}})
+			input := []byte(`{"msg":"hi","John Smith private notes":"reader@example.test"}`)
+			_, r := s.Sanitize(input)
+			audit, _ := json.Marshal(r)
+			if bytes.Contains(audit, []byte("John Smith")) || !reflect.DeepEqual(r.Paths, []string{"/*"}) {
+				t.Fatal("unapproved field name leaked into audit report")
+			}
+		}
+	})
+	t.Run("benign drop stays public", func(t *testing.T) {
+		s := sanitizerFor(t, Policy{AllowedPaths: []string{"/msg"}})
+		out, r := s.Sanitize([]byte(`{"msg":"hello","extra":"benign text"}`))
+		if string(out) != `{"msg":"hello"}` || r.Sensitivity != Public || r.Redactions != 1 || r.PII {
+			t.Fatalf("benign drop misclassified: %+v", r)
+		}
+	})
+	for _, value := range []string{"peer 2001:db8::1.", "call 202-555-0123 202-555-0145", "john.smith%40example.com"} {
+		s := sanitizerFor(t, Policy{Mode: Denylist})
+		out, r := s.Sanitize(jsonString(value))
+		if bytes.Contains(out, []byte(value)) || !r.PII || r.Sensitivity != Private || r.Redactions == 0 {
+			t.Fatal("PII boundary/encoding probe escaped")
+		}
+		if strings.HasPrefix(value, "call") && r.Redactions != 2 {
+			t.Fatal("adjacent phone numbers not independently scrubbed")
+		}
+		// Both reviewers found that a missed detector also exposed a dynamic key.
+		payload, _ := json.Marshal(map[string]string{value: "x"})
+		out, r = sanitizerFor(t, Policy{}).Sanitize(payload)
+		audit, _ := json.Marshal(r)
+		if string(out) != "{}" || bytes.Contains(audit, []byte(value)) || !r.PII || !reflect.DeepEqual(r.Paths, []string{"/*"}) {
+			t.Fatal("PII key or audit path escaped")
+		}
+	}
+}
+
+func FuzzSanitizeAllowlist(f *testing.F) {
+	f.Add("private field name", "private-value-eight", "/msg")
+	f.Add("pass\u200bword", "reader@example.test", "/rows/*/msg")
+	f.Add("a/b~c", strings.Repeat("a1", 16), "/~2")
+	f.Fuzz(func(t *testing.T, key, value, path string) {
+		// Exercise pointer validation independently; malformed policies must return
+		// a value-free error. A fixed schema makes noninterference testable.
+		_, _ = NewSanitizer(Policy{AllowedPaths: []string{path}})
+		if key == "msg" || !utf8.ValidString(key) || !utf8.ValidString(value) {
+			return
+		}
+		s := sanitizerFor(t, Policy{AllowedPaths: []string{"/msg"}})
+		input, _ := json.Marshal(map[string]any{"msg": "ok", key: value})
+		out, r := s.Sanitize(input)
+		if !json.Valid(out) {
+			t.Fatal("invalid allowlist output")
+		}
+		if r.ErrorClass != "" {
+			return
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal(out, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if len(decoded) != 1 || decoded["msg"] != "ok" {
+			t.Fatal("unlisted field survived")
+		}
+		if len(value) >= 8 && bytes.Contains(out, []byte(value)) {
+			t.Fatal("unlisted value survived")
+		}
+		for _, p := range r.Paths {
+			if p != "/*" {
+				t.Fatal("unapproved key entered a report path")
+			}
+		}
+	})
+}
+
+func FuzzSanitizeKeys(f *testing.F) {
+	f.Add("pass\u200bword")
+	f.Add("private person notes")
+	f.Add("2001:db8::1.")
+	f.Fuzz(func(t *testing.T, key string) {
+		if !utf8.ValidString(key) {
+			return
+		}
+		s := sanitizerFor(t, Policy{})
+		input, _ := json.Marshal(map[string]any{key: "ordinary unapproved value"})
+		out, r := s.Sanitize(input)
+		if !json.Valid(out) {
+			t.Fatal("key produced invalid JSON")
+		}
+		if r.ErrorClass == "" && string(out) != "{}" {
+			t.Fatal("unlisted key survived")
+		}
+		for _, p := range r.Paths {
+			if p != "/*" {
+				t.Fatal("key leaked to report")
+			}
+		}
+	})
 }

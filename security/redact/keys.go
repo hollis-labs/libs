@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"golang.org/x/text/unicode/norm"
 	"strings"
 	"unicode"
 )
@@ -50,8 +51,31 @@ func benignWord(w string) bool {
 	return false
 }
 
+// Normalize before splitting: format characters must not introduce word
+// boundaries, and compatibility spellings must share the same key policy.
+func normalizeKeyName(name string) string {
+	ascii := true
+	for i := range name {
+		if name[i] >= 0x80 {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return name
+	}
+	name = strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, name)
+	return norm.NFKC.String(name)
+}
+
 // segments splits a key into lower-case words.
 func segments(name string) []string {
+	name = normalizeKeyName(name)
 	var out []string
 	var cur []rune
 	flush := func() {
@@ -118,7 +142,7 @@ func (p *keyPolicy) sensitive(name string) bool {
 	if benignLast[segs[len(segs)-1]] {
 		return false
 	}
-	hit := false
+	hit := sensitiveWords[strings.Join(segs, "")]
 	for i, w := range segs {
 		if benignWord(w) {
 			continue

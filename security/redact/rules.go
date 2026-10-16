@@ -142,33 +142,43 @@ var (
 var providerPrefixes = []string{"sk-", "sk_", "rk_", "whsec_", "ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "xox", "xapp-",
 	"AKIA", "ASIA", "AGPA", "AIDA", "AROA", "ANPA", "ANVA", "glpat-", "AIza", "npm_", "SG.", "ya29.", "hf_", "dop_v1_", "eyJ"}
 
-func findProviderKey(_ *Redactor, s *scanText, add func(a, b int)) {
-	// Run the provider pattern only on credential-shaped words starting at a
-	// known prefix. Searching ordinary prose with the large alternation is costly.
+var providerPrefixBuckets = func() [256][]string {
+	var buckets [256][]string
 	for _, prefix := range providerPrefixes {
-		for offset := 0; offset < len(s.t); {
-			i := strings.Index(s.t[offset:], prefix)
-			if i < 0 {
+		buckets[prefix[0]] = append(buckets[prefix[0]], prefix)
+	}
+	return buckets
+}()
+
+func findProviderKey(_ *Redactor, s *scanText, add func(a, b int)) {
+	// The shortest provider shape is 15 bytes. Examine only word boundaries
+	// whose initial byte can begin a known prefix; regex sees candidate words.
+	for a := 0; a+15 <= len(s.t); a++ {
+		if a > 0 && asciiAlphaNum(s.t[a-1]) {
+			continue
+		}
+		found := false
+		for _, prefix := range providerPrefixBuckets[s.t[a]] {
+			if strings.HasPrefix(s.t[a:], prefix) {
+				found = true
 				break
 			}
-			a := offset + i
-			offset = a + len(prefix)
-			if a > 0 && asciiAlphaNum(s.t[a-1]) {
-				continue
-			}
-			b := a
-			for b < len(s.t) && (asciiAlphaNum(s.t[b]) || strings.ContainsRune("_.-", rune(s.t[b]))) {
-				b++
-			}
-			offset = b // the candidate scan below includes every provider shape in this word
-			start := a
-			if start > 0 {
-				start--
-			}
-			for _, m := range providerKeyRe.FindAllStringSubmatchIndex(s.t[start:b], -1) {
-				add(start+m[2], start+m[3])
-			}
 		}
+		if !found {
+			continue
+		}
+		b := a
+		for b < len(s.t) && (asciiAlphaNum(s.t[b]) || strings.ContainsRune("_.-", rune(s.t[b]))) {
+			b++
+		}
+		start := a
+		if start > 0 {
+			start--
+		}
+		for _, m := range providerKeyRe.FindAllStringSubmatchIndex(s.t[start:b], -1) {
+			add(start+m[2], start+m[3])
+		}
+		a = b - 1
 	}
 }
 

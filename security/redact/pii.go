@@ -21,7 +21,7 @@ var (
 )
 
 func piiRules() []rule {
-	return []rule{
+	rules := []rule{
 		{RuleEmail, findEmail},
 		{RulePhone, findPhone},
 		{RuleIPv4, findIPv4},
@@ -29,6 +29,10 @@ func piiRules() []rule {
 		{RuleCard, findCard},
 		{RuleNaniteID, findNaniteID},
 	}
+	for i := range rules {
+		rules[i].find = percentPII(rules[i].find)
+	}
+	return rules
 }
 
 func isPIIRule(name string) bool {
@@ -115,14 +119,20 @@ func findIPv6(_ *Redactor, s *scanText, add func(int, int)) {
 				b++
 			}
 		}
-		if strings.Count(t[a:b], ":") >= 2 && bounded(t, a, b) {
-			if ip, err := netip.ParseAddr(t[a:b]); err == nil && ip.Is6() {
-				add(a, b)
+		end := b
+		for end > a && t[end-1] == '.' {
+			end--
+		}
+		if strings.Count(t[a:end], ":") >= 2 && bounded(t, a, end) {
+			if ip, err := netip.ParseAddr(t[a:end]); err == nil && ip.Is6() {
+				add(a, end)
 			}
 		}
 		a = b
 	}
 }
+
+var nationalPhoneRE = regexp.MustCompile(`(?:\+?1[ .-]?)?(?:\([0-9]{3}\)|[0-9]{3})[ .-]?[0-9]{3}[ .-]?[0-9]{4}`)
 
 func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 	t := s.t
@@ -141,6 +151,11 @@ func findPhone(_ *Redactor, s *scanText, add func(int, int)) {
 		}
 		if end > a && bounded(t, a, end) {
 			v := t[a:end]
+			for _, m := range nationalPhoneRE.FindAllStringIndex(v, -1) {
+				if bounded(t, a+m[0], a+m[1]) {
+					add(a+m[0], a+m[1])
+				}
+			}
 			n := 0
 			for i := range v {
 				if digit(v[i]) {
@@ -214,4 +229,51 @@ func findNaniteID(_ *Redactor, s *scanText, add func(int, int)) {
 		}
 		a = b
 	}
+}
+
+// PII rules also inspect one percent-decoded view; offsets always map back to
+// the original encoded bytes. The raw pass retains IPv6 zone and literal '%' semantics.
+func percentPII(find finder) finder {
+	return func(r *Redactor, s *scanText, add func(int, int)) {
+		find(r, s, add)
+		if !strings.Contains(s.t, "%") {
+			return
+		}
+		v := percentView(s.t)
+		if v.orig == nil {
+			return
+		}
+		find(r, newScanText(v.text), func(a, b int) { add(v.at(a), v.at(b)) })
+	}
+}
+func percentView(s string) view {
+	out := make([]byte, 0, len(s))
+	offsets := make([]int, 0, len(s)+1)
+	changed := false
+	for i := 0; i < len(s); {
+		if s[i] == '%' && i+2 < len(s) && hex(s[i+1]) && hex(s[i+2]) {
+			out = append(out, hexValue(s[i+1])<<4|hexValue(s[i+2]))
+			offsets = append(offsets, i)
+			i += 3
+			changed = true
+		} else {
+			out = append(out, s[i])
+			offsets = append(offsets, i)
+			i++
+		}
+	}
+	if !changed {
+		return view{text: s}
+	}
+	offsets = append(offsets, len(s))
+	return view{text: string(out), orig: offsets}
+}
+func hexValue(c byte) byte {
+	if c >= '0' && c <= '9' {
+		return c - '0'
+	}
+	if c >= 'A' && c <= 'F' {
+		return c - 'A' + 10
+	}
+	return c - 'a' + 10
 }
