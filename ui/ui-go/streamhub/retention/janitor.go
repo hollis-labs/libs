@@ -99,8 +99,6 @@ type Report struct {
 	// HeldByHead counts rows past their envelope age that a head-only trim
 	// could not remove because an earlier row must stay.
 	HeldByHead int64
-	// Unresolved lists policy ids the planner could not resolve; those rows were left alone.
-	Unresolved []string
 	// StoppedEarly is true when the budget (rows or time) ended the pass.
 	StoppedEarly bool
 	// Resume, when StoppedEarly, is the token to pass to RunFrom. Starting over
@@ -221,7 +219,6 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (Re
 	}
 	sort.Strings(streams)
 	p := &pass{j: j, rep: &rep, start: t0}
-	unresolved := map[string]bool{}
 	for _, stream := range streams {
 		if resume != "" && stream < resume {
 			continue
@@ -234,7 +231,7 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (Re
 			return rep, nil
 		}
 		rep.Streams++
-		if err := p.stream(ctx, stream, now, unresolved); err != nil {
+		if err := p.stream(ctx, stream, now); err != nil {
 			return rep, err
 		}
 		if p.stopped {
@@ -242,10 +239,6 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (Re
 			break
 		}
 	}
-	for id := range unresolved {
-		rep.Unresolved = append(rep.Unresolved, id)
-	}
-	sort.Strings(rep.Unresolved)
 	return rep, nil
 }
 
@@ -266,7 +259,7 @@ func (p *pass) drain(ctx context.Context, f func(Op) (rows int64, more bool, err
 	}
 }
 
-func (p *pass) stream(ctx context.Context, stream string, now time.Time, unresolved map[string]bool) error {
+func (p *pass) stream(ctx context.Context, stream string, now time.Time) error {
 	j, rep := p.j, p.rep
 	st := j.store
 	fail := func(class string, err error) {
@@ -275,17 +268,7 @@ func (p *pass) stream(ctx context.Context, stream string, now time.Time, unresol
 		}
 	}
 
-	ids, err := st.PolicyIDs(ctx, stream)
-	if err != nil {
-		fail("", err)
-		return ctx.Err()
-	}
-	// Rollup buckets carry no policy id and are pruned by the current policy,
-	// so "" is always planned, even when no row carries it.
-	plan := j.planner.Plan(now, append(ids, ""))
-	for _, id := range plan.Unresolved {
-		unresolved[id] = true
-	}
+	plan := j.planner.Plan(now)
 
 	// 1. classify rows that have no class yet.
 	if classOf, ok := classifier(j.planner); ok {

@@ -9,13 +9,9 @@ import (
 
 var now = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-func plan(t *testing.T, c retention.Config, ids ...string) retention.Plan {
+func plan(t *testing.T, c retention.Config) retention.Plan {
 	t.Helper()
-	p := mustResolve(t, c)
-	if len(ids) == 0 {
-		ids = []string{""}
-	}
-	return retention.NewPlanner(retention.CurrentOnly(p)).Plan(now, ids)
+	return retention.NewPlanner(mustResolve(t, c)).Plan(now)
 }
 
 func tomb(pl retention.Plan, class string, pii bool) (retention.TombstoneSpec, bool) {
@@ -132,47 +128,39 @@ func TestPlanForeverPIIEverywhereWhenCapDisabled(t *testing.T) {
 	}
 }
 
-func TestPlanIsDeterministicAndPerPolicy(t *testing.T) {
-	old := mustResolve(t, retention.Config{Classes: map[string]retention.ClassPolicy{
-		retention.ClassActivity: {Full: retention.D(10 * retention.Day), Envelope: retention.D(20 * retention.Day)}}})
-	cur := mustResolve(t, retention.Config{})
-	res := func(id string) (*retention.Policy, bool) {
-		switch id {
-		case "", "v2":
-			return cur, true
-		case "v1":
-			return old, true
-		}
-		return nil, false
-	}
-	pl := retention.NewPlanner(res).Plan(now, []string{"v2", "v1", "", "v1", "gone"})
-	if len(pl.Unresolved) != 1 || pl.Unresolved[0] != "gone" {
-		t.Fatalf("unresolved = %v; an unknown policy id must be reported, never guessed", pl.Unresolved)
-	}
-	// Each admitted policy keeps its own cutoffs.
-	got := map[string]time.Time{}
-	for _, s := range pl.Tombstones {
-		if s.Class == retention.ClassActivity && !s.PII && !s.Secret {
-			got[s.PolicyID] = s.Before
+// D7 rev 2.2: R-audit rows are never head-trimmed, and a finite audit Full
+// tombstones the payload only. Configuration cannot change that.
+func TestAuditIsNeverTrimmedEvenWhenConfiguredFinite(t *testing.T) {
+	c := retention.Config{Acknowledge: true, Classes: map[string]retention.ClassPolicy{
+		retention.ClassAudit: {Full: retention.D(400 * retention.Day), Envelope: retention.D(500 * retention.Day),
+			Rollups: []retention.Rollup{{Bucket: retention.D(retention.Day)}}}}}
+	pl := plan(t, c)
+	for _, tr := range pl.Trims {
+		if tr.Class == retention.ClassAudit {
+			t.Fatalf("audit planned for trim: %+v", tr)
 		}
 	}
-	if !got["v1"].Equal(now.Add(-10*retention.Day)) || !got["v2"].Equal(now.Add(-30*retention.Day)) || !got[""].Equal(now.Add(-30*retention.Day)) {
-		t.Fatalf("per-policy cutoffs = %v", got)
+	if s, ok := tomb(pl, retention.ClassAudit, false); !ok || !s.Before.Equal(now.Add(-400*retention.Day)) || s.Withhold {
+		t.Fatalf("a finite audit Full must tombstone the payload at 400d: %+v, %v", s, ok)
 	}
-	again := retention.NewPlanner(res).Plan(now, []string{"", "gone", "v1", "v2"})
-	if len(again.Tombstones) != len(pl.Tombstones) || len(again.Trims) != len(pl.Trims) {
-		t.Fatal("plan depends on the order of the policy ids")
+}
+
+// The current configuration governs every row: planning depends on nothing else.
+func TestPlanIsDeterministic(t *testing.T) {
+	a, b := plan(t, retention.Config{}), plan(t, retention.Config{})
+	if len(a.Tombstones) != len(b.Tombstones) {
+		t.Fatal("plans differ")
 	}
-	for i := range pl.Tombstones {
-		if pl.Tombstones[i] != again.Tombstones[i] {
-			t.Fatalf("tombstone %d differs: %+v vs %+v", i, pl.Tombstones[i], again.Tombstones[i])
+	for i := range a.Tombstones {
+		if a.Tombstones[i] != b.Tombstones[i] {
+			t.Fatalf("tombstone %d differs: %+v vs %+v", i, a.Tombstones[i], b.Tombstones[i])
 		}
 	}
 }
 
-func TestNilPlannerLeavesEverythingUntouched(t *testing.T) {
-	pl := retention.NewPlanner(nil).Plan(now, []string{""})
-	if len(pl.Tombstones)+len(pl.Trims)+len(pl.Rollups)+len(pl.Prunes) != 0 || len(pl.Unresolved) != 1 {
+func TestNilPolicyPlansNothing(t *testing.T) {
+	pl := retention.NewPlanner(nil).Plan(now)
+	if len(pl.Tombstones)+len(pl.Trims)+len(pl.Rollups)+len(pl.Prunes) != 0 {
 		t.Fatalf("plan = %+v", pl)
 	}
 }

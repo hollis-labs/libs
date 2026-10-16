@@ -15,8 +15,9 @@ type Dims struct{ Kind, Project, Workstream, Agent, Outcome string }
 
 // Row is a row to seed. Class may be empty to exercise classification.
 type Row struct {
-	Stream   string
-	Class    string
+	Stream string
+	Class  string
+	// PolicyID is the policy the row was admitted under: audit only, it never changes what the janitor does to the row.
 	PolicyID string
 	At       time.Time
 	Attrs    retention.Attrs

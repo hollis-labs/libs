@@ -165,9 +165,9 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		}
 	}))
 
-	t.Run("TombstoneRespectsLimitAndPolicyID", guard(func(t *testing.T) {
+	t.Run("TombstoneRespectsLimitAndIgnoresAdmittedPolicyID", guard(func(t *testing.T) {
 		f := newFixture(t)
-		for range 5 {
+		for range 4 {
 			add(t, f, row(retention.ClassState, 0, "x"))
 		}
 		other := row(retention.ClassState, 0, "keep")
@@ -193,12 +193,9 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		if total != 5 || calls != 3 {
 			t.Fatalf("total %d in %d calls, want 5 in 3", total, calls)
 		}
-		if byClass(f.Rows("s"), o).Tombstoned {
-			t.Fatal("a row with another policy id was touched")
-		}
-		ids := must(st.PolicyIDs(ctx, "s"))
-		if len(ids) != 2 || ids[0] != "" || ids[1] != "v1" {
-			t.Fatalf("PolicyIDs = %v", ids)
+		// D7 rev 2.2: the admitted policy id is for audit only; the current config governs every row.
+		if !byClass(f.Rows("s"), o).Tombstoned {
+			t.Fatal("a row admitted under another policy id was shielded from the current configuration")
 		}
 	}))
 

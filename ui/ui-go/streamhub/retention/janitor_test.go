@@ -21,7 +21,7 @@ var (
 func jan(t *testing.T, st retention.Store, opts ...retention.Option) *retention.Janitor {
 	t.Helper()
 	p := mustResolve(t, retention.Config{})
-	return retention.NewJanitor(st, retention.NewPlanner(retention.CurrentOnly(p)), opts...)
+	return retention.NewJanitor(st, retention.NewPlanner(p), opts...)
 }
 
 func seed(t *testing.T, m *storetest.Mem, r storetest.Row) uint64 {
@@ -354,25 +354,19 @@ func TestJanitorSkipsWhenLocked(t *testing.T) {
 	}
 }
 
-func TestJanitorLeavesUnresolvedPolicyRowsAlone(t *testing.T) {
+// D7 rev 2.2: the policy id a row was admitted under is audit only; the current
+// configuration governs it.
+func TestJanitorAppliesTheCurrentConfigToRowsAdmittedUnderAnotherPolicy(t *testing.T) {
 	m := storetest.NewMem(retention.TrimHeadOnly)
-	known := state(0, "x")
-	unknown := state(0, "y")
-	unknown.PolicyID = "retired"
-	seed(t, m, known)
-	u := seed(t, m, unknown)
-	p := mustResolve(t, retention.Config{})
-	j := retention.NewJanitor(m, retention.NewPlanner(func(id string) (*retention.Policy, bool) { return p, id == "" }))
-	rep, err := j.Run(context.Background(), base.Add(400*day))
-	if err != nil {
+	old := state(0, "y")
+	old.PolicyID = "v0"
+	u := seed(t, m, old)
+	if _, err := jan(t, m).Run(context.Background(), base.Add(400*day)); err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Unresolved) != 1 || rep.Unresolved[0] != "retired" {
-		t.Fatalf("unresolved = %v", rep.Unresolved)
-	}
 	for _, r := range m.Rows("env") {
-		if r.Seq == u && (r.Tombstoned || r.Payload == nil) {
-			t.Fatalf("a row under an unknown policy was changed: %+v", r)
+		if r.Seq == u && !r.Tombstoned {
+			t.Fatalf("a row admitted under another policy id was shielded: %+v", r)
 		}
 	}
 }
