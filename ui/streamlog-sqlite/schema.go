@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS records (
 	data           BLOB,
 	digest         BLOB    NOT NULL,
 	payload_digest TEXT,
+	class          TEXT    NOT NULL DEFAULT '',
+	policy_id      TEXT    NOT NULL DEFAULT '',
+	rolled         INTEGER NOT NULL DEFAULT 0,
+	outcome        TEXT    NOT NULL DEFAULT '',
 	category       TEXT    NOT NULL DEFAULT '',
 	severity       TEXT    NOT NULL DEFAULT '',
 	sensitivity    TEXT    NOT NULL DEFAULT '',
@@ -54,12 +58,15 @@ CREATE INDEX IF NOT EXISTS records_workstream ON records (stream, workstream_id,
 CREATE INDEX IF NOT EXISTS records_agent    ON records (stream, agent_urn, seq)    WHERE agent_urn <> '';
 CREATE INDEX IF NOT EXISTS records_kind     ON records (stream, kind, seq);
 CREATE INDEX IF NOT EXISTS records_at       ON records (stream, at_ns);
+CREATE INDEX IF NOT EXISTS records_unrolled ON records (stream, class, seq) WHERE rolled = 0;
+CREATE INDEX IF NOT EXISTS records_unclassified ON records (stream, seq) WHERE class = '';
 
 -- Rollup buckets (retention tier 3). Filled by the retention janitor; the
 -- table is part of the log schema so a log never needs a separate migration.
 CREATE TABLE IF NOT EXISTS rollups (
 	stream        TEXT    NOT NULL,
-	bucket_size   TEXT    NOT NULL,
+	class         TEXT    NOT NULL,
+	bucket_ns     INTEGER NOT NULL,
 	bucket_start  INTEGER NOT NULL,
 	kind          TEXT    NOT NULL,
 	category      TEXT    NOT NULL DEFAULT '',
@@ -71,6 +78,6 @@ CREATE TABLE IF NOT EXISTS rollups (
 	count         INTEGER NOT NULL,
 	first_seq     INTEGER NOT NULL,
 	last_seq      INTEGER NOT NULL,
-	PRIMARY KEY (stream, bucket_size, bucket_start, kind, category, severity, project_id, workstream_id, agent_urn, outcome)
+	PRIMARY KEY (stream, class, bucket_ns, bucket_start, kind, category, severity, project_id, workstream_id, agent_urn, outcome)
 ) WITHOUT ROWID;
 `
