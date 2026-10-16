@@ -8,6 +8,8 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.5.0 — 2026-10-16
+
 ### Added
 
 - Envelope v1.1 fields on `Event`, all optional and additive (`SchemaVersion`
