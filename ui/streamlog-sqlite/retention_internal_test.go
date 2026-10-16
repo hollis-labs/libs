@@ -143,7 +143,7 @@ func TestJanitorOnALog(t *testing.T) {
 	_ = dbg1
 
 	clock = clock.Add(20 * 24 * time.Hour)
-	j := retention.NewJanitor(l.RetentionStore(), retention.NewPlanner(func(id string) (*retention.Policy, bool) { return policy, id == "v1" || id == "" }))
+	j := retention.NewJanitor(l.RetentionStore(), retention.NewPlanner(policy))
 	rep, err := j.Run(ctx, clock)
 	if err != nil {
 		t.Fatal(err)

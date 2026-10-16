@@ -59,8 +59,10 @@ type Options struct {
 	// OnStorageMismatch is the restore policy; see [MismatchPolicy].
 	// Retention, when set, classifies each record at append (its retention
 	// class is stored beside it) and RetentionPolicyID is stamped on the
-	// record as the policy it was admitted under. Without it records are
-	// stored with no class and the first janitor pass classifies them.
+	// record as the policy it was admitted under, for audit only: the janitor
+	// applies the current configuration to every row (D7 rev 2.2). Without
+	// Retention records are stored with no class and the first janitor pass
+	// classifies them.
 	Retention         *retention.Policy
 	RetentionPolicyID string
 	OnStorageMismatch MismatchPolicy

@@ -62,27 +62,6 @@ func (s *retentionStore) Streams(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
-func (s *retentionStore) PolicyIDs(ctx context.Context, stream string) ([]string, error) {
-	if err := s.l.enter(); err != nil {
-		return nil, err
-	}
-	defer s.l.leave()
-	rows, err := s.l.r.QueryContext(ctx, `SELECT DISTINCT policy_id FROM records WHERE stream=? ORDER BY 1`, stream)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
-}
-
 func (s *retentionStore) Stats(ctx context.Context, stream string) ([]retention.ClassStat, error) {
 	if err := s.l.enter(); err != nil {
 		return nil, err
@@ -123,6 +102,24 @@ func (s *retentionStore) tx(ctx context.Context, f func(*sql.Tx) error) error {
 	return tx.Commit()
 }
 
+// dry runs a counting query for a dry-run call under the call's MaxDuration. A
+// count that cannot finish in time is not an error: it reports More with
+// whatever lower bound was reached (none).
+func (s *retentionStore) dry(ctx context.Context, op retention.Op, f func(context.Context) error) (more bool, err error) {
+	if op.MaxDuration > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, op.MaxDuration)
+		defer cancel()
+	}
+	if err := f(ctx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) && ctx.Err() == context.DeadlineExceeded {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
 func limitOf(op retention.Op) int {
 	if op.Limit > 0 {
 		return op.Limit
@@ -133,7 +130,10 @@ func limitOf(op retention.Op) int {
 func (s *retentionStore) Classify(ctx context.Context, stream string, classOf func(retention.Attrs) string, op retention.Op) (retention.Result, error) {
 	var res retention.Result
 	if op.DryRun {
-		err := s.l.r.QueryRowContext(ctx, `SELECT count(*) FROM records WHERE stream=? AND class=''`, stream).Scan(&res.Rows)
+		var err error
+		res.More, err = s.dry(ctx, op, func(c context.Context) error {
+			return s.l.r.QueryRowContext(c, `SELECT count(*) FROM records WHERE stream=? AND class=''`, stream).Scan(&res.Rows)
+		})
 		return res, err
 	}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
@@ -215,14 +215,17 @@ func (s *retentionStore) Rollup(ctx context.Context, stream string, sp retention
 		return res, nil
 	}
 	bound := closedBound(sp.Buckets[len(sp.Buckets)-1], sp.ClosedBefore)
-	const where = `stream=? AND rolled=0 AND class=? AND policy_id=? AND at_ns < ?`
+	const where = `stream=? AND rolled=0 AND class=? AND at_ns < ?`
 	if op.DryRun {
-		err := s.l.r.QueryRowContext(ctx, `SELECT count(*) FROM records WHERE `+where, stream, sp.Class, sp.PolicyID, bound).Scan(&res.Rows)
+		var err error
+		res.More, err = s.dry(ctx, op, func(c context.Context) error {
+			return s.l.r.QueryRowContext(c, `SELECT count(*) FROM records WHERE `+where, stream, sp.Class, bound).Scan(&res.Rows)
+		})
 		return res, err
 	}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT seq, at_ns, kind, category, severity, project_id, workstream_id, agent_urn, outcome
-			FROM records WHERE `+where+` ORDER BY seq LIMIT ?`, stream, sp.Class, sp.PolicyID, bound, limitOf(op)+1)
+			FROM records WHERE `+where+` ORDER BY seq LIMIT ?`, stream, sp.Class, bound, limitOf(op)+1)
 		if err != nil {
 			return err
 		}
@@ -287,8 +290,8 @@ func (s *retentionStore) Rollup(ctx context.Context, stream string, sp retention
 
 func (s *retentionStore) Tombstone(ctx context.Context, stream string, sp retention.TombstoneSpec, op retention.Op) (retention.Result, error) {
 	var res retention.Result
-	where := `stream=? AND tier=0 AND policy_id=? AND at_ns <= ?`
-	args := []any{stream, sp.PolicyID, sp.Before.UnixNano()}
+	where := `stream=? AND tier=0 AND at_ns <= ?`
+	args := []any{stream, sp.Before.UnixNano()}
 	if sp.Secret {
 		where += ` AND sensitivity='secret'`
 	} else {
@@ -296,7 +299,10 @@ func (s *retentionStore) Tombstone(ctx context.Context, stream string, sp retent
 		args = append(args, sp.Class, sp.PII)
 	}
 	if op.DryRun {
-		err := s.l.r.QueryRowContext(ctx, `SELECT count(*), COALESCE(sum(length(data)),0) FROM records WHERE `+where, args...).Scan(&res.Rows, &res.BytesFreed)
+		var err error
+		res.More, err = s.dry(ctx, op, func(c context.Context) error {
+			return s.l.r.QueryRowContext(c, `SELECT count(*), COALESCE(sum(length(data)),0) FROM records WHERE `+where, args...).Scan(&res.Rows, &res.BytesFreed)
+		})
 		return res, err
 	}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
@@ -344,16 +350,15 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 	if len(specs) == 0 {
 		return res, nil
 	}
-	type specKey struct{ policy, class string }
-	by := map[specKey]retention.TrimSpec{}
+	by := map[string]retention.TrimSpec{}
 	for _, sp := range specs {
-		by[specKey{sp.PolicyID, sp.Class}] = sp
+		by[sp.Class] = sp
 	}
 	eligibleSQL := make([]string, 0, len(specs))
 	var eargs []any
 	for _, sp := range specs {
-		cond := `(policy_id=? AND class=? AND at_ns <= ?`
-		eargs = append(eargs, sp.PolicyID, sp.Class, sp.Before.UnixNano())
+		cond := `(class=? AND at_ns <= ?`
+		eargs = append(eargs, sp.Class, sp.Before.UnixNano())
 		if sp.RequireRolled {
 			cond += ` AND rolled=1`
 		}
@@ -376,7 +381,7 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 		if op.DryRun {
 			limit = 1 << 30
 		}
-		rows, err := q.QueryContext(ctx, `SELECT seq, class, policy_id, at_ns, rolled, size FROM records WHERE stream=? AND seq>? ORDER BY seq LIMIT ?`, stream, pruned, limit+1)
+		rows, err := q.QueryContext(ctx, `SELECT seq, class, at_ns, rolled, size FROM records WHERE stream=? AND seq>? ORDER BY seq LIMIT ?`, stream, pruned, limit+1)
 		if err != nil {
 			return err
 		}
@@ -384,13 +389,13 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 		stopped := false
 		for rows.Next() {
 			var seq, at, size int64
-			var class, policy string
+			var class string
 			var rolled bool
-			if err := rows.Scan(&seq, &class, &policy, &at, &rolled, &size); err != nil {
+			if err := rows.Scan(&seq, &class, &at, &rolled, &size); err != nil {
 				_ = rows.Close()
 				return err
 			}
-			sp, ok := by[specKey{policy, class}]
+			sp, ok := by[class]
 			if !ok || at > sp.Before.UnixNano() || (sp.RequireRolled && !rolled) {
 				stopped = true
 				break
@@ -419,7 +424,8 @@ func (s *retentionStore) Trim(ctx context.Context, stream string, specs []retent
 	}
 
 	if op.DryRun {
-		err := run(s.l.r, nil)
+		var err error
+		res.More, err = s.dry(ctx, op, func(c context.Context) error { ctx = c; return run(s.l.r, nil) })
 		return res, err
 	}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
@@ -444,7 +450,10 @@ func (s *retentionStore) Prune(ctx context.Context, stream string, sp retention.
 	where := `stream=? AND class=? AND bucket_ns=? AND bucket_start + bucket_ns <= ?`
 	args := []any{stream, sp.Class, int64(sp.Bucket), sp.Before.UnixNano()}
 	if op.DryRun {
-		err := s.l.r.QueryRowContext(ctx, `SELECT count(*) FROM rollups WHERE `+where, args...).Scan(&res.Rows)
+		var err error
+		res.More, err = s.dry(ctx, op, func(c context.Context) error {
+			return s.l.r.QueryRowContext(c, `SELECT count(*) FROM rollups WHERE `+where, args...).Scan(&res.Rows)
+		})
 		return res, err
 	}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
