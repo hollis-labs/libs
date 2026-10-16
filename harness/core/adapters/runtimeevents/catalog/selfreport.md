@@ -34,6 +34,8 @@ Both calls are MCP tools on Torque, with an HTTP equivalent. Their input and out
 - **Result:** `{emitted, event_id?, effective_level, detail_source, suppressed_reason?}`. `suppressed_reason` is `below_detail`, `rate_limited` or `duplicate`. A suppressed report is not an error.
 - **Idempotency first, then rate limit.** A repeated `idempotency_key` returns `duplicate`, with the original `event_id`. Otherwise, at most one report per task per level is emitted every 2 seconds, and extra reports return `rate_limited`.
 - **Shared state.** Idempotency keys (per task and key) and the rate limit are persisted by the Torque server, never held in a client process. A stdio MCP client proxies these calls to the server over HTTP, as workstream claim already does.
+- **Only an emitted report records its key.** A report suppressed as `below_detail` or `rate_limited` leaves no receipt, so the agent may retry it later with the same `idempotency_key`.
+- **A key has one meaning.** Keys share one space per task across both tools. The server stores a digest of the canonical input (every field except `idempotency_key`) with the key. If a key comes back with another tool or a different digest, the call fails with error code `idempotency_conflict`. It does not return the other call's result.
 
 ### `torque_task_data_emit`
 
@@ -42,6 +44,7 @@ Both calls are MCP tools on Torque, with an HTTP equivalent. Their input and out
 - **Input fields:** `task_id`, `run_id?`, `schema` (`id@version`, required), exactly one of `data` or `artifact_id`, `label?` and `idempotency_key?`. `run_id` and `artifact_id` are Torque's numeric ids passed as strings. The artifact, and the run when given, must belong to `task_id`.
 - **Inline data is capped at 16 KiB serialized.** A larger body is first created as a Torque artifact on the same task (`torque_artifact_create`), then referenced by `artifact_id`. An oversized `data` value is rejected with error code `data_too_large`, and the hint names `torque_artifact_create`.
 - **Result:** `{event_id, data_ref, duplicate?}`. `data_ref` is what `progress.checkpoint.data_ref` points at.
+- **Idempotency** follows the same rules as `torque_task_progress`: a repeated key with the same input returns `duplicate: true` and the original `event_id`; the same key with another tool or a different input fails with `idempotency_conflict`.
 - `progress_detail` does not gate it.
 
 ## One choke point
