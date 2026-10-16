@@ -28,15 +28,13 @@ type TombstoneSpec struct {
 }
 
 // TrimSpec says: rows of Class recorded at or before Before are past their
-// envelope age and may leave the head of the stream, once they are rolled up.
-// Trim is head-only unless the store declares otherwise. R-audit never has one.
+// envelope age and may leave the stream, once they are rolled up. A store
+// removes only rows that carry the rolled flag, in every trim mode: a class with
+// no rollups configured is never removed (its rows are tombstoned and stay;
+// [Config.Resolve] warns). R-audit never has a spec.
 type TrimSpec struct {
 	Class  string
 	Before time.Time
-	// RequireRolled is true when the class has rollups configured: a row may
-	// only be trimmed after it was counted. A class without rollups has
-	// nothing to count and is trimmable on age alone.
-	RequireRolled bool
 }
 
 // PruneSpec says: drop rollup buckets of Class/Bucket that ended at or
@@ -111,7 +109,7 @@ func (pl *Planner) Plan(now time.Time) Plan {
 		// Head trim: only classes with a finite whole-row age and a finite
 		// envelope age, and never R-audit, whatever its configuration.
 		if name != ClassAudit && c.Full != 0 && c.Envelope != 0 {
-			out.Trims = append(out.Trims, TrimSpec{Class: name, Before: now.Add(-time.Duration(c.Envelope)), RequireRolled: len(c.Rollups) > 0})
+			out.Trims = append(out.Trims, TrimSpec{Class: name, Before: now.Add(-time.Duration(c.Envelope))})
 		}
 		if len(c.Rollups) > 0 {
 			buckets := make([]Duration, 0, len(c.Rollups))

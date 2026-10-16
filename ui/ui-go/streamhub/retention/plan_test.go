@@ -95,11 +95,6 @@ func TestPlanDefaultsMatchD7(t *testing.T) {
 			t.Errorf("state rollup buckets = %v, want [1h 1d] ascending in one spec", r.Buckets)
 		}
 	}
-	for _, tr := range pl.Trims {
-		if !tr.RequireRolled {
-			t.Errorf("trim %+v: every default class has rollups, so a trim must require them", tr)
-		}
-	}
 	for _, pr := range pl.Prunes {
 		if pr.Class == retention.ClassAudit {
 			auditPrunes++

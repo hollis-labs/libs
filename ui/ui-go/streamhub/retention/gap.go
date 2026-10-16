@@ -2,37 +2,36 @@ package retention
 
 import "sort"
 
-// GapFrame is the single informational frame a reader gets, once and before
-// the data, when it starts below a class watermark of a [TrimPerRow] store
-// (D7 rev 2.3). Reason is always "retention". The reader's cursor is NOT
-// advanced by it: cursors are never reused and resuming from the cursor of a
-// removed row is valid.
-type GapFrame struct {
-	Reason string
-	// Class and ThroughCursor name the watermark that explains the gap: every
-	// row of Class at or below ThroughCursor was removed by retention.
+// ClassGap says that every row of Class at or below ThroughCursor was removed
+// by retention.
+type ClassGap struct {
 	Class         string
 	ThroughCursor uint64
 }
 
+// GapFrame is the single informational frame a reader gets, once and before
+// the data, when it starts below the watermark of at least one class of a
+// [TrimPerRow] store (D7 rev 2.3.1). Reason is always "retention". Classes lists
+// EVERY class whose watermark is above the reader's cursor, sorted by class
+// name. The reader's cursor is NOT advanced by the frame: cursors are never
+// reused and resuming from the cursor of a removed row is valid.
+type GapFrame struct {
+	Reason  string
+	Classes []ClassGap
+}
+
 // ReadGap returns the frame for a read that starts after cursor `after`, or
-// false when the read starts at or beyond every watermark. With several
-// classes below the reader the frame names the one with the highest
-// watermark (ties go to the class name that sorts first), so one frame says
-// how far retention has reached.
+// false when the read starts at or beyond every watermark.
 func ReadGap(watermarks map[string]uint64, after uint64) (GapFrame, bool) {
-	classes := make([]string, 0, len(watermarks))
-	for c := range watermarks {
-		classes = append(classes, c)
-	}
-	sort.Strings(classes)
-	var best GapFrame
-	found := false
-	for _, c := range classes {
-		w := watermarks[c]
-		if w > after && (!found || w > best.ThroughCursor) {
-			best, found = GapFrame{Reason: "retention", Class: c, ThroughCursor: w}, true
+	var classes []ClassGap
+	for class, w := range watermarks {
+		if w > after {
+			classes = append(classes, ClassGap{Class: class, ThroughCursor: w})
 		}
 	}
-	return best, found
+	if len(classes) == 0 {
+		return GapFrame{}, false
+	}
+	sort.Slice(classes, func(i, j int) bool { return classes[i].Class < classes[j].Class })
+	return GapFrame{Reason: "retention", Classes: classes}, true
 }
