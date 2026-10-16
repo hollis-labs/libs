@@ -6,12 +6,15 @@ import (
 	"time"
 )
 
-// RollupSpec says: build Bucket-sized rollup buckets for rows of Class whose
-// bucket has closed (its end is at or before ClosedBefore).
+// RollupSpec says: count rows of Class into every one of Buckets (hour, day,
+// ...) once the LARGEST bucket they fall in has closed (its end is at or
+// before ClosedBefore). A row is counted into all buckets at once and then
+// marked rolled up, so a row is never counted twice and a trim never sees a
+// half-rolled row.
 type RollupSpec struct {
 	PolicyID     string
 	Class        string
-	Bucket       Duration
+	Buckets      []Duration // ascending
 	ClosedBefore time.Time
 }
 
@@ -37,6 +40,10 @@ type TrimSpec struct {
 	PolicyID string
 	Class    string
 	Before   time.Time
+	// RequireRolled is true when the class has rollups configured: a row may
+	// only be trimmed after it was counted. A class without rollups has
+	// nothing to count and is trimmable on age alone.
+	RequireRolled bool
 }
 
 // PruneSpec says: drop rollup buckets of Class/Bucket that ended at or
@@ -72,6 +79,19 @@ type Planner struct{ resolve Resolver }
 // NewPlanner returns a Planner. A nil resolver is an error at Plan time, not
 // a panic: every id is then unresolved.
 func NewPlanner(resolve Resolver) *Planner { return &Planner{resolve: resolve} }
+
+// ClassOf classifies attributes with the current policy (policy id ""). It is
+// false when the resolver does not know the current policy.
+func (pl *Planner) ClassOf(a Attrs) (string, bool) {
+	if pl == nil || pl.resolve == nil {
+		return "", false
+	}
+	p, ok := pl.resolve("")
+	if !ok || p == nil {
+		return "", false
+	}
+	return p.ClassOf(a), true
+}
 
 // CurrentOnly is a [Resolver] that knows only the current policy: every row is
 // governed by p, whatever id it carries. This is D7 rev 2.1's reading, where a
@@ -128,10 +148,17 @@ func (out *Plan) add(id string, p *Policy, now time.Time) {
 		}
 		// Head trim: only classes with a finite whole-row age and a finite envelope age.
 		if c.Full != 0 && c.Envelope != 0 {
-			out.Trims = append(out.Trims, TrimSpec{PolicyID: id, Class: name, Before: now.Add(-time.Duration(c.Envelope))})
+			out.Trims = append(out.Trims, TrimSpec{PolicyID: id, Class: name, Before: now.Add(-time.Duration(c.Envelope)), RequireRolled: len(c.Rollups) > 0})
+		}
+		if len(c.Rollups) > 0 {
+			buckets := make([]Duration, 0, len(c.Rollups))
+			for _, r := range c.Rollups {
+				buckets = append(buckets, r.Bucket)
+			}
+			slices.Sort(buckets)
+			out.Rollups = append(out.Rollups, RollupSpec{PolicyID: id, Class: name, Buckets: buckets, ClosedBefore: now})
 		}
 		for _, r := range c.Rollups {
-			out.Rollups = append(out.Rollups, RollupSpec{PolicyID: id, Class: name, Bucket: r.Bucket, ClosedBefore: now})
 			if r.Keep != 0 {
 				out.Prunes = append(out.Prunes, PruneSpec{PolicyID: id, Class: name, Bucket: r.Bucket, Before: now.Add(-time.Duration(r.Keep))})
 			}
