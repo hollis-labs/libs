@@ -149,3 +149,10 @@ on a controlled host before claiming the gate passed.
 Structured key checks strip Unicode format characters then apply NFKC, using
 `golang.org/x/text/unicode/norm`. Joined secret-key words (such as `pass_word`)
 also match; benign metadata suffixes retain their existing precedence.
+
+On Linux, `go test -run '^$' -bench '^BenchmarkSanitize4KBCPU$'
+-benchtime=10000x -cpu=1 -count=10` additionally reports `cpu-ns/op` using process
+user+system CPU time (`getrusage`), including GC workers. Compare repeated runs
+with `benchstat`. This is mean CPU per call, not a percentile; keep it distinct
+from wall-clock p99. Returned JSON, reports and parse structures own their memory,
+so the API still allocates; it does not pool unredacted payload buffers.
