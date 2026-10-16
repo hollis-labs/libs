@@ -138,9 +138,9 @@ func TestProgressNodeDefersPredicateAndRefreshesBlockedDiagnostics(t *testing.T)
 	firstDependencyID := invocationID("run-progress", "dependency-a")
 	secondDependencyID := invocationID("run-progress", "dependency-b")
 	targetID := invocationID("run-progress", "target")
-	createNode(t, store, firstDependencyID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, secondDependencyID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, targetID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, firstDependencyID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, secondDependencyID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, targetID, workflowruntime.NodePending, 0, now)
 	evaluator := &predicateStub{value: true}
 	coordinator := workflowruntime.NewProgressionCoordinator(store, evaluator)
 	request := workflowruntime.ProgressNodeRequest{
@@ -185,7 +185,7 @@ func TestProgressNodePredicateFalseTrueErrorAndIdempotency(t *testing.T) {
 	t.Run("false_and_idempotent", func(t *testing.T) {
 		store := inmemory.NewStore()
 		id := invocationID("run-false", "target")
-		createNode(t, store, id, workflowruntime.NodePending, 0, now)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, now)
 		evaluator := &predicateStub{value: false}
 		coordinator := workflowruntime.NewProgressionCoordinator(store, evaluator)
 		request := workflowruntime.ProgressNodeRequest{
@@ -211,7 +211,7 @@ func TestProgressNodePredicateFalseTrueErrorAndIdempotency(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
 		store := inmemory.NewStore()
 		id := invocationID("run-true", "target")
-		createNode(t, store, id, workflowruntime.NodePending, 0, now)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, now)
 		result, err := workflowruntime.NewProgressionCoordinator(store, &predicateStub{value: true}).ProgressNode(
 			context.Background(), workflowruntime.ProgressNodeRequest{
 				InvocationID: id, Predicate: &graph.Expression{Text: "inputs.enabled"}, At: now.Add(time.Second),
@@ -225,7 +225,7 @@ func TestProgressNodePredicateFalseTrueErrorAndIdempotency(t *testing.T) {
 	t.Run("error_preserves_pending", func(t *testing.T) {
 		store := inmemory.NewStore()
 		id := invocationID("run-error", "target")
-		createNode(t, store, id, workflowruntime.NodePending, 0, now)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, now)
 		failure := errors.New("predicate failed")
 		_, err := workflowruntime.NewProgressionCoordinator(store, &predicateStub{err: failure}).ProgressNode(
 			context.Background(), workflowruntime.ProgressNodeRequest{
@@ -245,8 +245,8 @@ func TestProgressNodeUsesTypedExpressionEngineAndPreservesSourceDiagnostic(t *te
 	now := time.Date(2026, time.August, 24, 16, 30, 0, 0, time.UTC)
 	trueID := invocationID("run-expression", "true-target")
 	errorID := invocationID("run-expression", "error-target")
-	createNode(t, store, trueID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, errorID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, trueID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, errorID, workflowruntime.NodePending, 0, now)
 	coordinator := workflowruntime.NewProgressionCoordinator(store, nil)
 	expressionContext := values.ExpressionContext{Inputs: testValueSet(t, true)}
 
@@ -298,9 +298,9 @@ func TestProgressNodeFailureTimeoutHandledAndBlockedToSkip(t *testing.T) {
 			runID := workflowruntime.RunID(fmt.Sprintf("run-propagation-%d", index))
 			dependencyID := invocationID(runID, "dependency")
 			targetID := invocationID(runID, "target")
-			createNode(t, store, dependencyID, workflowruntime.NodeReady, 0, now)
+			createBoundNode(t, store, dependencyID, workflowruntime.NodeReady, 0, now)
 			makeTerminalNode(t, store, dependencyID, test.status, now.Add(time.Second))
-			createNode(t, store, targetID, workflowruntime.NodePending, 0, now)
+			createBoundNode(t, store, targetID, workflowruntime.NodePending, 0, now)
 			result, err := workflowruntime.NewProgressionCoordinator(store, nil).ProgressNode(
 				context.Background(), workflowruntime.ProgressNodeRequest{
 					InvocationID: targetID, Rule: test.rule,
@@ -320,8 +320,8 @@ func TestProgressNodeFailureTimeoutHandledAndBlockedToSkip(t *testing.T) {
 	store := inmemory.NewStore()
 	dependencyID := invocationID("run-blocked-skip", "dependency")
 	targetID := invocationID("run-blocked-skip", "target")
-	createNode(t, store, dependencyID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, targetID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, dependencyID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, targetID, workflowruntime.NodePending, 0, now)
 	coordinator := workflowruntime.NewProgressionCoordinator(store, nil)
 	request := workflowruntime.ProgressNodeRequest{
 		InvocationID: targetID, Dependencies: []workflowruntime.DependencyRef{{InvocationID: dependencyID}}, At: now.Add(time.Second),
@@ -345,9 +345,9 @@ func TestProgressNodeRejectsDependencyIdentityErrorsBeforeMutation(t *testing.T)
 	targetID := invocationID("run-identities", "target")
 	dependencyID := invocationID("run-identities", "dependency")
 	crossRunID := invocationID("other-run", "dependency")
-	createNode(t, store, targetID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, dependencyID, workflowruntime.NodePending, 0, now)
-	createNode(t, store, crossRunID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, targetID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, dependencyID, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, crossRunID, workflowruntime.NodePending, 0, now)
 	coordinator := workflowruntime.NewProgressionCoordinator(store, nil)
 	for _, test := range []struct {
 		name string
@@ -373,7 +373,7 @@ func TestSkippedTransitionExplanationReplayAndConflict(t *testing.T) {
 	store := inmemory.NewStore()
 	now := time.Date(2026, time.August, 24, 19, 0, 0, 0, time.UTC)
 	id := invocationID("run-explanation", "target")
-	createNode(t, store, id, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, id, workflowruntime.NodePending, 0, now)
 	reason := &workflowruntime.BlockedReason{
 		Code: workflowruntime.ReasonPredicateFalse, Message: "if predicate evaluated to false",
 		Dependencies: []workflowruntime.NodeInvocationID{invocationID(id.RunID, "z"), invocationID(id.RunID, "a")},
@@ -417,7 +417,7 @@ func TestBlockedTransitionDiagnosticRefreshContract(t *testing.T) {
 	store := inmemory.NewStore()
 	now := time.Date(2026, time.August, 24, 19, 30, 0, 0, time.UTC)
 	id := invocationID("run-blocked-refresh", "target")
-	createNode(t, store, id, workflowruntime.NodePending, 0, now)
+	createBoundNode(t, store, id, workflowruntime.NodePending, 0, now)
 	initialReason := &workflowruntime.BlockedReason{
 		Code: workflowruntime.ReasonReadinessWaiting, Message: "waiting",
 		Details: map[string]string{"terminal": "0", "nonterminal": "2"},

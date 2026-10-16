@@ -15,6 +15,10 @@ import (
 // ErrInvalidReadiness identifies malformed readiness or progression input.
 var ErrInvalidReadiness = errors.New("invalid workflow readiness input")
 
+// ErrInputsUnbound prevents an executable invocation from becoming ready or
+// being dispatched before its immutable input set has been durably bound.
+var ErrInputsUnbound = errors.New("workflow node inputs are not durably bound")
+
 const (
 	// ReasonReadinessWaiting identifies a dependency set that is not resolved.
 	ReasonReadinessWaiting = "readiness_waiting"
@@ -195,8 +199,15 @@ func EvaluateReadiness(rule graph.ReadyRule, dependencies []DependencyState) (Re
 // ProgressNode loads authoritative dependency state, evaluates the readiness
 // rule, then evaluates if only when ready. It persists blocked, ready, or
 // skipped through lifecycle CAS and returns expression failures without a
-// transition.
+// transition. Executable nodes must already have a durable Inputs reference,
+// including for an empty input set; otherwise readiness returns ErrInputsUnbound.
 func (c *ProgressionCoordinator) ProgressNode(ctx context.Context, request ProgressNodeRequest) (ProgressNodeResult, error) {
+	return c.progressNode(ctx, request, false)
+}
+
+// Fan-out aggregates are coordinator-owned; only their children execute and
+// carry bound inputs. The graph-aware driver/control-flow paths identify them.
+func (c *ProgressionCoordinator) progressNode(ctx context.Context, request ProgressNodeRequest, fanOutAggregate bool) (ProgressNodeResult, error) {
 	if ctx == nil {
 		return ProgressNodeResult{}, fmt.Errorf("%w: context is required", ErrInvalidReadiness)
 	}
@@ -218,6 +229,9 @@ func (c *ProgressionCoordinator) ProgressNode(ctx context.Context, request Progr
 		return ProgressNodeResult{}, err
 	}
 	if target.Status == NodeReady {
+		if target.Inputs == nil && !fanOutAggregate {
+			return ProgressNodeResult{}, ErrInputsUnbound
+		}
 		return ProgressNodeResult{Disposition: ReadinessReady, Snapshot: target}, nil
 	}
 	if target.Status == NodeSkipped {
@@ -257,6 +271,13 @@ func (c *ProgressionCoordinator) ProgressNode(ctx context.Context, request Progr
 
 	if evaluation.Disposition == ReadinessSkip {
 		return c.skipNode(ctx, target, evaluation.Reason, false, false, request.At)
+	}
+
+	// Dependencies can finish between the driver's preview and this evaluation.
+	// Refuse readiness until binding commits; the next drive can bind against a
+	// fresh expression context. The generation CAS below fences that binding.
+	if target.Inputs == nil && !fanOutAggregate {
+		return result, ErrInputsUnbound
 	}
 
 	if request.Predicate != nil {

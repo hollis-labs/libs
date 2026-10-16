@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -134,8 +135,15 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 		routeOwned, routeSelected = preview.RouteOwned, preview.Selected
 	}
 	progression := NewProgressionCoordinator(d.Store, d.Evaluator)
+	fanOutAggregate := request.Node.ForEach != nil && id.Iteration == ""
 	if routeOwned && !routeSelected {
 		progressed, progressErr := NewControlFlowCoordinator(d.Store, d.Control, d.Evaluator).ProgressControlNode(ctx, ProgressControlNodeRequest{Graph: request.Plan.Plan.Graph, InvocationID: id, Dependencies: dependencies, ExpressionContext: scoped, ExpressionOptions: scopedOptions, At: request.At})
+		if errors.Is(progressErr, ErrInputsUnbound) {
+			// A route selected this node after the preview; binding needs a
+			// fresh selected-route context on the next drive.
+			progressed = ProgressNodeResult{Disposition: ReadinessWaiting, Snapshot: node}
+			progressErr = nil
+		}
 		result.Progressed = progressed
 		return result, progressErr
 	}
@@ -148,12 +156,20 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 		return result, readinessErr
 	}
 	if readiness.Disposition != ReadinessReady {
+		var progressed ProgressNodeResult
+		var progressErr error
 		if graphRouteTarget(request.Plan.Plan.Graph, request.Node.ID) {
-			progressed, progressErr := NewControlFlowCoordinator(d.Store, d.Control, d.Evaluator).ProgressControlNode(ctx, ProgressControlNodeRequest{Graph: request.Plan.Plan.Graph, InvocationID: id, Dependencies: dependencies, ExpressionContext: scoped, ExpressionOptions: scopedOptions, At: request.At})
-			result.Progressed = progressed
-			return result, progressErr
+			progressed, progressErr = NewControlFlowCoordinator(d.Store, d.Control, d.Evaluator).ProgressControlNode(ctx, ProgressControlNodeRequest{Graph: request.Plan.Plan.Graph, InvocationID: id, Dependencies: dependencies, ExpressionContext: scoped, ExpressionOptions: scopedOptions, At: request.At})
+		} else {
+			progressed, progressErr = progression.progressNode(ctx, ProgressNodeRequest{InvocationID: id, Dependencies: dependencies, Rule: request.Node.ReadyWhen, Predicate: request.Node.If, ExpressionContext: scoped, ExpressionOptions: scopedOptions, At: request.At}, fanOutAggregate)
 		}
-		progressed, progressErr := progression.ProgressNode(ctx, ProgressNodeRequest{InvocationID: id, Dependencies: dependencies, Rule: request.Node.ReadyWhen, Predicate: request.Node.If, ExpressionContext: scoped, ExpressionOptions: scopedOptions, At: request.At})
+		if errors.Is(progressErr, ErrInputsUnbound) {
+			// A dependency completed after our preview. Leave the target
+			// unclaimable and let the next drive bind with a fresh context.
+			// This is ordinary concurrent progress, not a failed execution.
+			result.Progressed = ProgressNodeResult{Disposition: ReadinessWaiting, Snapshot: node}
+			return result, nil
+		}
 		result.Progressed = progressed
 		return result, progressErr
 	}
@@ -162,7 +178,6 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 	// per child by FanOutCoordinator. Binding them on the aggregate would either
 	// fail against absent locals or persist a misleading pre-expansion input set.
 	// Children are created with their complete immutable inputs already bound.
-	fanOutAggregate := request.Node.ForEach != nil && id.Iteration == ""
 	if !fanOutAggregate && node.Inputs == nil {
 		if node.Status != NodePending && node.Status != NodeBlocked {
 			return result, fmt.Errorf("%w: unbound node %v is already claimable or terminal", ErrRecoveryConflict, id)
@@ -219,11 +234,11 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 		result.Progressed = progressed
 		return result, progressErr
 	}
-	progressed, progressErr := progression.ProgressNode(ctx, ProgressNodeRequest{
+	progressed, progressErr := progression.progressNode(ctx, ProgressNodeRequest{
 		InvocationID: id, Dependencies: dependencies, Rule: request.Node.ReadyWhen,
 		Predicate: request.Node.If, ExpressionContext: scoped,
 		ExpressionOptions: scopedOptions, At: maxRecoveryTime(request.At, node.UpdatedAt),
-	})
+	}, fanOutAggregate)
 	result.Progressed = progressed
 	return result, progressErr
 }

@@ -342,12 +342,12 @@ func (d *StepDispatcher) Dispatch(ctx context.Context, request DispatchRequest) 
 		prestart.compensation = &dispatchCompensation{planDigest: run.Plan.Digest, handler: request.Node.Compensation.Handler, evidence: evidence}
 	}
 
-	inputs := values.ValueSet{}
-	if node.Inputs != nil {
-		inputs, err = d.store.LoadValues(ctx, *node.Inputs)
-		if err != nil {
-			return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, err))
-		}
+	if node.Inputs == nil {
+		return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, ErrInputsUnbound))
+	}
+	inputs, err := d.store.LoadValues(ctx, *node.Inputs)
+	if err != nil {
+		return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, err))
 	}
 	if inputsErr := inputs.Validate(); inputsErr != nil {
 		return d.failCompensationPrestart(durableCtx, request, prestart, DispatchValidateInput, inputsErr)
