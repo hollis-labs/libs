@@ -7,8 +7,10 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -305,12 +307,37 @@ func (l *Log) flushMarker(force bool) error {
 	return nil
 }
 
+// digestOf is the duplicate-detection digest: sha256 over Name and a
+// canonical form of Data. Valid JSON is decoded and re-encoded with sorted
+// keys and no insignificant whitespace (numbers keep their literal text), so
+// a producer that re-marshals the same event on retry gets the original
+// record, not a false conflict. Anything else is digested byte-exact.
 func digestOf(e streamhub.Event) []byte {
 	h := sha256.New()
 	h.Write([]byte(e.Name))
 	h.Write([]byte{0})
-	h.Write(e.Data)
+	h.Write(canonicalJSON(e.Data))
 	return h.Sum(nil)
+}
+
+func canonicalJSON(b []byte) []byte {
+	if len(b) == 0 {
+		return b
+	}
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return b
+	}
+	if _, err := dec.Token(); err != io.EOF { // trailing data: not a single JSON value
+		return b
+	}
+	out, err := json.Marshal(v)
+	if err != nil {
+		return b
+	}
+	return out
 }
 
 func copyBytes(b []byte) []byte {
@@ -598,7 +625,11 @@ func (l *Log) Trim(ctx context.Context, stream string, r streamhub.Retention) er
 	if _, err := tx.ExecContext(ctx, `UPDATE streams SET pruned=?, dropped=dropped+? WHERE stream=?`, cut, n, stream); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	_ = l.flushMarker(true) // a trim is a natural checkpoint; failure is visible via MarkerError
+	return nil
 }
 
 // Close implements [streamhub.Log]: it writes the marker and closes both pools.
@@ -629,4 +660,12 @@ func (l *Log) ColumnsOf(ctx context.Context, stream string, seq streamhub.Seq) (
 		 FROM records WHERE stream=? AND seq=?`, stream, uint64(seq)).
 		Scan(&c.Category, &c.Severity, &c.Sensitivity, &c.PII, &c.Visibility, &c.Generation, &c.ProjectID, &c.WorkstreamID, &c.TaskID, &c.SessionID, &c.AgentURN, &c.RunID)
 	return c, err
+}
+
+// HasIndex reports whether the named index exists; it exists for tests and
+// diagnostics.
+func (l *Log) HasIndex(ctx context.Context, name string) bool {
+	var n int
+	err := l.r.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type='index' AND name=?`, name).Scan(&n)
+	return err == nil && n == 1
 }

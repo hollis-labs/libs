@@ -2,6 +2,7 @@ package streamlogsqlite_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -346,4 +347,101 @@ func copyFile(t *testing.T, from, to string) {
 	if _, err := io.Copy(out, in); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// A retry that re-marshals the event (key order, whitespace) is a duplicate,
+// not a conflict; a real change is still a conflict; non-JSON is byte-exact.
+func TestEventIDDigestIsCanonicalForJSON(t *testing.T) {
+	l := open(t, filepath.Join(t.TempDir(), "log.db"), streamlog.Options{})
+	defer l.Close()
+	first, err := l.Append(ctx, "env", streamhub.Event{ID: "e1", Name: "k", Data: []byte(`{"a":1,"b":{"x":[1,2],"y":"z"},"n":1.50}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := l.Append(ctx, "env", streamhub.Event{ID: "e1", Name: "k", Data: []byte("{ \"n\": 1.50,\n \"b\": {\"y\":\"z\", \"x\": [1, 2]}, \"a\": 1 }")})
+	if err != nil || again.Seq != first.Seq {
+		t.Fatalf("reordered keys/whitespace = %+v, %v; want the original record", again, err)
+	}
+	if l.Stats().IDConflicts != 0 {
+		t.Fatal("re-marshaled retry was counted as a conflict")
+	}
+	for name, data := range map[string]string{
+		"value":  `{"a":2,"b":{"x":[1,2],"y":"z"},"n":1.50}`,
+		"array":  `{"a":1,"b":{"x":[2,1],"y":"z"},"n":1.50}`,
+		"number": `{"a":1,"b":{"x":[1,2],"y":"z"},"n":1.5}`, // literal text differs: not silently equal
+	} {
+		if _, err := l.Append(ctx, "env", streamhub.Event{ID: "e1", Name: "k", Data: []byte(data)}); !errors.Is(err, streamhub.ErrEventIDConflict) {
+			t.Fatalf("%s change err = %v, want ErrEventIDConflict", name, err)
+		}
+	}
+	if _, err := l.Append(ctx, "env", streamhub.Event{ID: "t1", Name: "k", Data: []byte("a  b")}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Append(ctx, "env", streamhub.Event{ID: "t1", Name: "k", Data: []byte("a b")}); !errors.Is(err, streamhub.ErrEventIDConflict) {
+		t.Fatalf("non-JSON whitespace change err = %v, want byte-exact conflict", err)
+	}
+}
+
+// mesh.Event keeps visibility at the top level; envelopes with class.visibility win.
+func TestExtractorReadsMeshTopLevelVisibility(t *testing.T) {
+	mesh := streamhub.Event{Name: "task.state_changed", Data: []byte(
+		`{"schema_version":"1","id":"evt_1","kind":"task.state_changed","session_id":"s1","generation":2,"visibility":"environment",` +
+			`"scope":{"project_id":"p1","workstream_id":"w1","agent_urn":"msg://agent/x/y"},"class":{"category":"state","severity":"info","sensitivity":"private"}}`)}
+	c := streamlog.EnvelopeExtractor(mesh)
+	if c.Visibility != "environment" || c.WorkstreamID != "w1" || c.AgentURN != "msg://agent/x/y" || c.Category != "state" || c.Generation != 2 {
+		t.Fatalf("mesh columns = %+v", c)
+	}
+	both := streamhub.Event{Data: []byte(`{"visibility":"mesh","class":{"visibility":"operator"}}`)}
+	if v := streamlog.EnvelopeExtractor(both).Visibility; v != "operator" {
+		t.Fatalf("class.visibility should win, got %q", v)
+	}
+}
+
+func TestWorkstreamAndAgentIndexesExist(t *testing.T) {
+	l := open(t, filepath.Join(t.TempDir(), "log.db"), streamlog.Options{})
+	defer l.Close()
+	for _, idx := range []string{"records_workstream", "records_agent", "records_project", "records_task", "records_session", "records_kind"} {
+		if !l.HasIndex(ctx, idx) {
+			t.Errorf("index %s missing", idx)
+		}
+	}
+}
+
+// With a long marker interval, appends do not touch the marker; Close does.
+func TestCloseAndTrimFlushTheMarker(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log.db")
+	l := open(t, path, streamlog.Options{MarkerEvery: time.Hour})
+	for range 3 {
+		l.Append(ctx, "env", streamhub.Event{Name: "k"})
+	}
+	if got := markerHead(t, path); got != 0 {
+		t.Fatalf("marker head %d before any flush, want the throttled value 0", got)
+	}
+	if err := l.Trim(ctx, "env", streamhub.Retention{MaxRecords: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if got := markerHead(t, path); got != 3 {
+		t.Fatalf("marker head %d after Trim, want 3", got)
+	}
+	l.Append(ctx, "env", streamhub.Event{Name: "k"})
+	if got := markerHead(t, path); got != 3 {
+		t.Fatalf("marker head %d before Close, want 3 (throttled)", got)
+	}
+	l.Close()
+	if got := markerHead(t, path); got != 4 {
+		t.Fatalf("marker head %d after Close, want 4", got)
+	}
+}
+
+func markerHead(t *testing.T, dbPath string) uint64 {
+	t.Helper()
+	b, err := os.ReadFile(dbPath + ".hwm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct{ Streams map[string]uint64 }
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	return m.Streams["env"]
 }

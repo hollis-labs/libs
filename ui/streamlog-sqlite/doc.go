@@ -35,6 +35,12 @@
 // records the epoch and each stream's high-water cursor. On Open, a marker
 // that disagrees with the database (a different epoch, or a stream whose head
 // is behind the marker) means the database was replaced or rolled back. The
+// The marker is a lower bound written after commits and throttled
+// ([Options.MarkerEvery]); it is also flushed by Open, Trim and Close. A
+// restore taken between the last marker write and a crash is therefore not
+// detected: the window is at most MarkerEvery of appends. Operators who restore
+// from backups should stop the daemon first (a graceful stop flushes the
+// marker) and treat a restore as a deliberate act. The
 // default is to re-mint the epoch and report it in [Log.Recovery];
 // [Options.OnStorageMismatch] can make Open fail instead.
 //

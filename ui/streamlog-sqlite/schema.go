@@ -50,6 +50,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS records_event_id ON records (event_id) WHERE e
 CREATE INDEX IF NOT EXISTS records_project  ON records (stream, project_id, seq)  WHERE project_id <> '';
 CREATE INDEX IF NOT EXISTS records_task     ON records (stream, task_id, seq)     WHERE task_id <> '';
 CREATE INDEX IF NOT EXISTS records_session  ON records (stream, session_id, seq)  WHERE session_id <> '';
+CREATE INDEX IF NOT EXISTS records_workstream ON records (stream, workstream_id, seq) WHERE workstream_id <> '';
+CREATE INDEX IF NOT EXISTS records_agent    ON records (stream, agent_urn, seq)    WHERE agent_urn <> '';
 CREATE INDEX IF NOT EXISTS records_kind     ON records (stream, kind, seq);
 CREATE INDEX IF NOT EXISTS records_at       ON records (stream, at_ns);
 
