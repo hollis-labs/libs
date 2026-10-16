@@ -1,0 +1,6 @@
+{
+  "provider": "claude",
+  "runtime": "streaming-stdio",
+  "variant": "bare",
+  "scenario": "create"
+}

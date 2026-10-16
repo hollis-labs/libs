@@ -48,3 +48,5 @@ jobs:
     with:
       module: ${{ matrix.module }}
       race: true
+      # The harness sandbox tests need a Linux backend; the hosted runner does not ship one.
+      sandbox-backend: ${{ matrix.module == 'harness/core' }}

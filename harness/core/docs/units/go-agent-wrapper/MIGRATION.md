@@ -1,0 +1,60 @@
+# Migration: go-agent-wrapper -> substrate/harness
+
+`github.com/hollis-labs/go-agent-wrapper` moved into the substrate monorepo as packages of the `github.com/hollis-labs/libs/harness/core` module, with its full git history (186 commits, 2026-05-26 to 2026-10-02; source HEAD `cd458f89dc2a`). Current destinations below include the subsequent workspace consolidation; the standalone module is no longer where new work happens.
+
+## Import paths
+
+| Old import path | New import path | Package |
+|---|---|---|
+| `github.com/hollis-labs/go-agent-wrapper/adapters` | `github.com/hollis-labs/libs/harness/core/adapters` | `adapters` |
+| `github.com/hollis-labs/go-agent-wrapper/acp` | `github.com/hollis-labs/libs/harness/core/adapters/acp` | `acp` |
+| `github.com/hollis-labs/go-agent-wrapper/activity` | `github.com/hollis-labs/libs/harness/core/adapters/activity` | `activity` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/claude` | `github.com/hollis-labs/libs/harness/core/adapters/claude` | `claude` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/claudeacp` | `github.com/hollis-labs/libs/harness/core/adapters/claudeacp` | `claudeacp` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/codex` | `github.com/hollis-labs/libs/harness/core/adapters/codex` | `codex` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/codexacp` | `github.com/hollis-labs/libs/harness/core/adapters/codexacp` | `codexacp` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/copilotacp` | `github.com/hollis-labs/libs/harness/core/adapters/copilotacp` | `copilotacp` |
+| `github.com/hollis-labs/go-agent-wrapper/launch` | `github.com/hollis-labs/libs/harness/core/adapters/launch` | `launch` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/opencode` | `github.com/hollis-labs/libs/harness/core/adapters/opencode` | `opencode` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/opencodeacp` | `github.com/hollis-labs/libs/harness/core/adapters/opencodeacp` | `opencodeacp` |
+| `github.com/hollis-labs/go-agent-wrapper/adapters/piacp` | `github.com/hollis-labs/libs/harness/core/adapters/piacp` | `piacp` |
+| `github.com/hollis-labs/go-agent-wrapper/turnoutput` | `github.com/hollis-labs/libs/harness/core/adapters/turnoutput` | `turnoutput` |
+| `github.com/hollis-labs/go-agent-wrapper/wrapper` | `github.com/hollis-labs/libs/harness/core/adapters/wrapper` | `wrapper` |
+| `github.com/hollis-labs/go-agent-wrapper/examples/claude-stream` | `github.com/hollis-labs/libs/harness/core/adapters/wrapper/examples/claude-stream` |  (command) |
+| `github.com/hollis-labs/go-agent-wrapper/examples/shared-conformance` | `github.com/hollis-labs/libs/harness/core/adapters/wrapper/examples/shared-conformance` |  (command) |
+| `github.com/hollis-labs/go-agent-wrapper/wrapper/testdata/acpfixture` | `github.com/hollis-labs/libs/harness/core/adapters/wrapper/testdata/acpfixture` |  (command) |
+| `github.com/hollis-labs/go-agent-wrapper/classifybridge` | `github.com/hollis-labs/libs/harness/core/interception/classifybridge` | `classifybridge` |
+| `github.com/hollis-labs/go-agent-wrapper/filters` | `github.com/hollis-labs/libs/harness/core/interception/filters` | `filters` |
+| `github.com/hollis-labs/go-agent-wrapper/policy` | `github.com/hollis-labs/libs/harness/core/interception/policy` | `policy` |
+| `github.com/hollis-labs/go-agent-wrapper/internal/childoutput` | `github.com/hollis-labs/libs/harness/core/internal/childoutput` | `childoutput` |
+| `github.com/hollis-labs/go-agent-wrapper/internal/closegate` | `github.com/hollis-labs/libs/harness/core/internal/closegate` | `closegate` |
+| `github.com/hollis-labs/go-agent-wrapper/sidebyside` | `github.com/hollis-labs/libs/harness/core/internal/sidebyside` | `sidebyside` |
+| `github.com/hollis-labs/go-agent-wrapper/internal/testgate` | `github.com/hollis-labs/libs/harness/core/internal/testgate` | `testgate` |
+| `github.com/hollis-labs/go-agent-wrapper/snapshot` | `github.com/hollis-labs/libs/harness/core/workspace/snapshot` | `snapshot` |
+| `github.com/hollis-labs/go-agent-wrapper/sandbox` | `github.com/hollis-labs/libs/harness/core/sandbox/wrapper` | `sandbox` |
+| `github.com/hollis-labs/go-agent-wrapper/plant` | `github.com/hollis-labs/libs/harness/core/agentlaunch/planting` | `planting` |
+
+`go get github.com/hollis-labs/libs/harness/core@<version>` replaces `go get github.com/hollis-labs/go-agent-wrapper@<version>`; the new module is `github.com/hollis-labs/libs/harness/core`.
+
+## What changed
+
+- **Module.** The code is now part of the `github.com/hollis-labs/libs/harness/core` module (one `go.mod` for all of its packages). Release tags of the old module (v0.1.0 v0.2.0 v0.3.0 v0.4.0 v0.5.0 v0.6.0 v0.7.0 v0.8.0 v0.8.1 v0.9.0 v0.9.1 v0.10.0 v0.10.1 v0.11.0 v0.11.1 v0.12.0 v0.13.0 v0.13.1 v0.14.0 v0.15.0 v0.16.0 v0.17.0 v0.17.1 v0.18.0 v0.19.0 v0.20.0 v0.21.0 v0.21.1 v0.22.0 v0.23.0 v0.24.0 v0.25.0 v0.25.1 v0.25.2 v0.25.3 v0.25.4 v0.25.5 v0.25.6 v0.25.7 v0.26.0 v0.27.0 v0.27.1 v0.27.2 v0.28.0) were not carried over; no `harness/vX.Y.Z` tag exists yet.
+- **Placement.** The initial import preserved package clauses. Subsequent planting consolidation uses the `planting` package qualifier and the current destinations above. Examples and fixtures sit next to the package they exercise. The old repository's own files (README, AGENTS.md, CHANGELOG.md, LICENSE, ROADMAP and docs) are in this directory.
+- **Import paths** in code, documentation and tests were rewritten mechanically, whole path segments only. Links to the old repository's web pages, the history in `CHANGELOG.md` and prose that still describes the standalone repository are left as written.
+- **Layout.** The old module's root held no Go package. Its packages are at their ADR 0055 homes: `wrapper` is `harness/adapters/wrapper` (with its examples and `testdata`, including the ACP fixture the tests build), `acp`, `activity`, `launch` and `turnoutput` and the provider subpackages (`claude`, `claudeacp`, `codex`, `codexacp`, `copilotacp`, `opencode`, `opencodeacp`, `piacp`) are below `harness/adapters/` (the `adapters` package itself is `harness/adapters`), `classifybridge`, `policy` and `filters` are below `harness/interception/`, the planting contract is `harness/agentlaunch/planting` (`PlantSpec`, `PlantResult`, `PlantHook`); the `harness/workspace` root owns planning and authority-checked materialization, `sandbox` is `harness/sandbox/wrapper` and `snapshot` is `harness/sandbox/snapshot`, `sidebyside` and the shared `internal/{childoutput,closegate,testgate}` helpers are `harness/internal/...` so every importer keeps Go's internal visibility. `turnoutput` and agentkit's `turn` stay two packages. One guard needed its scope kept: the installed-provider coverage test in `internal/testgate` walked the old repository root; it now covers exactly the directories of the packages imported from this module instead of the whole harness tree. Prose and doc comments that name the old module and its siblings are left as written.
+- **API.** The initial import preserved symbols. Subsequent consolidation requires explicit artifact authority and removes engine/side-writer overrides; see the current module CHANGELOG. Wrapper planting types are now `planting.PlantSpec`, `PlantResult` and `PlantHook`.
+- **Dependency versions.** It required `github.com/creack/pty` v1.1.24 and `gopkg.in/yaml.v3` v3.0.1 (indirect), the same versions the merged `harness/go.mod` carries, and `go-llm-types` v0.5.1, `go-llm-contracts` v0.4.0 and `agent-contracts-leaf` v0.3.0, now `github.com/hollis-labs/substrate/llm-core` v0.1.0. Its requirements on `agentkit` v0.21.0, `go-runtime-events` v0.2.1, `go-harness-filters` v0.1.1, `go-materialize` v0.1.0, `go-permission` v0.1.0, `go-providers` v0.46.0, `go-sandbox` v0.6.0, `go-runner` v0.8.2 and `go-safefs` v0.1.0 are packages of this module, at their `main`: agentkit moves from v0.21.0 to v0.26.1 and go-runtime-events from v0.2.1 to v0.2.2 (the wrapper never pinned them), and go-harness-filters, go-materialize, go-permission and go-safefs are 5, 1, 2 and 2 commits past their tags. The agentkit step changes the Codex turn-end source; see the lifecycle note below.
+- **Files not carried to the new location** (git history still has them): `.github`, `.folio.yaml`, `.golangci.yml`, `.gitignore`, `go.mod`, `go.sum`.
+- **Adoption.** Original import history is retained. Current library consolidation does not migrate live consumers or establish native installed/runtime support.
+- **Codex lifecycle.** The wrapper consumes the session's typed terminal event for Codex JSON-RPC stdio turns, emitting one turn lifecycle and preserving the stop reason and failure diagnostic. The native turn-order test runs again.
+
+## Filesystem snapshot host port
+
+Use `workspace/snapshot` for new integration through `workspace.Ports.Snapshots`.
+The earlier `sandbox/snapshot` package remains unchanged for existing callers;
+it is not a second automatically selected provider. The new home retains only
+the original snapshot package history, tests and benchmarks. See its
+[host integration limits](../../../workspace/snapshot/README.md).
+
+The standalone repository already carries a migration pointer and is archived.
+This addition does not alter it, delete old refs or migrate a live consumer.

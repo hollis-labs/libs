@@ -1,0 +1,41 @@
+{
+  "writer": "contexthook",
+  "source": "legacy context slot file writer",
+  "bindings": [
+    {
+      "name": "task-context",
+      "content": "Fixture task.\n",
+      "bytes": 0,
+      "token_estimate": 0,
+      "provenance": {
+        "kind": "",
+        "bytes": 0,
+        "fetched_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "name": "empty",
+      "bytes": 0,
+      "token_estimate": 0,
+      "provenance": {
+        "kind": "",
+        "bytes": 0,
+        "fetched_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "name": "task_context",
+      "content": "Colliding slot.\n",
+      "bytes": 0,
+      "token_estimate": 0,
+      "provenance": {
+        "kind": "",
+        "bytes": 0,
+        "fetched_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "diagnostics": [
+    "artifact filename collision: slot names \"task-context\" and \"task_context\" sanitise to the same filename \"task_context\".txt"
+  ]
+}

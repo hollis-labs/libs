@@ -1,0 +1,80 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/settings.json",
+    "kind": "file",
+    "mode": "0644",
+    "content": "{}\n"
+  },
+  {
+    "path": ".claude/skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": ".claude/skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".claude/skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"fixture-plan\",\n  \"roots\": {\n    \"project_root\": \"/fixture/project\",\n    \"boot_root\": \"\u003cboot\u003e\",\n    \"state_root\": \"/fixture/state\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".claude/settings.json\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:claude:.claude/settings.json\",\n        \"group_id\": \"provider:claude:pty\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"native-config\"\n      }\n    },\n    {\n      \"path\": \".claude/skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:.claude/skills/sample/SKILL.md\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \".claude/skills/sample/scripts/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:.claude/skills/sample/scripts/run.sh\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \".mcp.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"b7147d366919d8aa20fe1dd9189578c358f0a7b58f2417dfaa19a285aa131ddd\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:claude:.mcp.json\",\n        \"group_id\": \"provider:claude:pty\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"mcp\"\n      }\n    },\n    {\n      \"path\": \"CLAUDE.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"1d59397c0a95928eadb1791dac1cca6bc52bd30e6999c35128b590fde5ec4f7e\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:claude:CLAUDE.md\",\n        \"group_id\": \"provider:claude:pty\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"instructions\"\n      }\n    },\n    {\n      \"path\": \"boot.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:claude:boot.md\",\n        \"group_id\": \"provider:claude:pty\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"boot\"\n      }\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"http\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"mux\": {\n      \"args\": [\n        \"--stdio\"\n      ],\n      \"command\": \"fixture-mcp\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    },\n    \"stdio\": {\n      \"args\": [\n        \"one\",\n        \"two\"\n      ],\n      \"command\": \"fixture-server\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "CLAUDE.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Refreshed instructions.\n\n\n## MCP\n\nTools for this task are available via the MCP server configured in .mcp.json (http://127.0.0.1:23456/mcp).\nAdditional cross-task tools (Vanta + portfolio surface) are available via the `mux` MCP entry in .mcp.json (fixture-mcp).\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  },
+  {
+    "path": "operator.txt",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Operator owned.\n"
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "writer": "providerplant",
+  "source": "substrate legacy provider projection",
+  "diagnostics": [
+    "agentlaunch/providerplant: provider projection: MCPServerSpec \"http\": duplicate name"
+  ]
+}

@@ -1,0 +1,1 @@
+{"hook_event_name":"SubagentStop","session_id":"sess-42","cwd":"/work/proj","transcript_path":"/workspace/user/.claude/t.jsonl","permission_mode":"default","agent_id":"agent-7","agent_type":"Explore","stop_hook_active":true,"last_assistant_message":"found it"}

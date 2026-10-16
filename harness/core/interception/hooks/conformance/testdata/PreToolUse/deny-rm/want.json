@@ -1,0 +1,1 @@
+{"exit_code":2,"output":{"decision":"deny","reason":"refusing rm -rf"},"want_err_substr":""}

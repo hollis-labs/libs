@@ -1,0 +1,60 @@
+# harness/core: imports of substrate harness and agentcontext; findings reviewed by the owner 2026-10-15 (placeholders, fixtures, egress-filter address tables, commit messages).
+agent-box-host harness/core/docs/units/agentkit/docs/shared-materialization-handoff.md Internal build machine name used as a label or example; reviewed by the owner 2026-10-15, not an access path.
+agent-box-host harness/core/docs/units/go-agent-wrapper/docs/shared-materialization-conformance.md Internal build machine name used as a label or example; reviewed by the owner 2026-10-15, not an access path.
+agent-box-host (commit-message)@6352c556b579 Internal build machine name used as a label or example; reviewed by the owner 2026-10-15, not an access path.
+credentials-in-url harness/core/interception/egress/ssrf_test.go Placeholder connection string in a test or doc; reviewed by the owner 2026-10-15, no live credential.
+home-path-linux harness/core/adapters/provider/event_pipeline_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/provider/hack/capturefixtures/main.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/provider/hack/probe-harness-layout.sh Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/provider/testdata/antigravity/print_mcp_tool.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/README.md Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/antigravity/print_mcp_tool.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/codex/app_server_interrupt.transcript.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/codex/app_server_resume.transcript.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/codex/app_server_resume_unknown_id.transcript.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/codex/app_server_tool_approval.transcript.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/adapters/providertest/fixtures/codex/app_server_turn.transcript.jsonl Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-linux harness/core/sandbox/apply_linux_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/adapters/provider/bootdir_claude_trust_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/adapters/provider/bootdir_claude_trust_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/adapters/provider/bootdir_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/adapters/provider/bootdir_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/agentcontext/provider_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/agentlaunch/testdata/shared-materialization/cairn-install.json Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/agentlaunch/testdata/shared-materialization/nanite-refresh.json Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/agentlaunch/testdata/shared-materialization/tether-multi-task-tree.json Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/agentlaunch/testdata/shared-materialization/torque-loopback-task.json Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/docs/units/agentkit/docs/shared-materialization-contracts.md Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/docs/units/agentkit/docs/shared-materialization-handoff.md Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/docs/units/go-agent-wrapper/docs/shared-materialization-conformance.md Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/docs/units/go-sandbox/README.md Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/derivation.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/derivation_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/resolve.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/resolve_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/summary/summary.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/interception/permission/summary/summary_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/sandbox/apply_darwin_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos harness/core/sandbox/protect_darwin_test.go Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+home-path-macos (commit-message)@6352c556b579 Developer home directory path in a test, doc or local config; reviewed by the owner 2026-10-15, no credential.
+internal-ip harness/core/docs/units/go-egress-proxy/CHANGELOG.md Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/docs/units/go-egress-proxy/CHANGELOG.md Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/docs/units/go-egress-proxy/README.md Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/example_test.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/proxy.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/proxy.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/proxy_test.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/ssrf.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/ssrf_embedded_test.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/ssrf_nat64_test.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip harness/core/interception/egress/ssrf_test.go Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip (commit-message)@05a9f2821064 Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+internal-ip (commit-message)@51d37f65e75a Private-range sample address in a test or doc; reviewed by the owner 2026-10-15.
+llm-provider-key harness/core/adapters/provider/hack/probe-mcp-exclusive.sh Labelled dummy value in a probe script (the script comment says so); not a key; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/acp/lifecycle_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/acp/permission_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/provider/mcp_servers_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/provider/preparation_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/provider/projection_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/wrapper/acp_permission_subprocess_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.
+secret-assignment harness/core/adapters/wrapper/acp_subprocess_test.go Test, fixture or documentation sample; high-entropy check found no live credential; reviewed by the owner 2026-10-15.

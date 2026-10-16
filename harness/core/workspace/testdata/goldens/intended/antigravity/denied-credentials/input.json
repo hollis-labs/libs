@@ -1,0 +1,6 @@
+{
+  "provider": "antigravity",
+  "runtime": "subprocess-per-turn",
+  "variant": "",
+  "scenario": "denied-credentials"
+}

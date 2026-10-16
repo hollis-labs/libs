@@ -1,0 +1,18 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "bindings": {
+    "CWD": "<boot>",
+    "Env": null,
+    "ExtraArgs": [
+      "--add-dir",
+      "/fixture/project"
+    ],
+    "First": [],
+    "Resumed": [
+      "--resume",
+      "fixture-session"
+    ]
+  },
+  "diagnostics": []
+}

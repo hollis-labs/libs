@@ -1,0 +1,80 @@
+{
+  "writer": "bootdir",
+  "source": "substrate legacy planting baseline",
+  "bindings": {
+    "Result": {
+      "Files": [
+        {
+          "RelPath": "skills/sample/scripts/run.sh",
+          "Mode": 489,
+          "Source": "native"
+        },
+        {
+          "RelPath": "AGENTS.md",
+          "Mode": 420,
+          "Source": "overlay"
+        },
+        {
+          "RelPath": "notes/empty.txt",
+          "Mode": 420,
+          "Source": "overlay"
+        }
+      ]
+    },
+    "AtomicWrites": null
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "AGENTS.md",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "f1434f6021413cc5b8568e6ad34fb3b1b0adb3d41bf832bb54e722ba6c71e005"
+      },
+      "ownership": {
+        "entry_id": "agentruntime.bootdir:AGENTS.md",
+        "group_id": "agentruntime.bootdir:overlay"
+      },
+      "provenance": {
+        "source": "agentruntime/bootdir",
+        "note": "overlay"
+      }
+    },
+    {
+      "path": "notes/empty.txt",
+      "kind": "file",
+      "mode": 420,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ownership": {
+        "entry_id": "agentruntime.bootdir:notes/empty.txt",
+        "group_id": "agentruntime.bootdir:overlay"
+      },
+      "provenance": {
+        "source": "agentruntime/bootdir",
+        "note": "overlay"
+      }
+    },
+    {
+      "path": "skills/sample/scripts/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "agentruntime.bootdir:skills/sample/scripts/run.sh",
+        "group_id": "agentruntime.bootdir:native"
+      },
+      "provenance": {
+        "source": "agentruntime/bootdir",
+        "note": "native"
+      }
+    }
+  ]
+}

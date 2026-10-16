@@ -1,0 +1,5 @@
+{
+  "provider": "codex",
+  "scenario": "refresh",
+  "operation": "install"
+}

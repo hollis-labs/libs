@@ -1,0 +1,80 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"fixture-plan\",\n  \"roots\": {\n    \"project_root\": \"/fixture/project\",\n    \"boot_root\": \"\u003cboot\u003e\",\n    \"state_root\": \"/fixture/state\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".mcp.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"b7147d366919d8aa20fe1dd9189578c358f0a7b58f2417dfaa19a285aa131ddd\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:.mcp.json\",\n        \"group_id\": \"provider:opencode:http-sse\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"mcp-mirror\"\n      }\n    },\n    {\n      \"path\": \"agents/fixture.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"c800b204ae16bf608dfad42315521213bc6976a3601e9a569a5046034c71988e\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:agents/fixture.md\",\n        \"group_id\": \"provider:opencode:http-sse\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"instructions\"\n      }\n    },\n    {\n      \"path\": \"boot.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:boot.md\",\n        \"group_id\": \"provider:opencode:http-sse\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"boot\"\n      }\n    },\n    {\n      \"path\": \"opencode.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"2a10183f36617dc4c0dcc0de3bbe672ea5db64234145abed73f3445ec70afb9d\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"provider:opencode:opencode.json\",\n        \"group_id\": \"provider:opencode:http-sse\"\n      },\n      \"provenance\": {\n        \"source\": \"go-providers\",\n        \"source_path\": \"native-config\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:skills/sample/SKILL.md\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/scripts/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"injection:native:skills/sample/scripts/run.sh\",\n        \"group_id\": \"injection:native\"\n      },\n      \"provenance\": {\n        \"source\": \"agentlaunch.NativeFile\"\n      }\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"http\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"mux\": {\n      \"args\": [\n        \"--stdio\"\n      ],\n      \"command\": \"fixture-mcp\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    },\n    \"stdio\": {\n      \"args\": [\n        \"one\",\n        \"two\"\n      ],\n      \"command\": \"fixture-server\",\n      \"env\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"stdio\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "agents/fixture.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\ndescription: Launch agent fixture\nmode: primary\n---\n\n# fixture\n\nRefreshed instructions.\n\n\nMCP server: http://127.0.0.1:23456/mcp\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  },
+  {
+    "path": "opencode.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcp\": {\n    \"http\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"mux\": {\n      \"command\": [\n        \"fixture-mcp\",\n        \"--stdio\"\n      ],\n      \"enabled\": true,\n      \"environment\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"local\"\n    },\n    \"stdio\": {\n      \"command\": [\n        \"fixture-server\",\n        \"one\",\n        \"two\"\n      ],\n      \"enabled\": true,\n      \"environment\": {\n        \"FIXTURE\": \"yes\"\n      },\n      \"type\": \"local\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "operator.txt",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Operator owned.\n"
+  },
+  {
+    "path": "skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "Fixture skill.\n"
+  },
+  {
+    "path": "skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

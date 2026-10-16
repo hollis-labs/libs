@@ -1,0 +1,7 @@
+{
+  "writer": "agentsessions",
+  "source": "legacy preparePlant (per-file Mode ignored)",
+  "diagnostics": [
+    "agentsessions: plant .mcp.json: render: MCPServerSpec \"http\": duplicate name"
+  ]
+}

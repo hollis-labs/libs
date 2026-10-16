@@ -1,0 +1,111 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": ".agents",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": ".agents/plugins/tether/plugin.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "fixture settings\n"
+  },
+  {
+    "path": ".materialize",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": ".materialize/manifest.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"schema_version\": \"materialize.v1\",\n  \"generation\": \"fixture-v1\",\n  \"roots\": {\n    \"boot_root\": \"\u003cboot\u003e\"\n  },\n  \"entries\": [\n    {\n      \"path\": \".agents/plugins/tether/plugin.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"38ba31d528b12919a05b0594abfdf1240318d7d2ada3483b94903fd84dea8dd2\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"wrapper:legacy:provider-settings:antigravity\",\n        \"group_id\": \"wrapper:legacy\"\n      },\n      \"provenance\": {\n        \"source\": \"go-agent-wrapper.plant.Spec\"\n      }\n    },\n    {\n      \"path\": \".mcp.json\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"wrapper:legacy:mcp\",\n        \"group_id\": \"wrapper:legacy\"\n      },\n      \"provenance\": {\n        \"source\": \"go-agent-wrapper.plant.Spec\"\n      }\n    },\n    {\n      \"path\": \"AGENTS.md\",\n      \"kind\": \"file\",\n      \"mode\": 420,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"wrapper:legacy:file:AGENTS.md\",\n        \"group_id\": \"wrapper:legacy\"\n      },\n      \"provenance\": {\n        \"source\": \"go-agent-wrapper.plant.Spec\"\n      }\n    },\n    {\n      \"path\": \"empty\",\n      \"kind\": \"directory\",\n      \"mode\": 488,\n      \"digest\": {\n        \"algorithm\": \"\",\n        \"hex\": \"\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"fixture:empty\",\n        \"group_id\": \"fixture\"\n      },\n      \"provenance\": {}\n    },\n    {\n      \"path\": \"hooks/antigravity/start.sh\",\n      \"kind\": \"file\",\n      \"mode\": 448,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"wrapper:legacy:hook:antigravity:start.sh\",\n        \"group_id\": \"wrapper:legacy\"\n      },\n      \"provenance\": {\n        \"source\": \"go-agent-wrapper.plant.Spec\"\n      }\n    },\n    {\n      \"path\": \"recovery.md\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"48f8c37c2ff594240c55fa0eac4e207a7a6498b864dd28026fc5a44a17f98e7c\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"wrapper:legacy:recovery\",\n        \"group_id\": \"wrapper:legacy\"\n      },\n      \"provenance\": {\n        \"source\": \"go-agent-wrapper.plant.Spec\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/SKILL.md\",\n      \"kind\": \"file\",\n      \"mode\": 416,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"046c899b2417d0ebc75adb230fd77e6aba2b8ecc59b867339bff6e95284e6fea\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"fixture:skill\",\n        \"group_id\": \"fixture\"\n      },\n      \"provenance\": {\n        \"source\": \"fixture\"\n      }\n    },\n    {\n      \"path\": \"skills/sample/data.bin\",\n      \"kind\": \"file\",\n      \"mode\": 384,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"fixture:data\",\n        \"group_id\": \"fixture\"\n      },\n      \"provenance\": {}\n    },\n    {\n      \"path\": \"skills/sample/scripts/run.sh\",\n      \"kind\": \"file\",\n      \"mode\": 489,\n      \"digest\": {\n        \"algorithm\": \"sha256\",\n        \"hex\": \"306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb\"\n      },\n      \"ownership\": {\n        \"entry_id\": \"fixture:script\",\n        \"group_id\": \"fixture\"\n      },\n      \"provenance\": {}\n    }\n  ],\n  \"created_at\": \"2000-01-01T00:00:00Z\"\n}"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\"mcpServers\":{}}\n"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture instructions.\n"
+  },
+  {
+    "path": "empty",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": "hooks",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "hooks/antigravity",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "hooks/antigravity/start.sh",
+    "kind": "file",
+    "mode": "0700",
+    "content": "#!/bin/sh\nexit 0\n"
+  },
+  {
+    "path": "recovery.md",
+    "kind": "file",
+    "mode": "0600",
+    "content": "Fixture recovery.\n"
+  },
+  {
+    "path": "skills",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/SKILL.md",
+    "kind": "file",
+    "mode": "0640",
+    "content": "---\nname: sample\n---\nFixture skill.\n"
+  },
+  {
+    "path": "skills/sample/data.bin",
+    "kind": "file",
+    "mode": "0600",
+    "base64": "AP8B"
+  },
+  {
+    "path": "skills/sample/scripts",
+    "kind": "directory",
+    "mode": "0755"
+  },
+  {
+    "path": "skills/sample/scripts/run.sh",
+    "kind": "file",
+    "mode": "0751",
+    "content": "#!/bin/sh\nexit 0\n"
+  }
+]

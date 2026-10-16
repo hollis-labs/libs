@@ -1,0 +1,5 @@
+{
+  "provider": "antigravity",
+  "runtime": "subprocess-per-turn",
+  "scenario": "yolo-deny"
+}

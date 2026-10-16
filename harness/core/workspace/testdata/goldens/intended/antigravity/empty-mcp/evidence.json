@@ -1,0 +1,210 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {
+      "argv": [
+        "--add-dir",
+        "/fixture/project"
+      ],
+      "cwd": "<boot>",
+      "posture": {
+        "provider": "antigravity",
+        "mapper": "adapters/registry.Descriptor.PostureFor",
+        "posture": ""
+      }
+    },
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "native files and table bindings",
+    "root": "boot"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".agents",
+      "ownership": {
+        "entry_id": "workspace.render:.agents",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/plugins",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/plugins/tether",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/plugins/tether/mcp_config.json",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether/mcp_config.json",
+        "group_id": "workspace.render:antigravity-mcp"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "d8e397af03b5b032f21d0aa967086f0c78b33c87b76f2e9898ae0a144df7de02"
+      }
+    },
+    {
+      "path": ".agents/plugins/tether/plugin.json",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/plugins/tether/plugin.json",
+        "group_id": "workspace.render:antigravity-plugin"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"name\"]],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "bad44d0f8ae7218b22b2adfcbea41325cbb191dc060c9265d4abe67a011e05c5"
+      }
+    },
+    {
+      "path": ".agents/skills",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/skills/sample",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/skills/sample/SKILL.md",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/SKILL.md",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".agents/skills/sample/scripts/run.sh",
+      "ownership": {
+        "entry_id": "workspace.render:.agents/skills/sample/scripts/run.sh",
+        "group_id": "workspace.render:.agents/skills/sample"
+      },
+      "provenance": {
+        "source": "fixture-package",
+        "revision": "fixture-revision"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "ownership": {
+        "entry_id": "workspace.render:AGENTS.md",
+        "group_id": "workspace.render:instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
+      }
+    },
+    {
+      "path": "boot.md",
+      "ownership": {
+        "entry_id": "workspace.render:boot.md",
+        "group_id": "workspace.render:kickoff"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "kickoff"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "88c6ed488cd6a9e131bd1d06cd80d65e9bcb90bd2a005c5e87840c41814120ad"
+      }
+    }
+  ]
+}

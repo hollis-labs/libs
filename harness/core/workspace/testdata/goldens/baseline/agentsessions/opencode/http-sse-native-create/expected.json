@@ -1,0 +1,36 @@
+[
+  {
+    "path": ".",
+    "kind": "directory",
+    "mode": "0700"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file",
+    "mode": "0600",
+    "content": "{\n  \"mcpServers\": {\n    \"http\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"stdio\": {\n      \"args\": [\n        \"one\",\n        \"two\"\n      ],\n      \"command\": \"fixture-server\",\n      \"type\": \"stdio\"\n    }\n  }\n}\n"
+  },
+  {
+    "path": "agents",
+    "kind": "directory",
+    "mode": "0750"
+  },
+  {
+    "path": "agents/default.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "---\ndescription: Launch agent fixture\nmode: primary\n---\n\n# fixture\n\nFixture instructions.\n\n\nMCP server: http://127.0.0.1:23456/mcp\n"
+  },
+  {
+    "path": "boot.md",
+    "kind": "file",
+    "mode": "0644",
+    "content": "Fixture kickoff.\n"
+  },
+  {
+    "path": "opencode.json",
+    "kind": "file",
+    "mode": "0644",
+    "content": "{\n  \"mcp\": {\n    \"http\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://127.0.0.1:23457/mcp\"\n    },\n    \"loopback\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://127.0.0.1:23456/mcp\"\n    },\n    \"stdio\": {\n      \"command\": [\n        \"fixture-server\",\n        \"one\",\n        \"two\"\n      ],\n      \"enabled\": true,\n      \"type\": \"local\"\n    }\n  }\n}\n"
+  }
+]

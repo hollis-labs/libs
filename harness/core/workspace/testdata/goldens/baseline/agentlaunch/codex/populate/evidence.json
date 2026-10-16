@@ -1,0 +1,71 @@
+{
+  "writer": "agentlaunch.DefaultMaterializer",
+  "source": "legacy BootSpec Populate/Replant",
+  "bindings": {
+    "files_written": [
+      "AGENTS.md"
+    ],
+    "injections_written": [
+      "skills/sample/SKILL.md",
+      "support/run.sh"
+    ],
+    "runtime": {
+      "provider": "codex",
+      "runtime_kind": "subprocess-per-turn"
+    }
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": "AGENTS.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "55258974a5d4a4391f9c1c0d840740aebc6e4d1ac870c58ebbb5ee955f1986b4"
+      },
+      "ownership": {
+        "entry_id": "bootspec:file:instructions",
+        "group_id": "bootspec:file"
+      },
+      "provenance": {
+        "source": "agentlaunch.BootSpec",
+        "source_path": "instructions"
+      }
+    },
+    {
+      "path": "skills/sample/SKILL.md",
+      "kind": "file",
+      "mode": 416,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5cd9d2cf5f1d23b3b2c12c6998dc51ba7cb095aa43001e173e206f4a239fb51c"
+      },
+      "ownership": {
+        "entry_id": "bootspec:injection:skill",
+        "group_id": "bootspec:injection"
+      },
+      "provenance": {
+        "source": "agentlaunch.BootSpec",
+        "source_path": "skill"
+      }
+    },
+    {
+      "path": "support/run.sh",
+      "kind": "file",
+      "mode": 489,
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+      },
+      "ownership": {
+        "entry_id": "bootspec:injection:support",
+        "group_id": "bootspec:injection"
+      },
+      "provenance": {
+        "source": "agentlaunch.BootSpec",
+        "source_path": "support"
+      }
+    }
+  ]
+}

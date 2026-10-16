@@ -1,0 +1,94 @@
+{
+  "writer": "workspace/render",
+  "source": "authored plan-field table and resolved fixture inputs",
+  "bindings": {
+    "installed_skill_evidence": "authored installed package row and declared-mode contract; archived installed seed supplies no installed skills; no installed-skill seed parity claimed",
+    "installed_apply_acceptance": {
+      "check_normalization": "reproduce settings comparison after owned-key merge and Codex TOML normalization",
+      "existing_directories": "never chmod, conflict on, or remove a pre-existing user directory, including declared parent directories",
+      "found_json_key_order": "preserve existing JSON key order (Claude permissions before fixture_operator)",
+      "source_seed": "seeds/cairn/claude/install-refresh must pass byte-for-byte at installed apply; these pure fixtures do not perform a merge",
+      "unknown_nested_leaves": "preserve unknown operator leaves inside owned objects/tables, including Codex fixture_operator inside mcp_servers.fixture, without dropping or reordering",
+      "unowned_values": "never overwrite keys the installer does not own"
+    },
+    "compared": [
+      "table argv tokens",
+      "environment roots",
+      "cwd",
+      "RPC project parameters",
+      "before-resume placement"
+    ],
+    "excluded": {
+      "executable and protocol/turn argv": "runtime projection",
+      "manifest, generation and reconcile report": "materialize",
+      "permission flags and environment": "registry posture mapper"
+    },
+    "table": {},
+    "resume_placement": "same table deltas apply to first and resumed launch; caller composes protocol tokens",
+    "case_family": "supplied operator leaves and ownership metadata; no refresh byte parity claimed",
+    "permission_evidence": "explicit host native settings; no posture reference",
+    "root": "home"
+  },
+  "diagnostics": [],
+  "ownership": [
+    {
+      "path": ".claude",
+      "ownership": {
+        "entry_id": "workspace.render:.claude",
+        "group_id": "workspace.render:directories"
+      },
+      "provenance": {
+        "source": "workspace/render"
+      },
+      "digest": {
+        "algorithm": "",
+        "hex": ""
+      }
+    },
+    {
+      "path": ".claude/AGENTS.md",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/AGENTS.md",
+        "group_id": "workspace.render:instructions"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instructions"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "5325172137744cfd18cad54ed0f33d9722dc7f7b7e0bf39ebb65531dd49b6dad"
+      }
+    },
+    {
+      "path": ".claude/CLAUDE.md",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/CLAUDE.md",
+        "group_id": "workspace.render:claude-pointer"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "instruction-pointer"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49"
+      }
+    },
+    {
+      "path": ".claude/settings.json",
+      "ownership": {
+        "entry_id": "workspace.render:.claude/settings.json",
+        "group_id": "workspace.render:claude-settings"
+      },
+      "provenance": {
+        "source": "workspace/render",
+        "note": "{\"schema\":\"native-key-ownership.v1\",\"owned_key_paths\":[[\"permissions\",\"defaultMode\"]],\"reserved_slots\":[]}"
+      },
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "c0389394843bdf131d8deb7882573269978863371fa2e5e461f5638e5e986117"
+      }
+    }
+  ]
+}

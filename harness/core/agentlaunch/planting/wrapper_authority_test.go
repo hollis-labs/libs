@@ -1,0 +1,19 @@
+package planting
+
+import (
+	"context"
+	"github.com/hollis-labs/libs/harness/core/agentlaunch"
+	"github.com/hollis-labs/libs/harness/core/internal/workspacetest"
+	"testing"
+)
+
+func wrapperFixtureAuthorization(t *testing.T) agentlaunch.ArtifactAuthorizer {
+	t.Helper()
+	resolve := workspacetest.New(t)
+	return func(ctx context.Context, path string) (agentlaunch.ArtifactAuthority, error) {
+		input, ports, closePorts, err := resolve(ctx, path)
+		return agentlaunch.ArtifactAuthority{Inactive: true, PrivateCustody: true, Input: input, Ports: ports, Close: closePorts}, err
+	}
+}
+
+func wrapperFixturePrivateDir(t *testing.T) string { t.Helper(); return workspacetest.PrivateDir(t) }
