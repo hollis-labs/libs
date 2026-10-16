@@ -67,10 +67,9 @@ var ErrPanic = errors.New("eventstage: stage panicked")
 // no way to sanitize would let Classify see raw payloads. Stamp and Classify
 // are optional.
 //
-// Stamp runs before Sanitize, on the raw payload, so a Stamp stage must not
-// put payload values in the errors it returns: [Report.Err] carries Stamp
-// error text verbatim. Sanitize errors are reduced to a failure class by the
-// chain; Classify only ever sees sanitized data.
+// Stamp runs before Sanitize, on the raw payload. The chain never keeps any
+// stage's error text: [Report.Err] carries only the slot and a failure class,
+// which a stage can name by implementing [ClassedError].
 type Config[E any] struct {
 	Stamp    Stage[E]
 	Sanitize FailClosedStage[E]
@@ -94,7 +93,9 @@ type Step struct {
 	Slot    Slot
 	Stage   string
 	Outcome Outcome
-	// Err is the stage's error, or a wrapped [ErrPanic].
+	// Err is a value-free description of the stage's failure (the slot and a
+	// cleaned failure class, matching [ErrStamp], [ErrSanitize], [ErrClassify]
+	// and, for a panic, [ErrPanic]); the stage's own error text is never kept.
 	Err error
 	// FailedClosed is set on the Sanitize step when FailClosed ran.
 	FailedClosed bool
@@ -131,14 +132,20 @@ func (r Report) Err() error {
 // FailClosed that itself panics (the event cannot be made safe).
 func (c *Chain[E]) Apply(ctx context.Context, e *E) Report {
 	var rep Report
-	run := func(slot Slot, s Stage[E]) (Step, bool) {
+	// run applies s and records the step. The report keeps only a value-free
+	// form of any error, because Stamp runs on the raw payload and a stage
+	// error may quote what it choked on; the original goes to the caller of run.
+	run := func(slot Slot, s Stage[E]) (cause error) {
 		step := Step{Slot: slot, Stage: s.Name()}
-		step.Outcome, step.Err = safeApply(ctx, s, e)
+		step.Outcome, cause = safeApply(ctx, s, e)
+		if cause != nil {
+			step.Err = stageFailure{slot: slot, class: cleanClass(classOf(cause)), panicked: errors.Is(cause, ErrPanic)}
+		}
 		rep.Steps = append(rep.Steps, step)
 		if step.Outcome.Dropped {
 			rep.Dropped = true
 		}
-		return step, step.Err == nil
+		return cause
 	}
 
 	if c.cfg.Stamp != nil {
@@ -148,13 +155,9 @@ func (c *Chain[E]) Apply(ctx context.Context, e *E) Report {
 		}
 	}
 
-	if _, ok := run(SlotSanitize, c.cfg.Sanitize); !ok {
+	if cause := run(SlotSanitize, c.cfg.Sanitize); cause != nil {
 		last := &rep.Steps[len(rep.Steps)-1]
 		last.FailedClosed = true
-		cause := last.Err
-		// A sanitizer's error text may quote the value it choked on, so the
-		// report keeps only the failure class.
-		last.Err = sanitizeFailure{class: cleanClass(classOf(cause)), panicked: errors.Is(cause, ErrPanic)}
 		if !safeFailClosed(c.cfg.Sanitize, e, cause) {
 			// The event could not be made safe: do not emit it.
 			last.Err = errors.Join(last.Err, errFailClosedPanic)
@@ -193,15 +196,36 @@ func safeFailClosed[E any](s FailClosedStage[E], e *E, cause error) (ok bool) {
 	return true
 }
 
-// ErrSanitize is matched by the error a failed Sanitize step reports.
-var ErrSanitize = errors.New("eventstage: sanitize failed")
+// Sentinels matched by the error a failed step reports.
+var (
+	ErrSanitize = errors.New("eventstage: sanitize failed")
+	ErrStamp    = errors.New("eventstage: stamp failed")
+	ErrClassify = errors.New("eventstage: classify failed")
+)
 
-type sanitizeFailure struct {
+// stageFailure is the value-free error [Report] carries for a failed step: the
+// slot and a cleaned failure class (see [ClassedError]), never the stage's own
+// error text.
+type stageFailure struct {
+	slot     Slot
 	class    string
 	panicked bool
 }
 
-func (f sanitizeFailure) Error() string { return "eventstage: sanitize failed: " + f.class }
-func (f sanitizeFailure) Is(target error) bool {
-	return target == ErrSanitize || (f.panicked && target == ErrPanic)
+func (f stageFailure) Error() string {
+	return "eventstage: " + string(f.slot) + " failed: " + f.class
+}
+
+func (f stageFailure) Is(target error) bool {
+	switch target {
+	case ErrSanitize:
+		return f.slot == SlotSanitize
+	case ErrStamp:
+		return f.slot == SlotStamp
+	case ErrClassify:
+		return f.slot == SlotClassify
+	case ErrPanic:
+		return f.panicked
+	}
+	return false
 }

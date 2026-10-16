@@ -34,7 +34,8 @@ type PayloadSanitizer interface {
 	SanitizePayload(ctx context.Context, kind string, payload []byte) ([]byte, PayloadReport, error)
 }
 
-// ClassedError lets a sanitizer name the failure class without leaking a value.
+// ClassedError lets a stage (Stamp, Sanitize or Classify) name its failure class
+// without leaking a value; the class is all [Report.Err] keeps.
 type ClassedError interface {
 	error
 	SanitizeErrorClass() string

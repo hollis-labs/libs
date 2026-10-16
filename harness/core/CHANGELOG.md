@@ -13,7 +13,7 @@ All notable changes to the `harness` module are documented here (the module was 
 - `eventstage`: the ordered stage chain for the event stream (contract D4
   rev 2, CW-20261016-0145). `Stage[E]{Name(); Apply(ctx, *E) (Outcome, error)}`
   mutates in place; `Chain[E]` runs Stamp, Sanitize, Classify in a fixed order,
-  contains panics, fails Sanitize closed (payload replaced by
+  contains panics, keeps only a value-free failure class in `Report.Err` for every stage, fails Sanitize closed (payload replaced by
   `{"sanitize_error":"<class>"}`, `class.sanitized=false`, envelope still
   emitted) and runs Classify only after Sanitize completed. Sanitize adapters
   for `runtimeevents.Event` and `mesh.Event` call a `PayloadSanitizer` (the

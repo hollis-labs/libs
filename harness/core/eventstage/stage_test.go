@@ -157,3 +157,41 @@ func TestDroppedStopsTheChain(t *testing.T) {
 		t.Fatalf("report=%+v trail=%v", rep, e.Trail)
 	}
 }
+
+// A stage error may quote the payload it choked on, and Stamp sees the raw
+// payload, so no stage's error text may reach Report.Err.
+func TestReportErrNeverCarriesAStagesErrorText(t *testing.T) {
+	leak := errors.New("could not stamp payload token=SECRET")
+	for name, cfg := range map[string]Config[ev]{
+		"stamp error":    {Stamp: trail("stamp", Outcome{}, leak), Sanitize: &fakeSanitize{fn: scrub}},
+		"classify error": {Sanitize: &fakeSanitize{fn: scrub}, Classify: trail("classify", Outcome{}, leak)},
+		"sanitize error": {Sanitize: &fakeSanitize{fn: func(*ev) error { return leak }}},
+		"stamp panic":    {Stamp: Named("stamp", func(context.Context, *ev) (Outcome, error) { panic(leak) }), Sanitize: &fakeSanitize{fn: scrub}},
+	} {
+		c, _ := NewChain(cfg)
+		rep := c.Apply(t.Context(), &ev{Payload: "token=SECRET"})
+		err := rep.Err()
+		if err == nil || strings.Contains(err.Error(), "SECRET") || strings.Contains(err.Error(), "could not stamp") {
+			t.Errorf("%s: Report.Err = %v", name, err)
+		}
+	}
+
+	c, _ := NewChain(Config[ev]{Stamp: trail("stamp", Outcome{}, leak), Sanitize: &fakeSanitize{fn: scrub}, Classify: trail("classify", Outcome{}, leak)})
+	err := c.Apply(t.Context(), &ev{}).Err()
+	if !errors.Is(err, ErrStamp) || !errors.Is(err, ErrClassify) || errors.Is(err, ErrSanitize) {
+		t.Fatalf("sentinels: %v", err)
+	}
+}
+
+type classed struct{}
+
+func (classed) Error() string              { return "token=SECRET" }
+func (classed) SanitizeErrorClass() string { return "no_context" }
+
+func TestAStageCanNameItsFailureClass(t *testing.T) {
+	c, _ := NewChain(Config[ev]{Stamp: trail("stamp", Outcome{}, classed{}), Sanitize: &fakeSanitize{fn: scrub}})
+	err := c.Apply(t.Context(), &ev{}).Err()
+	if err == nil || !strings.Contains(err.Error(), "no_context") || strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("err = %v", err)
+	}
+}
