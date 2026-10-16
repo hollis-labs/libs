@@ -14,6 +14,11 @@ on:
         required: false
         type: boolean
         default: true
+      sandbox-backend:
+        description: Provision the Linux sandbox backend (bubblewrap) before the checks
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,6 +43,19 @@ jobs:
           cache-dependency-path: |
             ${{ inputs.module }}/go.mod
             ${{ inputs.module }}/go.sum
+
+      - name: Install Linux sandbox backend
+        if: ${{ inputs.sandbox-backend }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap iproute2
+          # Permit the namespace backend on this disposable hosted runner.
+          # This is CI provisioning, not a change to consumer host policy.
+          # Ubuntu 24.04 otherwise denies bwrap's loopback setup.
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --ro-bind / / --unshare-net -- /bin/true
 
       - name: gofmt
         run: |
