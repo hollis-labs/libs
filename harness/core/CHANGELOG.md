@@ -8,6 +8,15 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Changed
+
+- `eventstage`: the Sanitize adapters recognise a retention tombstone
+  (`payload_digest` set, mesh/core v0.6.0 and runtimeevents `Tombstoned`): they
+  return the note `tombstoned`, never call the sanitizer and never set
+  `class.sanitized`, so a tombstone is not flipped to sanitized and the hub
+  backstop does not read it as a producer that skipped its choke point
+  (CW-20261016-0213).
+
 ## v0.12.0 — 2026-10-16
 
 ### Added

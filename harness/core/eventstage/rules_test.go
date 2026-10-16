@@ -177,32 +177,63 @@ func TestCatalogFillsAnEmptyCategoryAndRulesCannotOverrideIt(t *testing.T) {
 	}
 }
 
-// A retention tombstone carries payload_digest and no payload. mesh/core v0.5.0
-// ignores payload_digest when decoding, so this fixture also holds for v0.6.0:
-// the chain must not panic, must not invent a payload, and must classify on
-// kind alone.
-func TestTombstonedEventFixtureKeepsItsNullPayload(t *testing.T) {
-	data, err := os.ReadFile("testdata/tombstoned.mesh.json")
+// A retention tombstone carries payload_digest and no payload. The Sanitize
+// adapters leave it exactly as it is: they never call the sanitizer, never set
+// class.sanitized (a tombstone is not "sanitized" and not "unsanitized"), and
+// Classify, which sees a payload only from a sanitized event, labels it on kind
+// alone.
+func TestTombstonedEventsAreLeftAloneBySanitizeAndClassifiedOnKindOnly(t *testing.T) {
+	rs := loadDefault(t)
+	for _, mode := range []Mode{ModeProducer, ModeVerifyAndScrub} {
+		for _, file := range []string{"testdata/tombstoned.mesh.json", "testdata/tombstoned.unsanitized.mesh.json"} {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var e mesh.Event
+			if err := json.Unmarshal(data, &e); err != nil {
+				t.Fatal(err)
+			}
+			if !e.Tombstoned() {
+				t.Fatalf("%s: the fixture is not a tombstone", file)
+			}
+			digest, wasSanitized := e.PayloadDigest, e.Class != nil && e.Class.Sanitized
+			c, _ := NewChain(Config[mesh.Event]{Sanitize: MeshSanitize(panicSanitizer{}, mode), Classify: MeshClassify(rs)})
+			rep := c.Apply(t.Context(), &e)
+			if !rep.Emit() || rep.Err() != nil || rep.Steps[0].Outcome.Note != NoteTombstoned || rep.Steps[0].Outcome.Changed {
+				t.Fatalf("%s mode %d: report = %+v err=%v", file, mode, rep, rep.Err())
+			}
+			if string(e.Payload) != "null" || e.PayloadDigest != digest || !e.Tombstoned() {
+				t.Fatalf("%s: payload=%s digest=%q", file, e.Payload, e.PayloadDigest)
+			}
+			if got := e.Class != nil && e.Class.Sanitized; got != wasSanitized {
+				t.Fatalf("%s mode %d: class.sanitized went from %v to %v", file, mode, wasSanitized, got)
+			}
+			if e.Class == nil || e.Class.Category != "state" || strings.Contains(strings.Join(e.Class.Labels, ","), "blocked") {
+				t.Fatalf("%s: class = %+v: classified on kind only, no payload rule may fire", file, e.Class)
+			}
+		}
+	}
+}
+
+func TestTombstonedRuntimeEventIsLeftAlone(t *testing.T) {
+	data, err := os.ReadFile("testdata/tombstoned.runtimeevents.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var e mesh.Event
+	var e runtimeevents.Event
 	if err := json.Unmarshal(data, &e); err != nil {
 		t.Fatal(err)
 	}
-	rs := loadDefault(t)
-	c, _ := NewChain(Config[mesh.Event]{
-		Sanitize: MeshSanitize(panicSanitizer{}, ModeProducer),
-		Classify: MeshClassify(rs),
-	})
+	if !e.Tombstoned() || e.PayloadDigest != "withheld" {
+		t.Fatalf("the fixture is not a tombstone: %+v", e)
+	}
+	c, _ := NewChain(Config[runtimeevents.Event]{Sanitize: RuntimeEventsSanitize(panicSanitizer{}, ModeVerifyAndScrub), Classify: RuntimeEventsClassify(loadDefault(t))})
 	rep := c.Apply(t.Context(), &e)
-	if !rep.Emit() || rep.Err() != nil {
-		t.Fatalf("emit=%v err=%v", rep.Emit(), rep.Err())
+	if !rep.Emit() || rep.Err() != nil || rep.Steps[0].Outcome.Note != NoteTombstoned {
+		t.Fatalf("report = %+v err=%v", rep, rep.Err())
 	}
-	if string(e.Payload) != "null" {
-		t.Fatalf("payload = %s, want it left null", e.Payload)
-	}
-	if e.Class == nil || e.Class.Category != "state" || strings.Contains(strings.Join(e.Class.Labels, ","), "blocked") {
-		t.Fatalf("class = %+v: classified on kind only, no payload rule may fire", e.Class)
+	if e.Class.Sanitized || e.PayloadDigest != "withheld" || len(e.Payload) != 0 || e.Class.Category != "state" {
+		t.Fatalf("event = %+v class=%+v", e, e.Class)
 	}
 }

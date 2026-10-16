@@ -70,8 +70,14 @@ const (
 	NoteBackstopFailedClosed = "backstop_failed_closed"
 	NoteFailedClosed         = "failed_closed"
 	NoteNoPayload            = "no_payload"
-	errorClassUnspecified    = "error"
-	maxErrorClass            = 32
+	// NoteTombstoned marks an event whose payload a retention pass removed
+	// (payload_digest is set). There is nothing to sanitize and nothing was
+	// sanitized: the adapters touch neither the payload nor class.sanitized, so
+	// a tombstone is never flipped to "sanitized" and never mistaken, by the hub
+	// backstop, for a producer that skipped its choke point.
+	NoteTombstoned        = "tombstoned"
+	errorClassUnspecified = "error"
+	maxErrorClass         = 32
 )
 
 // ErrorPayload is the payload an event carries after a fail-closed sanitize.
@@ -219,6 +225,9 @@ type rtSanitize struct{ sanitizeCore }
 func (r rtSanitize) Name() string { return r.name }
 
 func (r rtSanitize) Apply(ctx context.Context, e *runtimeevents.Event) (Outcome, error) {
+	if e.Tombstoned() {
+		return Outcome{Note: NoteTombstoned}, nil
+	}
 	var cur classFields
 	if e.Class != nil {
 		cur = classFields{e.Class.Sanitized, e.Class.Redactions, e.Class.Sensitivity, e.Class.PII}
@@ -257,9 +266,9 @@ type meshSanitize struct{ sanitizeCore }
 func (m meshSanitize) Name() string { return m.name }
 
 func (m meshSanitize) Apply(ctx context.Context, e *mesh.Event) (Outcome, error) {
-	// TODO(mesh/core v0.6.0): once harness/core requires it, treat a null
-	// payload with a payload_digest (Event.Tombstoned) as a retention
-	// tombstone rather than "no payload".
+	if e.Tombstoned() {
+		return Outcome{Note: NoteTombstoned}, nil
+	}
 	var cur classFields
 	if e.Class != nil {
 		cur = classFields{e.Class.Sanitized, e.Class.Redactions, e.Class.Sensitivity, e.Class.PII}
