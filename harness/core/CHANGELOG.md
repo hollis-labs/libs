@@ -19,8 +19,12 @@ All notable changes to the `harness` module are documented here (the module was 
   for `runtimeevents.Event` and `mesh.Event` call a `PayloadSanitizer` (the
   payload API of the shared redaction engine) and set `class.sanitized`,
   `redactions`, `sensitivity` and `pii`; `ModeVerifyAndScrub` is the hub
-  backstop. Classify evaluates a versioned, self-testing rule document
-  (`eventstage.rules/v1`) that can set only category, severity and labels.
+  backstop (a fail-closed event keeps `sanitized=false` and its error payload;
+  a never-sanitized one is reported as `backstop_unsanitized`). Classify
+  evaluates a versioned, self-testing rule document (`eventstage.rules/v1`)
+  that can set only category, severity and labels, can match on
+  `sanitized` (to label fail-closed events), fills an empty category from the
+  event kind catalog and rejects rules whose category conflicts with it.
 
 ## v0.11.0 — 2026-10-16
 

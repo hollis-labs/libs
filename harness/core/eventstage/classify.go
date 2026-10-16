@@ -33,13 +33,14 @@ type classifyStage[E any] struct {
 func (c classifyStage[E]) Name() string { return "classify/" + c.rs.ID + "@" + c.rs.Version }
 
 func (c classifyStage[E]) Apply(_ context.Context, e *E) (Outcome, error) {
+	sanitized := c.acc.Sanitized(e)
 	var payload []byte
-	if c.acc.Sanitized(e) {
+	if sanitized {
 		payload = c.acc.Payload(e)
 	}
 	in := c.acc.Get(e)
-	out, matched := c.rs.Evaluate(c.acc.Kind(e), in, payload)
-	if len(matched) == 0 {
+	out, matched := c.rs.Evaluate(EventView{Kind: c.acc.Kind(e), Fields: in, Sanitized: sanitized, Payload: payload})
+	if out.Category == in.Category && out.Severity == in.Severity && strings.Join(out.Labels, ",") == strings.Join(in.Labels, ",") {
 		return Outcome{}, nil
 	}
 	c.acc.Put(e, out)

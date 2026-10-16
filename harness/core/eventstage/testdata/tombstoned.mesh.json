@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "id": "evt_00000000000000000000000000000001",
+  "kind": "task.state_changed",
+  "time": "2026-10-16T12:00:00Z",
+  "source": {"channel": "test"},
+  "subject": "msg://task/torque/CW-0",
+  "generation": 1,
+  "source_sequence": 1,
+  "cursor": "1",
+  "content_type": "application/json",
+  "visibility": "environment",
+  "payload": null,
+  "payload_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "class": {"sanitized": true}
+}

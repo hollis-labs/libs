@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/hollis-labs/libs/harness/core/adapters/runtimeevents/catalog"
 )
 
 // RulesSchema is the schema id of a classify rule document.
@@ -47,15 +49,18 @@ var ErrRules = errors.New("eventstage: invalid rule set")
 //	  }]
 //	}
 //
-// Rules run in order and every matching rule applies: the first rule that
-// sets a category wins (and only when the event has none), severity only ever
+// An empty category is first filled from the event kind catalog, so a rule may
+// set a category only for a kind the catalog does not know; [RuleSet.Validate]
+// rejects a rule whose set.category conflicts with the catalog category of a
+// kind it can match. Rules run in order and every matching rule applies: the
+// first rule that sets a category wins (and only when the event has none), severity only ever
 // rises, and labels accumulate (sorted, de-duplicated, capped at [MaxLabels]).
 // A rule can set only category, severity and labels. Sensitivity, PII,
 // visibility and the sanitized flag belong to Sanitize, and unknown fields are
 // rejected so a rule cannot try.
 //
 // A match is the AND of its parts: kind (exact, "prefix.*" or "*"), category,
-// min_severity and payload conditions. A payload condition names an RFC 6901
+// min_severity, sanitized and payload conditions. A payload condition names an RFC 6901
 // JSON pointer and exactly one of equals (string, or the JSON text of a
 // scalar), in (list of those), matches (RE2 regular expression) or exists.
 // Payload conditions see only the sanitized payload.
@@ -81,10 +86,14 @@ type Rule struct {
 
 // Match selects events. An empty field matches everything.
 type Match struct {
-	Kind        []string       `json:"kind,omitempty"`
-	Category    []string       `json:"category,omitempty"`
-	MinSeverity string         `json:"min_severity,omitempty"`
-	Payload     []PayloadMatch `json:"payload,omitempty"`
+	Kind        []string `json:"kind,omitempty"`
+	Category    []string `json:"category,omitempty"`
+	MinSeverity string   `json:"min_severity,omitempty"`
+	// Sanitized matches on class.sanitized. Sanitized=false selects an event
+	// that failed closed (or was never sanitized): its payload is withheld,
+	// so this is how a rule labels it.
+	Sanitized *bool          `json:"sanitized,omitempty"`
+	Payload   []PayloadMatch `json:"payload,omitempty"`
 }
 
 // PayloadMatch is one condition on the sanitized payload.
@@ -112,10 +121,16 @@ type RuleTest struct {
 
 // RuleTestEvent is the input to a [RuleTest].
 type RuleTestEvent struct {
-	Kind     string          `json:"kind"`
-	Category string          `json:"category,omitempty"`
-	Severity string          `json:"severity,omitempty"`
-	Payload  json.RawMessage `json:"payload,omitempty"`
+	Kind     string `json:"kind"`
+	Category string `json:"category,omitempty"`
+	Severity string `json:"severity,omitempty"`
+	// Sanitized defaults to true. Set false to test an event that failed
+	// closed; its payload is then withheld from the rules.
+	Sanitized *bool `json:"sanitized,omitempty"`
+	// PayloadDigest marks a retention tombstone: the payload was removed, so
+	// the rules see none whatever Payload holds.
+	PayloadDigest string          `json:"payload_digest,omitempty"`
+	Payload       json.RawMessage `json:"payload,omitempty"`
 }
 
 // RuleTestOutcome is the expected result of a [RuleTest]. Category and
@@ -134,10 +149,11 @@ type Fields struct {
 }
 
 type compiledRule struct {
-	kinds []string
-	cats  map[string]bool
-	minSv int
-	conds []compiledCond
+	kinds     []string
+	cats      map[string]bool
+	minSv     int
+	sanitized *bool
+	conds     []compiledCond
 }
 
 type compiledCond struct {
@@ -233,6 +249,7 @@ func compileRule(r Rule) (compiledRule, error) {
 		}
 		cr.minSv = n
 	}
+	cr.sanitized = r.Match.Sanitized
 	if len(r.Match.Payload) > MaxPayloadMatches {
 		return cr, fmt.Errorf("%d payload conditions, max %d", len(r.Match.Payload), MaxPayloadMatches)
 	}
@@ -245,6 +262,11 @@ func compileRule(r Rule) (compiledRule, error) {
 	}
 	if r.Set.Category != "" && !categories[r.Set.Category] {
 		return cr, fmt.Errorf("unknown set.category %q", r.Set.Category)
+	}
+	if r.Set.Category != "" {
+		if kind, conflict := catalogConflict(cr.kinds, r.Set.Category); conflict {
+			return cr, fmt.Errorf("set.category %q conflicts with the catalog category of %q: the catalog fills the category of every catalogued kind, so a rule may set one only for uncatalogued kinds", r.Set.Category, kind)
+		}
 	}
 	if r.Set.Severity != "" {
 		if _, ok := severityRank[r.Set.Severity]; !ok {
@@ -263,6 +285,21 @@ func compileRule(r Rule) (compiledRule, error) {
 		return cr, errors.New("set is empty")
 	}
 	return cr, nil
+}
+
+// catalogConflict reports a catalogued kind the rule can match whose catalog
+// category differs from category.
+func catalogConflict(patterns []string, category string) (string, bool) {
+	cat, err := catalog.Load()
+	if err != nil {
+		return "", false
+	}
+	for _, e := range cat.Kinds {
+		if (len(patterns) == 0 || kindMatches(patterns, e.Kind)) && e.Category != category {
+			return e.Kind, true
+		}
+	}
+	return "", false
 }
 
 func compileCond(p PayloadMatch) (compiledCond, error) {
@@ -310,13 +347,29 @@ func compileCond(p PayloadMatch) (compiledCond, error) {
 	return c, nil
 }
 
-// Evaluate applies the rules to an event described by its kind, current
-// fields and sanitized payload (nil when the payload must not be inspected).
-// It returns the new fields and the ids of the rules that matched.
-func (rs *RuleSet) Evaluate(kind string, in Fields, payload []byte) (Fields, []string) {
+// EventView is what the rules see of an event.
+type EventView struct {
+	Kind   string
+	Fields Fields
+	// Sanitized is class.sanitized. The payload is inspected only when it is
+	// true, whatever Payload holds.
+	Sanitized bool
+	Payload   []byte
+}
+
+// Evaluate applies the rules to an event. It first fills an empty category
+// from the catalog, then returns the new fields and the ids of the rules that
+// matched. Payload conditions see the payload only when v.Sanitized is true.
+func (rs *RuleSet) Evaluate(v EventView) (Fields, []string) {
+	in := v.Fields
+	if in.Category == "" {
+		if e, ok := catalog.Lookup(v.Kind); ok {
+			in.Category = e.Category
+		}
+	}
 	var doc any
-	if len(payload) > 0 && len(payload) <= MaxScanBytes {
-		if err := json.Unmarshal(payload, &doc); err != nil {
+	if v.Sanitized && len(v.Payload) > 0 && len(v.Payload) <= MaxScanBytes {
+		if err := json.Unmarshal(v.Payload, &doc); err != nil {
 			doc = nil
 		}
 	}
@@ -331,7 +384,7 @@ func (rs *RuleSet) Evaluate(kind string, in Fields, payload []byte) (Fields, []s
 	}
 	var matched []string
 	for i, cr := range rs.compiled {
-		if !cr.matches(kind, in.Category, sv, doc) {
+		if !cr.matches(v.Kind, in.Category, sv, v.Sanitized, doc) {
 			continue
 		}
 		r := rs.Rules[i]
@@ -367,8 +420,11 @@ func orInfo(s string) string {
 	return "info"
 }
 
-func (cr compiledRule) matches(kind, category string, sv int, doc any) bool {
+func (cr compiledRule) matches(kind, category string, sv int, sanitized bool, doc any) bool {
 	if len(cr.kinds) > 0 && !kindMatches(cr.kinds, kind) {
+		return false
+	}
+	if cr.sanitized != nil && *cr.sanitized != sanitized {
 		return false
 	}
 	if cr.cats != nil && !cr.cats[category] {
@@ -463,7 +519,12 @@ func scalarText(v any) (string, bool) {
 func (rs *RuleSet) SelfTest(context.Context) []error {
 	var errs []error
 	for _, t := range rs.Tests {
-		got, _ := rs.Evaluate(t.Event.Kind, Fields{Category: t.Event.Category, Severity: t.Event.Severity}, t.Event.Payload)
+		sanitized := t.Event.Sanitized == nil || *t.Event.Sanitized
+		payload := []byte(t.Event.Payload)
+		if t.Event.PayloadDigest != "" {
+			payload = nil
+		}
+		got, _ := rs.Evaluate(EventView{Kind: t.Event.Kind, Fields: Fields{Category: t.Event.Category, Severity: t.Event.Severity}, Sanitized: sanitized, Payload: payload})
 		want := append([]string(nil), t.Want.Labels...)
 		sort.Strings(want)
 		if (t.Want.Category != "" && got.Category != t.Want.Category) ||

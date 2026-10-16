@@ -65,15 +65,15 @@ func TestParseRulesRejectsBadDocuments(t *testing.T) {
 
 func TestEvaluateRules(t *testing.T) {
 	rs := loadDefault(t)
-	got, matched := rs.Evaluate("task.state_changed", Fields{Severity: "debug", Labels: []string{"keep"}}, []byte(`{"to":"blocked"}`))
+	got, matched := rs.Evaluate(EventView{Kind: "task.state_changed", Fields: Fields{Severity: "debug", Labels: []string{"keep"}}, Sanitized: true, Payload: []byte(`{"to":"blocked"}`)})
 	if got.Category != "state" || got.Severity != "warning" || strings.Join(got.Labels, ",") != "blocked,keep" || len(matched) != 1 {
 		t.Fatalf("got %+v matched %v", got, matched)
 	}
-	if _, m := rs.Evaluate("task.state_changed", Fields{}, []byte(`not json`)); len(m) != 0 {
+	if _, m := rs.Evaluate(EventView{Kind: "task.state_changed", Sanitized: true, Payload: []byte(`not json`)}); len(m) != 0 {
 		t.Fatalf("a payload that is not JSON must match no payload condition: %v", m)
 	}
 	big := []byte(`{"to":"blocked","pad":"` + strings.Repeat("x", MaxScanBytes) + `"}`)
-	if _, m := rs.Evaluate("task.state_changed", Fields{}, big); len(m) != 0 {
+	if _, m := rs.Evaluate(EventView{Kind: "task.state_changed", Sanitized: true, Payload: big}); len(m) != 0 {
 		t.Fatalf("payloads over MaxScanBytes are not inspected: %v", m)
 	}
 }
@@ -133,5 +133,76 @@ func TestMeshClassifyWritesTheClassBlock(t *testing.T) {
 	}
 	if e.Class.Category != "tool" || e.Class.Severity != "error" || !e.Class.Sanitized {
 		t.Fatalf("class = %+v", e.Class)
+	}
+}
+
+// A fail-closed event has sanitized=false, so its payload is withheld; the
+// sanitized match field is how a rule still labels it. This runs the real
+// chain, not a hand-built event.
+func TestFailClosedEventIsLabelledByASanitizedFalseRule(t *testing.T) {
+	rs := loadDefault(t)
+	c, _ := NewChain(Config[runtimeevents.Event]{
+		Sanitize: RuntimeEventsSanitize(fakePayload{}, ModeProducer),
+		Classify: RuntimeEventsClassify(rs),
+	})
+	e := rtEvent(`{"x":"TOOBIG SECRET"}`)
+	rep := c.Apply(t.Context(), e)
+	if !rep.Emit() || e.Class.Sanitized {
+		t.Fatalf("emit=%v class=%+v", rep.Emit(), e.Class)
+	}
+	if got := strings.Join(e.Class.Labels, ","); got != "sanitize-failed" || e.Class.Severity != "warning" {
+		t.Fatalf("labels=%q severity=%q, want the sanitize-failed rule to fire", got, e.Class.Severity)
+	}
+	// The same rule must not fire for an event that sanitized normally.
+	ok := rtEvent(`{"x":"fine"}`)
+	c.Apply(t.Context(), ok)
+	if strings.Contains(strings.Join(ok.Class.Labels, ","), "sanitize-failed") {
+		t.Fatalf("sanitized event labelled sanitize-failed: %v", ok.Class.Labels)
+	}
+}
+
+func TestCatalogFillsAnEmptyCategoryAndRulesCannotOverrideIt(t *testing.T) {
+	rs := loadDefault(t)
+	e := &mesh.Event{Kind: "task.state_changed", Payload: json.RawMessage(`{"to":"blocked"}`), Class: &mesh.EventClass{Sanitized: true}}
+	if _, err := MeshClassify(rs).Apply(t.Context(), e); err != nil {
+		t.Fatal(err)
+	}
+	if e.Class.Category != "state" {
+		t.Fatalf("category = %q, want the catalog's", e.Class.Category)
+	}
+	// With no rule matching at all the category is still filled.
+	plain := &mesh.Event{Kind: "message.sent", Payload: json.RawMessage(`{}`), Class: &mesh.EventClass{Sanitized: true}}
+	if out, err := MeshClassify(rs).Apply(t.Context(), plain); err != nil || !out.Changed || plain.Class.Category != "message" {
+		t.Fatalf("out=%+v err=%v class=%+v", out, err, plain.Class)
+	}
+}
+
+// A retention tombstone carries payload_digest and no payload. mesh/core v0.5.0
+// ignores payload_digest when decoding, so this fixture also holds for v0.6.0:
+// the chain must not panic, must not invent a payload, and must classify on
+// kind alone.
+func TestTombstonedEventFixtureKeepsItsNullPayload(t *testing.T) {
+	data, err := os.ReadFile("testdata/tombstoned.mesh.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var e mesh.Event
+	if err := json.Unmarshal(data, &e); err != nil {
+		t.Fatal(err)
+	}
+	rs := loadDefault(t)
+	c, _ := NewChain(Config[mesh.Event]{
+		Sanitize: MeshSanitize(panicSanitizer{}, ModeProducer),
+		Classify: MeshClassify(rs),
+	})
+	rep := c.Apply(t.Context(), &e)
+	if !rep.Emit() || rep.Err() != nil {
+		t.Fatalf("emit=%v err=%v", rep.Emit(), rep.Err())
+	}
+	if string(e.Payload) != "null" {
+		t.Fatalf("payload = %s, want it left null", e.Payload)
+	}
+	if e.Class == nil || e.Class.Category != "state" || strings.Contains(strings.Join(e.Class.Labels, ","), "blocked") {
+		t.Fatalf("class = %+v: classified on kind only, no payload rule may fire", e.Class)
 	}
 }

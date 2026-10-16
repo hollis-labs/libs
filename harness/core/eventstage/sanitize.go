@@ -62,10 +62,15 @@ const (
 	// without ever being sanitized (a producer skipping its choke point), as
 	// opposed to one that failed closed.
 	NoteBackstopUnsanitized = "backstop_unsanitized"
-	NoteFailedClosed        = "failed_closed"
-	NoteNoPayload           = "no_payload"
-	errorClassUnspecified   = "error"
-	maxErrorClass           = 32
+	// NoteBackstopFailedClosed marks an event that arrived at the hub already
+	// failed closed. The backstop leaves it exactly as it is: the
+	// {"sanitize_error":...} payload and class.sanitized=false stay, so the
+	// hub can still tell it from a sanitized event.
+	NoteBackstopFailedClosed = "backstop_failed_closed"
+	NoteFailedClosed         = "failed_closed"
+	NoteNoPayload            = "no_payload"
+	errorClassUnspecified    = "error"
+	maxErrorClass            = 32
 )
 
 // ErrorPayload is the payload an event carries after a fail-closed sanitize.
@@ -158,6 +163,9 @@ type sanitizeCore struct {
 // apply sanitizes payload and returns the new payload, the new class fields
 // and the outcome. cur is the event's current class state.
 func (c sanitizeCore) apply(ctx context.Context, kind string, payload []byte, cur classFields) ([]byte, classFields, Outcome, error) {
+	if c.mode == ModeVerifyAndScrub && !cur.sanitized && failClosedPayload(payload) {
+		return payload, cur, Outcome{Note: NoteBackstopFailedClosed}, nil
+	}
 	if emptyPayload(payload) {
 		cur.sanitized = true
 		return payload, cur, Outcome{Changed: true, Note: NoteNoPayload}, nil

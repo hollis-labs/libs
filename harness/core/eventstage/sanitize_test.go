@@ -129,9 +129,14 @@ func TestBackstopTellsAnUnsanitizedEventFromOneThatFailedClosed(t *testing.T) {
 		t.Fatalf("producer that never sanitized: out=%+v payload=%s", out, skipped.Payload)
 	}
 
-	failed := &mesh.Event{Kind: "message.sent", Payload: ErrorPayload("oversized")}
-	if out, _ := hub.Apply(t.Context(), failed); out.Note != NoteSanitized {
-		t.Fatalf("event that failed closed upstream: out=%+v", out)
+	// A fail-closed event keeps its payload shape and sanitized=false.
+	failed := &mesh.Event{Kind: "message.sent", Payload: ErrorPayload("oversized"), Class: &mesh.EventClass{Redactions: 2}}
+	out, err := hub.Apply(t.Context(), failed)
+	if err != nil || out.Note != NoteBackstopFailedClosed || out.Changed {
+		t.Fatalf("event that failed closed upstream: out=%+v err=%v", out, err)
+	}
+	if failed.Class.Sanitized || string(failed.Payload) != string(ErrorPayload("oversized")) || failed.Class.Redactions != 2 {
+		t.Fatalf("backstop altered a fail-closed event: payload=%s class=%+v", failed.Payload, failed.Class)
 	}
 
 	// A producer-mode pass over an unsanitized event is the normal case.
