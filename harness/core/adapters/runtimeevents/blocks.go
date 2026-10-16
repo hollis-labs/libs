@@ -3,6 +3,7 @@ package runtimeevents
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	mesh "github.com/hollis-labs/libs/mesh/core"
@@ -38,8 +39,10 @@ type Corr struct {
 
 // Actor identifies who caused the event.
 //
-// URN and Kind use the mesh vocabulary: Kind is agent, user, service or
-// tool and matches the URN's authority (msg://agent/..., msg://user/...).
+// URN and Kind use the mesh vocabulary: Kind is agent, user, service, tool
+// or device and matches the URN's authority (msg://agent/...,
+// msg://device/...). device is a machine principal such as a laptop, a
+// worker host or a host daemon.
 // Role refines it: operator, system, workflow, hook or reaction. Verified
 // records how the actor was identified: token, claimed or none.
 type Actor struct {
@@ -89,6 +92,8 @@ func SessionBound(k EventKind) bool {
 	return false
 }
 
+var payloadDigestPattern = regexp.MustCompile(`^(sha256:[0-9a-f]{64}|withheld)$`)
+
 // ErrInvalid is matched by every error [Event.Validate] returns.
 var ErrInvalid = errors.New("runtimeevents: invalid event")
 
@@ -98,7 +103,8 @@ var ErrInvalid = errors.New("runtimeevents: invalid event")
 // Required: SchemaVersion, ID, Kind, Time, Sequence and Source.Channel;
 // at least one of SessionID or Subject; SessionID for every
 // [SessionBound] kind. When Actor is set its URN and Kind are required.
-// A non-zero Corr.Depth requires Corr.CausationID.
+// A non-zero Corr.Depth requires Corr.CausationID. A set PayloadDigest must
+// be well formed and requires an absent Payload.
 func (e Event) Validate() error {
 	var missing []string
 	if e.SchemaVersion == "" {
@@ -135,6 +141,14 @@ func (e Event) Validate() error {
 	}
 	if e.Corr != nil && e.Corr.Depth > 0 && e.Corr.CausationID == "" {
 		missing = append(missing, "corr.causation_id (depth is set)")
+	}
+	if e.Tombstoned() {
+		if !payloadDigestPattern.MatchString(e.PayloadDigest) {
+			missing = append(missing, "well-formed payload_digest")
+		}
+		if len(e.Payload) != 0 {
+			missing = append(missing, "absent payload (payload_digest is set)")
+		}
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("%w %s: missing %s", ErrInvalid, e.ID, strings.Join(missing, ", "))

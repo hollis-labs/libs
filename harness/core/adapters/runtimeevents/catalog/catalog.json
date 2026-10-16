@@ -117,6 +117,13 @@
    "status": "stable"
   },
   {
+   "kind": "agent.subagent_stop",
+   "category": "activity",
+   "payload_schema": "urn:hollis-labs:events:subagent_stop@1",
+   "status": "new",
+   "note": "parent_id is the matching agent.subagent_spawn event id"
+  },
+  {
    "kind": "agent.permission_requested",
    "category": "approval",
    "status": "stable",
@@ -194,6 +201,20 @@
    "category": "state",
    "payload_schema": "urn:hollis-labs:events:state_changed@1",
    "status": "new"
+  },
+  {
+   "kind": "session.usage",
+   "category": "activity",
+   "payload_schema": "urn:hollis-labs:events:session_usage@1",
+   "status": "new",
+   "note": "cumulative token totals for the session, at turn end and session end; an observation, not the usage ledger (Station owns cost)"
+  },
+  {
+   "kind": "session.health_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:session_health_changed@1",
+   "status": "new",
+   "note": "emitted on change only, never when from equals to"
   },
   {
    "kind": "session.state_changed",

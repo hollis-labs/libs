@@ -26,6 +26,7 @@ The design and its rulings are in Tesseract: `project/portfolio-architect/worksp
 | `subject` | `subject` | |
 | `cursor`, `recorded_at` | `cursor`, `recorded_at` | Set by the log only. |
 | `content_type`, `truncated`, `payload` | same names | |
+| `payload_digest` | `payload_digest` | Retention tombstone (D7). The payload is absent here and `null` on mesh. |
 | `scope` | `scope` | Same Go type (`mesh.EventScope`). |
 | `corr.trace_id`, `corr.span_id`, `corr.traceparent` | `trace.trace_id`, `trace.span_id`, `trace.traceparent` | |
 | `corr.causation_id`, `corr.correlation_id`, `corr.thread_id`, `corr.in_reply_to`, `corr.idempotency_key` | top-level fields with the same names | |
