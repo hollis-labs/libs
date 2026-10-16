@@ -4,7 +4,12 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ## Unreleased
 
-## v0.2.0 — pending security and performance gates
+## v0.2.0 — 2026-10-16
+
+Performance: the primary gate (CPU p99 < 200 µs for a 4 KiB payload) was waived.
+This release was accepted on the fallback: CPU median < 200 µs and quiet-host
+wall p99 < 1 ms. Measured CPU median was 162–170 µs; CPU p99 was 255–345 µs
+on a loaded host; quiet-host wall p99 was 170–185 µs.
 
 ### Added
 

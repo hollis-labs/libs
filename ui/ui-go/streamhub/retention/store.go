@@ -137,7 +137,9 @@ type Store interface {
 	Tombstone(ctx context.Context, stream string, s TombstoneSpec, op Op) (Result, error)
 
 	// Trim removes rows that match any of specs (same class, at or before the
-	// spec's cutoff, rolled up if RequireRolled). A head-only store removes the
+	// spec's cutoff, rolled up if RequireRolled; a per-row store requires the
+	// rolled flag whatever RequireRolled says and fails closed: a class with no
+	// rollups configured is never removed by it). A head-only store removes the
 	// longest contiguous prefix of eligible rows and advances pruned-through; a
 	// per-row store removes eligible rows per class in cursor order and raises
 	// the class watermark. Neither ever removes an R-audit row, even if a spec
