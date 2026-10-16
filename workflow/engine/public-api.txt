@@ -3538,6 +3538,7 @@ type DriveNodeRequest struct {
 	At                time.Time
 }
 type DriveNodeResult struct {
+	Recheck    bool                  `json:"recheck,omitempty"`
 	Binding    *BindNodeInputsResult `json:"binding,omitempty"`
 	Progressed ProgressNodeResult    `json:"progressed"`
 }
@@ -3977,6 +3978,7 @@ type ProgressControlNodeRequest struct {
 	At                time.Time
 }
 type ProgressNodeRequest struct {
+	Node              *graph.Node
 	InvocationID      NodeInvocationID
 	Dependencies      []DependencyRef
 	Rule              graph.ReadyRule

@@ -14,7 +14,11 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 ### Fixed
 
-- Keep executable nodes unclaimable until their immutable inputs are durably bound, including when dependencies finish between driver and coordinator readiness checks. Dispatch rejects legacy unbound ready nodes before starting an attempt.
+- Keep executable nodes unclaimable until their immutable inputs are durably bound, including when dependencies finish between driver and coordinator readiness checks. Dispatch demotes legacy unbound ready nodes to Blocked under the claim and generation fences before releasing the lease, so recovery can bind them without a re-claim loop.
+
+### Changed
+
+- Direct `ProgressNode` callers must supply a durable input reference, including for an empty input set. To progress a non-executable root fan-out aggregate, pass its matching plan node in `ProgressNodeRequest.Node`; a nil node retains the strict input fence and iteration children are never exempt. `DriveNodeResult.Recheck` signals concurrent dependency/control progress requiring a fresh bounded recovery pass.
 
 ## v0.1.0 — 2026-10-03
 

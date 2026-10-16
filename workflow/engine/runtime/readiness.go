@@ -77,6 +77,9 @@ type PredicateEvaluator interface {
 // ProgressNodeRequest supplies durable dependency identities and the typed
 // expression context for one pending or blocked invocation.
 type ProgressNodeRequest struct {
+	// Node is the exact plan node, required when progressing a coordinator-owned
+	// root fan-out aggregate. Nil retains the executable-input fence.
+	Node              *graph.Node
 	InvocationID      NodeInvocationID
 	Dependencies      []DependencyRef
 	Rule              graph.ReadyRule
@@ -202,7 +205,11 @@ func EvaluateReadiness(rule graph.ReadyRule, dependencies []DependencyState) (Re
 // transition. Executable nodes must already have a durable Inputs reference,
 // including for an empty input set; otherwise readiness returns ErrInputsUnbound.
 func (c *ProgressionCoordinator) ProgressNode(ctx context.Context, request ProgressNodeRequest) (ProgressNodeResult, error) {
-	return c.progressNode(ctx, request, false)
+	if request.Node != nil && request.Node.ID != request.InvocationID.NodeID {
+		return ProgressNodeResult{}, fmt.Errorf("%w: plan node does not match invocation", ErrInvalidReadiness)
+	}
+	aggregate := request.Node != nil && request.Node.ForEach != nil && request.InvocationID.Iteration == ""
+	return c.progressNode(ctx, request, aggregate)
 }
 
 // Fan-out aggregates are coordinator-owned; only their children execute and

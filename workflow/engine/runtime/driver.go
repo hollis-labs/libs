@@ -80,6 +80,9 @@ type DriveNodeRequest struct {
 }
 
 type DriveNodeResult struct {
+	// Recheck requests another bounded recovery pass with a fresh expression
+	// context after dependencies or control routes changed during this drive.
+	Recheck    bool                  `json:"recheck,omitempty"`
 	Binding    *BindNodeInputsResult `json:"binding,omitempty"`
 	Progressed ProgressNodeResult    `json:"progressed"`
 }
@@ -142,6 +145,7 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 			// A route selected this node after the preview; binding needs a
 			// fresh selected-route context on the next drive.
 			progressed = ProgressNodeResult{Disposition: ReadinessWaiting, Snapshot: node}
+			result.Recheck = true
 			progressErr = nil
 		}
 		result.Progressed = progressed
@@ -168,6 +172,7 @@ func (d *NodeDriver) Drive(ctx context.Context, request DriveNodeRequest) (Drive
 			// unclaimable and let the next drive bind with a fresh context.
 			// This is ordinary concurrent progress, not a failed execution.
 			result.Progressed = ProgressNodeResult{Disposition: ReadinessWaiting, Snapshot: node}
+			result.Recheck = true
 			return result, nil
 		}
 		result.Progressed = progressed
