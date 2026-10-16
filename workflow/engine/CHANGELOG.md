@@ -8,6 +8,10 @@ All notable changes to the `workflow` module are documented here. The format fol
 
 ## [Unreleased]
 
+### Added
+
+- `gate.Option.Outcome` (`gate.OptionOutcome`: `pass`, `fail`, `skip`), an optional, closed declaration of what choosing a gate option means for the gate. Unset declares nothing, except that a `kind: skip` option implies skip; nothing is inferred from an option's id or label. `Option.Validate` rejects an unknown outcome, `pass`/`fail` on a skip option, and `skip` on a non-skip option. The `human_gate@v1` config accepts `options[].outcome` and its schema lists the three values; invalid values are load-time diagnostics. Additive: a checkpoint without outcomes is unchanged.
+
 ## v0.1.0 — 2026-10-03
 
 - Module path is now `github.com/hollis-labs/libs/workflow/engine` (was `github.com/hollis-labs/libs/workflow`); the previous path and its `workflow/vX.Y.Z` tags no longer exist. Tags are `workflow/engine/vX.Y.Z`. No code change besides the path.

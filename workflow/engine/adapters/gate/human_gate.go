@@ -512,14 +512,15 @@ func parseOptions(value any, findings *[]diagnostic.Diagnostic) []workflowgate.O
 			continue
 		}
 		for _, key := range sortedKeys(object) {
-			if key != "id" && key != "label" && key != "kind" {
+			if key != "id" && key != "label" && key != "kind" && key != "outcome" {
 				*findings = append(*findings, finding(path+"."+key, "is not supported"))
 			}
 		}
 		option := workflowgate.Option{
-			ID:    requiredString(object["id"], path+".id", 128, findings),
-			Label: requiredString(object["label"], path+".label", 512, findings),
-			Kind:  workflowgate.OptionKind(optionalString(object["kind"], path+".kind", 32, findings)),
+			ID:      requiredString(object["id"], path+".id", 128, findings),
+			Label:   requiredString(object["label"], path+".label", 512, findings),
+			Kind:    workflowgate.OptionKind(optionalString(object["kind"], path+".kind", 32, findings)),
+			Outcome: workflowgate.OptionOutcome(optionalString(object["outcome"], path+".outcome", 32, findings)),
 		}
 		options = append(options, option)
 	}
@@ -645,9 +646,10 @@ func configSchema(profile Profile) graph.Schema {
 			"options": map[string]any{"type": "array", "minItems": json.Number("1"), "maxItems": json.Number("128"), "items": map[string]any{
 				"type": "object", "additionalProperties": false, "required": []any{"id", "label"},
 				"properties": map[string]any{
-					"id":    map[string]any{"type": "string", "minLength": json.Number("1")},
-					"label": map[string]any{"type": "string", "minLength": json.Number("1")},
-					"kind":  map[string]any{"type": "string", "enum": []any{"decision", "skip"}},
+					"id":      map[string]any{"type": "string", "minLength": json.Number("1")},
+					"label":   map[string]any{"type": "string", "minLength": json.Number("1")},
+					"kind":    map[string]any{"type": "string", "enum": []any{"decision", "skip"}},
+					"outcome": map[string]any{"type": "string", "enum": []any{"pass", "fail", "skip"}},
 				},
 			}},
 			"environment":    map[string]any{"type": "string", "minLength": json.Number("1")},
