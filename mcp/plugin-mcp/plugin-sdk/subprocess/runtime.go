@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hollis-labs/libs/core/panics"
 	"io"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -207,7 +207,11 @@ func serveConnection(p Plugin, options ServeOptions, core *correlation) error {
 		return run(scope, func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logger.Error("subprocess: panic in handler", "method", req.Method, "stack", string(debug.Stack()))
+					pe := panics.Capture("subprocess handler "+req.Method, r)
+					logger.Error("subprocess: panic in handler", "method", req.Method, "ref", pe.Rec.Ref)
+					// The wire text "panic: <value>" is fixed by the protocol
+					// conformance transcripts (v1 and v2, shared with the TS SDK),
+					// so it stays; changing it is a protocol revision, not a fix here.
 					srv.writeError(req.ID, ErrCodeInternal, fmt.Sprintf("panic: %v", r), scope)
 				}
 			}()
@@ -508,7 +512,7 @@ func (s *server) beginUnload(ctx context.Context) <-chan struct{} {
 			defer close(s.unloadDone)
 			defer func() {
 				if r := recover(); r != nil {
-					s.unloadErr = fmt.Errorf("panic: %v", r)
+					s.unloadErr = panics.Capture("subprocess unload", r)
 				}
 			}()
 			s.unloadErr = s.plugin.Unload(ctx)

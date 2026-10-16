@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hollis-labs/libs/core/panics"
 	"io"
 	"os"
 	"sync"
@@ -288,7 +289,7 @@ func (c *Conn) read() {
 	var cause error
 	defer func() {
 		if r := recover(); r != nil {
-			cause = fmt.Errorf("reader panic: %v", r)
+			cause = fmt.Errorf("reader panic: %w", panics.Capture("plugin-host reader", r))
 		}
 		if cause != nil {
 			c.fail(fmt.Errorf("%w: %w", ErrGone, cause))

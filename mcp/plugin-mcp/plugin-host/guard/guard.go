@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hollis-labs/libs/core/panics"
 	"time"
 )
 
@@ -47,9 +48,10 @@ func Guarded[T any](
 			if recovered := recover(); recovered != nil {
 				// A panic crossing a goroutine boundary takes the process
 				// with it, so it is recovered where it was raised and handed
-				// back as an error. The stack is lost; that is the trade.
+				// back as an error. The panic value and stack go to the panics reporter,
+				// redacted; the error carries only the ref.
 				var zero T
-				results <- outcome{value: zero, err: fmt.Errorf("%s panicked: %v", subject, recovered)}
+				results <- outcome{value: zero, err: fmt.Errorf("%s panicked: %w", subject, panics.Capture("plugin-host guard "+subject, recovered))}
 			}
 		}()
 		value, err := call(bounded)

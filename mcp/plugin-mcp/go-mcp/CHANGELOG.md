@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added (server)
+
+- `server.RecoverPanics` (tool middleware) and `server.RecoverPanicsReceiving`
+  (SDK receiving middleware) recover a panic in a tool handler or request
+  handler through `core/panics`. The caller gets a structured `internal_error`
+  `budget.ToolError` (tools) or a JSON-RPC internal error (other requests) that
+  carries the panic ref and nothing from the panic; the redacted value and
+  stack go to the guard's reporter, and the server keeps serving.
+  `WithPanicGuard(*panics.Guard)` picks the guard (default `panics.Default()`).
+- Behavior change: `NewServer` installs the guard as the outermost middleware
+  by default, because it only turns a process crash into an error and mutates
+  no data. `WithoutPanicGuard()` opts out for a caller that recovers itself.
+
+### Changed (plugin-host, plugin-sdk)
+
+- A recovered panic no longer puts its value in error text. `guard.Guarded`,
+  the plugin-host connection reader and the subprocess runtime's unload error
+  now return
+  `internal error (ref pnc_...)`; the value and stack go to the
+  `core/panics` reporter, redacted. Callers that matched the old
+  `"<subject> panicked: <value>"` or `"panic: <value>"` text must use the ref
+  or `errors.As(err, &*panics.Error)`. The subprocess runtime's handler-panic
+  JSON-RPC message stays `panic: <value>`: it is fixed by the v1/v2 protocol
+  conformance transcripts shared with the TS SDK, so changing it is a protocol
+  revision. The panic is now also captured (ref logged, value and stack to the
+  reporter).
+- The module now requires `github.com/hollis-labs/libs/core/panics` (and `go
+  1.26.9`, which that module requires).
+
 ## v0.14.1 — 2026-10-01
 
 ### Fixed (client)
