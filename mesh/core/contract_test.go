@@ -140,3 +140,15 @@ func TestTombstonedEventValidation(t *testing.T) {
 		t.Fatalf("tombstone lost in round trip: %s", b)
 	}
 }
+
+func TestDeviceActor(t *testing.T) {
+	if err := (mesh.Actor{URN: "msg://device/env/laptop-1", Kind: mesh.ActorDevice}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := (mesh.Actor{URN: "msg://device/env/laptop-1", Kind: mesh.ActorService}).Validate(); err == nil {
+		t.Fatal("device address accepted as a service actor")
+	}
+	if err := (mesh.Actor{URN: "msg://service/env/hub", Kind: mesh.ActorDevice}).Validate(); err == nil {
+		t.Fatal("service address accepted as a device actor")
+	}
+}

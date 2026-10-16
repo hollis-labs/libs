@@ -8,6 +8,13 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- `ActorDevice` (`device`): a machine principal (laptop, worker host, host
+  daemon) with a `msg://device/...` address. `Actor.Validate` accepts it with
+  the same address-matches-kind rule; no previously valid actor is rejected
+  (CW-20261016-0167).
+
 ## v0.6.0 — 2026-10-16
 
 ### Added

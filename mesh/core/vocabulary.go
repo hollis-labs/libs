@@ -26,6 +26,9 @@ const (
 	ActorUser    ActorKind = "user"
 	ActorService ActorKind = "service"
 	ActorTool    ActorKind = "tool"
+	// ActorDevice is a machine principal (a laptop, a worker host or a host
+	// daemon) authenticated by its own token, with a msg://device/... address.
+	ActorDevice ActorKind = "device"
 )
 
 type Actor struct {
@@ -38,7 +41,7 @@ func (a Actor) Validate() error {
 		return err
 	}
 	switch a.Kind {
-	case ActorAgent, ActorUser, ActorService, ActorTool:
+	case ActorAgent, ActorUser, ActorService, ActorTool, ActorDevice:
 	default:
 		return fmt.Errorf("invalid actor kind %q", a.Kind)
 	}
