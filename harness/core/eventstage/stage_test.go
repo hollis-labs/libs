@@ -183,15 +183,17 @@ func TestReportErrNeverCarriesAStagesErrorText(t *testing.T) {
 	}
 }
 
-type classed struct{}
+type classed string
 
-func (classed) Error() string              { return "token=SECRET" }
-func (classed) SanitizeErrorClass() string { return "no_context" }
+func (classed) Error() string                { return "token=SECRET" }
+func (e classed) SanitizeErrorClass() string { return string(e) }
 
-func TestAStageCanNameItsFailureClass(t *testing.T) {
-	c, _ := NewChain(Config[ev]{Stamp: trail("stamp", Outcome{}, classed{}), Sanitize: &fakeSanitize{fn: scrub}})
-	err := c.Apply(t.Context(), &ev{}).Err()
-	if err == nil || !strings.Contains(err.Error(), "no_context") || strings.Contains(err.Error(), "SECRET") {
-		t.Fatalf("err = %v", err)
+func TestAStageCanNameOnlyKnownFailureClasses(t *testing.T) {
+	for _, tc := range []struct{ provided, want string }{{"opaque", "opaque"}, {"no_context", "error"}} {
+		c, _ := NewChain(Config[ev]{Stamp: trail("stamp", Outcome{}, classed(tc.provided)), Sanitize: &fakeSanitize{fn: scrub}})
+		err := c.Apply(t.Context(), &ev{}).Err()
+		if err == nil || !strings.Contains(err.Error(), "failed: "+tc.want) || strings.Contains(err.Error(), "SECRET") || tc.provided != tc.want && strings.Contains(err.Error(), tc.provided) {
+			t.Fatalf("%s: err = %v", tc.provided, err)
+		}
 	}
 }

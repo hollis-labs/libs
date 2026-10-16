@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
+	"io"
+	"unicode/utf8"
+
+	"github.com/hollis-labs/libs/security/redact"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	mesh "github.com/hollis-labs/libs/mesh/core"
@@ -35,7 +38,8 @@ type PayloadSanitizer interface {
 }
 
 // ClassedError lets a stage (Stamp, Sanitize or Classify) name its failure class
-// without leaking a value; the class is all [Report.Err] keeps.
+// without leaking a value; the class is all [Report.Err] keeps. Only members
+// of [FailClosedClasses] are retained; any other label becomes "error".
 type ClassedError interface {
 	error
 	SanitizeErrorClass() string
@@ -86,30 +90,37 @@ func ErrorPayload(class string) json.RawMessage {
 	return b
 }
 
+// FailClosedClasses returns the closed failure vocabulary shared by the writer
+// and hub reader. Each call returns a fresh slice, including all redact classes
+// and eventstage's own failures; success is not a failure class.
+func FailClosedClasses() []string {
+	classes := make([]string, 0, len(redact.ErrorClasses())+3)
+	for _, class := range redact.ErrorClasses() {
+		classes = append(classes, string(class))
+	}
+	return append(classes, "panic", errorClassUnspecified, ErrorClassTombstoneWithPayload)
+}
+
+var failClosedClasses = func() map[string]struct{} {
+	classes := make(map[string]struct{})
+	for _, class := range FailClosedClasses() {
+		classes[class] = struct{}{}
+	}
+	return classes
+}()
+
 func cleanClass(c string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(c) {
-		if b.Len() == maxErrorClass {
-			break
-		}
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
+	if _, ok := failClosedClasses[c]; ok {
+		return c
 	}
-	if b.Len() == 0 {
-		return errorClassUnspecified
-	}
-	return b.String()
+	return errorClassUnspecified
 }
 
 func classOf(err error) string {
 	var ce ClassedError
 	switch {
 	case errors.As(err, &ce):
-		return ce.SanitizeErrorClass()
+		return cleanClass(ce.SanitizeErrorClass())
 	case errors.Is(err, ErrPanic):
 		return "panic"
 	}
@@ -135,26 +146,35 @@ func moreRestrictive(a, b string) string {
 	return a
 }
 
-// failClosedPayload reports whether p is exactly the payload a fail-closed
-// sanitize leaves behind: {"sanitize_error": <class>} where the class is a
-// cleaned token ([a-z0-9_], at most 32 characters, as [ErrorPayload] writes
-// it). Anything else, including a single sanitize_error key holding arbitrary
-// text, is not trusted: it could carry an unscrubbed value past the hub
-// backstop.
+// failClosedPayload trusts only one sanitize_error member holding an exact
+// closed-set class. Token decoding rejects duplicate keys rather than allowing
+// a later known class to hide arbitrary data in an earlier member.
 func failClosedPayload(p []byte) bool {
-	var m map[string]json.RawMessage
-	if json.Unmarshal(p, &m) != nil || len(m) != 1 {
+	if !utf8.Valid(p) {
 		return false
 	}
-	raw, ok := m["sanitize_error"]
-	if !ok {
+	decoder := json.NewDecoder(bytes.NewReader(p))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return false
+	}
+	token, err = decoder.Token()
+	if err != nil || token != "sanitize_error" {
 		return false
 	}
 	var class string
-	if json.Unmarshal(raw, &class) != nil {
+	if decoder.Decode(&class) != nil {
 		return false
 	}
-	return class == cleanClass(class)
+	if _, ok := failClosedClasses[class]; !ok {
+		return false
+	}
+	token, err = decoder.Token()
+	if err != nil || token != json.Delim('}') {
+		return false
+	}
+	_, err = decoder.Token()
+	return err == io.EOF
 }
 
 // ErrorClassTombstoneWithPayload is the failure class of an event that claims to

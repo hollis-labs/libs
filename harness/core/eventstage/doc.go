@@ -20,8 +20,10 @@
 // [runtimeevents.Event] and [mesh.Event].
 //
 // Sanitize calls a [PayloadSanitizer], the payload API of the shared redaction
-// engine (security/redact, D5, task CW-20261016-0144). This package does not
-// depend on that engine, so it can ship before it is tagged.
+// engine (security/redact, D5, task CW-20261016-0144). [NewPayloadSanitizer]
+// supplies the tagged engine adapter, selecting explicit exact/family policies
+// before catalog defaults. [FailClosedClasses] is the shared, closed vocabulary
+// of error payloads; unknown failure labels become "error".
 //
 // # Classify rules
 //

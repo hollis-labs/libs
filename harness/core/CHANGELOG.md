@@ -8,7 +8,26 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `eventstage.NewPayloadSanitizer`: immutable adapter to security/redact v0.2.0,
+  with exact-kind and longest-family policy selection, denylist defaults for
+  stable/deprecated kinds and allowlist defaults for new/unknown kinds. Raw
+  byte-span kinds default to opaque; JSON string payloads use the text rules.
+- `eventstage.FailClosedClasses`: the shared error vocabulary from redact plus
+  panic, error and tombstone_with_payload, returned as a fresh slice.
+
+### Fixed
+
+- The eventstage hub backstop only trusts single-key fail-closed payloads whose
+  class belongs to the shared closed set. Arbitrary class strings and duplicate
+  keys cannot bypass sanitation; writers map unknown classes to error (CW-0212).
+
 ### Changed
+
+- Custom `ClassedError` labels outside `FailClosedClasses` now map to `error`
+  in error payloads and stage reports, preventing arbitrary labels from leaking
+  data through the failure path.
 
 - `eventstage`: the Sanitize adapters recognise a retention tombstone
   (`payload_digest` set, mesh/core v0.6.0 and runtimeevents `Tombstoned`): they
