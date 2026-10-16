@@ -10,6 +10,12 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ### Added
 
+- `streamhub/retention`: `Planner` and `Plan`, the store-agnostic half of the retention janitor. `Planner.Plan(now, policyIDs)` turns policies into set specs per policy id and class (`RollupSpec`, `TombstoneSpec`, `TrimSpec`, `PruneSpec`) that any store can run; a `Resolver` supplies the policy for a row's policy id (`CurrentOnly` applies the current policy to every row). Pure, deterministic, no I/O. An unknown policy id is reported in `Plan.Unresolved` and its rows are left alone.
+- `streamhub/retention`: `Store`, the small set-based interface a log or hub implements so the janitor can run on it (`Classify`, `Rollup`, `Tombstone`, `Trim`, `Prune`, `Stats`, `TryLock`, `Caps`), with `TrimHeadOnly` and `TrimPerRow` modes, and `Janitor` (`NewJanitor`, `Run`, `RunFrom`): classify, roll up closed buckets, tombstone payloads, trim, prune rollups, in short bounded store calls (`WithMaxTxRows`, `WithMaxTxDuration`, `WithBudget`), idempotent and resumable, dry-run capable, no goroutines, timers or vacuum. `Report` (per class: scanned, classified, tombstoned, rolled up, trimmed, pruned, bytes freed, backlog, oldest remaining, errors) and its metadata-only `Summary`.
+- `streamhub/retention/storetest`: the conformance suite for `Store` (`Run`) and `Mem`, an in-memory reference store in both trim modes.
+
+### Added
+
 - `streamhub/retention`: configuration and decision model for tiered event retention (design D7 rev 2). Per-class `full` / `envelope` ages and rollup schedules (zero = forever), `Defaults()` with the proposed tiers, `Config.Resolve()` merging over defaults with validation (lengthening the pii payload cap or shortening the audit class below 400d needs `acknowledge` and yields a warning; storing secret payloads is always rejected), and `Policy.ClassOf` / `PayloadMax` / `TierAt` for a janitor or log to ask which tier an event of a given age is in. No storage code.
 - `streamhub/logkit`: shared pieces of a durable `streamhub.Log`, so backends agree on identity and deduplication: the opaque cursor `<epoch>:<seq>` (`FormatCursor`, `ParseCursor`, `ErrBadCursor`), the duplicate-detection `Digest` over Name and a canonical form of JSON Data (sorted keys, compact, number literals kept; non-JSON byte-exact), `Columns` / `Extractor` / `EnvelopeExtractor` for the indexed scope columns, and the external high-water `Marker` (`ReadMarker`, `WriteMarker`, `Marker.Behind`, `ErrMarkerUnreadable`) that detects a rolled-back or replaced store.
 
