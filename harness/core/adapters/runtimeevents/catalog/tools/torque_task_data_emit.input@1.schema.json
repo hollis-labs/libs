@@ -15,7 +15,8 @@
       "minLength": 1
     },
     "run_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Torque run id (numeric, as a string); must belong to task_id"
     },
     "schema": {
       "type": "string",
@@ -28,7 +29,7 @@
     },
     "artifact_id": {
       "type": "string",
-      "description": "existing artifact on the same task"
+      "description": "Torque artifact id (numeric, as a string); must belong to task_id"
     },
     "label": {
       "type": "string",

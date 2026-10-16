@@ -63,6 +63,11 @@ func (d ProgressDetail) Valid() bool { return d.rank() >= 0 }
 // EffectiveProgressDetail resolves the setting: the first valid value of
 // launch, task and template wins, otherwise [DefaultProgressDetail]. An
 // empty or unknown value is skipped, so a typo never silences progress.
+//
+// In Torque, template values are copied onto the task at creation with their
+// origin recorded. Pass the task's value as task, or as template when its
+// recorded origin is template. launch is the value stored on the run or
+// session launch request, never on a launch_profile.
 func EffectiveProgressDetail(launch, task, template ProgressDetail) (ProgressDetail, string) {
 	for _, c := range []struct {
 		d   ProgressDetail
