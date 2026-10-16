@@ -143,12 +143,17 @@ Run the seeded event corpus and fuzz checks with `go test ./...` and
 reports wall-clock per-call p99 over up to 10,000 samples, plus allocations and
 mean latency. Its 4 KiB payload includes PII and a synthetic provider credential.
 CPU profiles distinguish execution cost from scheduling; they do not establish
-per-call CPU-time p99. The release target is p99 below 200 microseconds; measure
-on a controlled host before claiming the gate passed.
+per-call CPU-time p99. The release target is CPU p99 below 200 microseconds,
+or CPU median below 200 microseconds plus quiet-host wall p99 below 1 millisecond.
+Measure on a controlled host before claiming the gate passed.
 
 Structured key checks strip Unicode format characters then apply NFKC, using
 `golang.org/x/text/unicode/norm`. Joined secret-key words (such as `pass_word`)
 also match; benign metadata suffixes retain their existing precedence.
+Whole-word key matching does not cover every Unicode spelling: for example,
+`PASSWORDİ` (with a trailing non-ASCII letter) does not match `PASSWORD`.
+Use explicit sensitive-key configuration for such names and allowlists for
+untrusted event kinds. Value-level credential and PII inspection still applies.
 
 On Linux, `go test -run '^$' -bench '^BenchmarkSanitize4KBCPU$'
 -benchtime=10000x -cpu=1 -count=10` additionally reports `cpu-ns/op` using process
