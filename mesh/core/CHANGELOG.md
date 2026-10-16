@@ -8,6 +8,14 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- Optional `teams.WorkflowRunIDPlanner` supplies a deterministic workflow ID
+  before eager member provisioning. The launch ledger retains `PlannedRunID`,
+  every initial intent receives it, retries reuse it, and a workflow ID mismatch
+  compensates the formation. Existing hosts and retained records remain unchanged
+  (CW-20261016-0247).
+
 ## v0.7.0 — 2026-10-16
 
 ### Added

@@ -43,17 +43,18 @@ type MemberIntent struct {
 	Member   *Member
 }
 type LaunchRecord struct {
-	Attempts   int
-	Deadline   time.Time
-	Failure    string
-	Key        string
-	Digest     string
-	State      LaunchState
-	Team       Team // Immutable snapshot: later edits don't change recovery.
-	Definition WorkflowDefinition
-	Intents    []MemberIntent
-	Limits     mesh.Limits
-	Run        TeamRun
+	PlannedRunID string // Optional host plan, immutable even before Run exists.
+	Attempts     int
+	Deadline     time.Time
+	Failure      string
+	Key          string
+	Digest       string
+	State        LaunchState
+	Team         Team // Immutable snapshot: later edits don't change recovery.
+	Definition   WorkflowDefinition
+	Intents      []MemberIntent
+	Limits       mesh.Limits
+	Run          TeamRun
 }
 type Launcher struct {
 	Definitions DefinitionStore
@@ -122,6 +123,15 @@ func (l *Launcher) Launch(ctx context.Context, req LaunchRequest) (TeamRun, erro
 				return err
 			}
 			record = LaunchRecord{Key: req.Key, Digest: digest, State: Planning, Deadline: l.Clock.Now().Add(limits.Timeout), Team: clone(t), Definition: definition, Limits: limits}
+			if planner, ok := l.Workflows.(WorkflowRunIDPlanner); ok {
+				record.PlannedRunID, err = planner.PlanWorkflowRunID(ctx, req.Key, clone(definition))
+				if err != nil {
+					return fmt.Errorf("launch: plan workflow run id: %w", err)
+				}
+				if record.PlannedRunID == "" {
+					return fmt.Errorf("launch: empty planned workflow run id")
+				}
+			}
 			for name := range req.Counts {
 				if _, ok := t.slot(name); !ok {
 					return fmt.Errorf("launch: unknown slot override %s", name)
@@ -145,7 +155,7 @@ func (l *Launcher) Launch(ctx context.Context, req LaunchRequest) (TeamRun, erro
 						identity = slot.Identities[i]
 					}
 					allocation := limits
-					record.Intents = append(record.Intents, MemberIntent{Key: id, Slot: clone(slot), MemberID: id, Request: ProvisionRequest{IdempotencyKey: id, MemberID: id, Slot: clone(slot), Identity: identity, ReservedIdentities: reservedIdentities, Limits: allocation}})
+					record.Intents = append(record.Intents, MemberIntent{Key: id, Slot: clone(slot), MemberID: id, Request: ProvisionRequest{IdempotencyKey: id, RunID: record.PlannedRunID, MemberID: id, Slot: clone(slot), Identity: identity, ReservedIdentities: reservedIdentities, Limits: allocation}})
 				}
 			}
 			if len(record.Intents) == 0 {
@@ -248,6 +258,9 @@ func (l *Launcher) advance(ctx context.Context, record *LaunchRecord) (TeamRun, 
 		runID, err := l.Workflows.LaunchWorkflow(ctx, record.Key, clone(record.Definition))
 		if err != nil {
 			return record.Run, err
+		}
+		if record.PlannedRunID != "" && runID != record.PlannedRunID {
+			return record.Run, fmt.Errorf("%w: workflow run id differs from persisted plan", ErrConflict)
 		}
 		if runID == "" {
 			return record.Run, fmt.Errorf("launch: empty workflow run id")

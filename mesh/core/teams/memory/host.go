@@ -186,7 +186,7 @@ func (h *Host) PutLaunch(ctx context.Context, v teams.LaunchRecord) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if old, ok := h.launches[v.Key]; ok {
-		if old.Digest != v.Digest || old.Team.ID != v.Team.ID {
+		if old.Digest != v.Digest || old.Team.ID != v.Team.ID || old.PlannedRunID != v.PlannedRunID {
 			return teams.ErrConflict
 		}
 		rank := map[teams.LaunchState]int{teams.Planning: 1, teams.Prepared: 2, teams.Launched: 3, teams.MembersReady: 4, teams.RoutingReady: 5}
