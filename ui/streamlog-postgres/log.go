@@ -23,6 +23,7 @@ import (
 
 	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 	"github.com/hollis-labs/libs/ui/ui-go/streamhub/logkit"
+	"github.com/hollis-labs/libs/ui/ui-go/streamhub/retention"
 )
 
 const (
@@ -68,6 +69,14 @@ type Options struct {
 	// MarkerEvery throttles marker writes after appends (default 1s; negative
 	// writes after every append). Open, Trim and Close always flush.
 	MarkerEvery time.Duration
+	// Retention, when set, classifies each record at append (its retention
+	// class is stored beside it) and RetentionPolicyID is stamped on the
+	// record as the policy it was admitted under, for audit only: the janitor
+	// applies the current configuration to every row (D7 rev 2.2). Without
+	// Retention records are stored with no class and the first janitor pass
+	// classifies them.
+	Retention         *retention.Policy
+	RetentionPolicyID string
 	// RequireIdentityCheck makes Open fail with [ErrIdentityUnavailable] when
 	// the server's system identifier and timeline cannot be read, instead of
 	// falling back to the marker alone. pg_control_system() and
@@ -597,12 +606,16 @@ func (l *Log) appendOnce(ctx context.Context, stream string, e streamhub.Event, 
 		 ON CONFLICT (stream) DO UPDATE SET latest = `+l.schema+`.streams.latest + 1 RETURNING latest`, stream).Scan(&seq); err != nil {
 		return streamhub.Record{}, false, err
 	}
+	class := ""
+	if l.opts.Retention != nil {
+		class = l.opts.Retention.ClassOf(retention.Attrs{Category: cols.Category, Severity: cols.Severity, Sensitivity: cols.Sensitivity, PII: cols.PII})
+	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO `+l.schema+`.records(stream, seq, event_id, kind, at, size, data, payload, digest,
+		`INSERT INTO `+l.schema+`.records(stream, seq, event_id, kind, at, size, data, payload, digest, class, policy_id, outcome,
 			category, severity, sensitivity, pii, visibility, generation,
 			project_id, workstream_id, task_id, session_id, agent_urn, run_id)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9, $10,$11,$12,$13,$14,$15, $16,$17,$18,$19,$20,$21)`,
-		stream, seq, eid, e.Name, at, len(e.Name)+len(data), data, jsonPayload(data), digest,
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12, $13,$14,$15,$16,$17,$18, $19,$20,$21,$22,$23,$24)`,
+		stream, seq, eid, e.Name, at, len(e.Name)+len(data), data, jsonPayload(data), digest, class, l.opts.RetentionPolicyID, cols.Outcome,
 		cols.Category, cols.Severity, cols.Sensitivity, cols.PII, cols.Visibility, cols.Generation,
 		cols.ProjectID, cols.WorkstreamID, cols.TaskID, cols.SessionID, cols.AgentURN, cols.RunID); err != nil {
 		var pg *pgconn.PgError
