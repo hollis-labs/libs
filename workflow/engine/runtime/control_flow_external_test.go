@@ -19,7 +19,7 @@ import (
 func TestSwitchOrderedFirstMatchDefaultAndImmutableReplay(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "switch")
 	for _, id := range []string{"choose", "first", "second", "fallback"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "choose"), workflowruntime.NodeSucceeded, base.Add(2*time.Second))
 	workflow := graph.Node{ID: "choose", Switch: &graph.SwitchSpec{Arms: []graph.SwitchArm{
@@ -53,7 +53,7 @@ func TestSwitchOrderedFirstMatchDefaultAndImmutableReplay(t *testing.T) {
 
 	ctx2, store2, base2, run2 := controlFixture(t, "default")
 	for _, id := range []string{"choose", "first", "second", "fallback"} {
-		createNode(t, store2, invocationID(run2, id), workflowruntime.NodePending, 0, base2)
+		createBoundNode(t, store2, invocationID(run2, id), workflowruntime.NodePending, 0, base2)
 	}
 	makeTerminalNode(t, store2, invocationID(run2, "choose"), workflowruntime.NodeSucceeded, base2.Add(2*time.Second))
 	defaulted, err := workflowruntime.NewControlFlowCoordinator(store2, store2, nil).DecideSwitch(ctx2, workflowruntime.DecideSwitchRequest{Source: invocationID(run2, "choose"), Node: workflow, ExpressionContext: values.ExpressionContext{Inputs: boolInputs(t, false, false)}, At: base2.Add(3 * time.Second)})
@@ -65,7 +65,7 @@ func TestSwitchOrderedFirstMatchDefaultAndImmutableReplay(t *testing.T) {
 func TestCatchTimeoutTypedErrorBindingAndContinueOnError(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "catch")
 	for _, id := range []string{"origin", "handler"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "origin"), workflowruntime.NodeTimedOut, base.Add(2*time.Second))
 	origin := graph.Node{ID: "origin", Catch: []graph.CatchRule{
@@ -123,7 +123,7 @@ func TestCatchTimeoutTypedErrorBindingAndContinueOnError(t *testing.T) {
 	}
 
 	ctx2, store2, base2, run2 := controlFixture(t, "continue")
-	createNode(t, store2, invocationID(run2, "origin"), workflowruntime.NodePending, 0, base2)
+	createBoundNode(t, store2, invocationID(run2, "origin"), workflowruntime.NodePending, 0, base2)
 	makeTerminalNode(t, store2, invocationID(run2, "origin"), workflowruntime.NodeFailed, base2.Add(2*time.Second))
 	continued, err := workflowruntime.NewControlFlowCoordinator(store2, store2, nil).DecideCatch(ctx2, workflowruntime.DecideCatchRequest{Source: invocationID(run2, "origin"), Node: graph.Node{ID: "origin", Catch: []graph.CatchRule{{Errors: []string{graph.CatchAllErrors}}}}, At: base2.Add(3 * time.Second)})
 	if err != nil || continued.Decision.Outcome != workflowruntime.ControlContinued {
@@ -134,7 +134,7 @@ func TestCatchTimeoutTypedErrorBindingAndContinueOnError(t *testing.T) {
 func TestRouteConvergenceIsAnySelectedAcrossCompleteOwnerSet(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "converge")
 	for _, id := range []string{"fail-a", "fail-b", "switch-a", "switch-b", "handler", "shared"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	for _, id := range []string{"fail-a", "fail-b"} {
 		makeTerminalNode(t, store, invocationID(runID, id), workflowruntime.NodeFailed, base.Add(2*time.Second))
@@ -184,7 +184,7 @@ func TestRouteKindsOnOneSourceTreatTerminalInapplicableOwnerAsUnselected(t *test
 		t.Run(test.name, func(t *testing.T) {
 			ctx, store, base, runID := controlFixture(t, "dual-"+string(test.status))
 			for _, id := range []string{"source", "target"} {
-				createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+				createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 			}
 			makeTerminalNode(t, store, invocationID(runID, "source"), test.status, base.Add(2*time.Second))
 			source := graph.Node{ID: "source", Catch: []graph.CatchRule{{Targets: []string{"target"}}}, Switch: &graph.SwitchSpec{Arms: []graph.SwitchArm{{When: graph.Expression{Text: "true"}, Targets: []string{"target"}}}}}
@@ -247,7 +247,7 @@ func TestFinallyRespectsOrdinaryExplicitDependencies(t *testing.T) {
 		{ID: "cleanup-b", Needs: []graph.Need{{Node: "cleanup-a"}}, Finally: &graph.FinallySpec{}},
 	}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "work"), workflowruntime.NodeSucceeded, base.Add(2*time.Second))
 	coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)
@@ -272,7 +272,7 @@ func TestFinallyRespectsOrdinaryExplicitDependencies(t *testing.T) {
 func TestControlDecisionRejectsKindOutcomeMismatchAndMalformedTarget(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "malformed")
 	for _, id := range []string{"source", "target"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "source"), workflowruntime.NodeSucceeded, base.Add(2*time.Second))
 	coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)
@@ -289,7 +289,7 @@ func TestControlDecisionRejectsKindOutcomeMismatchAndMalformedTarget(t *testing.
 func TestCatchCoordinatorContentionConvergesOneTypedDecision(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "catch-contention")
 	for _, id := range []string{"origin", "handler"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "origin"), workflowruntime.NodeFailed, base.Add(2*time.Second))
 	coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)
@@ -339,7 +339,7 @@ func TestNestedFinallyCancellationIntentFencesWorkAndCleanupFailureWins(t *testi
 		{ID: "outer-cleanup", Finally: &graph.FinallySpec{}},
 	}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 	}
 	work, _ := store.LoadNodeInvocation(ctx, invocationID(runID, "work"))
 	_, _ = store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: work.ID, ExpectedGeneration: work.Generation, To: workflowruntime.NodeReady, At: base.Add(time.Second)})
@@ -430,7 +430,7 @@ func TestFinallyOrderingBlocksOnlyNestedChain(t *testing.T) {
 		{ID: "outer-b", Finally: &graph.FinallySpec{Scope: []string{"work-b", "inner-b"}}},
 	}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "work-a"), workflowruntime.NodeSucceeded, base.Add(time.Second))
 	makeTerminalNode(t, store, invocationID(runID, "work-b"), workflowruntime.NodeSucceeded, base.Add(time.Second))
@@ -512,7 +512,7 @@ func TestPendingRunRejectsUnclosableCancellationFinalizerIntent(t *testing.T) {
 	runID := workflowruntime.RunID("run-control-pending-finalizer")
 	createRun(t, store, runID, base)
 	for _, id := range []string{"work", "cleanup"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	run, loadErr := store.LoadRun(ctx, runID)
 	if loadErr != nil {
@@ -563,9 +563,9 @@ func TestCancellationTreePreservesDirectChildFinalizersAndReplays(t *testing.T) 
 		}
 	}
 	rootNodeID := invocationID(rootID, "call-child")
-	createNode(t, store, rootNodeID, workflowruntime.NodePending, 0, base)
+	createBoundNode(t, store, rootNodeID, workflowruntime.NodePending, 0, base)
 	for _, id := range []string{"work", "cleanup"} {
-		createNode(t, store, invocationID(childID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(childID, id), workflowruntime.NodePending, 0, base)
 	}
 	if err := store.RecordChildRun(ctx, workflowruntime.ChildRunLink{ParentRunID: rootID, Invocation: rootNodeID, ChildRunID: childID, Policy: graph.ParentCloseCancel, CreatedAt: base.Add(time.Second)}); err != nil {
 		t.Fatal(err)
@@ -618,7 +618,7 @@ func TestCancellationTreePreservesDirectChildFinalizersAndReplays(t *testing.T) 
 func TestCancellationWithFinalizersContentionAndLateAttemptFence(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "cancel-contention")
 	for _, id := range []string{"work", "cleanup"} {
-		createNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, id), workflowruntime.NodePending, 0, base)
 	}
 	work, _ := store.LoadNodeInvocation(ctx, invocationID(runID, "work"))
 	ready, _ := store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: work.ID, ExpectedGeneration: work.Generation, To: workflowruntime.NodeReady, At: base.Add(time.Second)})
@@ -713,7 +713,7 @@ func TestReconcileRunCompletionAccountsEveryOutcomeAndRetainsTypedFailure(t *tes
 			ctx, store, base, runID := controlFixture(t, "account-"+string(test.node))
 			workflow := graph.Graph{Nodes: []graph.Node{{ID: "work"}, {ID: "cleanup", Finally: &graph.FinallySpec{}}}}
 			for _, node := range workflow.Nodes {
-				createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+				createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 			}
 			makeTerminalNode(t, store, invocationID(runID, "work"), test.node, base.Add(2*time.Second))
 			coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)
@@ -756,7 +756,7 @@ func TestPreAttemptTimeoutErrorProjectsFromTerminalIntentIntoFinalizerContext(t 
 		{ID: "cleanup", Finally: &graph.FinallySpec{}, If: &graph.Expression{Text: `steps.work.error.code == "node_timed_out"`}},
 	}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 	}
 	work, loadErr := store.LoadNodeInvocation(ctx, invocationID(runID, "work"))
 	if loadErr != nil {
@@ -802,7 +802,7 @@ func TestReconcileRunCompletionDistinguishesHandledUnmatchedAndCleanupFailure(t 
 			}
 			workflow.Nodes = append(workflow.Nodes, graph.Node{ID: "cleanup", Finally: &graph.FinallySpec{}})
 			for _, node := range workflow.Nodes {
-				createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+				createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 			}
 			makeTerminalNode(t, store, invocationID(runID, "origin"), workflowruntime.NodeFailed, base.Add(2*time.Second))
 			if test.withTarget {
@@ -829,7 +829,7 @@ func TestFailedReconcileContentionPersistsOneIntentAndError(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "reconcile-contention")
 	workflow := graph.Graph{Nodes: []graph.Node{{ID: "work"}, {ID: "cleanup", Finally: &graph.FinallySpec{}}}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, invocationID(runID, "work"), workflowruntime.NodeFailed, base.Add(2*time.Second))
 	coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)
@@ -873,7 +873,7 @@ func TestCompletedReconcileReplaysAndConvergesUnderContention(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "completion-contention")
 	workflow := graph.Graph{Nodes: []graph.Node{{ID: "work"}, {ID: "cleanup", Finally: &graph.FinallySpec{}}}}
 	for _, node := range workflow.Nodes {
-		createNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, invocationID(runID, node.ID), workflowruntime.NodePending, 0, base)
 		makeTerminalNode(t, store, invocationID(runID, node.ID), workflowruntime.NodeSucceeded, base.Add(2*time.Second))
 	}
 	coordinator := workflowruntime.NewControlFlowCoordinator(store, store, nil)

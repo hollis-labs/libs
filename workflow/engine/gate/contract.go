@@ -35,6 +35,23 @@ const (
 // Valid reports whether k belongs to the closed gate option vocabulary.
 func (k OptionKind) Valid() bool { return k == OptionDecision || k == OptionSkip }
 
+// OptionOutcome is the optional, workflow-declared meaning of choosing an option:
+// the gate passed, failed, or was skipped. The vocabulary is closed. Nothing is
+// ever inferred from an option's id or label, so an option with no outcome says
+// nothing about the gate result.
+type OptionOutcome string
+
+const (
+	OutcomePass OptionOutcome = "pass"
+	OutcomeFail OptionOutcome = "fail"
+	OutcomeSkip OptionOutcome = "skip"
+)
+
+// Valid reports whether o belongs to the closed gate outcome vocabulary.
+func (o OptionOutcome) Valid() bool {
+	return o == OutcomePass || o == OutcomeFail || o == OutcomeSkip
+}
+
 // Option is one stable decision that a presentation layer may render. IDs are
 // workflow data; labels are presentation text. Product-specific UI metadata is
 // intentionally absent.
@@ -42,6 +59,9 @@ type Option struct {
 	ID    string     `json:"id"`
 	Label string     `json:"label"`
 	Kind  OptionKind `json:"kind,omitempty"`
+	// Outcome optionally declares what choosing this option means for the gate.
+	// Unset declares nothing, except that a skip option implies skip.
+	Outcome OptionOutcome `json:"outcome,omitempty"`
 }
 
 // Validate checks the portable option declaration.
@@ -54,6 +74,15 @@ func (o Option) Validate() error {
 	}
 	if o.Kind != "" && !o.Kind.Valid() {
 		return fmt.Errorf("unsupported gate option kind %q", o.Kind)
+	}
+	if o.Outcome != "" && !o.Outcome.Valid() {
+		return fmt.Errorf("unsupported gate option outcome %q", o.Outcome)
+	}
+	if o.Kind == OptionSkip && (o.Outcome == OutcomePass || o.Outcome == OutcomeFail) {
+		return fmt.Errorf("a skip option cannot declare outcome %q", o.Outcome)
+	}
+	if o.Outcome == OutcomeSkip && o.Kind != OptionSkip {
+		return fmt.Errorf("outcome %q requires a skip option", o.Outcome)
 	}
 	return nil
 }

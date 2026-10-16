@@ -119,7 +119,8 @@ type RunTransitionResult struct {
 // Claim is required when the node currently has a lease. An exact same-state
 // request is a no-op. NodeBlocked to NodeBlocked with a changed valid Blocked
 // reason and strictly later At is an applied diagnostic refresh; every other
-// changed same-state request conflicts.
+// changed same-state request conflicts. Ready to Blocked atomically releases
+// the claim lease and scheduler holders under the same generation/claim fence.
 type NodeTransitionRequest struct {
 	InvocationID       NodeInvocationID
 	ExpectedGeneration uint64
