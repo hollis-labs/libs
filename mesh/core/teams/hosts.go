@@ -34,7 +34,7 @@ type RosterStore interface {
 // It excludes terminal RoutingReady/Failed records and includes Aborting cleanup.
 // Put permits monotonic launch steps or transition to Aborting then Failed;
 // terminal records cannot be resurrected. Attempts and deadlines are durable.
-// PlannedRunID and the provisioning intents are immutable after the first write.
+// PlannedRunID and each intent's Request are immutable after the first write.
 type LaunchLedger interface {
 	WithLease(context.Context, string, func(context.Context) error) error
 	GetLaunch(context.Context, string) (LaunchRecord, error)
