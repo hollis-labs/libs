@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -20,8 +21,17 @@ type Budget struct {
 	MaxElapsed time.Duration
 }
 
-// Janitor applies a retention policy to a [Store]. It starts no goroutines
-// and no timers and never vacuums: the caller schedules passes. Every pass is
+// A Janitor applies a retention policy to a [Store]. In a dry run every count is
+// an observation of one spec on its own, taken now: it does not simulate how
+// an earlier step (a rollup, a tombstone) changes what a later step would see,
+// and under concurrent writes it is not claimed to equal what a real pass will
+// do. A count the time budget cut short is marked Partial.
+//
+// The age of a row is the log's own recorded time, never a producer's claim,
+// and a row's class comes from the policy (a trusted catalog of categories),
+// never from a retention claim the producer made.
+//
+// It starts no goroutines and no timers and never vacuums: the caller schedules passes. Every pass is
 // idempotent and safe to abandon, and the work is cut into short store calls
 // (at most MaxTxRows rows and MaxTxDuration each, and never more than what is
 // left of the pass Budget) so a store with a single writer is released between
@@ -34,6 +44,7 @@ type Janitor struct {
 	txDur    time.Duration
 	dryRun   bool
 	policyID string
+	onError  func(stream, class string, err error)
 	elapsed  func() time.Time
 }
 
@@ -68,6 +79,14 @@ func WithDryRun(on bool) Option { return func(j *Janitor) { j.dryRun = on } }
 // pass runs under). It is reported in the Report and the pass event; it plays
 // no part in what the pass does.
 func WithPolicyID(id string) Option { return func(j *Janitor) { j.policyID = id } }
+
+// WithErrorLog gives the caller the raw error behind a counted failure, for
+// its own logs. The Report itself carries only a coarse class ("timeout",
+// "canceled", "store_error"), never the store's message, which can echo row
+// content.
+func WithErrorLog(f func(stream, class string, err error)) Option {
+	return func(j *Janitor) { j.onError = f }
+}
 
 // NewJanitor returns a Janitor over store, planning with planner.
 func NewJanitor(store Store, planner *Planner, opts ...Option) *Janitor {
@@ -104,8 +123,10 @@ type ClassReport struct {
 	Watermark uint64
 	// Partial is true when Backlog and OldestRemaining could not be collected
 	// in full (the pass ran out of budget): treat them as unknown, not as zero.
-	Partial    bool
-	Errors     int
+	Partial bool
+	Errors  int
+	// FirstError is the class of the first failure ("timeout", "canceled",
+	// "store_error"), never the store's message; see [WithErrorLog].
 	FirstError string
 }
 
@@ -125,8 +146,12 @@ type Report struct {
 	PolicyID string
 	// StoppedEarly is true when the budget (rows or time) ended the pass.
 	StoppedEarly bool
-	// Resume, when StoppedEarly, is the token to pass to RunFrom. Starting over
-	// with Run is equally correct; Resume only skips streams already finished.
+	// Resume, when StoppedEarly, is the token to pass to RunFrom. It is opaque
+	// and bound to the effective policy id: a token from another policy id is
+	// ignored and the pass starts over, so a configuration change can never
+	// make a resumed pass skip streams the new configuration has not seen.
+	// Starting over with Run is always equally correct; Resume only skips
+	// streams already finished.
 	Resume  string
 	Elapsed time.Duration
 	DryRun  bool
@@ -148,10 +173,21 @@ func (r *Report) class(name string) *ClassReport {
 	return c
 }
 
-func (c *ClassReport) fail(err error) {
+// errorClass is the only description of a failure that reaches a Report.
+func errorClass(err error) string {
+	switch {
+	case isDeadline(err):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	}
+	return "store_error"
+}
+
+func (c *ClassReport) fail(class string) {
 	c.Errors++
 	if c.FirstError == "" {
-		c.FirstError = err.Error()
+		c.FirstError = class
 	}
 }
 
@@ -301,7 +337,8 @@ func (j *Janitor) Run(ctx context.Context, now time.Time) (Report, error) {
 	return j.RunFrom(ctx, now, "")
 }
 
-// RunFrom is Run starting at the stream named by a Resume token ("" starts at the first).
+// RunFrom is Run starting where a Resume token says ("" starts at the first
+// stream). A token made under a different policy id starts over.
 func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (rep Report, err error) {
 	rep = Report{DryRun: j.dryRun, Trim: j.store.Caps().Trim, PolicyID: j.policyID}
 	t0 := j.elapsed()
@@ -323,15 +360,16 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	}
 	sort.Strings(streams)
 	p := &pass{j: j, rep: &rep, start: t0}
+	from := j.resumeStream(resume)
 	for _, stream := range streams {
-		if resume != "" && stream < resume {
+		if from != "" && stream < from {
 			continue
 		}
 		if err := ctx.Err(); err != nil {
 			return rep, err
 		}
 		if p.over() {
-			rep.StoppedEarly, rep.Resume = true, stream
+			rep.StoppedEarly, rep.Resume = true, j.resumeToken(stream)
 			return rep, nil
 		}
 		rep.Streams++
@@ -339,11 +377,21 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 			return rep, err
 		}
 		if p.stopped {
-			rep.StoppedEarly, rep.Resume = true, stream
+			rep.StoppedEarly, rep.Resume = true, j.resumeToken(stream)
 			break
 		}
 	}
 	return rep, nil
+}
+
+func (j *Janitor) resumeToken(stream string) string { return j.policyID + "\x00" + stream }
+
+func (j *Janitor) resumeStream(token string) string {
+	policy, stream, ok := strings.Cut(token, "\x00")
+	if !ok || policy != j.policyID {
+		return ""
+	}
+	return stream
 }
 
 // drain calls f until it reports no more work, the budget is spent, or ctx
@@ -369,7 +417,11 @@ func (p *pass) stream(ctx context.Context, stream string, now time.Time) error {
 	st := j.store
 	fail := func(class string, err error) {
 		if err != nil && !errors.Is(err, context.Canceled) && !isDeadline(err) {
-			rep.class(class).fail(err)
+			ec := errorClass(err)
+			rep.class(class).fail(ec)
+			if j.onError != nil {
+				j.onError(stream, ec, err)
+			}
 		}
 	}
 	step := func(class string, f func(Op) (int64, bool, error)) error {
