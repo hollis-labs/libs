@@ -77,7 +77,7 @@ func TestServiceLaunchIntentReacquiresAfterCrashAndGuaranteedTeardown(t *testing
 	}
 
 	teardownID := workflowruntime.NodeInvocationID{RunID: node.ID.RunID, NodeID: "node-teardown"}
-	createNode(t, store, teardownID, workflowruntime.NodeReady, 0, base.Add(2*time.Hour+2*time.Second))
+	createBoundNode(t, store, teardownID, workflowruntime.NodeReady, 0, base.Add(2*time.Hour+2*time.Second))
 	teardownClaim, acquired, claimErr := workflowruntime.NewReadyQueueCoordinator(store, nil).ClaimNext(context.Background(), workflowruntime.ReadyClaimRequest{Owner: "worker", Token: "teardown", IdempotencyKey: "claim-service-teardown", Now: base.Add(2*time.Hour + 3*time.Second), LeaseUntil: base.Add(3 * time.Hour)})
 	if claimErr != nil || !acquired || teardownClaim.Candidate.InvocationID != teardownID {
 		t.Fatalf("claim teardown = %#v, %t, %v", teardownClaim, acquired, claimErr)

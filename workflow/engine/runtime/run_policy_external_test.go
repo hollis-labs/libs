@@ -20,7 +20,7 @@ func TestRunPolicyFailFastFencesOrdinaryWorkAndPreservesCleanup(t *testing.T) {
 	running := invocationID(runID, "running")
 	cleanup := invocationID(runID, "cleanup")
 	for _, id := range []workflowruntime.NodeInvocationID{source, ready, running, cleanup} {
-		createNode(t, store, id, workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, source, workflowruntime.NodeFailed, base.Add(2*time.Second))
 	if _, err := store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: ready, ExpectedGeneration: 1, To: workflowruntime.NodeReady, At: base.Add(2 * time.Second)}); err != nil {
@@ -122,7 +122,7 @@ func TestRunPolicyRunToCompletionAndToleratedFanOutContinue(t *testing.T) {
 	source := invocationID(runID, "source")
 	independent := invocationID(runID, "independent")
 	for _, id := range []workflowruntime.NodeInvocationID{source, independent} {
-		createNode(t, store, id, workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, source, workflowruntime.NodeFailed, base.Add(2*time.Second))
 	if _, err := store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: independent, ExpectedGeneration: 1, To: workflowruntime.NodeReady, At: base.Add(2 * time.Second)}); err != nil {
@@ -154,7 +154,7 @@ func TestRunPolicyZeroFinalizerIntentWaitsCancellationAndPublicBeginRejectsIt(t 
 	source := invocationID(runID, "source")
 	running := invocationID(runID, "running")
 	for _, id := range []workflowruntime.NodeInvocationID{source, running} {
-		createNode(t, store, id, workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, base)
 	}
 	makeTerminalNode(t, store, source, workflowruntime.NodeFailed, base.Add(2*time.Second))
 	if _, err := store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: running, ExpectedGeneration: 1, To: workflowruntime.NodeReady, At: base.Add(2 * time.Second)}); err != nil {
@@ -198,7 +198,7 @@ func TestRunPolicyZeroFinalizerIntentWaitsCancellationAndPublicBeginRejectsIt(t 
 func TestRunPolicyAcceptsExactPreAttemptQueueTimeout(t *testing.T) {
 	ctx, store, base, runID := controlFixture(t, "run-policy-queue-timeout")
 	source := invocationID(runID, "source")
-	createNode(t, store, source, workflowruntime.NodePending, 0, base)
+	createBoundNode(t, store, source, workflowruntime.NodePending, 0, base)
 	timedOut, err := store.TransitionNode(ctx, workflowruntime.NodeTransitionRequest{InvocationID: source, ExpectedGeneration: 1, To: workflowruntime.NodeTimedOut, At: base.Add(time.Second)})
 	if err != nil {
 		t.Fatal(err)
@@ -225,10 +225,10 @@ func TestRunPolicyConcurrentFailuresConvergeOnWinningTrigger(t *testing.T) {
 	second := invocationID(runID, "second")
 	cleanup := invocationID(runID, "cleanup")
 	for _, id := range []workflowruntime.NodeInvocationID{first, second} {
-		createNode(t, store, id, workflowruntime.NodePending, 0, base)
+		createBoundNode(t, store, id, workflowruntime.NodePending, 0, base)
 		makeTerminalNode(t, store, id, workflowruntime.NodeFailed, base.Add(2*time.Second))
 	}
-	createNode(t, store, cleanup, workflowruntime.NodePending, 0, base)
+	createBoundNode(t, store, cleanup, workflowruntime.NodePending, 0, base)
 	workflow := graph.Graph{ID: "plan", Version: "v1", Completion: &graph.RunCompletionPolicy{Mode: graph.CompletionFailFast}, Nodes: []graph.Node{{ID: "first"}, {ID: "second"}, {ID: "cleanup", Finally: &graph.FinallySpec{}}}}
 	coordinator := workflowruntime.NewRunPolicyCoordinator(store, store, store)
 	type outcome struct {
