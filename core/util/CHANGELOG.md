@@ -8,6 +8,8 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.6.0 — 2026-10-16
+
 ### Added
 
 - `mw`: one middleware contract (`Handler`, `Middleware`, `Chain`) with a descriptor per member checked at assembly (phase order, a required failure mode, observer/protector defaults that need a stated reason, mutation opt-in, required and provided context keys), shadow and off modes for any member, a `Fault` type owned by the guard that handled it, `Explain`, `RecoverMember` and `TimeoutMember`. Standard library only.
