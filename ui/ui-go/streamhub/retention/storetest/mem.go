@@ -194,10 +194,11 @@ type budget struct {
 func newBudget(op retention.Op) *budget { return &budget{op: op, start: time.Now()} }
 
 func (b *budget) full() bool {
-	if b.op.DryRun || b.n == 0 {
+	if b.n == 0 {
 		return false
 	}
-	if b.op.Limit > 0 && b.n >= b.op.Limit {
+	// A dry run ignores the row limit but not the time bound.
+	if !b.op.DryRun && b.op.Limit > 0 && b.n >= b.op.Limit {
 		return true
 	}
 	return b.op.MaxDuration > 0 && time.Since(b.start) >= b.op.MaxDuration
@@ -348,7 +349,10 @@ func (m *Mem) Trim(ctx context.Context, stream string, specs []retention.TrimSpe
 			return false
 		}
 		for _, sp := range specs {
-			if r.Class == sp.Class && !r.At.After(sp.Before) && (!sp.RequireRolled || r.Rolled) {
+			// A per-row store fails closed: no removal without a committed covering
+			// rollup, whatever RequireRolled says (D7 rev 2.3).
+			needRolled := sp.RequireRolled || m.mode == retention.TrimPerRow
+			if r.Class == sp.Class && !r.At.After(sp.Before) && (!needRolled || r.Rolled) {
 				return true
 			}
 		}
@@ -447,15 +451,20 @@ func (m *Mem) Prune(ctx context.Context, stream string, sp retention.PruneSpec, 
 	defer m.mu.Unlock()
 	s := m.stream(stream)
 	var res retention.Result
+	b := newBudget(op)
 	for k := range s.buckets {
+		if err := ctx.Err(); err != nil {
+			return retention.Result{}, err
+		}
 		if k.class != sp.Class || k.size != sp.Bucket || time.Unix(0, k.start+int64(k.size)).After(sp.Before) {
 			continue
 		}
-		if !op.DryRun && op.Limit > 0 && res.Rows >= int64(op.Limit) {
+		if b.full() {
 			res.More = true
 			break
 		}
 		res.Rows++
+		b.n++
 		if !op.DryRun {
 			delete(s.buckets, k)
 		}

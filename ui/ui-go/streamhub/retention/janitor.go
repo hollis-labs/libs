@@ -359,8 +359,17 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	if !j.trimAllowed(rep.Trim) {
 		return rep, ErrUnsupportedTrim
 	}
-	unlock, ok, err := j.store.TryLock(ctx)
+	// MaxElapsed is a whole-pass guarantee: the lock and the stream listing are
+	// bounded by it too. Running out of time there is an early stop, not a failure.
+	p := &pass{j: j, rep: &rep, start: t0}
+	pre, cancelPre, _ := p.bounded(ctx)
+	defer cancelPre()
+	unlock, ok, err := j.store.TryLock(pre)
 	if err != nil {
+		if isDeadline(err) && ctx.Err() == nil {
+			rep.StoppedEarly = true
+			return rep, nil
+		}
 		return rep, err
 	}
 	if !ok {
@@ -369,12 +378,15 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	}
 	defer unlock()
 
-	streams, err := j.store.Streams(ctx)
+	streams, err := j.store.Streams(pre)
 	if err != nil {
+		if isDeadline(err) && ctx.Err() == nil {
+			rep.StoppedEarly = true
+			return rep, nil
+		}
 		return rep, err
 	}
 	sort.Strings(streams)
-	p := &pass{j: j, rep: &rep, start: t0}
 	from := j.resumeStream(resume)
 	for _, stream := range streams {
 		if from != "" && stream < from {
