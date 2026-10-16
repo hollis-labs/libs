@@ -196,7 +196,7 @@ func (s *Sanitizer) Sanitize(payload []byte) ([]byte, Report) {
 		return fail(ErrorInvalidJSON)
 	}
 	st := payloadWalk{s: s, rep: &rep, seen: map[string]bool{}}
-	out, keep := st.walk(value, s.paths, "", s.mode == Denylist)
+	out, keep := st.walk(value, s.paths, "", s.mode == Denylist, "")
 	if !keep {
 		out = nil
 	}
@@ -304,8 +304,19 @@ func (w *payloadWalk) sensitive(key string, v any) bool {
 	}
 }
 
+// Only the ambiguous Nanite identifier rule is exempted for correlation and
+// integrity metadata. Every credential rule, Scope, and other PII rule still runs.
+func (w *payloadWalk) textField(t, key string) (string, int) {
+	skip := ""
+	key = strings.ToLower(normalizeKeyName(key))
+	if key == "trace_id" || key == "span_id" || key == "traceparent" || strings.HasSuffix(key, "_digest") || strings.HasSuffix(key, "_hash") {
+		skip = RuleNaniteID
+	}
+	return w.s.r.replaceFindings(t, w.s.r.scanExcept(t, w.classify, skip))
+}
+
 // inspect preserves PII and sensitivity even when an ancestor is removed whole.
-func (w *payloadWalk) inspect(v any) {
+func (w *payloadWalk) inspect(v any, key string) {
 	switch x := v.(type) {
 	case object:
 		for _, p := range x {
@@ -313,16 +324,16 @@ func (w *payloadWalk) inspect(v any) {
 			if w.sensitive(p.k, p.v) {
 				w.raise(Secret)
 			}
-			w.inspect(p.v)
+			w.inspect(p.v, p.k)
 		}
 	case []any:
 		for _, e := range x {
-			w.inspect(e)
+			w.inspect(e, "")
 		}
 	case string:
-		w.text(x)
+		w.textField(x, key)
 	case json.Number:
-		w.text(x.String())
+		w.textField(x.String(), key)
 	}
 }
 func child(n *pathNode, key string) *pathNode {
@@ -332,14 +343,13 @@ func child(n *pathNode, key string) *pathNode {
 	return n.children[key]
 }
 
-func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool) (any, bool) {
+func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool, key string) (any, bool) {
 	if !all && n == nil {
 		if v == nil {
 			return nil, false
 		}
-		w.inspect(v)
+		w.inspect(v, key)
 		w.record(path, 1)
-		w.raise(Secret)
 		return nil, false
 	}
 	switch x := v.(type) {
@@ -348,17 +358,17 @@ func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool) (any, bool
 		for _, p := range x {
 			_, nkey := w.text(p.k)
 			key := p.k
-			if nkey > 0 {
+			if nkey > 0 || child(n, p.k) == nil {
 				key = "*"
 			}
 			fieldPath := pointerChild(path, key)
 			if nkey > 0 {
-				w.inspect(p.v)
+				w.inspect(p.v, p.k)
 				w.record(fieldPath, 1)
 				continue
 			}
 			if w.sensitive(p.k, p.v) {
-				w.inspect(p.v)
+				w.inspect(p.v, p.k)
 				w.raise(Secret)
 				// A denied field is dropped, rather than adding a new allowlisted key.
 				if !all && child(n, p.k) == nil {
@@ -369,7 +379,7 @@ func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool) (any, bool
 				out = append(out, pair{p.k, w.s.r.marker})
 				continue
 			}
-			val, keep := w.walk(p.v, child(n, p.k), fieldPath, all)
+			val, keep := w.walk(p.v, child(n, p.k), fieldPath, all, p.k)
 			if keep {
 				out = append(out, pair{p.k, val})
 			}
@@ -384,7 +394,7 @@ func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool) (any, bool
 				cn = unionPath(cn, wildcard)
 			}
 			// Removed elements become null, retaining positions used by JSON pointers.
-			out[i], _ = w.walk(e, cn, pointerChild(path, index), all)
+			out[i], _ = w.walk(e, cn, pointerChild(path, index), all, "")
 		}
 		return out, true
 	default:
@@ -392,18 +402,17 @@ func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool) (any, bool
 			if v == nil {
 				return nil, false
 			}
-			w.inspect(v)
+			w.inspect(v, key)
 			w.record(path, 1)
-			w.raise(Secret)
 			return nil, false
 		}
 		switch t := v.(type) {
 		case string:
-			out, count := w.text(t)
+			out, count := w.textField(t, key)
 			w.record(path, count)
 			return out, true
 		case json.Number:
-			out, count := w.text(t.String())
+			out, count := w.textField(t.String(), key)
 			w.record(path, count)
 			if count > 0 {
 				return out, true

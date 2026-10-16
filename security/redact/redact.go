@@ -220,6 +220,10 @@ func (r *Redactor) Scan(s string) []Finding {
 
 // observe runs before merging so overlapping rules retain their classification.
 func (r *Redactor) scan(s string, observe func(string)) []Finding {
+	return r.scanExcept(s, observe, "")
+}
+
+func (r *Redactor) scanExcept(s string, observe func(string), skip string) []Finding {
 	if s == "" {
 		return nil
 	}
@@ -227,6 +231,9 @@ func (r *Redactor) scan(s string, observe func(string)) []Finding {
 	st := newScanText(v.text)
 	var raw []Finding
 	for _, rl := range r.rules {
+		if rl.name == skip {
+			continue
+		}
 		name := rl.name
 		rl.find(r, st, func(a, b int) {
 			if b > a {

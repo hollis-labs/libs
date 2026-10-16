@@ -113,6 +113,9 @@ clean, report := s.Sanitize(payload)
 - Mandatory PII detectors cover ASCII email addresses, international phone
   numbers (7–15 digits with `+`) and national numbers (10–11 digits), validated
   IPv4/IPv6, 13–19 digit Luhn-valid cards, and Nanite's 32-hex identifiers.
+  PII also scans a single percent-decoded view, mapping replacements to the
+  original encoded bytes. The 32-hex rule alone exempts `trace_id`, `span_id`,
+  `traceparent`, `*_digest` and `*_hash` values; other rules still run.
   Formats are deterministic, not a guarantee to recognize every personal datum.
   Internationalized email addresses, names and inferred locale-specific PII
   are not modeled. Use an allowlist for untrusted/new event kinds.
@@ -121,8 +124,9 @@ clean, report := s.Sanitize(payload)
   matches and dropped subtrees retain both classifications.
 - Counts describe replaced spans or removed values; a whole dropped subtree
   counts once. Report paths never include values; PII/credential-bearing keys
-  are masked in paths and their entire members removed. Unclassified dropped
-  fields conservatively raise sensitivity to `Secret`. Already absent values
+  and all non-allowlisted key segments are replaced by `*` in report paths,
+  including in denylist mode. PII-bearing key members are removed. Dropping a
+  benign field does not raise sensitivity; inspection results do. Already absent values
   and null array placeholders do not add redactions on a second pass.
 - The default size cap is 64 KiB (configurable), applied to input and output.
   Oversized, opaque, invalid JSON (including duplicate keys/invalid UTF-8), or
@@ -141,3 +145,7 @@ mean latency. Its 4 KiB payload includes PII and a synthetic provider credential
 CPU profiles distinguish execution cost from scheduling; they do not establish
 per-call CPU-time p99. The release target is p99 below 200 microseconds; measure
 on a controlled host before claiming the gate passed.
+
+Structured key checks strip Unicode format characters then apply NFKC, using
+`golang.org/x/text/unicode/norm`. Joined secret-key words (such as `pass_word`)
+also match; benign metadata suffixes retain their existing precedence.

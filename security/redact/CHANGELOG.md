@@ -24,6 +24,11 @@ This module is versioned independently with `security/redact/vX.Y.Z` tags.
 
 ### Changed
 
+- Normalize structured key names (strip format characters, then NFKC), and
+  recognize joined secret-key words. Adds the pinned x/text normalization dependency.
+- Mask all non-allowlisted report key segments, classify dropped fields from
+  inspection only, and exempt correlation/digest metadata from the 32-hex rule alone.
+- PII recognizes percent encoding, sentence-final IPv6 and adjacent national phones.
 - Provider-key patterns scan candidate tokens instead of the entire text;
   reference-span checks retain the existing pattern semantics.
 
