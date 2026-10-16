@@ -1,0 +1,1 @@
+{"schema_version":"1","id":"evt_bad4","kind":"message.sent","time":"2026-10-16T05:00:00Z","sequence":1,"source":{"channel":"hook"},"subject":"msg://message/tether/m1","actor":{"kind":"agent"}}

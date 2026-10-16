@@ -13,9 +13,17 @@ const SchemaVersion = "1"
 
 // Event is the runtime activity event envelope.
 //
-// Producers must populate SchemaVersion, ID, Kind, Time, SessionID,
-// Sequence, and Source.Channel. All other fields are optional and may be
-// omitted when not meaningful for the event.
+// Producers must populate SchemaVersion, ID, Kind, Time, Sequence, and
+// Source.Channel, and at least one of SessionID or Subject. SessionID is
+// required for every session-bound kind (see [Event.Validate]); events that
+// are not tied to a session (daemon, fleet, message, task) carry Subject
+// instead. All other fields are optional and may be omitted when not
+// meaningful for the event.
+//
+// Envelope v1.1 adds optional nested blocks (Scope, Corr, Actor, Class) and
+// log-assigned fields (RecordedAt, Cursor). They are additive: SchemaVersion
+// stays "1" and a v1 consumer ignores them. Field names follow mesh.Event so
+// [ToMesh] and [FromMesh] project between the two envelopes without loss.
 //
 // Payload is opaque to this package; per-kind payload shapes are defined
 // by the wrapper, by adapters, or by consuming apps. Apps that need to
@@ -28,7 +36,7 @@ type Event struct {
 	Time          time.Time `json:"time"`
 
 	App       string `json:"app,omitempty"`
-	SessionID string `json:"session_id"`
+	SessionID string `json:"session_id,omitempty"`
 	TurnID    string `json:"turn_id,omitempty"`
 	Sequence  uint64 `json:"sequence"`
 
@@ -45,6 +53,31 @@ type Event struct {
 	Process Process         `json:"process"`
 	Source  Source          `json:"source"`
 	Payload json.RawMessage `json:"payload,omitempty"`
+
+	// Subject names what the event is about when it is not a session: a
+	// URN such as msg://task/torque/CW-20261016-0129. Required when
+	// SessionID is empty.
+	Subject string `json:"subject,omitempty"`
+
+	// Generation is the producer's restart counter: it changes whenever the
+	// producer restarts its Sequence. Zero means unknown and is read as 1.
+	Generation uint64 `json:"generation,omitempty"`
+
+	// RecordedAt and Cursor are assigned by the durable log on append.
+	// Producers leave them empty. Cursor is opaque and is the only value a
+	// consumer may resume from; Sequence stays inside its producer.
+	RecordedAt *time.Time `json:"recorded_at,omitempty"`
+	Cursor     string     `json:"cursor,omitempty"`
+
+	// ContentType describes Payload (default application/json). Truncated
+	// reports that the producer cut Payload to fit a size cap.
+	ContentType string `json:"content_type,omitempty"`
+	Truncated   bool   `json:"truncated,omitempty"`
+
+	Scope *Scope `json:"scope,omitempty"`
+	Corr  *Corr  `json:"corr,omitempty"`
+	Actor *Actor `json:"actor,omitempty"`
+	Class *Class `json:"class,omitempty"`
 }
 
 // Process describes the subprocess the event pertains to. Zero values mean
