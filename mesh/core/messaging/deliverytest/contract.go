@@ -57,6 +57,7 @@ type Factory func(t *testing.T) Harness
 // RunStoreContract exercises the Messaging vNext reliable-delivery contract.
 func RunStoreContract(t *testing.T, factory Factory) {
 	t.Helper()
+	runTransitionContract(t, factory)
 
 	t.Run("immutable message identity and frozen recipient obligations", func(t *testing.T) {
 		h := factory(t)
@@ -441,5 +442,192 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// runTransitionContract checks the log through the public Store API so durable
+// and in-memory implementations must agree on cursor and mutation semantics.
+func runTransitionContract(t *testing.T, factory Factory) {
+	t.Run("transitions page fanout without replay or same-status noise", func(t *testing.T) {
+		h := factory(t)
+		ctx := context.Background()
+		for _, args := range []struct {
+			after int64
+			limit int
+		}{{-1, 1}, {0, 0}, {0, -1}} {
+			if _, err := h.Store.Transitions(ctx, args.after, args.limit); !errors.Is(err, delivery.ErrInvalidArgument) {
+				t.Fatalf("invalid cursor/limit: %v", err)
+			}
+		}
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+		if _, err := h.Store.Transitions(canceled, 0, 1); !errors.Is(err, context.Canceled) {
+			t.Fatalf("canceled read: %v", err)
+		}
+		req := basicRequest("transition-fanout", agent("alice"), agent("bob"), agent("carol"))
+		res := mustEnqueue(t, h.Store, req)
+		mustEnqueue(t, h.Store, req) // replay must not create transitions
+		req.Payload = []byte("conflict")
+		if _, err := h.Store.Enqueue(ctx, req); !errors.Is(err, delivery.ErrDigestConflict) {
+			t.Fatal(err)
+		}
+		first, err := h.Store.Transitions(ctx, 0, 1)
+		must(t, err)
+		if len(first) != 1 {
+			t.Fatalf("first page: %+v", first)
+		}
+		second, err := h.Store.Transitions(ctx, first[0].ID, 1)
+		must(t, err)
+		if len(second) != 1 || second[0].ID <= first[0].ID {
+			t.Fatalf("second page: %+v", second)
+		}
+		seen := map[delivery.DeliveryID]bool{}
+		for _, tr := range []delivery.Transition{first[0], second[0]} {
+			if tr.ID <= 0 || tr.MessageID != res.Message.ID || tr.From != "" || tr.To != delivery.DeliveryPending || tr.AttemptID != "" || tr.Reason != delivery.TransitionCreated || !tr.At.Equal(h.Clock.Now()) {
+				t.Fatalf("creation: %+v", tr)
+			}
+			seen[tr.DeliveryID] = true
+		}
+		for _, d := range res.Deliveries {
+			if !seen[d.ID] {
+				t.Fatalf("missing fanout transition for %s", d.ID)
+			}
+		}
+		cursor := second[0].ID
+		assertNoTransitions(t, h.Store, cursor)
+		// A returned snapshot cannot mutate the persisted log.
+		first[0].Reason = "corrupted"
+		again, err := h.Store.Transitions(ctx, 0, 1)
+		must(t, err)
+		if again[0].Reason != delivery.TransitionCreated {
+			t.Fatal("mutable transition result")
+		}
+
+		d := res.Deliveries[0]
+		claim, err := h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Minute, 1))
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryPending, delivery.DeliveryLeased, delivery.TransitionClaimed)
+		_, err = h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "other", time.Minute, 1))
+		if !errors.Is(err, delivery.ErrAlreadyClaimed) {
+			t.Fatal(err)
+		}
+		ref := leaseRef(claim.Attempt)
+		_, err = h.Store.ExtendLease(ctx, ref, h.Clock.Now().Add(2*time.Minute))
+		must(t, err)
+		for _, stage := range []delivery.ReceiptStage{delivery.StageHostAccepted, delivery.StageTurnSubmitted} {
+			_, _, err = h.Store.Ack(ctx, delivery.AckRequest{Lease: ref, Stage: stage})
+			must(t, err)
+		}
+		assertNoTransitions(t, h.Store, cursor)
+		// IDs, not timestamps, define order, including a regressing wall clock.
+		h.Clock.Advance(-time.Second)
+		_, _, err = h.Store.Ack(ctx, delivery.AckRequest{Lease: ref, Stage: delivery.StageConsumed})
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryLeased, delivery.DeliveryDelivered, delivery.TransitionConsumed)
+		_, _, err = h.Store.Ack(ctx, delivery.AckRequest{Lease: ref, Stage: delivery.StageConsumed})
+		must(t, err)
+		_, _, err = h.Store.Nack(ctx, delivery.NackRequest{Lease: ref, Error: "late"})
+		must(t, err)
+		assertNoTransitions(t, h.Store, cursor)
+	})
+
+	t.Run("transitions include retry expiry dead letter and redrive", func(t *testing.T) {
+		h := factory(t)
+		ctx := context.Background()
+		res := mustEnqueue(t, h.Store, basicRequest("transition-lifecycle", agent("alice"), agent("bob")))
+		d := res.Deliveries[0]
+		cursor := assertTransition(t, h, 0, d, "", "", delivery.DeliveryPending, delivery.TransitionCreated)
+		claim, err := h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Minute, 1))
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryPending, delivery.DeliveryLeased, delivery.TransitionClaimed)
+		nack := delivery.NackRequest{Lease: leaseRef(claim.Attempt), Retryable: true, Error: "busy"}
+		_, _, err = h.Store.Nack(ctx, nack)
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryLeased, delivery.DeliveryRetryScheduled, delivery.TransitionNacked)
+		_, _, err = h.Store.Nack(ctx, nack)
+		must(t, err)
+		assertNoTransitions(t, h.Store, cursor)
+		claim, err = h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Minute, 2))
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryRetryScheduled, delivery.DeliveryLeased, delivery.TransitionClaimed)
+		h.Clock.Advance(2 * time.Minute)
+		assertNoTransitions(t, h.Store, cursor) // log reads never expire leases
+		oldAttempt := claim.Attempt.ID
+		claim, err = h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Minute, 3))
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, oldAttempt, delivery.DeliveryLeased, delivery.DeliveryRetryScheduled, delivery.TransitionLeaseExpired)
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryRetryScheduled, delivery.DeliveryLeased, delivery.TransitionClaimed)
+		_, _, err = h.Store.Nack(ctx, delivery.NackRequest{Lease: leaseRef(claim.Attempt), Error: "terminal"})
+		if !errors.Is(err, delivery.ErrDeadLettered) {
+			t.Fatal(err)
+		}
+		cursor = assertTransition(t, h, cursor, d, claim.Attempt.ID, delivery.DeliveryLeased, delivery.DeliveryDeadLettered, delivery.TransitionNacked)
+		_, err = h.Store.Redrive(ctx, delivery.RedriveRequest{DeliveryID: d.ID})
+		if !errors.Is(err, delivery.ErrUnauthorized) {
+			t.Fatal(err)
+		}
+		assertNoTransitions(t, h.Store, cursor)
+		_, err = h.Store.Redrive(ctx, delivery.RedriveRequest{DeliveryID: d.ID, AuthorizedBy: "operator"})
+		must(t, err)
+		cursor = assertTransition(t, h, cursor, d, "", delivery.DeliveryDeadLettered, delivery.DeliveryPending, delivery.TransitionRedriven)
+		assertNoTransitions(t, h.Store, cursor)
+	})
+
+	for _, action := range []string{"claim", "ack", "nack"} {
+		t.Run("transitions include deadline on "+action, func(t *testing.T) {
+			h := factory(t)
+			ctx := context.Background()
+			req := basicRequest("deadline", agent("alice"), agent("bob"))
+			req.DeadlineAt = h.Clock.Now().Add(time.Minute)
+			d := mustEnqueue(t, h.Store, req).Deliveries[0]
+			cursor := assertTransition(t, h, 0, d, "", "", delivery.DeliveryPending, delivery.TransitionCreated)
+			from := delivery.DeliveryPending
+			var a delivery.Attempt
+			if action != "claim" {
+				claim, err := h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Hour, 1))
+				must(t, err)
+				a = claim.Attempt
+				cursor = assertTransition(t, h, cursor, d, a.ID, from, delivery.DeliveryLeased, delivery.TransitionClaimed)
+				from = delivery.DeliveryLeased
+			}
+			h.Clock.Advance(2 * time.Minute)
+			var err error
+			switch action {
+			case "claim":
+				_, err = h.Store.Claim(ctx, claimFor(d.ID, d.Recipient, "host", time.Minute, 1))
+			case "ack":
+				_, _, err = h.Store.Ack(ctx, delivery.AckRequest{Lease: leaseRef(a), Stage: delivery.StageConsumed})
+			case "nack":
+				_, _, err = h.Store.Nack(ctx, delivery.NackRequest{Lease: leaseRef(a), Retryable: true})
+			}
+			if !errors.Is(err, delivery.ErrDeadlineExceeded) && !errors.Is(err, delivery.ErrDeadLettered) {
+				t.Fatalf("deadline: %v", err)
+			}
+			cursor = assertTransition(t, h, cursor, d, a.ID, from, delivery.DeliveryDeadLettered, delivery.TransitionDeadlineExceeded)
+			assertNoTransitions(t, h.Store, cursor)
+		})
+	}
+}
+
+func assertTransition(t *testing.T, h Harness, after int64, d delivery.RecipientDelivery, attempt delivery.AttemptID, from, to delivery.DeliveryStatus, reason delivery.TransitionReason) int64 {
+	t.Helper()
+	rows, err := h.Store.Transitions(context.Background(), after, 1)
+	must(t, err)
+	if len(rows) != 1 {
+		t.Fatalf("missing transition after %d: %+v", after, rows)
+	}
+	tr := rows[0]
+	if tr.ID <= after || tr.DeliveryID != d.ID || tr.MessageID != d.MessageID || tr.AttemptID != attempt || tr.From != from || tr.To != to || tr.Reason != reason || !tr.At.Equal(h.Clock.Now()) {
+		t.Fatalf("transition after %d = %+v; want %s -> %s (%s), attempt %s, at %s", after, tr, from, to, reason, attempt, h.Clock.Now())
+	}
+	return tr.ID
+}
+
+func assertNoTransitions(t *testing.T, store delivery.Store, after int64) {
+	t.Helper()
+	rows, err := store.Transitions(context.Background(), after, 100)
+	must(t, err)
+	if len(rows) != 0 {
+		t.Fatalf("unexpected transitions after %d: %+v", after, rows)
 	}
 }

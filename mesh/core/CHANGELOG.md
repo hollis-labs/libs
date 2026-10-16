@@ -8,6 +8,19 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- Reliable delivery stores now atomically record status transitions, including
+  lease expiry and deadline handling. `Store.Transitions(ctx, after, limit)`
+  exposes an ascending, exclusive cursor for host-owned publication. SQLite
+  schema version 2 adds `messaging_transitions` without reconstructing history;
+  memory and SQLite implementations share transition contract tests.
+
+### Changed
+
+- Custom `delivery.Store` implementations must implement `Transitions`. Existing
+  stores must apply the SQLite schema before using the updated implementation.
+
 ## v0.5.0 — 2026-10-16
 
 ### Added
