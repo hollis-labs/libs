@@ -120,3 +120,24 @@ type panicSanitizer struct{}
 func (panicSanitizer) SanitizePayload(context.Context, string, []byte) ([]byte, PayloadReport, error) {
 	panic("must not be called")
 }
+
+func TestBackstopTellsAnUnsanitizedEventFromOneThatFailedClosed(t *testing.T) {
+	hub := MeshSanitize(fakePayload{}, ModeVerifyAndScrub)
+
+	skipped := &mesh.Event{Kind: "message.sent", Payload: json.RawMessage(`{"a":"SECRET"}`)}
+	if out, _ := hub.Apply(t.Context(), skipped); out.Note != NoteBackstopUnsanitized || strings.Contains(string(skipped.Payload), "SECRET") {
+		t.Fatalf("producer that never sanitized: out=%+v payload=%s", out, skipped.Payload)
+	}
+
+	failed := &mesh.Event{Kind: "message.sent", Payload: ErrorPayload("oversized")}
+	if out, _ := hub.Apply(t.Context(), failed); out.Note != NoteSanitized {
+		t.Fatalf("event that failed closed upstream: out=%+v", out)
+	}
+
+	// A producer-mode pass over an unsanitized event is the normal case.
+	prod := MeshSanitize(fakePayload{}, ModeProducer)
+	fresh := &mesh.Event{Kind: "message.sent", Payload: json.RawMessage(`{"a":"x"}`)}
+	if out, _ := prod.Apply(t.Context(), fresh); out.Note != NoteSanitized {
+		t.Fatalf("producer pass: out=%+v", out)
+	}
+}

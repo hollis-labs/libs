@@ -66,6 +66,11 @@ var ErrPanic = errors.New("eventstage: stage panicked")
 // Config selects the stages of a [Chain]. Sanitize is required: a chain with
 // no way to sanitize would let Classify see raw payloads. Stamp and Classify
 // are optional.
+//
+// Stamp runs before Sanitize, on the raw payload, so a Stamp stage must not
+// put payload values in the errors it returns: [Report.Err] carries Stamp
+// error text verbatim. Sanitize errors are reduced to a failure class by the
+// chain; Classify only ever sees sanitized data.
 type Config[E any] struct {
 	Stamp    Stage[E]
 	Sanitize FailClosedStage[E]

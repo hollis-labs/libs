@@ -56,12 +56,16 @@ const (
 
 // Outcome notes set by the Sanitize adapters.
 const (
-	NoteSanitized         = "sanitized"
-	NoteBackstopScrubbed  = "backstop_scrubbed"
-	NoteFailedClosed      = "failed_closed"
-	NoteNoPayload         = "no_payload"
-	errorClassUnspecified = "error"
-	maxErrorClass         = 32
+	NoteSanitized        = "sanitized"
+	NoteBackstopScrubbed = "backstop_scrubbed"
+	// NoteBackstopUnsanitized marks an event that reached the hub backstop
+	// without ever being sanitized (a producer skipping its choke point), as
+	// opposed to one that failed closed.
+	NoteBackstopUnsanitized = "backstop_unsanitized"
+	NoteFailedClosed        = "failed_closed"
+	NoteNoPayload           = "no_payload"
+	errorClassUnspecified   = "error"
+	maxErrorClass           = 32
 )
 
 // ErrorPayload is the payload an event carries after a fail-closed sanitize.
@@ -119,6 +123,18 @@ func moreRestrictive(a, b string) string {
 	return a
 }
 
+// failClosedPayload reports whether p is the payload a fail-closed sanitize
+// leaves behind, which tells an event that failed closed from one that was
+// never sanitized.
+func failClosedPayload(p []byte) bool {
+	var m map[string]json.RawMessage
+	if json.Unmarshal(p, &m) != nil {
+		return false
+	}
+	_, ok := m["sanitize_error"]
+	return ok && len(m) == 1
+}
+
 func emptyPayload(p []byte) bool {
 	t := bytes.TrimSpace(p)
 	return len(t) == 0 || bytes.Equal(t, []byte("null"))
@@ -154,13 +170,17 @@ func (c sanitizeCore) apply(ctx context.Context, kind string, payload []byte, cu
 		return payload, cur, Outcome{}, err
 	}
 	rescrub := c.mode == ModeVerifyAndScrub && cur.sanitized && rep.Redactions > 0
+	skipped := c.mode == ModeVerifyAndScrub && !cur.sanitized && !failClosedPayload(payload)
 	cur.sanitized = true
 	cur.redactions += rep.Redactions
 	cur.sensitivity = moreRestrictive(cur.sensitivity, rep.Sensitivity)
 	cur.pii = cur.pii || rep.PII
 	note := NoteSanitized
-	if rescrub {
+	switch {
+	case rescrub:
 		note = NoteBackstopScrubbed
+	case skipped:
+		note = NoteBackstopUnsanitized
 	}
 	return out, cur, Outcome{Changed: true, Note: note}, nil
 }
@@ -218,6 +238,9 @@ type meshSanitize struct{ sanitizeCore }
 func (m meshSanitize) Name() string { return m.name }
 
 func (m meshSanitize) Apply(ctx context.Context, e *mesh.Event) (Outcome, error) {
+	// TODO(mesh/core v0.6.0): once harness/core requires it, treat a null
+	// payload with a payload_digest (Event.Tombstoned) as a retention
+	// tombstone rather than "no payload".
 	var cur classFields
 	if e.Class != nil {
 		cur = classFields{e.Class.Sanitized, e.Class.Redactions, e.Class.Sensitivity, e.Class.PII}
