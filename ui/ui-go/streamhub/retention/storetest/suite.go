@@ -56,6 +56,23 @@ func byClass(rows []RowState, seq uint64) RowState {
 // suiteError carries a store error out of a subtest; guard turns it into t.Fatalf.
 type suiteError struct{ err error }
 
+// rollAll rolls up every row of every class, so a per-row store (which never
+// removes an unrolled row) may trim them.
+func rollAll(t *testing.T, f Fixture) {
+	t.Helper()
+	for _, c := range []string{retention.ClassAudit, retention.ClassState, retention.ClassActivity, retention.ClassDebug} {
+		for {
+			r, err := f.Store().Rollup(ctx, "s", retention.RollupSpec{Class: c, Buckets: []retention.Duration{retention.D(time.Hour)}, ClosedBefore: t0.Add(5000 * 24 * time.Hour)}, retention.Op{})
+			if err != nil {
+				t.Fatalf("rollAll: %v", err)
+			}
+			if !r.More {
+				break
+			}
+		}
+	}
+}
+
 func must[T any](v T, err error) T {
 	if err != nil {
 		panic(suiteError{err})
@@ -290,9 +307,15 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 				t.Fatalf("head-only behind an ineligible row: %+v, want 0 trimmed and 1 held", r)
 			}
 		} else {
+			// A per-row store fails closed without a covering rollup, even for a class with none configured.
+			r = must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
+			if r.Rows != 0 {
+				t.Fatalf("per-row trim removed an unrolled row: %+v", r)
+			}
+			rollAll(t, f)
 			r = must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 			if r.Rows != 1 || byClass(f.Rows("s"), c).Seq != 0 {
-				t.Fatalf("per-row trim: %+v", r)
+				t.Fatalf("per-row trim after the rollup: %+v", r)
 			}
 		}
 	}))
@@ -306,6 +329,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		keep := add(t, f, row(retention.ClassAudit, time.Hour, "keep")) // audit: no spec
 		c := add(t, f, row(retention.ClassDebug, 2*time.Hour, "c"))
 		st := f.Store()
+		rollAll(t, f)
 		r := must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		if r.Rows != 1 || r.Held != 1 {
 			t.Fatalf("Trim = %+v, want 1 removed and 1 held", r)
@@ -327,6 +351,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		add(t, f, row(retention.ClassDebug, 0, "a"))
 		keep := add(t, f, row(retention.ClassAudit, time.Hour, "keep"))
 		add(t, f, row(retention.ClassDebug, 2*time.Hour, "c"))
+		rollAll(t, f)
 		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		if r.Rows != 2 || r.Held != 0 {
 			t.Fatalf("Trim = %+v", r)
@@ -398,6 +423,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		a := add(t, f, row(retention.ClassAudit, 0, "audit"))
 		d := add(t, f, row(retention.ClassDebug, time.Hour, "d"))
 		// Even a spec that names R-audit (a bug in a caller) cannot remove an audit row.
+		rollAll(t, f)
 		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{
 			{Class: retention.ClassAudit, Before: t0.Add(1000 * day)}, {Class: retention.ClassDebug, Before: t0.Add(1000 * day)}}, retention.Op{}))
 		left := f.Rows("s")
@@ -416,6 +442,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		f := newFixture(t)
 		old := add(t, f, row(retention.ClassDebug, 0, "old"))
 		young := add(t, f, row(retention.ClassDebug, 5*day, "young"))
+		rollAll(t, f)
 		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		left := f.Rows("s")
 		if byClass(left, old).Seq != 0 || byClass(left, young).Seq != young {
@@ -448,6 +475,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		}
 		specs := []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}
 		for step := 0; step < 6; step++ {
+			rollAll(t, f)
 			must(f.Store().Trim(ctx, "s", specs, retention.Op{Limit: 3}))
 			left := f.Rows("s")
 			// For each class what remains must be a suffix of its cursor order: no earlier row stays while a later one is gone.
@@ -480,6 +508,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		young := add(t, f, row(retention.ClassActivity, 10*day, "young")) // inside its tier: stays
 		e2 := add(t, f, row(retention.ClassActivity, time.Hour, "e2"))    // old enough, but behind a row that stays
 		o := add(t, f, row(retention.ClassDebug, 2*time.Hour, "other class"))
+		rollAll(t, f)
 		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassActivity, Before: t0.Add(day)}, {Class: retention.ClassDebug, Before: t0.Add(day)}}, retention.Op{}))
 		left := f.Rows("s")
 		if byClass(left, e1).Seq != 0 || byClass(left, young).Seq != young || byClass(left, e2).Seq != e2 || byClass(left, o).Seq != 0 {
@@ -493,6 +522,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		d1 := add(t, f, row(retention.ClassDebug, 0, "d1"))
 		a1 := add(t, f, row(retention.ClassActivity, time.Hour, "a1"))
 		d2 := add(t, f, row(retention.ClassDebug, 2*time.Hour, "d2"))
+		rollAll(t, f)
 		must(st.Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(time.Hour)}}, retention.Op{}))
 		marks := must(st.Watermarks(ctx, "s"))
 		if st.Caps().Trim == retention.TrimHeadOnly {
@@ -531,6 +561,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		specs := []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}}
 		boom := errors.New("injected")
 		fx.InjectFault(FaultTrim, boom)
+		rollAll(t, f)
 		if _, err := f.Store().Trim(ctx, "s", specs, retention.Op{}); !errors.Is(err, boom) {
 			t.Fatalf("Trim err = %v, want the injected fault", err)
 		}
@@ -588,6 +619,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		a1 := add(t, f, row(retention.ClassActivity, time.Hour, "a1"))
 		keep := add(t, f, row(retention.ClassActivity, 20*day, "keep"))
 		d2 := add(t, f, row(retention.ClassDebug, 2*time.Hour, "d2"))
+		rollAll(t, f)
 		must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day)}, {Class: retention.ClassActivity, Before: t0.Add(day)}}, retention.Op{}))
 		marks := must(f.Store().Watermarks(ctx, "s"))
 		// Starting from the beginning: one frame, naming the highest watermark; no cursor advance.
@@ -647,6 +679,42 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 		}
 		if hours != 2 || days != 1 {
 			t.Fatalf("hourly buckets count %d rows, daily %d; want 2 and 1 (the old row has no daily history, and nothing is counted twice)", hours, days)
+		}
+	}))
+
+	t.Run("PerRowFailsClosedWithoutACoveringRollup", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if f.Store().Caps().Trim != retention.TrimPerRow {
+			t.Skip("store trims head-only")
+		}
+		a := add(t, f, row(retention.ClassDebug, 0, "d"))
+		// A class with no rollups configured plans RequireRolled=false; a per-row store still removes nothing unrolled.
+		r := must(f.Store().Trim(ctx, "s", []retention.TrimSpec{{Class: retention.ClassDebug, Before: t0.Add(day), RequireRolled: false}}, retention.Op{}))
+		if r.Rows != 0 || byClass(f.Rows("s"), a).Seq != a {
+			t.Fatalf("a per-row store removed an unrolled row: %+v", r)
+		}
+		if marks := must(f.Store().Watermarks(ctx, "s")); len(marks) != 0 {
+			t.Fatalf("watermarks moved without a removal: %v", marks)
+		}
+	}))
+
+	t.Run("DryRunAndPruneHonourMaxDuration", guard(func(t *testing.T) {
+		f := newFixture(t)
+		if tb, ok := f.(TimeBounded); !ok || !tb.HonoursMaxDuration() {
+			t.Skip("store bounds calls by Limit, not by time")
+		}
+		for i := range 30 {
+			add(t, f, row(retention.ClassState, time.Duration(i)*day, "x"))
+		}
+		st := f.Store()
+		r := must(st.Tombstone(ctx, "s", retention.TombstoneSpec{Class: retention.ClassState, Before: t0.Add(100 * day)}, retention.Op{DryRun: true, MaxDuration: time.Nanosecond}))
+		if r.Rows < 1 || r.Rows >= 30 || !r.More {
+			t.Fatalf("dry-run Tombstone with a 1ns budget = %+v: at least one row, then stop, More", r)
+		}
+		must(st.Rollup(ctx, "s", retention.RollupSpec{Class: retention.ClassState, Buckets: []retention.Duration{retention.D(day)}, ClosedBefore: t0.Add(200 * day)}, retention.Op{}))
+		p := must(st.Prune(ctx, "s", retention.PruneSpec{Class: retention.ClassState, Bucket: retention.D(day), Before: t0.Add(200 * day)}, retention.Op{MaxDuration: time.Nanosecond}))
+		if p.Rows < 1 || p.Rows >= 30 || !p.More {
+			t.Fatalf("Prune with a 1ns budget = %+v", p)
 		}
 	}))
 

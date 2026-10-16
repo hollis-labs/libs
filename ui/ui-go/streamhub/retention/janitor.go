@@ -44,9 +44,15 @@ type Janitor struct {
 	txDur    time.Duration
 	dryRun   bool
 	policyID string
+	allow    []TrimMode // nil = every mode this package knows
 	onError  func(stream, class string, err error)
 	elapsed  func() time.Time
 }
+
+// ErrUnsupportedTrim is returned by Run when the store declares a trim mode the
+// janitor does not support or was not allowed to use. The pass does nothing;
+// it never falls back to another strategy.
+var ErrUnsupportedTrim = errors.New("retention: unsupported trim strategy")
 
 // Option configures a [Janitor].
 type Option func(*Janitor)
@@ -79,6 +85,12 @@ func WithDryRun(on bool) Option { return func(j *Janitor) { j.dryRun = on } }
 // pass runs under). It is reported in the Report and the pass event; it plays
 // no part in what the pass does.
 func WithPolicyID(id string) Option { return func(j *Janitor) { j.policyID = id } }
+
+// WithTrimModes restricts the trim strategies this janitor may run (default:
+// both). A store that declares another mode makes Run fail with
+// [ErrUnsupportedTrim] before touching anything, so a deployment can say "head
+// only" and be sure a per-row store is refused rather than quietly used.
+func WithTrimModes(modes ...TrimMode) Option { return func(j *Janitor) { j.allow = modes } }
 
 // WithErrorLog gives the caller the raw error behind a counted failure, for
 // its own logs. The Report itself carries only a coarse class ("timeout",
@@ -344,8 +356,20 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	t0 := j.elapsed()
 	defer func() { rep.Elapsed = j.elapsed().Sub(t0) }()
 
-	unlock, ok, err := j.store.TryLock(ctx)
+	if !j.trimAllowed(rep.Trim) {
+		return rep, ErrUnsupportedTrim
+	}
+	// MaxElapsed is a whole-pass guarantee: the lock and the stream listing are
+	// bounded by it too. Running out of time there is an early stop, not a failure.
+	p := &pass{j: j, rep: &rep, start: t0}
+	pre, cancelPre, _ := p.bounded(ctx)
+	defer cancelPre()
+	unlock, ok, err := j.store.TryLock(pre)
 	if err != nil {
+		if isDeadline(err) && ctx.Err() == nil {
+			rep.StoppedEarly = true
+			return rep, nil
+		}
 		return rep, err
 	}
 	if !ok {
@@ -354,12 +378,15 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 	}
 	defer unlock()
 
-	streams, err := j.store.Streams(ctx)
+	streams, err := j.store.Streams(pre)
 	if err != nil {
+		if isDeadline(err) && ctx.Err() == nil {
+			rep.StoppedEarly = true
+			return rep, nil
+		}
 		return rep, err
 	}
 	sort.Strings(streams)
-	p := &pass{j: j, rep: &rep, start: t0}
 	from := j.resumeStream(resume)
 	for _, stream := range streams {
 		if from != "" && stream < from {
@@ -382,6 +409,21 @@ func (j *Janitor) RunFrom(ctx context.Context, now time.Time, resume string) (re
 		}
 	}
 	return rep, nil
+}
+
+func (j *Janitor) trimAllowed(m TrimMode) bool {
+	if m != TrimHeadOnly && m != TrimPerRow {
+		return false
+	}
+	if j.allow == nil {
+		return true
+	}
+	for _, a := range j.allow {
+		if a == m {
+			return true
+		}
+	}
+	return false
 }
 
 func (j *Janitor) resumeToken(stream string) string { return j.policyID + "\x00" + stream }

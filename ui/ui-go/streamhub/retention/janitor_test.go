@@ -691,3 +691,62 @@ func TestCurrentConfigGovernsEachPass(t *testing.T) {
 		t.Fatal("lengthening the age restored a tombstoned payload")
 	}
 }
+
+type oddStore struct {
+	retention.Store
+	mode retention.TrimMode
+}
+
+func (o oddStore) Caps() retention.Caps { return retention.Caps{Trim: o.mode} }
+
+// An unsupported or disallowed trim strategy fails explicitly and touches nothing.
+func TestUnsupportedTrimStrategyFailsExplicitly(t *testing.T) {
+	m := storetest.NewMem(retention.TrimPerRow)
+	seed(t, m, state(0, "x"))
+	for name, j := range map[string]*retention.Janitor{
+		"unknown mode":                 jan(t, oddStore{Store: m, mode: retention.TrimMode(99)}),
+		"per-row store, head-only job": jan(t, m, retention.WithTrimModes(retention.TrimHeadOnly)),
+	} {
+		rep, err := j.Run(context.Background(), base.Add(400*day))
+		if !errors.Is(err, retention.ErrUnsupportedTrim) || rep.Streams != 0 {
+			t.Fatalf("%s: err = %v, streams %d; want ErrUnsupportedTrim and no work", name, err, rep.Streams)
+		}
+		for _, r := range m.Rows("env") {
+			if r.Tombstoned || r.Rolled {
+				t.Fatalf("%s: a refused pass changed a row: %+v", name, r)
+			}
+		}
+	}
+	if _, err := jan(t, m, retention.WithTrimModes(retention.TrimPerRow)).Run(context.Background(), base.Add(400*day)); err != nil {
+		t.Fatalf("allowed mode refused: %v", err)
+	}
+}
+
+type slowStreams struct {
+	retention.Store
+	d time.Duration
+}
+
+func (s slowStreams) Streams(ctx context.Context) ([]string, error) {
+	select {
+	case <-time.After(s.d):
+		return s.Store.Streams(ctx)
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// MaxElapsed is a whole-pass guarantee: a slow stream listing ends the pass
+// early instead of running past it or failing.
+func TestSlowStreamListingStopsEarlyWithinTheBudget(t *testing.T) {
+	m := storetest.NewMem(retention.TrimHeadOnly)
+	seed(t, m, state(0, "x"))
+	start := time.Now()
+	rep, err := jan(t, slowStreams{Store: m, d: 2 * time.Second}, retention.WithBudget(retention.Budget{MaxElapsed: 50 * time.Millisecond})).Run(context.Background(), base.Add(400*day))
+	if err != nil || !rep.StoppedEarly || rep.Streams != 0 {
+		t.Fatalf("report = %+v, %v; want an early stop without error", rep, err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("the pass took %v, far past its 50ms budget", time.Since(start))
+	}
+}
