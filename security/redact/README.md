@@ -70,8 +70,8 @@ A safety net, not a guarantee.
   Only a known value (`Scope`) protects it. `WithHeuristics()` adds the one common
   unlabeled shape (an AWS secret access key) and can match ordinary 40-character
   identifiers, so it is off by default.
-- It does not detect personal data (email, phone, card, address). `Rule` is the extension
-  point; nothing is built in.
+- The credential-only `Redactor` does not infer personal data. Use `Sanitizer`
+  for the deterministic PII rules described below.
 - `Writer` redacts a stream line by line in bounded memory. A value longer than `WithHold` that straddles a forced flush of a very long unbroken line can be missed; `Tail` handles a single chunk that was cut in the middle of a known value.
 - Redact at the boundary, and prefer not to put secrets in text at all.
 
@@ -84,3 +84,60 @@ finds a leak or a false positive, add the case here first, then fix the rule. Kn
 listed in the test, with the reason.
 
 `go test -fuzz=FuzzText ./security/redact` hunts for invariant violations.
+
+### Event payload sanitization
+
+`NewSanitizer(Policy, ...Option)` compiles an immutable per-kind policy.
+`Sanitize(payload)` returns JSON bytes and a typed `Report`, without importing
+an event envelope or transport. The event-stage adapter maps the report into
+its envelope's class fields. Any nonempty `Report.ErrorClass` means the caller
+must mark the envelope **unsanitized**, even though the returned tombstone is
+safe to emit.
+
+```go
+s, err := redact.NewSanitizer(redact.Policy{
+    AllowedPaths: []string{"/entity/type", "/entity/id", "/to", "/trigger/kind"},
+    Sensitivity: redact.Private,
+})
+if err != nil { /* refuse to start with an invalid policy */ }
+clean, report := s.Sanitize(payload)
+```
+
+- Zero mode is `Allowlist`. Only listed values survive; explicit `Denylist`
+  keeps the shape and applies credential, key-name and PII rules. Producers
+  select these policies per kind: existing catalog kinds use denylist, new
+  kinds use their allowlist, and unknown kinds get an empty allowlist.
+- Paths use RFC 6901 escaping (`~0`, `~1`); `*` matches an array index. Listing a
+  container does not grant access to its descendants. List each retained leaf.
+  Removed array elements become `null` so other indices remain stable.
+- Mandatory PII detectors cover ASCII email addresses, international phone
+  numbers (7–15 digits with `+`) and national numbers (10–11 digits), validated
+  IPv4/IPv6, 13–19 digit Luhn-valid cards, and Nanite's 32-hex identifiers.
+  Formats are deterministic, not a guarantee to recognize every personal datum.
+  Internationalized email addresses, names and inferred locale-specific PII
+  are not modeled. Use an allowlist for untrusted/new event kinds.
+- Secret rules and key matches raise sensitivity to `Secret`; PII raises it to
+  at least `Private`. Policy classification can only raise it. Overlapping
+  matches and dropped subtrees retain both classifications.
+- Counts describe replaced spans or removed values; a whole dropped subtree
+  counts once. Report paths never include values; PII/credential-bearing keys
+  are masked in paths and their entire members removed. Unclassified dropped
+  fields conservatively raise sensitivity to `Secret`. Already absent values
+  and null array placeholders do not add redactions on a second pass.
+- The default size cap is 64 KiB (configurable), applied to input and output.
+  Oversized, opaque, invalid JSON (including duplicate keys/invalid UTF-8), or
+  nesting deeper than 64 levels produces `{"sanitize_error":"<class>"}`.
+  Failure classification is `Secret`; no parse error text or input is returned.
+
+The credential-only `Default()` behavior is unchanged. Sanitizer options
+customize the underlying redactor but cannot disable its mandatory PII rules.
+A runtime scope may still learn known values concurrently.
+
+Run the seeded event corpus and fuzz checks with `go test ./...` and
+`go test -run '^$' -fuzz '^FuzzSanitize$' -fuzztime=30s`. The benchmark
+`go test -run '^$' -bench BenchmarkSanitize4KB -benchtime=10000x -cpu=1`
+reports wall-clock per-call p99 over up to 10,000 samples, plus allocations and
+mean latency. Its 4 KiB payload includes PII and a synthetic provider credential.
+CPU profiles distinguish execution cost from scheduling; they do not establish
+per-call CPU-time p99. The release target is p99 below 200 microseconds; measure
+on a controlled host before claiming the gate passed.

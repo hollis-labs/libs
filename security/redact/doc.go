@@ -31,6 +31,7 @@
 //
 // It is a safety net, not a guarantee. It cannot find a secret that looks like
 // ordinary text and has no label (a bare base64 blob); [WithHeuristics] adds the
-// one such shape that is common. It does not detect personal data. Redact at the
-// boundary where text leaves your control, and prefer not to log secrets at all.
+// one such shape that is common. [Sanitizer] adds deterministic PII detection,
+// per-kind field allowlists, classification and fail-closed payload limits.
+// Redact where text leaves your control, and prefer not to log secrets at all.
 package redact
