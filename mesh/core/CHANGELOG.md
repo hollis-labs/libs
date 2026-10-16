@@ -10,6 +10,14 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ### Added
 
+- `Event.PayloadDigest` (`payload_digest`, optional) and `Event.Tombstoned`
+  mark an event whose payload a retention pass removed (event retention D7,
+  envelope tier). The value is `sha256:` plus 64 lowercase hex digits over the
+  stored payload bytes, or `withheld` when no digest is kept (PII). When it is
+  set, `Validate` requires the payload to be absent or JSON null and checks the
+  value's format; events without it validate exactly as before
+  (CW-20261016-0167).
+
 - Reliable delivery stores now atomically record status transitions, including
   lease expiry and deadline handling. `Store.Transitions(ctx, after, limit)`
   exposes an ascending, exclusive cursor for host-owned publication. SQLite
