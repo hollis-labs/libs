@@ -8,6 +8,8 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+## v0.3.0 — 2026-10-16
+
 ### Added
 
 - `streamhub/retention`: configuration and decision model for tiered event retention (design D7 rev 2). Per-class `full` / `envelope` ages and rollup schedules (zero = forever), `Defaults()` with the proposed tiers, `Config.Resolve()` merging over defaults with validation (lengthening the pii payload cap or shortening the audit class below 400d needs `acknowledge` and yields a warning; storing secret payloads is always rejected), and `Policy.ClassOf` / `PayloadMax` / `TierAt` for a janitor or log to ask which tier an event of a given age is in. No storage code.
