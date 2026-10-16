@@ -8,6 +8,8 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.7.0 — 2026-10-16
+
 ### Added
 
 - `ActorDevice` (`device`): a machine principal (laptop, worker host, host
