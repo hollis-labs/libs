@@ -8,6 +8,8 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.5.0 — 2026-10-16
+
 ### Added
 - `otel/redaction.Exporter`: a `sdktrace.SpanExporter` wrapper that forwards redacted copies of spans: denylisted attribute keys dropped (span, event, link), denylisted event names lose their attributes, and an injected `WithValueRedactor(func(string) string)` scrubs every exported string. `WithKeyFilter` replaces the key decision. Tested against a recording exporter.
 - `otel.WithSpanRedaction(...redaction.ExporterOption)`.

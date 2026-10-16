@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.12.0 — 2026-10-16
+
 ### Added
 
 - `eventstage`: the ordered stage chain for the event stream (contract D4

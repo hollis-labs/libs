@@ -8,6 +8,18 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-16
+
+### Added
+
+- `go-mcp/server`: `RecoverPanics` (tool middleware) and `RecoverPanicsReceiving` (SDK receiving middleware) recover a panic in a tool or request handler through `core/panics`. The caller gets an `internal_error` `budget.ToolError` (or a JSON-RPC internal error) carrying only the panic ref; the redacted value and stack go to the guard's reporter and the server keeps serving. `WithPanicGuard(*panics.Guard)` picks the guard.
+
+### Changed
+
+- **Behavior change:** `server.NewServer` installs the panic guard as the outermost middleware by default. `WithoutPanicGuard()` opts out for a caller that recovers panics itself.
+- A recovered panic no longer puts its value in error text: `guard.Guarded`, the plugin-host connection reader and the subprocess runtime's unload error now return `internal error (ref pnc_...)`. Callers that matched the old `"<subject> panicked: <value>"` text must use the ref or `errors.As(err, *panics.Error)`. The subprocess handler-panic JSON-RPC message stays `panic: <value>` (fixed by the v1/v2 conformance transcripts shared with the TS SDK).
+- Requires `core/panics` v0.1.0 (and `go 1.26.9`, which it requires).
+
 ## [0.3.0] - 2026-10-15
 
 ### Added
