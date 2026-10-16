@@ -35,6 +35,10 @@ const (
 // ErrStorageMismatch is returned by [Open] under [RefuseOnMismatch].
 var ErrStorageMismatch = errors.New("streamlogpostgres: database does not match its recorded identity")
 
+// ErrIdentityUnavailable is returned by [Open] when [Options.RequireIdentityCheck]
+// is set and the server's system identifier and timeline cannot be read.
+var ErrIdentityUnavailable = errors.New("streamlogpostgres: server identity unavailable (grant EXECUTE on pg_control_system() and pg_control_checkpoint())")
+
 // MismatchPolicy says what Open does when a restore check fails.
 type MismatchPolicy int
 
@@ -64,6 +68,12 @@ type Options struct {
 	// MarkerEvery throttles marker writes after appends (default 1s; negative
 	// writes after every append). Open, Trim and Close always flush.
 	MarkerEvery time.Duration
+	// RequireIdentityCheck makes Open fail with [ErrIdentityUnavailable] when
+	// the server's system identifier and timeline cannot be read, instead of
+	// falling back to the marker alone. pg_control_system() and
+	// pg_control_checkpoint() are superuser-only by default; grant the log's
+	// role EXECUTE on both (see the package documentation).
+	RequireIdentityCheck bool
 	// OnStorageMismatch is the restore policy.
 	OnStorageMismatch MismatchPolicy
 	// OnIDConflict is called when an Event.ID is appended again with
@@ -82,6 +92,26 @@ type Recovery struct {
 	Reason string
 	// Warnings are conditions that weaken restore detection.
 	Warnings []string
+	// Checks says which restore checks are active in this process.
+	Checks Checks
+}
+
+// Checks lists the restore checks that are active.
+type Checks struct {
+	// ServerIdentity: the system identifier and timeline are compared (cluster
+	// swap, point-in-time recovery, promotion).
+	ServerIdentity bool
+	// Marker: the external high-water marker is compared (pg_restore into the
+	// same cluster, snapshot rollback).
+	Marker bool
+}
+
+// Status is a snapshot for health endpoints and logs.
+type Status struct {
+	Epoch    string
+	Checks   Checks
+	Warnings []string
+	Recovery Recovery
 }
 
 // Stats are monotonic counters since Open.
@@ -100,8 +130,11 @@ type Log struct {
 	markerPath string
 	markerGap  time.Duration
 
-	epoch    string
+	epoch    string // init scratch; use curEpoch after Open
 	recovery Recovery
+
+	epochMu sync.RWMutex
+	cur     string // the epoch last seen in log_meta
 
 	conflicts atomic.Uint64
 
@@ -208,6 +241,11 @@ func (l *Log) resolveMarkerPath() string {
 
 func (l *Log) init(ctx context.Context) error {
 	sysid, timeline, idErr := l.serverIdentity(ctx)
+	if idErr != nil && l.opts.RequireIdentityCheck {
+		return fmt.Errorf("%w: %v", ErrIdentityUnavailable, idErr)
+	}
+	l.recovery.Checks.ServerIdentity = idErr == nil
+	l.recovery.Checks.Marker = !l.opts.DisableMarker
 	if idErr != nil {
 		l.warn("server system identifier and timeline are unavailable (" + idErr.Error() +
 			"); cluster-swap and point-in-time-recovery detection is off, only the marker applies")
@@ -356,12 +394,59 @@ func (l *Log) init(ctx context.Context) error {
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
+	l.cur = l.epoch
 	l.dirty = true
 	return l.flushMarker(true)
 }
 
+// curEpoch is the epoch last seen in log_meta by this instance.
+func (l *Log) curEpoch() string {
+	l.epochMu.RLock()
+	defer l.epochMu.RUnlock()
+	return l.cur
+}
+
+// adoptEpoch switches to an epoch another instance minted: this instance
+// must not keep issuing cursors under the old one. The marker is rewritten
+// at once so a restart does not read the new epoch as a mismatch.
+func (l *Log) adoptEpoch(e string) {
+	l.epochMu.Lock()
+	changed := e != "" && e != l.cur
+	if changed {
+		l.cur = e
+	}
+	l.epochMu.Unlock()
+	if !changed {
+		return
+	}
+	l.mkMu.Lock()
+	l.dirty = true
+	l.mkMu.Unlock()
+	_ = l.flushMarker(true)
+}
+
+type queryRower interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// txEpoch reads the epoch inside the caller's transaction, so a re-mint by
+// another instance is seen by the very next append or read.
+func (l *Log) txEpoch(ctx context.Context, q queryRower) (string, error) {
+	var e string
+	if err := q.QueryRow(ctx, `SELECT value FROM `+l.schema+`.log_meta WHERE key='epoch'`).Scan(&e); err != nil {
+		return "", err
+	}
+	l.adoptEpoch(e)
+	return e, nil
+}
+
 // Epoch is the identity of this log; see the package documentation.
-func (l *Log) Epoch() string { return l.epoch }
+func (l *Log) Epoch() string { return l.curEpoch() }
+
+// Status reports the epoch and which restore checks are active.
+func (l *Log) Status() Status {
+	return Status{Epoch: l.curEpoch(), Checks: l.recovery.Checks, Warnings: l.recovery.Warnings, Recovery: l.recovery}
+}
 
 // Recovery reports whether Open re-minted the epoch, why, and any warnings.
 func (l *Log) Recovery() Recovery { return l.recovery }
@@ -398,7 +483,7 @@ func (l *Log) flushMarker(force bool) error {
 	if !force && l.markerGap > 0 && l.now().Sub(l.lastMk) < l.markerGap {
 		return nil
 	}
-	m := logkit.Marker{Epoch: l.epoch, Streams: make(map[string]uint64, len(l.heads))}
+	m := logkit.Marker{Epoch: l.curEpoch(), Streams: make(map[string]uint64, len(l.heads))}
 	for s, n := range l.heads {
 		m.Streams[s] = n
 	}
@@ -478,6 +563,10 @@ func (l *Log) appendOnce(ctx context.Context, stream string, e streamhub.Event, 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	epoch, err := l.txEpoch(ctx, tx)
+	if err != nil {
+		return streamhub.Record{}, false, err
+	}
 	if e.ID != "" {
 		var (
 			ostream, okind string
@@ -490,7 +579,7 @@ func (l *Log) appendOnce(ctx context.Context, stream string, e streamhub.Event, 
 		switch {
 		case err == nil:
 			if ostream == stream && bytes.Equal(odigest, digest) {
-				return streamhub.Record{Seq: streamhub.Seq(oseq), Name: okind, Data: odata, At: oat.UTC(), ID: e.ID, Epoch: l.epoch}, false, nil
+				return streamhub.Record{Seq: streamhub.Seq(oseq), Name: okind, Data: odata, At: oat.UTC(), ID: e.ID, Epoch: epoch}, false, nil
 			}
 			l.conflicts.Add(1)
 			if l.opts.OnIDConflict != nil {
@@ -526,7 +615,7 @@ func (l *Log) appendOnce(ctx context.Context, stream string, e streamhub.Event, 
 		return streamhub.Record{}, false, err
 	}
 	l.noteHead(stream, uint64(seq))
-	return streamhub.Record{Seq: streamhub.Seq(seq), Name: e.Name, Data: data, At: at, ID: e.ID, Epoch: l.epoch}, false, nil
+	return streamhub.Record{Seq: streamhub.Seq(seq), Name: e.Name, Data: data, At: at, ID: e.ID, Epoch: epoch}, false, nil
 }
 
 // After implements [streamhub.Log].
@@ -581,6 +670,10 @@ func (l *Log) readPage(ctx context.Context, stream, epoch string, cursor streamh
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	curEpoch, err := l.txEpoch(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 	var latest, pruned int64
 	if err := tx.QueryRow(ctx, `SELECT latest, pruned FROM `+l.schema+`.streams WHERE stream=$1`, stream).Scan(&latest, &pruned); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
@@ -588,11 +681,11 @@ func (l *Log) readPage(ctx context.Context, stream, epoch string, cursor streamh
 	gap := func(reason streamhub.GapReason, missed uint64) error {
 		return &streamhub.GapError{Gap: streamhub.Gap{
 			Reason: reason, Requested: cursor, OldestAvailable: streamhub.Seq(pruned + 1),
-			Latest: streamhub.Seq(latest), Missed: missed, Epoch: l.epoch,
+			Latest: streamhub.Seq(latest), Missed: missed, Epoch: curEpoch,
 		}}
 	}
 	switch {
-	case epoch != "" && epoch != l.epoch:
+	case epoch != "" && epoch != curEpoch:
 		return nil, gap(streamhub.GapEpochChanged, 0)
 	case uint64(cursor) > uint64(latest):
 		return nil, gap(streamhub.GapCursorAhead, uint64(cursor)-uint64(latest))
@@ -617,7 +710,7 @@ func (l *Log) readPage(ctx context.Context, stream, epoch string, cursor streamh
 		if err := rows.Scan(&seq, &r.Name, &at, &r.Data, &eid); err != nil {
 			return nil, err
 		}
-		r.Seq, r.At, r.Epoch = streamhub.Seq(seq), at.UTC(), l.epoch
+		r.Seq, r.At, r.Epoch = streamhub.Seq(seq), at.UTC(), curEpoch
 		if eid != nil {
 			r.ID = *eid
 		}
@@ -638,9 +731,13 @@ func (l *Log) Head(ctx context.Context, stream string) (streamhub.Head, error) {
 		return streamhub.Head{}, err
 	}
 	defer l.leave()
-	h := streamhub.Head{Epoch: l.epoch}
+	ep, err := l.txEpoch(ctx, l.pool)
+	if err != nil {
+		return streamhub.Head{}, err
+	}
+	h := streamhub.Head{Epoch: ep}
 	var latest, pruned, dropped int64
-	err := l.pool.QueryRow(ctx, `SELECT latest, pruned, dropped FROM `+l.schema+`.streams WHERE stream=$1`, stream).Scan(&latest, &pruned, &dropped)
+	err = l.pool.QueryRow(ctx, `SELECT latest, pruned, dropped FROM `+l.schema+`.streams WHERE stream=$1`, stream).Scan(&latest, &pruned, &dropped)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return h, nil
 	}
