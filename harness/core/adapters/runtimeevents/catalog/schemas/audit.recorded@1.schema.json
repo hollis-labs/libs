@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:audit.recorded@1",
+  "title": "audit.recorded@1",
+  "description": "A fact recorded in a producer's audit log. The producer's own log stays the system of record; ref points into it. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "action",
+    "outcome"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the producer's own action name, e.g. memory.write or grant_created"
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outcome": {
+      "type": "string",
+      "description": "ok, denied, failed or the producer's own outcome word"
+    },
+    "ref": {
+      "type": "string"
+    },
+    "chain_digest": {
+      "type": "string"
+    }
+  }
+}

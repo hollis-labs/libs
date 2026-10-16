@@ -199,7 +199,8 @@
    "kind": "session.state_changed",
    "category": "state",
    "payload_schema": "urn:hollis-labs:events:state_changed@1",
-   "status": "new"
+   "status": "stable",
+   "note": "Tether emits {from,to,exit_code,reason} today; add entity and trigger (CW-20261016-0136)"
   },
   {
    "kind": "checkpoint.state_changed",
@@ -424,6 +425,225 @@
    "status": "deprecated",
    "successor": "tool.call.finished",
    "note": "Tether gateway"
+  },
+  {
+   "kind": "audit.recorded",
+   "category": "audit",
+   "payload_schema": "urn:hollis-labs:events:audit.recorded@1",
+   "status": "new",
+   "note": "generic audit fact: Tesseract audit actions, Cerberus intent/outcome/grant/brake records"
+  },
+  {
+   "kind": "session.turn_routed",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.turn_output",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.boot_dir_planted",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.stalled",
+   "category": "alert",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.shim_status",
+   "category": "state",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.output",
+   "category": "activity",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.started",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_started",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_completed",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.shutdown_sessions_ended",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.sessions_swept",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "daemon.execution_policy_changed",
+   "category": "fleet",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "ai.budget_rejected",
+   "category": "alert",
+   "status": "stable",
+   "note": "Tether"
+  },
+  {
+   "kind": "sysop.session_stop",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.session_checkpoint",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.logical_agent_resume",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.session_cleanup",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "sysop.logical_agent_policy",
+   "category": "audit",
+   "status": "stable",
+   "note": "Tether sysop"
+  },
+  {
+   "kind": "workspace.snapshot.taken",
+   "category": "data",
+   "status": "stable",
+   "note": "mesh/core; payload schema workspace.snapshot.taken.v1 lives in mesh/core"
+  },
+  {
+   "kind": "session.turn_interrupt_requested",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "interrupt.requested",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.turn_interrupt_completed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "interrupt.acknowledged",
+   "note": "Tether"
+  },
+  {
+   "kind": "session.request_status",
+   "category": "approval",
+   "status": "deprecated",
+   "successor": "approval.requested",
+   "note": "Tether; open maps to approval.requested, close to approval.resolved"
+  },
+  {
+   "kind": "session.force_closed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=human, reason=force_closed"
+  },
+  {
+   "kind": "session.shim_retired",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=human, reason=shim_retired"
+  },
+  {
+   "kind": "session.launch_failed",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; to=failed, reason=launch_failed"
+  },
+  {
+   "kind": "session.reaper",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.state_changed",
+   "note": "Tether; trigger.kind=system, reason=reaped"
+  },
+  {
+   "kind": "session.activity",
+   "category": "activity",
+   "status": "deprecated",
+   "successor": "session.heartbeat",
+   "note": "Tether"
+  },
+  {
+   "kind": "provider.session_lost",
+   "category": "state",
+   "status": "deprecated",
+   "successor": "session.lost",
+   "note": "Tether"
+  },
+  {
+   "kind": "provider.permission_denied",
+   "category": "approval",
+   "status": "deprecated",
+   "successor": "agent.permission_denied",
+   "note": "Tether"
+  },
+  {
+   "kind": "broker.envelope_created",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.sent",
+   "note": "Tether broker"
+  },
+  {
+   "kind": "broker.envelope_replied",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.sent",
+   "note": "Tether broker; reply carries in_reply_to"
+  },
+  {
+   "kind": "routing.reply_delivered",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.delivered",
+   "note": "Tether"
+  },
+  {
+   "kind": "routing.reply_undeliverable",
+   "category": "message",
+   "status": "deprecated",
+   "successor": "message.failed",
+   "note": "Tether"
   }
  ]
 }

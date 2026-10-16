@@ -20,6 +20,12 @@ All notable changes to the `harness` module are documented here (the module was 
   `adapters/runtimeevents/projection.md` (event stream contract C1,
   CW-20261016-0129).
 
+- `adapters/runtimeevents/catalog`: the event kind registry (`catalog.json`,
+  106 kinds with category, status, successor and payload schema id), 15
+  minimum payload schemas `urn:hollis-labs:events:<name>@1`, generated Go and
+  TypeScript constants, and `mapping.md`, which maps the kinds every producer
+  emits today onto the catalog (event stream contract C2, CW-20261016-0130).
+
 ### Changed
 
 - `runtimeevents.Event.SessionID` is now omitted from JSON when empty. Events

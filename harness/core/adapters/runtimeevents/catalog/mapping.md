@@ -1,0 +1,130 @@
+# Mapping today's kinds onto the catalog
+
+This table shows how each producer's current event kinds land on the shared bus catalog (`catalog.json`).
+It is event stream contract C2 (CW-20261016-0130). Each producer lane implements its own rows.
+
+Every row has one of these outcomes:
+
+- **keep**: the kind is registered in `catalog.json` unchanged.
+- **→ X**: the producer emits catalog kind X on the bus. If the old kind was on the bus, it is registered as `deprecated` with successor X, and both are emitted during the deprecation window.
+- **local**: the kind stays inside the producer (its own table, SSE or UI channel) and does not go on the shared bus in v1.1. A lane may propose promoting it later; promotion means a catalog PR.
+- **name pending**: the kind belongs on the bus, but its current name breaks the naming rule. The producer lane proposes a name in a catalog PR. Until then it stays local.
+
+When the old kind's meaning is a transition, the producer carries the old detail in the successor's payload: `reason`, `trigger.kind`, and `outcome` for approvals.
+
+Inventory sources, read 2026-10-16:
+
+| Producer | Ref |
+|---|---|
+| Tether | origin/main d03f6cd |
+| Torque | origin/main e42c797 |
+| Tangent | origin/main 0dede48 |
+| libs | origin/main f8c3000 |
+| Tesseract | main a8f5ebf |
+| Hadron | main 45c83b4 |
+| Cerberus | main 2bf26bc |
+
+## runtimeevents (libs harness)
+
+All 32 kinds in `kinds.go` are kept. `agent.permission_*` and `policy.approval_requested` keep their kinds and are also mapped to `approval.requested` and `approval.resolved` notifications at the bus, as section 6 of the design specifies.
+
+## mesh/core
+
+| Today | Outcome |
+|---|---|
+| `workspace.snapshot.taken` | keep (its payload schema stays in mesh/core) |
+| `Event.Kind` from Tether environmentstream | Passes the durable Tether kind through, so the Tether rows below apply |
+| `gap`, `synchronized` (environmentstream SSE control frames) | local: transport control, not events |
+
+## Tether bus (`events` table)
+
+This overlaps CW-20261014-0144, which resolves here. That task now implements these rows on Tether's side, together with CW-20261016-0136 (X1) and CW-20261016-0137 (X2).
+
+| Today | Outcome |
+|---|---|
+| `session.state_changed` | keep, with payload schema `state_changed@1`. Add `entity` and `trigger` to today's `{from,to,exit_code,reason}`. |
+| `session.turn_routed`, `session.turn_output`, `session.boot_dir_planted`, `session.output`, `session.shim_status`, `session.stalled` | keep |
+| `session.force_closed`, `session.shim_retired`, `session.launch_failed`, `session.reaper` | → `session.state_changed`, with `reason` set to the old name. `trigger.kind` is `human` for force_closed and shim_retired, `system` for launch_failed and reaper. |
+| `session.turn_interrupt_requested` / `_completed` | → `interrupt.requested` / `interrupt.acknowledged` |
+| `session.request_status` | → `approval.requested` (open) / `approval.resolved` (close) |
+| `session.activity` | → `session.heartbeat` |
+| `provider.session_lost` | → `session.lost` |
+| `provider.permission_denied` | → `agent.permission_denied` |
+| `broker.envelope_created`, `broker.envelope_replied` | → `message.sent` (a reply carries `in_reply_to`) |
+| `routing.reply_delivered` / `routing.reply_undeliverable` | → `message.delivered` / `message.failed` |
+| (no event today) send, claim, deliver, read, consume, dead-letter, redrive, cancel, archive, purge, wake | → `message.*` and `wake.*` (X2) |
+| `daemon.started`, `daemon.shutdown_started`, `daemon.shutdown_completed`, `daemon.shutdown_sessions_ended`, `daemon.sessions_swept`, `daemon.execution_policy_changed` | keep |
+| `ai.budget_rejected` | keep |
+| `sysop.session_stop`, `sysop.session_checkpoint`, `sysop.logical_agent_resume`, `sysop.session_cleanup`, `sysop.logical_agent_policy` | keep (category audit) |
+| `tool_call_start` / `tool_call_end` | → `tool.call.started` / `tool.call.finished` (X3). `ok` appears only on finished. |
+| `machine_authority_decision`, `sandbox_rule_unenforced` | name pending (X3 and X4) |
+
+## Torque
+
+| Today | Outcome |
+|---|---|
+| `task.transitioned` (bus and SSE), `task_transitioned` (run_events) | → `task.state_changed` |
+| `run.started`, `run.completed`, `run.canceled`, `run.finished`, `run.superseded`, and `run_*` lifecycle rows (`run_started`, `run_completed`, `run_canceled`, `run_interrupted`, `run_blocked_permanent`, `run_orphan_recovered`, `run_superseded`) | → `run.state_changed`, with `to` taken from the old verb |
+| `run.progress`, run_events `progress` | → `progress.checkpoint` (T3; non-parking) |
+| `checkpoint.emitted`, `checkpoint.responded`, `checkpoint.canceled`, `checkpoint.timed_out`, `checkpoint.escalated` | → `checkpoint.state_changed` |
+| `sprint.transitioned` | → `sprint.state_changed` |
+| `plan.phase_added` / `plan.phase_removed` (bus), `plan.phase.added` / `plan.phase.removed` (SSE) | local. Phase lifecycle on the bus is `phase.started`, `phase.completed` and `phase.state_changed` (T2). The two spellings should be unified inside Torque. |
+| (no event today) quality gates and landing gate | → `gate.evaluated` (T2) |
+| `daemon.up` | → `daemon.started` |
+| `health.anomaly` | → `alert.raised` |
+| `worker.stale`, `worker.stale.live` | → `fleet.node.degraded` |
+| `envelope.created`, `envelope.responded`, `envelope.escalated`, `envelope.delivered` (broker), `envelope.paused` (reactor) | → `message.*` lifecycle, if Torque's broker stays. Otherwise local. |
+| `run.event`, run_events `log`, `artifact`, `tokens`, `tool_use`, `unknown` | local (executor detail); `data.emitted` for structured results (T3) |
+| `scheduler.tick`, `scheduler.dispatch_skipped`, `task.notify`, `wait.fired`, `recovery.pack_planted`, `checkpoint.response_dispatched`, `checkpoint.orchestrator_redispatched`, `end_agent_enqueue_failed` | local |
+| CRUD notifications: `task.created` and `task.updated`, plus the created/updated/deleted events of `artifact.*`, `collection.*`, `epic.*`, `issue.*`, `project.*`, `sprint.*` and `plan.*`; also `judge.changed`, `planner.changed` | local (UI cache invalidation on Torque SSE) |
+| `CanonicalEvent` | Not wired. T1 either wires the choke point to emit catalog kinds or retires the type. |
+| Plugin-catalog constants with no emit site (`task.transitioning`, `task.assigned`, `run.failed`, `deliverable.check`, `plugin.*`, `config.changed`) | local; no change |
+
+## Tesseract
+
+| Today | Outcome |
+|---|---|
+| 20 `audit_events` actions (`write`, `typed_write`, `status_promote`, `status_deprecate`, `session_snapshot`, `packet`, `bulk_ingest`, `chunked_ingest`, `promote.*`, `maintenance.*`, `memory.*`, `knowledge.*`, `namespace.*`) | → `audit.recorded`, with `action` set to the action name (O1) |
+| (no event today) `touch` | → `audit.recorded`, with `action=touch` (O1) |
+| Event-domain types `journal`, `reasoning` | local (content, not events; pull only) |
+| Plugin-catalog `context.*`, `embed.completed` (emit sites unconfirmed) | local |
+
+## Hadron
+
+| Today | Outcome |
+|---|---|
+| `run.status_changed` (workflow_events) | → `run.state_changed`, with `entity.type=workflow_run` |
+| `node.attempt_finished` | → `step.executed` |
+| other `workflow_events` types (`node.*`, `control.*`, `compensation.*`, `external_operation.*`, `fanout.*`, `retry.*`, `service.*`, `wait.*`, `cancellation.resolved`, `run.cancellation_requested`, `run.terminal_intent_recorded`, `run.replay_created`, `run.fail_fast_triggered`) | local. They are served through Hadron's own subscription with a resume cursor (O2). |
+| Legacy pipeline `run_events` (`started`, `completed`, `step_*`, `hook_*` …) | local |
+
+## Cerberus
+
+| Today | Outcome |
+|---|---|
+| `approval_requested` | → `approval.requested` |
+| `approval_decided` | → `approval.resolved` (`approved` or `denied`) |
+| `approval_expired` | → `approval.resolved` (`expired`) |
+| `approval_revoked` | → `approval.resolved` (`withdrawn`) |
+| `approval_consumed`, `intent`, `outcome`, `grant_created`, `grant_used`, `grant_revoked`, `break_glass`, `break_glass_acked`, `enforcement_changed`, `brake_changed`, `enrollment_changed`, `presence_helper` | → `audit.recorded`, with `action` set to the record kind and `chain_digest` set (O3) |
+| `chain_start`, `file_start`, `chain_break`, `chain_reanchored` | local (integrity of the chain itself); `chain_break` also raises `alert.raised` |
+| Schedule notifications: outbox `failure` / `recovery` | → `alert.raised` / `alert.cleared` |
+| Schedule notifications: `success`, `misfire` | local |
+
+## Tangent
+
+| Today | Outcome |
+|---|---|
+| `interaction.admitted` (approval-class interactions) | → `approval.requested` (O4) |
+| `interaction.resolved` / `interaction.canceled` (approval-class) | → `approval.resolved` (`approved` or `denied` / `withdrawn`) |
+| other telemetry (`interaction.presented`, `interaction.pending`, `interaction.refused`, `presentation.refused`, `connection.*`, `draft.refused`, `delivery.recorded`, `delivery.failed`, `capability.denied`, `readiness.changed`, `renderer.unavailable`) | local (closed telemetry set) |
+| durable `surface_events`, `interaction_events`, `delivery_events` | local |
+| WebSocket frames (`connection`, `envelope`, `sync`, `ui.command`, `error`) | local (transport) |
+
+Tangent has no SSE event stream today, so O4 adds the typed v1.1 stream.
+
+## Not confirmed
+
+- Emit sites for the Torque and Tesseract plugin-catalog constants.
+- Whether the Tesseract event domain writes `event.*` revision audits.
+- Exact line numbers for Cerberus `enrollment_changed` and `presence_helper`.
