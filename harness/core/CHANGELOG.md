@@ -8,6 +8,20 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `eventstage`: the ordered stage chain for the event stream (contract D4
+  rev 2, CW-20261016-0145). `Stage[E]{Name(); Apply(ctx, *E) (Outcome, error)}`
+  mutates in place; `Chain[E]` runs Stamp, Sanitize, Classify in a fixed order,
+  contains panics, fails Sanitize closed (payload replaced by
+  `{"sanitize_error":"<class>"}`, `class.sanitized=false`, envelope still
+  emitted) and runs Classify only after Sanitize completed. Sanitize adapters
+  for `runtimeevents.Event` and `mesh.Event` call a `PayloadSanitizer` (the
+  payload API of the shared redaction engine) and set `class.sanitized`,
+  `redactions`, `sensitivity` and `pii`; `ModeVerifyAndScrub` is the hub
+  backstop. Classify evaluates a versioned, self-testing rule document
+  (`eventstage.rules/v1`) that can set only category, severity and labels.
+
 ## v0.11.0 — 2026-10-16
 
 ### Added
