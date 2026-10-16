@@ -1,12 +1,21 @@
 # Changelog
 
-All notable changes to the `agent` module are documented here. The format follows
+All notable changes to the `agent` module are documented here (the module was `agent` in the substrate repository). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`agent/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`agent/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-10-16
+
+### Changed (breaking)
+
+- Module path is now `github.com/hollis-labs/libs/agent/core` (was `github.com/hollis-labs/substrate/agent`); the substrate path and its `agent/vX.Y.Z` tags no longer exist. Tags are `agent/core/vX.Y.Z`. Entries below keep the former package names.
+- `agentcontext` (with `resolvers` and `skills`) is no longer part of this module: it moved down to `github.com/hollis-labs/libs/harness/core/agentcontext`, because the harness is a layer of its own below the agent and its launch engine builds on it. Import it from there.
+- The permission contract is `github.com/hollis-labs/libs/security/policy/permission` (was `harness/interception/permission`); `approval` and the embed example import it from there.
+- Requires `llm/core` v0.2.0, `mesh/core` v0.4.0, `security/policy` v0.1.0 and `ui/ui-go` v0.1.0 (were the substrate `llm-core`, `mesh` and `harness` modules and `libs/ui-go`). The module no longer depends on the harness.
 
 ## [0.3.0] — 2026-10-09
 

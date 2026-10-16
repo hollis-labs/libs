@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 	"github.com/hollis-labs/libs/agent/core/service"
+	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 )
 
 type output struct {
