@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.13.0 — 2026-10-16
+
 ### Changed
 
 - `eventstage`: the Sanitize adapters recognise a retention tombstone
