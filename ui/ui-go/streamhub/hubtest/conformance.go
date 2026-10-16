@@ -17,6 +17,10 @@ type Factory struct {
 	// process restart. It may close l. Leave it nil for a backend with no
 	// persistence to skip the reopen case (MemoryLog returns l itself).
 	Reopen func(t *testing.T, l streamhub.Log) streamhub.Log
+	// Idempotent says the backend implements Event.ID deduplication
+	// (ErrEventIDConflict). Leave it false to skip those cases. Epoch cases
+	// run when the backend reports a non-empty Head.Epoch, and need no flag.
+	Idempotent bool
 }
 
 func (f Factory) newLog(t *testing.T) streamhub.Log {
@@ -136,6 +140,7 @@ func Conformance(t *testing.T, f Factory) {
 	t.Run("UnknownStreamIsEmpty", func(t *testing.T) {
 		l := f.newLog(t)
 		h, err := l.Head(ctx, "nope")
+		h.Epoch = "" // the log's epoch is reported even for an unknown stream
 		if err != nil || h != (streamhub.Head{}) {
 			t.Fatalf("Head = %+v, %v", h, err)
 		}
@@ -176,6 +181,151 @@ func Conformance(t *testing.T, f Factory) {
 		r, _ := l.Append(ctx, "s", streamhub.Event{})
 		if r.Seq != 11 {
 			t.Fatalf("Seq after trim = %d, want 11", r.Seq)
+		}
+	})
+
+	t.Run("EventIDIsIdempotent", func(t *testing.T) {
+		if !f.Idempotent {
+			t.Skip("backend does not declare Idempotent")
+		}
+		l := f.newLog(t)
+		first, err := l.Append(ctx, "s", streamhub.Event{ID: "evt_1", Name: "k", Data: []byte("a")})
+		if err != nil || first.ID != "evt_1" {
+			t.Fatalf("first = %+v, %v", first, err)
+		}
+		again, err := l.Append(ctx, "s", streamhub.Event{ID: "evt_1", Name: "k", Data: []byte("a")})
+		if err != nil {
+			t.Fatalf("duplicate Append: %v", err)
+		}
+		if again.Seq != first.Seq || again.ID != "evt_1" || string(again.Data) != "a" {
+			t.Fatalf("duplicate returned %+v, want the stored %+v", again, first)
+		}
+		next, _ := l.Append(ctx, "s", streamhub.Event{ID: "evt_2"})
+		if next.Seq != first.Seq+1 {
+			t.Fatalf("Seq after duplicate = %d, want %d (a duplicate must not consume a cursor)", next.Seq, first.Seq+1)
+		}
+		if h, _ := l.Head(ctx, "s"); h.Latest != 2 {
+			t.Fatalf("head = %+v, want Latest 2", h)
+		}
+		got, _ := after(l, "s", 0)
+		wantSeqs(t, got, 1, 2)
+	})
+
+	t.Run("EventIDConflict", func(t *testing.T) {
+		if !f.Idempotent {
+			t.Skip("backend does not declare Idempotent")
+		}
+		l := f.newLog(t)
+		if _, err := l.Append(ctx, "s", streamhub.Event{ID: "evt_1", Name: "k", Data: []byte("a")}); err != nil {
+			t.Fatal(err)
+		}
+		for name, e := range map[string]streamhub.Event{
+			"data": {ID: "evt_1", Name: "k", Data: []byte("b")},
+			"name": {ID: "evt_1", Name: "other", Data: []byte("a")},
+		} {
+			if _, err := l.Append(ctx, "s", e); !errors.Is(err, streamhub.ErrEventIDConflict) {
+				t.Fatalf("%s: Append err = %v, want ErrEventIDConflict", name, err)
+			}
+		}
+		// Ids are unique within the log, not per stream.
+		if _, err := l.Append(ctx, "other", streamhub.Event{ID: "evt_1", Name: "k", Data: []byte("a")}); !errors.Is(err, streamhub.ErrEventIDConflict) {
+			t.Fatalf("other stream: Append err = %v, want ErrEventIDConflict", err)
+		}
+		if h, _ := l.Head(ctx, "s"); h.Latest != 1 {
+			t.Fatalf("head = %+v, want Latest 1: a conflict must not append", h)
+		}
+	})
+
+	t.Run("EventIDEmptyIsNotDeduplicated", func(t *testing.T) {
+		if !f.Idempotent {
+			t.Skip("backend does not declare Idempotent")
+		}
+		l := f.newLog(t)
+		appendN(t, l, "s", 3)
+		if h, _ := l.Head(ctx, "s"); h.Latest != 3 {
+			t.Fatalf("head = %+v", h)
+		}
+	})
+
+	t.Run("EpochIsStableAndIdentifiesTheLog", func(t *testing.T) {
+		l := f.newLog(t)
+		r, _ := l.Append(ctx, "s", streamhub.Event{})
+		h, _ := l.Head(ctx, "s")
+		if h.Epoch == "" {
+			t.Skip("log has no epoch")
+		}
+		if r.Epoch != h.Epoch {
+			t.Fatalf("epoch: record %q, head %q; want equal and non-empty", r.Epoch, h.Epoch)
+		}
+		if hu, _ := l.Head(ctx, "unknown"); hu.Epoch != h.Epoch {
+			t.Fatalf("unknown-stream epoch %q, want %q", hu.Epoch, h.Epoch)
+		}
+		other := f.newLog(t)
+		if ho, _ := other.Head(ctx, "s"); ho.Epoch == h.Epoch {
+			t.Fatalf("two fresh logs share epoch %q", h.Epoch)
+		}
+	})
+
+	t.Run("EpochChangedGap", func(t *testing.T) {
+		l := f.newLog(t)
+		er, ok := l.(streamhub.EpochReader)
+		if !ok {
+			t.Skip("log does not implement EpochReader")
+		}
+		if h, _ := l.Head(ctx, "s"); h.Epoch == "" {
+			t.Skip("log has no epoch")
+		}
+		appendN(t, l, "s", 5)
+		h, _ := l.Head(ctx, "s")
+		// Matching or empty epoch reads normally.
+		for _, e := range []string{h.Epoch, ""} {
+			n := 0
+			for _, err := range er.AfterEpoch(ctx, "s", e, 2) {
+				if err != nil {
+					t.Fatalf("AfterEpoch(%q): %v", e, err)
+				}
+				n++
+			}
+			if n != 3 {
+				t.Fatalf("AfterEpoch(%q) read %d records, want 3", e, n)
+			}
+		}
+		// A different epoch yields one epoch_changed gap and no records.
+		n := 0
+		var gerr error
+		for _, err := range er.AfterEpoch(ctx, "s", "some-other-log", 2) {
+			if err != nil {
+				gerr = err
+				break
+			}
+			n++
+		}
+		var ge *streamhub.GapError
+		if n != 0 || !errors.As(gerr, &ge) || !errors.Is(gerr, streamhub.ErrGap) {
+			t.Fatalf("AfterEpoch(other) = %d records, %v; want ErrGap", n, gerr)
+		}
+		if g := ge.Gap; g.Reason != streamhub.GapEpochChanged || g.OldestAvailable != 1 || g.Latest != 5 || g.Epoch != h.Epoch {
+			t.Fatalf("gap = %+v", g)
+		}
+	})
+
+	t.Run("GapsCarryEpochAndPositions", func(t *testing.T) {
+		l := f.newLog(t)
+		if h, _ := l.Head(ctx, "s"); h.Epoch == "" {
+			t.Skip("log has no epoch")
+		}
+		appendN(t, l, "s", 6)
+		_ = l.Trim(ctx, "s", streamhub.Retention{MaxRecords: 2})
+		h, _ := l.Head(ctx, "s")
+		for _, c := range []streamhub.Seq{1, 20} {
+			_, err := after(l, "s", c)
+			var ge *streamhub.GapError
+			if !errors.As(err, &ge) {
+				t.Fatalf("After(%d) err = %v", c, err)
+			}
+			if g := ge.Gap; g.Epoch != h.Epoch || g.OldestAvailable != 5 || g.Latest != 6 {
+				t.Fatalf("After(%d) gap = %+v, want epoch %q, oldest 5, latest 6", c, g, h.Epoch)
+			}
 		}
 	})
 

@@ -1,7 +1,10 @@
 package streamhub
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"iter"
 	"sync"
 	"time"
@@ -45,9 +48,17 @@ type MemoryLog struct {
 	now       func() time.Time
 	retention Retention
 
+	epoch string
+
 	mu      sync.Mutex
 	streams map[string]*memStream
+	ids     map[string]idRef // Event.ID -> where it is stored
 	closed  bool
+}
+
+type idRef struct {
+	stream string
+	seq    Seq
 }
 
 type memStream struct {
@@ -60,6 +71,7 @@ type memStream struct {
 
 var _ Log = (*MemoryLog)(nil)
 var _ Forgetter = (*MemoryLog)(nil)
+var _ EpochReader = (*MemoryLog)(nil)
 
 // NewMemoryLog returns an empty in-memory log.
 func NewMemoryLog(o ...MemoryOption) *MemoryLog {
@@ -67,10 +79,14 @@ func NewMemoryLog(o ...MemoryOption) *MemoryLog {
 		pageSize: Seq(defaultPageSize),
 		now:      time.Now,
 		streams:  make(map[string]*memStream),
+		ids:      make(map[string]idRef),
 	}
 	for _, f := range o {
 		f(l)
 	}
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	l.epoch = hex.EncodeToString(b[:])
 	return l
 }
 
@@ -90,13 +106,28 @@ func (l *MemoryLog) Append(ctx context.Context, stream string, e Event) (Record,
 	if l.closed {
 		return Record{}, ErrClosed
 	}
+	if e.ID != "" {
+		if ref, ok := l.ids[e.ID]; ok {
+			if ref.stream == stream {
+				if ms := l.streams[stream]; ms != nil && ref.seq > ms.pruned {
+					if old := ms.recs[ref.seq-ms.pruned-1]; old.Name == e.Name && bytes.Equal(old.Data, data) {
+						return old, nil
+					}
+				}
+			}
+			return Record{}, ErrEventIDConflict
+		}
+	}
 	ms := l.streams[stream]
 	if ms == nil {
 		ms = &memStream{}
 		l.streams[stream] = ms
 	}
 	ms.latest++
-	rec := Record{Seq: ms.latest, Name: e.Name, Data: data, At: l.now()}
+	rec := Record{Seq: ms.latest, Name: e.Name, Data: data, At: l.now(), ID: e.ID, Epoch: l.epoch}
+	if e.ID != "" {
+		l.ids[e.ID] = idRef{stream: stream, seq: rec.Seq}
+	}
 	ms.recs = append(ms.recs, rec)
 	ms.bytes += recSize(e)
 	if !l.retention.isZero() {
@@ -107,9 +138,27 @@ func (l *MemoryLog) Append(ctx context.Context, stream string, e Event) (Record,
 
 // After implements [Log].
 func (l *MemoryLog) After(ctx context.Context, stream string, after Seq) iter.Seq2[Record, error] {
+	return l.AfterEpoch(ctx, stream, "", after)
+}
+
+// AfterEpoch implements [EpochReader].
+func (l *MemoryLog) AfterEpoch(ctx context.Context, stream, epoch string, after Seq) iter.Seq2[Record, error] {
 	return func(yield func(Record, error) bool) {
 		cursor := after
 		for {
+			if epoch != "" && epoch != l.epoch {
+				l.mu.Lock()
+				var latest, pruned Seq
+				if ms := l.streams[stream]; ms != nil {
+					latest, pruned = ms.latest, ms.pruned
+				}
+				l.mu.Unlock()
+				yield(Record{}, &GapError{Gap: Gap{
+					Reason: GapEpochChanged, Requested: cursor,
+					OldestAvailable: pruned + 1, Latest: latest, Epoch: l.epoch,
+				}})
+				return
+			}
 			page, err := l.page(ctx, stream, cursor)
 			if err != nil {
 				yield(Record{}, err)
@@ -147,13 +196,13 @@ func (l *MemoryLog) page(ctx context.Context, stream string, cursor Seq) ([]Reco
 		return nil, &GapError{Gap: Gap{
 			Reason: GapCursorAhead, Requested: cursor,
 			OldestAvailable: ms.pruned + 1, Latest: ms.latest,
-			Missed: uint64(cursor - ms.latest),
+			Missed: uint64(cursor - ms.latest), Epoch: l.epoch,
 		}}
 	case cursor < ms.pruned:
 		return nil, &GapError{Gap: Gap{
 			Reason: GapRetention, Requested: cursor,
 			OldestAvailable: ms.pruned + 1, Latest: ms.latest,
-			Missed: uint64(ms.pruned - cursor),
+			Missed: uint64(ms.pruned - cursor), Epoch: l.epoch,
 		}}
 	}
 	// Slice indices may be any integer type; cursor is in [pruned, latest],
@@ -175,9 +224,9 @@ func (l *MemoryLog) Head(ctx context.Context, stream string) (Head, error) {
 	}
 	ms := l.streams[stream]
 	if ms == nil {
-		return Head{}, nil
+		return Head{Epoch: l.epoch}, nil
 	}
-	return Head{Latest: ms.latest, PrunedThrough: ms.pruned, Dropped: ms.dropped}, nil
+	return Head{Latest: ms.latest, PrunedThrough: ms.pruned, Dropped: ms.dropped, Epoch: l.epoch}, nil
 }
 
 // Trim implements [Log].
@@ -223,6 +272,9 @@ func (l *MemoryLog) trimLocked(ms *memStream, r Retention) {
 	}
 	for i := range cut {
 		ms.bytes -= len(ms.recs[i].Name) + len(ms.recs[i].Data)
+		if id := ms.recs[i].ID; id != "" {
+			delete(l.ids, id)
+		}
 	}
 	clear(ms.recs[:cut])
 	ms.recs = ms.recs[cut:]
@@ -234,6 +286,13 @@ func (l *MemoryLog) trimLocked(ms *memStream, r Retention) {
 func (l *MemoryLog) Forget(_ context.Context, stream string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if ms := l.streams[stream]; ms != nil {
+		for _, r := range ms.recs {
+			if r.ID != "" {
+				delete(l.ids, r.ID)
+			}
+		}
+	}
 	delete(l.streams, stream)
 	return nil
 }
@@ -244,5 +303,6 @@ func (l *MemoryLog) Close() error {
 	defer l.mu.Unlock()
 	l.closed = true
 	l.streams = make(map[string]*memStream)
+	l.ids = make(map[string]idRef)
 	return nil
 }

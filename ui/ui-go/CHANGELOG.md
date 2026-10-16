@@ -8,6 +8,11 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+### Added
+
+- `streamhub`: `Event.ID`, an optional idempotency key. Appending the same ID with the same content returns the stored record and consumes no cursor; different content fails with `ErrEventIDConflict`. `Record.ID` echoes it.
+- `streamhub`: `Head.Epoch`, `Record.Epoch` and `Gap.Epoch`: the identity of the log that assigned the cursors (not a producer restart counter), the optional `EpochReader` interface, and `GapEpochChanged` for a reader whose remembered epoch is not the log's. `MemoryLog` implements all of it; `hubtest.Conformance` covers it.
+
 ## v0.1.0 — 2026-10-03
 
 - Module path is now `github.com/hollis-labs/libs/ui/ui-go` (was `github.com/hollis-labs/libs/ui-go`); the previous path and its `ui-go/vX.Y.Z` tags no longer exist. Tags are `ui/ui-go/vX.Y.Z`. No code change besides the path.

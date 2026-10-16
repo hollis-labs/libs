@@ -124,7 +124,7 @@ func TestMemoryLog_ForgetAndClose(t *testing.T) {
 	if err := l.Forget(ctx, "s"); err != nil {
 		t.Fatal(err)
 	}
-	if h, _ := l.Head(ctx, "s"); h != (streamhub.Head{}) {
+	if h, _ := l.Head(ctx, "s"); (h != streamhub.Head{Epoch: h.Epoch}) || h.Epoch == "" {
 		t.Fatalf("head after Forget = %+v", h)
 	}
 	if err := l.Close(); err != nil {
