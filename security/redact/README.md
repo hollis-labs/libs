@@ -269,3 +269,12 @@ processes and load averages above its CPU count: these results **do not establis
 the quiet-host release gate**, and not every CPU median is below 200 µs. Repeat
 the documented CPU-sample and wall-sample commands on a quiet host before
 accepting that gate. The earlier v0.2.0 waiver is not extended to this change.
+
+A later lower-load window with 76–79% sampled CPU idle measured CPU medians
+99–100 µs and wall p99 193–203 µs. A subsequent repeat measured CPU medians
+125–194 µs and wall p99 318–442 µs; PII Text medians of run means were 54.46 µs
+for ordinary prose and 111.76 µs for mixed PII, with the same allocation counts.
+Both repeats met the numeric fallback thresholds, but competing tests resumed
+and sampled idle varied from 31–68%. Keep the distinction between these observed
+passing samples and a controlled quiet-host acceptance run; that acceptance
+remains pending.
