@@ -1,0 +1,203 @@
+package retention_test
+
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/hollis-labs/libs/ui/ui-go/streamhub/retention"
+)
+
+func mustResolve(t *testing.T, c retention.Config) *retention.Policy {
+	t.Helper()
+	p, err := c.Resolve()
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	return p
+}
+
+func TestDurationRoundTrip(t *testing.T) {
+	for in, want := range map[string]retention.Duration{
+		"0": 0, "forever": 0, "": 0, "36h": retention.D(36 * time.Hour), "180d": retention.D(180 * retention.Day),
+		"2y": retention.D(2 * retention.Year), "3w": retention.D(3 * retention.Week), "90m": retention.D(90 * time.Minute),
+	} {
+		got, err := retention.ParseDuration(in)
+		if err != nil || got != want {
+			t.Errorf("ParseDuration(%q) = %v, %v; want %v", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"-1d", "d", "1.5d", "10x", "abc"} {
+		if _, err := retention.ParseDuration(bad); err == nil {
+			t.Errorf("ParseDuration(%q) succeeded", bad)
+		}
+	}
+	b, _ := json.Marshal(retention.D(180 * retention.Day))
+	if string(b) != `"180d"` {
+		t.Errorf("Marshal = %s", b)
+	}
+	var d retention.Duration
+	if err := json.Unmarshal([]byte(`30`), &d); err == nil {
+		t.Error("a bare number must be rejected: its unit is a guess")
+	}
+}
+
+func TestDefaultsAreTheD7Table(t *testing.T) {
+	p := mustResolve(t, retention.Config{})
+	if len(p.Warnings) != 0 {
+		t.Fatalf("defaults warn: %v", p.Warnings)
+	}
+	cases := []struct {
+		class         string
+		full, env     retention.Duration
+		rollups       int
+		firstKeep, d0 retention.Duration
+	}{
+		{retention.ClassAudit, 0, 0, 1, 0, 0},
+		{retention.ClassState, retention.D(180 * retention.Day), retention.D(2 * retention.Year), 2, retention.D(2 * retention.Year), 0},
+		{retention.ClassActivity, retention.D(30 * retention.Day), retention.D(180 * retention.Day), 2, retention.D(2 * retention.Year), 0},
+		{retention.ClassDebug, retention.D(7 * retention.Day), retention.D(7 * retention.Day), 1, retention.D(90 * retention.Day), 0},
+	}
+	for _, c := range cases {
+		got := p.Classes[c.class]
+		if got.Full != c.full || got.Envelope != c.env || len(got.Rollups) != c.rollups {
+			t.Errorf("%s = %+v", c.class, got)
+		}
+	}
+	if p.PIIMax != retention.D(30*retention.Day) {
+		t.Errorf("pii max = %v", p.PIIMax)
+	}
+}
+
+func TestConfigMergesOverDefaultsAndShorteningIsFree(t *testing.T) {
+	var c retention.Config
+	if err := json.Unmarshal([]byte(`{"classes":{"R-activity":{"full":"3d","envelope":"30d","rollups":[{"bucket":"1d","keep":"1y"}]}}}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	p := mustResolve(t, c)
+	if a := p.Classes[retention.ClassActivity]; a.Full != retention.D(3*retention.Day) || len(a.Rollups) != 1 {
+		t.Fatalf("activity = %+v", a)
+	}
+	if s := p.Classes[retention.ClassState]; s.Full != retention.D(180*retention.Day) {
+		t.Fatalf("an unmentioned class lost its default: %+v", s)
+	}
+}
+
+func TestGuardedChangesNeedAcknowledge(t *testing.T) {
+	long := retention.D(90 * retention.Day)
+	short := retention.ClassPolicy{Full: retention.D(30 * retention.Day)}
+	for name, c := range map[string]retention.Config{
+		"pii cap lengthened": {Overrides: &retention.Overrides{PII: retention.PIIOverride{PayloadMax: &long}}},
+		"pii cap forever":    {Overrides: &retention.Overrides{PII: retention.PIIOverride{PayloadMax: new(retention.Duration)}}},
+		"audit full < 400d":  {Classes: map[string]retention.ClassPolicy{retention.ClassAudit: short}},
+	} {
+		if _, err := c.Resolve(); !errors.Is(err, retention.ErrInvalid) || !strings.Contains(err.Error(), "acknowledge") {
+			t.Errorf("%s: err = %v, want a refusal that names acknowledge", name, err)
+		}
+		c.Acknowledge = true
+		p, err := c.Resolve()
+		if err != nil || len(p.Warnings) != 1 {
+			t.Errorf("%s acknowledged: %v, warnings %v; want one warning", name, err, p)
+		}
+	}
+	// Shortening needs nothing.
+	sh := retention.D(7 * retention.Day)
+	if _, err := (retention.Config{Overrides: &retention.Overrides{PII: retention.PIIOverride{PayloadMax: &sh}}}).Resolve(); err != nil {
+		t.Errorf("shortening the pii cap: %v", err)
+	}
+}
+
+func TestSecretPayloadsAreRejectedEvenAcknowledged(t *testing.T) {
+	c := retention.Config{Acknowledge: true, Overrides: &retention.Overrides{StoreSecretPayloads: true}}
+	if _, err := c.Resolve(); !errors.Is(err, retention.ErrInvalid) {
+		t.Fatalf("err = %v, want ErrInvalid", err)
+	}
+}
+
+func TestStructuralValidation(t *testing.T) {
+	for name, cp := range map[string]retention.ClassPolicy{
+		"envelope before full": {Full: retention.D(30 * retention.Day), Envelope: retention.D(7 * retention.Day)},
+		"zero bucket":          {Full: retention.D(retention.Day), Rollups: []retention.Rollup{{Bucket: 0, Keep: retention.D(retention.Day)}}},
+		"duplicate bucket": {Full: retention.D(retention.Day), Rollups: []retention.Rollup{
+			{Bucket: retention.D(time.Hour)}, {Bucket: retention.D(time.Hour)}}},
+	} {
+		c := retention.Config{Classes: map[string]retention.ClassPolicy{retention.ClassState: cp}}
+		if _, err := c.Resolve(); !errors.Is(err, retention.ErrInvalid) {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
+
+func TestClassOf(t *testing.T) {
+	p := mustResolve(t, retention.Config{})
+	for a, want := range map[retention.Attrs]string{
+		{Category: "audit"}:                      retention.ClassAudit,
+		{Category: "approval"}:                   retention.ClassAudit,
+		{Category: "state"}:                      retention.ClassState,
+		{Category: "message"}:                    retention.ClassState,
+		{Category: "tool"}:                       retention.ClassActivity,
+		{Category: "progress"}:                   retention.ClassActivity,
+		{Category: ""}:                           retention.ClassActivity,
+		{Category: "mystery"}:                    retention.ClassActivity,
+		{Category: "state", Severity: "debug"}:   retention.ClassDebug, // 7d beats 180d
+		{Category: "tool", Severity: "debug"}:    retention.ClassDebug,
+		{Category: "state", Severity: "warning"}: retention.ClassState,
+	} {
+		if got := p.ClassOf(a); got != want {
+			t.Errorf("ClassOf(%+v) = %s, want %s", a, got, want)
+		}
+	}
+}
+
+// Open question for the architect (see the PR): by the literal "most
+// restrictive wins" rule a debug-severity audit event is R-debug. This test
+// pins the current behaviour so a change is deliberate.
+func TestDebugAuditEventFollowsTheLiteralRule(t *testing.T) {
+	p := mustResolve(t, retention.Config{})
+	if got := p.ClassOf(retention.Attrs{Category: "audit", Severity: "debug"}); got != retention.ClassDebug {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestTierAt(t *testing.T) {
+	p := mustResolve(t, retention.Config{})
+	act := retention.Attrs{Category: "tool"}
+	for age, want := range map[time.Duration]retention.Tier{
+		0:                   retention.TierFull,
+		29 * retention.Day:  retention.TierFull,
+		30 * retention.Day:  retention.TierEnvelope,
+		179 * retention.Day: retention.TierEnvelope,
+		180 * retention.Day: retention.TierTrimmed,
+		10 * retention.Year: retention.TierTrimmed,
+	} {
+		if got := p.TierAt(act, age); got != want {
+			t.Errorf("activity at %v = %v, want %v", age, got, want)
+		}
+	}
+	// Audit never leaves the full tier.
+	if got := p.TierAt(retention.Attrs{Category: "audit"}, 50*retention.Year); got != retention.TierFull {
+		t.Errorf("audit at 50y = %v", got)
+	}
+	// Debug goes straight from whole to trimmed: no envelope tier.
+	dbg := retention.Attrs{Category: "tool", Severity: "debug"}
+	if got := p.TierAt(dbg, 7*retention.Day); got != retention.TierTrimmed {
+		t.Errorf("debug at 7d = %v", got)
+	}
+	// Pii caps the payload: a state event is tombstoned at 30d, not 180d, and its envelope follows the class.
+	pii := retention.Attrs{Category: "state", PII: true}
+	if got := p.TierAt(pii, 31*retention.Day); got != retention.TierEnvelope {
+		t.Errorf("pii state at 31d = %v", got)
+	}
+	if got := p.PayloadMax(pii); got != retention.D(30*retention.Day) {
+		t.Errorf("pii payload max = %v", got)
+	}
+	if got := p.PayloadMax(retention.Attrs{Category: "state"}); got != retention.D(180*retention.Day) {
+		t.Errorf("state payload max = %v", got)
+	}
+	// A pii audit event gets a tombstoned payload even though its class is forever.
+	if got := p.TierAt(retention.Attrs{Category: "audit", PII: true}, 31*retention.Day); got != retention.TierEnvelope {
+		t.Errorf("pii audit at 31d = %v", got)
+	}
+}
