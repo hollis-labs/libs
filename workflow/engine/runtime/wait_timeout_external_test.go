@@ -110,7 +110,7 @@ func TestTimeoutWaitBoundaryAtomicOutcomeAndUTCReplay(t *testing.T) {
 	}
 
 	handlerID := invocationID(fixture.invocation.RunID, "timeout-handler")
-	createNode(t, fixture.store, handlerID, workflowruntime.NodePending, 0, request.Now)
+	createBoundNode(t, fixture.store, handlerID, workflowruntime.NodePending, 0, request.Now)
 	handled, err := workflowruntime.NewProgressionCoordinator(fixture.store, nil).ProgressNode(ctx, workflowruntime.ProgressNodeRequest{
 		InvocationID: handlerID, Rule: graph.ReadyOneFailed,
 		Dependencies: []workflowruntime.DependencyRef{{InvocationID: fixture.invocation}},
@@ -296,7 +296,7 @@ func prepareWaitingWait(t *testing.T, suffix string, base time.Time) waitTimeout
 	store := inmemory.NewStore()
 	invocation := invocationID(workflowruntime.RunID("run-timeout-"+suffix), "wait-node")
 	waitID := workflowruntime.WaitID("wait-" + suffix)
-	createNode(t, store, invocation, workflowruntime.NodeReady, 0, base)
+	createBoundNode(t, store, invocation, workflowruntime.NodeReady, 0, base)
 	claim := claimNode(t, store, invocation, 0, "timeout-worker", "timeout-token-"+suffix,
 		"timeout-claim-"+suffix, base.Add(time.Second), base.Add(time.Hour))
 	claimed, err := store.LoadNodeInvocation(ctx, invocation)

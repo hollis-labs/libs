@@ -301,8 +301,15 @@ func newControlFlowFixtureStore(ctx context.Context, suffix string) (*inmemory.S
 }
 
 func createControlNode(ctx context.Context, store *inmemory.Store, runID workflowruntime.RunID, nodeID string, at time.Time) error {
-	_, err := store.CreateNodeInvocation(ctx, workflowruntime.CreateNodeInvocationRequest{Snapshot: workflowruntime.NodeInvocationSnapshot{
-		ID: workflowruntime.NodeInvocationID{RunID: runID, NodeID: nodeID}, Status: workflowruntime.NodePending, CreatedAt: at, UpdatedAt: at,
+	id := workflowruntime.NodeInvocationID{RunID: runID, NodeID: nodeID}
+	// These fixtures test control flow with no plan inputs. Persist that empty
+	// input set explicitly before exercising readiness.
+	inputs, err := store.SaveValues(ctx, workflowruntime.SaveValuesRequest{Owner: workflowruntime.ValueOwner{Kind: "node-inputs", RunID: runID, Invocation: &id}, Values: values.ValueSet{}})
+	if err != nil {
+		return err
+	}
+	_, err = store.CreateNodeInvocation(ctx, workflowruntime.CreateNodeInvocationRequest{Snapshot: workflowruntime.NodeInvocationSnapshot{
+		ID: id, Inputs: &inputs, Status: workflowruntime.NodePending, CreatedAt: at, UpdatedAt: at,
 	}})
 	return err
 }

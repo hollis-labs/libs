@@ -342,12 +342,26 @@ func (d *StepDispatcher) Dispatch(ctx context.Context, request DispatchRequest) 
 		prestart.compensation = &dispatchCompensation{planDigest: run.Plan.Digest, handler: request.Node.Compensation.Handler, evidence: evidence}
 	}
 
-	inputs := values.ValueSet{}
-	if node.Inputs != nil {
-		inputs, err = d.store.LoadValues(ctx, *node.Inputs)
-		if err != nil {
-			return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, err))
+	if node.Inputs == nil {
+		// A legacy invalid Ready record must not be released back into the
+		// ready queue. Fence it into the existing unclaimable Blocked state
+		// and clear its lease atomically; the driver can then bind it normally.
+		// A separate release would strand the blocked node if the worker crashes.
+		blocked, blockErr := d.store.TransitionNode(durableCtx, NodeTransitionRequest{
+			InvocationID: node.ID, ExpectedGeneration: node.Generation, To: NodeBlocked,
+			Blocked: &BlockedReason{Code: "inputs_unbound", Message: "node inputs require durable binding"},
+			Claim:   &ClaimProof{Owner: request.Claim.Lease.Owner, Token: request.Claim.Lease.Token, Generation: request.Claim.Lease.Generation},
+			At:      d.atOrAfter(node.UpdatedAt),
+		})
+		if blockErr != nil {
+			return prestart, dispatchError(DispatchValidateInput, request, errors.Join(ErrInputsUnbound, blockErr))
 		}
+		prestart.Node = blocked.Snapshot
+		return prestart, dispatchError(DispatchValidateInput, request, ErrInputsUnbound)
+	}
+	inputs, err := d.store.LoadValues(ctx, *node.Inputs)
+	if err != nil {
+		return d.releasePrestartClaim(durableCtx, request, prestart, dispatchError(DispatchValidateInput, request, err))
 	}
 	if inputsErr := inputs.Validate(); inputsErr != nil {
 		return d.failCompensationPrestart(durableCtx, request, prestart, DispatchValidateInput, inputsErr)
