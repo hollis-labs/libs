@@ -2,7 +2,9 @@ package redaction
 
 import (
 	"context"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -98,6 +100,44 @@ func TestExporterLeavesOriginalSpansUntouched(t *testing.T) {
 	sp.End()
 	if len(seen) != 1 || len(seen[0].Attributes()) != 1 {
 		t.Fatalf("original span was mutated: %+v", seen)
+	}
+}
+
+func TestExporterPreservesEventAndLinkStorage(t *testing.T) {
+	t.Setenv("HOLLIS_OTEL_REDACT_PROMPTS", "")
+	source := tracetest.SpanStub{
+		Name: marker,
+		Events: []sdktrace.Event{
+			{Name: marker, Attributes: []attribute.KeyValue{attribute.String("detail", marker)}},
+			{Name: "gen_ai.content.prompt", Attributes: []attribute.KeyValue{attribute.String("detail", marker)}},
+		},
+		Links: []sdktrace.Link{{Attributes: []attribute.KeyValue{attribute.String("detail", marker), attribute.String("gen_ai.content.prompt", marker)}}},
+	}.Snapshot()
+	before := tracetest.SpanStubFromReadOnlySpan(source)
+	// Keep independent expected slices: a shallow snapshot would hide mutation.
+	before.Events = append([]sdktrace.Event(nil), before.Events...)
+	before.Links = append([]sdktrace.Link(nil), before.Links...)
+	mem := tracetest.NewInMemoryExporter()
+	exporter := Exporter(mem, WithValueRedactor(func(s string) string { return strings.ReplaceAll(s, marker, "[REDACTED]") }))
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if err := exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{source}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if after := tracetest.SpanStubFromReadOnlySpan(source); !reflect.DeepEqual(before, after) {
+		t.Fatal("redaction mutated the original span events or links")
+	}
+	for _, span := range mem.GetSpans() {
+		if span.Events[0].Name != "[REDACTED]" || span.Events[0].Attributes[0].Value.AsString() != "[REDACTED]" {
+			t.Fatal("exported event was not redacted")
+		}
+		if len(span.Events[1].Attributes) != 0 || len(span.Links[0].Attributes) != 1 || span.Links[0].Attributes[0].Value.AsString() != "[REDACTED]" {
+			t.Fatal("exported event or link retained sensitive attributes")
+		}
 	}
 }
 
