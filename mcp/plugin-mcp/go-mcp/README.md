@@ -19,6 +19,9 @@ module currently exposes:
   response-size cap
 - `transport/http` — exposes a `server.Server` over the official SDK's
   Streamable HTTP transport, in stateless mode, with an origin allowlist
+- `toolmw` — adapts the `core/util/mw` middleware contract to tool handlers: a
+  validated, phase-ordered chain built once per tool, wrapping go-mcp's own tool
+  middleware, with safe error mapping
 - `auth` — a pluggable auth/middleware seam for `transport/http`, with a
   lightweight static-token default provider
 - `compat` — isolated backward-compat adapters for peers that don't speak
