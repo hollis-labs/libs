@@ -237,7 +237,8 @@ PII-shaped literal: the corpus builds them at runtime with `j`.
 
 ### Measured cost
 
-Measured on 2026-10-16, Linux/amd64, Go 1.26.9, Intel i5-11400F. These are
+Measured on 2026-10-16 and 2026-10-17, Linux/amd64, Go 1.26.9, Intel
+i5-11400F (6 cores / 12 logical CPUs). These are
 measurements on a shared development host, not a universal latency guarantee.
 
 For default-path comparison, the new benchmark file was backported to clean
@@ -253,28 +254,35 @@ base `a5fb9319` without enabling PII. Ten alternating before/after runs of
 No default-path regression was observed in these samples; timing ranges overlap.
 The credential-only scan does not construct PII views or run PII finders.
 
-On the final implementation, three runs of
-`go test -run '^$' -bench '^BenchmarkText4KB|^BenchmarkSanitize4KB(CPUSamples)?$'
--benchtime=10000x -cpu=1 -count=3` during competing host tests measured:
+On the final implementation, three runs on 2026-10-17 measured:
 
 | PII on, 4 KiB | Median of run means | Run range | Median allocations |
 |---|---:|---:|---:|
-| Ordinary prose | 117.59 µs | 114.70–118.12 µs | 160 B, 5 allocs |
-| Mixed email/IBAN/SSN/NINO | 227.91 µs | 172.02–262.00 µs | 8,984 B, 17 allocs |
+| Ordinary prose | 45.46 µs | 44.84–46.33 µs | 160 B, 5 allocs |
+| Mixed email/IBAN/SSN/NINO | 98.59 µs | 97.07–99.91 µs | 8,984 B, 17 allocs |
 
-The same run measured Sanitizer **CPU median 187–206 µs**, CPU p99 351–377 µs,
-and **wall p99 317–364 µs**, at 253 allocations per call. Earlier loaded runs
-reached CPU median 213–236 µs and wall p99 968 µs. The host had concurrent test
-processes and load averages above its CPU count: these results **do not establish
-the quiet-host release gate**, and not every CPU median is below 200 µs. Repeat
-the documented CPU-sample and wall-sample commands on a quiet host before
-accepting that gate. The earlier v0.2.0 waiver is not extended to this change.
+Sanitizer measured **CPU median 88–89 µs**, CPU p99 180–185 µs, and
+**wall p99 165–176 µs**, at 253 allocations per call. These pass the requested
+CPU-median <200 µs / quiet-host wall-p99 <1 ms gate. Each percentile is over
+10,000 calls per run; the Text numbers above are medians of three run means,
+not per-call percentiles.
 
-A later lower-load window with 76–79% sampled CPU idle measured CPU medians
-99–100 µs and wall p99 193–203 µs. A subsequent repeat measured CPU medians
-125–194 µs and wall p99 318–442 µs; PII Text medians of run means were 54.46 µs
-for ordinary prose and 111.76 µs for mixed PII, with the same allocation counts.
-Both repeats met the numeric fallback thresholds, but competing tests resumed
-and sampled idle varied from 31–68%. Keep the distinction between these observed
-passing samples and a controlled quiet-host acceptance run; that acceptance
-remains pending.
+The benchmark started after five consecutive one-second samples above 90% host
+CPU idle, with no other test, compiler, linker or scanner jobs observed.
+One-second samples throughout the run observed no such competing jobs and
+84.2–92.3% host idle (median 87.7%), including the benchmark's own CPU use.
+Background services remained running. The test binary was compiled beforehand
+to exclude compilation from that observation window:
+
+```sh
+GOWORK=off go test -c -o /tmp/redact-pii-bench.test
+/tmp/redact-pii-bench.test -test.run='^$' \
+  -test.bench='^BenchmarkText4KB|^BenchmarkSanitize4KB(CPUSamples)?$' \
+  -test.benchtime=10000x -test.cpu=1 -test.count=3
+```
+
+Host conditions matter: earlier competing-test runs reached CPU medians
+213–236 µs and wall p99 968 µs; other loaded runs measured PII Text medians
+117.59 µs (ordinary prose) and 227.91 µs (mixed PII). Those observations are
+not quiet-host acceptance evidence. The passing run above establishes the gate
+for this implementation and host; it does not rely on the v0.2.0 waiver.
