@@ -2,6 +2,7 @@ package redaction
 
 import (
 	"context"
+	"slices"
 
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -95,6 +96,11 @@ func (e *exporter) span(s sdktrace.ReadOnlySpan) sdktrace.ReadOnlySpan {
 	stub.Name = e.str(stub.Name)
 	stub.Attributes = e.attrs(stub.Attributes)
 	stub.Status.Description = e.str(stub.Status.Description)
+	// SpanStubFromReadOnlySpan retains the original slice backing arrays.
+	// Copy their elements before replacing names or attribute slices so other
+	// processors/exporters can keep reading the immutable source span.
+	stub.Events = slices.Clone(stub.Events)
+	stub.Links = slices.Clone(stub.Links)
 	for i := range stub.Events {
 		ev := &stub.Events[i]
 		if e.drop != nil && e.drop(ev.Name) {

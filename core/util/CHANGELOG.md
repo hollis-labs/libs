@@ -8,6 +8,11 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- OTel redaction clones event and link slices before rewriting them, preserving
+  the original read-only span for other processors and concurrent exporters.
+
 ## v0.6.0 — 2026-10-16
 
 ### Added
