@@ -136,11 +136,16 @@ func NewSanitizer(p Policy, opts ...Option) (*Sanitizer, error) {
 		}
 		n.terminal = true
 	}
-	r, err := New(opts...)
+	// Append mandatory policy last, without modifying the caller's option slice.
+	mandatory := append(append([]Option(nil), opts...), func(c *config) error {
+		c.pii = PIIAll
+		c.mandatoryPII = true
+		return nil
+	})
+	r, err := New(mandatory...)
 	if err != nil {
 		return nil, err
 	}
-	r.rules = append(r.rules, piiRules()...)
 	return &Sanitizer{r: r, mode: p.Mode, format: p.Format, maxBytes: p.MaxBytes, sensitivity: p.Sensitivity, paths: root}, nil
 }
 
@@ -299,7 +304,7 @@ func (w *payloadWalk) text(t string) (string, int) {
 	return w.s.r.replaceFindings(t, w.s.r.scan(t, w.classify))
 }
 func (w *payloadWalk) sensitive(key string, v any) bool {
-	if !w.s.r.policy.sensitive(key) {
+	if !w.s.r.sensitiveName(key) {
 		return false
 	}
 	switch t := v.(type) {
@@ -330,7 +335,7 @@ func (w *payloadWalk) inspect(v any, key string) {
 		for _, p := range x {
 			w.text(p.k)
 			if w.sensitive(p.k, p.v) {
-				w.raise(Secret)
+				w.classifyKey(p.k)
 			}
 			w.inspect(p.v, p.k)
 		}
@@ -377,7 +382,7 @@ func (w *payloadWalk) walk(v any, n *pathNode, path string, all bool, key string
 			}
 			if w.sensitive(p.k, p.v) {
 				w.inspect(p.v, p.k)
-				w.raise(Secret)
+				w.classifyKey(p.k)
 				// A denied field is dropped, rather than adding a new allowlisted key.
 				if !all && child(n, p.k) == nil {
 					w.record(fieldPath, 1)
@@ -445,4 +450,13 @@ func unionPath(a, b *pathNode) *pathNode {
 		n.children[k] = unionPath(n.children[k], v)
 	}
 	return n
+}
+
+func (w *payloadWalk) classifyKey(key string) {
+	if w.s.r.piiName(key) {
+		w.classify(RulePIIName)
+	}
+	if w.s.r.policy.sensitive(key) {
+		w.raise(Secret)
+	}
 }

@@ -114,6 +114,10 @@ func (w *redactingWriter) drain(final bool) error {
 			open := f.End > cut || f.End == len(s) || (forced && f.End == cut)
 			if f.Start < cut && open {
 				cut = f.Start
+				if !forced {
+					// Keep the key/quote context of multiline values for the next scan.
+					cut = strings.LastIndexByte(s[:cut], '\n') + 1
+				}
 				changed = true
 			}
 		}

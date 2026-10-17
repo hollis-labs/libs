@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // Marker replaces each redacted value unless [WithMarker] says otherwise. One
@@ -14,14 +16,16 @@ import (
 // components, must still read the same.
 const Marker = "[REDACTED]"
 
-// Redactor removes credential material from text. It is immutable after [New]
+// Redactor removes credential material and, with [WithPII], personal data from text. It is immutable after [New]
 // (except for the values a [Scope] it uses learns later) and safe for concurrent use.
 type Redactor struct {
-	marker string
-	rules  []rule
-	policy *keyPolicy
-	refs   []string // lower-case reference prefixes: "op://"
-	scope  *Scope
+	marker   string
+	rules    []rule
+	policy   *keyPolicy
+	refs     []string // lower-case reference prefixes: "op://"
+	scope    *Scope
+	pii      PIIClass
+	piiRules []rule
 }
 
 // Finding is one redacted range of the original text. It carries no secret.
@@ -45,14 +49,16 @@ type Rule struct {
 type Option func(*config) error
 
 type config struct {
-	marker     string
-	scope      *Scope
-	extra      []rule
-	disabled   map[string]bool
-	refs       []string
-	benign     []string
-	sensitive  []string
-	heuristics bool
+	marker       string
+	scope        *Scope
+	extra        []rule
+	disabled     map[string]bool
+	refs         []string
+	benign       []string
+	sensitive    []string
+	heuristics   bool
+	pii          PIIClass
+	mandatoryPII bool
 }
 
 // WithMarker replaces the default [Marker].
@@ -139,7 +145,7 @@ func New(opts ...Option) (*Redactor, error) {
 			return nil, err
 		}
 	}
-	r := &Redactor{marker: c.marker, scope: c.scope, refs: append(append([]string{}, defaultRefs...), c.refs...)}
+	r := &Redactor{pii: c.pii, marker: c.marker, scope: c.scope, refs: append(append([]string{}, defaultRefs...), c.refs...)}
 	r.policy = &keyPolicy{extraBenign: map[string]bool{}, extraSensitive: map[string]bool{}}
 	for _, n := range c.benign {
 		r.policy.extraBenign[normKey(n)] = true
@@ -156,6 +162,13 @@ func New(opts ...Option) (*Redactor, error) {
 		r.rules = append(r.rules, rule{RuleAWSSecretKey, findAWSSecret})
 	}
 	r.rules = append(r.rules, c.extra...)
+	if c.pii != 0 {
+		for _, rl := range piiRules() {
+			if c.pii&piiRuleClass(rl.name) != 0 && (c.mandatoryPII || !c.disabled[rl.name]) {
+				r.piiRules = append(r.piiRules, rl)
+			}
+		}
+	}
 	return r, nil
 }
 
@@ -213,7 +226,8 @@ func (r *Redactor) replaceFindings(s string, fs []Finding) (string, int) {
 }
 
 // Scan reports what would be redacted in s, without the values. The findings are
-// merged: overlapping or touching ranges are one.
+// merged: overlapping or touching ranges are one, retaining one representative
+// PII rule in preference to a credential rule. Counts are spans, not all rule hits.
 func (r *Redactor) Scan(s string) []Finding {
 	return r.scan(s, nil)
 }
@@ -252,6 +266,21 @@ func (r *Redactor) scanExcept(s string, observe func(string), skip string) []Fin
 		name = RuleScope
 		r.scope.find(v.text, add)
 	}
+	if len(r.piiRules) > 0 {
+		// Reuse the existing view and callback when NFKC would not change it
+		// (including ASCII). Only non-normal PII needs a second offset map.
+		if norm.NFKC.IsNormalString(v.text) {
+			for _, rl := range r.piiRules {
+				if rl.name == skip {
+					continue
+				}
+				name = rl.name
+				rl.find(r, st, add)
+			}
+		} else {
+			raw = r.scanPII(s, raw, observe, skip)
+		}
+	}
 	return merge(raw)
 }
 
@@ -269,6 +298,9 @@ func merge(fs []Finding) []Finding {
 	for _, f := range fs[1:] {
 		last := &out[len(out)-1]
 		if f.Start <= last.End {
+			if isPIIRule(f.Rule) && !isPIIRule(last.Rule) {
+				last.Rule = f.Rule
+			}
 			if f.End > last.End {
 				last.End = f.End
 			}

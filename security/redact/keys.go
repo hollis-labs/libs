@@ -118,6 +118,7 @@ func set(names ...string) map[string]bool {
 
 // keyPolicy decides whether a key names a secret.
 type keyPolicy struct {
+	piiOnly        PIIClass
 	extraSensitive map[string]bool // normalized whole keys
 	extraBenign    map[string]bool
 }
@@ -126,6 +127,9 @@ func normKey(s string) string { return strings.Join(segments(s), "_") }
 
 // sensitive reports whether name holds a secret value.
 func (p *keyPolicy) sensitive(name string) bool {
+	if p != nil && p.piiOnly != 0 {
+		return piiNameClass(name)&p.piiOnly != 0
+	}
 	segs := segments(name)
 	if len(segs) == 0 {
 		return false

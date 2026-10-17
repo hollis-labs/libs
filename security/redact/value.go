@@ -141,3 +141,32 @@ func isTypeName(k string) bool {
 	}
 	return lower && upper
 }
+
+// PII key values may be quoted across lines (for example an address). The
+// credential-only parser keeps its historical line boundary semantics.
+func (r *Redactor) parseKeyValue(t string, i int) (int, int, bool) {
+	if r.policy.piiOnly == 0 || i >= len(t) {
+		return parseValue(t, i)
+	}
+	if strings.HasPrefix(t[i:], `\"`) {
+		if n := strings.Index(t[i+2:], `\"`); n >= 0 {
+			return i + 2, i + 2 + n, n > 0
+		}
+		return i + 2, len(t), len(t) > i+2
+	}
+	if t[i] != '"' && t[i] != '\'' {
+		return parseValue(t, i)
+	}
+	end := i + 1
+	for end < len(t) {
+		if t[end] == '\\' && end+1 < len(t) {
+			end += 2
+			continue
+		}
+		if t[end] == t[i] {
+			break
+		}
+		end++
+	}
+	return i + 1, end, end > i+1
+}

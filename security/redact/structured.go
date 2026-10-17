@@ -114,7 +114,7 @@ func (r *Redactor) readValue(dec *json.Decoder) (any, error) {
 // redactField replaces the value of a sensitive key. Booleans and null carry no
 // secret and stay; everything else, including a whole object, becomes the marker.
 func (r *Redactor) redactField(key string, val any) any {
-	if !r.policy.sensitive(key) {
+	if !r.sensitiveName(key) {
 		return val
 	}
 	switch val.(type) {
@@ -215,7 +215,7 @@ func (r *Redactor) Args(args []string) []string {
 			switch {
 			case hasNext && (cmd == "curl" || cmd == "wget") && (a == "-u" || a == "--user" || a == "--proxy-user"):
 				next = userPassNext
-			case hasNext && (r.policy.sensitive(name) || (cmd == "sshpass" && a == "-p")):
+			case hasNext && (r.sensitiveName(name) || (cmd == "sshpass" && a == "-p")):
 				next = wholeNext
 			}
 		}
@@ -232,7 +232,7 @@ func (r *Redactor) Env(environ []string) []string {
 		switch {
 		case !ok:
 			out[i] = r.Text(kv)
-		case r.policy.sensitive(name) && !r.isPlaceholder(val):
+		case r.sensitiveName(name) && !r.isPlaceholder(val):
 			out[i] = name + "=" + r.marker
 		default:
 			out[i] = name + "=" + r.Text(val)

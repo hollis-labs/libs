@@ -1,0 +1,97 @@
+package redact
+
+// BBAN shapes from SWIFT's ISO 13616 registry, release 103 (September 2026).
+// https://www.swift.com/swift-resource/9606/download
+// n: digit; a: uppercase letter; c: alphanumeric. Keep the source notation
+// beside each expanded shape so registry updates can be reviewed directly.
+var ibanShapes = map[string]string{
+	"AD": "nnnnnnnncccccccccccc",          // 4!n4!n12!c
+	"AE": "nnnnnnnnnnnnnnnnnnn",           // 3!n16!n
+	"AL": "nnnnnnnncccccccccccccccc",      // 8!n16!c
+	"AT": "nnnnnnnnnnnnnnnn",              // 5!n11!n
+	"AZ": "aaaacccccccccccccccccccc",      // 4!a20!c
+	"BA": "nnnnnnnnnnnnnnnn",              // 3!n3!n8!n2!n
+	"BE": "nnnnnnnnnnnn",                  // 3!n7!n2!n
+	"BG": "aaaannnnnncccccccc",            // 4!a4!n2!n8!c
+	"BH": "aaaacccccccccccccc",            // 4!a14!c
+	"BI": "nnnnnnnnnnnnnnnnnnnnnnn",       // 5!n5!n11!n2!n
+	"BR": "ccccccccnnnnnnnnnnnnnnncc",     // 8!c5!n10!n1!c1!c
+	"BY": "ccccnnnncccccccccccccccc",      // 4!c4!n16!c
+	"CH": "nnnnncccccccccccc",             // 5!n12!c
+	"CR": "nnnnnnnnnnnnnnnnnn",            // 4!n14!n
+	"CY": "nnnnnnnncccccccccccccccc",      // 3!n5!n16!c
+	"CZ": "nnnnnnnnnnnnnnnnnnnn",          // 4!n6!n10!n
+	"DE": "nnnnnnnnnnnnnnnnnn",            // 8!n10!n
+	"DJ": "nnnnnnnnnnnnnnnnnnnnnnn",       // 5!n5!n11!n2!n
+	"DK": "nnnnnnnnnnnnnn",                // 4!n9!n1!n
+	"DO": "ccccnnnnnnnnnnnnnnnnnnnn",      // 4!c20!n
+	"EE": "nnnnnnnnnnnnnnnn",              // 2!n14!n
+	"EG": "nnnnnnnnnnnnnnnnnnnnnnnnn",     // 4!n4!n17!n
+	"ES": "nnnnnnnnnnnnnnnnnnnn",          // 4!n4!n1!n1!n10!n
+	"FI": "nnnnnnnnnnnnnn",                // 3!n11!n
+	"FK": "aannnnnnnnnnnn",                // 2!a12!n
+	"FO": "nnnnnnnnnnnnnn",                // 4!n9!n1!n
+	"FR": "nnnnnnnnnncccccccccccnn",       // 5!n5!n11!c2!n
+	"GB": "aaaannnnnnnnnnnnnn",            // 4!a6!n8!n
+	"GE": "aannnnnnnnnnnnnnnn",            // 2!a16!n
+	"GI": "aaaaccccccccccccccc",           // 4!a15!c
+	"GL": "nnnnnnnnnnnnnn",                // 4!n9!n1!n
+	"GR": "nnnnnnncccccccccccccccc",       // 3!n4!n16!c
+	"GT": "cccccccccccccccccccccccc",      // 4!c20!c
+	"HN": "aaaannnnnnnnnnnnnnnnnnnn",      // 4!a20!n
+	"HR": "nnnnnnnnnnnnnnnnn",             // 7!n10!n
+	"HU": "nnnnnnnnnnnnnnnnnnnnnnnn",      // 3!n4!n1!n15!n1!n
+	"IE": "aaaannnnnnnnnnnnnn",            // 4!a6!n8!n
+	"IL": "nnnnnnnnnnnnnnnnnnn",           // 3!n3!n13!n
+	"IQ": "aaaannnnnnnnnnnnnnn",           // 4!a3!n12!n
+	"IS": "nnnnnnnnnnnnnnnnnnnnnn",        // 4!n2!n6!n10!n
+	"IT": "annnnnnnnnncccccccccccc",       // 1!a5!n5!n12!c
+	"JO": "aaaannnncccccccccccccccccc",    // 4!a4!n18!c
+	"KW": "aaaacccccccccccccccccccccc",    // 4!a22!c
+	"KZ": "nnnccccccccccccc",              // 3!n13!c
+	"LB": "nnnncccccccccccccccccccc",      // 4!n20!c
+	"LC": "aaaacccccccccccccccccccccccc",  // 4!a24!c
+	"LI": "nnnnncccccccccccc",             // 5!n12!c
+	"LT": "nnnnnnnnnnnnnnnn",              // 5!n11!n
+	"LU": "nnnccccccccccccc",              // 3!n13!c
+	"LV": "aaaaccccccccccccc",             // 4!a13!c
+	"LY": "nnnnnnnnnnnnnnnnnnnnn",         // 3!n3!n15!n
+	"MC": "nnnnnnnnnncccccccccccnn",       // 5!n5!n11!c2!n
+	"MD": "cccccccccccccccccccc",          // 2!c18!c
+	"ME": "nnnnnnnnnnnnnnnnnn",            // 3!n13!n2!n
+	"MK": "nnnccccccccccnn",               // 3!n10!c2!n
+	"MN": "nnnnnnnnnnnnnnnn",              // 4!n12!n
+	"MR": "nnnnnnnnnnnnnnnnnnnnnnn",       // 5!n5!n11!n2!n
+	"MT": "aaaannnnncccccccccccccccccc",   // 4!a5!n18!c
+	"MU": "aaaannnnnnnnnnnnnnnnnnnaaa",    // 4!a2!n2!n12!n3!n3!a
+	"NI": "aaaannnnnnnnnnnnnnnnnnnn",      // 4!a20!n
+	"NL": "aaaannnnnnnnnn",                // 4!a10!n
+	"NO": "nnnnnnnnnnn",                   // 4!n6!n1!n
+	"OM": "nnncccccccccccccccc",           // 3!n16!c
+	"PK": "aaaacccccccccccccccc",          // 4!a16!c
+	"PL": "nnnnnnnnnnnnnnnnnnnnnnnn",      // 8!n16!n
+	"PS": "aaaaccccccccccccccccccccc",     // 4!a21!c
+	"PT": "nnnnnnnnnnnnnnnnnnnnn",         // 4!n4!n11!n2!n
+	"QA": "aaaaccccccccccccccccccccc",     // 4!a21!c
+	"RO": "aaaacccccccccccccccc",          // 4!a16!c
+	"RS": "nnnnnnnnnnnnnnnnnn",            // 3!n13!n2!n
+	"RU": "nnnnnnnnnnnnnnccccccccccccccc", // 9!n5!n15!c
+	"SA": "nncccccccccccccccccc",          // 2!n18!c
+	"SC": "aaaannnnnnnnnnnnnnnnnnnnaaa",   // 4!a2!n2!n16!n3!a
+	"SD": "nnnnnnnnnnnnnn",                // 2!n12!n
+	"SE": "nnnnnnnnnnnnnnnnnnnn",          // 3!n16!n1!n
+	"SI": "nnnnnnnnnnnnnnn",               // 5!n8!n2!n
+	"SK": "nnnnnnnnnnnnnnnnnnnn",          // 4!n6!n10!n
+	"SM": "annnnnnnnnncccccccccccc",       // 1!a5!n5!n12!c
+	"SO": "nnnnnnnnnnnnnnnnnnn",           // 4!n3!n12!n
+	"ST": "nnnnnnnnnnnnnnnnnnnnn",         // 4!n4!n11!n2!n
+	"SV": "aaaannnnnnnnnnnnnnnnnnnn",      // 4!a20!n
+	"TL": "nnnnnnnnnnnnnnnnnnn",           // 3!n14!n2!n
+	"TN": "nnnnnnnnnnnnnnnnnnnn",          // 2!n3!n13!n2!n
+	"TR": "nnnnnncccccccccccccccc",        // 5!n1!n16!c
+	"UA": "nnnnnnccccccccccccccccccc",     // 6!n19!c
+	"VA": "nnnnnnnnnnnnnnnnnn",            // 3!n15!n
+	"VG": "aaaannnnnnnnnnnnnnnn",          // 4!a16!n
+	"XK": "nnnnnnnnnnnnnnnn",              // 4!n10!n2!n
+	"YE": "aaaannnncccccccccccccccccc",    // 4!a4!n18!c
+}
