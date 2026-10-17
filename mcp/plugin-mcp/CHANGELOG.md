@@ -8,6 +8,16 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-17
+
+### Added
+
+- `go-mcp/toolmw`: adapts the `core/util/mw` middleware contract to go-mcp tool handlers. `Stack.Middleware` returns one `server.ToolMiddleware` for `server.WithToolMiddleware`; members are built once per tool at registration and can be limited to some tools; `Wrap` adapts existing go-mcp tool middleware (`StrictArgs`, `ValidateSchema`). Standard set: `Recover`, `Audit`, `Timeout` (per-tool overrides), `Authorize` and `DenyDestructive`. A fault or recovered panic reaches the client as a generic `internal` tool error, never its own text.
+
+### Changed
+
+- The module now requires `github.com/hollis-labs/libs/core/util` (for `mw`). Requires `core/util` v0.6.0.
+
 ## [0.4.0] - 2026-10-16
 
 ### Added
