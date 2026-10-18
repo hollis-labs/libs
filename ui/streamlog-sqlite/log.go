@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -18,6 +15,7 @@ import (
 
 	"github.com/hollis-labs/libs/core/util/sqlite/sqlitekit"
 	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
+	"github.com/hollis-labs/libs/ui/ui-go/streamhub/logkit"
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
 )
 
@@ -44,8 +42,8 @@ const (
 
 // Options configures [Open]. The zero value is usable.
 type Options struct {
-	// Extractor fills the indexed columns; default [EnvelopeExtractor].
-	Extractor Extractor
+	// Extractor fills the indexed columns; default [logkit.EnvelopeExtractor].
+	Extractor logkit.Extractor
 	// PageSize is how many records After reads per page (default 128).
 	PageSize int
 	// Now is the clock for Record.At and MaxAge trimming (default time.Now).
@@ -90,7 +88,7 @@ type Log struct {
 	markerGap  time.Duration
 	page       int
 	now        func() time.Time
-	extract    Extractor
+	extract    logkit.Extractor
 	onConflict func(string, streamhub.Event)
 
 	epoch    string
@@ -135,7 +133,7 @@ func Open(ctx context.Context, path string, o Options) (*Log, error) {
 		l.now = time.Now
 	}
 	if l.extract == nil {
-		l.extract = EnvelopeExtractor
+		l.extract = logkit.EnvelopeExtractor
 	}
 	var err error
 	l.w, err = sqlitekit.OpenWriter(ctx, path, sqlitekit.OpenOptions{CreateParentDir: true})
@@ -212,25 +210,24 @@ func (l *Log) init(ctx context.Context, policy MismatchPolicy) error {
 	}
 
 	// Compare with the marker kept outside the database file.
-	mk, err := readMarker(l.markerPath)
-	if err != nil {
-		return fmt.Errorf("streamlogsqlite: read marker: %w", err)
+	mk, merr := logkit.ReadMarker(l.markerPath)
+	if merr != nil && !errors.Is(merr, logkit.ErrMarkerUnreadable) {
+		return fmt.Errorf("streamlogsqlite: read marker: %w", merr)
 	}
 	reason := ""
 	switch {
+	case errors.Is(merr, logkit.ErrMarkerUnreadable):
+		if !fresh {
+			reason = "marker_unreadable"
+		}
 	case fresh && mk != nil && mk.Epoch != "":
 		// A marker exists but the database is new: the file was deleted or replaced by an empty one.
 		reason = "epoch_differs"
-	case !fresh && mk != nil && mk.Epoch == "\x00unreadable":
-		reason = "marker_unreadable"
 	case !fresh && mk != nil && mk.Epoch != l.epoch:
 		reason = "epoch_differs"
 	case !fresh && mk != nil:
-		for s, hw := range mk.Streams {
-			if l.heads[s] < hw {
-				reason = "head_behind_marker"
-				break
-			}
+		if _, behind := mk.Behind(l.heads); behind {
+			reason = "head_behind_marker"
 		}
 	}
 	prev := l.epoch
@@ -292,11 +289,11 @@ func (l *Log) flushMarker(force bool) error {
 	if !force && l.markerGap > 0 && l.now().Sub(l.lastMk) < l.markerGap {
 		return nil
 	}
-	m := marker{Epoch: l.epoch, Streams: make(map[string]uint64, len(l.heads))}
+	m := logkit.Marker{Epoch: l.epoch, Streams: make(map[string]uint64, len(l.heads))}
 	for s, n := range l.heads {
 		m.Streams[s] = n
 	}
-	if err := writeMarker(l.markerPath, m); err != nil {
+	if err := logkit.WriteMarker(l.markerPath, m); err != nil {
 		l.mkError = err
 		if force {
 			return fmt.Errorf("streamlogsqlite: write marker: %w", err)
@@ -305,39 +302,6 @@ func (l *Log) flushMarker(force bool) error {
 	}
 	l.mkError, l.dirty, l.lastMk = nil, false, l.now()
 	return nil
-}
-
-// digestOf is the duplicate-detection digest: sha256 over Name and a
-// canonical form of Data. Valid JSON is decoded and re-encoded with sorted
-// keys and no insignificant whitespace (numbers keep their literal text), so
-// a producer that re-marshals the same event on retry gets the original
-// record, not a false conflict. Anything else is digested byte-exact.
-func digestOf(e streamhub.Event) []byte {
-	h := sha256.New()
-	h.Write([]byte(e.Name))
-	h.Write([]byte{0})
-	h.Write(canonicalJSON(e.Data))
-	return h.Sum(nil)
-}
-
-func canonicalJSON(b []byte) []byte {
-	if len(b) == 0 {
-		return b
-	}
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return b
-	}
-	if _, err := dec.Token(); err != io.EOF { // trailing data: not a single JSON value
-		return b
-	}
-	out, err := json.Marshal(v)
-	if err != nil {
-		return b
-	}
-	return out
 }
 
 func copyBytes(b []byte) []byte {
@@ -369,7 +333,7 @@ func (l *Log) Append(ctx context.Context, stream string, e streamhub.Event) (str
 	defer l.leave()
 
 	data := copyBytes(e.Data)
-	digest := digestOf(e)
+	digest := logkit.Digest(e)
 	cols := l.extract(e)
 
 	tx, err := l.w.BeginTx(ctx, nil)
@@ -435,11 +399,11 @@ func (l *Log) After(ctx context.Context, stream string, after streamhub.Seq) ite
 	return l.AfterEpoch(ctx, stream, "", after)
 }
 
-// AfterCursor is After for an opaque cursor made by [FormatCursor]. The empty
+// AfterCursor is After for an opaque cursor made by [logkit.FormatCursor]. The empty
 // cursor reads from the start. A cursor from another epoch yields one
 // [streamhub.GapEpochChanged] gap and no records.
 func (l *Log) AfterCursor(ctx context.Context, stream, cursor string) iter.Seq2[streamhub.Record, error] {
-	epoch, seq, err := ParseCursor(cursor)
+	epoch, seq, err := logkit.ParseCursor(cursor)
 	if err != nil {
 		return func(yield func(streamhub.Record, error) bool) { yield(streamhub.Record{}, err) }
 	}
@@ -649,12 +613,12 @@ func (l *Log) Close() error {
 func (l *Log) Path() string { return l.path }
 
 // ColumnsOf returns the indexed columns stored for one record.
-func (l *Log) ColumnsOf(ctx context.Context, stream string, seq streamhub.Seq) (Columns, error) {
+func (l *Log) ColumnsOf(ctx context.Context, stream string, seq streamhub.Seq) (logkit.Columns, error) {
 	if err := l.enter(); err != nil {
-		return Columns{}, err
+		return logkit.Columns{}, err
 	}
 	defer l.leave()
-	var c Columns
+	var c logkit.Columns
 	err := l.r.QueryRowContext(ctx,
 		`SELECT category, severity, sensitivity, pii, visibility, generation, project_id, workstream_id, task_id, session_id, agent_urn, run_id
 		 FROM records WHERE stream=? AND seq=?`, stream, uint64(seq)).

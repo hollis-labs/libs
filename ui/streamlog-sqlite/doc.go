@@ -18,7 +18,7 @@
 // interprets). It is minted when the database is created and stays the same
 // across restarts. It is re-minted whenever the database is recreated or
 // restored, because cursor values under the old epoch would then name
-// different events. [FormatCursor] and [ParseCursor] encode "<epoch>:<seq>";
+// different events. [logkit.FormatCursor] and [logkit.ParseCursor] encode "<epoch>:<seq>";
 // [Log.AfterCursor] answers a stale epoch with a [streamhub.GapEpochChanged]
 // gap instead of records.
 //

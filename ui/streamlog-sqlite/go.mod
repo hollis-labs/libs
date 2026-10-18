@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/hollis-labs/libs/core/util v0.4.0
-	github.com/hollis-labs/libs/ui/ui-go v0.2.0
+	github.com/hollis-labs/libs/ui/ui-go v0.3.0
 	modernc.org/sqlite v1.60.1
 )
 

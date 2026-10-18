@@ -14,6 +14,7 @@ import (
 	streamlog "github.com/hollis-labs/libs/ui/streamlog-sqlite"
 	streamhub "github.com/hollis-labs/libs/ui/ui-go/streamhub"
 	"github.com/hollis-labs/libs/ui/ui-go/streamhub/hubtest"
+	"github.com/hollis-labs/libs/ui/ui-go/streamhub/logkit"
 )
 
 var ctx = context.Background()
@@ -91,7 +92,7 @@ func TestRestartKeepsCursorsAndEpoch(t *testing.T) {
 		}
 	}
 	epoch := l.Epoch()
-	cursor := streamlog.FormatCursor(epoch, 3)
+	cursor := logkit.FormatCursor(epoch, 3)
 	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -122,14 +123,14 @@ func TestTrimGapIsNeverEmpty(t *testing.T) {
 	if err := l.Trim(ctx, "env", streamhub.Retention{MaxRecords: 3}); err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []string{"", streamlog.FormatCursor(l.Epoch(), 2)} {
+	for _, c := range []string{"", logkit.FormatCursor(l.Epoch(), 2)} {
 		_, err := collect(l, "env", c)
 		g := gapOf(t, err)
 		if g.Reason != streamhub.GapRetention || g.OldestAvailable != 8 || g.Latest != 10 || g.Epoch != l.Epoch() || g.Missed == 0 {
 			t.Fatalf("cursor %q gap = %+v", c, g)
 		}
 	}
-	_, err := collect(l, "env", streamlog.FormatCursor(l.Epoch(), 99))
+	_, err := collect(l, "env", logkit.FormatCursor(l.Epoch(), 99))
 	if g := gapOf(t, err); g.Reason != streamhub.GapCursorAhead || g.Latest != 10 || g.OldestAvailable != 8 {
 		t.Fatalf("ahead gap = %+v", g)
 	}
@@ -142,7 +143,7 @@ func TestRecreateRemintsEpoch(t *testing.T) {
 	l := open(t, path, streamlog.Options{})
 	l.Append(ctx, "env", streamhub.Event{Name: "k"})
 	l.Append(ctx, "env", streamhub.Event{Name: "k"})
-	old := streamlog.FormatCursor(l.Epoch(), 2)
+	old := logkit.FormatCursor(l.Epoch(), 2)
 	oldEpoch := l.Epoch()
 	l.Close()
 	for _, p := range []string{path, path + "-wal", path + "-shm"} {
@@ -209,7 +210,7 @@ func TestRestoreOfOlderCopyIsDetected(t *testing.T) {
 			}
 			// A consumer that had read cursor 3 under the old epoch is not served cursor 2's new meaning.
 			l.Append(ctx, "env", streamhub.Event{Name: "different event"})
-			_, gerr := collect(l, "env", streamlog.FormatCursor(epoch, 2))
+			_, gerr := collect(l, "env", logkit.FormatCursor(epoch, 2))
 			if g := gapOf(t, gerr); g.Reason != streamhub.GapEpochChanged {
 				t.Fatalf("gap = %+v", g)
 			}
@@ -294,7 +295,7 @@ func TestEnvelopeColumnsAreIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := streamlog.Columns{Category: "state", Severity: "info", Visibility: "environment", Generation: 3,
+	want := logkit.Columns{Category: "state", Severity: "info", Visibility: "environment", Generation: 3,
 		ProjectID: "p1", TaskID: "t1", SessionID: "s1", AgentURN: "a"}
 	if cols != want {
 		t.Fatalf("columns = %+v, want %+v", cols, want)
@@ -302,15 +303,15 @@ func TestEnvelopeColumnsAreIndexed(t *testing.T) {
 }
 
 func TestParseCursor(t *testing.T) {
-	e, s, err := streamlog.ParseCursor(streamlog.FormatCursor("abc", 7))
+	e, s, err := logkit.ParseCursor(logkit.FormatCursor("abc", 7))
 	if err != nil || e != "abc" || s != 7 {
 		t.Fatalf("round trip = %q %d %v", e, s, err)
 	}
-	if e, s, err := streamlog.ParseCursor(""); err != nil || e != "" || s != 0 {
+	if e, s, err := logkit.ParseCursor(""); err != nil || e != "" || s != 0 {
 		t.Fatalf("empty = %q %d %v", e, s, err)
 	}
 	for _, bad := range []string{"nocolon", ":5", "abc:x", "abc:-1"} {
-		if _, _, err := streamlog.ParseCursor(bad); !errors.Is(err, streamlog.ErrBadCursor) {
+		if _, _, err := logkit.ParseCursor(bad); !errors.Is(err, logkit.ErrBadCursor) {
 			t.Fatalf("ParseCursor(%q) err = %v", bad, err)
 		}
 	}
@@ -387,12 +388,12 @@ func TestExtractorReadsMeshTopLevelVisibility(t *testing.T) {
 	mesh := streamhub.Event{Name: "task.state_changed", Data: []byte(
 		`{"schema_version":"1","id":"evt_1","kind":"task.state_changed","session_id":"s1","generation":2,"visibility":"environment",` +
 			`"scope":{"project_id":"p1","workstream_id":"w1","agent_urn":"msg://agent/x/y"},"class":{"category":"state","severity":"info","sensitivity":"private"}}`)}
-	c := streamlog.EnvelopeExtractor(mesh)
+	c := logkit.EnvelopeExtractor(mesh)
 	if c.Visibility != "environment" || c.WorkstreamID != "w1" || c.AgentURN != "msg://agent/x/y" || c.Category != "state" || c.Generation != 2 {
 		t.Fatalf("mesh columns = %+v", c)
 	}
 	both := streamhub.Event{Data: []byte(`{"visibility":"mesh","class":{"visibility":"operator"}}`)}
-	if v := streamlog.EnvelopeExtractor(both).Visibility; v != "operator" {
+	if v := logkit.EnvelopeExtractor(both).Visibility; v != "operator" {
 		t.Fatalf("class.visibility should win, got %q", v)
 	}
 }
