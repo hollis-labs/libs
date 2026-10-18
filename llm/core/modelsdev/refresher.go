@@ -10,7 +10,7 @@ import (
 func (c *Client) StartRefresher(ctx context.Context) { go c.Run(ctx) }
 
 // Run refreshes stale/missing data and retries failures with bounded backoff.
-// It returns after cancellation and after any in-flight callback finishes.
+// It returns after cancellation and after its own refresh and callback finish.
 // Callbacks may read the client but must not recursively call Refresh or Run.
 func (c *Client) Run(ctx context.Context) {
 	// Only one background loop owns scheduling for this client.
