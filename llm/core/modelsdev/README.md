@@ -6,7 +6,7 @@
 
 ## Status
 
-Pre-1.0 (v0.x.y). The exported API surface is small and intended to remain stable, but breaking changes can still land in minor bumps before v1.0 — see [`CHANGELOG.md`](CHANGELOG.md) for each release's contract.
+Pre-1.0 (v0.x.y). The exported API surface is small and intended to remain stable, but breaking changes can still land in minor bumps before v1.0 — see [module changelog](../CHANGELOG.md) for each release's contract.
 
 ## Install
 
@@ -41,7 +41,7 @@ func main() {
         fmt.Println("model not found")
         return
     }
-    fmt.Printf("%s — input: $%.2f/M tokens\n", m.Name, m.Cost.Input)
+    fmt.Printf("%s — input: $%.2f/M tokens (unknown=%t)\n", m.Name, m.Cost.Input, m.Cost.UnknownRates.Input)
 }
 ```
 
@@ -99,9 +99,11 @@ See [`examples/`](examples/) — each example is its own `main` package that run
 - [`examples/lookup`](examples/lookup) — one-shot fetch + `Get` lookup.
 - [`examples/refresher`](examples/refresher) — `StartRefresher` + `WithOnRefresh` hook, prints a catalog summary.
 
+From the `llm/core` module directory:
+
 ```bash
-go run ./examples/lookup
-go run ./examples/refresher
+go run ./modelsdev/examples/lookup
+go run ./modelsdev/examples/refresher
 ```
 
 ## Cache Behavior

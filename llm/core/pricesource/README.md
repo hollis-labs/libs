@@ -111,7 +111,7 @@ Adopting the seam from an existing estimator:
 
 ## Compatibility
 
-This package is pre-1.0 and unreleased: any release, including a minor one, may break the exported API, and there is no deprecation period. Pin an exact version and read [CHANGELOG.md](./CHANGELOG.md) before upgrading.
+This package belongs to the pre-1.0 `llm/core` module: any release, including a minor one, may break the exported API, and there is no deprecation period. Pin an exact version and read [module changelog](../CHANGELOG.md) before upgrading.
 
 ## Known limitations
 
