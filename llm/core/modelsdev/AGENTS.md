@@ -42,6 +42,8 @@ what would be convenient.
 
 The monorepo root owns workspace and release rules. No `go.work` is tracked.
 
-Cache schema 1 preserves absent rates and flags. Unversioned caches keep their
-metadata but zero rates and false flags are ambiguous, so load them as unknown
-until refresh. Do not restore the old missing-means-free behavior.
+Cache schema 2 binds snapshots to their exact source URL and preserves rate/flag
+availability. Unbound legacy files need an explicit source declaration before
+loading; version 0 zero/false fields remain unknown until refresh. Test retries,
+source isolation, last-good preservation and shutdown with local HTTP fixtures.
+Health must never expose raw URLs, response bodies or filesystem errors.

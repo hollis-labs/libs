@@ -8,6 +8,17 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-18
+
+### Added
+
+- `modelsdev`: safe refresh health, bounded fetch/body options, configurable failure backoff, source-bound cache schema 2, and atomic model/fetch-timestamp reads. Old unbound caches require explicit source ownership via `WithLegacyCacheSource`.
+
+### Fixed
+
+- Keep last-good catalog data through invalid/empty/oversized responses and cache write failures; serialize client refresh publication and callbacks, bound retries after stale-cache failures, and wait for in-flight work during shutdown.
+- `pricesource`: use atomic catalog reads for consistent price provenance across refreshes. `LastFetchedAt` hydrates disk state on first read.
+
 ## [0.3.0] - 2026-10-18
 
 ### Changed
