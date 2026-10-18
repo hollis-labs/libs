@@ -33,7 +33,7 @@ func TestCatalogAvailabilitySurvivesAdaptersAndOfflineTable(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "catalog.json"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	client := modelsdev.New(modelsdev.WithCacheDir(dir))
+	client := modelsdev.New(modelsdev.WithCacheDir(dir), modelsdev.WithLegacyCacheSource("https://models.dev/api.json?type=all"))
 	src := pricesource.FromModelsDev(client)
 	snap, found := src.Snapshot("relay", "offering")
 	if !found || snap.Source != pricesource.SourceModelsDev || !snap.AsOf.Equal(asOf) {

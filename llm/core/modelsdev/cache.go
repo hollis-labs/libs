@@ -1,38 +1,81 @@
 package modelsdev
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 )
 
-const (
-	cacheVersion = 1
-	cacheFile    = "catalog.json"
-	cacheTmp     = "catalog.json.tmp"
-)
+const cacheVersion = 2
 
 type cacheEntry struct {
 	Version   int       `json:"schema_version"`
+	Source    string    `json:"source_id,omitempty"`
 	FetchedAt time.Time `json:"fetched_at"`
 	Data      Catalog   `json:"data"`
 }
 
-func loadCache(dir string) (*cacheEntry, error) {
-	f, err := os.Open(filepath.Join(dir, cacheFile))
+func (c *Client) sourceID() string {
+	sum := sha256.Sum256([]byte(c.url))
+	return hex.EncodeToString(sum[:])
+}
+func (c *Client) cachePath() string {
+	return filepath.Join(c.cacheDir, "catalog-v2-"+c.sourceID()+".json")
+}
+
+func (c *Client) loadSourceCache() (*cacheEntry, bool, error) {
+	entry, err := readCache(c.cachePath(), c.maxResponseBytes)
+	if err == nil {
+		if entry.Version != cacheVersion || entry.Source != c.sourceID() {
+			return nil, false, fmt.Errorf("cache source mismatch")
+		}
+		return entry, false, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) || c.legacySource == "" || c.legacySource != c.url {
+		return nil, false, err
+	}
+	entry, err = readCache(filepath.Join(c.cacheDir, "catalog.json"), c.maxResponseBytes)
+	if err != nil {
+		return nil, false, err
+	}
+	if entry.Version >= cacheVersion {
+		return nil, false, fmt.Errorf("unbound cache version")
+	}
+	return entry, true, nil
+}
+
+func readCache(path string, maxBytes int64) (*cacheEntry, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-
+	data, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("cache too large")
+	}
 	var entry cacheEntry
-	if err := json.NewDecoder(f).Decode(&entry); err != nil {
-		return nil, fmt.Errorf("modelsdev: decode cache: %w", err)
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, err
 	}
 	if entry.Version < 0 || entry.Version > cacheVersion {
-		return nil, fmt.Errorf("modelsdev: unsupported cache schema version %d", entry.Version)
+		return nil, fmt.Errorf("unsupported cache schema")
+	}
+	if entry.FetchedAt.IsZero() || entry.FetchedAt.After(time.Now().Add(time.Minute)) {
+		return nil, fmt.Errorf("invalid cache timestamp")
+	}
+	if err := validateCatalog(entry.Data); err != nil {
+		return nil, err
 	}
 	if entry.Version == 0 {
 		// Legacy encoders wrote absent input/output as zero and false flags as
@@ -59,39 +102,66 @@ func loadCache(dir string) (*cacheEntry, error) {
 	return &entry, nil
 }
 
-// saveCache writes data to disk atomically: it writes to a .tmp file first,
-// then renames it into place. If anything fails, the existing cache file
-// remains untouched.
-func saveCache(dir string, data Catalog) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("modelsdev: create cache dir: %w", err)
+// writeCache uses a unique temporary file; cancellation before rename preserves
+// the old snapshot. Rename is the publication point, after which memory must follow.
+func writeCache(ctx context.Context, path string, entry cacheEntry, maxBytes int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-
-	tmp := filepath.Join(dir, cacheTmp)
-	f, err := os.Create(tmp)
+	data, err := json.Marshal(entry)
 	if err != nil {
-		return fmt.Errorf("modelsdev: create tmp cache: %w", err)
+		return err
 	}
-
-	entry := cacheEntry{Version: cacheVersion, FetchedAt: time.Now(), Data: data}
-	if encErr := json.NewEncoder(f).Encode(entry); encErr != nil {
+	if int64(len(data)) > maxBytes {
+		return fmt.Errorf("cache too large")
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".catalog-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.Write(data); err != nil {
 		f.Close()
-		os.Remove(tmp) // best-effort cleanup; old cache is still intact
-		return fmt.Errorf("modelsdev: encode cache: %w", encErr)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(tmp)
-		return fmt.Errorf("modelsdev: close tmp cache: %w", err)
+		return err
 	}
-
-	dest := filepath.Join(dir, cacheFile)
-	if err := os.Rename(tmp, dest); err != nil {
-		os.Remove(tmp)
-		return fmt.Errorf("modelsdev: rename cache: %w", err)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	return nil
+	return os.Rename(f.Name(), path)
 }
 
-func isStale(entry *cacheEntry, ttl time.Duration) bool {
-	return entry.Version != cacheVersion || time.Since(entry.FetchedAt) > ttl
+func validateCatalog(cat Catalog) error {
+	models := 0
+	if len(cat.Providers) == 0 {
+		return fmt.Errorf("empty catalog")
+	}
+	for id, p := range cat.Providers {
+		if id == "" || p.ID != id {
+			return fmt.Errorf("invalid provider identity")
+		}
+		for mid, m := range p.Models {
+			if mid == "" || m.ID != mid {
+				return fmt.Errorf("invalid model identity")
+			}
+			if m.Limit.ContextWindow < 0 || m.Limit.MaxOutputTokens < 0 || (m.Limit.MaxInputTokens != nil && *m.Limit.MaxInputTokens < 0) {
+				return fmt.Errorf("invalid model limit")
+			}
+			models++
+		}
+	}
+	if models == 0 {
+		return fmt.Errorf("empty model catalog")
+	}
+	return nil
 }

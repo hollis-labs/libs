@@ -69,7 +69,7 @@ The same program lives in [`examples/hello`](./examples/hello/main.go). It print
 
 The sources:
 
-- `FromModelsDev(client)` / `Catalog{...}` adapts any `costcalc.Catalog`. Snapshots carry `Source: "models.dev"` and, for a `*modelsdev.Client`, `AsOf` from `LastFetchedAt()`.
+- `FromModelsDev(client)` / `Catalog{...}` adapts any `costcalc.Catalog`. Snapshots carry `Source: "models.dev"` and, for a `*modelsdev.Client`, `AsOf` from an atomic model/timestamp lookup. Catalogs implementing `GetWithFetchedAt` supply their own consistent timestamp; `Catalog.AsOf` is only a fallback for other catalogs.
 - `NewTable(name, asOf, entries...)` builds an immutable table. An `Entry` rate is a `*float64`: `nil` is unknown, `Rate(0)` is free. `Provider: AnyProvider` (`"*"`) matches the model under any provider; an exact provider match wins.
 - `FromCatalog(name, asOf, models)` freezes a list of catalog models into a table.
 - `ParseLiteLLM(r, name, asOf)` reads a LiteLLM-style JSON price map (per-token `input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`, `cache_creation_input_token_cost`, `output_cost_per_reasoning_token`), converts to per-million rates, strips a `provider/` key prefix, and returns the keys it skipped. A missing rate is unknown.
