@@ -122,7 +122,9 @@ func TestRun_FreshCacheWaitsForCancel(t *testing.T) {
 	defer srv.Close()
 
 	dir := t.TempDir()
-	require.NoError(t, modelsdev.SaveCacheForTest(dir, modelsdev.Catalog{Providers: minimalCatalog()}))
+	seed := modelsdev.New(modelsdev.WithURL(srv.URL), modelsdev.WithCacheDir(dir))
+	require.NoError(t, seed.Refresh(context.Background()))
+	hits.Store(0)
 
 	c := modelsdev.New(
 		modelsdev.WithURL(srv.URL),
@@ -138,6 +140,8 @@ func TestRun_FreshCacheWaitsForCancel(t *testing.T) {
 		c.Run(ctx)
 	}()
 
+	require.Eventually(t, func() bool { return c.Health().Running }, time.Second, time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 	cancel()
 	select {
 	case <-done:

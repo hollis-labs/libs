@@ -109,9 +109,9 @@ go run ./modelsdev/examples/refresher
 ## Cache Behavior
 
 - Default cache directory: `~/.cache/go-modelsdev/` (via `os.UserCacheDir()`)
-- Cache file: `catalog.json`
+- Cache files: `catalog-v2-<sha256-of-source-URL>.json` (schema and source bound)
 - Default TTL: 24 hours
-- **Atomic write contract**: the cache is written to a `.tmp` file first, then renamed into place. If a fetch or write fails, the existing cache remains intact and the client continues serving stale-but-valid data.
+- **Atomic write contract**: the cache is written to a unique temporary file first, then renamed into place. If a fetch or write fails, the existing cache remains intact and the client continues serving stale-but-valid data.
 
 ## Options
 
@@ -121,7 +121,11 @@ go run ./modelsdev/examples/refresher
 | `WithCacheTTL(d time.Duration)` | `24h` | How long a cached catalog is considered fresh |
 | `WithHTTPClient(c *http.Client)` | 30s-timeout client | Replace the HTTP client (useful for tests) |
 | `WithURL(url string)` | `https://models.dev/api.json?type=all` | Override the API endpoint |
-| `WithOnRefresh(fn func(*Client))` | nil | Callback fired after every successful refresh |
+| `WithOnRefresh(fn func(*Client))` | nil | Callback fired after every successful refresh; reads allowed, no recursive Refresh/Run |
+| `WithRefreshTimeout(d)` | `30s` | Bounds gate wait and HTTP attempts; callbacks must finish themselves |
+| `WithMaxResponseBytes(n)` | `64 MiB` | Bound HTTP bodies and encoded cache; nonpositive or above 1 GiB uses default |
+| `WithRetryBackoff(min, max)` | `1s`, `1m` | HTTP retry and background failure delays; invalid minimum uses 1s, max is at least min |
+| `WithLegacyCacheSource(url)` | disabled | Explicitly attest which source wrote an old unbound cache |
 
 ## Dependencies
 
@@ -163,12 +167,37 @@ and clear each corresponding unknown flag when assigning its rate. Do not read
 a numeric rate as free without checking its unknown flag. Likewise, manually
 constructed capability flags remain known unless marked unknown.
 
-Cache schema 1 preserves availability. Unversioned caches remain usable offline,
-but their zero rates and false capability flags are conservatively unknown: the
-old encoder erased their original presence. A running refresher treats those
-caches as stale and recovers availability on its next successful fetch. Future
-unsupported cache versions are rejected. Historical usage-ledger rows are not
-rewritten.
+Cache schema 2 preserves availability and binds each snapshot to the SHA-256 of
+its exact source URL. Changing the URL (including filters) cannot load another
+source's cache. URL values are not written to filenames or exposed in health.
+Unbound schema 0/1 `catalog.json` files are ignored unless the caller explicitly
+attests their source with `WithLegacyCacheSource(url)`, equal to the configured
+URL. Do not automatically bind an old file whose origin is unknown. Bound legacy
+caches remain usable offline and trigger refresh; schema 0 zero/false ambiguity
+is treated conservatively as unknown. A successful fetch writes a schema 2 file.
+Historical ledger snapshots are unchanged.
+
+`Health()` reports empty/fresh/stale data independently of the last refresh
+result, plus active-loop/in-flight state, attempts, consecutive failures, fetch
+and retry times, safe error classes and HTTP status. Errors never include response
+bodies, credentials, source URLs or filesystem paths. Health is process-local;
+only the source snapshot and its fetch time persist across restarts. A nil/empty
+next-attempt timestamp means a refresh is immediately eligible; scheduling only
+runs while `Run` is active.
+
+Each client serializes refreshes and callbacks. Failed cycles retry from 1s up to
+1m by default, even when cached data has expired. Each cycle has at most three
+HTTP attempts; permanent HTTP errors and invalid payloads are not retried within
+the cycle. Empty catalogs, inconsistent IDs, negative limits, malformed/trailing
+JSON, oversized bodies and cache write failures preserve last-good data. Startup
+reads the matching cache before attempting a refresh. Reads expose read-only
+metadata views; callers must not mutate returned maps, slices or pointers.
+
+`GetWithFetchedAt` reads model data and its fetch timestamp together.
+`pricesource.FromModelsDev` uses this operation to prevent mismatched price
+provenance during concurrent refreshes. `LastFetchedAt` also hydrates disk state
+on its first call. Unique temporary files isolate concurrent writers; refresh
+ordering is guaranteed within one client, not across processes sharing a cache.
 
 The catalog preserves audio and tiered prices without calculating them. The
 five-component `costcalc` projection marks context-dependent rates unknown when

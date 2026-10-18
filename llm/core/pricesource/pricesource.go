@@ -18,14 +18,15 @@ import (
 const SourceModelsDev = "models.dev"
 
 // Catalog adapts a costcalc.Catalog (for example a *modelsdev.Client) as a
-// costcalc.PriceSource. Its snapshots carry Name as Source and AsOf() as AsOf.
+// costcalc.PriceSource. Snapshots carry Name as Source and the catalog's atomic
+// fetch timestamp, falling back to AsOf() for catalogs with only Get.
 // Omitted rates remain unknown, including through offline tables.
 type Catalog struct {
 	// Catalog is the model catalog to read. Required.
 	Catalog costcalc.Catalog
 	// Name is the Source label; empty means SourceModelsDev.
 	Name string
-	// AsOf, when set, reports when the catalog's data was fetched.
+	// AsOf is the fallback fetch timestamp for catalogs without GetWithFetchedAt.
 	AsOf func() time.Time
 }
 
@@ -39,16 +40,31 @@ func FromModelsDev(c *modelsdev.Client) Catalog {
 
 // Snapshot implements costcalc.PriceSource.
 func (c Catalog) Snapshot(providerID, modelID string) (usageledger.PriceSnapshot, bool) {
-	snap, ok := costcalc.SnapshotPrice(c.Catalog, providerID, modelID)
+	var snap usageledger.PriceSnapshot
+	var ok bool
+	// A catalog that offers an atomic model/timestamp read owns provenance.
+	// AsOf remains the fallback for custom catalogs with only Get.
+	if atomic, supports := c.Catalog.(interface {
+		GetWithFetchedAt(string, string) (modelsdev.Model, time.Time, bool)
+	}); supports {
+		model, fetched, found := atomic.GetWithFetchedAt(providerID, modelID)
+		ok = found
+		if ok {
+			snap = costcalc.PriceSnapshotFromPricing(model.Cost)
+			snap.AsOf = fetched
+		}
+	} else {
+		snap, ok = costcalc.SnapshotPrice(c.Catalog, providerID, modelID)
+		if ok && c.AsOf != nil {
+			snap.AsOf = c.AsOf()
+		}
+	}
 	if !ok {
 		return usageledger.PriceSnapshot{}, false
 	}
 	snap.Source = c.Name
 	if snap.Source == "" {
 		snap.Source = SourceModelsDev
-	}
-	if c.AsOf != nil {
-		snap.AsOf = c.AsOf()
 	}
 	return snap, true
 }
