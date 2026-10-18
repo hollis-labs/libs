@@ -11,7 +11,7 @@
 //	    log.Fatal(err)
 //	}
 //	if m, ok := c.Get("anthropic", "claude-sonnet-4-5"); ok {
-//	    fmt.Printf("%s — input: $%.2f/M tokens\n", m.Name, m.Cost.Input)
+//	    fmt.Printf("%s — input: $%.2f/M tokens (unknown=%t)\n", m.Name, m.Cost.Input, m.Cost.UnknownRates.Input)
 //	}
 //
 // # Cache behaviour

@@ -35,7 +35,7 @@ CI (`.github/workflows/check.yml`) is the full gate.
 - `Cost.Kind` comes from the row (`PriceRow`) or the caller; `IsBill` is true only for a priced `api_billed` cost. `Cost` stays comparable and has no total field.
 - `PriceSource` is the seam for price data; its implementations live in `llm-core/pricesource`, never here (no fetching or persistence in this package).
 - `PriceRow` uses the row's stored snapshot only. Do not add a variant that re-prices from a live catalog (`TestPriceRow_UsesStoredSnapshotNotLiveCatalog`, `TestPriceRow_NilPriceIsUnpriced`).
-- `PriceSnapshotFromPricing` must track `modelsdev.Pricing` rate for rate (the `...PerMillion` fields; `Source`, `AsOf` and `UnknownRates` are provenance and are left empty); a new pricing dimension on either side fails `TestPriceSnapshotFromPricing_FieldParity`. This is the conformance test `go-usage-ledger` deferred to this module.
+- `PriceSnapshotFromPricing` projects the five core rates and preserves their unknown flags. The catalog also carries audio and context tiers: do not expand the ledger core to mirror those fields. Context-dependent rates are unknown without tier selection; `Dims` remain unpriced. `TestPriceSnapshotFromPricing_CoreRates` and the catalog-pricing behavior tests cover the projection.
 - Plain `float64` USD, no rounding, no currency. `FuzzPrice` must never panic or return a non-finite total on its bounded domain.
 - Behavioral equivalence with any application is not claimed: nothing was ported and the app code was read, not run.
 - Out of scope: persistence, currency, `Dims` pricing, catalog lifecycle (`Refresh`, `StartRefresher`, constructing a client), adoption in an application.

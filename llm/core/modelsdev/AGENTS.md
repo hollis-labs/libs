@@ -40,6 +40,8 @@ is pinned against a trimmed real response (`TestModel_UnmarshalAPIShape`), so
 treat that fixture as the record of what models.dev actually sends rather than
 what would be convenient.
 
-The tracked `go.work` (`use .`) is a single-module workspace and contradicts
-the convention in these repos of leaving `go.work` uncommitted. It is harmless
-today; do not build cross-module overrides on it.
+The monorepo root owns workspace and release rules. No `go.work` is tracked.
+
+Cache schema 1 preserves absent rates and flags. Unversioned caches keep their
+metadata but zero rates and false flags are ambiguous, so load them as unknown
+until refresh. Do not restore the old missing-means-free behavior.

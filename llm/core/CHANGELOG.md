@@ -8,6 +8,16 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ## [Unreleased]
 
+### Added
+
+- `modelsdev`: provider-specific canonical identity, type/status/description, request metadata, reasoning controls, structured-output and capability availability, input limits, audio rates and context tiers. The default API URL requests all model types. Prices use USD per million provider-native tokens.
+- `modelsdev.Pricing.UnknownRates` and `UnknownPricing`: missing/null JSON rates remain unknown; explicit zero remains free. Existing keyed numeric Go literals retain known-zero semantics; `Pricing` is no longer comparable because it carries a tier slice.
+
+### Fixed
+
+- `costcalc` and `pricesource` preserve rate availability through catalog lookups and frozen offline tables, so missing rates produce partial costs instead of silently free usage. Context-dependent pricing is unknown in the context-free snapshot; audio dimensions remain unpriced.
+- Version the models.dev disk cache to preserve availability. Legacy caches remain usable offline with ambiguous zero rates/false flags marked unknown, and are refreshed even when their timestamp is recent. Historical ledger snapshots are unchanged.
+
 ## [0.2.0] - 2026-10-15
 
 - Module path is now `github.com/hollis-labs/libs/llm/core` (was `github.com/hollis-labs/substrate/llm-core`); the substrate path and its `llm-core/vX.Y.Z` tags no longer exist. Tags are `llm/core/vX.Y.Z`. Package paths below are relative to the module root; entries from before this release keep the former `llm-core/` prefix.

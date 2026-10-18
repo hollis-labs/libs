@@ -102,19 +102,28 @@ func perMillion(tokens int64, ratePerMillion float64) float64 {
 	return float64(tokens) / 1_000_000 * ratePerMillion
 }
 
-// PriceSnapshotFromPricing converts a catalog modelsdev.Pricing into the
-// usageledger.PriceSnapshot carried by a Row. The field-for-field parity of the
-// rates is pinned by TestPriceSnapshotFromPricing_FieldParity. It leaves
-// Source, AsOf and UnknownRates empty: models.dev omits an optional rate it
-// does not know, so a 0 here cannot be told apart from free.
+// PriceSnapshotFromPricing projects the five core rates, preserving unknowns.
+// Audio prices remain catalog metadata; audio usage belongs in Usage.Dims and
+// stays unpriced. Context-dependent prices require a tier-aware caller: this
+// context-free projection marks all core rates unknown rather than guessing.
+// Source and AsOf are supplied by the price source.
 func PriceSnapshotFromPricing(p modelsdev.Pricing) usageledger.PriceSnapshot {
-	return usageledger.PriceSnapshot{
-		InputPerMillion:      p.Input,
-		OutputPerMillion:     p.Output,
-		CacheWritePerMillion: p.CacheWrite,
-		CacheReadPerMillion:  p.CacheRead,
-		ReasoningPerMillion:  p.Reasoning,
+	if p.HasContextTiers() {
+		p = modelsdev.UnknownPricing()
 	}
+	s := usageledger.PriceSnapshot{}
+	set := func(v float64, unknown bool, dst *float64, flag *bool) {
+		*flag = unknown
+		if !unknown {
+			*dst = v
+		}
+	}
+	set(p.Input, p.UnknownRates.Input, &s.InputPerMillion, &s.UnknownRates.UncachedInput)
+	set(p.Output, p.UnknownRates.Output, &s.OutputPerMillion, &s.UnknownRates.Output)
+	set(p.CacheWrite, p.UnknownRates.CacheWrite, &s.CacheWritePerMillion, &s.UnknownRates.CacheWrite)
+	set(p.CacheRead, p.UnknownRates.CacheRead, &s.CacheReadPerMillion, &s.UnknownRates.CacheRead)
+	set(p.Reasoning, p.UnknownRates.Reasoning, &s.ReasoningPerMillion, &s.UnknownRates.Reasoning)
+	return s
 }
 
 // SnapshotPrice looks up (providerID, modelID) in cat and returns the
