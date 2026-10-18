@@ -14,7 +14,7 @@ Price sources for `costcalc`: a models.dev adapter, override tables with explici
 go get github.com/hollis-labs/libs/llm/core/pricesource
 ```
 
-Requires Go 1.26.6 or newer. Depends on `llm-core/costcalc`, `llm-core/usageledger`, `llm-core/modelsdev` and the standard library.
+Requires Go 1.26.9 or newer. Depends on `llm-core/costcalc`, `llm-core/usageledger`, `llm-core/modelsdev` and the standard library.
 
 ## Usage
 

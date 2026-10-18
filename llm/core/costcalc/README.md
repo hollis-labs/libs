@@ -14,7 +14,7 @@ Cost calculation over disjoint LLM usage components: go-usage-ledger Usage price
 go get github.com/hollis-labs/libs/llm/core/costcalc
 ```
 
-Requires Go 1.26.6 or newer. Depends on [go-usage-ledger](https://github.com/hollis-labs/go-usage-ledger) v0.1.0 and [go-modelsdev](https://github.com/hollis-labs/go-modelsdev) v0.2.0 (which pulls in `cenkalti/backoff/v5`).
+Requires Go 1.26.9 or newer. Depends on [go-usage-ledger](https://github.com/hollis-labs/go-usage-ledger) v0.1.0 and [go-modelsdev](https://github.com/hollis-labs/go-modelsdev) v0.2.0 (which pulls in `cenkalti/backoff/v5`).
 
 ## Usage
 

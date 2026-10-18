@@ -1,6 +1,6 @@
 module github.com/hollis-labs/libs/llm/core
 
-go 1.26.6
+go 1.26.9
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
