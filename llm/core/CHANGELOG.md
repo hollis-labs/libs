@@ -8,11 +8,7 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-10-18
-
-### Changed
-
-- Require Go 1.26.9, the patched toolchain used for release validation.
+## [0.4.0] - 2026-10-18
 
 ### Added
 
@@ -22,6 +18,12 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 - Keep last-good catalog data through invalid/empty/oversized responses and cache write failures; serialize client refresh publication and callbacks, bound retries after stale-cache failures, and wait for in-flight work during shutdown.
 - `pricesource`: use atomic catalog reads for consistent price provenance across refreshes. `LastFetchedAt` hydrates disk state on first read.
+
+## [0.3.0] - 2026-10-18
+
+### Changed
+
+- Require Go 1.26.9, the patched toolchain used for release validation.
 
 ### Added
 
