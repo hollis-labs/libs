@@ -50,3 +50,5 @@ jobs:
       race: true
       # The harness sandbox tests need a Linux backend; the hosted runner does not ship one.
       sandbox-backend: ${{ matrix.module == 'harness/core' }}
+      # The Postgres log's tests need a server; without one they would skip and CI would pass without running them.
+      postgres: ${{ matrix.module == 'ui/streamlog-postgres' }}
