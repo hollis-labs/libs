@@ -8,6 +8,12 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-18
+
+### Changed
+
+- Require Go 1.26.9, the patched toolchain used for release validation.
+
 ### Added
 
 - `modelsdev`: provider-specific canonical identity, type/status/description, request metadata, reasoning controls, structured-output and capability availability, input limits, audio rates and context tiers. The default API URL requests all model types. Prices use USD per million provider-native tokens.
