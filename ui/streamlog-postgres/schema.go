@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS %[1]s.records (
 	payload        jsonb,
 	digest         bytea       NOT NULL,
 	payload_digest text,
+	class          text        NOT NULL DEFAULT '',
+	policy_id      text        NOT NULL DEFAULT '',
+	rolled         boolean     NOT NULL DEFAULT false,
+	outcome        text        NOT NULL DEFAULT '',
 	category       text        NOT NULL DEFAULT '',
 	severity       text        NOT NULL DEFAULT '',
 	sensitivity    text        NOT NULL DEFAULT '',
@@ -53,10 +57,13 @@ CREATE INDEX IF NOT EXISTS records_session     ON %[1]s.records (stream, session
 CREATE INDEX IF NOT EXISTS records_agent       ON %[1]s.records (stream, agent_urn, seq)     WHERE agent_urn <> '';
 CREATE INDEX IF NOT EXISTS records_kind        ON %[1]s.records (stream, kind, seq);
 CREATE INDEX IF NOT EXISTS records_at          ON %[1]s.records (stream, at);
+CREATE INDEX IF NOT EXISTS records_unrolled    ON %[1]s.records (stream, class, seq) WHERE NOT rolled;
+CREATE INDEX IF NOT EXISTS records_unclassified ON %[1]s.records (stream, seq) WHERE class = '';
 
 CREATE TABLE IF NOT EXISTS %[1]s.rollups (
 	stream        text        NOT NULL,
-	bucket_size   text        NOT NULL,
+	class         text        NOT NULL,
+	bucket_ns     bigint      NOT NULL,
 	bucket_start  timestamptz NOT NULL,
 	kind          text        NOT NULL,
 	category      text        NOT NULL DEFAULT '',
@@ -68,6 +75,6 @@ CREATE TABLE IF NOT EXISTS %[1]s.rollups (
 	count         bigint      NOT NULL,
 	first_seq     bigint      NOT NULL,
 	last_seq      bigint      NOT NULL,
-	PRIMARY KEY (stream, bucket_size, bucket_start, kind, category, severity, project_id, workstream_id, agent_urn, outcome)
+	PRIMARY KEY (stream, class, bucket_ns, bucket_start, kind, category, severity, project_id, workstream_id, agent_urn, outcome)
 );
 `

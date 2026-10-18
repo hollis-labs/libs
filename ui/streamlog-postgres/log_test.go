@@ -483,7 +483,7 @@ func roleDSN(t *testing.T, e *env) (dsn, role string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("postgres://%s:pw@%s:%d/%s?sslmode=disable", role, cfg.ConnConfig.Host, cfg.ConnConfig.Port, cfg.ConnConfig.Database), role
+	return fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=pw sslmode=disable", cfg.ConnConfig.Host, cfg.ConnConfig.Port, cfg.ConnConfig.Database, role), role
 }
 
 // Without the grant the identity check degrades to marker-only, loudly.
