@@ -7,6 +7,10 @@ All notable changes to the `streamlog-sqlite` module are documented here. The fo
 
 ## [Unreleased]
 
+### Changed
+
+- The cursor encoding, the duplicate-detection digest, the envelope extractor and the restore marker now come from `ui-go/streamhub/logkit` (shared with the Postgres log) instead of private copies. `FormatCursor`, `ParseCursor`, `ErrBadCursor`, `Columns`, `Extractor` and `EnvelopeExtractor` moved there; use `logkit.*`. Requires `ui/ui-go` v0.3.0.
+
 ### Added
 
 - `Open`: a durable `streamhub.Log` on SQLite (single writer connection, separate read pool, WAL), passing `hubtest.Conformance` and `hubtest.HubSuite`.
