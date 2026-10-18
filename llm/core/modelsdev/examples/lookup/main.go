@@ -54,9 +54,20 @@ func main() {
 	}
 
 	fmt.Printf("%s/%s — context: %d tokens\n", provider, m.ID, m.Limit.ContextWindow)
-	fmt.Printf("  input:  $%.2f/M tokens\n", m.Cost.Input)
-	fmt.Printf("  output: $%.2f/M tokens\n", m.Cost.Output)
+	printRate("input", m.Cost.Input, m.Cost.UnknownRates.Input)
+	printRate("output", m.Cost.Output, m.Cost.UnknownRates.Output)
+	if m.Cost.HasContextTiers() {
+		fmt.Println("  context tiers apply; base rates are not a complete estimate")
+	}
 	if m.Capabilities.ToolCall {
 		fmt.Println("  tool_call: yes")
 	}
+}
+
+func printRate(name string, rate float64, unknown bool) {
+	if unknown {
+		fmt.Printf("  %s: unknown\n", name)
+		return
+	}
+	fmt.Printf("  %s: $%.2f/M tokens\n", name, rate)
 }

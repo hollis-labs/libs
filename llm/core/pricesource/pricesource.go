@@ -19,8 +19,7 @@ const SourceModelsDev = "models.dev"
 
 // Catalog adapts a costcalc.Catalog (for example a *modelsdev.Client) as a
 // costcalc.PriceSource. Its snapshots carry Name as Source and AsOf() as AsOf.
-// A models.dev rate the catalog omits reads as 0 and is not marked unknown:
-// the catalog cannot tell an absent optional rate from a free one.
+// Omitted rates remain unknown, including through offline tables.
 type Catalog struct {
 	// Catalog is the model catalog to read. Required.
 	Catalog costcalc.Catalog
@@ -192,19 +191,26 @@ func (t *Table) Snapshot(providerID, modelID string) (usageledger.PriceSnapshot,
 
 // FromCatalog freezes a model catalog listing (for example
 // modelsdev.Client.List) into a table labelled name. Each model's five rates
-// are copied as known, the same way costcalc.PriceSnapshotFromPricing reads
-// them. Use it with FileCache to keep a catalog's prices available offline.
+// preserve unknown flags using costcalc.PriceSnapshotFromPricing. Use it with
+// FileCache to keep a catalog's prices available offline.
 func FromCatalog(name string, asOf time.Time, models []modelsdev.ModelRef) (*Table, error) {
 	entries := make([]Entry, 0, len(models))
 	for _, m := range models {
+		snap := costcalc.PriceSnapshotFromPricing(m.Cost)
+		rate := func(v float64, unknown bool) *float64 {
+			if unknown {
+				return nil
+			}
+			return Rate(v)
+		}
 		entries = append(entries, Entry{
 			Provider:   m.ProviderID,
 			Model:      m.ID,
-			Input:      Rate(m.Cost.Input),
-			Output:     Rate(m.Cost.Output),
-			CacheWrite: Rate(m.Cost.CacheWrite),
-			CacheRead:  Rate(m.Cost.CacheRead),
-			Reasoning:  Rate(m.Cost.Reasoning),
+			Input:      rate(snap.InputPerMillion, snap.UnknownRates.UncachedInput),
+			Output:     rate(snap.OutputPerMillion, snap.UnknownRates.Output),
+			CacheWrite: rate(snap.CacheWritePerMillion, snap.UnknownRates.CacheWrite),
+			CacheRead:  rate(snap.CacheReadPerMillion, snap.UnknownRates.CacheRead),
+			Reasoning:  rate(snap.ReasoningPerMillion, snap.UnknownRates.Reasoning),
 		})
 	}
 	return NewTable(name, asOf, entries...)

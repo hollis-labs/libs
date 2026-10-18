@@ -67,7 +67,7 @@ This module is pre-1.0 and unreleased: any release, including a minor one, may b
 ## Known limitations
 
 - Costs are unrounded `float64` USD. Rounding and display precision are the caller's concern.
-- A zero rate not marked unknown contributes $0. The catalog's pricing type cannot tell "free" from "rate not populated" for the optional cache and reasoning rates, so `PriceSnapshotFromPricing` never marks a rate unknown; a source with better data (an override table) can.
+- `PriceSnapshotFromPricing` preserves omitted/null rate availability; explicit zero remains free. Context-dependent pricing becomes unknown in this context-free projection. Audio metadata is retained in the catalog, while audio usage in `Dims` remains unpriced. Numeric Go pricing literals retain known-zero semantics; use `modelsdev.UnknownPricing()` for incomplete programmatic data.
 - `Priced == false` covers both "model not in the catalog" and "the catalog's cache was never populated": `Catalog.Get` does not distinguish them. A caller that cares should check `modelsdev.Client.LastFetchedAt()` before pricing.
 - `Cost.Provenance` includes `Dims` entries even though they are never priced, so an uncertain extension dimension can make a fully priced total read `estimated` or `unknown`.
 - `Price` does not call `Usage.Validate`, and negative or non-finite rates or token counts are not rejected; garbage in gives garbage out (`FuzzPrice` covers the non-negative, finite, bounded domain).

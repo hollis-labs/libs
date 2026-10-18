@@ -115,7 +115,7 @@ This package is pre-1.0 and unreleased: any release, including a minor one, may 
 
 ## Known limitations
 
-- models.dev decodes an omitted optional rate (cache, reasoning) as 0, which cannot be told apart from free. `Catalog` snapshots therefore never mark a rate unknown; put an override table in front for a model whose missing rate matters.
+- models.dev adapters and `FromCatalog` preserve unknown rates through offline tables. Context-dependent prices are unknown in the five-component snapshot until a caller selects a tier; audio prices remain catalog metadata. Tables preserve this conservative projection, not the complete tier/audio structure.
 - `Catalog` cannot tell "model not in the catalog" from "the catalog's cache was never populated"; check `modelsdev.Client.LastFetchedAt()`.
 - `ParseLiteLLM` reads only the five per-token rate fields. Tiered, per-character, per-image, per-second and batch prices are ignored, and an entry with none of the five rates is skipped.
 - The cache is a single JSON file per table with no locking between processes; the last `SaveFile` wins.

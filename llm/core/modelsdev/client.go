@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultURL = "https://models.dev/api.json"
+	defaultURL = "https://models.dev/api.json?type=all"
 	defaultTTL = 24 * time.Hour
 	maxRetries = 3
 )
@@ -136,18 +136,26 @@ func (c *Client) List() []ModelRef {
 		for _, mid := range modelIDs {
 			m := p.Models[mid]
 			refs = append(refs, ModelRef{
-				ProviderID:      pid,
-				ID:              m.ID,
-				Name:            m.Name,
-				Family:          m.Family,
-				OpenWeights:     m.OpenWeights,
-				ReleaseDate:     m.ReleaseDate,
-				KnowledgeCutoff: m.KnowledgeCutoff,
-				LastUpdated:     m.LastUpdated,
-				Cost:            m.Cost,
-				Limit:           m.Limit,
-				Modality:        m.Modality,
-				Capabilities:    m.Capabilities,
+				ProviderID:       pid,
+				Description:      m.Description,
+				CanonicalModelID: m.CanonicalModelID,
+				Type:             m.Type,
+				Status:           m.Status,
+				Provider:         m.Provider,
+				ReasoningOptions: m.ReasoningOptions,
+				Interleaved:      m.Interleaved,
+				Experimental:     m.Experimental,
+				ID:               m.ID,
+				Name:             m.Name,
+				Family:           m.Family,
+				OpenWeights:      m.OpenWeights,
+				ReleaseDate:      m.ReleaseDate,
+				KnowledgeCutoff:  m.KnowledgeCutoff,
+				LastUpdated:      m.LastUpdated,
+				Cost:             m.Cost,
+				Limit:            m.Limit,
+				Modality:         m.Modality,
+				Capabilities:     m.Capabilities,
 			})
 		}
 	}

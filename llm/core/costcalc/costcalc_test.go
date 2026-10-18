@@ -3,7 +3,6 @@ package costcalc_test
 import (
 	"math"
 	"reflect"
-	"strings"
 	"testing"
 
 	costcalc "github.com/hollis-labs/libs/llm/core/costcalc"
@@ -247,40 +246,11 @@ func TestPriceModel_Found(t *testing.T) {
 	}
 }
 
-func TestPriceSnapshotFromPricing_FieldParity(t *testing.T) {
-	pt := reflect.TypeOf(modelsdev.Pricing{})
-	st := reflect.TypeOf(usageledger.PriceSnapshot{})
-	// Parity is about rates: count PriceSnapshot's ...PerMillion fields, not
-	// its source metadata (Source, AsOf, UnknownRates).
-	rates := 0
-	for i := range st.NumField() {
-		if strings.HasSuffix(st.Field(i).Name, "PerMillion") {
-			rates++
-		}
-	}
-	if pt.NumField() != rates {
-		t.Fatalf("modelsdev.Pricing has %d fields, usageledger.PriceSnapshot has %d rate fields: a pricing dimension was added on one side", pt.NumField(), rates)
-	}
-	// Give every Pricing field a distinct non-zero value, convert, and require
-	// each one to land in the PriceSnapshot field named <Name>PerMillion.
-	var p modelsdev.Pricing
-	pv := reflect.ValueOf(&p).Elem()
-	for i := range pt.NumField() {
-		if pt.Field(i).Type.Kind() != reflect.Float64 {
-			t.Fatalf("Pricing.%s is %s, not float64", pt.Field(i).Name, pt.Field(i).Type)
-		}
-		pv.Field(i).SetFloat(float64(i + 1))
-	}
-	sv := reflect.ValueOf(costcalc.PriceSnapshotFromPricing(p))
-	for i := range pt.NumField() {
-		name := pt.Field(i).Name + "PerMillion"
-		f := sv.FieldByName(name)
-		if !f.IsValid() {
-			t.Fatalf("PriceSnapshot has no field %s for Pricing.%s", name, pt.Field(i).Name)
-		}
-		if f.Float() != float64(i+1) {
-			t.Errorf("Pricing.%s -> %s = %v, want %v", pt.Field(i).Name, name, f.Float(), float64(i+1))
-		}
+func TestPriceSnapshotFromPricing_CoreRates(t *testing.T) {
+	p := modelsdev.Pricing{Input: 1, Output: 2, CacheWrite: 3, CacheRead: 4, Reasoning: 5}
+	want := usageledger.PriceSnapshot{InputPerMillion: 1, OutputPerMillion: 2, CacheWritePerMillion: 3, CacheReadPerMillion: 4, ReasoningPerMillion: 5}
+	if got := costcalc.PriceSnapshotFromPricing(p); got != want {
+		t.Fatalf("snapshot = %+v, want %+v", got, want)
 	}
 }
 

@@ -118,7 +118,7 @@ go run ./examples/refresher
 | `WithCacheDir(dir string)` | `~/.cache/go-modelsdev/` | Override the cache directory |
 | `WithCacheTTL(d time.Duration)` | `24h` | How long a cached catalog is considered fresh |
 | `WithHTTPClient(c *http.Client)` | 30s-timeout client | Replace the HTTP client (useful for tests) |
-| `WithURL(url string)` | `https://models.dev/api.json` | Override the API endpoint |
+| `WithURL(url string)` | `https://models.dev/api.json?type=all` | Override the API endpoint |
 | `WithOnRefresh(fn func(*Client))` | nil | Callback fired after every successful refresh |
 
 ## Dependencies
@@ -137,3 +137,46 @@ Tests use `httptest.NewServer` and `t.TempDir()` — no network access or real A
 ## License
 
 [MIT](LICENSE) © Hollis Labs.
+
+## Metadata and price availability
+
+The default endpoint includes specialized model types (`type=all`). `WithURL`
+uses the supplied URL unchanged. `Model` and `ModelRef` retain canonical identity,
+provider request metadata, model type/status, reasoning controls, input limits,
+structured output, audio rates and context pricing tiers. Provider IDs and prices
+remain separate even when offerings share a `CanonicalModelID`. Provider bodies,
+headers and API URLs are descriptive data; this client never applies them to
+inference requests.
+
+`Capabilities.Unknown` distinguishes absent flags from explicit false. Missing
+input limits are nil. `Pricing.UnknownRates` distinguishes omitted/null core
+rates from explicit zero; audio rates are pointers with the same distinction.
+These distinctions survive JSON and disk-cache round trips. The units are
+`PricingCurrency` (USD) and `PricingUnit` (per million provider-native tokens).
+
+The added tier slice makes `Pricing` non-comparable with `==`. Existing keyed
+numeric Go literals keep their meaning: `Pricing{}` describes known
+zero core rates. For incomplete programmatic data, start with `UnknownPricing()`
+and clear each corresponding unknown flag when assigning its rate. Do not read
+a numeric rate as free without checking its unknown flag. Likewise, manually
+constructed capability flags remain known unless marked unknown.
+
+Cache schema 1 preserves availability. Unversioned caches remain usable offline,
+but their zero rates and false capability flags are conservatively unknown: the
+old encoder erased their original presence. A running refresher treats those
+caches as stale and recovers availability on its next successful fetch. Future
+unsupported cache versions are rejected. Historical usage-ledger rows are not
+rewritten.
+
+The catalog preserves audio and tiered prices without calculating them. The
+five-component `costcalc` projection marks context-dependent rates unknown when
+no tier has been selected; audio usage in `Usage.Dims` remains unpriced. Consumers
+must check partial costs before displaying a complete estimate or enforcing a
+budget. A frozen `pricesource.Table` contains this conservative projection, not
+the full tier/audio metadata; keep the model catalog when those fields are needed.
+
+Upstream contract reviewed 2026-10-18:
+[models.dev schema](https://github.com/anomalyco/models.dev/blob/dev/packages/core/src/schema.ts)
+and [API documentation](https://github.com/anomalyco/models.dev/blob/dev/README.md).
+Tests use a frozen representative fixture with synthetic prices, not current
+billing rates. See the module [changelog](../CHANGELOG.md) for release status.
