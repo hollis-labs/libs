@@ -38,6 +38,7 @@ something from a higher group, the shared part moves down. The ranks live in
 | `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper and a Tesseract memory API client. |
 | `core/panics` | `github.com/hollis-labs/libs/core/panics` | Panic containment: recover at a boundary, return a ref and keep a redacted, bounded record. Goroutine, call and `net/http` guards; no dependencies. |
 | `security/redact` | `github.com/hollis-labs/libs/security/redact` | Credential redaction for text, JSON, command lines, environments and logs: pattern rules plus exact known values, one marker, idempotent. Standard library only. |
+| `security/pairing` | `github.com/hollis-labs/libs/security/pairing` | Device enrollment protocol and standalone SQLite mechanism: one-use grants, scoped credentials, expiry, renewal and revocation. See its README for host authorization and transport requirements. |
 | `ui/ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `mcp/plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 | `workflow/engine` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |

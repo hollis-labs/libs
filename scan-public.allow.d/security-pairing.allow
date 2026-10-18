@@ -1,0 +1,2 @@
+# Synthetic credentials inside a URL must be rejected by origin validation.
+credentials-in-url security/pairing/pairing_test.go Invented user:secret at example.test exercises refusal of URL userinfo; no real credential or host.
