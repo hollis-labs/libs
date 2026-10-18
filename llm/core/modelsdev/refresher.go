@@ -5,69 +5,63 @@ import (
 	"time"
 )
 
-// StartRefresher starts a background goroutine that keeps the catalog fresh.
-//
-// On start: if the cache is stale or missing, Refresh is called immediately.
-// After each successful refresh, the next refresh is scheduled at
-// lastFetchedAt + TTL so the goroutine drifts with actual fetch times
-// rather than accumulating clock skew.
-//
-// Stops cleanly when ctx is cancelled. Safe to call from main().
-// StartRefresher gives the caller nothing to wait on; use [Client.Run] in
-// your own goroutine when shutdown must know the refresher has exited — for
-// example before closing a store that [WithOnRefresh] writes to.
-func (c *Client) StartRefresher(ctx context.Context) {
-	go c.Run(ctx)
-}
+// StartRefresher runs Run in a goroutine. Use Run directly when shutdown must
+// wait for an in-flight refresh and its callback to finish.
+func (c *Client) StartRefresher(ctx context.Context) { go c.Run(ctx) }
 
-// Run is the refresher loop [Client.StartRefresher] starts, run on the
-// calling goroutine. It blocks until ctx is cancelled and returns only once
-// no refresh is in flight, so the cache write and the [WithOnRefresh]
-// callback cannot happen after Run returns.
+// Run refreshes stale/missing data and retries failures with bounded backoff.
+// It returns after cancellation and after any in-flight callback finishes.
+// Callbacks may read the client but must not recursively call Refresh or Run.
 func (c *Client) Run(ctx context.Context) {
-	// Determine whether an immediate refresh is needed.
-	needNow := true
-	if entry, err := loadCache(c.cacheDir); err == nil && !isStale(entry, c.ttl) {
-		// Cache exists and is fresh — load it into memory and wait until it expires.
-		c.mu.Lock()
-		if c.catalog == nil {
-			c.catalog = &entry.Data
-			c.lastFetched = entry.FetchedAt
-		}
-		c.mu.Unlock()
-		needNow = false
+	// Only one background loop owns scheduling for this client.
+	select {
+	case c.runGate <- struct{}{}:
+		defer func() { <-c.runGate }()
+	case <-ctx.Done():
+		return
 	}
-
-	if needNow {
-		// Run first refresh inline so the catalog is populated before we enter
-		// the wait loop. Ignore errors — the old cache (if any) is still usable.
-		_ = c.Refresh(ctx)
-	}
-
+	c.mu.Lock()
+	c.health.Running = true
+	c.mu.Unlock()
+	defer func() { c.mu.Lock(); c.health.Running = false; c.mu.Unlock() }()
+	c.ensureCatalog()
 	for {
-		next := c.nextRefreshIn()
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
-		case <-time.After(next):
-			_ = c.Refresh(ctx)
 		}
+		wait := c.nextRefreshIn()
+		if wait > 0 {
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		// A manual refresh may have changed the schedule while the timer waited.
+		if c.nextRefreshIn() > 0 {
+			continue
+		}
+		_ = c.Refresh(ctx) // Failure details and the next retry are retained in Health.
 	}
 }
 
-// nextRefreshIn returns how long until the next scheduled refresh.
-// If the cache has never been populated it returns the full TTL.
 func (c *Client) nextRefreshIn() time.Duration {
 	c.mu.RLock()
-	fetched := c.lastFetched
-	c.mu.RUnlock()
-
-	if fetched.IsZero() {
-		return c.ttl
+	defer c.mu.RUnlock()
+	target := c.health.NextAttempt
+	if target.IsZero() {
+		if c.catalog == nil || c.legacyCache {
+			return 0
+		}
+		target = c.lastFetched.Add(c.ttl)
 	}
-	remaining := time.Until(fetched.Add(c.ttl))
-	if remaining <= 0 {
-		return 0
+	if d := time.Until(target); d > 0 {
+		return d
 	}
-	return remaining
+	return 0
 }

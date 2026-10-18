@@ -16,6 +16,15 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ### Added
 
+- `modelsdev`: safe refresh health, bounded fetch/body options, configurable failure backoff, source-bound cache schema 2, and atomic model/fetch-timestamp reads. Old unbound caches require explicit source ownership via `WithLegacyCacheSource`.
+
+### Fixed
+
+- Keep last-good catalog data through invalid/empty/oversized responses and cache write failures; serialize client refresh publication and callbacks, bound retries after stale-cache failures, and wait for in-flight work during shutdown.
+- `pricesource`: use atomic catalog reads for consistent price provenance across refreshes. `LastFetchedAt` hydrates disk state on first read.
+
+### Added
+
 - `modelsdev`: provider-specific canonical identity, type/status/description, request metadata, reasoning controls, structured-output and capability availability, input limits, audio rates and context tiers. The default API URL requests all model types. Prices use USD per million provider-native tokens.
 - `modelsdev.Pricing.UnknownRates` and `UnknownPricing`: missing/null JSON rates remain unknown; explicit zero remains free. Existing keyed numeric Go literals retain known-zero semantics; `Pricing` is no longer comparable because it carries a tier slice.
 

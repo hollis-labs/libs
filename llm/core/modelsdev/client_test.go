@@ -3,10 +3,12 @@ package modelsdev_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
+
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +67,7 @@ func newTestClient(t *testing.T, srv *httptest.Server) *modelsdev.Client {
 		modelsdev.WithHTTPClient(srv.Client()),
 		modelsdev.WithCacheDir(t.TempDir()),
 		modelsdev.WithCacheTTL(24*time.Hour),
+		modelsdev.WithRetryBackoff(time.Millisecond, time.Millisecond),
 	)
 }
 
@@ -133,10 +136,13 @@ func TestRefresh_Fallback(t *testing.T) {
 	defer badSrv.Close()
 
 	c2 := modelsdev.New(
-		modelsdev.WithURL(badSrv.URL),
-		modelsdev.WithHTTPClient(badSrv.Client()),
+		modelsdev.WithURL(goodSrv.URL),
+		modelsdev.WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 500, Body: io.NopCloser(strings.NewReader("unavailable")), Header: make(http.Header)}, nil
+		})}),
 		modelsdev.WithCacheDir(dir), // same cache dir — old cache must survive
 		modelsdev.WithCacheTTL(24*time.Hour),
+		modelsdev.WithRetryBackoff(time.Millisecond, time.Millisecond),
 	)
 
 	err := c2.Refresh(context.Background())
@@ -144,8 +150,10 @@ func TestRefresh_Fallback(t *testing.T) {
 
 	// A fresh client reading the same cache dir should still see the old catalog.
 	c3 := modelsdev.New(
-		modelsdev.WithURL(badSrv.URL),
-		modelsdev.WithHTTPClient(badSrv.Client()),
+		modelsdev.WithURL(goodSrv.URL),
+		modelsdev.WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 500, Body: io.NopCloser(strings.NewReader("unavailable")), Header: make(http.Header)}, nil
+		})}),
 		modelsdev.WithCacheDir(dir),
 	)
 	m, ok := c3.Get("acme", "fast-1")
@@ -165,10 +173,13 @@ func TestRefresh_AtomicWrite(t *testing.T) {
 	)
 	require.NoError(t, c.Refresh(context.Background()))
 
-	// After a successful refresh the .tmp file must not exist (rename cleaned it up).
-	tmp := filepath.Join(dir, "catalog.json.tmp")
-	_, err := os.Stat(tmp)
-	require.True(t, os.IsNotExist(err), ".tmp file must not exist after successful refresh")
+	// A successful atomic publish leaves no temporary file behind.
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		require.False(t, strings.HasSuffix(entry.Name(), ".tmp"))
+	}
+
 }
 
 func TestLastFetchedAt(t *testing.T) {
