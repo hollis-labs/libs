@@ -13,7 +13,7 @@ recorded-assertion re-verification. `sqlitestore` implements the storage contrac
 
 ## Install
 
-Requires Go 1.26.8 or later. After the `security/webauthn/v0.1.0` tag is published:
+Requires Go 1.26.9 or later. After the `security/webauthn/v0.1.0` tag is published:
 
 ```sh
 go get github.com/hollis-labs/libs/security/webauthn@v0.1.0

@@ -4,6 +4,8 @@
 
 ## v0.1.0 — 2026-10-19
 
+- Require Go 1.26.9 for the standard-library security fixes identified by the
+  release vulnerability scan.
 - Require authenticated caller binding at Service begin/finish; wrong-session
   completion is refused without consuming the legitimate caller's ceremony.
 - Permanently reserve challenge digests per authority in SQLite to reject
