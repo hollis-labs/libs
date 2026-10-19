@@ -10,7 +10,10 @@ import (
 
 // Ceremony is server-owned state. Never reconstruct it from a client request.
 type Ceremony struct {
-	Kind         string
+	Kind string
+	// BindingHash is derived from trusted authenticated caller/session context.
+	// It is not a browser-supplied identity or an authentication credential.
+	BindingHash  [32]byte
 	Challenge    []byte
 	Origin       string
 	ExpiresAt    time.Time
@@ -46,7 +49,12 @@ type Snapshot struct {
 // atomically commits credentials, counters, ceremonies and proof receipts only
 // if expected still matches. A credential ID cannot belong to two subjects.
 // Implementations must return ErrConflict on stale state and propagate write
-// failures. Callers must not accept a proof until its commit succeeds.
+// failures. Every newly inserted assertion/removal ceremony must reserve its
+// challenge permanently within the authority in the same transaction.
+// Return ErrChallengeReuse if that challenge was reserved before, even when
+// the earlier ceremony or receipt has expired or been removed. Store only its
+// hash in a separate ledger; do not grow the subject snapshot with history.
+// Callers must not accept options or a proof until its commit succeeds.
 type Store interface {
 	Load(context.Context, string) (Snapshot, error)
 	CompareAndSwap(context.Context, string, int64, Snapshot) error

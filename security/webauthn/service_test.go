@@ -2,6 +2,7 @@ package webauthn_test
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -55,19 +56,19 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, opts, err := f.svc.BeginRegistration(ctx, "alice", origin, f.now.Add(time.Minute))
+	id, opts, err := f.svc.BeginRegistration(ctx, "alice", "session-a", origin, f.now.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.svc.FinishRegistration(ctx, "alice", id, f.key.Register(t, opts)); err != nil {
+	if _, err = f.svc.FinishRegistration(ctx, "alice", "session-a", id, f.key.Register(t, opts)); err != nil {
 		t.Fatal(err)
 	}
 	return f
 }
 func (f *fixture) begin(t *testing.T) (string, json.RawMessage, []byte) {
 	t.Helper()
-	ch := proof.Challenge([]byte("operation"), []byte(t.Name()), []byte("synthetic nonce"))
-	id, opts, err := f.svc.BeginAssertion(ctx, "alice", ch, origin, f.now.Add(time.Minute))
+	ch := proof.Challenge([]byte("operation"), []byte(t.Name()), []byte(rand.Text()))
+	id, opts, err := f.svc.BeginAssertion(ctx, "alice", "session-a", ch, origin, f.now.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,10 +83,10 @@ func TestProofSurvivesRestartButCannotBeDecidedTwice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = other.FinishAssertion(ctx, "alice", id, raw); err != nil {
+	if _, err = other.FinishAssertion(ctx, "alice", "session-a", id, raw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.svc.FinishAssertion(ctx, "alice", id, raw); !errors.Is(err, proof.ErrCeremony) {
+	if _, err = f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw); !errors.Is(err, proof.ErrCeremony) {
 		t.Fatalf("replay: %v", err)
 	}
 	if _, err = other.Reverify(ctx, "alice", id, ch); err != nil {
@@ -108,7 +109,7 @@ func TestAssertionFailuresConsumeCeremony(t *testing.T) {
 			f := setup(t)
 			if tc == "counter" {
 				id, opts, _ := f.begin(t)
-				if _, err := f.svc.FinishAssertion(ctx, "alice", id, f.key.Assert(t, opts)); err != nil {
+				if _, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, f.key.Assert(t, opts)); err != nil {
 					t.Fatal(err)
 				}
 				f.key.Counter = 0
@@ -138,10 +139,10 @@ func TestAssertionFailuresConsumeCeremony(t *testing.T) {
 				data["response"].(map[string]any)["signature"] = "AA"
 				raw, _ = json.Marshal(data)
 			}
-			if _, err := f.svc.FinishAssertion(ctx, "alice", id, raw); err == nil {
+			if _, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw); err == nil {
 				t.Fatal("invalid assertion accepted")
 			}
-			if _, err := f.svc.FinishAssertion(ctx, "alice", id, raw); !errors.Is(err, proof.ErrCeremony) {
+			if _, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw); !errors.Is(err, proof.ErrCeremony) {
 				t.Fatalf("failed ceremony replay: %v", err)
 			}
 		})
@@ -150,21 +151,21 @@ func TestAssertionFailuresConsumeCeremony(t *testing.T) {
 func TestRemovalInvalidatesRecordedProof(t *testing.T) {
 	f := setup(t)
 	id, opts, ch := f.begin(t)
-	p, err := f.svc.FinishAssertion(ctx, "alice", id, f.key.Assert(t, opts))
+	p, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, f.key.Assert(t, opts))
 	if err != nil {
 		t.Fatal(err)
 	}
-	removal, ropts, err := f.svc.BeginRemoval(ctx, "alice", p.CredentialID, origin, f.now.Add(time.Minute))
+	removal, ropts, err := f.svc.BeginRemoval(ctx, "alice", "session-a", p.CredentialID, origin, f.now.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = f.svc.FinishRemoval(ctx, "alice", removal, f.key.Assert(t, ropts)); err != nil {
+	if err = f.svc.FinishRemoval(ctx, "alice", "session-a", removal, f.key.Assert(t, ropts)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.svc.Reverify(ctx, "alice", id, ch); err == nil {
 		t.Fatalf("removed key: %v", err)
 	}
-	if err = f.svc.FinishRemoval(ctx, "alice", removal, f.key.Assert(t, ropts)); !errors.Is(err, proof.ErrCeremony) {
+	if err = f.svc.FinishRemoval(ctx, "alice", "session-a", removal, f.key.Assert(t, ropts)); !errors.Is(err, proof.ErrCeremony) {
 		t.Fatalf("removal replay: %v", err)
 	}
 }
@@ -176,7 +177,11 @@ func TestConcurrentCompletionAcceptsOnce(t *testing.T) {
 	results := make(chan error, 8)
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
-		go func() { defer wg.Done(); _, err := f.svc.FinishAssertion(ctx, "alice", id, raw); results <- err }()
+		go func() {
+			defer wg.Done()
+			_, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw)
+			results <- err
+		}()
 	}
 	wg.Wait()
 	close(results)
@@ -241,7 +246,7 @@ func TestWriteFailureDoesNotReturnProof(t *testing.T) {
 	}
 	id, opts, _ := f.begin(t)
 	st.fail = true
-	p, err := svc.FinishAssertion(ctx, "alice", id, f.key.Assert(t, opts))
+	p, err := svc.FinishAssertion(ctx, "alice", "session-a", id, f.key.Assert(t, opts))
 	if err == nil || len(p.Assertion) != 0 {
 		t.Fatal("proof escaped failed commit")
 	}
@@ -279,7 +284,7 @@ func TestPendingAndCounterStateSurviveDatabaseReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = svc.FinishAssertion(ctx, "alice", id, f.key.Assert(t, opts)); err != nil {
+	if _, err = svc.FinishAssertion(ctx, "alice", "session-a", id, f.key.Assert(t, opts)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = svc.Reverify(ctx, "alice", id, ch); err != nil {
@@ -298,10 +303,10 @@ func TestCounterlessAssertionStillSingleUse(t *testing.T) {
 	id, opts, _ := f.begin(t)
 	f.key.Counter = ^uint32(0) // synthetic authenticator wraps to the zero-count format
 	raw := f.key.Assert(t, opts)
-	if _, err := f.svc.FinishAssertion(ctx, "alice", id, raw); err != nil {
+	if _, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.svc.FinishAssertion(ctx, "alice", id, raw); !errors.Is(err, proof.ErrCeremony) {
+	if _, err := f.svc.FinishAssertion(ctx, "alice", "session-a", id, raw); !errors.Is(err, proof.ErrCeremony) {
 		t.Fatalf("counterless replay: %v", err)
 	}
 }
