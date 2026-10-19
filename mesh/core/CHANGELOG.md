@@ -8,6 +8,13 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- Draft caller-profile examples for operation-bound WebAuthn evidence carried
+  through go-hitl response extensions, with synthetic positive/negative vectors
+  and an offline fixture checker. Core verification behavior is unchanged
+  (CW-20261018-0082).
+
 ## v0.8.0 — 2026-10-16
 
 ### Added
