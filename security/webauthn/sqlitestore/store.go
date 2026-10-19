@@ -101,7 +101,7 @@ func (s *Store) CompareAndSwap(ctx context.Context, subject string, expected int
 	}
 	// Backfill challenges still present in pre-ledger snapshots before checking
 	// new ceremonies. Historical challenges already pruned by older software
-	// cannot be recovered; this module has not yet had a production release.
+	// cannot be recovered; the ledger is included from the first release, v0.1.0.
 	remember := func(challenge []byte) error {
 		digest := sha256.Sum256(challenge)
 		_, err := tx.ExecContext(ctx, `INSERT INTO webauthn_challenges(authority,subject,digest) VALUES(?,?,?) ON CONFLICT DO NOTHING`, s.authority, subject, digest[:])
