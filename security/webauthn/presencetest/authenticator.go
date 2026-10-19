@@ -24,6 +24,7 @@ type Authenticator struct {
 	RPID    string
 	Origin  string
 	UV      bool
+	Present bool
 	Counter uint32
 	key     *ecdsa.PrivateKey
 	id      []byte
@@ -38,11 +39,14 @@ func New(t testing.TB, rpID, origin string) *Authenticator {
 	}
 	id := make([]byte, 16)
 	_, _ = rand.Read(id)
-	return &Authenticator{RPID: rpID, Origin: origin, UV: true, key: k, id: id}
+	return &Authenticator{RPID: rpID, Origin: origin, UV: true, Present: true, key: k, id: id}
 }
 
 func (a *Authenticator) flags(attested bool) byte {
-	f := byte(0x01) // user present
+	f := byte(0)
+	if a.Present {
+		f |= 0x01
+	} // user present
 	if a.UV {
 		f |= 0x04
 	}
