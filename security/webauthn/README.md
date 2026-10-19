@@ -11,6 +11,14 @@ ceremonies, five-minute maximum ceremony lifetime, atomic counter updates and
 recorded-assertion re-verification. `sqlitestore` implements the storage contract;
 `presencetest` supplies an ephemeral software authenticator for tests.
 
+## Install
+
+Requires Go 1.26.9 or later. After the `security/webauthn/v0.1.0` tag is published:
+
+```sh
+go get github.com/hollis-labs/libs/security/webauthn@v0.1.0
+```
+
 ## Trust and ownership
 
 Construct a party from a trusted RP ID and origin allow-list. Initialize each
@@ -89,8 +97,8 @@ error denies completion and must not trigger a retry that executes effects.
 
 The challenge-ledger addition backfills challenges still present in old
 snapshots when they are next updated. It cannot reconstruct history already
-pruned by an earlier build. The module is unreleased; an experimental caller
-upgrading persisted state must backfill all subjects before accepting requests
+pruned by an earlier build. An experimental caller upgrading persisted state
+from a pre-v0.1.0 build must backfill all subjects before accepting requests
 and account for missing historical challenges before trusting old counterless
 credentials. Lazy per-subject backfill alone does not prevent cross-subject reuse
 of an old challenge belonging to a subject that has not yet been updated.
