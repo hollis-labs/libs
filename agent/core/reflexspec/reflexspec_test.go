@@ -515,7 +515,7 @@ func TestStdlibOnly(t *testing.T) {
 		t.Skipf("go list unavailable: %v", err)
 	}
 	for _, p := range strings.Fields(string(out)) {
-		if !strings.HasPrefix(p, "github.com/hollis-labs/reflex-definition-spec") {
+		if !strings.HasPrefix(p, "github.com/hollis-labs/libs/agent/core/reflexspec") {
 			t.Errorf("non-stdlib dependency %s", p)
 		}
 	}

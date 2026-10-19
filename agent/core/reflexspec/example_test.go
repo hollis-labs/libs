@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	reflexspec "github.com/hollis-labs/reflex-definition-spec"
+	reflexspec "github.com/hollis-labs/libs/agent/core/reflexspec"
 )
 
 func ExampleValidate() {

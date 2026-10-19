@@ -3,7 +3,7 @@ package conformance_test
 import (
 	"fmt"
 
-	"github.com/hollis-labs/reflex-definition-spec/conformance"
+	"github.com/hollis-labs/libs/agent/core/reflexspec/conformance"
 )
 
 func ExampleRun() {

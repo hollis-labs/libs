@@ -5,7 +5,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	reflexspec "github.com/hollis-labs/reflex-definition-spec"
+	reflexspec "github.com/hollis-labs/libs/agent/core/reflexspec"
 )
 
 // TestFixtures runs every embedded case against the validator: valid cases

@@ -9,7 +9,7 @@ Portable contract for one reflex definition: validates the record shape, the tri
 ## Install
 
 ```sh
-go get github.com/hollis-labs/reflex-definition-spec
+go get github.com/hollis-labs/libs/agent/core@latest
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 
-	reflexspec "github.com/hollis-labs/reflex-definition-spec"
+	reflexspec "github.com/hollis-labs/libs/agent/core/reflexspec"
 )
 
 func main() {

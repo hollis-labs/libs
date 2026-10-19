@@ -29,9 +29,9 @@ inputs:
   repo_name: reflex-definition-spec
   stability: pre-1.0
 computed:
-  import_line: reflexspec "github.com/hollis-labs/reflex-definition-spec"
-  import_path: github.com/hollis-labs/reflex-definition-spec
-  module_path: github.com/hollis-labs/reflex-definition-spec
+  import_line: reflexspec "github.com/hollis-labs/libs/agent/core/reflexspec"
+  import_path: github.com/hollis-labs/libs/agent/core/reflexspec
+  module_path: github.com/hollis-labs/libs/agent/core/reflexspec
   year: "2026"
 files:
   .github/workflows/check.yml:

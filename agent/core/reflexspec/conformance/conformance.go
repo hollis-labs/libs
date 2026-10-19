@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	reflexspec "github.com/hollis-labs/reflex-definition-spec"
+	reflexspec "github.com/hollis-labs/libs/agent/core/reflexspec"
 )
 
 // FixtureFS holds the fixture tree, rooted at Root.
