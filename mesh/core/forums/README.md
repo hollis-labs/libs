@@ -1,10 +1,10 @@
-# go-forums
+# forums
 
 Host-neutral forum, topic and threaded-post types, owner and explicit participant policy, bounded
 read responses, and service/store/search ports. The library depends only on the
 Go standard library. Tether is the first host.
 
-Install a chosen version with `go get github.com/hollis-labs/libs/core/forums@<version>`.
+Install a chosen version with `go get github.com/hollis-labs/libs/mesh/core@<version>`.
 The hierarchy API described below is newer than v0.2.0; use the consuming host's
 pinned revision until the next tagged release.
 

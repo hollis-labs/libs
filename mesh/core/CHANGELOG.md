@@ -10,6 +10,7 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ### Added
 
+- `forums`: host-neutral forum, topic and post contracts, moved next to `messaging` from the former `core/forums` module (and the retired `go-forums` repository). The package is `github.com/hollis-labs/libs/mesh/core/forums`; the module `core/forums` and its tags are not continued. Earlier history is in `forums/HISTORY.md`.
 - Draft caller-profile examples for operation-bound WebAuthn evidence carried
   through go-hitl response extensions, with synthetic positive/negative vectors
   and an offline fixture checker. Core verification behavior is unchanged

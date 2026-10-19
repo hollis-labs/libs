@@ -404,6 +404,39 @@ func (p ResolvedAccessPolicy) WithProtected(paths ...string) (ResolvedAccessPoli
 	return out, nil
 }
 
+// WithHidden returns a copy of p that also denies the child every existing
+// path in paths (read and write), the resolved-policy counterpart of
+// Profile.FS.Hide. Each path must be absolute and is canonicalized. A path
+// that does not exist is skipped: there is nothing to hide, and a Deny entry
+// for it could not be mounted over.
+func (p ResolvedAccessPolicy) WithHidden(paths ...string) (ResolvedAccessPolicy, error) {
+	out := p
+	out.FS.Deny = slices.Clone(p.FS.Deny)
+	for _, raw := range paths {
+		if !filepath.IsAbs(raw) {
+			return ResolvedAccessPolicy{}, fmt.Errorf("sandbox: hidden path %q must be absolute", raw)
+		}
+		if err := validateProtectPath(raw); err != nil {
+			return ResolvedAccessPolicy{}, err
+		}
+		resolved, err := resolvePathRef(AccessDeny, PathRef{Path: raw}, ResolvedRoots{})
+		if err != nil {
+			return ResolvedAccessPolicy{}, err
+		}
+		if _, err := os.Lstat(resolved.Path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return ResolvedAccessPolicy{}, fmt.Errorf("sandbox: inspect hidden path %q: %w", raw, err)
+		}
+		if !slices.ContainsFunc(out.FS.Deny, func(r ResolvedPath) bool { return r.Path == resolved.Path }) {
+			out.FS.Deny = append(out.FS.Deny, resolved)
+		}
+	}
+	sortResolvedPolicy(&out)
+	return out, nil
+}
+
 // LegacyProfile converts a resolved policy into the legacy Profile shape. This
 // is a compatibility bridge for existing Apply callers and may lose future
 // policy detail; new code should pass the resolved policy to backend-aware
@@ -488,6 +521,9 @@ const (
 	CapSubprocessDeny      Capability = "subprocess-deny"
 	CapGUILaunchDeny       Capability = "gui-launch-deny"
 	CapWriteProtect        Capability = "write-protect"
+	// CapHidePaths is Profile.FS.Hide: named paths made unreadable to the
+	// child inside a host-filesystem profile. Linux bwrap only.
+	CapHidePaths Capability = "hide-paths"
 	// CapUserServiceManagerDeny is AccessPolicy.DenyUserServiceManager.
 	CapUserServiceManagerDeny Capability = "user-service-manager-deny"
 	CapDisabledMode           Capability = "disabled-mode"
@@ -548,6 +584,7 @@ func ResolveBackendCapabilities(goos string, requested BackendName) BackendCapab
 			CapLoopback,
 			CapLoopbackForward,
 			CapWriteProtect,
+			CapHidePaths,
 			CapUserServiceManagerDeny,
 		}
 	default:
