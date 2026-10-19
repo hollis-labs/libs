@@ -6,6 +6,7 @@ package sqlitestore
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -30,7 +31,10 @@ func New(ctx context.Context, db *sql.DB, authority string) (*Store, error) {
  state BLOB NOT NULL, PRIMARY KEY(authority,subject));
  CREATE TABLE IF NOT EXISTS webauthn_credentials (
  authority TEXT NOT NULL, credential_id BLOB NOT NULL, subject TEXT NOT NULL,
- PRIMARY KEY(authority,credential_id));`)
+ PRIMARY KEY(authority,credential_id));
+ CREATE TABLE IF NOT EXISTS webauthn_challenges (
+ authority TEXT NOT NULL, subject TEXT NOT NULL, digest BLOB NOT NULL,
+ PRIMARY KEY(authority,digest));`)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +78,7 @@ func (s *Store) CompareAndSwap(ctx context.Context, subject string, expected int
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var old proof.Snapshot
 	var oldRaw []byte
 	var oldVersion int64
 	err = tx.QueryRowContext(ctx, `SELECT version,state FROM webauthn_subjects WHERE authority=? AND subject=?`, s.authority, subject).Scan(&oldVersion, &oldRaw)
@@ -87,7 +92,6 @@ func (s *Store) CompareAndSwap(ctx context.Context, subject string, expected int
 		if oldVersion != expected {
 			return proof.ErrConflict
 		}
-		var old proof.Snapshot
 		if err = json.Unmarshal(oldRaw, &old); err != nil {
 			return err
 		}
@@ -95,6 +99,47 @@ func (s *Store) CompareAndSwap(ctx context.Context, subject string, expected int
 			return proof.ErrConflict
 		}
 	}
+	// Backfill challenges still present in pre-ledger snapshots before checking
+	// new ceremonies. Historical challenges already pruned by older software
+	// cannot be recovered; this module has not yet had a production release.
+	remember := func(challenge []byte) error {
+		digest := sha256.Sum256(challenge)
+		_, err := tx.ExecContext(ctx, `INSERT INTO webauthn_challenges(authority,subject,digest) VALUES(?,?,?) ON CONFLICT DO NOTHING`, s.authority, subject, digest[:])
+		return err
+	}
+	for _, c := range old.Pending {
+		if c.Kind == "assert" || c.Kind == "remove" {
+			if err := remember(c.Challenge); err != nil {
+				return err
+			}
+		}
+	}
+	for _, p := range old.Proofs {
+		if err := remember(p.Challenge); err != nil {
+			return err
+		}
+	}
+	for id, c := range next.Pending {
+		if c.Kind != "assert" && c.Kind != "remove" {
+			continue
+		}
+		if _, exists := old.Pending[id]; exists {
+			continue
+		}
+		digest := sha256.Sum256(c.Challenge)
+		result, err := tx.ExecContext(ctx, `INSERT INTO webauthn_challenges(authority,subject,digest) VALUES(?,?,?) ON CONFLICT DO NOTHING`, s.authority, subject, digest[:])
+		if err != nil {
+			return err
+		}
+		n, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return proof.ErrChallengeReuse
+		}
+	}
+
 	next.Version = expected + 1
 	raw, err := json.Marshal(next)
 	if err != nil {

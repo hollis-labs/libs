@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -45,6 +46,20 @@ func Challenge(parts ...[]byte) []byte {
 	}
 	return h.Sum(nil)
 }
+
+// Binding must come from authenticated server context (for example a stable
+// session identifier), never a request body. Keep it identical at begin/finish.
+func callerBindingHash(binding string) [32]byte {
+	return sha256.Sum256([]byte("webauthn caller binding v1\x00" + binding))
+}
+func matchesCaller(c Ceremony, binding string) bool {
+	if binding == "" {
+		return false
+	}
+	digest := callerBindingHash(binding)
+	return subtle.ConstantTimeCompare(c.BindingHash[:], digest[:]) == 1
+}
+
 func randomID() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -95,7 +110,12 @@ func (s *Service) expiry(deadline time.Time) (time.Time, error) {
 // BeginAssertion persists the exact challenge and origin before returning
 // browser options. The challenge must include an unpredictable nonce and bind
 // the operation; the generated ceremony ID is NOT automatically in that hash.
-func (s *Service) BeginAssertion(ctx context.Context, subject string, challenge []byte, origin string, deadline time.Time) (string, json.RawMessage, error) {
+// The store also rejects challenge reuse across ceremonies, including after
+// expiry/removal. binding identifies the authenticated initiating session.
+func (s *Service) BeginAssertion(ctx context.Context, subject, binding string, challenge []byte, origin string, deadline time.Time) (string, json.RawMessage, error) {
+	if binding == "" {
+		return "", nil, ErrBinding
+	}
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return "", nil, err
@@ -110,7 +130,7 @@ func (s *Service) BeginAssertion(ctx context.Context, subject string, challenge 
 	}
 	id := randomID()
 	s.prune(&st)
-	c := Ceremony{Kind: "assert", Challenge: append([]byte(nil), challenge...), Origin: origin, ExpiresAt: expires}
+	c := Ceremony{Kind: "assert", BindingHash: callerBindingHash(binding), Challenge: append([]byte(nil), challenge...), Origin: origin, ExpiresAt: expires}
 	for _, cred := range st.User.Credentials {
 		c.AllowedIDs = append(c.AllowedIDs, cred.ID)
 	}
@@ -145,7 +165,7 @@ func updateCredential(u *User, c *wa.Credential) {
 // FinishAssertion atomically spends the ceremony, advances the counter and
 // records the original assertion. Storage failure or a concurrent mutation
 // refuses the result. A failed signature consumes the ceremony as well.
-func (s *Service) FinishAssertion(ctx context.Context, subject, id string, raw json.RawMessage) (Proof, error) {
+func (s *Service) FinishAssertion(ctx context.Context, subject, binding, id string, raw json.RawMessage) (Proof, error) {
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return Proof{}, err
@@ -153,6 +173,9 @@ func (s *Service) FinishAssertion(ctx context.Context, subject, id string, raw j
 	c, ok := st.Pending[id]
 	if !ok || c.Kind != "assert" || !s.now().Before(c.ExpiresAt) {
 		return Proof{}, ErrCeremony
+	}
+	if !matchesCaller(c, binding) {
+		return Proof{}, ErrBinding
 	}
 	delete(st.Pending, id)
 	cred, verifyErr := s.party.VerifyAssertion(ceremonyUser(st.User, c), raw, c.Challenge, c.Origin)
@@ -207,7 +230,10 @@ func (s *Service) Reverify(ctx context.Context, subject, id string, challenge []
 
 // BeginRegistration requires caller authorization for enrollment. Existing
 // credential authorization or first-key bootstrap policy is application-owned.
-func (s *Service) BeginRegistration(ctx context.Context, subject, origin string, deadline time.Time) (string, json.RawMessage, error) {
+func (s *Service) BeginRegistration(ctx context.Context, subject, binding, origin string, deadline time.Time) (string, json.RawMessage, error) {
+	if binding == "" {
+		return "", nil, ErrBinding
+	}
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return "", nil, err
@@ -222,7 +248,7 @@ func (s *Service) BeginRegistration(ctx context.Context, subject, origin string,
 	}
 	id := randomID()
 	s.prune(&st)
-	st.Pending[id] = Ceremony{Kind: "register", Origin: origin, ExpiresAt: expires, Registration: session}
+	st.Pending[id] = Ceremony{Kind: "register", BindingHash: callerBindingHash(binding), Origin: origin, ExpiresAt: expires, Registration: session}
 	if err = s.store.CompareAndSwap(ctx, subject, st.Version, st); err != nil {
 		return "", nil, err
 	}
@@ -230,8 +256,9 @@ func (s *Service) BeginRegistration(ctx context.Context, subject, origin string,
 }
 
 // FinishRegistration validates and stores a new public credential. The caller
-// must recheck enrollment authorization before calling this method.
-func (s *Service) FinishRegistration(ctx context.Context, subject, id string, raw json.RawMessage) (*wa.Credential, error) {
+// must recheck enrollment authorization and supply the same trusted caller
+// binding as BeginRegistration before calling this method.
+func (s *Service) FinishRegistration(ctx context.Context, subject, binding, id string, raw json.RawMessage) (*wa.Credential, error) {
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return nil, err
@@ -239,6 +266,9 @@ func (s *Service) FinishRegistration(ctx context.Context, subject, id string, ra
 	c, ok := st.Pending[id]
 	if !ok || c.Kind != "register" || c.Registration == nil || !s.now().Before(c.ExpiresAt) {
 		return nil, ErrCeremony
+	}
+	if !matchesCaller(c, binding) {
+		return nil, ErrBinding
 	}
 	delete(st.Pending, id)
 	cred, verifyErr := s.party.FinishRegistration(st.User, *c.Registration, raw)
@@ -266,7 +296,10 @@ func (s *Service) FinishRegistration(ctx context.Context, subject, id string, ra
 
 // BeginRemoval binds an enrolled-key assertion to this subject and exact
 // credential ID. The caller's removal policy remains independently required.
-func (s *Service) BeginRemoval(ctx context.Context, subject string, target []byte, origin string, deadline time.Time) (string, json.RawMessage, error) {
+func (s *Service) BeginRemoval(ctx context.Context, subject, binding string, target []byte, origin string, deadline time.Time) (string, json.RawMessage, error) {
+	if binding == "" {
+		return "", nil, ErrBinding
+	}
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return "", nil, err
@@ -291,7 +324,7 @@ func (s *Service) BeginRemoval(ctx context.Context, subject string, target []byt
 		return "", nil, err
 	}
 	s.prune(&st)
-	c := Ceremony{Kind: "remove", Challenge: challenge, Origin: origin, ExpiresAt: expires, RemoveID: append([]byte(nil), target...)}
+	c := Ceremony{Kind: "remove", BindingHash: callerBindingHash(binding), Challenge: challenge, Origin: origin, ExpiresAt: expires, RemoveID: append([]byte(nil), target...)}
 	for _, cred := range st.User.Credentials {
 		c.AllowedIDs = append(c.AllowedIDs, cred.ID)
 	}
@@ -301,7 +334,7 @@ func (s *Service) BeginRemoval(ctx context.Context, subject string, target []byt
 	}
 	return id, opts, nil
 }
-func (s *Service) FinishRemoval(ctx context.Context, subject, id string, raw json.RawMessage) error {
+func (s *Service) FinishRemoval(ctx context.Context, subject, binding, id string, raw json.RawMessage) error {
 	st, err := s.load(ctx, subject)
 	if err != nil {
 		return err
@@ -309,6 +342,9 @@ func (s *Service) FinishRemoval(ctx context.Context, subject, id string, raw jso
 	c, ok := st.Pending[id]
 	if !ok || c.Kind != "remove" || !s.now().Before(c.ExpiresAt) {
 		return ErrCeremony
+	}
+	if !matchesCaller(c, binding) {
+		return ErrBinding
 	}
 	delete(st.Pending, id)
 	cred, verifyErr := s.party.VerifyAssertion(ceremonyUser(st.User, c), raw, c.Challenge, c.Origin)

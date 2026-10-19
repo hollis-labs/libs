@@ -16,6 +16,8 @@ var (
 	ErrCounter           = errors.New("webauthn: signature counter did not advance")
 	ErrConflict          = errors.New("webauthn: credential state changed")
 	ErrCeremony          = errors.New("webauthn: unknown, used or expired ceremony")
+	ErrBinding           = errors.New("webauthn: ceremony caller binding mismatch")
+	ErrChallengeReuse    = errors.New("webauthn: assertion challenge already used")
 )
 
 // User comes from the caller's trusted identity store, never a browser's claims.
