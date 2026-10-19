@@ -205,22 +205,21 @@ jobs:
         with:
           deno-version: v2.9.7
 
-      # Test-only normal-Serve fixture source; not the module dependency pin.
-      - name: pinned SDK negotiated child
+      # Test-only normal-Serve fixture source. It is this repository's own plugin-sdk (the standalone
+      # plugin-sdk repository no longer exists). The host tests identify the fixture by the legacy
+      # commit id below and by the SHA-256 of protocol/v2/fixtures/duplex-child.json, which is
+      # unchanged since that commit; the hash check is the real guard.
+      - name: negotiated child from the in-repo SDK
         run: |
           pin=ea8ec0dca862d0c7284cc6a130a4b27fb812ed21
           assets="$RUNNER_TEMP/plugin-host-interop-$pin"
           mkdir -p "$assets"
-          fixture="$assets/source"
-          git init "$fixture"
-          git -C "$fixture" remote add origin https://github.com/hollis-labs/plugin-sdk.git
-          git -C "$fixture" fetch --depth=1 origin $pin
-          git -C "$fixture" checkout --detach FETCH_HEAD
-          test "$(git -C "$fixture" rev-parse HEAD)" = $pin
-          (cd "$fixture" && GOWORK=off go test -p 2 -race -c ./subprocess -o "$assets/duplex-child")
-          (cd "$fixture/ts" && npm ci --ignore-scripts && npm run build)
+          sdk="$GITHUB_WORKSPACE/mcp/plugin-mcp/plugin-sdk"
+          fixture="$sdk"
+          test "$(sha256sum "$sdk/protocol/v2/fixtures/duplex-child.json" | cut -d' ' -f1)" = 30cb07b87060dc88e9cb6ac5414f7b9cb7bb19c7a97c058e284d96e1e59ff4a9
+          (cd "$GITHUB_WORKSPACE/mcp/plugin-mcp" && GOWORK=off go test -p 2 -race -c ./plugin-sdk/subprocess -o "$assets/duplex-child")
+          (cd "$sdk/ts" && npm ci --ignore-scripts && npm run build)
           printf '%s\n' "$pin" > "$fixture/.interop-source-commit"
-          test "$(sha256sum "$fixture/protocol/v2/fixtures/duplex-child.json" | cut -d' ' -f1)" = 30cb07b87060dc88e9cb6ac5414f7b9cb7bb19c7a97c058e284d96e1e59ff4a9
           printf '%s\n' "$pin|$(go version)|GOMAXPROCS=4|GOFLAGS=-p=2|race=true" > "$assets/build-receipt"
           printf '%s\n' "$pin|$(node --version)|$(npm --version)|npm-ci-ignore-scripts|workspace-build" > "$assets/ts-build-receipt"
           echo "INTEROP_SDK_SOURCE=$fixture" >> "$GITHUB_ENV"
