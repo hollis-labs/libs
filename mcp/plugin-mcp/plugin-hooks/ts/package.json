@@ -1,0 +1,33 @@
+{
+  "name": "@hollis-labs/plugin-hooks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.check.json",
+    "build": "tsc",
+    "test": "vitest run",
+    "check": "npm run format:check && npm run typecheck && npm run build && npm test && npm run test:browser && npm pack --dry-run",
+    "format:check": "prettier --check src test scripts *.json",
+    "test:browser": "node --experimental-vm-modules scripts/browser-smoke.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

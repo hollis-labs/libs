@@ -8,6 +8,10 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+### Added
+
+- `plugin-hooks`: the host-owned hook and filter engine (registry, catalog, execution, breaker, observability, remote scheduling, `hookstest` conformance harness, TypeScript reference in `plugin-hooks/ts`) and its SDK `bridge`, imported with history from the former `plugin-hooks` repository (whose `v0.1.0` tag is not carried). Import paths are now `github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks[/...]`. The bridge tests that replay against a prepared SDK copy skip unless `SDK_TEST_SOURCE` is set (`plugin-hooks/bridge/scripts/prepare.sh`; the script's new layout is untested).
+
 ## [0.5.0] - 2026-10-17
 
 ### Added
