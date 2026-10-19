@@ -88,6 +88,9 @@ func buildBwrapArgs(p Profile, workspace, helperPath, bridgeDir string, env []st
 	if p.HostFilesystem {
 		return buildHostFilesystemBwrapArgs(p, absWS, env)
 	}
+	if len(p.FS.Hide) > 0 {
+		return nil, fmt.Errorf("%w: profile %q: FS.Hide applies to a host-filesystem profile; use FS.Deny here", ErrUnsupportedPolicy, p.ID)
+	}
 
 	args := make([]string, 0, 32)
 
@@ -222,6 +225,13 @@ func buildHostFilesystemBwrapArgs(p Profile, workspace string, env []string) ([]
 	args := []string{"--dev-bind", "/", "/", "--unshare-pid", "--proc", "/proc"}
 	args = append(args, plan.pinArgs("--dev-bind")...)
 	args = append(args, plan.bindArgs()...)
+	// Hides go after the protect binds so they cover a protected directory
+	// (or a file inside one) as well.
+	hides, err := hostHideArgs(p.FS.Hide, workspace, home)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, hides...)
 	if p.DenyUserServiceManager {
 		masks, err := userManagerMasks([]protectRoot{{Dest: "/", Canon: "/", Writable: true}}, nil, env, p.Net)
 		if err != nil {
@@ -232,7 +242,7 @@ func buildHostFilesystemBwrapArgs(p Profile, workspace string, env []string) ([]
 	// With paths to protect, the user namespace is required, not tried: it is
 	// what makes the kernel refuse /proc/<pid>/root and ptrace of host
 	// processes from inside, so a bwrap that cannot create one must fail.
-	if len(protected) > 0 {
+	if len(protected) > 0 || len(hides) > 0 {
 		args = append(args, "--unshare-user")
 	} else {
 		args = append(args, "--unshare-user-try")
@@ -243,6 +253,61 @@ func buildHostFilesystemBwrapArgs(p Profile, workspace string, env []string) ([]
 	args = append(args, "--die-with-parent")
 	if !p.Net {
 		args = append(args, "--unshare-net")
+	}
+	return args, nil
+}
+
+// hostHideArgs is Profile.FS.Hide in a host-filesystem profile: an empty
+// tmpfs over each existing directory and a read-only /dev/null bind over each
+// other existing path. Paths are expanded, refused when the child could
+// re-point a symlink on the way, resolved to their canonical host path and
+// sorted shallow first; one under a hidden directory is dropped, since it is
+// already invisible. A missing path is skipped.
+func hostHideArgs(raws []string, workspace, home string) ([]string, error) {
+	var paths []string
+	for _, raw := range raws {
+		path := expandPathLinux(raw, workspace, home)
+		if !filepath.IsAbs(path) {
+			return nil, fmt.Errorf("%w: hidden path %q must be absolute (or ~/..., or workspace)", ErrUnsupportedPolicy, raw)
+		}
+		if err := validateProtectPath(path); err != nil {
+			return nil, err
+		}
+		canonical, err := canonicalPath(path)
+		if err != nil {
+			return nil, fmt.Errorf("sandbox: resolve hidden path %q: %w", raw, err)
+		}
+		if canonical == "/" {
+			return nil, fmt.Errorf("%w: the root cannot be hidden", ErrUnsupportedPolicy)
+		}
+		if !slices.Contains(paths, canonical) {
+			paths = append(paths, canonical)
+		}
+	}
+	slices.SortFunc(paths, func(a, b string) int {
+		if da, db := pathDepthLinux(a), pathDepthLinux(b); da != db {
+			return da - db
+		}
+		return strings.Compare(a, b)
+	})
+	var args, hiddenDirs []string
+	for _, path := range paths {
+		if pathUnderAny(path, hiddenDirs) {
+			continue
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("sandbox: inspect hidden path %q: %w", path, err)
+		}
+		if info.IsDir() {
+			args = append(args, "--tmpfs", path)
+			hiddenDirs = append(hiddenDirs, path)
+			continue
+		}
+		args = append(args, "--ro-bind", "/dev/null", path)
 	}
 	return args, nil
 }

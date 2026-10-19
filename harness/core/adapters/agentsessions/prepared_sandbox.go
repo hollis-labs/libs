@@ -141,6 +141,10 @@ func normalizeStartOptions(opts StartOptions) (StartOptions, error) {
 	if err != nil {
 		return StartOptions{}, err
 	}
+	opts, err = applyHiddenPaths(opts)
+	if err != nil {
+		return StartOptions{}, err
+	}
 	return applyGUILaunchDeny(opts)
 }
 
@@ -202,6 +206,47 @@ func minimalProtectProfile(paths []string) sandbox.Profile {
 	}
 }
 
+// ErrHiddenPathsUnsupported means StartOptions.HiddenPaths was set where it
+// cannot be enforced; the launch fails rather than run with the paths readable.
+var ErrHiddenPathsUnsupported = errors.New("agentsessions: HiddenPaths cannot be enforced")
+
+// applyHiddenPaths folds StartOptions.HiddenPaths into the one sandbox that
+// will wrap the child, the way applyProtectedPaths does for its list. It runs
+// after it, so the minimal profile it may have installed is the one that gains
+// the hides. It is idempotent.
+func applyHiddenPaths(opts StartOptions) (StartOptions, error) {
+	if len(opts.HiddenPaths) == 0 {
+		return opts, nil
+	}
+	for _, path := range opts.HiddenPaths {
+		if !filepath.IsAbs(path) {
+			return StartOptions{}, fmt.Errorf("agentsessions: StartOptions.HiddenPaths entry %q must be absolute", path)
+		}
+	}
+	caps := sandbox.ResolveBackendCapabilities("", sandbox.BackendAuto)
+	if !caps.Supported || !slices.Contains(caps.Capabilities, sandbox.CapHidePaths) {
+		return StartOptions{}, fmt.Errorf("%w: the %s sandbox backend on %s cannot hide paths", ErrHiddenPathsUnsupported, caps.Backend, caps.GOOS)
+	}
+	switch {
+	case opts.SandboxPolicy != nil && opts.SandboxPolicy.Mode == sandbox.ConfinementDisabled:
+		opts.SandboxPolicy = nil
+		opts.Profile = minimalProtectProfile(nil)
+		opts.Profile.FS.Hide = appendMissing(nil, opts.HiddenPaths)
+	case opts.SandboxPolicy != nil:
+		merged, err := opts.SandboxPolicy.WithHidden(opts.HiddenPaths...)
+		if err != nil {
+			return StartOptions{}, fmt.Errorf("agentsessions: StartOptions.HiddenPaths: %w", err)
+		}
+		opts.SandboxPolicy = &merged
+	case opts.Profile.ID != "":
+		opts.Profile.FS.Hide = appendMissing(slices.Clone(opts.Profile.FS.Hide), opts.HiddenPaths)
+	default:
+		opts.Profile = minimalProtectProfile(nil)
+		opts.Profile.FS.Hide = appendMissing(nil, opts.HiddenPaths)
+	}
+	return opts, nil
+}
+
 func appendMissing(dst, values []string) []string {
 	for _, value := range values {
 		if !slices.Contains(dst, value) {
@@ -252,6 +297,9 @@ func normalizeProviderStartOptions(opts StartOptions) (StartOptions, error) {
 	}
 	if len(opts.ProtectedPaths) > 0 {
 		return StartOptions{}, fmt.Errorf("%w: a provider-native runtime applies no OS sandbox", ErrProtectedPathsUnsupported)
+	}
+	if len(opts.HiddenPaths) > 0 {
+		return StartOptions{}, fmt.Errorf("%w: a provider-native runtime applies no OS sandbox", ErrHiddenPathsUnsupported)
 	}
 	opts, err := normalizeStartOptions(opts)
 	if err != nil {

@@ -446,6 +446,19 @@ type StartOptions struct {
 	// go-sandbox's README).
 	ProtectedPaths []string
 
+	// HiddenPaths lists control-plane paths the agent must not even read:
+	// a state directory, a token file, a secrets directory (CW-20261001-0263).
+	// Each must be absolute. They are merged into the effective sandbox like
+	// ProtectedPaths: onto Profile.FS.Hide, onto a resolved SandboxPolicy as
+	// denies, and otherwise into the minimal host-filesystem profile. On Linux
+	// a directory reads as empty and a file as empty; a path that does not
+	// exist when the sandbox is built is skipped, so list only what exists
+	// and relaunch after creating the rest. A launch fails with
+	// ErrHiddenPathsUnsupported where the backend cannot hide paths, and a
+	// provider-native runtime rejects it. Hiding a file leaves its directory
+	// visible: it does not stop connect(2) on a Unix socket beside it.
+	HiddenPaths []string
+
 	// EndTurnOnAuthFailure ends a subprocess-per-turn turn as soon as the
 	// adapter's AuthFailureClassifier recognizes a login failure on stderr,
 	// instead of waiting for the CLI to give up (agy waits 60s for a browser
