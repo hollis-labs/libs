@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_kind",
+      "code": "unknown_trigger_kind"
+    }
+  ],
+  "reason": "trigger_kind is predicate, event or interval"
+}

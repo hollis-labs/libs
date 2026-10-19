@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.names",
+      "code": "required"
+    }
+  ],
+  "reason": "tool_name_window needs names or pattern"
+}

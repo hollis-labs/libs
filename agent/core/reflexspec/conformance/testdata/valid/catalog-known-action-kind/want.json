@@ -1,0 +1,8 @@
+{
+  "valid": true,
+  "options": {
+    "known_action_kinds": [
+      "halt_session"
+    ]
+  }
+}

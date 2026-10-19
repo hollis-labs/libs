@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.clauses",
+      "code": "required"
+    }
+  ],
+  "reason": "AND with no clauses never fires"
+}

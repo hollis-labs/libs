@@ -1,0 +1,16 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_kind",
+      "code": "not_in_catalog"
+    }
+  ],
+  "reason": "injected catalog rejects a kind it does not know",
+  "options": {
+    "known_action_kinds": [
+      "halt_session",
+      "inject_reminder"
+    ]
+  }
+}

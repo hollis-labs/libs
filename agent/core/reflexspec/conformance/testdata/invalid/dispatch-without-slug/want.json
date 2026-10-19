@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec.agent_slug",
+      "code": "required"
+    }
+  ],
+  "reason": "dispatch_to_agent requires agent_slug"
+}

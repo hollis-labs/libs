@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.windw",
+      "code": "unknown_field"
+    }
+  ],
+  "reason": "misspelled field is ignored by the engine and falls back to a default"
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.kind",
+      "code": "unknown_predicate_kind"
+    }
+  ],
+  "reason": "kind is one letter short of tool_calls_window; Nanite's validator accepts this and the reflex never fires"
+}

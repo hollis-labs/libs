@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"AND\",\"clauses\":[{\"kind\":\"tool_calls_window\",\"window\":3,\"op\":\"=\",\"value\":0},{\"kind\":\"OR\",\"clauses\":[{\"kind\":\"attr\",\"key\":\"scope\",\"value\":\"open\",\"op\":\"!=\"},{\"kind\":\"prefix_pressure\",\"ratio\":0.85,\"context_window\":200000}]}]}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"r\"}",
+  "status": "active"
+}

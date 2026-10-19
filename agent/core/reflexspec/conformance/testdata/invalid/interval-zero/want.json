@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.every_n_ticks",
+      "code": "out_of_range"
+    }
+  ],
+  "reason": "interval <= 0 never fires"
+}

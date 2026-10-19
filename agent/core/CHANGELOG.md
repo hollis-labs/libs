@@ -8,6 +8,10 @@ All notable changes to the `agent` module are documented here (the module was `a
 
 ## [Unreleased]
 
+### Added
+
+- `reflexspec`: the portable reflex-definition contract (record shape, trigger predicate grammar, per-kind `action_spec` validator and conformance fixtures), imported from the former `reflex-definition-spec` repository with history. It sits beside `reflexes`.
+
 ## [0.4.0] - 2026-10-16
 
 ### Changed (breaking)

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.name",
+      "code": "required"
+    }
+  ],
+  "reason": "event trigger needs a name"
+}

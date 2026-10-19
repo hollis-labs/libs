@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_received\"}",
+  "action_kind": "send_message",
+  "action_spec": "[1]",
+  "status": "active"
+}

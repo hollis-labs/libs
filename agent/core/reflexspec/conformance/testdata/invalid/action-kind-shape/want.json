@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_kind",
+      "code": "invalid_value"
+    }
+  ],
+  "reason": "open enum is still shape-checked"
+}
