@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec.body",
+      "code": "required"
+    }
+  ],
+  "reason": "inject_reminder requires body"
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec.loop_run_id",
+      "code": "required"
+    }
+  ],
+  "reason": "resume_loop_run requires loop_run_id"
+}

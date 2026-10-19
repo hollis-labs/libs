@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.pattern",
+      "code": "invalid_regex"
+    }
+  ],
+  "reason": "pattern must compile as RE2"
+}

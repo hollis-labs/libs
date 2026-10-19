@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "event",
+  "trigger_spec": "{\"name\":\"mail_received\"}",
+  "action_kind": "dispatch_to_agent",
+  "action_spec": "{\"confidence\":0.5}",
+  "status": "active"
+}

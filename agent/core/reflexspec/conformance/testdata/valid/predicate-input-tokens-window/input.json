@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"input_tokens_window\",\"window\":5,\"op\":\"<\",\"value\":5}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"r\"}",
+  "status": "active"
+}

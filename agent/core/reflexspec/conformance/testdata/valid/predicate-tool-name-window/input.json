@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "trigger_kind": "predicate",
+  "trigger_spec": "{\"kind\":\"tool_name_window\",\"mode\":\"none\",\"names\":[\"wiki_search\"]}",
+  "action_kind": "halt_session",
+  "action_spec": "{\"reason\":\"r\"}",
+  "status": "active"
+}

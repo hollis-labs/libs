@@ -1,0 +1,16 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "provenance_tier",
+      "code": "not_in_catalog"
+    }
+  ],
+  "reason": "injected tier catalog",
+  "options": {
+    "known_provenance_tiers": [
+      "system",
+      "operator"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.clauses[1].clauses[0].kind",
+      "code": "unknown_predicate_kind"
+    }
+  ],
+  "reason": "misspelled kind inside AND/OR"
+}

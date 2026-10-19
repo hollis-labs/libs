@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.kind",
+      "code": "required"
+    }
+  ],
+  "reason": "predicate node without kind"
+}

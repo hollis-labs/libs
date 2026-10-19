@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec",
+      "code": "required"
+    }
+  ],
+  "reason": "action_spec is required"
+}

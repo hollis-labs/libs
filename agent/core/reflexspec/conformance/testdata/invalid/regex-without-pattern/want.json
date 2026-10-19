@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.pattern",
+      "code": "required"
+    }
+  ],
+  "reason": "regex predicates require pattern"
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec.key",
+      "code": "required"
+    }
+  ],
+  "reason": "attr requires key"
+}

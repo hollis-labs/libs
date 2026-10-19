@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "trigger_spec",
+      "code": "invalid_json"
+    }
+  ],
+  "reason": "trigger_spec must be JSON"
+}

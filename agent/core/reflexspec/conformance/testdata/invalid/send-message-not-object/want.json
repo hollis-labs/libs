@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec",
+      "code": "not_object"
+    }
+  ],
+  "reason": "unevidenced kinds are object-only, but object they must be"
+}

@@ -1,0 +1,10 @@
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "action_spec.confidence",
+      "code": "out_of_range"
+    }
+  ],
+  "reason": "confidence is within [0,1]"
+}
