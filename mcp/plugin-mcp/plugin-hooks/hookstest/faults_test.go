@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
-	"github.com/hollis-labs/plugin-hooks/hookstest"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks/hookstest"
 )
 
 // Deliberately broken host adapters prove the suite observes actual behavior.

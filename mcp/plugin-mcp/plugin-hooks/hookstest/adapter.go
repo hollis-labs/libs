@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
 )
 
 // Handle is a host-owned opaque registration token. Never synthesize a token

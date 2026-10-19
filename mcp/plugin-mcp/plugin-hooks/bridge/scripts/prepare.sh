@@ -2,9 +2,9 @@
 # Prepare pinned SDK fixtures outside tests; tests never fetch or install.
 set -euo pipefail
 : "${TMPDIR:?set TMPDIR to disk-backed scratch}"
-source_dir=$(go list -m -f '{{.Dir}}' github.com/hollis-labs/plugin-sdk)
+source_dir=$(go list -m -f "{{.Dir}}" github.com/hollis-labs/libs/mcp/plugin-mcp)
 target_dir=$(mktemp -d "$TMPDIR/hooks-sdk-source.XXXXXX")
-cp -R "$source_dir/." "$target_dir/"
+cp -R "$source_dir/plugin-sdk/." "$target_dir/"
 chmod -R u+w "$target_dir"
 (cd "$target_dir" && go test -c -o "$target_dir/sdk-child" ./subprocess)
 (cd "$target_dir/ts" && npm ci --ignore-scripts && npm run build --workspace @hollis-labs/plugin-sdk)

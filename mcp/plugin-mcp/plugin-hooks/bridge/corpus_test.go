@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
-	sdk "github.com/hollis-labs/plugin-sdk/subprocess"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
+	sdk "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type vector struct {
@@ -34,6 +34,7 @@ func corpus(t *testing.T) []vector {
 	return vectors
 }
 func TestPinnedCorpus(t *testing.T) {
+	requireSDK(t)
 	for _, v := range corpus(t) {
 		t.Run(v.Name, func(t *testing.T) {
 			err := sdk.ValidateHookDTO(v.DTO, []byte(v.Raw))
@@ -103,6 +104,7 @@ func TestPinnedCorpus(t *testing.T) {
 	}
 }
 func TestPinnedTranscripts(t *testing.T) {
+	requireSDK(t)
 	// Use the SDK's authored replay runners against their OWN pinned corpus.
 	// No transcript or literal vector is copied into this repository.
 	source := os.Getenv("SDK_TEST_SOURCE")
@@ -146,6 +148,7 @@ func hostRequest(p sdk.HookHandleParams) hooks.RemoteRequest {
 	return q
 }
 func TestHostLedgerAndLiteralMappings(t *testing.T) {
+	requireSDK(t)
 	p, err := sdk.DecodeHookHandleParams([]byte(corpus(t)[0].Raw))
 	if err != nil {
 		t.Fatal(err)
@@ -211,6 +214,7 @@ func TestHostLedgerAndLiteralMappings(t *testing.T) {
 	}
 }
 func TestLatency(t *testing.T) {
+	requireSDK(t)
 	for _, runtime := range []string{"Go", "Node"} {
 		t.Run(runtime, func(t *testing.T) {
 			p, err := sdk.DecodeHookHandleParams([]byte(corpus(t)[0].Raw))
@@ -259,6 +263,7 @@ func TestLatency(t *testing.T) {
 }
 
 func TestRealChildPayloadLiterals(t *testing.T) {
+	requireSDK(t)
 	for _, runtime := range []string{"Go", "Node"} {
 		t.Run(runtime, func(t *testing.T) {
 			p, err := sdk.DecodeHookHandleParams([]byte(corpus(t)[0].Raw))
@@ -304,6 +309,7 @@ func TestRealChildPayloadLiterals(t *testing.T) {
 }
 
 func TestRealChildOperationalModes(t *testing.T) {
+	requireSDK(t)
 	for _, runtime := range []string{"Go", "Node"} {
 		t.Run(runtime, func(t *testing.T) {
 			p, err := sdk.DecodeHookHandleParams([]byte(corpus(t)[0].Raw))

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
 )
 
 // Harness runs plugin registration callbacks in process against a dispatcher.

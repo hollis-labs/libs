@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
 )
 
 func remoteDefinition(name string, kind hooks.Kind) hooks.Definition {

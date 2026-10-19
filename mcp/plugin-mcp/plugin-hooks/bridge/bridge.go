@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"time"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
-	"github.com/hollis-labs/plugin-sdk/capability"
-	sdk "github.com/hollis-labs/plugin-sdk/subprocess"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/capability"
+	sdk "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/subprocess"
 )
 
 // Incarnation is supplied by the host's registration ledger, not derived from

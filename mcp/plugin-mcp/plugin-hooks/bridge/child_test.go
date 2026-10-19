@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	hooks "github.com/hollis-labs/plugin-hooks"
-	"github.com/hollis-labs/plugin-hooks/hookstest"
-	"github.com/hollis-labs/plugin-sdk/capability"
-	sdk "github.com/hollis-labs/plugin-sdk/subprocess"
+	hooks "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks/hookstest"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/capability"
+	sdk "github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-sdk/subprocess"
 )
 
 type childReply struct {
@@ -429,6 +429,7 @@ func (s wireScope) AddRemoteFilter(h, n string, o hooks.Options, r hooks.RemoteR
 }
 
 func TestRealChildren(t *testing.T) {
+	requireSDK(t)
 	for _, runtime := range []string{"Go", "Node"} {
 		t.Run(runtime+"/hooks_profile_version=1 WITHOUT plugin-originated callbacks (reverse lane not exercised or claimed)", func(t *testing.T) {
 			pool := &childPool{runtime: runtime, children: map[capability.RuntimeIdentity]*child{}}
@@ -452,5 +453,14 @@ func TestRealChildren(t *testing.T) {
 			}
 			hookstest.Run(t, factory)
 		})
+	}
+}
+
+// requireSDK skips the bridge tests that replay against a prepared copy of the plugin SDK.
+// Run scripts/prepare.sh and export the variables it prints to run them.
+func requireSDK(t *testing.T) {
+	t.Helper()
+	if os.Getenv("SDK_TEST_SOURCE") == "" {
+		t.Skip("SDK_TEST_SOURCE is not set; run scripts/prepare.sh to prepare the pinned SDK fixtures")
 	}
 }
