@@ -10,6 +10,13 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Added
 
+- `adapters/runtimeevents/httpsink`: a `runtimeevents.Sink` that posts events to
+  an event hub over HTTP (bounded queue that drops the oldest event when full,
+  batching, retry with backoff on network errors, 429 and 5xx, a counted drop on
+  other 4xx, `Close` that flushes). `FromEnv` and `FromConfig` return a no-op
+  sink when no URL is set, so an app runs unchanged without a hub. The request
+  layout (`POST {"events":[...]}`, bearer token) and the `HOLLIS_EVENTS_*`
+  variable names are provisional until the hub ingest route is settled.
 - `sandbox.FSSpec.Hide` (yaml `hide`, CW-20261001-0263): paths a host-filesystem
   profile makes unreadable. Linux bwrap puts an empty tmpfs over an existing
   directory and a read-only `/dev/null` bind over any other existing path,
