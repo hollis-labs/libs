@@ -16,6 +16,7 @@ import (
 
 const (
 	eventSchemaID    = "urn:hollis-labs:runtimeevents:event/v1"
+	ingestEventID    = "urn:hollis-labs:runtimeevents:ingest-event/v1"
 	requestSchemaID  = "urn:hollis-labs:runtimeevents:ingest-request/v1"
 	responseSchemaID = "urn:hollis-labs:runtimeevents:ingest-response/v1"
 )
@@ -30,6 +31,7 @@ func compile(t *testing.T, id string) *jsonschema.Schema {
 		doc []byte
 	}{
 		{eventSchemaID, runtimeevents.JSONSchema},
+		{ingestEventID, ingest.EventSchema},
 		{requestSchemaID, ingest.RequestSchema},
 		{responseSchemaID, ingest.ResponseSchema},
 	} {
@@ -217,5 +219,53 @@ func TestRejectionResult(t *testing.T) {
 	b, _ := json.Marshal(ingest.NewResponse([]ingest.Result{r}))
 	if err := validate(t, s, b); err != nil {
 		t.Fatalf("response schema: %v", err)
+	}
+}
+
+// Every valid item fixture passes the ingest event schema and CheckItem; every
+// invalid one is rejected by both, as schema_invalid. The schema and the Go
+// check must agree.
+func TestItemFixtures(t *testing.T) {
+	s := compile(t, ingestEventID)
+	for name, b := range fixtures(t, "item/valid") {
+		t.Run("valid/"+name, func(t *testing.T) {
+			if err := validate(t, s, b); err != nil {
+				t.Fatalf("schema rejected: %v", err)
+			}
+			if _, rej := ingest.CheckItem("torque", b, ingest.Options{}); rej != nil {
+				t.Fatalf("CheckItem rejected: %v", rej)
+			}
+		})
+	}
+	invalid := fixtures(t, "item/invalid")
+	if len(invalid) < 20 {
+		t.Fatalf("only %d invalid vectors", len(invalid))
+	}
+	for name, b := range invalid {
+		t.Run("invalid/"+name, func(t *testing.T) {
+			if err := validate(t, s, b); err == nil {
+				t.Fatal("schema accepted an invalid event")
+			}
+			_, rej := ingest.CheckItem("torque", b, ingest.Options{})
+			if rej == nil || rej.Code != ingest.CodeSchemaInvalid {
+				t.Fatalf("CheckItem = %v, want schema_invalid", rej)
+			}
+			if strings.Contains(rej.Message, "999") || strings.Contains(rej.Message, "Torque") {
+				t.Errorf("message echoes a value: %q", rej.Message)
+			}
+		})
+	}
+}
+
+// The generic Validate stays as it is; the ingest adds the schema on top. An
+// event that satisfies the schema but names neither session nor subject is
+// still refused by Validate.
+func TestCheckItemKeepsValidate(t *testing.T) {
+	b := event("task.state_changed", "torque", func(m map[string]any) {
+		m["id"] = "evt_00000000000000000000000000000b02"
+		delete(m, "subject")
+	})
+	if _, rej := ingest.CheckItem("torque", b, ingest.Options{}); rej == nil || rej.Code != ingest.CodeSchemaInvalid {
+		t.Fatalf("%v", rej)
 	}
 }

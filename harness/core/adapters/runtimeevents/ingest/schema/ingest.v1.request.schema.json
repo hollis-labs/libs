@@ -18,7 +18,7 @@
     },
     {
       "allOf": [
-        { "$ref": "urn:hollis-labs:runtimeevents:event/v1" },
+        { "$ref": "urn:hollis-labs:runtimeevents:ingest-event/v1" },
         { "not": { "required": ["events"] } }
       ]
     }

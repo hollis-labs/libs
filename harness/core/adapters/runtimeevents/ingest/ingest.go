@@ -5,10 +5,62 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/hollis-labs/libs/harness/core/adapters/runtimeevents"
 	"github.com/hollis-labs/libs/harness/core/adapters/runtimeevents/catalog"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+const (
+	eventSchemaID       = "urn:hollis-labs:runtimeevents:event/v1"
+	ingestEventSchemaID = "urn:hollis-labs:runtimeevents:ingest-event/v1"
+)
+
+var (
+	compileOnce  sync.Once
+	eventChecker *jsonschema.Schema
+	compileErr   error
+)
+
+// eventSchema compiles the ingest event schema once.
+func eventSchema() (*jsonschema.Schema, error) {
+	compileOnce.Do(func() {
+		c := jsonschema.NewCompiler()
+		c.DefaultDraft(jsonschema.Draft2020)
+		c.AssertFormat()
+		for _, r := range []struct {
+			id  string
+			doc []byte
+		}{{eventSchemaID, runtimeevents.JSONSchema}, {ingestEventSchemaID, EventSchema}} {
+			doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(r.doc))
+			if err != nil {
+				compileErr = err
+				return
+			}
+			if err := c.AddResource(r.id, doc); err != nil {
+				compileErr = err
+				return
+			}
+		}
+		eventChecker, compileErr = c.Compile(ingestEventSchemaID)
+	})
+	return eventChecker, compileErr
+}
+
+// schemaProblem describes the first schema violation without echoing values.
+func schemaProblem(err error) string {
+	var ve *jsonschema.ValidationError
+	if errors.As(err, &ve) {
+		out := ve.BasicOutput()
+		for _, u := range out.Errors {
+			if u.InstanceLocation != "" {
+				return "event does not match the ingest schema at " + u.InstanceLocation
+			}
+		}
+	}
+	return "event does not match the ingest schema"
+}
 
 // Limits. The hub may be configured with smaller values, never larger.
 const (
@@ -161,9 +213,11 @@ type Options struct {
 }
 
 // CheckItem applies the per-event rules for a producer registered as app, in
-// this order: JSON decodes as an Event; payload size; [runtimeevents.Event.Validate];
-// visibility is not "local"; the kind is in the catalog; the app may publish
-// the kind. It returns the decoded event, or a Rejection. It does not check
+// this order: JSON decodes as an Event; payload size; the event matches
+// [EventSchema] (canonical id, required app, closed vocabularies, types);
+// [runtimeevents.Event.Validate]; visibility is not "local"; the kind is in the
+// catalog; the app may publish the kind. The payload is only required to be
+// JSON: per-kind payload schemas are not validated here. It returns the decoded event, or a Rejection. It does not check
 // that Event.App equals app: that is a whole-request 403 decided by the hub
 // from the credential.
 //
@@ -176,6 +230,17 @@ func CheckItem(app string, raw json.RawMessage, opt Options) (runtimeevents.Even
 	}
 	if len(ev.Payload) > MaxPayloadBytes {
 		return ev, &Rejection{CodePayloadTooLarge, fmt.Sprintf("payload is %d bytes, limit %d", len(ev.Payload), MaxPayloadBytes)}
+	}
+	schema, err := eventSchema()
+	if err != nil {
+		return ev, &Rejection{CodeSchemaInvalid, "ingest schema unavailable"}
+	}
+	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		return ev, &Rejection{CodeSchemaInvalid, "event is not a valid JSON envelope"}
+	}
+	if err := schema.Validate(inst); err != nil {
+		return ev, &Rejection{CodeSchemaInvalid, schemaProblem(err)}
 	}
 	if err := ev.Validate(); err != nil {
 		return ev, &Rejection{CodeSchemaInvalid, err.Error()}
