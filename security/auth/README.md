@@ -89,6 +89,31 @@ Contract:
 - `HTTPMinter` posts JSON with the parent credential as a bearer and accepts `{"token", "expires_at"|"ttl_seconds"}` (the shape of Tether's `POST /auth/token`); it falls back to the JWT's own `exp`. It refuses cross-origin redirects. Errors carry the HTTP status at most: never the issuer's reply body (an endpoint may echo the Authorization header), the URL, or the credential.
 - Service tokens (below) do not need a refresher.
 
+## Reloading config without a restart
+
+Verifier and posture configuration can change while the app serves requests. Three small pieces, one mechanism:
+
+```go
+g, _ := auth.New(auth.Config{Mode: mode, Verifier: jv, Scopes: scopes, Addr: addr})
+load := func(ctx context.Context) error {                   // all-or-nothing: build everything, then install once
+	cfg, err := readConfig(path)                            // your format (YAML, JSON, env file)
+	if err != nil { return err }                            // previous config stays in effect
+	jv, err := auth.NewJWTVerifier(cfg.JWT)
+	if err != nil { return err }
+	return g.Apply(cfg.Mode, jv)                            // validates, then swaps mode and verifier together or not at all
+}
+_ = load(ctx)                                               // startup load
+go (&auth.Reloader{Path: path, Load: load}).Run(ctx)
+```
+
+If `Load` builds anything with a lifetime of its own (a JWKS refresh loop, a deny-list poller), start it for the new configuration only after `Apply` succeeded and stop the old one afterwards; `CheckApply(mode, v)` answers "would this be accepted" without changing anything.
+
+- `Reloader` calls `Load` when the file's content changes (checked every 2s; a change must be seen unchanged on two consecutive checks, so a half-written file is not loaded), on `SIGHUP`, and on `Trigger()`. A touch with identical content does nothing. `Load` is not called for the content present when `Run` starts. The file is fingerprinted before `Load` runs, so an edit made while `Load` is running is loaded again afterwards, never marked applied unseen.
+- A `Load` error (or panic) is logged and passed to `OnResult`; the running configuration is untouched. A file that failed to load is not retried until its content changes again, or a signal or `Trigger` forces it. A file missing mid-replace is ignored.
+- `Guard.Apply(mode, verifier)` moves the posture dial and the verifier live as one atomic step (`SetMode(m)` is `Apply(m, nil)`). A request takes its mode and verifier once, on entry, before any verification, and keeps that pair to the end even if `Apply` runs meanwhile. It refuses, leaving both unchanged, a mode `ParseMode` does not accept, `enforce` with no verifier, and, when `Config.Addr` is set, any mode `ValidateBind` rejects for that address (a reload cannot loosen auth on a non-local listener). Modes are stored in canonical form, so `ENFORCE` and ` observe ` mean what they say; a mode the guard does not recognize is treated as `enforce`.
+- `Switch` is a swappable `Verifier` for code that does not use a `Guard`; with no verifier it answers `ErrUnavailable` (503 under enforce), never a pass.
+- Rotated JWKS keys already refresh on their own (`Run`, or an unknown `kid`); reload is for changing the verifier's configuration itself (issuer, audience, JWKS URL, bootstrap key, deny-list source).
+
 ## Deny-list wire format
 
 `GET` returns `{"jti":[...],"sub":[...],"sid":[...]}` with an `ETag`; the poller sends `If-None-Match` every 30s and keeps the last list on 304 or failure.
