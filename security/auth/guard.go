@@ -125,8 +125,12 @@ func (g *Guard) CheckApply(m Mode, v Verifier) error {
 // atomic step: a request sees the old pair or the new pair, never a mix, and
 // each request keeps the pair it started under. It refuses, leaving both
 // unchanged, a mode ParseMode does not accept (the canonical form is stored,
-// so "ENFORCE" and " observe " work), enforce with no verifier, and (when
-// Config.Addr is set) a mode ValidateBind rejects for that address.
+// so "ENFORCE" and " observe " work), enforce with no verifier, (when
+// Config.Addr is set) a mode ValidateBind rejects for that address, and (when
+// Config.ReloadBind is set) a mode weaker than the current one unless that
+// listener is loopback; that last refusal wraps ErrLoosenRefused. The loosening
+// check runs against the same state the compare-and-swap retries on, so a
+// concurrent tightening cannot be bypassed by a stale earlier mode.
 func (g *Guard) Apply(m Mode, v Verifier) error {
 	for {
 		cur := g.st.Load()
