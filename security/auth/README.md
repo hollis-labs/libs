@@ -54,6 +54,18 @@ func callTool(ctx context.Context, name string, args json.RawMessage) (any, erro
 
 Scope grants match exactly, `*`, or `<app>.*`. Claims read: `iss sub aud scope exp nbf jti kind sid par`.
 
+## Posture dial
+
+Each app reads its own dial with `ModeFromEnv("<app>", def)`: `HOLLIS_AUTH_<APP>` first, then the global `HOLLIS_AUTH`, then `def`. The per-app variable wins over the global one. The app name is upper-cased and every non-alphanumeric becomes `_` (`my-app` reads `HOLLIS_AUTH_MY_APP`). Accepted values are `off`, `permissive` (alias `observe`) and `enforce`; anything else is an error. Dev default is `off`; see Modes for the behaviour of each.
+
+## Service tokens (dev)
+
+A service token is a normal Tether JWT with `kind=service`, a scope list of `<app>.<verb>` strings and a `jti`. It carries no `sid`. It is meant to be configured once as a static bearer and to stay valid until revoked.
+
+The verifier requires `exp` (a missing or zero `exp` is `ErrInvalidToken`), so a service token is effectively non-expiring: it carries a very distant `exp` (about ten years) and is ended by revocation through the deny-list, not by time. This is not a new lifetime policy; it is how "no expiry" is expressed to a verifier that requires `exp`. Nothing else about verification changes: signature, `iss`, `aud`, scope and the deny-list apply as for any JWT.
+
+Revocation is the deny-list: put the token's `jti` (or its `sub`) in the issuer's list. A consumer rejects the token after its next successful poll (default interval 30s). A failed poll keeps the previous list, so while the issuer's deny-list is unreachable a revoked token stays valid; with a ten-year `exp` there is no expiry to bound that, so monitor the poll (the `DenyListPoller` logs each failure). Because the token outlives every poll window, the issuer must keep the entry on the list until the token's own `exp`. The wire format is the one below; `service_test.go` holds the vectors (valid far-future token, still valid years later, rejected without `exp` (zero and absent), revoked by `jti` and by `sub`, scope and wildcard behaviour through the guard).
+
 ## Deny-list wire format
 
 `GET` returns `{"jti":[...],"sub":[...],"sid":[...]}` with an `ETag`; the poller sends `If-None-Match` every 30s and keeps the last list on 304 or failure.
