@@ -1176,3 +1176,223 @@ func TestReplayQuarantineDeliversAfterTheCauseIsFixed(t *testing.T) {
 		t.Fatal("replaying on a closed client must fail, not lose events")
 	}
 }
+
+// ---- gap marker acknowledgement and failure paths ----
+
+// lossDir returns a spool directory holding a persisted protected-loss record,
+// as left by a process that overflowed while the hub was down.
+func lossDir(t *testing.T) (dir string, lost uint64) {
+	t.Helper()
+	dir = t.TempDir()
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	defer dead.Close()
+	c, _ := New(quiet(fast(Config{URL: dead.URL, SpoolDir: dir, SpoolMaxBytes: 700, QueueSize: 1, BatchSize: 1})))
+	for i := 0; i < 20; i++ {
+		c.Publish(item(fmt.Sprintf("h%02d", i), PriorityHigh))
+	}
+	closeClient(t, c)
+	st := c.Stats()
+	if len(st.Losses) != 1 {
+		t.Fatalf("setup: no loss recorded: %+v", st)
+	}
+	return dir, st.Losses[0].Count
+}
+
+func gapItem() (Item, error) {
+	return Item{ID: "gap1", Priority: PriorityHigh, Body: json.RawMessage(`{"id":"gap1","kind":"alert.raised"}`)}, nil
+}
+
+// The record is cleared only when the hub accepts the marker. A marker the hub
+// rejects leaves the loss on record, and is not announced again in a loop.
+func TestRejectedGapMarkerLeavesTheLossOnRecord(t *testing.T) {
+	dir, lost := lossDir(t)
+	h := &hub{status: func(_ int32, ids []string) (int, string, map[string]string) {
+		for _, id := range ids {
+			if id == "gap1" {
+				return 200, `{"results":[{"id":"gap1","status":"rejected","code":"unknown_kind"}]}`, nil
+			}
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var marks atomic.Int32
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, SpoolMaxBytes: 700, GapMarker: func(Loss) (Item, error) {
+		marks.Add(1)
+		return gapItem()
+	}})))
+	waitFor(t, "the marker to be rejected and quarantined", func() bool { return c.Stats().Quarantined >= 1 })
+	time.Sleep(150 * time.Millisecond) // a loop would announce again
+	closeClient(t, c)
+	if marks.Load() != 1 {
+		t.Fatalf("marker built %d times, want once", marks.Load())
+	}
+	got := c.Stats().Losses
+	if len(got) != 1 || got[0].Count != lost {
+		t.Fatalf("the loss must stay on record when the marker was not accepted: %+v (want count %d)", got, lost)
+	}
+}
+
+// Losses that happen while a marker is in flight are not erased by its
+// acknowledgement: only the announced items come off the record.
+func TestLossesDuringAMarkerSurviveItsAcknowledgement(t *testing.T) {
+	dir, lost := lossDir(t)
+	inFlight := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		switch {
+		case strings.Contains(string(body), `"gap1"`):
+			once.Do(func() { close(inFlight) })
+			<-release
+		case strings.Contains(string(body), `"gap2"`):
+			// The marker for the later losses is rejected, so what it announced
+			// stays visible on the record for the assertion below.
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"results":[{"id":"gap2","status":"rejected","code":"unknown_kind"}]}`)
+			return
+		}
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	var n atomic.Int32
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, SpoolMaxBytes: 700, GapMarker: func(Loss) (Item, error) {
+		id := fmt.Sprintf("gap%d", n.Add(1))
+		return Item{ID: id, Priority: PriorityHigh, Body: json.RawMessage(fmt.Sprintf(`{"id":%q,"kind":"alert.raised"}`, id))}, nil
+	}})))
+	select {
+	case <-inFlight:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the marker never reached the hub")
+	}
+	// The record is still on disk while the marker is unacknowledged.
+	raw, err := os.ReadFile(filepath.Join(dir, "loss.json"))
+	if err != nil || !strings.Contains(string(raw), `"marker_id":"gap1"`) {
+		t.Fatalf("loss.json while in flight: %s (%v)", raw, err)
+	}
+	// Two more protected items are lost meanwhile.
+	c.mu.Lock()
+	c.recordLoss(2)
+	c.mu.Unlock()
+	close(release)
+	waitFor(t, "the second marker to be rejected", func() bool { return c.Stats().Quarantined >= 1 })
+	closeClient(t, c)
+	got := c.Stats().Losses
+	if len(got) != 1 || got[0].Count != 2 {
+		t.Fatalf("after the first marker's acknowledgement only the later losses remain: %+v (the first marker announced %d)", got, lost)
+	}
+}
+
+// A marker that never reached the hub (crash, eviction) is announced again by
+// the next process, and the record is cleared only by an accepted marker.
+func TestUnacknowledgedMarkerIsAnnouncedAgainAfterARestart(t *testing.T) {
+	dir, lost := lossDir(t)
+	stuck := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), `"gap1"`) {
+			<-r.Context().Done() // never answers: the process "crashes" here
+			return
+		}
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+		(&hub{}).ServeHTTP(w, r)
+	}))
+	var marks atomic.Int32
+	mk := func(Loss) (Item, error) { marks.Add(1); return gapItem() }
+	c1, _ := New(quiet(fast(Config{URL: stuck.URL, SpoolDir: dir, SpoolMaxBytes: 700, GapMarker: mk, Timeout: time.Hour})))
+	waitFor(t, "marker in flight", func() bool {
+		raw, _ := os.ReadFile(filepath.Join(dir, "loss.json"))
+		return strings.Contains(string(raw), `"marker_id":"gap1"`)
+	})
+	_ = c1
+	stuck.CloseClientConnections()
+
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c2, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, SpoolMaxBytes: 700, GapMarker: mk})))
+	waitFor(t, "record cleared by an accepted marker", func() bool { return len(c2.Stats().Losses) == 0 })
+	closeClient(t, c2)
+	if marks.Load() < 2 {
+		t.Fatalf("marker built %d times; the new process must announce again", marks.Load())
+	}
+	if got := openLossBook(dir).list(); len(got) != 0 {
+		t.Fatalf("loss still on disk (was %d): %+v", lost, got)
+	}
+}
+
+// If the quarantine cannot be written, the event is not settled: it stays in the
+// spool, is not counted as quarantined, and is quarantined once storage works.
+func TestQuarantineWriteFailureKeepsTheEvent(t *testing.T) {
+	dir := t.TempDir()
+	sp, err := openSpool(dir, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sp.append(item("bad", PriorityHigh)); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the quarantine file should be.
+	if err := os.Mkdir(filepath.Join(dir, "quarantine.jsonl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 400, "", nil }}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var errs atomic.Int32
+	c, err := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, OnError: func(error) { errs.Add(1) }})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "a reported storage failure", func() bool { return errs.Load() >= 2 })
+	st := c.Stats()
+	if st.Quarantined != 0 || st.SpoolBytes == 0 {
+		t.Fatalf("the event must stay in the spool and not be counted as quarantined: %+v", st)
+	}
+	if err := os.Remove(filepath.Join(dir, "quarantine.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "quarantine once storage works", func() bool { return c.Stats().Quarantined == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.SpoolBytes != 0 || st.Sent != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+	if got := quarantineIDs(t, dir); len(got) != 1 || got[0] != "bad:bad_request" {
+		t.Fatalf("quarantine = %v", got)
+	}
+}
+
+// OnError may call back into the client even when the loss record cannot be
+// saved: the error is reported outside the lock.
+func TestLossSaveFailureIsReportedOutsideTheLock(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "loss.json.tmp"), 0o700); err != nil { // makes every save fail
+		t.Fatal(err)
+	}
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	defer dead.Close()
+	var c *Client
+	var calls atomic.Int32
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, _ = New(quiet(fast(Config{URL: dead.URL, SpoolDir: dir, SpoolMaxBytes: 300, QueueSize: 1, BatchSize: 1,
+			OnError: func(error) { calls.Add(1); _ = c.Stats() }})))
+		for i := 0; i < 20; i++ {
+			c.Publish(item(fmt.Sprintf("h%02d", i), PriorityHigh))
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("deadlock: OnError ran under the lock")
+	}
+	if calls.Load() == 0 {
+		t.Fatal("the save failure was never reported")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = c.Close(ctx)
+}

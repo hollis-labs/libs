@@ -63,10 +63,20 @@
 // Losing a protected item is recorded: a [Loss] with the class, the first and
 // last time something was dropped and a count is persisted (loss.json in the
 // spool directory), counted in Stats.DroppedHigh, logged at WARN and reported to
-// OnDrop with the reason "high_priority_dropped". The next time the hub accepts
-// events, Config.GapMarker, if set, builds an event announcing the gap, which is
-// published and the record cleared. An app that cannot accept even that loss
+// OnDrop with the reason "high_priority_dropped". When the queue is empty,
+// Config.GapMarker, if set, builds an event announcing the gap; the record is
+// tied to that event's id and stays on disk until the hub accepts the marker.
+// Only the items the marker announced then come off the record, so losses that
+// happened meanwhile are kept; a marker the hub rejects or never answers leaves
+// the loss on record (a rejected one is quarantined, not re-announced in a
+// loop). A new process announces any record again, because a marker queued by
+// the old one may not have survived. An app that cannot accept even that loss
 // keeps its own outbox and replays it through a relay.
+//
+// Errors from saving the loss record or the quarantine are reported through
+// OnError, outside the lock. If the quarantine cannot be written, the events are
+// not settled: they stay where they are (in the spool, if spooled), are not
+// counted as quarantined, and are retried with backoff.
 //
 // # Disk spool
 //

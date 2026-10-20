@@ -27,7 +27,8 @@
   resort. Losing a protected item is recorded (`Loss`: class, first and last
   time, count; persisted in `loss.json`), counted in `Stats.DroppedHigh`, logged
   at WARN, reported to `OnDrop` as `high_priority_dropped`, and announced by the
-  event `Config.GapMarker` builds when the hub next accepts events.
+  event `Config.GapMarker` builds. The record is cleared only by the hub's
+  acceptance of that marker, and only for the items it announced.
 - Optional bounded disk spool that keeps order and survives restarts. Records
   stay on disk until the hub settles them, the file is swapped atomically by
   generation, a torn tail is repaired, and disk use is bounded by compaction.

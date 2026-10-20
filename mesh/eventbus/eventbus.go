@@ -153,6 +153,7 @@ type Client struct {
 	quar   *quarantine
 	loss   *lossBook
 	closed bool
+	errs   []error // reported by emit, outside the lock
 
 	wake chan struct{}
 	stop chan struct{}
@@ -259,8 +260,16 @@ type dropNote struct {
 	reason string
 }
 
-// emit counts the notes and calls OnDrop for each. Call it without holding c.mu.
+// emit counts the notes, calls OnDrop for each and reports the errors collected
+// under the lock. Call it without holding c.mu.
 func (c *Client) emit(notes []dropNote) {
+	c.mu.Lock()
+	errs := c.errs
+	c.errs = nil
+	c.mu.Unlock()
+	for _, err := range errs {
+		c.report(err)
+	}
 	for _, d := range notes {
 		if d.n <= 0 {
 			continue
@@ -285,7 +294,7 @@ func (c *Client) recordLoss(n int) {
 		return
 	}
 	if err := c.loss.add(lossClass, n, time.Now().UTC()); err != nil {
-		c.report(fmt.Errorf("eventbus: save loss record: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("eventbus: save loss record: %w", err))
 	}
 }
 
@@ -500,28 +509,48 @@ func (c *Client) pump(closing bool) {
 	}
 }
 
-// announceLoss publishes a gap marker for each persisted loss record, once the
-// hub has accepted events and the queue is empty, and clears the record.
+// announceLoss publishes a gap marker for each persisted loss record that has
+// none in flight, once the queue is empty (so the marker follows everything
+// already pending). The marker is its own reachability probe: if the hub is
+// down it waits in the queue like any event. The record stays on disk, tied to
+// the marker's id, until the hub accepts that marker; only then are the
+// announced items taken off it (see ackMarker).
 func (c *Client) announceLoss() {
-	if c.cfg.GapMarker == nil || c.sent.Load() == 0 {
+	if c.cfg.GapMarker == nil {
 		return
 	}
 	c.mu.Lock()
-	recs := c.loss.list()
+	var snaps []Loss
+	for _, r := range c.loss.list() {
+		if r.MarkerID == "" {
+			snaps = append(snaps, r)
+		}
+	}
 	c.mu.Unlock()
-	for _, rec := range recs {
-		it, err := c.cfg.GapMarker(rec)
+	for _, snap := range snaps {
+		it, err := c.cfg.GapMarker(snap)
 		if err != nil {
 			c.report(fmt.Errorf("eventbus: build gap marker: %w", err))
 			continue
 		}
-		c.Publish(it)
 		c.mu.Lock()
-		err = c.loss.clear(rec.Class)
+		err = c.loss.beginMarker(snap.Class, it.ID, snap)
 		c.mu.Unlock()
 		if err != nil {
-			c.report(fmt.Errorf("eventbus: clear loss record: %w", err))
+			c.report(fmt.Errorf("eventbus: save loss record: %w", err))
+			continue
 		}
+		c.Publish(it)
+	}
+}
+
+// markerAccepted is called for each event the hub accepted.
+func (c *Client) markerAccepted(id string) {
+	c.mu.Lock()
+	_, err := c.loss.ackMarker(id)
+	c.mu.Unlock()
+	if err != nil {
+		c.report(fmt.Errorf("eventbus: save loss record: %w", err))
 	}
 }
 
@@ -560,21 +589,27 @@ func (c *Client) ackBatch(batch []queued, settled []bool) {
 	}
 }
 
-// quarantineItems sets items aside undelivered. They are never counted as sent.
-func (c *Client) quarantineItems(items []Item, reason, code, message string) {
+// quarantineItems sets items aside undelivered, whole or not at all, and
+// reports whether they are safely recorded. When it returns false nothing was
+// written and the caller must keep the items (and retry): they are not settled
+// and not counted as quarantined. They are never counted as sent.
+func (c *Client) quarantineItems(items []Item, reason, code, message string) bool {
 	now := time.Now().UTC()
+	recs := make([]quarantineRec, len(items))
+	for i, it := range items {
+		recs[i] = quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: it.Body}
+	}
 	c.mu.Lock()
-	var errs []error
-	for _, it := range items {
-		if err := c.quar.add(quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: it.Body}); err != nil {
-			errs = append(errs, err)
-		}
-	}
+	err, trimErr := c.quar.addAll(recs)
 	c.mu.Unlock()
-	c.quarantined.Add(uint64(len(items)))
-	for _, err := range errs {
-		c.report(fmt.Errorf("eventbus: write quarantine: %w", err))
+	if err != nil {
+		c.report(fmt.Errorf("eventbus: cannot write quarantine, keeping %d event(s) to retry: %w", len(items), err))
+		return false
 	}
+	if trimErr != nil {
+		c.report(fmt.Errorf("eventbus: trim quarantine: %w", trimErr))
+	}
+	c.quarantined.Add(uint64(len(items)))
 	for _, it := range items {
 		if c.cfg.OnQuarantine != nil {
 			c.cfg.OnQuarantine(it, reason, code)
@@ -582,6 +617,7 @@ func (c *Client) quarantineItems(items []Item, reason, code, message string) {
 	}
 	c.log.Warn("eventbus: events quarantined undelivered", "count", len(items), "reason", reason, "code", code)
 	c.report(fmt.Errorf("eventbus: %d event(s) quarantined (reason %s %s); none was sent", len(items), reason, code))
+	return true
 }
 
 type outcome int
@@ -667,29 +703,35 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 
 		switch res.out {
 		case outcomeFinal:
-			c.quarantineItems(items, res.reason, res.code, "")
-			finishItems(send)
-			continue
+			if c.quarantineItems(items, res.reason, res.code, "") {
+				finishItems(send)
+				continue
+			}
+			// The quarantine could not be written: keep the events and retry.
 		case outcomeAuth:
 			if authSince.IsZero() {
 				authSince = time.Now()
 			}
 			if c.cfg.StrictAuth || (c.cfg.RetryAuthMax > 0 && time.Since(authSince) >= c.cfg.RetryAuthMax) {
-				c.quarantineItems(items, "auth", res.code, "")
-				authSince = time.Time{}
-				finishItems(send)
-				continue
+				if c.quarantineItems(items, "auth", res.code, "") {
+					authSince = time.Time{}
+					finishItems(send)
+					continue
+				}
 			}
 			c.report(fmt.Errorf("eventbus: hub returned an auth failure (%s); keeping events, retrying for up to %s", res.code, c.cfg.RetryAuthMax))
 			// fall through to the backoff below
 		case outcomeTooLarge:
 			if w == 1 {
-				c.quarantineItems(items, "payload_too_large", "", "hub refused the request size")
-				finishItems(send)
+				if c.quarantineItems(items, "payload_too_large", "", "hub refused the request size") {
+					finishItems(send)
+					continue
+				}
+				// Could not record it: keep the event and retry below.
+			} else {
+				window = w / 2
 				continue
 			}
-			window = w / 2
-			continue
 		case outcomeOK:
 			var done, open []int
 			for k, i := range send {
@@ -697,18 +739,23 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 				switch {
 				case r != nil && r.Status == "accepted":
 					c.sent.Add(1)
+					c.markerAccepted(items[k].ID)
 					done = append(done, i)
 				case r != nil && r.Status == "duplicate":
 					c.dups.Add(1)
 					c.sent.Add(1)
+					c.markerAccepted(items[k].ID)
 					done = append(done, i)
 				case r != nil && r.Status == "rejected":
-					c.rejected.Add(1)
-					if c.cfg.OnReject != nil {
-						c.cfg.OnReject(items[k].ID, r.Code, r.Message)
+					if c.quarantineItems(items[k:k+1], "rejected", r.Code, r.Message) {
+						c.rejected.Add(1)
+						if c.cfg.OnReject != nil {
+							c.cfg.OnReject(items[k].ID, r.Code, r.Message)
+						}
+						done = append(done, i)
+					} else {
+						open = append(open, i)
 					}
-					c.quarantineItems(items[k:k+1], "rejected", r.Code, r.Message)
-					done = append(done, i)
 				default:
 					open = append(open, i)
 				}
@@ -720,9 +767,10 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			}
 			unresolved++
 			if c.cfg.MaxUnresolved > 0 && unresolved > c.cfg.MaxUnresolved {
-				c.quarantineItems(itemsOf(open), "unresolved", "", "no valid verdict from the hub")
-				finishItems(open)
-				continue
+				if c.quarantineItems(itemsOf(open), "unresolved", "", "no valid verdict from the hub") {
+					finishItems(open)
+					continue
+				}
 			}
 			c.report(fmt.Errorf("eventbus: hub gave no valid verdict for %d of %d events", len(open), len(send)))
 			wait = 0

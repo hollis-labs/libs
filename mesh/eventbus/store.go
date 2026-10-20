@@ -20,6 +20,14 @@ type Loss struct {
 	First time.Time `json:"first_dropped_at"`
 	Last  time.Time `json:"last_dropped_at"`
 	Count uint64    `json:"count"`
+
+	// MarkerID names the gap marker event in flight for the first MarkerCount
+	// of these items (up to MarkerLast). The record is reduced only when the
+	// hub has accepted that marker, so a lost or rejected marker leaves the
+	// loss on record, and losses that happen meanwhile are never erased.
+	MarkerID    string    `json:"marker_id,omitempty"`
+	MarkerCount uint64    `json:"marker_count,omitempty"`
+	MarkerLast  time.Time `json:"marker_last,omitempty"`
 }
 
 // lossClass is the Loss.Class of high-priority items.
@@ -42,6 +50,10 @@ func openLossBook(dir string) *lossBook {
 		if json.Unmarshal(data, &list) == nil {
 			for i := range list {
 				l := list[i]
+				// A marker queued by an earlier process may not have survived;
+				// announce again (a marker that did survive is harmless: it is
+				// delivered, and only the marker named here reduces the record).
+				l.MarkerID, l.MarkerCount, l.MarkerLast = "", 0, time.Time{}
 				b.recs[l.Class] = &l
 			}
 		}
@@ -60,9 +72,33 @@ func (b *lossBook) add(class string, n int, now time.Time) error {
 	return b.save()
 }
 
-func (b *lossBook) clear(class string) error {
-	delete(b.recs, class)
+// beginMarker records that a marker with id covers the snapshot's items.
+func (b *lossBook) beginMarker(class, id string, snap Loss) error {
+	r := b.recs[class]
+	if r == nil || r.MarkerID != "" {
+		return nil
+	}
+	r.MarkerID, r.MarkerCount, r.MarkerLast = id, snap.Count, snap.Last
 	return b.save()
+}
+
+// ackMarker is called when the hub accepted the event id. If it is a marker,
+// the items it announced come off the record; losses added since stay.
+func (b *lossBook) ackMarker(id string) (bool, error) {
+	for class, r := range b.recs {
+		if r.MarkerID != id || id == "" {
+			continue
+		}
+		if r.Count <= r.MarkerCount {
+			delete(b.recs, class)
+		} else {
+			r.Count -= r.MarkerCount
+			r.First = r.MarkerLast
+			r.MarkerID, r.MarkerCount, r.MarkerLast = "", 0, time.Time{}
+		}
+		return true, b.save()
+	}
+	return false, nil
 }
 
 func (b *lossBook) list() []Loss {
@@ -132,22 +168,29 @@ func openQuarantine(dir string, max int64) *quarantine {
 	return q
 }
 
-func (q *quarantine) add(rec quarantineRec) error {
-	if q.path == "" {
-		return nil
+// addAll appends every record in one write, so a batch is quarantined whole or
+// not at all. A failure to append is returned and nothing is recorded; a failure
+// to trim afterwards is returned as trimErr, the records themselves being safe.
+func (q *quarantine) addAll(recs []quarantineRec) (err, trimErr error) {
+	if q.path == "" || len(recs) == 0 {
+		return nil, nil
 	}
-	line, err := json.Marshal(rec)
-	if err != nil {
-		return err
+	var buf bytes.Buffer
+	for _, rec := range recs {
+		line, err := json.Marshal(rec)
+		if err != nil {
+			return err, nil
+		}
+		buf.Write(line)
+		buf.WriteByte('\n')
 	}
-	line = append(line, '\n')
 	f, err := os.OpenFile(q.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return err
+		return err, nil
 	}
-	n, werr := f.Write(line)
+	n, werr := f.Write(buf.Bytes())
 	cerr := f.Close()
-	if werr != nil || cerr != nil || n != len(line) {
+	if werr != nil || cerr != nil || n != buf.Len() {
 		_ = os.Truncate(q.path, q.size)
 		if werr == nil {
 			werr = cerr
@@ -155,13 +198,13 @@ func (q *quarantine) add(rec quarantineRec) error {
 		if werr == nil {
 			werr = errors.New("eventbus: short write to quarantine")
 		}
-		return werr
+		return werr, nil
 	}
-	q.size += int64(len(line))
+	q.size += int64(buf.Len())
 	if q.max > 0 && q.size > q.max {
-		return q.trim()
+		return nil, q.trim()
 	}
-	return nil
+	return nil, nil
 }
 
 // trim drops the oldest records until the file is at most 90% of its cap.
