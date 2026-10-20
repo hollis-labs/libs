@@ -20,10 +20,8 @@
   a WARN log and `OnError`. They are never counted as sent. A 401 or a 403 other
   than app_mismatch waits and retries (a service often starts before its
   credential exists), up to `RetryAuthMax` (default 10 minutes); `StrictAuth`
-  makes them final at once. `ReplayQuarantine` hands quarantined events back to
-  delivery (all, or by reason) once the cause is fixed, oldest first, as a
-  durable handoff: spool first, then removal from quarantine, under the lock
-  `Close` takes.
+  makes them final at once.
+  Recovery is manual in this version (see the package documentation).
 - Priorities `PriorityDebug`, `PriorityActivity`, `PriorityHigh`: a full queue or
   spool drops debug first, then activity, and protected items only as the last
   resort. Losing a protected item is recorded (`Loss`: class, first and last

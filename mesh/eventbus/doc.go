@@ -47,14 +47,13 @@
 // quarantine.jsonl, bounded by Config.QuarantineMaxBytes with the oldest records
 // going first. Without one, only the callback and the counters remain.
 //
-// Quarantine is not a graveyard: Client.ReplayQuarantine hands quarantined events
-// back to delivery (all of them, or only those quarantined for the given
-// reasons, such as "auth" once a credential is fixed), oldest first. The handoff
-// is durable: events are appended to the spool first and removed from the
-// quarantine file only afterwards, under the lock Close takes, so a crash or a
-// concurrent Close can at worst cause a second send, never a loss; it stops when
-// the spool has no room and Stats.Replayed counts only events actually handed
-// over.
+// Recovering quarantined events is manual in this version. quarantine.jsonl has
+// one JSON object per line: at, reason, code, message, id, p (the priority) and
+// b (the exact envelope body as it was sent). To resend, stop the client, fix the
+// cause, read the lines you want, call Publish with Item{ID: id, Priority: p,
+// Body: b} on a running client, and remove those lines from the file. The hub
+// dedupes on the id, so resending an event it already has is harmless. A
+// ReplayQuarantine call that does this safely is a separate follow-up.
 //
 // # Overflow
 //

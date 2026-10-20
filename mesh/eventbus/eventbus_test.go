@@ -510,14 +510,6 @@ func TestAuthCeilingQuarantinesInsteadOfWaitingForever(t *testing.T) {
 	if errs.Load() == 0 {
 		t.Fatal("the quarantine must be loud")
 	}
-	// And it can be put back once the cause is fixed.
-	c2, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
-	n, err := c2.ReplayQuarantine("auth")
-	if err != nil || n == 0 {
-		t.Fatalf("replay n=%d err=%v", n, err)
-	}
-	waitFor(t, "replayed delivery", func() bool { return c2.Stats().Sent >= 1 })
-	closeClient(t, c2)
 }
 
 func TestNegativeCeilingNeverQuarantinesAuthFailures(t *testing.T) {
@@ -1131,52 +1123,6 @@ func TestTokenFileEnvName(t *testing.T) {
 	}
 }
 
-// Quarantined events can be put back: after the cause is fixed they are
-// delivered in their original order and leave the file.
-func TestReplayQuarantineDeliversAfterTheCauseIsFixed(t *testing.T) {
-	dir := t.TempDir()
-	var authed atomic.Bool
-	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
-		if !authed.Load() {
-			return 401, "", nil
-		}
-		return 0, "", nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1, StrictAuth: true})))
-	for _, id := range []string{"a", "b", "c"} {
-		c.Publish(item(id, PriorityHigh))
-	}
-	waitFor(t, "all quarantined", func() bool { return c.Stats().Quarantined == 3 })
-	if got := quarantineIDs(t, dir); len(got) != 3 {
-		t.Fatalf("quarantine = %v", got)
-	}
-	authed.Store(true)
-
-	if n, err := c.ReplayQuarantine("unresolved"); err != nil || n != 0 {
-		t.Fatalf("a reason that matches nothing replays nothing: n=%d err=%v", n, err)
-	}
-	n, err := c.ReplayQuarantine("auth")
-	if err != nil || n != 3 {
-		t.Fatalf("replayed n=%d err=%v", n, err)
-	}
-	waitFor(t, "replayed events delivered", func() bool { return c.Stats().Sent == 3 })
-	closeClient(t, c)
-	if got := strings.Join(h.got(), ","); got != "a,b,c" {
-		t.Fatalf("delivered = %s, want the original order", got)
-	}
-	if got := quarantineIDs(t, dir); len(got) != 0 {
-		t.Fatalf("replayed records must leave the file: %v", got)
-	}
-	if st := c.Stats(); st.Replayed != 3 {
-		t.Fatalf("stats = %+v", st)
-	}
-	if _, err := c.ReplayQuarantine(); err == nil {
-		t.Fatal("replaying on a closed client must fail, not lose events")
-	}
-}
-
 // ---- gap marker acknowledgement and failure paths ----
 
 // lossDir returns a spool directory holding a persisted protected-loss record,
@@ -1397,142 +1343,57 @@ func TestLossSaveFailureIsReportedOutsideTheLock(t *testing.T) {
 	_ = c.Close(ctx)
 }
 
-// ---- replay is a durable handoff ----
+// ---- Close races ----
 
-func prefillQuarantine(t *testing.T, dir string, ids ...string) {
-	t.Helper()
-	q := openQuarantine(dir, 1<<20)
-	var recs []quarantineRec
-	for _, id := range ids {
-		recs = append(recs, quarantineRec{At: time.Now().UTC(), Reason: "auth", ID: id, Prio: PriorityHigh, Body: item(id, PriorityHigh).Body})
-	}
-	if err, terr := q.addAll(recs); err != nil || terr != nil {
-		t.Fatalf("prefill: %v %v", err, terr)
-	}
-}
-
-// everyID lists the ids held anywhere on disk: the unsettled spool and the
-// quarantine.
-func everyID(t *testing.T, dir string) map[string]bool {
+func spoolIDs(t *testing.T, dir string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
 	sp, err := openSpool(dir, 1<<30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	items, err := sp.peek(10000)
+	items, err := sp.peek(100000)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, q := range items {
 		out[q.ID] = true
 	}
-	recs, _, err := openQuarantine(dir, 1<<30).peek(func(quarantineRec) bool { return true })
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, r := range recs {
-		out[r.ID] = true
-	}
 	return out
 }
 
-func deadHub(t *testing.T) *httptest.Server {
-	t.Helper()
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
-	t.Cleanup(s.Close)
-	return s
-}
-
-// A replay that cannot reach the spool changes nothing: the records stay in
-// quarantine and nothing is counted as replayed.
-func TestReplayKeepsRecordsWhenTheSpoolCannotTakeThem(t *testing.T) {
-	dir := t.TempDir()
-	prefillQuarantine(t, dir, "a", "b", "c")
-	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, FlushInterval: time.Hour}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Block the live spool file with a directory.
-	c.mu.Lock()
-	live := c.spool.filePath(c.spool.gen)
-	c.mu.Unlock()
-	_ = os.Remove(live)
-	if err := os.Mkdir(live, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	n, err := c.ReplayQuarantine()
-	if err == nil || n != 0 {
-		t.Fatalf("n=%d err=%v, want 0 and an error", n, err)
-	}
-	if st := c.Stats(); st.Replayed != 0 {
-		t.Fatalf("stats = %+v", st)
-	}
-	recs, _, _ := openQuarantine(dir, 1<<20).peek(func(quarantineRec) bool { return true })
-	if len(recs) != 3 {
-		t.Fatalf("the records must stay in quarantine, found %d", len(recs))
-	}
-	_ = os.Remove(live)
-	closeClient(t, c)
-}
-
-// A replay whose source cannot be cleaned up has already put the events in the
-// spool: they are never lost, at worst sent twice (the hub dedupes on the id),
-// and the error says so.
-func TestReplayNeverLosesEventsWhenCleanupFails(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("directory permissions do not bind root")
-	}
-	dir := t.TempDir()
-	prefillQuarantine(t, dir, "a", "b", "c")
-	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, FlushInterval: time.Hour}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.mu.Lock()
-	live := c.spool.filePath(c.spool.gen)
-	c.mu.Unlock()
-	if f, err := os.OpenFile(live, os.O_CREATE|os.O_WRONLY, 0o600); err == nil { // exists, so appending needs no new file
-		f.Close()
-	}
-	if err := os.Chmod(dir, 0o500); err != nil { // no new files: the quarantine rewrite fails
-		t.Fatal(err)
-	}
-	defer os.Chmod(dir, 0o700)
-	n, err := c.ReplayQuarantine()
-	_ = os.Chmod(dir, 0o700)
-	if n != 3 || err == nil || !strings.Contains(err.Error(), "quarantine") {
-		t.Fatalf("n=%d err=%v, want 3 handed over and a cleanup error", n, err)
-	}
-	if st := c.Stats(); st.Replayed != 3 || st.SpoolBytes == 0 {
-		t.Fatalf("stats = %+v", st)
-	}
-	got := everyID(t, dir)
-	for _, id := range []string{"a", "b", "c"} {
-		if !got[id] {
-			t.Fatalf("event %s is nowhere on disk after a failed cleanup: %v", id, got)
-		}
-	}
-	closeClient(t, c)
-}
-
-// A replay racing with Close either completes or is refused; either way every
-// event is still on disk afterwards, in the spool or in quarantine.
-func TestReplayRacingCloseNeverLosesAnEvent(t *testing.T) {
-	srv := deadHub(t)
-	for i := 0; i < 25; i++ {
+// Publish racing with Close: every event is either on disk for the next
+// process or reported as dropped because the client was closed. None vanishes.
+func TestPublishRacingCloseAccountsForEveryEvent(t *testing.T) {
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	defer dead.Close()
+	for round := 0; round < 15; round++ {
 		dir := t.TempDir()
-		prefillQuarantine(t, dir, "a", "b", "c", "d", "e")
-		c, err := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
+		var closedDrops atomic.Int64
+		c, err := New(quiet(fast(Config{URL: dead.URL, SpoolDir: dir, QueueSize: 100000,
+			OnDrop: func(n int, reason string) {
+				if reason == "closed" {
+					closedDrops.Add(int64(n))
+				}
+			}})))
 		if err != nil {
 			t.Fatal(err)
 		}
+		const writers, each = 4, 25
 		var wg sync.WaitGroup
-		wg.Add(2)
-		var replayed int
-		go func() { defer wg.Done(); replayed, _ = c.ReplayQuarantine() }()
+		for w := 0; w < writers; w++ {
+			wg.Add(1)
+			go func(w int) {
+				defer wg.Done()
+				for i := 0; i < each; i++ {
+					c.Publish(item(fmt.Sprintf("r%d-w%d-%02d", round, w, i), PriorityHigh))
+				}
+			}(w)
+		}
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			time.Sleep(time.Duration(round%5) * time.Millisecond)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			_ = c.Close(ctx)
@@ -1540,48 +1401,48 @@ func TestReplayRacingCloseNeverLosesAnEvent(t *testing.T) {
 		wg.Wait()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if err := c.Close(ctx); err != nil {
-			t.Fatalf("round %d: close: %v", i, err)
+			t.Fatalf("round %d: close: %v", round, err)
 		}
 		cancel()
-		got := everyID(t, dir)
-		for _, id := range []string{"a", "b", "c", "d", "e"} {
-			if !got[id] {
-				t.Fatalf("round %d: event %s lost (replayed %d): %v", i, id, replayed, got)
-			}
-		}
-		if st := c.Stats(); st.Dropped != 0 {
-			t.Fatalf("round %d: stats = %+v", i, st)
+		onDisk := len(spoolIDs(t, dir))
+		if total := onDisk + int(closedDrops.Load()); total != writers*each {
+			t.Fatalf("round %d: %d on disk + %d reported closed = %d, want %d: events vanished", round, onDisk, closedDrops.Load(), total, writers*each)
 		}
 	}
 }
 
-// When the spool has no room the rest stays in quarantine; nothing is lost.
-func TestReplayStopsWhenTheSpoolIsFull(t *testing.T) {
-	dir := t.TempDir()
-	var ids []string
-	for i := 0; i < 12; i++ {
-		ids = append(ids, fmt.Sprintf("q%02d", i))
-	}
-	prefillQuarantine(t, dir, ids...)
-	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, SpoolMaxBytes: 400, FlushInterval: time.Hour}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	n, err := c.ReplayQuarantine()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n == 0 || n >= len(ids) {
-		t.Fatalf("handed over %d of %d; want some but not all", n, len(ids))
-	}
-	if st := c.Stats(); st.Dropped != 0 || st.Replayed != uint64(n) || st.SpoolBytes > 400 {
-		t.Fatalf("stats = %+v", st)
-	}
-	got := everyID(t, dir)
-	for _, id := range ids {
-		if !got[id] {
-			t.Fatalf("event %s lost: %v", id, got)
+// Quarantining while Close runs: an event is in the quarantine file or still
+// pending (spooled), never neither.
+func TestQuarantineRacingCloseNeverLosesAnEvent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(400) }))
+	defer srv.Close()
+	for round := 0; round < 15; round++ {
+		dir := t.TempDir()
+		c, err := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1})))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := []string{"a", "b", "c", "d", "e", "f"}
+		for _, id := range ids {
+			c.Publish(item(id, PriorityHigh))
+		}
+		time.Sleep(time.Duration(round%4) * time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := c.Close(ctx); err != nil {
+			t.Fatalf("round %d: close: %v", round, err)
+		}
+		cancel()
+		held := spoolIDs(t, dir)
+		for _, id := range quarantineIDs(t, dir) {
+			held[strings.SplitN(id, ":", 2)[0]] = true
+		}
+		for _, id := range ids {
+			if !held[id] {
+				t.Fatalf("round %d: event %s is neither pending nor quarantined: %v", round, id, held)
+			}
+		}
+		if st := c.Stats(); st.Dropped != 0 {
+			t.Fatalf("round %d: stats = %+v", round, st)
 		}
 	}
-	closeClient(t, c)
 }
