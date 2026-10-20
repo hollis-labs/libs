@@ -426,6 +426,7 @@ type itemResult struct {
 	Status  string `json:"status"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Cursor  string `json:"cursor"`
 }
 
 // deliver sends batch until every item has a verdict. It returns false with
@@ -494,10 +495,10 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			for k, i := range send {
 				r, ok := results[items[k].ID]
 				switch {
-				case ok && r.Status == "accepted":
+				case ok && r.Status == "accepted" && r.Cursor != "":
 					c.sent.Add(1)
 					done = append(done, i)
-				case ok && r.Status == "duplicate":
+				case ok && r.Status == "duplicate" && r.Cursor != "":
 					c.dups.Add(1)
 					c.sent.Add(1)
 					done = append(done, i)
@@ -641,23 +642,32 @@ func errorCode(body []byte) string {
 	return e.Error.Code
 }
 
-// parseResults reads {"results":[{id,status,...}]}, or a bare array of the same
-// objects. Anything else yields no verdicts.
+// parseResults reads the hub's {"results":[{id,status,...}]} answer. Anything
+// else (not JSON, no results key, a bare array) yields no verdicts. Cursors are
+// strings in the contract; a number is accepted too and kept as text.
 func parseResults(body []byte) map[string]itemResult {
-	var list []itemResult
 	var wrapped struct {
-		Results []itemResult `json:"results"`
+		Results []struct {
+			ID      string          `json:"id"`
+			Status  string          `json:"status"`
+			Code    string          `json:"code"`
+			Message string          `json:"message"`
+			Cursor  json.RawMessage `json:"cursor"`
+		} `json:"results"`
 	}
-	if json.Unmarshal(body, &wrapped) == nil && wrapped.Results != nil {
-		list = wrapped.Results
-	} else if json.Unmarshal(body, &list) != nil {
+	if json.Unmarshal(body, &wrapped) != nil || wrapped.Results == nil {
 		return nil
 	}
-	m := make(map[string]itemResult, len(list))
-	for _, r := range list {
-		if r.ID != "" {
-			m[r.ID] = r
+	m := make(map[string]itemResult, len(wrapped.Results))
+	for _, r := range wrapped.Results {
+		if r.ID == "" {
+			continue
 		}
+		cur := strings.Trim(string(r.Cursor), `"`)
+		if cur == "null" {
+			cur = ""
+		}
+		m[r.ID] = itemResult{ID: r.ID, Status: r.Status, Code: r.Code, Message: r.Message, Cursor: cur}
 	}
 	return m
 }

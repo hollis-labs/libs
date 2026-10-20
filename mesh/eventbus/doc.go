@@ -15,7 +15,7 @@
 //   - Delivery is in order and at least once. The hub dedupes on the envelope
 //     id, so a retried batch is harmless.
 //   - An event is finished only when the hub gives it an explicit verdict:
-//     "accepted" or "duplicate" count as sent, "rejected" goes to OnReject and
+//     "accepted" or "duplicate" (with a cursor) count as sent, "rejected" goes to OnReject and
 //     is never retried. A 200 that is unreadable, omits an event, or names an
 //     unknown status leaves those events unresolved: they are sent again, alone,
 //     with backoff, and dropped (reason "unresolved") only after
@@ -55,6 +55,7 @@
 // Wire format (settled with the hub): POST {"events":[<envelope>...]} with a
 // bearer token; HTTP 200 carries per-item results
 // {"results":[{"id","status","code","message","cursor"}]} where status is
-// accepted, duplicate or rejected. A bare JSON array of the same objects is
-// also accepted.
+// accepted, duplicate or rejected; accepted and duplicate carry a cursor. Only an
+// explicit accepted or duplicate with a cursor counts as sent. A bare array is
+// not the contract and is treated as no verdict.
 package eventbus

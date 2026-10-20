@@ -147,7 +147,7 @@ func TestBatchAndAuth(t *testing.T) {
 
 func TestPerItemResults(t *testing.T) {
 	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		return 200, `{"results":[{"id":"a","status":"accepted"},{"id":"b","status":"duplicate"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}]}`, nil
+		return 200, `{"results":[{"id":"a","status":"accepted","cursor":"11"},{"id":"b","status":"duplicate","cursor":"7"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}]}`, nil
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
@@ -199,7 +199,7 @@ func TestMalformed200IsRetriedNotCountedSent(t *testing.T) {
 func TestOmittedIDsAreRetriedAlone(t *testing.T) {
 	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
 		if call == 1 {
-			return 200, `{"results":[{"id":"a","status":"accepted"},{"id":"c","status":"mystery"}]}`, nil
+			return 200, `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"c","status":"mystery"}]}`, nil
 		}
 		return 0, "", nil
 	}}
@@ -679,6 +679,42 @@ func TestOtherForbiddenAndNotYetEnabledAreRetried(t *testing.T) {
 	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
 	closeClient(t, c)
 	if st := c.Stats(); st.Retries != 3 || st.Dropped != 0 || st.Rejected != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// Acceptance needs a cursor, and a bare array is not the contract's answer.
+func TestAcceptedWithoutCursorAndBareArrayAreUnresolved(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		switch call {
+		case 1:
+			return 200, `{"results":[{"id":"a","status":"accepted"}]}`, nil
+		case 2:
+			return 200, `[{"id":"a","status":"accepted","cursor":"1"}]`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Retries != 2 {
+		t.Fatalf("stats = %+v, want 2 retries before an explicit acceptance", st)
+	}
+}
+
+func TestNumericCursorIsAccepted(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		return 200, `{"results":[{"id":"a","status":"accepted","cursor":4812}]}`, nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour})
+	c.Publish(item("a", PriorityHigh))
+	closeClient(t, c)
+	if st := c.Stats(); st.Sent != 1 {
 		t.Fatalf("stats = %+v", st)
 	}
 }
