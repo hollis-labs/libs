@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -337,4 +338,152 @@ func TestReloadEndToEndKeyRotationAndPostureFlip(t *testing.T) {
 	if g.Mode() != ModeEnforce || do(h, "GET", "/notes", tokB).Code != 200 {
 		t.Fatal("broken config disturbed the running configuration")
 	}
+}
+
+// --- review findings on mode normalization, atomic apply, request snapshot and digest ordering ---
+
+func keyVerifier(key string) Verifier {
+	return NewAPIKeyVerifier(APIKey{Hash: HashKey(key), ID: "svc/" + key, Scopes: []string{"tesseract.read"}})
+}
+
+func notesGuard(t *testing.T, cfg Config) (*Guard, http.Handler) {
+	t.Helper()
+	cfg.Scopes = NewScopeTable().Route("GET", "/notes", "tesseract.read")
+	g, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g, g.Middleware(okHandler())
+}
+
+func TestModesAreStoredCanonicalNotAsGiven(t *testing.T) {
+	// New: a non-canonical spelling must still enforce, not fall through every case.
+	g, h := notesGuard(t, Config{Mode: "ENFORCE", Verifier: keyVerifier("k")})
+	if g.Mode() != ModeEnforce || g.Status() != "auth=enforce" {
+		t.Fatalf("New stored %q", g.Mode())
+	}
+	if got := do(h, "GET", "/notes", "").Code; got != 401 {
+		t.Fatalf("anonymous request under Mode=ENFORCE: %d", got)
+	}
+	// SetMode: the reviewer's repro. Start enforcing, flip to "ENFORCE".
+	g, h = notesGuard(t, Config{Mode: ModeEnforce, Verifier: keyVerifier("k")})
+	if err := g.SetMode("ENFORCE"); err != nil || g.Mode() != ModeEnforce {
+		t.Fatalf("SetMode(ENFORCE): %v %q", err, g.Mode())
+	}
+	if got := do(h, "GET", "/notes", "").Code; got != 401 {
+		t.Fatalf("anonymous request after SetMode(ENFORCE): %d", got)
+	}
+	for in, want := range map[Mode]Mode{" observe ": ModePermissive, "Permissive": ModePermissive, "OFF": ModeOff, "enforce": ModeEnforce} {
+		if err := g.SetMode(in); err != nil || g.Mode() != want {
+			t.Errorf("SetMode(%q): err=%v mode=%q want %q", in, err, g.Mode(), want)
+		}
+	}
+	if err := g.SetMode("enforcing"); err == nil {
+		t.Error("an unknown mode was accepted")
+	}
+}
+
+func TestApplyIsAtomicAndRefusalChangesNothing(t *testing.T) {
+	oldV, newV := keyVerifier("old"), keyVerifier("new")
+	g, h := notesGuard(t, Config{Mode: ModeEnforce, Verifier: oldV, Addr: "0.0.0.0:8080"})
+	accepts := func(key string) bool { return do(h, "GET", "/notes", "Bearer "+key).Code == 200 }
+	if !accepts("old") || accepts("new") {
+		t.Fatal("setup")
+	}
+	// Loosening a non-local listener is refused; the verifier must not move either.
+	if err := g.Apply(ModeOff, newV); err == nil {
+		t.Fatal("off on a non-local bind accepted")
+	}
+	if err := g.CheckApply(ModeOff, newV); err == nil {
+		t.Fatal("CheckApply disagrees with Apply")
+	}
+	if g.Mode() != ModeEnforce || !accepts("old") || accepts("new") {
+		t.Fatalf("a refused Apply changed state: mode=%q old=%v new=%v", g.Mode(), accepts("old"), accepts("new"))
+	}
+	if err := g.Apply("bogus", newV); err == nil || !accepts("old") || accepts("new") {
+		t.Fatalf("a bogus mode changed state: %v", err)
+	}
+	// A valid pair lands together.
+	if err := g.Apply(ModeEnforce, newV); err != nil {
+		t.Fatal(err)
+	}
+	if accepts("old") || !accepts("new") {
+		t.Fatal("verifier not replaced by a valid Apply")
+	}
+	// A nil verifier keeps the current one.
+	if err := g.Apply(ModeEnforce, nil); err != nil || !accepts("new") {
+		t.Fatalf("Apply(mode, nil): %v", err)
+	}
+}
+
+func TestApplyRefusesEnforceWithoutAVerifier(t *testing.T) {
+	g, _ := notesGuard(t, Config{Mode: ModeOff})
+	if err := g.Apply(ModeEnforce, nil); err == nil || g.Mode() != ModeOff {
+		t.Fatalf("enforce without any verifier accepted: %v mode=%q", err, g.Mode())
+	}
+	if err := g.Apply(ModeEnforce, keyVerifier("k")); err != nil || g.Mode() != ModeEnforce {
+		t.Fatalf("enforce with a verifier refused: %v", err)
+	}
+}
+
+// blockingVerifier holds Verify until released, so a request can be in flight
+// while the Guard is reconfigured.
+type blockingVerifier struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingVerifier) Verify(context.Context, string) (Principal, error) {
+	b.entered <- struct{}{}
+	<-b.release
+	return Principal{}, ErrInvalidToken
+}
+
+func TestRequestKeepsTheModeAndVerifierItStartedWith(t *testing.T) {
+	bv := &blockingVerifier{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	g, h := notesGuard(t, Config{Mode: ModeOff, Verifier: bv})
+	done := make(chan int, 1)
+	go func() { done <- do(h, "GET", "/notes", "Bearer some-token").Code }()
+	<-bv.entered // the request is inside verification, already decided to run under "off"
+	if err := g.Apply(ModeEnforce, keyVerifier("k")); err != nil {
+		t.Fatal(err)
+	}
+	close(bv.release)
+	if got := <-done; got != 200 {
+		t.Fatalf("an in-flight request was judged under the new mode: %d", got)
+	}
+	if got := do(h, "GET", "/notes", "Bearer some-token").Code; got != 401 {
+		t.Fatalf("a new request should run under the new pair: %d", got)
+	}
+}
+
+func TestReloaderEditDuringLoadGetsItsOwnPass(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "auth.conf")
+	writeFile(t, p, "v1")
+	var mu sync.Mutex
+	var loaded []string
+	entered := make(chan struct{}, 4)
+	release := make(chan struct{})
+	r := &Reloader{Path: p, Load: func(context.Context) error {
+		b, _ := os.ReadFile(p) //nolint:gosec // test path
+		mu.Lock()
+		loaded = append(loaded, string(b))
+		first := len(loaded) == 1
+		mu.Unlock()
+		entered <- struct{}{}
+		if first {
+			<-release // stall the first Load while the file is edited
+		}
+		return nil
+	}}
+	startReloader(t, r)
+	r.Trigger()
+	<-entered // the first Load is running (it read v1)
+	writeFile(t, p, "v2")
+	close(release)
+	waitFor(t, "a second pass for the edit made during Load", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(loaded) == 2 && loaded[1] == "v2"
+	})
 }

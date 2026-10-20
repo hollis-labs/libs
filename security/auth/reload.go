@@ -115,7 +115,14 @@ func (r *Reloader) Run(ctx context.Context) error {
 		signal.Notify(sig, syscall.SIGHUP)
 		defer signal.Stop(sig)
 	}
+	applied, _ := fileDigest(r.Path) // what is in effect now (the startup load)
+	var pending [sha256.Size]byte
+	var havePending bool
+	// apply runs Load and records which content it was loaded for. The digest
+	// is taken BEFORE Load, so an edit made while Load runs differs from it
+	// and gets its own pass instead of being marked applied unseen.
 	apply := func(reason string) {
+		d, _ := fileDigest(r.Path)
 		err := r.safeLoad(ctx)
 		if err != nil {
 			lg.Warn("auth: config reload failed; keeping previous configuration", "reason", reason, "err", err)
@@ -125,10 +132,8 @@ func (r *Reloader) Run(ctx context.Context) error {
 		if r.OnResult != nil {
 			r.OnResult(err)
 		}
+		applied, havePending = d, false
 	}
-	applied, _ := fileDigest(r.Path) // what is in effect now (the startup load)
-	var pending [sha256.Size]byte
-	var havePending bool
 	t := time.NewTicker(iv)
 	defer t.Stop()
 	for {
@@ -137,12 +142,8 @@ func (r *Reloader) Run(ctx context.Context) error {
 			return nil
 		case <-sig:
 			apply("SIGHUP")
-			applied, _ = fileDigest(r.Path)
-			havePending = false
 		case <-r.trigger:
 			apply("trigger")
-			applied, _ = fileDigest(r.Path)
-			havePending = false
 		case <-t.C:
 			if r.Path == "" {
 				continue
@@ -156,9 +157,7 @@ func (r *Reloader) Run(ctx context.Context) error {
 				pending, havePending = d, true // changed: confirm on the next check
 				continue
 			}
-			havePending = false
-			applied = d // record before Load so a failing file is not retried
-			apply("file changed")
+			apply("file changed") // applied becomes the digest taken before Load
 		}
 	}
 }
