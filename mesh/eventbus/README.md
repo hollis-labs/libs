@@ -11,7 +11,7 @@ defer pub.Close(ctx)
 pub.Publish(eventbus.Item{ID: ev.ID, Priority: eventbus.PriorityHigh, Body: rawJSON})
 ```
 
-With `HOLLIS_EVENTS_URL` unset, `FromEnv` returns a no-op publisher and the app
+`HOLLIS_EVENTS_URL` is the hub's base URL (`/events` is added; a URL already ending in `/events` is used as is). With it unset, `FromEnv` returns a no-op publisher and the app
 behaves as it did before. The bearer token is read from the file named by
 `HOLLIS_AUTH_TOKEN_FILE_<APP>` on every request, so rotating it needs no restart.
 `HOLLIS_EVENTS_SPOOL_DIR` enables the disk spool.

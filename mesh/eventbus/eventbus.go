@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -45,7 +46,8 @@ type Publisher interface {
 
 // Config configures a [Client]. Only URL is required.
 type Config struct {
-	// URL is the hub ingest endpoint (POST /events).
+	// URL is the hub: either its base URL (http://host:port), to which
+	// "/events" is added, or the full ingest endpoint ending in "/events".
 	URL string
 	// Token is sent as a bearer token. TokenFile, when set, is re-read on
 	// every request (so rotation needs no restart) and wins over Token.
@@ -147,6 +149,7 @@ func New(cfg Config) (*Client, error) {
 	if cfg.MaxUnresolved <= 0 {
 		cfg.MaxUnresolved = 8
 	}
+	cfg.URL = ingestURL(cfg.URL)
 	c := &Client{
 		cfg:     cfg,
 		http:    cfg.Client,
@@ -174,6 +177,23 @@ func New(cfg Config) (*Client, error) {
 		c.nudge()
 	}
 	return c, nil
+}
+
+// ingestURL turns a hub base URL into the ingest endpoint. A URL that already
+// ends in /events is used as given; a query string or fragment is kept.
+func ingestURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	p := strings.TrimRight(u.Path, "/")
+	if !strings.HasSuffix(p, "/events") {
+		p += "/events"
+	}
+	u.Path = p
+	u.RawPath = ""
+	return u.String()
 }
 
 type dropNote struct {

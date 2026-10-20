@@ -604,3 +604,35 @@ func TestTokenFileEnvName(t *testing.T) {
 		t.Fatalf("got %s", got)
 	}
 }
+
+func TestIngestURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"http://hub:7777":         "http://hub:7777/events",
+		"http://hub:7777/":        "http://hub:7777/events",
+		"http://hub:7777/events":  "http://hub:7777/events",
+		"http://hub:7777/events/": "http://hub:7777/events",
+		"http://hub/api":          "http://hub/api/events",
+		"http://hub:7777?x=1":     "http://hub:7777/events?x=1",
+		"  http://hub:7777  ":     "http://hub:7777/events",
+	} {
+		if got := ingestURL(in); got != want {
+			t.Errorf("ingestURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestPostsToEventsPathOfBaseURL(t *testing.T) {
+	var path atomic.Value
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path.Store(r.URL.Path)
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour})
+	c.Publish(item("a", PriorityHigh))
+	closeClient(t, c)
+	if path.Load() != "/events" {
+		t.Fatalf("path = %v", path.Load())
+	}
+}
