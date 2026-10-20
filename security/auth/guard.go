@@ -57,6 +57,10 @@ type Guard struct {
 	st  atomic.Pointer[guardState] // live mode and verifier; see Apply
 }
 
+// pinKey carries, in a request context, the guardState Middleware admitted the
+// request under. It is per Guard so one Guard's pin never answers for another.
+type pinKey struct{ g *Guard }
+
 // guardState is what a request is decided under. It is replaced as a whole,
 // and a request loads it once on entry, so the mode and the verifier it uses
 // always belong together and never change mid-request.
@@ -233,6 +237,10 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		cur := g.st.Load() // one mode and verifier for the whole request, taken before any blocking work
+		// Pin the generation in the request context so a later AuthorizeTool
+		// call from the handler is judged by the same mode the request was
+		// admitted under, not by whatever Apply installed meanwhile.
+		r = r.WithContext(context.WithValue(r.Context(), pinKey{g}, cur))
 		p, state := g.authenticate(r.Context(), cur.verifier, r.Header.Values("Authorization"))
 		required, known := g.cfg.Scopes.ForRoute(r.Method, r.URL.Path)
 		unmapped := g.cfg.Scopes.denyUnmapped(known, required)
@@ -262,7 +270,14 @@ func (g *Guard) AuthorizeTool(ctx context.Context, tool string) error {
 	required, known := g.cfg.Scopes.ForTool(tool)
 	unmapped := g.cfg.Scopes.denyUnmapped(known, required)
 	p, ok := FromContext(ctx)
-	mode := g.Mode() // AuthorizeTool verifies nothing itself: the principal was stamped by Middleware
+	// AuthorizeTool verifies nothing itself: the principal was stamped by
+	// Middleware. Follow the generation Middleware pinned for this request;
+	// with none (a stdio transport that stamped the principal itself) the
+	// current generation applies.
+	mode := g.Mode()
+	if pinned, has := ctx.Value(pinKey{g}).(*guardState); has {
+		mode = pinned.mode
+	}
 	state := StateMissing
 	if ok && p.Verified {
 		state = StateVerified

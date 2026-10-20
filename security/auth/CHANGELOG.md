@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.1 — 2026-10-20
+
+Bug fix and documentation; no exported API changes.
+
+### Fixed
+
+- `Guard.AuthorizeTool` took the mode current at its own call, so a request admitted by `Middleware` under one `{mode, verifier}` generation and judged by `AuthorizeTool` after `Apply` installed another was decided by a mix (verified under the old verifier, judged under the new mode). `Middleware` now pins the generation in the request context and `AuthorizeTool` follows it; a caller with no pinned context (stdio, where the app stamps the principal itself) is judged by the generation current at the call.
+
+### Documentation
+
+- The reload recipe now keeps the deny-list and its single poller outside `Load` and shares them with every verifier, and says why: a verifier built with no list, or a fresh one, forgets revocations until its first successful poll. A changed deny-list endpoint needs a validated first `Poll` before the swap. A new "What is pinned" paragraph states what the library pins and what an application has to pin itself.
+
 ## v0.2.0 — 2026-10-20
 
 Additive release: no existing exported signature changes.
