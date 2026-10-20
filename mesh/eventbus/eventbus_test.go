@@ -636,3 +636,49 @@ func TestPostsToEventsPathOfBaseURL(t *testing.T) {
 		t.Fatalf("path = %v", path.Load())
 	}
 }
+
+func TestAppMismatchIsTerminalAndDoesNotBlockLaterEvents(t *testing.T) {
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		if ids[0] == "bad" {
+			return 403, `{"error":{"code":"app_mismatch","message":"x"}}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var errs atomic.Int32
+	c, _ := New(fast(Config{URL: srv.URL, BatchSize: 1, OnError: func(error) { errs.Add(1) }}))
+	c.Publish(item("bad", PriorityHigh))
+	c.Publish(item("good", PriorityHigh))
+	waitFor(t, "good delivered", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Rejected != 1 || st.Retries != 0 {
+		t.Fatalf("stats = %+v (app_mismatch must not be retried)", st)
+	}
+	if errs.Load() == 0 {
+		t.Fatal("app_mismatch must be reported through OnError")
+	}
+}
+
+func TestOtherForbiddenAndNotYetEnabledAreRetried(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		switch call {
+		case 1:
+			return 403, `{"error":{"code":"scope_required"}}`, nil
+		case 2:
+			return 405, "", nil
+		case 3:
+			return 404, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Retries != 3 || st.Dropped != 0 || st.Rejected != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}

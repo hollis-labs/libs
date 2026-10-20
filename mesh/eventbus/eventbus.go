@@ -601,9 +601,19 @@ func (c *Client) post(items []Item) (outcome, time.Duration, map[string]itemResu
 		return outcomeOK, 0, parseResults(body)
 	case resp.StatusCode == http.StatusRequestEntityTooLarge:
 		return outcomeTooLarge, 0, nil
+	case resp.StatusCode == http.StatusForbidden && errorCode(body) == "app_mismatch":
+		// The credential is bound to another app than the events name. No retry
+		// can succeed, and retrying would block everything behind them.
+		c.report(errors.New("eventbus: hub returned 403 app_mismatch: the events' app is not the credential's app; batch dropped"))
+		return outcomeReject, 0, nil
 	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
-		// A rotated or not-yet-issued credential: keep the events and retry.
+		// A rotated or not-yet-issued credential, or a scope not granted yet:
+		// keep the events and retry.
 		c.report(fmt.Errorf("eventbus: hub returned %d", resp.StatusCode))
+		return outcomeRetry, 0, nil
+	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusMethodNotAllowed:
+		// The hub is not accepting events yet (ingest off, or no events store).
+		c.report(fmt.Errorf("eventbus: hub returned %d: ingest not enabled yet; keeping events", resp.StatusCode))
 		return outcomeRetry, 0, nil
 	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode == http.StatusServiceUnavailable, resp.StatusCode >= 500:
 		var ra time.Duration
@@ -616,6 +626,19 @@ func (c *Client) post(items []Item) (outcome, time.Duration, map[string]itemResu
 		c.report(fmt.Errorf("eventbus: hub returned %d, batch rejected", resp.StatusCode))
 		return outcomeReject, 0, nil
 	}
+}
+
+// errorCode reads the code of a {"error":{"code":"..."}} body, or "".
+func errorCode(body []byte) string {
+	var e struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &e) != nil {
+		return ""
+	}
+	return e.Error.Code
 }
 
 // parseResults reads {"results":[{id,status,...}]}, or a bare array of the same

@@ -22,10 +22,13 @@
 //     Config.MaxUnresolved tries. Events with a verdict are never re-sent.
 //   - A request is at most 100 events and about 900 KiB. A 413 halves the
 //     window; a single event the hub refuses as too large is rejected.
-//   - Network errors, 401/403, 429 and 5xx are retried with doubling backoff
-//     (Retry-After honoured). 401/403 are retried because a credential may be
-//     rotated or not yet issued; OnError reports them. Other 4xx drop the batch
-//     and count it as rejected.
+//   - Network errors, 401, 403 (scope_required), 404/405 (ingest not enabled on
+//     the hub yet), 429 and 5xx are retried with doubling backoff (Retry-After
+//     honoured): a credential may be rotated or a scope not granted yet, and the
+//     events are kept meanwhile. OnError reports each failure. A 403
+//     app_mismatch (the events name another app than the credential) can never
+//     succeed, so that batch is dropped and counted rather than blocking
+//     everything behind it. Other 4xx drop the batch and count it as rejected.
 //   - When the in-memory queue is full and there is no spool, the oldest
 //     [PriorityLow] item is evicted to make room. If everything held is
 //     high priority, an incoming low-priority item is the one dropped, and an
