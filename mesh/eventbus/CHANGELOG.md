@@ -4,9 +4,14 @@
 
 ### Added
 
-- Initial module: `Client` (bounded queue, batching to the hub's 100 events and
-  1 MiB limits, per-item result handling, retry with backoff, 413 splitting,
-  priority-aware eviction), an optional bounded disk spool that keeps order and
-  survives restarts, `FromEnv` (no-op when `HOLLIS_EVENTS_URL` is unset) and
-  `Noop`. Envelope-agnostic: items are raw JSON, so the module needs nothing
-  from the harness group.
+- Initial module: the hub client. `Client` with a bounded queue, batching to the
+  hub's 100 events and 1 MiB limits, retry with backoff, 413 splitting and
+  priority-aware eviction. An event is finished only on an explicit per-event
+  verdict from the hub (accepted, duplicate or rejected); an unreadable or
+  incomplete 200 is retried, never counted as sent.
+- Optional bounded disk spool that keeps order and survives restarts. Records
+  stay on disk until the hub settles them, the file is swapped atomically by
+  generation, a torn tail is repaired, and disk use is bounded by compaction.
+- `FromEnv` (a no-op `Noop` when `HOLLIS_EVENTS_URL` is unset) and `Noop`.
+  Envelope-agnostic: items are raw JSON, so the module needs nothing from the
+  harness group.

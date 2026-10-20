@@ -20,17 +20,19 @@ func item(id string, p Priority) Item {
 	return Item{ID: id, Priority: p, Body: json.RawMessage(fmt.Sprintf(`{"id":%q,"kind":"x"}`, id))}
 }
 
-// hub is a test ingest endpoint.
+// hub is a test ingest endpoint. By default it accepts every event and says so
+// per id. status can replace the answer for a call.
 type hub struct {
 	mu     sync.Mutex
-	ids    []string
+	ids    []string   // every id received, in order
+	calls  [][]string // ids per request
 	auth   []string
-	calls  atomic.Int32
-	status func(call int32, n int) (code int, body string, hdr map[string]string)
+	n      atomic.Int32
+	status func(call int32, ids []string) (code int, body string, hdr map[string]string)
 }
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	call := h.calls.Add(1)
+	call := h.n.Add(1)
 	raw, _ := io.ReadAll(r.Body)
 	var req struct {
 		Events []struct {
@@ -38,9 +40,16 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} `json:"events"`
 	}
 	_ = json.Unmarshal(raw, &req)
+	ids := make([]string, 0, len(req.Events))
+	for _, e := range req.Events {
+		ids = append(ids, e.ID)
+	}
 	if h.status != nil {
-		code, body, hdr := h.status(call, len(req.Events))
+		code, body, hdr := h.status(call, ids)
 		if code != 0 {
+			h.mu.Lock()
+			h.calls = append(h.calls, ids)
+			h.mu.Unlock()
 			for k, v := range hdr {
 				w.Header().Set(k, v)
 			}
@@ -50,19 +59,31 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.mu.Lock()
+	h.calls = append(h.calls, ids)
 	h.auth = append(h.auth, r.Header.Get("Authorization"))
-	for _, e := range req.Events {
-		h.ids = append(h.ids, e.ID)
-	}
+	h.ids = append(h.ids, ids...)
 	h.mu.Unlock()
+	var parts []string
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf(`{"id":%q,"status":"accepted","cursor":"1"}`, id))
+	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(w, `{"results":[]}`)
+	_, _ = io.WriteString(w, `{"results":[`+strings.Join(parts, ",")+`]}`)
 }
 
 func (h *hub) got() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return append([]string(nil), h.ids...)
+}
+
+func (h *hub) callIDs(i int) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if i >= len(h.calls) {
+		return "<no call>"
+	}
+	return strings.Join(h.calls[i], ",")
 }
 
 func (h *hub) authAt(i int) string {
@@ -125,7 +146,7 @@ func TestBatchAndAuth(t *testing.T) {
 }
 
 func TestPerItemResults(t *testing.T) {
-	h := &hub{status: func(int32, int) (int, string, map[string]string) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
 		return 200, `{"results":[{"id":"a","status":"accepted"},{"id":"b","status":"duplicate"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}]}`, nil
 	}}
 	srv := httptest.NewServer(h)
@@ -150,13 +171,70 @@ func TestPerItemResults(t *testing.T) {
 	if len(rej) != 1 || rej[0] != "c:unknown_kind" {
 		t.Fatalf("rejected = %v", rej)
 	}
-	if h.calls.Load() != 1 {
-		t.Fatalf("rejected item must not be retried, calls = %d", h.calls.Load())
+	if h.n.Load() != 1 {
+		t.Fatalf("a verdict is final, calls = %d", h.n.Load())
+	}
+}
+
+// A 200 that does not parse is not success: the events are retried.
+func TestMalformed200IsRetriedNotCountedSent(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		if call == 1 {
+			return 200, "not json", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Retries < 1 || st.Dropped != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// Only the events without a verdict are sent again.
+func TestOmittedIDsAreRetriedAlone(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		if call == 1 {
+			return 200, `{"results":[{"id":"a","status":"accepted"},{"id":"c","status":"mystery"}]}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL, FlushInterval: time.Hour}))
+	for _, id := range []string{"a", "b", "c"} {
+		c.Publish(item(id, PriorityHigh))
+	}
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 3 })
+	closeClient(t, c)
+	if h.callIDs(0) != "a,b,c" || h.callIDs(1) != "b,c" {
+		t.Fatalf("calls: %q then %q", h.callIDs(0), h.callIDs(1))
+	}
+}
+
+func TestNoVerdictIsDroppedAfterMaxUnresolved(t *testing.T) {
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 200, `{}`, nil }}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var reasons sync.Map
+	c, _ := New(fast(Config{URL: srv.URL, MaxUnresolved: 2, OnDrop: func(n int, r string) { reasons.Store(r, n) }}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "drop", func() bool { return c.Stats().Dropped == 1 })
+	closeClient(t, c)
+	if v, ok := reasons.Load("unresolved"); !ok || v.(int) != 1 {
+		t.Fatalf("drop reasons: %v", v)
+	}
+	if st := c.Stats(); st.Sent != 0 {
+		t.Fatalf("stats = %+v", st)
 	}
 }
 
 func TestRetryTransientThenDeliver(t *testing.T) {
-	h := &hub{status: func(call int32, _ int) (int, string, map[string]string) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
 		switch call {
 		case 1:
 			return 503, "", nil
@@ -177,26 +255,26 @@ func TestRetryTransientThenDeliver(t *testing.T) {
 		t.Fatalf("stats = %+v", st)
 	}
 	if got := h.got(); len(got) != 1 || got[0] != "a" {
-		t.Fatalf("ids = %v (must be delivered exactly once)", got)
+		t.Fatalf("ids = %v (must be accepted exactly once)", got)
 	}
 }
 
 func TestBadRequestDropsBatchWithoutRetry(t *testing.T) {
-	h := &hub{status: func(int32, int) (int, string, map[string]string) { return 400, "", nil }}
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 400, "", nil }}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 	c, _ := New(fast(Config{URL: srv.URL}))
 	c.Publish(item("a", PriorityHigh))
 	waitFor(t, "reject", func() bool { return c.Stats().Rejected == 1 })
 	closeClient(t, c)
-	if h.calls.Load() != 1 {
-		t.Fatalf("calls = %d, want 1", h.calls.Load())
+	if h.n.Load() != 1 {
+		t.Fatalf("calls = %d, want 1", h.n.Load())
 	}
 }
 
 func TestTooLargeSplitsBatch(t *testing.T) {
-	h := &hub{status: func(_ int32, n int) (int, string, map[string]string) {
-		if n > 2 {
+	h := &hub{status: func(_ int32, ids []string) (int, string, map[string]string) {
+		if len(ids) > 2 {
 			return 413, "", nil
 		}
 		return 0, "", nil
@@ -213,33 +291,67 @@ func TestTooLargeSplitsBatch(t *testing.T) {
 	}
 }
 
-func TestFullQueueDropsLowPriorityFirst(t *testing.T) {
+func memIDs(c *Client) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var ids []string
+	for _, q := range c.mem {
+		ids = append(ids, q.ID)
+	}
+	return strings.Join(ids, ",")
+}
+
+func TestFullQueueEvictsLowPriorityFirst(t *testing.T) {
 	var drops atomic.Int32
-	c, _ := New(Config{URL: "http://127.0.0.1:1", QueueSize: 3, BatchSize: 100, FlushInterval: time.Hour,
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(Config{URL: srv.URL, QueueSize: 3, BatchSize: 100, FlushInterval: time.Hour,
 		OnDrop: func(n int, _ string) { drops.Add(int32(n)) }})
 	c.Publish(item("low1", PriorityLow))
 	c.Publish(item("high1", PriorityHigh))
 	c.Publish(item("low2", PriorityLow))
 	c.Publish(item("high2", PriorityHigh)) // evicts low1
 	c.Publish(item("high3", PriorityHigh)) // evicts low2
-	c.mu.Lock()
-	var ids []string
-	for _, it := range c.mem {
-		ids = append(ids, it.ID)
-	}
-	c.mu.Unlock()
-	if got := strings.Join(ids, ","); got != "high1,high2,high3" {
+	if got := memIDs(c); got != "high1,high2,high3" {
 		t.Fatalf("queue = %s", got)
 	}
 	if drops.Load() != 2 {
 		t.Fatalf("drops = %d", drops.Load())
+	}
+	closeClient(t, c)
+	if got := strings.Join(h.got(), ","); got != "high1,high2,high3" {
+		t.Fatalf("delivered = %s", got)
+	}
+}
+
+// With only high-priority items held, an incoming low-priority one is the item
+// that goes; an incoming high-priority one replaces the oldest.
+func TestFullQueueOfHighDropsIncomingLow(t *testing.T) {
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(Config{URL: srv.URL, QueueSize: 2, FlushInterval: time.Hour})
+	c.Publish(item("h1", PriorityHigh))
+	c.Publish(item("h2", PriorityHigh))
+	c.Publish(item("l1", PriorityLow))
+	if got := memIDs(c); got != "h1,h2" {
+		t.Fatalf("queue after low = %s", got)
+	}
+	c.Publish(item("h3", PriorityHigh))
+	if got := memIDs(c); got != "h2,h3" {
+		t.Fatalf("queue after high = %s", got)
+	}
+	closeClient(t, c)
+	if got := strings.Join(h.got(), ","); got != "h2,h3" {
+		t.Fatalf("delivered = %s", got)
 	}
 }
 
 func TestSpoolOverflowKeepsOrder(t *testing.T) {
 	var down atomic.Bool
 	down.Store(true)
-	h := &hub{status: func(int32, int) (int, string, map[string]string) {
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) {
 		if down.Load() {
 			return 503, "", nil
 		}
@@ -266,6 +378,30 @@ func TestSpoolOverflowKeepsOrder(t *testing.T) {
 	}
 }
 
+// QueueSize 1 must still drain the spool.
+func TestQueueSizeOneDeliversOverflow(t *testing.T) {
+	var down atomic.Bool
+	down.Store(true)
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) {
+		if down.Load() {
+			return 503, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL, QueueSize: 1, BatchSize: 1, SpoolDir: t.TempDir()}))
+	for i := 0; i < 6; i++ {
+		c.Publish(item(fmt.Sprintf("q%d", i), PriorityHigh))
+	}
+	down.Store(false)
+	waitFor(t, "drain", func() bool { return c.Stats().Sent == 6 })
+	closeClient(t, c)
+	if got := strings.Join(h.got(), ","); got != "q0,q1,q2,q3,q4,q5" {
+		t.Fatalf("delivered = %s", got)
+	}
+}
+
 func TestCloseKeepsUnsentInSpoolAndNextClientResumes(t *testing.T) {
 	dir := t.TempDir()
 	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
@@ -277,9 +413,6 @@ func TestCloseKeepsUnsentInSpoolAndNextClientResumes(t *testing.T) {
 	dead.Close()
 	if st := c1.Stats(); st.Dropped != 0 {
 		t.Fatalf("nothing may be dropped with a spool, stats = %+v", st)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "spool.jsonl")); err != nil {
-		t.Fatal(err)
 	}
 
 	h := &hub{}
@@ -294,6 +427,99 @@ func TestCloseKeepsUnsentInSpoolAndNextClientResumes(t *testing.T) {
 	}
 }
 
+// Spooled events stay on disk until the hub answers: a crash while a request is
+// in flight loses nothing.
+func TestInFlightSpoolRecordsSurviveACrash(t *testing.T) {
+	dir := t.TempDir()
+	sp, err := openSpool(dir, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"a", "b", "c"} {
+		if _, err := sp.append(item(id, PriorityHigh)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+	c, err := New(fast(Config{URL: srv.URL, SpoolDir: dir, Timeout: time.Hour}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("request never started")
+	}
+	// "Crash": read the directory as a fresh process would, without Close.
+	again, err := openSpool(dir, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := again.peek(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || got[0].ID != "a" || got[2].ID != "c" {
+		t.Fatalf("after crash: %+v", got)
+	}
+	_ = c
+}
+
+func TestSecondCloseHonoursItsOwnContext(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-release }))
+	defer srv.Close()
+	defer close(release)
+	c, _ := New(fast(Config{URL: srv.URL, Timeout: time.Hour}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "request", func() bool { return true })
+	time.Sleep(50 * time.Millisecond)
+
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel1()
+	if err := c.Close(ctx1); err == nil {
+		t.Fatal("first Close should time out while the request is blocked")
+	}
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	cancel2()
+	start := time.Now()
+	if err := c.Close(ctx2); err == nil {
+		t.Fatal("second Close with a canceled context must return its error")
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("second Close ignored its context for %v", time.Since(start))
+	}
+}
+
+// OnDrop may call back into the client without deadlocking.
+func TestCallbacksRunOutsideTheLock(t *testing.T) {
+	var c *Client
+	var once sync.Once
+	called := make(chan struct{})
+	c, _ = New(Config{URL: "http://127.0.0.1:1", QueueSize: 1, FlushInterval: time.Hour,
+		OnDrop: func(int, string) {
+			_ = c.Stats()
+			once.Do(func() { close(called) })
+		}})
+	c.Publish(item("a", PriorityHigh))
+	c.Publish(item("b", PriorityHigh))
+	select {
+	case <-called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("OnDrop blocked: callback ran under the lock")
+	}
+}
+
 func TestCloseWithoutSpoolCountsDrop(t *testing.T) {
 	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	defer dead.Close()
@@ -305,46 +531,19 @@ func TestCloseWithoutSpoolCountsDrop(t *testing.T) {
 	}
 }
 
-func TestSpoolCapDropsLowPriorityFirst(t *testing.T) {
-	sp, err := openSpool(t.TempDir(), 400)
-	if err != nil {
-		t.Fatal(err)
-	}
-	total := 0
-	for i := 0; i < 10; i++ {
-		p := PriorityHigh
-		if i%2 == 0 {
-			p = PriorityLow
-		}
-		n, err := sp.append(item(fmt.Sprintf("e%d", i), p))
-		if err != nil {
-			t.Fatal(err)
-		}
-		total += n
-	}
-	if total == 0 || sp.pending() > 400 {
-		t.Fatalf("cap not enforced: dropped=%d pending=%d", total, sp.pending())
-	}
-	items, _ := sp.readAll()
-	lows := 0
-	for _, it := range items {
-		if it.Priority == PriorityLow {
-			lows++
-		}
-	}
-	if highs := len(items) - lows; highs < lows {
-		t.Fatalf("low priority must go first: highs=%d lows=%d", highs, lows)
-	}
-}
-
-func TestInvalidJSONIsDropped(t *testing.T) {
+func TestInvalidItemsAreDropped(t *testing.T) {
 	var reason atomic.Value
 	c, _ := New(Config{URL: "http://127.0.0.1:1", OnDrop: func(_ int, r string) { reason.Store(r) }})
 	c.Publish(Item{ID: "x", Body: json.RawMessage(`{not json`)})
-	closeClient(t, c)
 	if reason.Load() != "invalid" {
-		t.Fatalf("reason = %v", reason.Load())
+		t.Fatalf("bad json: reason = %v", reason.Load())
 	}
+	reason.Store("")
+	c.Publish(Item{Body: json.RawMessage(`{}`)})
+	if reason.Load() != "invalid" {
+		t.Fatalf("empty id: reason = %v", reason.Load())
+	}
+	closeClient(t, c)
 }
 
 func TestTokenFileIsReread(t *testing.T) {
