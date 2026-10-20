@@ -9,8 +9,9 @@ import (
 
 // Dev service tokens are ordinary Tether JWTs with kind=service and a very
 // distant exp. The verifier rejects exp==0 (see TestJWTRejects "no exp"), so
-// "no expiry" is expressed as a far-future exp and revoked through the
-// deny-list. These vectors pin that contract for issuers and consumers.
+// a service token is effectively non-expiring: a far-future exp, ended by
+// revocation through the deny-list rather than by time (not a new lifetime
+// policy). These vectors pin that contract for issuers and consumers.
 
 const serviceLifetime = 10 * 365 * 24 * time.Hour
 
