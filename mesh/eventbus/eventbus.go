@@ -78,13 +78,13 @@ type Config struct {
 	// client runs.
 	MaxUnresolved int
 
-	// A 401, or a 403 other than app_mismatch, is treated as transient by
+	// A 401, or a 403 with the code scope_required, is treated as transient by
 	// default: a service often starts before its credential exists, and a
 	// credential is renewed or granted at runtime. The batch is kept and
 	// retried with capped backoff until the failures have lasted RetryAuthMax
 	// (default 10 minutes; negative means no ceiling), then it is quarantined,
 	// reported and counted, never dropped. StrictAuth makes them final
-	// immediately instead. A 403 app_mismatch is always final.
+	// immediately instead. Any other 403, app_mismatch included, is final.
 	RetryAuthMax time.Duration
 	StrictAuth   bool
 
@@ -113,7 +113,8 @@ type Config struct {
 	// queue or spool, the last resort), "closed", "invalid" or "spool_error".
 	// OnReject is called for each item the hub rejected. OnQuarantine is called
 	// for each item moved to quarantine; reason is "rejected", "bad_request",
-	// "auth", "payload_too_large", "app_mismatch", "unresolved" or "http_<code>".
+	// "auth", "forbidden", "payload_too_large", "app_mismatch", "unresolved" or
+	// "http_<code>".
 	// OnError reports transport and auth failures and quarantines. None is
 	// called with an internal lock held; all must not block.
 	OnDrop       func(n int, reason string)
@@ -822,12 +823,22 @@ func (c *Client) post(items []Item) postResult {
 		// The credential is bound to another app than the events name: no
 		// retry can succeed.
 		return postResult{out: outcomeFinal, reason: "app_mismatch", code: "app_mismatch"}
-	case st == http.StatusUnauthorized || st == http.StatusForbidden:
+	case st == http.StatusUnauthorized || (st == http.StatusForbidden && errorCode(body) == "scope_required"):
+		// A credential that is missing, expired, being renewed, or not yet
+		// granted the scope: fixable at runtime, so wait (see RetryAuthMax).
 		code := errorCode(body)
 		if code == "" {
 			code = strconv.Itoa(st)
 		}
 		return postResult{out: outcomeAuth, code: code}
+	case st == http.StatusForbidden:
+		// Any other 403 (an unknown code, or none) is not known to be fixable by
+		// waiting: final for the batch.
+		code := errorCode(body)
+		if code == "" {
+			code = "403"
+		}
+		return postResult{out: outcomeFinal, reason: "forbidden", code: code}
 	case st == http.StatusNotFound || st == http.StatusMethodNotAllowed:
 		// The hub is not accepting events yet (ingest off, or no events store).
 		c.report(fmt.Errorf("eventbus: hub returned %d: ingest not enabled yet; keeping events", st))

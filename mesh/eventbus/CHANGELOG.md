@@ -13,12 +13,12 @@
   anything else, an unreadable or incomplete 200 included, is retried and never
   counted as sent.
 - Quarantine: events set aside undelivered (explicitly rejected, a request
-  refused for good with 400, 403 app_mismatch or a single too-large event, or
+  refused for good with 400, any other 403 or a single too-large event, or
   still without a valid verdict after `MaxUnresolved` tries, or kept failing
   with 401 or 403 for `RetryAuthMax`) go to a bounded
   `quarantine.jsonl` (oldest first), with `OnQuarantine`, `Stats.Quarantined`,
-  a WARN log and `OnError`. They are never counted as sent. A 401 or a 403 other
-  than app_mismatch waits and retries (a service often starts before its
+  a WARN log and `OnError`. They are never counted as sent. A 401 or a 403
+  scope_required waits and retries (a service often starts before its
   credential exists), up to `RetryAuthMax` (default 10 minutes); `StrictAuth`
   makes them final at once.
   Recovery is manual in this version (see the package documentation).

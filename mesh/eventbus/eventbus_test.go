@@ -387,6 +387,8 @@ func TestFinalRequestFailuresAreQuarantined(t *testing.T) {
 		{"unauthorized when strict", 401, "", "auth", func(c *Config) { c.StrictAuth = true }},
 		{"forbidden scope when strict", 403, `{"error":{"code":"scope_required"}}`, "auth", func(c *Config) { c.StrictAuth = true }},
 		{"app mismatch is always immediate", 403, `{"error":{"code":"app_mismatch"}}`, "app_mismatch", nil},
+		{"other 403 code is final", 403, `{"error":{"code":"banned"}}`, "forbidden", nil},
+		{"bare 403 is final", 403, "", "forbidden", nil},
 		{"unexpected 4xx", 418, "", "http_418", nil},
 	}
 	for _, tc := range cases {
