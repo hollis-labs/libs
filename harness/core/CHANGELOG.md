@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.14.1 — 2026-10-20
+
 ### Added
 
 - Catalog: `resource.state_changed` (payload `resource.state_changed@1`) and
