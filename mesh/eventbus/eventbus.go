@@ -493,16 +493,16 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		case outcomeOK:
 			var done, open []int
 			for k, i := range send {
-				r, ok := results[items[k].ID]
+				r := results[k]
 				switch {
-				case ok && r.Status == "accepted" && r.Cursor != "":
+				case r != nil && r.Status == "accepted":
 					c.sent.Add(1)
 					done = append(done, i)
-				case ok && r.Status == "duplicate" && r.Cursor != "":
+				case r != nil && r.Status == "duplicate":
 					c.dups.Add(1)
 					c.sent.Add(1)
 					done = append(done, i)
-				case ok && r.Status == "rejected":
+				case r != nil && r.Status == "rejected":
 					c.rejected.Add(1)
 					if c.cfg.OnReject != nil {
 						c.cfg.OnReject(items[k].ID, r.Code, r.Message)
@@ -567,7 +567,7 @@ func (c *Client) report(err error) {
 
 // post makes one request. For a 200 it returns the per-id verdicts the hub
 // gave (empty if the body could not be read).
-func (c *Client) post(items []Item) (outcome, time.Duration, map[string]itemResult) {
+func (c *Client) post(items []Item) (outcome, time.Duration, []*itemResult) {
 	var buf bytes.Buffer
 	buf.WriteString(`{"events":[`)
 	for i, it := range items {
@@ -599,7 +599,7 @@ func (c *Client) post(items []Item) (outcome, time.Duration, map[string]itemResu
 
 	switch {
 	case resp.StatusCode == http.StatusOK:
-		return outcomeOK, 0, parseResults(body)
+		return outcomeOK, 0, verdicts(items, body)
 	case resp.StatusCode == http.StatusRequestEntityTooLarge:
 		return outcomeTooLarge, 0, nil
 	case resp.StatusCode == http.StatusForbidden && errorCode(body) == "app_mismatch":
@@ -642,10 +642,24 @@ func errorCode(body []byte) string {
 	return e.Error.Code
 }
 
-// parseResults reads the hub's {"results":[{id,status,...}]} answer. Anything
-// else (not JSON, no results key, a bare array) yields no verdicts. Cursors are
-// strings in the contract; a number is accepted too and kept as text.
-func parseResults(body []byte) map[string]itemResult {
+// rejectCodes are the codes the hub gives a rejected event.
+var rejectCodes = map[string]bool{
+	"unknown_kind": true, "schema_invalid": true, "forbidden_kind": true,
+	"payload_too_large": true, "id_conflict": true,
+}
+
+// verdicts turns a 200 body into one entry per request item: the item's
+// verdict, or nil when it has none. Per the contract the answer is
+// {"results":[...]} with exactly one result per item, in order, each carrying
+// the item's id. accepted and duplicate need a non-empty cursor and no code;
+// rejected needs one of the reject codes and no cursor. Anything else is no
+// verdict: a body that is not that object (a bare array included), a result
+// for another id, an unknown status, a missing cursor. If the number of results
+// differs from the number of items, results are matched by id instead, and an
+// item whose id occurs more than once in the batch gets no verdict. Cursors are
+// strings in the contract; a number is accepted too.
+func verdicts(items []Item, body []byte) []*itemResult {
+	out := make([]*itemResult, len(items))
 	var wrapped struct {
 		Results []struct {
 			ID      string          `json:"id"`
@@ -656,20 +670,52 @@ func parseResults(body []byte) map[string]itemResult {
 		} `json:"results"`
 	}
 	if json.Unmarshal(body, &wrapped) != nil || wrapped.Results == nil {
-		return nil
+		return out
 	}
-	m := make(map[string]itemResult, len(wrapped.Results))
-	for _, r := range wrapped.Results {
-		if r.ID == "" {
-			continue
-		}
+	list := make([]itemResult, len(wrapped.Results))
+	for i, r := range wrapped.Results {
 		cur := strings.Trim(string(r.Cursor), `"`)
 		if cur == "null" {
 			cur = ""
 		}
-		m[r.ID] = itemResult{ID: r.ID, Status: r.Status, Code: r.Code, Message: r.Message, Cursor: cur}
+		list[i] = itemResult{ID: r.ID, Status: r.Status, Code: r.Code, Message: r.Message, Cursor: cur}
 	}
-	return m
+	valid := func(r *itemResult) bool {
+		switch r.Status {
+		case "accepted", "duplicate":
+			return r.Cursor != "" && r.Code == ""
+		case "rejected":
+			return rejectCodes[r.Code] && r.Cursor == ""
+		}
+		return false
+	}
+	if len(list) == len(items) {
+		for k := range items {
+			if list[k].ID == items[k].ID && valid(&list[k]) {
+				out[k] = &list[k]
+			}
+		}
+		return out
+	}
+	occurs := make(map[string]int, len(items))
+	for _, it := range items {
+		occurs[it.ID]++
+	}
+	byID := make(map[string]*itemResult, len(list))
+	seen := make(map[string]int, len(list))
+	for i := range list {
+		seen[list[i].ID]++
+		byID[list[i].ID] = &list[i]
+	}
+	for k, it := range items {
+		if occurs[it.ID] > 1 || seen[it.ID] != 1 {
+			continue
+		}
+		if r := byID[it.ID]; valid(r) {
+			out[k] = r
+		}
+	}
+	return out
 }
 
 // finish runs after Close: one delivery attempt per batch, then the leftovers

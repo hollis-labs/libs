@@ -147,7 +147,7 @@ func TestBatchAndAuth(t *testing.T) {
 
 func TestPerItemResults(t *testing.T) {
 	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		return 200, `{"results":[{"id":"a","status":"accepted","cursor":"11"},{"id":"b","status":"duplicate","cursor":"7"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}]}`, nil
+		return 200, `{"results":[{"id":"a","status":"accepted","cursor":"11"},{"id":"b","status":"duplicate","cursor":"7"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}],"accepted":1,"duplicate":1,"rejected":1}`, nil
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
@@ -716,5 +716,51 @@ func TestNumericCursorIsAccepted(t *testing.T) {
 	closeClient(t, c)
 	if st := c.Stats(); st.Sent != 1 {
 		t.Fatalf("stats = %+v", st)
+	}
+}
+
+func TestVerdictRules(t *testing.T) {
+	items := []Item{{ID: "a"}, {ID: "b"}}
+	cases := []struct {
+		name string
+		body string
+		want [2]string // status of a and b, "" for no verdict
+	}{
+		{"both explicit", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"rejected","code":"schema_invalid"}]}`, [2]string{"accepted", "rejected"}},
+		{"accepted with a code", `{"results":[{"id":"a","status":"accepted","cursor":"1","code":"x"},{"id":"b","status":"duplicate","cursor":"2"}]}`, [2]string{"", "duplicate"}},
+		{"rejected without a code", `{"results":[{"id":"a","status":"rejected"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"rejected with an unknown code", `{"results":[{"id":"a","status":"rejected","code":"nope"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"rejected carrying a cursor", `{"results":[{"id":"a","status":"rejected","code":"id_conflict","cursor":"9"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"ids out of order", `{"results":[{"id":"b","status":"accepted","cursor":"2"},{"id":"a","status":"accepted","cursor":"1"}]}`, [2]string{"", ""}},
+		{"short list matched by id", `{"results":[{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"result for a foreign id", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"zzz","status":"accepted","cursor":"2"}]}`, [2]string{"accepted", ""}},
+		{"bare array", `[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"accepted","cursor":"2"}]`, [2]string{"", ""}},
+		{"not json", `oops`, [2]string{"", ""}},
+	}
+	for _, c := range cases {
+		got := verdicts(items, []byte(c.body))
+		for k := range items {
+			status := ""
+			if got[k] != nil {
+				status = got[k].Status
+			}
+			if status != c.want[k] {
+				t.Errorf("%s: item %s = %q, want %q", c.name, items[k].ID, status, c.want[k])
+			}
+		}
+	}
+}
+
+// The same id twice in one request is answered by position.
+func TestDuplicateIDsInOneBatchAreMatchedByPosition(t *testing.T) {
+	items := []Item{{ID: "a"}, {ID: "a"}}
+	v := verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"a","status":"duplicate","cursor":"1"}]}`))
+	if v[0] == nil || v[0].Status != "accepted" || v[1] == nil || v[1].Status != "duplicate" {
+		t.Fatalf("verdicts = %+v %+v", v[0], v[1])
+	}
+	// With a short list the duplicated id cannot be told apart: no verdict.
+	v = verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"}]}`))
+	if v[0] != nil || v[1] != nil {
+		t.Fatalf("ambiguous duplicate ids must be unresolved: %+v %+v", v[0], v[1])
 	}
 }

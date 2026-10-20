@@ -14,10 +14,11 @@
 //     (OnDrop, OnReject, OnError) are never called with an internal lock held.
 //   - Delivery is in order and at least once. The hub dedupes on the envelope
 //     id, so a retried batch is harmless.
-//   - An event is finished only when the hub gives it an explicit verdict:
-//     "accepted" or "duplicate" (with a cursor) count as sent, "rejected" goes to OnReject and
-//     is never retried. A 200 that is unreadable, omits an event, or names an
-//     unknown status leaves those events unresolved: they are sent again, alone,
+//   - An event is finished only when the hub gives it an explicit, valid verdict
+//     (see the wire format below). "accepted" or "duplicate" count as sent,
+//     "rejected" goes to OnReject and is never retried. A 200 that is
+//     unreadable, omits an event, or gives an invalid verdict leaves those
+//     events unresolved: they are sent again, alone,
 //     with backoff, and dropped (reason "unresolved") only after
 //     Config.MaxUnresolved tries. Events with a verdict are never re-sent.
 //   - A request is at most 100 events and about 900 KiB. A 413 halves the
@@ -47,15 +48,22 @@
 // once the spool holds unsettled records, new items go behind them.
 //
 // What it is not: a durable outbox. Items still in memory are lost if the
-// process is killed (with a spool, only those that never reached it). An app that must not lose events writes them to its own
-// outbox in the same transaction as the change and replays that outbox; this
+// process is killed (with a spool, only those that never reached it). An app
+// that must not lose events writes them to its own outbox in the same
+// transaction as the change and replays that outbox; this
 // client is the transport for that replay as well as for fire-and-forget
 // events.
 //
-// Wire format (settled with the hub): POST {"events":[<envelope>...]} with a
-// bearer token; HTTP 200 carries per-item results
-// {"results":[{"id","status","code","message","cursor"}]} where status is
-// accepted, duplicate or rejected; accepted and duplicate carry a cursor. Only an
-// explicit accepted or duplicate with a cursor counts as sent. A bare array is
-// not the contract and is treated as no verdict.
+// Wire format (settled with the hub, libs ingest contract): POST
+// {"events":[<envelope>...]} with a bearer token. HTTP 200 carries
+// {"results":[{"id","status","code","message","cursor"}],"accepted":N,
+// "duplicate":N,"rejected":N}, one result per event in request order, each with
+// the event's id. accepted and duplicate need a non-empty cursor and no code;
+// rejected needs one of unknown_kind, schema_invalid, forbidden_kind,
+// payload_too_large or id_conflict and no cursor. The counts are derived and not
+// trusted. Anything else is no verdict and the event is retried: a body that is
+// not that object (a bare array included), a result for another id or out of
+// order, an unknown status, a missing cursor. If the result count differs from
+// the request count, results are matched by id, and an id that occurs twice in
+// one request gets no verdict.
 package eventbus
