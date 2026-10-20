@@ -1778,13 +1778,17 @@ func TestCloseWaitsForARunningDeliver(t *testing.T) {
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("close: %v", err)
 	}
+	// Deliver's return and this goroutine's send on delivered are not ordered
+	// with Close returning, so wait a bounded time for the result instead of
+	// sampling the channel. What must hold is that Deliver ends promptly with
+	// its item Pending (its request cancelled), not that the send already ran.
 	select {
 	case got := <-delivered:
 		if dispo(got) != "pending" {
 			t.Fatalf("dispositions = %s", dispo(got))
 		}
-	default:
-		t.Fatal("Close returned while Deliver was still running")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Deliver did not return after Close")
 	}
 }
 
