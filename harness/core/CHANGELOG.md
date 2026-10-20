@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.14.0 — 2026-10-20
+
 ### Added
 
 - `adapters/runtimeevents/ingest` (CW-20261020-0009): the contract for publishing
