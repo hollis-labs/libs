@@ -365,14 +365,21 @@ func (c *Client) makeRoom(in Item) []dropNote {
 	return []dropNote{{1, "queue_full"}}
 }
 
-// ReplayQuarantine puts quarantined events back in the queue, oldest first, and
-// removes them from quarantine.jsonl. With no reasons given every quarantined
-// event is replayed; otherwise only those quarantined for one of the reasons
-// (for example "auth" after a credential was fixed, or "unresolved"). It returns
-// how many were queued. Events quarantined because the hub rejected them
-// ("rejected") will be rejected again unless the cause was fixed. Without a
-// spool directory there is no file and nothing to replay. Replayed events go
-// through Publish, so the same bounds and loss rules apply.
+// ReplayQuarantine puts quarantined events back in the delivery queue, oldest
+// first. With no reasons given every quarantined event is replayed; otherwise
+// only those quarantined for one of the reasons (for example "auth" after a
+// credential was fixed, or "unresolved"). It returns how many were handed over.
+//
+// The handoff is durable: each event is first appended to the spool, and only
+// then are the handed-over records removed from quarantine.jsonl. A crash in
+// between leaves an event in both places, which at worst sends it twice (the hub
+// dedupes on the id); it can never lose one. The whole transfer runs under the
+// lock Close takes, so a replay either completes or is refused as closed. It
+// stops, leaving the rest in quarantine, when the spool has no room (90% of
+// SpoolMaxBytes), and on a spool error, which it returns. Events quarantined
+// because the hub rejected them ("rejected") will be rejected again unless the
+// cause was fixed. Without a spool directory there is no file and nothing to
+// replay. Stats.Replayed counts only events actually handed over.
 func (c *Client) ReplayQuarantine(reasons ...string) (int, error) {
 	want := map[string]bool{}
 	for _, r := range reasons {
@@ -383,16 +390,43 @@ func (c *Client) ReplayQuarantine(reasons ...string) (int, error) {
 		c.mu.Unlock()
 		return 0, errors.New("eventbus: client is closed")
 	}
-	recs, err := c.quar.take(func(r quarantineRec) bool { return len(want) == 0 || want[r.Reason] })
-	c.mu.Unlock()
+	if c.spool == nil {
+		c.mu.Unlock()
+		return 0, nil
+	}
+	recs, pos, err := c.quar.peek(func(r quarantineRec) bool { return len(want) == 0 || want[r.Reason] })
 	if err != nil {
+		c.mu.Unlock()
 		return 0, fmt.Errorf("eventbus: read quarantine: %w", err)
 	}
-	for _, r := range recs {
-		c.Publish(Item{ID: r.ID, Priority: r.Prio, Body: r.Body})
+	var notes []dropNote
+	var moved []int
+	var firstErr error
+	room := c.spool.max * 9 / 10
+	for i, r := range recs {
+		if c.spool.unread() >= room {
+			break // the rest stays in quarantine
+		}
+		lost, err := c.spool.append(Item{ID: r.ID, Priority: r.Prio, Body: r.Body})
+		if err != nil {
+			firstErr = fmt.Errorf("eventbus: replay: spool: %w", err)
+			break
+		}
+		notes = append(notes, c.lossNotes(lost)...)
+		moved = append(moved, pos[i])
 	}
-	c.replayed.Add(uint64(len(recs)))
-	return len(recs), nil
+	if len(moved) > 0 {
+		if err := c.quar.removeAt(moved); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("eventbus: replayed %d event(s) but could not remove them from quarantine (they may be sent twice, which the hub tolerates): %w", len(moved), err)
+		}
+	}
+	c.mu.Unlock()
+	c.replayed.Add(uint64(len(moved)))
+	c.emit(notes)
+	if len(moved) > 0 {
+		c.nudge()
+	}
+	return len(moved), firstErr
 }
 
 // Stats returns the counters.

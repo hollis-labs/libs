@@ -1396,3 +1396,192 @@ func TestLossSaveFailureIsReportedOutsideTheLock(t *testing.T) {
 	defer cancel()
 	_ = c.Close(ctx)
 }
+
+// ---- replay is a durable handoff ----
+
+func prefillQuarantine(t *testing.T, dir string, ids ...string) {
+	t.Helper()
+	q := openQuarantine(dir, 1<<20)
+	var recs []quarantineRec
+	for _, id := range ids {
+		recs = append(recs, quarantineRec{At: time.Now().UTC(), Reason: "auth", ID: id, Prio: PriorityHigh, Body: item(id, PriorityHigh).Body})
+	}
+	if err, terr := q.addAll(recs); err != nil || terr != nil {
+		t.Fatalf("prefill: %v %v", err, terr)
+	}
+}
+
+// everyID lists the ids held anywhere on disk: the unsettled spool and the
+// quarantine.
+func everyID(t *testing.T, dir string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	sp, err := openSpool(dir, 1<<30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := sp.peek(10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range items {
+		out[q.ID] = true
+	}
+	recs, _, err := openQuarantine(dir, 1<<30).peek(func(quarantineRec) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range recs {
+		out[r.ID] = true
+	}
+	return out
+}
+
+func deadHub(t *testing.T) *httptest.Server {
+	t.Helper()
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	t.Cleanup(s.Close)
+	return s
+}
+
+// A replay that cannot reach the spool changes nothing: the records stay in
+// quarantine and nothing is counted as replayed.
+func TestReplayKeepsRecordsWhenTheSpoolCannotTakeThem(t *testing.T) {
+	dir := t.TempDir()
+	prefillQuarantine(t, dir, "a", "b", "c")
+	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, FlushInterval: time.Hour}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Block the live spool file with a directory.
+	c.mu.Lock()
+	live := c.spool.filePath(c.spool.gen)
+	c.mu.Unlock()
+	_ = os.Remove(live)
+	if err := os.Mkdir(live, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	n, err := c.ReplayQuarantine()
+	if err == nil || n != 0 {
+		t.Fatalf("n=%d err=%v, want 0 and an error", n, err)
+	}
+	if st := c.Stats(); st.Replayed != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+	recs, _, _ := openQuarantine(dir, 1<<20).peek(func(quarantineRec) bool { return true })
+	if len(recs) != 3 {
+		t.Fatalf("the records must stay in quarantine, found %d", len(recs))
+	}
+	_ = os.Remove(live)
+	closeClient(t, c)
+}
+
+// A replay whose source cannot be cleaned up has already put the events in the
+// spool: they are never lost, at worst sent twice (the hub dedupes on the id),
+// and the error says so.
+func TestReplayNeverLosesEventsWhenCleanupFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions do not bind root")
+	}
+	dir := t.TempDir()
+	prefillQuarantine(t, dir, "a", "b", "c")
+	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, FlushInterval: time.Hour}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	live := c.spool.filePath(c.spool.gen)
+	c.mu.Unlock()
+	if f, err := os.OpenFile(live, os.O_CREATE|os.O_WRONLY, 0o600); err == nil { // exists, so appending needs no new file
+		f.Close()
+	}
+	if err := os.Chmod(dir, 0o500); err != nil { // no new files: the quarantine rewrite fails
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0o700)
+	n, err := c.ReplayQuarantine()
+	_ = os.Chmod(dir, 0o700)
+	if n != 3 || err == nil || !strings.Contains(err.Error(), "quarantine") {
+		t.Fatalf("n=%d err=%v, want 3 handed over and a cleanup error", n, err)
+	}
+	if st := c.Stats(); st.Replayed != 3 || st.SpoolBytes == 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+	got := everyID(t, dir)
+	for _, id := range []string{"a", "b", "c"} {
+		if !got[id] {
+			t.Fatalf("event %s is nowhere on disk after a failed cleanup: %v", id, got)
+		}
+	}
+	closeClient(t, c)
+}
+
+// A replay racing with Close either completes or is refused; either way every
+// event is still on disk afterwards, in the spool or in quarantine.
+func TestReplayRacingCloseNeverLosesAnEvent(t *testing.T) {
+	srv := deadHub(t)
+	for i := 0; i < 25; i++ {
+		dir := t.TempDir()
+		prefillQuarantine(t, dir, "a", "b", "c", "d", "e")
+		c, err := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		var replayed int
+		go func() { defer wg.Done(); replayed, _ = c.ReplayQuarantine() }()
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = c.Close(ctx)
+		}()
+		wg.Wait()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := c.Close(ctx); err != nil {
+			t.Fatalf("round %d: close: %v", i, err)
+		}
+		cancel()
+		got := everyID(t, dir)
+		for _, id := range []string{"a", "b", "c", "d", "e"} {
+			if !got[id] {
+				t.Fatalf("round %d: event %s lost (replayed %d): %v", i, id, replayed, got)
+			}
+		}
+		if st := c.Stats(); st.Dropped != 0 {
+			t.Fatalf("round %d: stats = %+v", i, st)
+		}
+	}
+}
+
+// When the spool has no room the rest stays in quarantine; nothing is lost.
+func TestReplayStopsWhenTheSpoolIsFull(t *testing.T) {
+	dir := t.TempDir()
+	var ids []string
+	for i := 0; i < 12; i++ {
+		ids = append(ids, fmt.Sprintf("q%02d", i))
+	}
+	prefillQuarantine(t, dir, ids...)
+	c, err := New(quiet(Config{URL: deadHub(t).URL, SpoolDir: dir, SpoolMaxBytes: 400, FlushInterval: time.Hour}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := c.ReplayQuarantine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n == 0 || n >= len(ids) {
+		t.Fatalf("handed over %d of %d; want some but not all", n, len(ids))
+	}
+	if st := c.Stats(); st.Dropped != 0 || st.Replayed != uint64(n) || st.SpoolBytes > 400 {
+		t.Fatalf("stats = %+v", st)
+	}
+	got := everyID(t, dir)
+	for _, id := range ids {
+		if !got[id] {
+			t.Fatalf("event %s lost: %v", id, got)
+		}
+	}
+	closeClient(t, c)
+}

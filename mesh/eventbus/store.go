@@ -233,42 +233,59 @@ func (q *quarantine) trim() error {
 	return nil
 }
 
-// take removes and returns, oldest first, the records pick selects; the rest
-// stay in the file.
-func (q *quarantine) take(pick func(quarantineRec) bool) ([]quarantineRec, error) {
+// peek returns, oldest first, the records pick selects, with their positions
+// (line numbers), without removing anything.
+func (q *quarantine) peek(pick func(quarantineRec) bool) (recs []quarantineRec, pos []int, err error) {
 	if q.path == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	data, err := os.ReadFile(q.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
-	var taken []quarantineRec
-	var keep bytes.Buffer
-	for _, line := range bytes.SplitAfter(data, []byte("\n")) {
+	for i, line := range bytes.SplitAfter(data, []byte("\n")) {
 		if len(line) == 0 {
 			continue
 		}
 		var rec quarantineRec
 		if json.Unmarshal(bytes.TrimSpace(line), &rec) == nil && pick(rec) {
-			taken = append(taken, rec)
+			recs = append(recs, rec)
+			pos = append(pos, i)
+		}
+	}
+	return recs, pos, nil
+}
+
+// removeAt removes the lines at the given positions (from peek), atomically.
+func (q *quarantine) removeAt(pos []int) error {
+	if q.path == "" || len(pos) == 0 {
+		return nil
+	}
+	drop := make(map[int]bool, len(pos))
+	for _, p := range pos {
+		drop[p] = true
+	}
+	data, err := os.ReadFile(q.path)
+	if err != nil {
+		return err
+	}
+	var keep bytes.Buffer
+	for i, line := range bytes.SplitAfter(data, []byte("\n")) {
+		if len(line) == 0 || drop[i] {
 			continue
 		}
 		keep.Write(line)
 	}
-	if len(taken) == 0 {
-		return nil, nil
-	}
 	tmp := q.path + ".tmp"
 	if err := os.WriteFile(tmp, keep.Bytes(), 0o600); err != nil {
-		return nil, err
+		return err
 	}
 	if err := os.Rename(tmp, q.path); err != nil {
-		return nil, err
+		return err
 	}
 	q.size = int64(keep.Len())
-	return taken, nil
+	return nil
 }

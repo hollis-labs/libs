@@ -47,10 +47,14 @@
 // quarantine.jsonl, bounded by Config.QuarantineMaxBytes with the oldest records
 // going first. Without one, only the callback and the counters remain.
 //
-// Quarantine is not a graveyard: Client.ReplayQuarantine puts quarantined events
-// back in the queue (all of them, or only those quarantined for the given
-// reasons, such as "auth" once a credential is fixed), oldest first, and removes
-// them from the file.
+// Quarantine is not a graveyard: Client.ReplayQuarantine hands quarantined events
+// back to delivery (all of them, or only those quarantined for the given
+// reasons, such as "auth" once a credential is fixed), oldest first. The handoff
+// is durable: events are appended to the spool first and removed from the
+// quarantine file only afterwards, under the lock Close takes, so a crash or a
+// concurrent Close can at worst cause a second send, never a loss; it stops when
+// the spool has no room and Stats.Replayed counts only events actually handed
+// over.
 //
 // # Overflow
 //
