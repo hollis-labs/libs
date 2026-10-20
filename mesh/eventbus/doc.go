@@ -27,11 +27,15 @@
 //   - A request is at most 100 events and about 900 KiB. A 413 halves the
 //     window; a single event the hub refuses as too large is quarantined.
 //   - Retried with doubling backoff (Retry-After honoured): network errors, 429,
-//     5xx, and 404/405 (the hub's ingest is not enabled yet). Final for the
-//     batch, which is quarantined and reported through OnError: 400, 401, 403
-//     (including 403 app_mismatch, which can never succeed) and any other 4xx.
-//     Config.RetryAuth makes 401 and a 403 other than app_mismatch retried
-//     instead, for setups where a credential may be rotated or granted later.
+//     5xx, 404/405 (the hub's ingest is not enabled yet), and 401 or 403 other
+//     than app_mismatch. A service often starts before its credential exists
+//     and credentials are renewed or granted at runtime, so auth failures keep
+//     the events and wait; if they last Config.RetryAuthMax (default 10
+//     minutes; negative means no ceiling) the batch is quarantined, never
+//     dropped. Config.StrictAuth makes them final at once.
+//   - Final at once, the batch quarantined and reported through OnError: 403
+//     app_mismatch (a configuration bug), 400 and any other 4xx, and a single
+//     event that is still too large after splitting.
 //   - With no Token and no TokenFile no Authorization header is sent at all, and
 //     that is not an error: a local relay that holds the credential needs none.
 //

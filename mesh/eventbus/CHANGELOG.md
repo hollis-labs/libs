@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## v0.1.0 — 2026-10-20
+
 ### Added
 
 - Initial module: the hub client. `Client` with a bounded queue, batching to the
@@ -11,11 +13,14 @@
   anything else, an unreadable or incomplete 200 included, is retried and never
   counted as sent.
 - Quarantine: events set aside undelivered (explicitly rejected, a request
-  refused for good with 400, 401, 403 or a single too-large event, or still
-  without a valid verdict after `MaxUnresolved` tries) go to a bounded
+  refused for good with 400, 403 app_mismatch or a single too-large event, or
+  still without a valid verdict after `MaxUnresolved` tries, or kept failing
+  with 401 or 403 for `RetryAuthMax`) go to a bounded
   `quarantine.jsonl` (oldest first), with `OnQuarantine`, `Stats.Quarantined`,
-  a WARN log and `OnError`. They are never counted as sent. `RetryAuth` retries
-  401 and 403 instead. `ReplayQuarantine` puts quarantined events back in the
+  a WARN log and `OnError`. They are never counted as sent. A 401 or a 403 other
+  than app_mismatch waits and retries (a service often starts before its
+  credential exists), up to `RetryAuthMax` (default 10 minutes); `StrictAuth`
+  makes them final at once. `ReplayQuarantine` puts quarantined events back in the
   queue (all, or by reason) once the cause is fixed, oldest first.
 - Priorities `PriorityDebug`, `PriorityActivity`, `PriorityHigh`: a full queue or
   spool drops debug first, then activity, and protected items only as the last

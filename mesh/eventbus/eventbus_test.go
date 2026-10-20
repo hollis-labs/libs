@@ -384,9 +384,9 @@ func TestFinalRequestFailuresAreQuarantined(t *testing.T) {
 		cfg    func(*Config)
 	}{
 		{"bad request", 400, `{"error":{"code":"bad_body"}}`, "bad_request", nil},
-		{"unauthorized", 401, "", "auth", nil},
-		{"forbidden scope", 403, `{"error":{"code":"scope_required"}}`, "auth", nil},
-		{"app mismatch", 403, `{"error":{"code":"app_mismatch"}}`, "app_mismatch", func(c *Config) { c.RetryAuth = true }},
+		{"unauthorized when strict", 401, "", "auth", func(c *Config) { c.StrictAuth = true }},
+		{"forbidden scope when strict", 403, `{"error":{"code":"scope_required"}}`, "auth", func(c *Config) { c.StrictAuth = true }},
+		{"app mismatch is always immediate", 403, `{"error":{"code":"app_mismatch"}}`, "app_mismatch", nil},
 		{"unexpected 4xx", 418, "", "http_418", nil},
 	}
 	for _, tc := range cases {
@@ -424,8 +424,8 @@ func TestFinalRequestFailuresAreQuarantined(t *testing.T) {
 	}
 }
 
-// With RetryAuth a 401 or a 403 scope_required keeps the events and retries.
-func TestRetryAuthKeepsAndRetries(t *testing.T) {
+// By default a 401 or a 403 scope_required keeps the events and retries.
+func TestAuthFailuresAreRetriedByDefault(t *testing.T) {
 	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
 		switch call {
 		case 1:
@@ -437,12 +437,123 @@ func TestRetryAuthKeepsAndRetries(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, RetryAuth: true})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
 	c.Publish(item("a", PriorityHigh))
 	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
 	closeClient(t, c)
 	if st := c.Stats(); st.Retries != 2 || st.Quarantined != 0 {
 		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// A service often starts before its credential exists: the events wait, and go
+// out once the token appears.
+func TestServiceStartedBeforeItsCredentialDeliversWhenTheTokenAppears(t *testing.T) {
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer issued" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, TokenFile: tokenFile})))
+	c.Publish(item("a", PriorityHigh))
+	c.Publish(item("b", PriorityHigh))
+	waitFor(t, "some auth retries", func() bool { return c.Stats().Retries >= 3 })
+	if st := c.Stats(); st.Sent != 0 || st.Quarantined != 0 {
+		t.Fatalf("nothing may be sent or quarantined before the credential exists: %+v", st)
+	}
+	if err := os.WriteFile(tokenFile, []byte("issued\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "delivery once the token exists", func() bool { return c.Stats().Sent == 2 })
+	closeClient(t, c)
+	if got := strings.Join(h.got(), ","); got != "a,b" {
+		t.Fatalf("delivered = %s", got)
+	}
+	if st := c.Stats(); st.Quarantined != 0 || st.Dropped != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// Auth failures that outlast the ceiling quarantine the batch (kept, counted,
+// loud), and the events behind it get their own wait.
+func TestAuthCeilingQuarantinesInsteadOfWaitingForever(t *testing.T) {
+	dir := t.TempDir()
+	var fixed atomic.Bool
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		if !fixed.Load() {
+			return 401, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var errs atomic.Int32
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1, RetryAuthMax: 60 * time.Millisecond,
+		OnError: func(error) { errs.Add(1) }})))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "the ceiling to quarantine the first batch", func() bool { return c.Stats().Quarantined >= 1 })
+	fixed.Store(true)
+	closeClient(t, c)
+	if got := quarantineIDs(t, dir); len(got) == 0 || got[0] != "a:auth" {
+		t.Fatalf("quarantine = %v", got)
+	}
+	if st := c.Stats(); st.Sent != 0 || st.Dropped != 0 {
+		t.Fatalf("stats = %+v (quarantined, never sent or dropped)", st)
+	}
+	if errs.Load() == 0 {
+		t.Fatal("the quarantine must be loud")
+	}
+	// And it can be put back once the cause is fixed.
+	c2, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
+	n, err := c2.ReplayQuarantine("auth")
+	if err != nil || n == 0 {
+		t.Fatalf("replay n=%d err=%v", n, err)
+	}
+	waitFor(t, "replayed delivery", func() bool { return c2.Stats().Sent >= 1 })
+	closeClient(t, c2)
+}
+
+func TestNegativeCeilingNeverQuarantinesAuthFailures(t *testing.T) {
+	var fixed atomic.Bool
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		if !fixed.Load() {
+			return 403, `{"error":{"code":"scope_required"}}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, RetryAuthMax: -1})))
+	c.Publish(item("a", PriorityHigh))
+	time.Sleep(150 * time.Millisecond)
+	fixed.Store(true)
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Quarantined != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// app_mismatch is a configuration bug: immediate, even though auth retries are on.
+func TestAppMismatchIsQuarantinedImmediatelyEvenWithAuthRetries(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		return 403, `{"error":{"code":"app_mismatch"}}`, nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "quarantine", func() bool { return c.Stats().Quarantined == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Retries != 0 || h.n.Load() != 1 {
+		t.Fatalf("stats = %+v calls=%d", st, h.n.Load())
 	}
 }
 
@@ -1033,7 +1144,7 @@ func TestReplayQuarantineDeliversAfterTheCauseIsFixed(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1, StrictAuth: true})))
 	for _, id := range []string{"a", "b", "c"} {
 		c.Publish(item(id, PriorityHigh))
 	}

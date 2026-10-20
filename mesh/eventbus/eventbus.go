@@ -78,10 +78,15 @@ type Config struct {
 	// client runs.
 	MaxUnresolved int
 
-	// RetryAuth makes a 401 or 403 a transient failure (kept and retried), for
-	// setups where the credential may be rotated or granted later. By default
-	// they are final for the batch: it is quarantined and reported.
-	RetryAuth bool
+	// A 401, or a 403 other than app_mismatch, is treated as transient by
+	// default: a service often starts before its credential exists, and a
+	// credential is renewed or granted at runtime. The batch is kept and
+	// retried with capped backoff until the failures have lasted RetryAuthMax
+	// (default 10 minutes; negative means no ceiling), then it is quarantined,
+	// reported and counted, never dropped. StrictAuth makes them final
+	// immediately instead. A 403 app_mismatch is always final.
+	RetryAuthMax time.Duration
+	StrictAuth   bool
 
 	// SpoolDir, when set, enables the disk spool, the quarantine file and the
 	// loss record: items that do not fit in memory, and anything unsent at
@@ -189,6 +194,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.MaxUnresolved == 0 {
 		cfg.MaxUnresolved = 8
+	}
+	if cfg.RetryAuthMax == 0 {
+		cfg.RetryAuthMax = 10 * time.Minute
 	}
 	if cfg.QuarantineMaxBytes <= 0 {
 		cfg.QuarantineMaxBytes = 8 << 20
@@ -583,6 +591,7 @@ const (
 	outcomeRetry
 	outcomeTooLarge
 	outcomeFinal // the request failed for good: quarantine its events
+	outcomeAuth  // 401 or 403: transient until it has lasted RetryAuthMax
 )
 
 type itemResult struct {
@@ -613,6 +622,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 	}
 	window := len(pending)
 	unresolved := 0
+	var authSince time.Time // when the current run of auth failures began
 
 	finishItems := func(idx []int) {
 		for _, i := range idx {
@@ -651,12 +661,27 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		items := itemsOf(send)
 		res := c.post(items)
 		wait := res.wait
+		if res.out != outcomeAuth {
+			authSince = time.Time{}
+		}
 
 		switch res.out {
 		case outcomeFinal:
 			c.quarantineItems(items, res.reason, res.code, "")
 			finishItems(send)
 			continue
+		case outcomeAuth:
+			if authSince.IsZero() {
+				authSince = time.Now()
+			}
+			if c.cfg.StrictAuth || (c.cfg.RetryAuthMax > 0 && time.Since(authSince) >= c.cfg.RetryAuthMax) {
+				c.quarantineItems(items, "auth", res.code, "")
+				authSince = time.Time{}
+				finishItems(send)
+				continue
+			}
+			c.report(fmt.Errorf("eventbus: hub returned an auth failure (%s); keeping events, retrying for up to %s", res.code, c.cfg.RetryAuthMax))
+			// fall through to the backoff below
 		case outcomeTooLarge:
 			if w == 1 {
 				c.quarantineItems(items, "payload_too_large", "", "hub refused the request size")
@@ -787,11 +812,7 @@ func (c *Client) post(items []Item) postResult {
 		if code == "" {
 			code = strconv.Itoa(st)
 		}
-		if c.cfg.RetryAuth {
-			c.report(fmt.Errorf("eventbus: hub returned %d (%s); keeping events", st, code))
-			return postResult{out: outcomeRetry}
-		}
-		return postResult{out: outcomeFinal, reason: "auth", code: code}
+		return postResult{out: outcomeAuth, code: code}
 	case st == http.StatusNotFound || st == http.StatusMethodNotAllowed:
 		// The hub is not accepting events yet (ingest off, or no events store).
 		c.report(fmt.Errorf("eventbus: hub returned %d: ingest not enabled yet; keeping events", st))
