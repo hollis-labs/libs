@@ -19,6 +19,11 @@
   missing credential cannot drain an outbox into quarantine; `StrictAuth` still
   makes it final. `Close` waits for a running `Deliver` and cancels its in-flight
   request. It keeps its own retry state, so it can run next to the queue sender.
+  `Deliver` requires `Config.SpoolDir`: `Quarantined` means "recorded in
+  `quarantine.jsonl`", so a client without one leaves every item `Pending` and
+  reports an error rather than let a relay skip an event it has no copy of. A
+  closed client, or one closed between chunks, sends nothing more. The relay moves
+  its cursor only over `Sent` and `Quarantined`; any other disposition stops it.
 - Package `relay`: ships an app's local outbox to the hub. The app supplies a
   `Source` (entries after a sequence number, in order; optionally `Head` for lag)
   and a `Cursor` (the last settled sequence number; `FileCursor` is one). The

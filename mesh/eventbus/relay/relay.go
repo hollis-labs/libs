@@ -296,7 +296,10 @@ func (r *Relay) Run(ctx context.Context) error {
 		r.batches.Add(1)
 
 		settled := 0
-		for settled < len(entries) && settled < len(disp) && disp[settled].Disposition != eventbus.DispositionPending {
+		// Only Sent and Quarantined move the cursor; Pending, or anything a
+		// custom Deliverer invents, stops it.
+	settle:
+		for settled < len(entries) && settled < len(disp) {
 			switch d := disp[settled]; d.Disposition {
 			case eventbus.DispositionSent:
 				r.sent.Add(1)
@@ -308,6 +311,8 @@ func (r *Relay) Run(ctx context.Context) error {
 				if d.Reason == "rejected" {
 					r.rejected.Add(1)
 				}
+			default:
+				break settle
 			}
 			settled++
 		}

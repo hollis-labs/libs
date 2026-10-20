@@ -529,6 +529,9 @@ func (o *outbox) Head(context.Context) (int64, error) {
 
 func clientWith(t *testing.T, cfg eventbus.Config) *eventbus.Client {
 	t.Helper()
+	if cfg.SpoolDir == "" {
+		cfg.SpoolDir = t.TempDir() // Deliver needs a durable quarantine record
+	}
 	cfg.FlushInterval = time.Hour
 	cfg.BackoffBase = time.Millisecond
 	cfg.BackoffMax = 5 * time.Millisecond
@@ -704,7 +707,7 @@ func TestClosingTheClientUnderARunningRelay(t *testing.T) {
 	}))
 	defer srv.Close()
 	defer close(block)
-	c, err := eventbus.New(eventbus.Config{URL: srv.URL, Timeout: time.Hour, FlushInterval: time.Hour,
+	c, err := eventbus.New(eventbus.Config{URL: srv.URL, SpoolDir: t.TempDir(), Timeout: time.Hour, FlushInterval: time.Hour,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -763,5 +766,30 @@ func TestStatsReportLagWhenTheSourceHasAHead(t *testing.T) {
 	_ = stop()
 	if st := r.Stats(); st.Head != 4 || st.Sent != 4 {
 		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// Only Sent and Quarantined move the cursor: a disposition the relay does not
+// know (a custom Deliverer's bug) stops it where it is.
+func TestUnknownDispositionDoesNotAdvanceTheCursor(t *testing.T) {
+	ob := &outbox{}
+	ob.add(1, 2, 3)
+	cur := &memCursor{}
+	d := &scripted{reply: func(_ int, items []eventbus.Item) []eventbus.Result {
+		out := allSent(0, items)
+		for i, it := range items {
+			if it.ID == "e002" {
+				out[i].Disposition = eventbus.Disposition(99)
+			}
+		}
+		return out
+	}}
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: d, BatchSize: 3, OnError: func(error) {}})
+	stop := start(t, r)
+	waitFor(t, "cursor 1", func() bool { return cur.get() == 1 })
+	time.Sleep(30 * time.Millisecond)
+	_ = stop()
+	if got := cur.get(); got != 1 {
+		t.Fatalf("cursor = %d, want 1 (the unknown disposition must hold it)", got)
 	}
 }

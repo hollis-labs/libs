@@ -34,7 +34,7 @@ An app that must not lose events keeps its own outbox and ships it with the
 `relay` package. The relay reads the outbox in order from a saved cursor, sends
 each batch with `Client.Deliver`, and moves the cursor only over events the hub
 has settled (sent, or durably quarantined). A missing credential is waited out,
-not quarantined. After a crash it resends from the
+not quarantined. The client needs a `SpoolDir`, whose `quarantine.jsonl` is the durable copy of what cannot be sent. After a crash it resends from the
 saved cursor; the hub dedupes on the event id.
 
 ```go

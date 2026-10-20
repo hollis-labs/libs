@@ -1498,7 +1498,7 @@ func TestDeliverRetriesTransientFailuresAndSplitsBatches(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, FlushInterval: time.Hour})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: t.TempDir(), FlushInterval: time.Hour})))
 	defer closeClient(t, c)
 	items := []Item{item("a", PriorityHigh), item("b", PriorityHigh), item("c", PriorityHigh), item("d", PriorityHigh)}
 	got := c.Deliver(context.Background(), items)
@@ -1621,7 +1621,7 @@ func TestDeliverAndTheQueueRunConcurrently(t *testing.T) {
 	h := &hub{}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: t.TempDir()})))
 	var wg sync.WaitGroup
 	wg.Add(2)
 	var got []Result
@@ -1705,7 +1705,7 @@ func TestDeliverWaitsOutAMissingCredentialInsteadOfQuarantining(t *testing.T) {
 		h.ServeHTTP(w, r)
 	}))
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, TokenFile: tokenFile, BatchSize: 5, RetryAuthMax: 30 * time.Millisecond})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: t.TempDir(), TokenFile: tokenFile, BatchSize: 5, RetryAuthMax: 30 * time.Millisecond})))
 	defer closeClient(t, c)
 	var items []Item
 	for i := 0; i < 20; i++ {
@@ -1765,7 +1765,7 @@ func TestCloseWaitsForARunningDeliver(t *testing.T) {
 		<-r.Context().Done()
 	}))
 	defer srv.Close()
-	c, _ := New(quiet(fast(Config{URL: srv.URL, Timeout: time.Hour})))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: t.TempDir(), Timeout: time.Hour})))
 	delivered := make(chan []Result, 1)
 	go func() { delivered <- c.Deliver(context.Background(), []Item{item("a", PriorityHigh)}) }()
 	select {
@@ -1785,5 +1785,40 @@ func TestCloseWaitsForARunningDeliver(t *testing.T) {
 		}
 	default:
 		t.Fatal("Close returned while Deliver was still running")
+	}
+}
+
+// Without a spool directory there is no durable quarantine record, so Deliver
+// must not claim Quarantined for anything: it leaves all Pending and says why.
+func TestDeliverWithoutSpoolDirSettlesNothingQuarantined(t *testing.T) {
+	for name, status := range map[string]int{"final 400": 400, "ok": 200} {
+		t.Run(name, func(t *testing.T) {
+			h := &hub{status: func(int32, []string) (int, string, map[string]string) {
+				return status, `{"results":[{"id":"a","status":"rejected","code":"unknown_kind"}]}`, nil
+			}}
+			srv := httptest.NewServer(h)
+			defer srv.Close()
+			var errs atomic.Int32
+			c, _ := New(quiet(fast(Config{URL: srv.URL, OnError: func(error) { errs.Add(1) }})))
+			defer closeClient(t, c)
+			got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh), {ID: "", Body: []byte(`x`)}})
+			if dispo(got) != "pending,pending" || len(h.got()) != 0 || errs.Load() == 0 {
+				t.Fatalf("dispositions = %s, hub saw %v, errors %d", dispo(got), h.got(), errs.Load())
+			}
+		})
+	}
+}
+
+// A client that has finished closing sends nothing, and Deliver notices a Close
+// between chunks.
+func TestDeliverStopsAtClose(t *testing.T) {
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: t.TempDir(), BatchSize: 1})))
+	closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh), {ID: "", Body: []byte(`x`)}})
+	if dispo(got) != "pending,pending" || len(h.got()) != 0 {
+		t.Fatalf("closed client: dispositions = %s, hub saw %v", dispo(got), h.got())
 	}
 }

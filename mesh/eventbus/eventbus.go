@@ -404,6 +404,10 @@ type Result struct {
 // still makes them final; and an item is quarantined only once that record is
 // durably written, otherwise it is retried.
 //
+// Deliver needs Config.SpoolDir: Quarantined means "recorded in quarantine.jsonl",
+// so a client without one leaves every item Pending and reports an error. A
+// client that is closed (at entry, or between chunks) sends nothing more.
+//
 // Deliver returns when every item is Sent or Quarantined, or when ctx is done
 // or the client is closed; the items not yet settled are then Pending, and the
 // settled ones before them stay settled. Close waits for a running Deliver,
@@ -417,6 +421,14 @@ func (c *Client) Deliver(ctx context.Context, items []Item) []Result {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
+		return out
+	}
+	if c.quar.path == "" {
+		// Deliver's caller advances past a Quarantined item on the strength of
+		// the record, so without a place to keep it nothing may be settled as
+		// quarantined: leave everything Pending and say why.
+		c.mu.Unlock()
+		c.report(errors.New("eventbus: Deliver needs Config.SpoolDir (the quarantine record is its durable copy of what it cannot send); nothing was sent"))
 		return out
 	}
 	c.deliverWG.Add(1)
@@ -437,6 +449,11 @@ func (c *Client) Deliver(ctx context.Context, items []Item) []Result {
 	backoff := c.cfg.BackoffBase
 	i := 0
 	for i < len(items) {
+		select {
+		case <-c.stop:
+			return out // closed: the rest stays Pending
+		default:
+		}
 		if it := items[i]; it.ID == "" || !json.Valid(it.Body) {
 			if c.quarantineItems(items[i:i+1], "invalid", "", "not a sendable item") {
 				out[i] = Result{Disposition: DispositionQuarantined, Reason: "invalid"}
