@@ -64,7 +64,30 @@ A service token is a normal Tether JWT with `kind=service`, a scope list of `<ap
 
 The verifier requires `exp` (a missing or zero `exp` is `ErrInvalidToken`), so a service token is effectively non-expiring: it carries a very distant `exp` (about ten years) and is ended by revocation through the deny-list, not by time. This is not a new lifetime policy; it is how "no expiry" is expressed to a verifier that requires `exp`. Nothing else about verification changes: signature, `iss`, `aud`, scope and the deny-list apply as for any JWT.
 
-Revocation is the deny-list: put the token's `jti` (or its `sub`) in the issuer's list. A consumer rejects the token after its next successful poll (default interval 30s). A failed poll keeps the previous list, so while the issuer's deny-list is unreachable a revoked token stays valid; with a ten-year `exp` there is no expiry to bound that, so monitor the poll (the `DenyListPoller` logs each failure). Because the token outlives every poll window, the issuer must keep the entry on the list until the token's own `exp`. The wire format is the one below; `service_test.go` holds the vectors (valid far-future token, still valid years later, rejected without `exp` (zero and absent), revoked by `jti` and by `sub`, scope and wildcard behaviour through the guard).
+Revocation is the deny-list: put the token's `jti` (or its `sub`) in the issuer's list. Revocation takes effect within one poll interval (default 30s) after a successful poll. If the issuer or its deny-list is unreachable, the last list stays in force (stale), so a revoked token keeps being accepted for as long as the outage lasts; with a ten-year `exp` there is no expiry to bound that, so monitor the poll (the `DenyListPoller` logs each failure). Because the token outlives every poll window, the issuer must keep the entry on the list until the token's own `exp`. The wire format is the one below; `service_test.go` holds the vectors (valid far-future token, still valid years later, rejected without `exp` (zero and absent), revoked by `jti` and by `sub`, scope and wildcard behaviour through the guard).
+
+## Keeping a short-lived token alive (refresher)
+
+Agent and session JWTs live 15 minutes. `Refresher` keeps one valid for as long as the process runs, so a consumer never hand-rolls renewal:
+
+```go
+m := &auth.HTTPMinter{URL: hub + "/auth/token", Body: map[string]any{"audience": "torque", "scopes": []string{"torque.read"}, "session_id": sid},
+	Credential: func() (string, error) { return tokenfile.Read(deviceTokenPath) }, // re-read on every mint
+	Header:     http.Header{"Tether-Protocol": {"1"}}}
+r, _ := auth.NewRefresher(auth.RefresherConfig{Mint: m.Mint})
+go r.Run(ctx)               // optional: renew ahead of demand
+tok, err := r.Token(ctx)    // per request; never expired, no restart needed
+```
+
+Contract:
+- Renews at 2/3 of the token's life (`Fraction`, default `DefaultRefreshFraction`): 10 minutes for a 15 minute token.
+- `Token` is safe for concurrent use and renews lazily. At most one mint runs at a time; a caller that finds the token due while another caller is renewing gets the still-valid token without waiting.
+- If the issuer is unreachable at renewal time, the held token keeps being served until it is within `Skew` (5s) of expiry, and mints retry with exponential backoff (`RetryMin` 2s to `RetryMax` 60s). After that `Token` returns `ErrNoToken` wrapping the mint error. It recovers by itself when the issuer returns.
+- A reply is judged against the clock when it arrives: a token already expired, or inside `Skew` of expiry, is refused as a failed mint, so the token already held is kept and the retry backoff applies.
+- `Token` honors its context: a caller waiting behind a stalled mint returns `ctx.Err()` as soon as its context is done.
+- `OnRefresh` reports each attempt's result and new expiry; the token is never passed to callbacks, logged or put in an error.
+- `HTTPMinter` posts JSON with the parent credential as a bearer and accepts `{"token", "expires_at"|"ttl_seconds"}` (the shape of Tether's `POST /auth/token`); it falls back to the JWT's own `exp`. It refuses cross-origin redirects. Errors carry the HTTP status at most: never the issuer's reply body (an endpoint may echo the Authorization header), the URL, or the credential.
+- Service tokens (below) do not need a refresher.
 
 ## Deny-list wire format
 
