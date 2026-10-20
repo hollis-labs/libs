@@ -11,10 +11,10 @@ defer pub.Close(ctx)
 pub.Publish(eventbus.Item{ID: ev.ID, Priority: eventbus.PriorityHigh, Body: rawJSON})
 ```
 
-With `TETHER_EVENTS_URL` unset, `FromEnv` returns a no-op publisher and the app
+With `HOLLIS_EVENTS_URL` unset, `FromEnv` returns a no-op publisher and the app
 behaves as it did before. The bearer token is read from the file named by
 `HOLLIS_AUTH_TOKEN_FILE_<APP>` on every request, so rotating it needs no restart.
-`TETHER_EVENTS_SPOOL_DIR` enables the disk spool.
+`HOLLIS_EVENTS_SPOOL_DIR` enables the disk spool.
 
 See the package documentation for the delivery guarantees and for what this
 client deliberately does not do (it is not a durable outbox). It has no

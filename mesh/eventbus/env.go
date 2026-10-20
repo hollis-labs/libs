@@ -9,9 +9,9 @@ import (
 const (
 	// EnvURL is the hub ingest endpoint. Unset means no hub: FromEnv
 	// returns a [Noop].
-	EnvURL = "TETHER_EVENTS_URL"
+	EnvURL = "HOLLIS_EVENTS_URL"
 	// EnvSpoolDir enables the disk spool.
-	EnvSpoolDir = "TETHER_EVENTS_SPOOL_DIR"
+	EnvSpoolDir = "HOLLIS_EVENTS_SPOOL_DIR"
 	// tokenFilePrefix plus the upper-cased app name names the variable that
 	// holds the path of the app's token file.
 	tokenFilePrefix = "HOLLIS_AUTH_" + "TOKEN_FILE_"
@@ -32,7 +32,7 @@ func TokenFileEnv(app string) string {
 }
 
 // FromEnv builds a Publisher for app from the environment. With no
-// TETHER_EVENTS_URL it returns a [Noop], so an app runs unchanged without a
+// HOLLIS_EVENTS_URL it returns a [Noop], so an app runs unchanged without a
 // hub. base carries any other settings; its URL, TokenFile and SpoolDir are
 // overwritten by the environment when set.
 func FromEnv(app string, base Config) (Publisher, error) {
