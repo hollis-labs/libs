@@ -64,7 +64,7 @@ A service token is a normal Tether JWT with `kind=service`, a scope list of `<ap
 
 The verifier requires `exp` (a missing or zero `exp` is `ErrInvalidToken`), so "no expiry" is expressed as a very distant `exp` (about ten years). Nothing else about verification changes: signature, `iss`, `aud`, scope and the deny-list apply as for any JWT.
 
-Revocation is the deny-list: put the token's `jti` (or its `sub`) in the issuer's list. A consumer rejects the token after its next poll (30s). Because the token outlives every poll window, the issuer must keep the entry on the list until the token's own `exp`. The wire format is the one below; `service_test.go` holds the vectors (valid far-future token, still valid years later, rejected without `exp`, revoked by `jti` and by `sub`, scope and wildcard behaviour through the guard).
+Revocation is the deny-list: put the token's `jti` (or its `sub`) in the issuer's list. A consumer rejects the token after its next successful poll (default interval 30s). A failed poll keeps the previous list, so while the issuer's deny-list is unreachable a revoked token stays valid; with a ten-year `exp` there is no expiry to bound that, so monitor the poll (the `DenyListPoller` logs each failure). Because the token outlives every poll window, the issuer must keep the entry on the list until the token's own `exp`. The wire format is the one below; `service_test.go` holds the vectors (valid far-future token, still valid years later, rejected without `exp` (zero and absent), revoked by `jti` and by `sub`, scope and wildcard behaviour through the guard).
 
 ## Deny-list wire format
 

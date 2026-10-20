@@ -24,6 +24,10 @@ func serviceClaims(over map[string]any) map[string]any {
 	})
 	delete(c, "sid") // a service token is not bound to an agent session
 	for k, v := range over {
+		if v == nil { // a nil override removes the claim
+			delete(c, k)
+			continue
+		}
 		c[k] = v
 	}
 	return c
@@ -60,11 +64,12 @@ func TestServiceTokenRejects(t *testing.T) {
 	is := newIssuer(t, "k1")
 	v := newVerifier(t, is, nil)
 	cases := map[string]string{
-		"no exp (zero)":  is.token("k1", serviceClaims(map[string]any{"exp": 0})),
-		"expired":        is.token("k1", serviceClaims(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})),
-		"wrong audience": is.token("k1", serviceClaims(map[string]any{"aud": "torque"})),
-		"wrong issuer":   is.token("k1", serviceClaims(map[string]any{"iss": "evil"})),
-		"no subject":     is.token("k1", serviceClaims(map[string]any{"sub": ""})),
+		"no exp (zero)":    is.token("k1", serviceClaims(map[string]any{"exp": 0})),
+		"no exp (missing)": is.token("k1", serviceClaims(map[string]any{"exp": nil})),
+		"expired":          is.token("k1", serviceClaims(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})),
+		"wrong audience":   is.token("k1", serviceClaims(map[string]any{"aud": "torque"})),
+		"wrong issuer":     is.token("k1", serviceClaims(map[string]any{"iss": "evil"})),
+		"no subject":       is.token("k1", serviceClaims(map[string]any{"sub": ""})),
 	}
 	for name, tok := range cases {
 		if _, err := v.Verify(context.Background(), tok); !errors.Is(err, ErrInvalidToken) {
