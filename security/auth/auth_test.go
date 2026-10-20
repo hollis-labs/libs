@@ -70,6 +70,10 @@ func claims(over map[string]any) map[string]any {
 	c := map[string]any{"iss": "https://tether", "sub": "msg://agent/a1", "aud": aud, "scope": "tesseract.read tesseract.write",
 		"exp": time.Now().Add(10 * time.Minute).Unix(), "iat": time.Now().Unix(), "jti": "j1", "kind": "agent", "sid": "s1"}
 	for k, v := range over {
+		if v == nil { // a nil override removes the claim
+			delete(c, k)
+			continue
+		}
 		c[k] = v
 	}
 	return c
@@ -104,18 +108,19 @@ func TestJWTRejects(t *testing.T) {
 	v := newVerifier(t, is, nil)
 	_, other, _ := ed25519.GenerateKey(rand.Reader)
 	cases := map[string]string{
-		"expired":        is.token("k1", claims(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})),
-		"wrong audience": is.token("k1", claims(map[string]any{"aud": "torque"})),
-		"aud array":      is.token("k1", claims(map[string]any{"aud": []string{aud}})),
-		"aud array two":  is.token("k1", claims(map[string]any{"aud": []string{aud, "torque"}})),
-		"wrong issuer":   is.token("k1", claims(map[string]any{"iss": "evil"})),
-		"no exp":         is.token("k1", claims(map[string]any{"exp": 0})),
-		"bad signature":  signJWT(other, "k1", "EdDSA", claims(nil)),
-		"alg none":       signJWT(is.keys["k1"], "k1", "none", claims(nil)),
-		"alg hs256":      signJWT(is.keys["k1"], "k1", "HS256", claims(nil)),
-		"unknown kid":    signJWT(other, "nope", "EdDSA", claims(nil)),
-		"garbage":        "a.b.c",
-		"two parts":      "a.b",
+		"expired":         is.token("k1", claims(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})),
+		"wrong audience":  is.token("k1", claims(map[string]any{"aud": "torque"})),
+		"aud array":       is.token("k1", claims(map[string]any{"aud": []string{aud}})),
+		"aud array two":   is.token("k1", claims(map[string]any{"aud": []string{aud, "torque"}})),
+		"wrong issuer":    is.token("k1", claims(map[string]any{"iss": "evil"})),
+		"no exp (zero)":   is.token("k1", claims(map[string]any{"exp": 0})),
+		"no exp (absent)": is.token("k1", claims(map[string]any{"exp": nil})),
+		"bad signature":   signJWT(other, "k1", "EdDSA", claims(nil)),
+		"alg none":        signJWT(is.keys["k1"], "k1", "none", claims(nil)),
+		"alg hs256":       signJWT(is.keys["k1"], "k1", "HS256", claims(nil)),
+		"unknown kid":     signJWT(other, "nope", "EdDSA", claims(nil)),
+		"garbage":         "a.b.c",
+		"two parts":       "a.b",
 	}
 	for name, tok := range cases {
 		if _, err := v.Verify(context.Background(), tok); !errors.Is(err, ErrInvalidToken) {
