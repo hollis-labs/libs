@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.15.0 — 2026-10-20
+
 ### Added
 
 - `adapters/eventbussink` (CW-20261020-0021): a `runtimeevents.Sink` over the hub
@@ -16,7 +18,8 @@ All notable changes to the `harness` module are documented here (the module was 
   `ingest.CheckEnvelope` before publishing, so an event the hub would reject on
   shape (a non-canonical id, an unsupported schema version, no app, a missing
   required field) is refused to the producer at the call. An event with
-  `class.visibility` `local` is skipped, not published and not an error; `Sink.Stats().SkippedLocal` counts them (never their content). It maps
+  `class.visibility` `local` is skipped, not published and not an error;
+  `Sink.Stats().SkippedLocal` counts them (never their content). It maps
   events to the client's drop order: state, approval, audit and alert events are
   protected whatever their severity or an explicit class says; otherwise debug
   severity is debug, the activity category is activity, a kind the catalog does
