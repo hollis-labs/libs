@@ -1,0 +1,41 @@
+{
+ "version": 1,
+ "note": "Which kinds each app may publish through the hub ingest (POST /events). An entry ending in a dot is a prefix; any other entry is an exact kind. Kind ownership is reviewed in the same change as the kind. Entries marked unconfirmed in the note were proposed by the hub side and are awaiting the producing app's owner.",
+ "producers": [
+  {
+   "app": "cerberus",
+   "kinds": ["resource.", "deploy.", "fleet.", "approval.", "audit.", "alert."]
+  },
+  {
+   "app": "torque",
+   "kinds": ["task.", "run.", "checkpoint.", "sprint.", "phase.", "claim.", "gate.", "progress.", "data.", "step.", "fleet.node.degraded", "alert.", "daemon.started"]
+  },
+  {
+   "app": "hadron",
+   "kinds": ["run.", "step.", "gate.", "alert."]
+  },
+  {
+   "app": "nanite",
+   "note": "unconfirmed: proposed by the hub side, awaiting the Nanite owner",
+   "kinds": ["session.", "turn.", "agent.", "run.", "progress.", "alert."]
+  },
+  {
+   "app": "fragments-engine",
+   "note": "unconfirmed: proposed by the hub side, awaiting the Fragments Engine owner",
+   "kinds": ["delivery.", "data.", "alert."]
+  },
+  {
+   "app": "tangent",
+   "kinds": ["approval.", "alert."]
+  },
+  {
+   "app": "tesseract",
+   "kinds": ["audit."]
+  },
+  {
+   "app": "tether",
+   "note": "off-box workers and relays acting for the hub; the hub's own producers publish in process",
+   "kinds": ["process.", "session.", "turn.", "stdin.", "stdout.", "stderr.", "agent.", "policy.", "plant.", "sandbox.", "interrupt.", "message.", "wake.", "tool.", "daemon.", "fleet.", "audit.", "alert.", "sysop.", "ai.", "workspace.", "provider.", "broker.", "routing.", "event."]
+  }
+ ]
+}
