@@ -10,6 +10,17 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Added
 
+- `adapters/runtimeevents/ingest` (CW-20261020-0009): the contract for publishing
+  events to the hub with `POST /events`. Limits (100 events, 1 MiB per request,
+  64 KiB per payload), `ParseRequest`, `CheckItem` (the per-event rules in a fixed
+  order, including the ingest event JSON Schema: the generic envelope plus a canonical
+  `evt_` id and a required app, no new vocabulary restrictions; the per-kind payload
+  schema is not validated), the per-event `Result` and `Response`, JSON Schemas for the request and
+  the answer, and fixtures for other languages.
+- `adapters/runtimeevents/catalog`: `producers.json` with `LoadProducers`,
+  `ProducerFor` and `ProducerAllows`, the per-app list of kinds a producer may
+  publish through the ingest. A test requires every non-deprecated catalog kind
+  to have an owner, so kind ownership is reviewed with the kind.
 - `sandbox.FSSpec.Hide` (yaml `hide`, CW-20261001-0263): paths a host-filesystem
   profile makes unreadable. Linux bwrap puts an empty tmpfs over an existing
   directory and a read-only `/dev/null` bind over any other existing path,

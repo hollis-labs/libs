@@ -14,6 +14,9 @@
 //
 //	go test ./adapters/runtimeevents/catalog -run TestGenerated -update
 //
+// producers.json says which kinds each app may publish through the hub ingest
+// (see [ProducerAllows]).
+//
 // mapping.md maps the kinds each producer emits today onto this catalog.
 // selfreport.md, with [EffectiveProgressDetail] and [ToolSchema], is the
 // progress_detail setting and the agent self-report call contract.

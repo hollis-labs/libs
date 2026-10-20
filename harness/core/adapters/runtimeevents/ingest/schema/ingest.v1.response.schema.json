@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:runtimeevents:ingest-response/v1",
+  "title": "POST /events 200 answer",
+  "description": "One result per event, in request order. accepted and duplicate carry a cursor; rejected carries a code.",
+  "type": "object",
+  "required": ["results", "accepted", "duplicate", "rejected"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["accepted", "duplicate", "rejected"] },
+          "code": {
+            "enum": ["unknown_kind", "schema_invalid", "forbidden_kind", "payload_too_large", "id_conflict"]
+          },
+          "message": { "type": "string" },
+          "cursor": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "rejected" } } },
+            "then": { "required": ["code"], "not": { "required": ["cursor"] } },
+            "else": { "required": ["cursor"], "not": { "required": ["code"] } }
+          }
+        ]
+      }
+    },
+    "accepted": { "type": "integer", "minimum": 0 },
+    "duplicate": { "type": "integer", "minimum": 0 },
+    "rejected": { "type": "integer", "minimum": 0 }
+  }
+}

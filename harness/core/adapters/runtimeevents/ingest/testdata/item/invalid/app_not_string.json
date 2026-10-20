@@ -1,0 +1,1 @@
+{"schema_version":"1","id":"evt_00000000000000000000000000000a01","kind":"task.state_changed","time":"2026-10-20T01:00:00Z","app":7,"sequence":1,"generation":1,"source":{"channel":"hook","confidence":"exact"},"subject":"msg://task/torque/CW-1","payload":{"entity":{"type":"task","id":"CW-1"},"to":"doing","trigger":{"kind":"agent"}},"class":{"category":"state","severity":"info"}}

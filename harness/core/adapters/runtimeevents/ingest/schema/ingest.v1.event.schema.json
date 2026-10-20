@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:runtimeevents:ingest-event/v1",
+  "title": "One event as accepted by POST /events",
+  "description": "The runtimeevents Event envelope plus the two things the hub requires of a publisher: a canonical producer-minted id (evt_ and 32 lowercase hex, contract decision 6) and an app (the credential's app binding needs one). Everything else is the generic envelope, which tolerates unknown vocabulary values; no enums are added here. The payload is only required to be JSON; per-kind payload schemas are not validated at ingest.",
+  "allOf": [
+    {
+      "$ref": "urn:hollis-labs:runtimeevents:event/v1"
+    },
+    {
+      "required": [
+        "app"
+      ],
+      "properties": {
+        "id": {
+          "pattern": "^evt_[0-9a-f]{32}$"
+        },
+        "app": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

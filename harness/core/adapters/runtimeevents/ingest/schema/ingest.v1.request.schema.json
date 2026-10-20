@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:runtimeevents:ingest-request/v1",
+  "title": "POST /events request body",
+  "description": "One runtimeevents Event, or a batch. Batch items are checked one by one by the hub, so only their shape as objects is required here.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["events"],
+      "properties": {
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "type": "object" }
+        }
+      }
+    },
+    {
+      "allOf": [
+        { "$ref": "urn:hollis-labs:runtimeevents:ingest-event/v1" },
+        { "not": { "required": ["events"] } }
+      ]
+    }
+  ]
+}
