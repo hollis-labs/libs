@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-10-20
 
 Additive; one stricter behavior only for callers that set the new field.
 
