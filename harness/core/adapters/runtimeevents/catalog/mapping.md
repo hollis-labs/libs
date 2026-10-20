@@ -131,6 +131,25 @@ Hadron run and node ids stay in `subject` and the payload: `scope.run_id` and `s
 
 Tangent has no SSE event stream today, so O4 adds the typed v1.1 stream.
 
+## Lifecycle (resource, service, deploy, host)
+
+One vocabulary for every app. Services and managed resources use `resource.state_changed` (payload `resource.state_changed@1`); deploys use `deploy.state_changed`; hosts use `fleet.node.*`; a wedged or degraded resource that needs attention also raises `alert.raised`.
+
+| Event | Kind | Notes |
+|---|---|---|
+| A managed resource or an app's own service changes state | `resource.state_changed` | `entity.type` is `resource` (something Cerberus manages) or `service` (an app's own daemon: Torque, Hadron, Nanite, Fragments Engine). `to` (and `from`) are one of `stopped`, `starting`, `running`, `deploying`, `degraded`, `wedged`, `failed`, `removed`. |
+| Restart, recovery, intentional stop, crash | `resource.state_changed` | Not states. `restarted` is `to=running` with `reason=restart` after `starting`; `recovered` is `to=running` with `reason=recovered` from `degraded`, `wedged` or `failed`; an operator stop is `to=stopped`, `trigger.kind=human`, `reason=operator_stop`, so it never looks like a failure. |
+| Wedged (process up, health failing past a threshold window) | `resource.state_changed` `to=wedged` and `alert.raised` | `alert.raised` has `rule_id=<app>.wedged` and `coalesce_key` the resource id; `alert.cleared` with the same key when it ends. `source_event_ids` holds the `resource.state_changed` event id. |
+| A deployment starts, ends or is rolled back | `deploy.state_changed` | `entity.type=deployment`; `to` is `started`, `succeeded`, `failed` or `rolled_back`. `corr.correlation_id` ties it to the `resource.state_changed` events (`deploying`, then `running`). `artifact` is a version or digest, never a path with credentials. |
+| A host reboots, becomes unreachable or comes back | `fleet.node.restarted`, `fleet.node.down`, `fleet.node.up`, `fleet.node.degraded` | Hosts only. Payload `fleet.node@1` (`environment_id` required). A reboot or an unreachable host also raises `alert.raised` (`rule_id=<app>.host_reboot` or `<app>.host_unreachable`). |
+| Daemon process start and stop | `resource.state_changed` with `entity.type=service` | New lifecycle emission uses this kind. The stable `daemon.*` kinds stay as they are (Tether's, and Torque's `daemon.started`). |
+
+Subjects follow the existing convention `msg://<noun>/<app>/<id>`: `msg://resource/<app>/<resource id>`, `msg://service/<app>/<service>`, `msg://deployment/<app>/<deploy id>`, `msg://host/<app>/<name>`. The hub stamps `actor` (`msg://service/<app>/<env>`); producers never send it.
+
+Labels in the payload (`labels`: `project`, `host`, `connector`, `mode`, `supervisor`, `run_from`, `env`, `owner`, `admin`) say where and how the resource runs. They never carry configuration values or environment variables.
+
+Producers that own these kinds are listed in `producers.json` (`resource.` for Cerberus, Torque, Hadron, Nanite and Fragments Engine; `deploy.` and `fleet.` for Cerberus).
+
 ## Not confirmed
 
 - Emit sites for the Torque and Tesseract plugin-catalog constants.

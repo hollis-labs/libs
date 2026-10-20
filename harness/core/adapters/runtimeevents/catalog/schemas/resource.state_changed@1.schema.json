@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:resource.state_changed@1",
+  "title": "resource.state_changed@1",
+  "description": "Lifecycle state of a managed resource or an app's own service (a Cerberus resource, or the Torque, Hadron, Nanite or Fragments Engine daemon). One vocabulary for every app. Emitted only when the state changed: from differs from to, except a forced re-assertion (forced=true). restarted and recovered are not states: they are transitions, carried in reason (restart, recovered, operator_stop, crash, health_failed) and trigger. wedged (process up, health failing past a threshold window) also raises alert.raised with rule_id <app>.wedged and coalesce_key the resource id, and alert.cleared when it ends. Hosts use fleet.node.*, not this kind. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "entity",
+    "to",
+    "trigger"
+  ],
+  "properties": {
+    "entity": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "resource",
+            "service"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "from": {
+      "enum": [
+        "stopped",
+        "starting",
+        "running",
+        "deploying",
+        "degraded",
+        "wedged",
+        "failed",
+        "removed"
+      ]
+    },
+    "to": {
+      "enum": [
+        "stopped",
+        "starting",
+        "running",
+        "deploying",
+        "degraded",
+        "wedged",
+        "failed",
+        "removed"
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "human, agent, scheduler, hook, reaction or system"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "reason": {
+      "type": "string",
+      "description": "A short closed code, never free text or an error message: restart, recovered, operator_stop, crash, health_failed, deploy, boot, shutdown."
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "forced": {
+      "type": "boolean"
+    },
+    "labels": {
+      "type": "object",
+      "description": "Where and how the resource runs. Strings only; never configuration values or environment variables.",
+      "properties": {
+        "project": {"type": "string"},
+        "host": {"type": "string"},
+        "connector": {"type": "string"},
+        "mode": {"type": "string"},
+        "supervisor": {"type": "string"},
+        "run_from": {"type": "string"},
+        "env": {"type": "string"},
+        "owner": {"type": "string"},
+        "admin": {"type": "string"}
+      },
+      "additionalProperties": {"type": "string"}
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:deploy.state_changed@1",
+  "title": "deploy.state_changed@1",
+  "description": "A deployment of a resource moved on. Emitted when a deploy starts and when it ends: started, then succeeded, failed or rolled_back, tied together by corr.correlation_id. The resource itself goes deploying then running through resource.state_changed. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "entity",
+    "to",
+    "trigger"
+  ],
+  "properties": {
+    "entity": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "deployment"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "from": {
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "rolled_back"
+      ]
+    },
+    "to": {
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "rolled_back"
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "human, agent, scheduler, hook, reaction or system"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "artifact": {
+      "type": "string",
+      "description": "A version, build id or digest. Not a path or URL with credentials."
+    },
+    "reason": {
+      "type": "string",
+      "description": "A short closed code, never an error message: build_failed, health_failed, rollback, operator_cancel."
+    },
+    "forced": {
+      "type": "boolean"
+    }
+  }
+}

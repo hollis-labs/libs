@@ -12,6 +12,15 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Added
 
+- Catalog: `resource.state_changed` (payload `resource.state_changed@1`) and
+  `deploy.state_changed` (`deploy.state_changed@1`), the one lifecycle vocabulary
+  for every app. Resource and service `to`/`from` are `stopped`, `starting`,
+  `running`, `deploying`, `degraded`, `wedged`, `failed` or `removed`;
+  `restarted` and `recovered` are carried in `reason`, not as states. Deploys go
+  `started` then `succeeded`, `failed` or `rolled_back`. Hosts keep using
+  `fleet.node.*`; a wedged resource also raises `alert.raised`. New mapping.md
+  section "Lifecycle" and `resource.` added to the Torque, Hadron, Nanite and
+  Fragments Engine entries of `producers.json`.
 - `adapters/runtimeevents/ingest` (CW-20261020-0009): the contract for publishing
   events to the hub with `POST /events`. Limits (100 events, 1 MiB per request,
   64 KiB per payload), `ParseRequest`, `CheckItem` (the per-event rules in a fixed
