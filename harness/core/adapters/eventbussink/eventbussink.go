@@ -16,7 +16,7 @@
 // producer learns about an event the hub would reject at the call, not later in
 // quarantine. Which kinds an app may publish stays the hub's decision. An event
 // whose class.visibility is "local" is never published: it must not leave the
-// process, so it is skipped without error.
+// process, so it is skipped without error and counted in [Sink.Stats].
 package eventbussink
 
 import (
@@ -34,9 +34,20 @@ import (
 
 // Sink implements [runtimeevents.Sink] on top of an [eventbus.Publisher].
 type Sink struct {
-	pub eventbus.Publisher
-	app string
+	pub     eventbus.Publisher
+	app     string
+	skipped atomic.Uint64
 }
+
+// Stats are the sink's counters.
+type Stats struct {
+	// SkippedLocal counts events not published because their class.visibility
+	// is "local". Only the count is kept, never the event.
+	SkippedLocal uint64
+}
+
+// Stats returns the counters.
+func (s *Sink) Stats() Stats { return Stats{SkippedLocal: s.skipped.Load()} }
 
 var _ runtimeevents.Sink = (*Sink)(nil)
 
@@ -61,6 +72,7 @@ func New(pub eventbus.Publisher, opts ...Option) *Sink {
 // the caller. An event with class.visibility "local" is skipped without error.
 func (s *Sink) Write(_ context.Context, ev runtimeevents.Event) error {
 	if ev.Class != nil && ev.Class.Visibility == "local" {
+		s.skipped.Add(1)
 		return nil // local means it never leaves the process
 	}
 	ev.Cursor = ""

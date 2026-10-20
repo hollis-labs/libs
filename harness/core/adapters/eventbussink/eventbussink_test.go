@@ -96,11 +96,22 @@ func TestEnvelopesTheHubWouldRejectAreRefusedToTheProducer(t *testing.T) {
 func TestLocalEventsAreSkippedWithoutError(t *testing.T) {
 	r := &recorder{}
 	ev := event("resource.state_changed", &runtimeevents.Class{Visibility: "local"})
-	if err := New(r, WithApp("cerberus")).Write(context.Background(), ev); err != nil {
+	sink := New(r, WithApp("cerberus"))
+	if err := sink.Write(context.Background(), ev); err != nil {
 		t.Fatalf("a local event is not an error: %v", err)
 	}
 	if len(r.items) != 0 {
 		t.Fatal("a local event must never be published")
+	}
+	if got := sink.Stats().SkippedLocal; got != 1 {
+		t.Fatalf("SkippedLocal = %d, want 1", got)
+	}
+	// A non-local event is published and not counted.
+	if err := sink.Write(context.Background(), event("resource.state_changed", nil)); err != nil {
+		t.Fatal(err)
+	}
+	if got := sink.Stats().SkippedLocal; got != 1 || len(r.items) != 1 {
+		t.Fatalf("SkippedLocal = %d, published %d", got, len(r.items))
 	}
 }
 
