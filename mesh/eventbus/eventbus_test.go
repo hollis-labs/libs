@@ -1448,3 +1448,204 @@ func TestQuarantineRacingCloseNeverLosesAnEvent(t *testing.T) {
 		}
 	}
 }
+
+// ---- Deliver (synchronous delivery for an outbox relay) ----
+
+func dispo(ds []Disposition) string {
+	var out []string
+	for _, d := range ds {
+		out = append(out, map[Disposition]string{DispositionPending: "pending", DispositionSent: "sent", DispositionQuarantined: "quarantined"}[d])
+	}
+	return strings.Join(out, ",")
+}
+
+func TestDeliverReportsEachItemsDisposition(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		return 200, `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"duplicate","cursor":"2"},{"id":"c","status":"rejected","code":"unknown_kind"}]}`, nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(Config{URL: srv.URL, SpoolDir: dir, FlushInterval: time.Hour}))
+	defer closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh), item("b", PriorityHigh), item("c", PriorityHigh)})
+	if dispo(got) != "sent,sent,quarantined" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+	if q := quarantineIDs(t, dir); len(q) != 1 || q[0] != "c:rejected" {
+		t.Fatalf("quarantine = %v (a quarantined item must be durable before Deliver reports it)", q)
+	}
+	if st := c.Stats(); st.Queued != 0 || st.Sent != 2 {
+		t.Fatalf("Deliver must bypass the queue: %+v", st)
+	}
+}
+
+func TestDeliverRetriesTransientFailuresAndSplitsBatches(t *testing.T) {
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		if call == 1 {
+			return 503, "", nil
+		}
+		if len(ids) > 2 {
+			return 413, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, FlushInterval: time.Hour})))
+	defer closeClient(t, c)
+	items := []Item{item("a", PriorityHigh), item("b", PriorityHigh), item("c", PriorityHigh), item("d", PriorityHigh)}
+	got := c.Deliver(context.Background(), items)
+	if dispo(got) != "sent,sent,sent,sent" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+	if ids := strings.Join(h.got(), ","); ids != "a,b,c,d" {
+		t.Fatalf("delivered = %s, want the original order", ids)
+	}
+}
+
+// A request that can never succeed quarantines its items and the next chunk
+// still goes out.
+func TestDeliverQuarantinesFinalFailuresAndContinues(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		if ids[0] == "bad" {
+			return 400, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1})))
+	defer closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{item("bad", PriorityHigh), item("good", PriorityHigh)})
+	if dispo(got) != "quarantined,sent" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+	if q := quarantineIDs(t, dir); len(q) != 1 || q[0] != "bad:bad_request" {
+		t.Fatalf("quarantine = %v", q)
+	}
+}
+
+// When the call ends before everything is settled, the settled prefix stays
+// settled and the rest is Pending; nothing is recorded for Pending items.
+func TestDeliverLeavesTheUnsettledPending(t *testing.T) {
+	dir := t.TempDir()
+	block := make(chan struct{})
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), `"second"`) {
+			select {
+			case <-block:
+			case <-r.Context().Done():
+			}
+			return
+		}
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	defer close(block)
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1, Timeout: time.Hour})))
+	defer closeClient(t, c)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	got := c.Deliver(ctx, []Item{item("first", PriorityHigh), item("second", PriorityHigh), item("third", PriorityHigh)})
+	if dispo(got) != "sent,pending,pending" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+	if q := quarantineIDs(t, dir); len(q) != 0 {
+		t.Fatalf("pending items must not be recorded anywhere: %v", q)
+	}
+}
+
+func TestDeliverWithTheHubDownEndsWithTheContext(t *testing.T) {
+	c, _ := New(quiet(fast(Config{URL: deadHub(t).URL})))
+	defer closeClient(t, c)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	got := c.Deliver(ctx, []Item{item("a", PriorityHigh)})
+	if dispo(got) != "pending" || time.Since(start) > 5*time.Second {
+		t.Fatalf("dispositions = %s after %v", dispo(got), time.Since(start))
+	}
+}
+
+func TestDeliverQuarantinesUnsendableItems(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
+	defer closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{
+		item("ok1", PriorityHigh),
+		{ID: "", Body: json.RawMessage(`{}`)},
+		{ID: "badjson", Body: json.RawMessage(`{nope`)},
+		item("ok2", PriorityHigh),
+	})
+	if dispo(got) != "sent,quarantined,quarantined,sent" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+}
+
+func TestDeliverOnAClosedClientSettlesNothing(t *testing.T) {
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
+	closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh)})
+	if dispo(got) == "sent" {
+		// A closed client may still complete one request that wins the race; it
+		// must never claim more than it did.
+		if len(h.got()) != 1 {
+			t.Fatalf("reported sent but the hub saw %v", h.got())
+		}
+		return
+	}
+	if dispo(got) != "pending" {
+		t.Fatalf("dispositions = %s", dispo(got))
+	}
+}
+
+// Deliver and the queue sender run side by side without sharing retry state.
+func TestDeliverAndTheQueueRunConcurrently(t *testing.T) {
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var got []Disposition
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 40; i++ {
+			c.Publish(item(fmt.Sprintf("q%02d", i), PriorityHigh))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		var items []Item
+		for i := 0; i < 40; i++ {
+			items = append(items, item(fmt.Sprintf("d%02d", i), PriorityHigh))
+		}
+		got = c.Deliver(context.Background(), items)
+	}()
+	wg.Wait()
+	waitFor(t, "queued events delivered", func() bool { return c.Stats().Sent == 80 })
+	closeClient(t, c)
+	for i, d := range got {
+		if d != DispositionSent {
+			t.Fatalf("item %d: %v", i, d)
+		}
+	}
+}
+
+func deadHub(t *testing.T) *httptest.Server {
+	t.Helper()
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	t.Cleanup(s.Close)
+	return s
+}

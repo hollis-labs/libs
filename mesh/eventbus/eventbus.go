@@ -364,6 +364,74 @@ func (c *Client) makeRoom(in Item) []dropNote {
 	return []dropNote{{1, "queue_full"}}
 }
 
+// Disposition is what became of one item passed to [Client.Deliver].
+type Disposition uint8
+
+const (
+	// DispositionPending: not settled; the call ended first (ctx done, or the
+	// client closed). Nothing was recorded for it.
+	DispositionPending Disposition = iota
+	// DispositionSent: the hub accepted it (or already had it).
+	DispositionSent
+	// DispositionQuarantined: it will not be delivered and is durably recorded
+	// in quarantine (the hub rejected it, refused its request for good, or gave
+	// no valid verdict within MaxUnresolved tries). The caller may move on.
+	DispositionQuarantined
+)
+
+// Deliver sends items synchronously, bypassing the queue and the spool, and
+// returns a [Disposition] for each, in order. It is for a caller that keeps its
+// own durable record and must not move past an event until the hub has settled
+// it (an outbox relay). It applies the same rules as the queue: strict
+// verdicts, retries with backoff for transient failures and for 401 / 403
+// scope_required up to RetryAuthMax, quarantine for what can never succeed. It
+// returns when every item is Sent or Quarantined, or when ctx is done or the
+// client is closed; the items not yet settled are then Pending, and the settled
+// ones before them stay settled. Items the client cannot send at all (no id, not
+// JSON) are quarantined. Call it from one goroutine at a time per stream of
+// events so order is kept.
+func (c *Client) Deliver(ctx context.Context, items []Item) []Disposition {
+	out := make([]Disposition, len(items))
+	backoff := c.cfg.BackoffBase
+	i := 0
+	for i < len(items) {
+		if it := items[i]; it.ID == "" || !json.Valid(it.Body) {
+			if c.quarantineItems(items[i:i+1], "invalid", "", "not a sendable item") {
+				out[i] = DispositionQuarantined
+				i++
+				continue
+			}
+			return out // could not record it: leave it and everything after Pending
+		}
+		// Take as many as fit one request.
+		n, size := 0, 0
+		for i+n < len(items) && n < c.cfg.BatchSize {
+			it := items[i+n]
+			if it.ID == "" || !json.Valid(it.Body) {
+				break
+			}
+			l := len(it.Body) + 1
+			if n > 0 && size+l > c.cfg.MaxBatchBytes {
+				break
+			}
+			size += l
+			n++
+		}
+		batch := make([]queued, n)
+		for k := 0; k < n; k++ {
+			batch[k] = queued{Item: items[i+k]}
+		}
+		chunk := make([]Disposition, n)
+		_, ok := c.deliverCtx(ctx, &backoff, chunk, batch, false)
+		copy(out[i:], chunk)
+		if !ok {
+			return out
+		}
+		i += n
+	}
+	return out
+}
+
 // Stats returns the counters.
 func (c *Client) Stats() Stats {
 	c.mu.Lock()
@@ -565,7 +633,14 @@ func (c *Client) quarantineItems(items []Item, reason, code, message string) boo
 	now := time.Now().UTC()
 	recs := make([]quarantineRec, len(items))
 	for i, it := range items {
-		recs[i] = quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: it.Body}
+		body := it.Body
+		if !json.Valid(body) {
+			// Not JSON, so it cannot sit in the record as raw JSON: keep the
+			// bytes as a JSON string (see the recovery notes in the package
+			// documentation).
+			body, _ = json.Marshal(string(it.Body))
+		}
+		recs[i] = quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: body}
 	}
 	c.mu.Lock()
 	err, trimErr := c.quar.addAll(recs)
@@ -616,9 +691,26 @@ type postResult struct {
 	results []*itemResult // for outcomeOK, one per sent item, nil when no valid verdict
 }
 
-// deliver sends batch until every item has a verdict. It returns false with
-// the unsettled items when sending should stop (closing, or Close called).
+// deliver is the queue sender's delivery: it uses the client's shared backoff
+// and stops when Close is called.
 func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
+	return c.deliverCtx(context.Background(), &c.backoff, nil, batch, closing)
+}
+
+// deliverCtx sends batch until every item has a verdict. It returns false with
+// the unsettled items when sending should stop (closing, Close called, or ctx
+// done). backoff is the caller's retry delay state, so callers on different
+// goroutines do not share it. If outcomes is not nil it receives, for each item
+// that settles, whether it was sent or quarantined.
+func (c *Client) deliverCtx(ctx context.Context, backoff *time.Duration, outcomes []Disposition, batch []queued, closing bool) ([]queued, bool) {
+	mark := func(idx []int, d Disposition) {
+		if outcomes == nil {
+			return
+		}
+		for _, i := range idx {
+			outcomes[i] = d
+		}
+	}
 	settled := make([]bool, len(batch))
 	pending := make([]int, len(batch))
 	for i := range pending {
@@ -657,13 +749,16 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 	}
 
 	for len(pending) > 0 {
+		if ctx.Err() != nil {
+			return unsettled(), false
+		}
 		w := window
 		if w > len(pending) {
 			w = len(pending)
 		}
 		send := append([]int(nil), pending[:w]...)
 		items := itemsOf(send)
-		res := c.post(items)
+		res := c.post(ctx, items)
 		wait := res.wait
 		if res.out != outcomeAuth {
 			authSince = time.Time{}
@@ -672,6 +767,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		switch res.out {
 		case outcomeFinal:
 			if c.quarantineItems(items, res.reason, res.code, "") {
+				mark(send, DispositionQuarantined)
 				finishItems(send)
 				continue
 			}
@@ -683,6 +779,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			if c.cfg.StrictAuth || (c.cfg.RetryAuthMax > 0 && time.Since(authSince) >= c.cfg.RetryAuthMax) {
 				if c.quarantineItems(items, "auth", res.code, "") {
 					authSince = time.Time{}
+					mark(send, DispositionQuarantined)
 					finishItems(send)
 					continue
 				}
@@ -692,6 +789,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		case outcomeTooLarge:
 			if w == 1 {
 				if c.quarantineItems(items, "payload_too_large", "", "hub refused the request size") {
+					mark(send, DispositionQuarantined)
 					finishItems(send)
 					continue
 				}
@@ -708,11 +806,13 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 				case r != nil && r.Status == "accepted":
 					c.sent.Add(1)
 					c.markerAccepted(items[k].ID)
+					mark([]int{i}, DispositionSent)
 					done = append(done, i)
 				case r != nil && r.Status == "duplicate":
 					c.dups.Add(1)
 					c.sent.Add(1)
 					c.markerAccepted(items[k].ID)
+					mark([]int{i}, DispositionSent)
 					done = append(done, i)
 				case r != nil && r.Status == "rejected":
 					if c.quarantineItems(items[k:k+1], "rejected", r.Code, r.Message) {
@@ -720,6 +820,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 						if c.cfg.OnReject != nil {
 							c.cfg.OnReject(items[k].ID, r.Code, r.Message)
 						}
+						mark([]int{i}, DispositionQuarantined)
 						done = append(done, i)
 					} else {
 						open = append(open, i)
@@ -730,12 +831,13 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			}
 			finishItems(done)
 			if len(open) == 0 {
-				c.backoff = c.cfg.BackoffBase
+				*backoff = c.cfg.BackoffBase
 				continue
 			}
 			unresolved++
 			if c.cfg.MaxUnresolved > 0 && unresolved > c.cfg.MaxUnresolved {
 				if c.quarantineItems(itemsOf(open), "unresolved", "", "no valid verdict from the hub") {
+					mark(open, DispositionQuarantined)
 					finishItems(open)
 					continue
 				}
@@ -749,15 +851,17 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			return unsettled(), false
 		}
 		c.retries.Add(1)
-		d := c.backoff
+		d := *backoff
 		if wait > d {
 			d = wait
 		}
-		if c.backoff < c.cfg.BackoffMax {
-			c.backoff *= 2
+		if *backoff < c.cfg.BackoffMax {
+			*backoff *= 2
 		}
 		select {
 		case <-time.After(d):
+		case <-ctx.Done():
+			return unsettled(), false
 		case <-c.stop:
 			return unsettled(), false
 		}
@@ -783,7 +887,7 @@ func (c *Client) report(err error) {
 }
 
 // post makes one request.
-func (c *Client) post(items []Item) postResult {
+func (c *Client) post(ctx context.Context, items []Item) postResult {
 	var buf bytes.Buffer
 	buf.WriteString(`{"events":[`)
 	for i, it := range items {
@@ -794,9 +898,9 @@ func (c *Client) post(items []Item) postResult {
 	}
 	buf.WriteString(`]}`)
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
+	rctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.URL, &buf)
+	req, err := http.NewRequestWithContext(rctx, http.MethodPost, c.cfg.URL, &buf)
 	if err != nil {
 		c.report(err)
 		return postResult{out: outcomeFinal, reason: "bad_request"}
@@ -807,7 +911,9 @@ func (c *Client) post(items []Item) postResult {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		c.report(err)
+		if ctx.Err() == nil { // a canceled caller is not a transport failure
+			c.report(err)
+		}
 		return postResult{out: outcomeRetry}
 	}
 	defer resp.Body.Close()

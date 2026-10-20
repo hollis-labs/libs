@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-20
+
+### Added
+
+- `Client.Deliver(ctx, items)`: synchronous delivery for a caller that keeps its
+  own durable record (an outbox relay). It bypasses the queue and spool, applies
+  the same rules as the queue (strict verdicts, backoff, the auth ceiling,
+  quarantine for what can never succeed) and returns a `Disposition` per item:
+  `DispositionSent`, `DispositionQuarantined` (durably recorded, so the caller
+  may move on) or `DispositionPending` (not settled because the context ended
+  or the client closed). It keeps its own retry state, so it can run next to the
+  queue sender.
+- Package `relay`: ships an app's local outbox to the hub. The app supplies a
+  `Source` (entries after a sequence number, in order) and a `Cursor` (the last
+  settled sequence number; `FileCursor` is one). The relay moves the cursor only
+  over entries the hub settled, resumes from it after a restart, and reports and
+  retries failures of the source, the cursor store and the hub. At least once;
+  the hub dedupes on the event id.
+
+### Fixed
+
+- An item whose body is not valid JSON can now be quarantined (it is stored as a
+  JSON string of its raw bytes; reason `invalid`).
+
 ## v0.1.0 — 2026-10-20
 
 ### Added
