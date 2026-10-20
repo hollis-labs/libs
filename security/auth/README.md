@@ -94,10 +94,16 @@ Contract:
 Verifier and posture configuration can change while the app serves requests. Three small pieces, one mechanism:
 
 ```go
+// Built ONCE, outside Load, and shared by every verifier the app ever builds.
+dl := auth.NewDenyList()
+poller := &auth.DenyListPoller{URL: denyURL, List: dl}
+go poller.Run(ctx)
+
 g, _ := auth.New(auth.Config{Mode: mode, Verifier: jv, Scopes: scopes, Addr: addr})
 load := func(ctx context.Context) error {                   // all-or-nothing: build everything, then install once
 	cfg, err := readConfig(path)                            // your format (YAML, JSON, env file)
 	if err != nil { return err }                            // previous config stays in effect
+	cfg.JWT.DenyList = dl                                   // the SAME list: a reload must not start from an empty one
 	jv, err := auth.NewJWTVerifier(cfg.JWT)
 	if err != nil { return err }
 	return g.Apply(cfg.Mode, jv)                            // validates, then swaps mode and verifier together or not at all
@@ -106,11 +112,15 @@ _ = load(ctx)                                               // startup load
 go (&auth.Reloader{Path: path, Load: load}).Run(ctx)
 ```
 
-If `Load` builds anything with a lifetime of its own (a JWKS refresh loop, a deny-list poller), start it for the new configuration only after `Apply` succeeded and stop the old one afterwards; `CheckApply(mode, v)` answers "would this be accepted" without changing anything.
+**A reload must never forget a revocation.** The library never builds a deny-list for you: `Switch`, `Reloader` and `Guard.Apply` only swap what your `Load` hands them. A `JWTVerifier` built with `DenyList` nil checks nothing, and one built with a fresh `NewDenyList()` accepts every revoked token again until its first successful poll (and for as long as the issuer's deny-list endpoint is down). So keep the list, and the one poller that feeds it, outside `Load` and pass the same `*DenyList` into every verifier (`TestSwappingVerifiersThatShareADenyListKeepsRevocations`). If a reload points at a deny-list endpoint you have not heard from, there is nothing known to keep: call `poller.Poll(ctx)` against it first and refuse the reload if that fails.
+
+If `Load` builds anything else with a lifetime of its own (a JWKS refresh loop), start it for the new configuration only after `Apply` succeeded and stop the old one afterwards; `CheckApply(mode, v)` answers "would this be accepted" without changing anything.
+
+**What is pinned.** `Middleware` takes the guard's `{mode, verifier}` once, on entry, uses it for verification and the decision, and pins it in the request context; a later `AuthorizeTool` call made with that context follows the same mode, however long the handler runs and whatever `Apply` does meanwhile. A caller that stamps the principal itself with `WithPrincipal` (a stdio transport) has no pin, and `AuthorizeTool` uses the generation current at the call. The guard does not carry application data with a generation: an app whose decisions also depend on its own per-generation data (a namespace ceiling, say) needs its own generation object, pinned in the request the same way, and must not translate a verified principal into claims with data from a different generation.
 
 - `Reloader` calls `Load` when the file's content changes (checked every 2s; a change must be seen unchanged on two consecutive checks, so a half-written file is not loaded), on `SIGHUP`, and on `Trigger()`. A touch with identical content does nothing. `Load` is not called for the content present when `Run` starts. The file is fingerprinted before `Load` runs, so an edit made while `Load` is running is loaded again afterwards, never marked applied unseen.
 - A `Load` error (or panic) is logged and passed to `OnResult`; the running configuration is untouched. A file that failed to load is not retried until its content changes again, or a signal or `Trigger` forces it. A file missing mid-replace is ignored.
-- `Guard.Apply(mode, verifier)` moves the posture dial and the verifier live as one atomic step (`SetMode(m)` is `Apply(m, nil)`). A request takes its mode and verifier once, on entry, before any verification, and keeps that pair to the end even if `Apply` runs meanwhile. It refuses, leaving both unchanged, a mode `ParseMode` does not accept, `enforce` with no verifier, and, when `Config.Addr` is set, any mode `ValidateBind` rejects for that address (a reload cannot loosen auth on a non-local listener). Modes are stored in canonical form, so `ENFORCE` and ` observe ` mean what they say; a mode the guard does not recognize is treated as `enforce`.
+- `Guard.Apply(mode, verifier)` moves the posture dial and the verifier live as one atomic step (`SetMode(m)` is `Apply(m, nil)`). A request takes its mode and verifier once, on entry, before any verification, and keeps that pair to the end (including a later `AuthorizeTool`) even if `Apply` runs meanwhile. It refuses, leaving both unchanged, a mode `ParseMode` does not accept, `enforce` with no verifier, and, when `Config.Addr` is set, any mode `ValidateBind` rejects for that address (a reload cannot loosen auth on a non-local listener). Modes are stored in canonical form, so `ENFORCE` and ` observe ` mean what they say; a mode the guard does not recognize is treated as `enforce`.
 - `Switch` is a swappable `Verifier` for code that does not use a `Guard`; with no verifier it answers `ErrUnavailable` (503 under enforce), never a pass.
 - Rotated JWKS keys already refresh on their own (`Run`, or an unknown `kid`); reload is for changing the verifier's configuration itself (issuer, audience, JWKS URL, bootstrap key, deny-list source).
 
