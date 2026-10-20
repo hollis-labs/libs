@@ -114,7 +114,11 @@ func TestPriority(t *testing.T) {
 		{"activity from catalog", event("process.started", nil), eventbus.PriorityActivity},
 		{"class activity on a non-protected kind", event("tool.call.started", &runtimeevents.Class{Category: "activity"}), eventbus.PriorityActivity},
 		{"debug severity on a non-protected kind", event("process.started", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityDebug},
-		{"unknown kind", event("x.y", nil), eventbus.PriorityHigh},
+		// A kind the catalog does not know is activity unless its class says more.
+		{"unknown kind defaults to activity", event("x.y", nil), eventbus.PriorityActivity},
+		{"unknown kind with an explicit state class is protected", event("x.y", &runtimeevents.Class{Category: "state"}), eventbus.PriorityHigh},
+		{"unknown kind with an explicit non-activity class is protected", event("x.y", &runtimeevents.Class{Category: "tool"}), eventbus.PriorityHigh},
+		{"unknown kind at debug severity", event("x.y", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityDebug},
 		{"alert", event("alert.raised", nil), eventbus.PriorityHigh},
 		// Protected categories win over severity and over an explicit class: a
 		// state change logged at debug is still a state change.
@@ -206,5 +210,32 @@ func TestGapMarkerRefusesAnEmptyApp(t *testing.T) {
 	_, err := GapMarker("")(eventbus.Loss{Class: "protected", First: time.Now(), Last: time.Now(), Count: 1})
 	if err == nil {
 		t.Fatal("a marker the hub would reject (no app) must be an error, not an item")
+	}
+}
+
+// Markers built from the same instant (a loss record with an unchanged
+// timestamp) still get strictly increasing sequences, starting from 1 in a fresh
+// process, on their own channel.
+func TestGapMarkersFromTheSameInstantAreStrictlyIncreasing(t *testing.T) {
+	at := time.Date(2026, 10, 20, 1, 0, 0, 0, time.UTC)
+	loss := eventbus.Loss{Class: "protected", First: at, Last: at, Count: 1}
+	mk := GapMarker("torque")
+	var prev uint64
+	for i := 0; i < 20; i++ {
+		it, err := mk(loss)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ev runtimeevents.Event
+		if err := json.Unmarshal(it.Body, &ev); err != nil {
+			t.Fatal(err)
+		}
+		if ev.Source.Channel != "eventbus" {
+			t.Fatalf("channel = %q, want its own channel", ev.Source.Channel)
+		}
+		if ev.Sequence <= prev {
+			t.Fatalf("sequence %d did not increase past %d for markers built from the same instant", ev.Sequence, prev)
+		}
+		prev = ev.Sequence
 	}
 }

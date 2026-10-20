@@ -19,7 +19,8 @@ All notable changes to the `harness` module are documented here (the module was 
   `class.visibility` `local` is skipped, not published and not an error. It maps
   events to the client's drop order: state, approval, audit and alert events are
   protected whatever their severity or an explicit class says; otherwise debug
-  severity is debug, the activity category is activity, and the rest is
+  severity is debug, the activity category is activity, a kind the catalog does
+  not know is activity unless its class names a category, and the rest is
   protected. `GapMarker(app)` builds the `alert.raised` event (rule
   `eventbus.loss`, coalesce key `eventbus.loss:<app>`) that announces protected
   events the client had to drop; it carries a per-process generation and a

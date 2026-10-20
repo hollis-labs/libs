@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -150,4 +151,50 @@ func TestEndToEndAgainstTheContractHub(t *testing.T) {
 	if len(hub.got) < 2 {
 		t.Fatalf("hub accepted only %d events", len(hub.got))
 	}
+}
+
+// Protected-loss accounting works through the adapter: protected events are not
+// downgraded by debug severity or an explicit activity class, so they are the
+// last thing a full queue gives up, and giving one up is counted and recorded.
+func TestProtectedEventsAreAccountedForThroughTheAdapter(t *testing.T) {
+	var drops sync.Map
+	c, err := eventbus.New(eventbus.Config{
+		URL: "http://127.0.0.1:1", QueueSize: 3, FlushInterval: time.Hour,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		OnDrop: func(n int, reason string) {
+			v, _ := drops.LoadOrStore(reason, new(int))
+			*(v.(*int)) += n
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink := New(c, WithApp("cerberus"))
+	write := func(kind runtimeevents.EventKind, class *runtimeevents.Class) {
+		ev := lifecycle("cerberus")
+		ev.Kind, ev.Class = kind, class
+		ev.SessionID = runtimeevents.NewSessionID() // session-bound kinds need one
+		if err := sink.Write(context.Background(), ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Three events fill the queue: one real activity, then two protected kinds
+	// that a naive mapping would have downgraded.
+	write("process.started", nil)                                           // activity
+	write("task.state_changed", &runtimeevents.Class{Severity: "debug"})    // protected despite debug severity
+	write("task.state_changed", &runtimeevents.Class{Category: "activity"}) // protected despite the class
+	// A fourth protected event evicts the activity one: nothing protected is lost.
+	write("alert.raised", nil)
+	if st := c.Stats(); st.DroppedHigh != 0 || len(st.Losses) != 0 {
+		t.Fatalf("the activity event must go first: %+v", st)
+	}
+	// A fifth finds only protected events left: that loss is counted and recorded.
+	write("audit.recorded", nil)
+	st := c.Stats()
+	if st.DroppedHigh != 1 || len(st.Losses) != 1 || st.Losses[0].Count != 1 {
+		t.Fatalf("losing a protected event must be counted and recorded: %+v", st)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = c.Close(ctx)
 }

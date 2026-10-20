@@ -87,18 +87,20 @@ var protectedCategories = map[string]bool{"state": true, "approval": true, "audi
 
 // priority maps an event to the client's drop order. An event is protected if
 // its own class or the catalog puts it in a protected category, whatever its
-// severity or an explicit activity class says: a state change logged at debug
-// severity is still a state change. Otherwise debug severity is PriorityDebug,
-// the activity category is PriorityActivity, and everything else (unknown kinds
-// included) is protected.
+// severity or an explicit class says: a state change logged at debug severity is
+// still a state change. Otherwise debug severity is PriorityDebug and the
+// activity category is PriorityActivity. A kind the catalog does not know is
+// activity unless its class names a category, which then decides; every other
+// known category is protected.
 func priority(ev runtimeevents.Event) eventbus.Priority {
 	var cat, sev string
 	if ev.Class != nil {
 		cat, sev = ev.Class.Category, ev.Class.Severity
 	}
 	catalogCat := ""
+	known := false
 	if e, ok := catalog.Lookup(string(ev.Kind)); ok {
-		catalogCat = e.Category
+		catalogCat, known = e.Category, true
 	}
 	if protectedCategories[cat] || protectedCategories[catalogCat] {
 		return eventbus.PriorityHigh
@@ -107,6 +109,9 @@ func priority(ev runtimeevents.Event) eventbus.Priority {
 		return eventbus.PriorityDebug
 	}
 	if cat == "" {
+		if !known {
+			return eventbus.PriorityActivity
+		}
 		cat = catalogCat
 	}
 	if cat == "activity" {
