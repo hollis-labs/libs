@@ -1822,3 +1822,83 @@ func TestDeliverStopsAtClose(t *testing.T) {
 		t.Fatalf("closed client: dispositions = %s, hub saw %v", dispo(got), h.got())
 	}
 }
+
+// syncBuf is a goroutine-safe log sink.
+type syncBuf struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
+
+// While Deliver waits on a missing credential the client says since when, warns
+// again every AuthWarnInterval naming the code, and clears the stamp when the
+// credential works.
+func TestDeliverAuthWaitIsVisibleAndWarnsRepeatedly(t *testing.T) {
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer issued" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	logs := &syncBuf{}
+	cfg := fast(Config{URL: srv.URL, SpoolDir: t.TempDir(), TokenFile: tokenFile, AuthWarnInterval: 40 * time.Millisecond})
+	cfg.Logger = slog.New(slog.NewTextHandler(logs, nil))
+	c, _ := New(cfg)
+	defer closeClient(t, c)
+	if !c.AuthWaitingSince().IsZero() {
+		t.Fatal("AuthWaitingSince set before any failure")
+	}
+	start := time.Now()
+	done := make(chan []Result, 1)
+	go func() { done <- c.Deliver(context.Background(), []Item{item("a", PriorityHigh)}) }()
+	waitUntil(t, "auth wait visible", func() bool { return !c.AuthWaitingSince().IsZero() })
+	if since := c.AuthWaitingSince(); since.Before(start.Add(-time.Second)) || since.After(time.Now()) {
+		t.Fatalf("AuthWaitingSince = %v, not around %v", since, start)
+	}
+	waitUntil(t, "two warnings", func() bool {
+		return strings.Count(logs.String(), "Deliver is still waiting on the hub's auth failure") >= 2
+	})
+	if !strings.Contains(logs.String(), "status_code") {
+		t.Fatalf("warning does not name the status: %s", logs.String())
+	}
+	if err := os.WriteFile(tokenFile, []byte("issued\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-done:
+		if got[0].Disposition != DispositionSent {
+			t.Fatalf("%+v", got[0])
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Deliver did not finish after the credential appeared")
+	}
+	if !c.AuthWaitingSince().IsZero() {
+		t.Fatal("AuthWaitingSince still set after Deliver finished")
+	}
+}
+
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timeout waiting for %s", what)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}

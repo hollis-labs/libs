@@ -87,6 +87,11 @@ type Config struct {
 	// immediately instead. Any other 403, app_mismatch included, is final.
 	RetryAuthMax time.Duration
 	StrictAuth   bool
+	// AuthWarnInterval is how often Deliver, which waits out auth failures for
+	// as long as its context lives, logs a WARN naming the status while it is
+	// still waiting (default 5 minutes), so a permanently wrong scope cannot sit
+	// silent. [Client.AuthWaitingSince] says since when.
+	AuthWarnInterval time.Duration
 
 	// SpoolDir, when set, enables the disk spool, the quarantine file and the
 	// loss record: items that do not fit in memory, and anything unsent at
@@ -152,7 +157,9 @@ type Client struct {
 	quar   *quarantine
 	loss   *lossBook
 	closed bool
-	errs   []error // reported by emit, outside the lock
+
+	authWaiting atomic.Int64 // unix nanos when Deliver's auth failures began, 0 when none
+	errs        []error      // reported by emit, outside the lock
 
 	deliverWG sync.WaitGroup // running Deliver calls; Close waits for them
 
@@ -199,6 +206,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.RetryAuthMax == 0 {
 		cfg.RetryAuthMax = 10 * time.Minute
+	}
+	if cfg.AuthWarnInterval <= 0 {
+		cfg.AuthWarnInterval = 5 * time.Minute
 	}
 	if cfg.QuarantineMaxBytes <= 0 {
 		cfg.QuarantineMaxBytes = 8 << 20
@@ -489,6 +499,17 @@ func (c *Client) Deliver(ctx context.Context, items []Item) []Result {
 		i += n
 	}
 	return out
+}
+
+// AuthWaitingSince is when the hub's current run of 401 / 403 scope_required
+// answers to [Client.Deliver] began, or the zero time when Deliver is not
+// waiting on auth. Deliver waits as long as its context lives, so this is how a
+// permanently wrong scope is noticed.
+func (c *Client) AuthWaitingSince() time.Time {
+	if n := c.authWaiting.Load(); n != 0 {
+		return time.Unix(0, n)
+	}
+	return time.Time{}
 }
 
 // Stats returns the counters.
@@ -785,6 +806,10 @@ func (c *Client) deliverCtx(ctx context.Context, backoff *time.Duration, outcome
 	window := len(pending)
 	unresolved := 0
 	var authSince time.Time // when the current run of auth failures began
+	var authWarned time.Time
+	if outcomes != nil {
+		defer c.authWaiting.Store(0) // Deliver is done waiting, whatever the outcome
+	}
 
 	finishItems := func(idx []int) {
 		for _, i := range idx {
@@ -827,7 +852,10 @@ func (c *Client) deliverCtx(ctx context.Context, backoff *time.Duration, outcome
 		res := c.post(ctx, items)
 		wait := res.wait
 		if res.out != outcomeAuth {
-			authSince = time.Time{}
+			authSince, authWarned = time.Time{}, time.Time{}
+			if outcomes != nil {
+				c.authWaiting.Store(0)
+			}
 		}
 
 		switch res.out {
@@ -841,6 +869,13 @@ func (c *Client) deliverCtx(ctx context.Context, backoff *time.Duration, outcome
 		case outcomeAuth:
 			if authSince.IsZero() {
 				authSince = time.Now()
+			}
+			if outcomes != nil {
+				c.authWaiting.CompareAndSwap(0, authSince.UnixNano())
+				if authWarned.IsZero() || time.Since(authWarned) >= c.cfg.AuthWarnInterval {
+					authWarned = time.Now()
+					c.log.Warn("eventbus: Deliver is still waiting on the hub's auth failure; check the credential and its scope", "status_code", res.code, "since", authSince.UTC().Format(time.RFC3339), "waiting", time.Since(authSince).Round(time.Second).String())
+				}
 			}
 			// The ceiling protects the queue's bounded memory. A caller of Deliver
 			// keeps its own durable record, so waiting loses nothing and must not

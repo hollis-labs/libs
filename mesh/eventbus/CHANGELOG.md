@@ -24,6 +24,10 @@
   reports an error rather than let a relay skip an event it has no copy of. A
   closed client, or one closed between chunks, sends nothing more. The relay moves
   its cursor only over `Sent` and `Quarantined`; any other disposition stops it.
+  While `Deliver` waits on an auth failure, `Client.AuthWaitingSince()` (and
+  `relay.Stats.AuthWaitingSince`) say since when, and a WARN naming the status is
+  logged every `Config.AuthWarnInterval` (default 5 minutes), so a permanently
+  wrong scope cannot sit silent.
 - Package `relay`: ships an app's local outbox to the hub. The app supplies a
   `Source` (entries after a sequence number, in order; optionally `Head` for lag)
   and a `Cursor` (the last settled sequence number; `FileCursor` is one). The

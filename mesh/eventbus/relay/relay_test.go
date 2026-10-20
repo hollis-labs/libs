@@ -793,3 +793,24 @@ func TestUnknownDispositionDoesNotAdvanceTheCursor(t *testing.T) {
 		t.Fatalf("cursor = %d, want 1 (the unknown disposition must hold it)", got)
 	}
 }
+
+// authDeliverer is a Deliverer that reports it is waiting on auth.
+type authDeliverer struct {
+	scripted
+	since time.Time
+}
+
+func (a *authDeliverer) AuthWaitingSince() time.Time { return a.since }
+
+func TestStatsCarryAuthWaitingSince(t *testing.T) {
+	since := time.Now().Add(-time.Minute).Truncate(time.Second)
+	d := &authDeliverer{scripted: scripted{reply: allSent}, since: since}
+	r := newRelay(t, Config{Source: &outbox{}, Cursor: &memCursor{}, Deliverer: d})
+	if got := r.Stats().AuthWaitingSince; !got.Equal(since) {
+		t.Fatalf("AuthWaitingSince = %v, want %v", got, since)
+	}
+	plain := newRelay(t, Config{Source: &outbox{}, Cursor: &memCursor{}, Deliverer: &scripted{reply: allSent}})
+	if !plain.Stats().AuthWaitingSince.IsZero() {
+		t.Fatal("a Deliverer that cannot say must give the zero time")
+	}
+}

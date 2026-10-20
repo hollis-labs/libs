@@ -110,6 +110,16 @@ type Stats struct {
 	Sent, Duplicates, Rejected, Quarantined uint64
 	Batches                                 uint64
 	Errors                                  uint64
+	// AuthWaitingSince is when the hub's current run of auth failures began,
+	// zero when there is none. Only a Deliverer that implements AuthWaiter (the
+	// eventbus Client does) can say.
+	AuthWaitingSince time.Time
+}
+
+// AuthWaiter is implemented by a Deliverer that can say how long it has been
+// waiting on the hub's auth failures.
+type AuthWaiter interface {
+	AuthWaitingSince() time.Time
 }
 
 // Relay moves outbox entries to the hub.
@@ -173,6 +183,9 @@ func (r *Relay) Stats() Stats {
 	}
 	if st.Head > st.Cursor {
 		st.Lag = st.Head - st.Cursor
+	}
+	if w, ok := r.cfg.Deliverer.(AuthWaiter); ok {
+		st.AuthWaitingSince = w.AuthWaitingSince()
 	}
 	return st
 }
