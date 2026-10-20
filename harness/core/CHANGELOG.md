@@ -11,12 +11,25 @@ All notable changes to the `harness` module are documented here (the module was 
 ### Added
 
 - `adapters/eventbussink` (CW-20261020-0021): a `runtimeevents.Sink` over the hub
-  client `mesh/eventbus` (v0.1.0). It validates each event, clears the fields the
-  hub owns (cursor, recorded_at, actor), fills `Event.App` (`WithApp`), maps
-  severity and category to the client's drop order (debug, activity, protected),
-  and sends the event as its v1.1 JSON. `GapMarker(app)` builds the `alert.raised`
-  event (rule `eventbus.loss`, coalesce key `eventbus.loss:<app>`) that announces
-  protected events the client had to drop. Requires `mesh/eventbus` v0.1.0.
+  client `mesh/eventbus` (v0.1.0). It fills `Event.App` (`WithApp`), clears the
+  fields the hub owns (cursor, recorded_at, actor), and checks the envelope with
+  `ingest.CheckEnvelope` before publishing, so an event the hub would reject on
+  shape (a non-canonical id, an unsupported schema version, no app, a missing
+  required field) is refused to the producer at the call. An event with
+  `class.visibility` `local` is skipped, not published and not an error. It maps
+  events to the client's drop order: state, approval, audit and alert events are
+  protected whatever their severity or an explicit class says; otherwise debug
+  severity is debug, the activity category is activity, and the rest is
+  protected. `GapMarker(app)` builds the `alert.raised` event (rule
+  `eventbus.loss`, coalesce key `eventbus.loss:<app>`) that announces protected
+  events the client had to drop; it carries a per-process generation and a
+  strictly increasing sequence and is checked the same way. Requires
+  `mesh/eventbus` v0.1.0.
+- `adapters/runtimeevents/ingest.CheckEnvelope`: the shape part of `CheckItem`
+  (decodes, payload size, the ingest event schema, `Event.Validate`, visibility
+  not `local`) without the catalog or the producer allowlist, for a producer that
+  wants to know what the hub would reject on shape. `CheckItem` is unchanged in
+  behaviour.
 
 ## v0.14.1 — 2026-10-20
 

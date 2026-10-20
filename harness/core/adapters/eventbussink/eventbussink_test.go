@@ -18,7 +18,7 @@ func (r *recorder) Close(context.Context) error { return nil }
 func event(kind runtimeevents.EventKind, class *runtimeevents.Class) runtimeevents.Event {
 	now := time.Unix(10, 0).UTC()
 	return runtimeevents.Event{
-		SchemaVersion: runtimeevents.SchemaVersion, ID: "evt_1", Kind: kind, Time: now,
+		SchemaVersion: runtimeevents.SchemaVersion, ID: runtimeevents.NewEventID(), Kind: kind, Time: now,
 		Subject: "msg://resource/cerberus/tether", Sequence: 1, Source: runtimeevents.Source{Channel: "outbox"},
 		Class: class, Cursor: "9", RecordedAt: &now,
 		Actor: &runtimeevents.Actor{URN: "msg://service/x/y"},
@@ -39,7 +39,7 @@ func TestWriteClearsHubFieldsFillsAppAndKeepsID(t *testing.T) {
 	if err := New(r, WithApp("cerberus")).Write(context.Background(), event("resource.state_changed", nil)); err != nil {
 		t.Fatal(err)
 	}
-	if len(r.items) != 1 || r.items[0].ID != "evt_1" {
+	if len(r.items) != 1 || r.items[0].ID == "" {
 		t.Fatalf("items = %+v", r.items)
 	}
 	got := body(t, r.items[0])
@@ -65,15 +65,42 @@ func TestAnEventsOwnAppIsKept(t *testing.T) {
 	}
 }
 
-func TestInvalidEventsAreRefusedToTheProducer(t *testing.T) {
+// Everything the hub rejects on shape is refused to the producer at the call,
+// and nothing is published.
+func TestEnvelopesTheHubWouldRejectAreRefusedToTheProducer(t *testing.T) {
+	withApp := func(p eventbus.Publisher) *Sink { return New(p, WithApp("cerberus")) }
+	cases := map[string]struct {
+		mutate func(*runtimeevents.Event)
+		sink   func(eventbus.Publisher) *Sink
+	}{
+		"missing required field": {func(e *runtimeevents.Event) { e.Source.Channel = "" }, withApp},
+		"non-canonical id":       {func(e *runtimeevents.Event) { e.ID = "evt_1" }, withApp},
+		"unsupported version":    {func(e *runtimeevents.Event) { e.SchemaVersion = "999" }, withApp},
+		"no app and no WithApp":  {func(e *runtimeevents.Event) {}, func(p eventbus.Publisher) *Sink { return New(p) }},
+	}
+	for name, c := range cases {
+		r := &recorder{}
+		ev := event("resource.state_changed", nil)
+		c.mutate(&ev)
+		if err := c.sink(r).Write(context.Background(), ev); err == nil {
+			t.Errorf("%s: the producer must be told", name)
+		}
+		if len(r.items) != 0 {
+			t.Errorf("%s: an event the hub would reject must not be published", name)
+		}
+	}
+}
+
+// Local means it never leaves the process: skipped, not an error, so a producer
+// can write one stream to a local sink and the hub together.
+func TestLocalEventsAreSkippedWithoutError(t *testing.T) {
 	r := &recorder{}
-	ev := event("alert.raised", nil)
-	ev.Source.Channel = ""
-	if err := New(r).Write(context.Background(), ev); err == nil {
-		t.Fatal("an envelope the hub would reject must be reported to the producer")
+	ev := event("resource.state_changed", &runtimeevents.Class{Visibility: "local"})
+	if err := New(r, WithApp("cerberus")).Write(context.Background(), ev); err != nil {
+		t.Fatalf("a local event is not an error: %v", err)
 	}
 	if len(r.items) != 0 {
-		t.Fatal("an invalid event must not be published")
+		t.Fatal("a local event must never be published")
 	}
 }
 
@@ -85,11 +112,18 @@ func TestPriority(t *testing.T) {
 	}{
 		{"state from catalog", event("task.state_changed", nil), eventbus.PriorityHigh},
 		{"activity from catalog", event("process.started", nil), eventbus.PriorityActivity},
-		{"class activity", event("task.state_changed", &runtimeevents.Class{Category: "activity"}), eventbus.PriorityActivity},
-		{"class state beats catalog activity", event("process.started", &runtimeevents.Class{Category: "state"}), eventbus.PriorityHigh},
-		{"debug severity", event("task.state_changed", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityDebug},
+		{"class activity on a non-protected kind", event("tool.call.started", &runtimeevents.Class{Category: "activity"}), eventbus.PriorityActivity},
+		{"debug severity on a non-protected kind", event("process.started", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityDebug},
 		{"unknown kind", event("x.y", nil), eventbus.PriorityHigh},
 		{"alert", event("alert.raised", nil), eventbus.PriorityHigh},
+		// Protected categories win over severity and over an explicit class: a
+		// state change logged at debug is still a state change.
+		{"debug severity does not downgrade state", event("task.state_changed", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityHigh},
+		{"debug severity does not downgrade an alert", event("alert.raised", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityHigh},
+		{"debug severity does not downgrade audit", event("audit.recorded", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityHigh},
+		{"debug severity does not downgrade an approval", event("approval.requested", &runtimeevents.Class{Severity: "debug"}), eventbus.PriorityHigh},
+		{"explicit activity class does not downgrade a catalog state", event("task.state_changed", &runtimeevents.Class{Category: "activity"}), eventbus.PriorityHigh},
+		{"explicit state class protects a catalog activity kind", event("process.started", &runtimeevents.Class{Category: "state"}), eventbus.PriorityHigh},
 	}
 	for _, c := range cases {
 		if got := priority(c.ev); got != c.want {
@@ -135,5 +169,42 @@ func TestGapMarkerIsAValidAlertEvent(t *testing.T) {
 	}
 	if p.RuleID != "eventbus.loss" || p.Sources == nil || len(p.Sources) != 0 || p.CoalesceBy != "eventbus.loss:cerberus" || p.Summary == "" {
 		t.Fatalf("payload = %+v", p)
+	}
+}
+
+// The marker is identified within its producer as the contract asks: the
+// sequence only goes up inside a generation, and both are stable per process.
+func TestGapMarkerSequenceIsStrictlyMonotonicWithinAGeneration(t *testing.T) {
+	first := time.Date(2026, 10, 20, 1, 0, 0, 0, time.UTC)
+	mk := GapMarker("cerberus")
+	var prevSeq, gen uint64
+	for i := 0; i < 50; i++ {
+		// A wall clock that goes backwards must not matter.
+		last := first.Add(time.Duration(50-i) * time.Minute)
+		it, err := mk(eventbus.Loss{Class: "protected", First: first, Last: last, Count: uint64(i + 1)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ev runtimeevents.Event
+		if err := json.Unmarshal(it.Body, &ev); err != nil {
+			t.Fatal(err)
+		}
+		if i > 0 && ev.Sequence <= prevSeq {
+			t.Fatalf("sequence went %d then %d", prevSeq, ev.Sequence)
+		}
+		if i > 0 && ev.Generation != gen {
+			t.Fatalf("generation changed within a process: %d then %d", gen, ev.Generation)
+		}
+		prevSeq, gen = ev.Sequence, ev.Generation
+	}
+	if gen == 0 {
+		t.Fatal("the marker must carry a generation")
+	}
+}
+
+func TestGapMarkerRefusesAnEmptyApp(t *testing.T) {
+	_, err := GapMarker("")(eventbus.Loss{Class: "protected", First: time.Now(), Last: time.Now(), Count: 1})
+	if err == nil {
+		t.Fatal("a marker the hub would reject (no app) must be an error, not an item")
 	}
 }

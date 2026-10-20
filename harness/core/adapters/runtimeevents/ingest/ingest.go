@@ -212,18 +212,13 @@ type Options struct {
 	AllowUnknownKinds bool
 }
 
-// CheckItem applies the per-event rules for a producer registered as app, in
-// this order: JSON decodes as an Event; payload size; the event matches
-// [EventSchema] (the generic envelope plus a canonical id and a required app);
-// [runtimeevents.Event.Validate]; visibility is not "local"; the kind is in the
-// catalog; the app may publish the kind. The payload is only required to be
-// JSON: per-kind payload schemas are not validated here. It returns the decoded event, or a Rejection. It does not check
-// that Event.App equals app: that is a whole-request 403 decided by the hub
-// from the credential.
-//
-// With Options.AllowUnknownKinds an unknown kind skips the last two checks,
-// because there is no catalog entry to assign an owner.
-func CheckItem(app string, raw json.RawMessage, opt Options) (runtimeevents.Event, *Rejection) {
+// CheckEnvelope applies the part of [CheckItem] that is about the shape of the
+// envelope, without the catalog and without deciding who may publish what: JSON
+// decodes as an Event; payload size; the event matches [EventSchema] (the generic
+// envelope plus a canonical id and a required app); [runtimeevents.Event.Validate];
+// visibility is not "local". A producer can run it before sending to learn what
+// the hub would reject on shape, whatever the hub's allowlist says.
+func CheckEnvelope(raw json.RawMessage) (runtimeevents.Event, *Rejection) {
 	var ev runtimeevents.Event
 	if err := json.Unmarshal(raw, &ev); err != nil {
 		return ev, &Rejection{CodeSchemaInvalid, "event is not a valid JSON envelope"}
@@ -247,6 +242,25 @@ func CheckItem(app string, raw json.RawMessage, opt Options) (runtimeevents.Even
 	}
 	if ev.Class != nil && ev.Class.Visibility == "local" {
 		return ev, &Rejection{CodeSchemaInvalid, `class.visibility "local" is not accepted at ingest`}
+	}
+	return ev, nil
+}
+
+// CheckItem applies the per-event rules for a producer registered as app, in
+// this order: [CheckEnvelope] (JSON decodes as an Event; payload size; the event
+// matches [EventSchema], the generic envelope plus a canonical id and a required
+// app; [runtimeevents.Event.Validate]; visibility is not "local"); the kind is in
+// the catalog; the app may publish the kind. The payload is only required to be
+// JSON: per-kind payload schemas are not validated here. It returns the decoded
+// event, or a Rejection. It does not check that Event.App equals app: that is a
+// whole-request 403 decided by the hub from the credential.
+//
+// With Options.AllowUnknownKinds an unknown kind skips the last two checks,
+// because there is no catalog entry to assign an owner.
+func CheckItem(app string, raw json.RawMessage, opt Options) (runtimeevents.Event, *Rejection) {
+	ev, rej := CheckEnvelope(raw)
+	if rej != nil {
+		return ev, rej
 	}
 	if _, ok := catalog.Lookup(string(ev.Kind)); !ok {
 		if opt.AllowUnknownKinds {
