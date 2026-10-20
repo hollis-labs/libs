@@ -6,6 +6,8 @@ github.com/hollis-labs/libs/llm/core v0.2.0 h1:jYjfC4gsLbxsUG5mQ4ougbmUB0b9rQpqb
 github.com/hollis-labs/libs/llm/core v0.2.0/go.mod h1:Hl8R2j3sR/mxfX8S/XBSxqcm7VM+RSVzH924gYXTyGw=
 github.com/hollis-labs/libs/mesh/core v0.6.0 h1:WQwxbGozmC+elJK96iNw275yNEKT+uC93qT+zoupzJI=
 github.com/hollis-labs/libs/mesh/core v0.6.0/go.mod h1:K1a1oeFXakkaJDyKogI/I2j+2lpKklTZgdtzSw45Bss=
+github.com/hollis-labs/libs/mesh/eventbus v0.1.0 h1:wUNUTHEAgWI+x9LePNnzV9vvxOSdaMHy55vdYtZbTAA=
+github.com/hollis-labs/libs/mesh/eventbus v0.1.0/go.mod h1:KKQBH8hpxgkuoMlowUnqn809z3BDMQqkLHteAIcpkZU=
 github.com/hollis-labs/libs/security/policy v0.1.0 h1:XsksYYhpJ315wlr9QmWwxUKRfyDAJSSRiekBh7jpI70=
 github.com/hollis-labs/libs/security/policy v0.1.0/go.mod h1:vFJQekM6tI5OV+2rqK+mx/imNUSSJ26PkvAvgMmdQBo=
 github.com/hollis-labs/libs/security/redact v0.1.0 h1:Tz6KMduh5cUJyWTsiEpWMOPErjGcW0FRDxNuyqqTEd8=

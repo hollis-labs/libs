@@ -15,3 +15,5 @@ require (
 )
 
 require github.com/hollis-labs/libs/security/redact v0.1.0
+
+require github.com/hollis-labs/libs/mesh/eventbus v0.1.0
