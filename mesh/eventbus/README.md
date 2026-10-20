@@ -16,6 +16,12 @@ behaves as it did before. The bearer token is read from the file named by
 `HOLLIS_AUTH_TOKEN_FILE_<APP>` on every request, so rotating it needs no restart.
 `HOLLIS_EVENTS_SPOOL_DIR` enables the disk spool.
 
+With no token file, no Authorization header is sent (a local relay that holds the
+credential needs none). Events the hub rejects, or refuses for good, are set aside
+in `quarantine.jsonl` in the spool directory and reported, never counted as sent;
+if the queue or spool is full, debug goes first, then activity, and protected
+events only as the last resort, recorded and announced (see `Config.GapMarker`).
+
 See the package documentation for the delivery guarantees and for what this
 client deliberately does not do (it is not a durable outbox). It has no
 dependencies and imports nothing from the harness group; turning a

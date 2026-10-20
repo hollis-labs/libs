@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,14 +18,18 @@ import (
 	"time"
 )
 
-// Priority decides which items a full queue or spool gives up first.
+// Priority decides what a full queue or spool gives up first: debug, then
+// activity, and protected items only as the last resort.
 type Priority uint8
 
 const (
-	// PriorityLow is for activity and debug events: dropped first.
-	PriorityLow Priority = iota
-	// PriorityHigh is for state, approval, audit and alert events: dropped
-	// only when nothing else is left.
+	// PriorityDebug is for debug events: dropped first.
+	PriorityDebug Priority = iota
+	// PriorityActivity is for activity events: dropped after debug.
+	PriorityActivity
+	// PriorityHigh is for state, approval, audit and alert events. They are
+	// protected: lost only when nothing else can go, and then recorded (see
+	// [Loss]).
 	PriorityHigh
 )
 
@@ -50,7 +55,9 @@ type Config struct {
 	// "/events" is added, or the full ingest endpoint ending in "/events".
 	URL string
 	// Token is sent as a bearer token. TokenFile, when set, is re-read on
-	// every request (so rotation needs no restart) and wins over Token.
+	// every request (so rotation needs no restart) and wins over Token. With
+	// neither, no Authorization header is sent at all (a local relay that holds
+	// the credential needs none).
 	Token     string
 	TokenFile string
 	// Client overrides the HTTP client.
@@ -64,54 +71,80 @@ type Config struct {
 	BackoffBase   time.Duration // first retry delay, doubling; default 500ms
 	BackoffMax    time.Duration // default 30s
 
-	// MaxUnresolved, when positive, is how many times the hub may answer 200
-	// without a valid verdict for the same events (missing, unknown status,
-	// unreadable body) before those events are dropped as "unresolved". The
-	// default, 0, never drops them: they are retried with backoff for as long
-	// as the client runs, and the queue and spool caps bound the memory and
-	// disk used meanwhile.
+	// MaxUnresolved is how many times the hub may answer 200 without a valid
+	// verdict for the same events (missing, unknown status, unreadable body)
+	// before those events are quarantined, so one bad event cannot hold up
+	// the queue behind it. Default 8; negative means retry for as long as the
+	// client runs.
 	MaxUnresolved int
 
-	// SpoolDir, when set, enables the disk spool: items that do not fit in
-	// memory, and anything unsent at Close, are kept there and resumed by the
-	// next Client on the same directory. SpoolMaxBytes bounds the unsettled
-	// bytes in it (default 64 MiB); the file on disk stays within about 1.34
-	// times that.
-	SpoolDir      string
-	SpoolMaxBytes int64
+	// RetryAuth makes a 401 or 403 a transient failure (kept and retried), for
+	// setups where the credential may be rotated or granted later. By default
+	// they are final for the batch: it is quarantined and reported.
+	RetryAuth bool
+
+	// SpoolDir, when set, enables the disk spool, the quarantine file and the
+	// loss record: items that do not fit in memory, and anything unsent at
+	// Close, are kept there and resumed by the next Client on the same
+	// directory. SpoolMaxBytes bounds the unsettled bytes in the spool (default
+	// 64 MiB; the file stays within about 1.34 times that). QuarantineMaxBytes
+	// bounds quarantine.jsonl (default 8 MiB, oldest records go first).
+	SpoolDir           string
+	SpoolMaxBytes      int64
+	QuarantineMaxBytes int64
+
+	// GapMarker, when set, builds the event that announces a persisted [Loss]
+	// to the hub. The client calls it, and publishes what it returns, the next
+	// time the hub accepts events, then clears the record. This package does
+	// not know the envelope, so the caller (the harness adapter) builds it.
+	GapMarker func(Loss) (Item, error)
+
+	// Logger receives warnings (protected-item loss, quarantine). Default
+	// slog.Default().
+	Logger *slog.Logger
 
 	// OnDrop is called when items are lost: reason is "queue_full",
-	// "spool_full", "high_priority_dropped" (a state, approval, audit or alert
-	// item lost to a full queue or spool, the last resort), "closed",
-	// "invalid", "unresolved", "rejected" or "spool_error". OnReject is called for each item the hub rejected (not
-	// retried). OnError reports transport and auth failures that are being
-	// retried. None is called with an internal lock held; all must not block.
-	OnDrop   func(n int, reason string)
-	OnReject func(id, code, message string)
-	OnError  func(err error)
+	// "spool_full", "high_priority_dropped" (a protected item lost to a full
+	// queue or spool, the last resort), "closed", "invalid" or "spool_error".
+	// OnReject is called for each item the hub rejected. OnQuarantine is called
+	// for each item moved to quarantine; reason is "rejected", "bad_request",
+	// "auth", "payload_too_large", "app_mismatch", "unresolved" or "http_<code>".
+	// OnError reports transport and auth failures and quarantines. None is
+	// called with an internal lock held; all must not block.
+	OnDrop       func(n int, reason string)
+	OnReject     func(id, code, message string)
+	OnQuarantine func(it Item, reason, code string)
+	OnError      func(err error)
 }
 
 // Stats is a snapshot of the counters.
 type Stats struct {
 	Sent       uint64 // accepted or duplicate
 	Duplicates uint64
-	Rejected   uint64
-	Dropped    uint64
-	// DroppedHigh counts the high-priority items among Dropped.
-	DroppedHigh uint64
-	Retries     uint64
-	Queued      int
-	SpoolBytes  int64 // unsettled bytes on disk
+	Rejected   uint64 // rejected by the hub (also quarantined)
+	// Quarantined counts events set aside undelivered; none was sent.
+	Quarantined uint64
+	Dropped     uint64 // lost to a full queue or spool, or discarded
+	// DroppedHigh counts the protected (high-priority) items among Dropped.
+	DroppedHigh     uint64
+	Retries         uint64
+	Queued          int
+	SpoolBytes      int64 // unsettled bytes on disk
+	QuarantineBytes int64
+	Losses          []Loss // persisted protected-loss records not yet announced
 }
 
 // Client posts items to a hub. Create one with [New] or [FromEnv].
 type Client struct {
 	cfg  Config
 	http *http.Client
+	log  *slog.Logger
 
 	mu     sync.Mutex
 	mem    []queued
 	spool  *spool
+	quar   *quarantine
+	loss   *lossBook
 	closed bool
 
 	wake chan struct{}
@@ -121,7 +154,7 @@ type Client struct {
 	carry   []queued // owned by the sender goroutine
 	backoff time.Duration
 
-	sent, dups, rejected, dropped, droppedHigh, retries atomic.Uint64
+	sent, dups, rejected, quarantined, dropped, droppedHigh, retries atomic.Uint64
 }
 
 var _ Publisher = (*Client)(nil)
@@ -152,10 +185,17 @@ func New(cfg Config) (*Client, error) {
 	if cfg.BackoffMax <= 0 {
 		cfg.BackoffMax = 30 * time.Second
 	}
+	if cfg.MaxUnresolved == 0 {
+		cfg.MaxUnresolved = 8
+	}
+	if cfg.QuarantineMaxBytes <= 0 {
+		cfg.QuarantineMaxBytes = 8 << 20
+	}
 	cfg.URL = ingestURL(cfg.URL)
 	c := &Client{
 		cfg:     cfg,
 		http:    cfg.Client,
+		log:     cfg.Logger,
 		wake:    make(chan struct{}, 1),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
@@ -164,6 +204,11 @@ func New(cfg Config) (*Client, error) {
 	if c.http == nil {
 		c.http = &http.Client{Timeout: cfg.Timeout}
 	}
+	if c.log == nil {
+		c.log = slog.Default()
+	}
+	c.quar = openQuarantine(cfg.SpoolDir, cfg.QuarantineMaxBytes)
+	c.loss = openLossBook(cfg.SpoolDir)
 	if cfg.SpoolDir != "" {
 		max := cfg.SpoolMaxBytes
 		if max <= 0 {
@@ -176,7 +221,7 @@ func New(cfg Config) (*Client, error) {
 		c.spool = sp
 	}
 	go c.run()
-	if c.spool != nil && c.spool.unread() > 0 {
+	if (c.spool != nil && c.spool.unread() > 0) || len(c.loss.recs) > 0 {
 		c.nudge()
 	}
 	return c, nil
@@ -204,7 +249,7 @@ type dropNote struct {
 	reason string
 }
 
-// emit calls OnDrop for each note. Call it without holding c.mu.
+// emit counts the notes and calls OnDrop for each. Call it without holding c.mu.
 func (c *Client) emit(notes []dropNote) {
 	for _, d := range notes {
 		if d.n <= 0 {
@@ -213,6 +258,7 @@ func (c *Client) emit(notes []dropNote) {
 		c.dropped.Add(uint64(d.n))
 		if d.reason == "high_priority_dropped" {
 			c.droppedHigh.Add(uint64(d.n))
+			c.log.Warn("eventbus: protected events dropped: the queue or spool is full and nothing less important was left", "count", d.n)
 		}
 		if c.cfg.OnDrop != nil {
 			c.cfg.OnDrop(d.n, d.reason)
@@ -221,6 +267,27 @@ func (c *Client) emit(notes []dropNote) {
 }
 
 func (c *Client) drop(n int, reason string) { c.emit([]dropNote{{n, reason}}) }
+
+// recordLoss adds n protected items to the persisted loss record. Caller holds
+// c.mu.
+func (c *Client) recordLoss(n int) {
+	if n <= 0 {
+		return
+	}
+	if err := c.loss.add(lossClass, n, time.Now().UTC()); err != nil {
+		c.report(fmt.Errorf("eventbus: save loss record: %w", err))
+	}
+}
+
+// lossNotes turns spool loss counts into notes and records the protected ones.
+// Caller holds c.mu.
+func (c *Client) lossNotes(l lossCounts) []dropNote {
+	c.recordLoss(l[PriorityHigh])
+	return []dropNote{
+		{l[PriorityDebug] + l[PriorityActivity], "spool_full"},
+		{l[PriorityHigh], "high_priority_dropped"},
+	}
+}
 
 // Publish queues an item. Do not modify it.Body afterwards.
 func (c *Client) Publish(it Item) {
@@ -236,14 +303,14 @@ func (c *Client) Publish(it Item) {
 	case c.spool != nil && (c.spool.unread() > 0 || len(c.mem) >= c.cfg.QueueSize):
 		// Everything after unsettled spool records goes behind them, so the
 		// order of delivery is the order of Publish.
-		n, high, err := c.spool.append(it)
+		lost, err := c.spool.append(it)
 		if err != nil {
 			notes = append(notes, dropNote{1, "spool_error"})
 		} else {
-			notes = append(notes, dropNote{n - high, "spool_full"}, dropNote{high, "high_priority_dropped"})
+			notes = append(notes, c.lossNotes(lost)...)
 		}
 	case len(c.mem) >= c.cfg.QueueSize:
-		notes = append(notes, c.makeRoom(it)...)
+		notes = c.makeRoom(it)
 	default:
 		c.mem = append(c.mem, queued{Item: it})
 	}
@@ -255,35 +322,41 @@ func (c *Client) Publish(it Item) {
 	}
 }
 
-// makeRoom handles a full memory queue (no spool) for the incoming item:
-// evict the oldest low-priority item and keep the incoming one; if everything
-// held is high priority, a low-priority incoming item is the one dropped, and a
-// high-priority one replaces the oldest. Caller holds c.mu.
+// makeRoom handles a full memory queue (no spool) for the incoming item. The
+// oldest item of the least important class held goes; if the incoming item is
+// less important than everything held, it is the one refused; a protected
+// incoming item replaces the oldest protected one only when nothing else is
+// left, and that loss is recorded. Caller holds c.mu.
 func (c *Client) makeRoom(in Item) []dropNote {
+	idx, lowest := -1, PriorityHigh+1
 	for i, q := range c.mem {
-		if q.Priority == PriorityLow {
-			c.mem = append(c.mem[:i], c.mem[i+1:]...)
-			c.mem = append(c.mem, queued{Item: in})
-			return []dropNote{{1, "queue_full"}}
+		if q.Priority < lowest {
+			idx, lowest = i, q.Priority
 		}
 	}
-	if in.Priority == PriorityLow {
+	if in.Priority < lowest {
 		return []dropNote{{1, "queue_full"}}
 	}
-	c.mem = append(c.mem[1:], queued{Item: in})
-	return []dropNote{{1, "high_priority_dropped"}}
+	c.mem = append(c.mem[:idx], c.mem[idx+1:]...)
+	c.mem = append(c.mem, queued{Item: in})
+	if lowest == PriorityHigh {
+		c.recordLoss(1)
+		return []dropNote{{1, "high_priority_dropped"}}
+	}
+	return []dropNote{{1, "queue_full"}}
 }
 
 // Stats returns the counters.
 func (c *Client) Stats() Stats {
 	c.mu.Lock()
-	q := len(c.mem)
-	var sb int64
+	st := Stats{Queued: len(c.mem), Losses: c.loss.list(), QuarantineBytes: c.quar.size}
 	if c.spool != nil {
-		sb = c.spool.unread()
+		st.SpoolBytes = c.spool.unread()
 	}
 	c.mu.Unlock()
-	return Stats{Sent: c.sent.Load(), Duplicates: c.dups.Load(), Rejected: c.rejected.Load(), Dropped: c.dropped.Load(), DroppedHigh: c.droppedHigh.Load(), Retries: c.retries.Load(), Queued: q, SpoolBytes: sb}
+	st.Sent, st.Duplicates, st.Rejected = c.sent.Load(), c.dups.Load(), c.rejected.Load()
+	st.Quarantined, st.Dropped, st.DroppedHigh, st.Retries = c.quarantined.Load(), c.dropped.Load(), c.droppedHigh.Load(), c.retries.Load()
+	return st
 }
 
 // Close makes one last delivery attempt, then keeps whatever is unsent in the
@@ -373,12 +446,40 @@ func (c *Client) pump(closing bool) {
 			batch = c.nextBatch()
 		}
 		if len(batch) == 0 {
+			if !closing {
+				c.announceLoss()
+			}
 			return
 		}
 		rest, ok := c.deliver(batch, closing)
 		if !ok {
 			c.carry = rest
 			return
+		}
+	}
+}
+
+// announceLoss publishes a gap marker for each persisted loss record, once the
+// hub has accepted events and the queue is empty, and clears the record.
+func (c *Client) announceLoss() {
+	if c.cfg.GapMarker == nil || c.sent.Load() == 0 {
+		return
+	}
+	c.mu.Lock()
+	recs := c.loss.list()
+	c.mu.Unlock()
+	for _, rec := range recs {
+		it, err := c.cfg.GapMarker(rec)
+		if err != nil {
+			c.report(fmt.Errorf("eventbus: build gap marker: %w", err))
+			continue
+		}
+		c.Publish(it)
+		c.mu.Lock()
+		err = c.loss.clear(rec.Class)
+		c.mu.Unlock()
+		if err != nil {
+			c.report(fmt.Errorf("eventbus: clear loss record: %w", err))
 		}
 	}
 }
@@ -418,21 +519,55 @@ func (c *Client) ackBatch(batch []queued, settled []bool) {
 	}
 }
 
+// quarantineItems sets items aside undelivered. They are never counted as sent.
+func (c *Client) quarantineItems(items []Item, reason, code, message string) {
+	now := time.Now().UTC()
+	c.mu.Lock()
+	var errs []error
+	for _, it := range items {
+		if err := c.quar.add(quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: it.Body}); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	c.mu.Unlock()
+	c.quarantined.Add(uint64(len(items)))
+	for _, err := range errs {
+		c.report(fmt.Errorf("eventbus: write quarantine: %w", err))
+	}
+	for _, it := range items {
+		if c.cfg.OnQuarantine != nil {
+			c.cfg.OnQuarantine(it, reason, code)
+		}
+	}
+	c.log.Warn("eventbus: events quarantined undelivered", "count", len(items), "reason", reason, "code", code)
+	c.report(fmt.Errorf("eventbus: %d event(s) quarantined (reason %s %s); none was sent", len(items), reason, code))
+}
+
 type outcome int
 
 const (
 	outcomeOK outcome = iota
 	outcomeRetry
 	outcomeTooLarge
-	outcomeReject
+	outcomeFinal // the request failed for good: quarantine its events
 )
 
 type itemResult struct {
-	ID      string `json:"id"`
-	Status  string `json:"status"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Cursor  string `json:"cursor"`
+	ID            string
+	Status        string
+	Code          string
+	Message       string
+	Cursor        string // the cursor, if it was a non-empty JSON string
+	CursorPresent bool   // some cursor was sent, of any type
+}
+
+// postResult is what one request came to.
+type postResult struct {
+	out     outcome
+	wait    time.Duration
+	reason  string // for outcomeFinal
+	code    string
+	results []*itemResult // for outcomeOK, one per sent item, nil when no valid verdict
 }
 
 // deliver sends batch until every item has a verdict. It returns false with
@@ -459,6 +594,13 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		pending = rest
 		c.ackBatch(batch, settled)
 	}
+	itemsOf := func(idx []int) []Item {
+		out := make([]Item, len(idx))
+		for k, i := range idx {
+			out[k] = batch[i].Item
+		}
+		return out
+	}
 	unsettled := func() []queued {
 		out := make([]queued, 0, len(pending))
 		for _, i := range pending {
@@ -473,24 +615,18 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			w = len(pending)
 		}
 		send := append([]int(nil), pending[:w]...)
-		items := make([]Item, w)
-		for k, i := range send {
-			items[k] = batch[i].Item
-		}
-		out, wait, results := c.post(items)
+		items := itemsOf(send)
+		res := c.post(items)
+		wait := res.wait
 
-		switch out {
-		case outcomeReject:
-			c.rejected.Add(uint64(len(send)))
-			c.drop(len(send), "rejected")
+		switch res.out {
+		case outcomeFinal:
+			c.quarantineItems(items, res.reason, res.code, "")
 			finishItems(send)
 			continue
 		case outcomeTooLarge:
 			if w == 1 {
-				c.rejected.Add(1)
-				if c.cfg.OnReject != nil {
-					c.cfg.OnReject(items[0].ID, "payload_too_large", "hub refused the request size")
-				}
+				c.quarantineItems(items, "payload_too_large", "", "hub refused the request size")
 				finishItems(send)
 				continue
 			}
@@ -499,7 +635,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		case outcomeOK:
 			var done, open []int
 			for k, i := range send {
-				r := results[k]
+				r := res.results[k]
 				switch {
 				case r != nil && r.Status == "accepted":
 					c.sent.Add(1)
@@ -513,6 +649,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 					if c.cfg.OnReject != nil {
 						c.cfg.OnReject(items[k].ID, r.Code, r.Message)
 					}
+					c.quarantineItems(items[k:k+1], "rejected", r.Code, r.Message)
 					done = append(done, i)
 				default:
 					open = append(open, i)
@@ -525,11 +662,11 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			}
 			unresolved++
 			if c.cfg.MaxUnresolved > 0 && unresolved > c.cfg.MaxUnresolved {
-				c.drop(len(open), "unresolved")
+				c.quarantineItems(itemsOf(open), "unresolved", "", "no valid verdict from the hub")
 				finishItems(open)
 				continue
 			}
-			c.report(fmt.Errorf("eventbus: hub gave no verdict for %d of %d events", len(open), len(send)))
+			c.report(fmt.Errorf("eventbus: hub gave no valid verdict for %d of %d events", len(open), len(send)))
 			wait = 0
 		}
 
@@ -571,9 +708,8 @@ func (c *Client) report(err error) {
 	}
 }
 
-// post makes one request. For a 200 it returns the per-id verdicts the hub
-// gave (empty if the body could not be read).
-func (c *Client) post(items []Item) (outcome, time.Duration, []*itemResult) {
+// post makes one request.
+func (c *Client) post(items []Item) postResult {
 	var buf bytes.Buffer
 	buf.WriteString(`{"events":[`)
 	for i, it := range items {
@@ -589,7 +725,7 @@ func (c *Client) post(items []Item) (outcome, time.Duration, []*itemResult) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.URL, &buf)
 	if err != nil {
 		c.report(err)
-		return outcomeReject, 0, nil
+		return postResult{out: outcomeFinal, reason: "bad_request"}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if tok := c.token(); tok != "" {
@@ -598,40 +734,46 @@ func (c *Client) post(items []Item) (outcome, time.Duration, []*itemResult) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.report(err)
-		return outcomeRetry, 0, nil
+		return postResult{out: outcomeRetry}
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	st := resp.StatusCode
 
 	switch {
-	case resp.StatusCode == http.StatusOK:
-		return outcomeOK, 0, verdicts(items, body)
-	case resp.StatusCode == http.StatusRequestEntityTooLarge:
-		return outcomeTooLarge, 0, nil
-	case resp.StatusCode == http.StatusForbidden && errorCode(body) == "app_mismatch":
-		// The credential is bound to another app than the events name. No retry
-		// can succeed, and retrying would block everything behind them.
-		c.report(errors.New("eventbus: hub returned 403 app_mismatch: the events' app is not the credential's app; batch dropped"))
-		return outcomeReject, 0, nil
-	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
-		// A rotated or not-yet-issued credential, or a scope not granted yet:
-		// keep the events and retry.
-		c.report(fmt.Errorf("eventbus: hub returned %d", resp.StatusCode))
-		return outcomeRetry, 0, nil
-	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusMethodNotAllowed:
+	case st == http.StatusOK:
+		return postResult{out: outcomeOK, results: verdicts(items, body)}
+	case st == http.StatusRequestEntityTooLarge:
+		return postResult{out: outcomeTooLarge}
+	case st == http.StatusForbidden && errorCode(body) == "app_mismatch":
+		// The credential is bound to another app than the events name: no
+		// retry can succeed.
+		return postResult{out: outcomeFinal, reason: "app_mismatch", code: "app_mismatch"}
+	case st == http.StatusUnauthorized || st == http.StatusForbidden:
+		code := errorCode(body)
+		if code == "" {
+			code = strconv.Itoa(st)
+		}
+		if c.cfg.RetryAuth {
+			c.report(fmt.Errorf("eventbus: hub returned %d (%s); keeping events", st, code))
+			return postResult{out: outcomeRetry}
+		}
+		return postResult{out: outcomeFinal, reason: "auth", code: code}
+	case st == http.StatusNotFound || st == http.StatusMethodNotAllowed:
 		// The hub is not accepting events yet (ingest off, or no events store).
-		c.report(fmt.Errorf("eventbus: hub returned %d: ingest not enabled yet; keeping events", resp.StatusCode))
-		return outcomeRetry, 0, nil
-	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode == http.StatusServiceUnavailable, resp.StatusCode >= 500:
+		c.report(fmt.Errorf("eventbus: hub returned %d: ingest not enabled yet; keeping events", st))
+		return postResult{out: outcomeRetry}
+	case st == http.StatusTooManyRequests || st == http.StatusServiceUnavailable || st >= 500:
 		var ra time.Duration
 		if secs, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && secs > 0 {
 			ra = time.Duration(secs) * time.Second
 		}
-		c.report(fmt.Errorf("eventbus: hub returned %d", resp.StatusCode))
-		return outcomeRetry, ra, nil
+		c.report(fmt.Errorf("eventbus: hub returned %d", st))
+		return postResult{out: outcomeRetry, wait: ra}
+	case st == http.StatusBadRequest:
+		return postResult{out: outcomeFinal, reason: "bad_request", code: errorCode(body)}
 	default:
-		c.report(fmt.Errorf("eventbus: hub returned %d, batch rejected", resp.StatusCode))
-		return outcomeReject, 0, nil
+		return postResult{out: outcomeFinal, reason: "http_" + strconv.Itoa(st), code: errorCode(body)}
 	}
 }
 
@@ -657,13 +799,13 @@ var rejectCodes = map[string]bool{
 // verdicts turns a 200 body into one entry per request item: the item's
 // verdict, or nil when it has none. Per the contract the answer is
 // {"results":[...]} with exactly one result per item, in order, each carrying
-// the item's id. accepted and duplicate need a non-empty cursor and no code;
-// rejected needs one of the reject codes and no cursor. Anything else is no
-// verdict: a body that is not that object (a bare array included), a result
-// for another id, an unknown status, a missing cursor. If the number of results
-// differs from the number of items, results are matched by id instead, and an
-// item whose id occurs more than once in the batch gets no verdict. Cursors are
-// strings in the contract; a number is accepted too.
+// the item's id. accepted and duplicate need a cursor that is a non-empty JSON
+// string and no code; rejected needs one of the reject codes and no cursor at
+// all. Anything else is no verdict: a body that is not that object (a bare
+// array included), a result for another id, an unknown status, a cursor of
+// another type. If the number of results differs from the number of items,
+// results are matched by id instead, and an item whose id occurs more than once
+// in the batch gets no verdict.
 func verdicts(items []Item, body []byte) []*itemResult {
 	out := make([]*itemResult, len(items))
 	var wrapped struct {
@@ -680,18 +822,23 @@ func verdicts(items []Item, body []byte) []*itemResult {
 	}
 	list := make([]itemResult, len(wrapped.Results))
 	for i, r := range wrapped.Results {
-		cur := strings.Trim(string(r.Cursor), `"`)
-		if cur == "null" {
-			cur = ""
+		ir := itemResult{ID: r.ID, Status: r.Status, Code: r.Code, Message: r.Message}
+		raw := bytes.TrimSpace(r.Cursor)
+		ir.CursorPresent = len(raw) > 0 && string(raw) != "null"
+		if ir.CursorPresent {
+			var s string
+			if json.Unmarshal(raw, &s) == nil {
+				ir.Cursor = s
+			}
 		}
-		list[i] = itemResult{ID: r.ID, Status: r.Status, Code: r.Code, Message: r.Message, Cursor: cur}
+		list[i] = ir
 	}
 	valid := func(r *itemResult) bool {
 		switch r.Status {
 		case "accepted", "duplicate":
 			return r.Cursor != "" && r.Code == ""
 		case "rejected":
-			return rejectCodes[r.Code] && r.Cursor == ""
+			return rejectCodes[r.Code] && !r.CursorPresent
 		}
 		return false
 	}
@@ -735,7 +882,14 @@ func (c *Client) finish() {
 	switch {
 	case len(left) == 0:
 	case c.spool == nil:
-		notes = append(notes, dropNote{len(left), "closed"})
+		var high int
+		for _, q := range left {
+			if q.Priority == PriorityHigh {
+				high++
+			}
+		}
+		c.recordLoss(high)
+		notes = append(notes, dropNote{len(left) - high, "closed"}, dropNote{high, "high_priority_dropped"})
 	default:
 		// Items that came from the spool are still there; only the ones that
 		// never reached it need writing, in front of the unsettled records.
@@ -746,11 +900,11 @@ func (c *Client) finish() {
 			}
 		}
 		if len(fresh) > 0 {
-			n, high, err := c.spool.prepend(fresh)
+			lost, err := c.spool.prepend(fresh)
 			if err != nil {
 				notes = append(notes, dropNote{len(fresh), "spool_error"})
 			} else {
-				notes = append(notes, dropNote{n - high, "spool_full"}, dropNote{high, "high_priority_dropped"})
+				notes = append(notes, c.lossNotes(lost)...)
 			}
 		}
 	}

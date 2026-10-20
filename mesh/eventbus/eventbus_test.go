@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,14 +22,15 @@ func item(id string, p Priority) Item {
 }
 
 // hub is a test ingest endpoint. By default it accepts every event and says so
-// per id. status can replace the answer for a call.
+// per id, with a cursor. status can replace the answer for a call.
 type hub struct {
-	mu     sync.Mutex
-	ids    []string   // every id received, in order
-	calls  [][]string // ids per request
-	auth   []string
-	n      atomic.Int32
-	status func(call int32, ids []string) (code int, body string, hdr map[string]string)
+	mu      sync.Mutex
+	ids     []string   // every accepted id, in order
+	calls   [][]string // ids per request
+	auth    []string   // Authorization header per accepted request
+	hasAuth []bool
+	n       atomic.Int32
+	status  func(call int32, ids []string) (code int, body string, hdr map[string]string)
 }
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,12 +46,14 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, e := range req.Events {
 		ids = append(ids, e.ID)
 	}
+	_, present := r.Header["Authorization"]
+	h.mu.Lock()
+	h.calls = append(h.calls, ids)
+	h.hasAuth = append(h.hasAuth, present)
+	h.mu.Unlock()
 	if h.status != nil {
 		code, body, hdr := h.status(call, ids)
 		if code != 0 {
-			h.mu.Lock()
-			h.calls = append(h.calls, ids)
-			h.mu.Unlock()
 			for k, v := range hdr {
 				w.Header().Set(k, v)
 			}
@@ -59,7 +63,6 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.mu.Lock()
-	h.calls = append(h.calls, ids)
 	h.auth = append(h.auth, r.Header.Get("Authorization"))
 	h.ids = append(h.ids, ids...)
 	h.mu.Unlock()
@@ -122,11 +125,50 @@ func fast(cfg Config) Config {
 	return cfg
 }
 
+func quiet(cfg Config) Config {
+	cfg.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	return cfg
+}
+
+// memIDs lists the memory queue, oldest first.
+func memIDs(c *Client) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var ids []string
+	for _, q := range c.mem {
+		ids = append(ids, q.ID)
+	}
+	return strings.Join(ids, ",")
+}
+
+// quarantineIDs reads quarantine.jsonl in dir as "id:reason" pairs.
+func quarantineIDs(t *testing.T, dir string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "quarantine.jsonl"))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		var r quarantineRec
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatalf("quarantine line %q: %v", line, err)
+		}
+		out = append(out, r.ID+":"+r.Reason)
+	}
+	return out
+}
+
+// ---- delivery and acknowledgement ----
+
 func TestBatchAndAuth(t *testing.T) {
 	h := &hub{}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, err := New(Config{URL: srv.URL, Token: "tok", FlushInterval: time.Hour})
+	c, err := New(quiet(Config{URL: srv.URL, Token: "tok", FlushInterval: time.Hour}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,36 +182,62 @@ func TestBatchAndAuth(t *testing.T) {
 	if h.authAt(0) != "Bearer tok" {
 		t.Fatalf("auth = %q", h.authAt(0))
 	}
-	if st := c.Stats(); st.Sent != 3 || st.Dropped != 0 {
+	if st := c.Stats(); st.Sent != 3 || st.Dropped != 0 || st.Quarantined != 0 {
 		t.Fatalf("stats = %+v", st)
 	}
 }
 
-func TestPerItemResults(t *testing.T) {
+// A local relay holds the credential: with no token the request carries no
+// Authorization header at all, and that is not an error.
+func TestNoAuthorizationHeaderWithoutAToken(t *testing.T) {
+	h := &hub{}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var errs atomic.Int32
+	c, _ := New(quiet(Config{URL: srv.URL, FlushInterval: time.Hour, OnError: func(error) { errs.Add(1) }}))
+	c.Publish(item("a", PriorityHigh))
+	closeClient(t, c)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.hasAuth) != 1 || h.hasAuth[0] {
+		t.Fatalf("Authorization header present = %v, want absent", h.hasAuth)
+	}
+	if errs.Load() != 0 || len(h.ids) != 1 {
+		t.Fatalf("errors=%d delivered=%v", errs.Load(), h.ids)
+	}
+}
+
+func TestPerItemResultsAndRejectedIsQuarantined(t *testing.T) {
+	dir := t.TempDir()
 	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
 		return 200, `{"results":[{"id":"a","status":"accepted","cursor":"11"},{"id":"b","status":"duplicate","cursor":"7"},{"id":"c","status":"rejected","code":"unknown_kind","message":"nope"}],"accepted":1,"duplicate":1,"rejected":1}`, nil
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 	var mu sync.Mutex
-	var rej []string
-	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour, OnReject: func(id, code, msg string) {
-		mu.Lock()
-		rej = append(rej, id+":"+code)
-		mu.Unlock()
-	}})
+	var rej, quar []string
+	c, _ := New(quiet(Config{URL: srv.URL, FlushInterval: time.Hour, SpoolDir: dir,
+		OnReject: func(id, code, msg string) { mu.Lock(); rej = append(rej, id+":"+code); mu.Unlock() },
+		OnQuarantine: func(it Item, reason, code string) {
+			mu.Lock()
+			quar = append(quar, it.ID+":"+reason+":"+code)
+			mu.Unlock()
+		}}))
 	for _, id := range []string{"a", "b", "c"} {
 		c.Publish(item(id, PriorityHigh))
 	}
 	closeClient(t, c)
 	st := c.Stats()
-	if st.Sent != 2 || st.Duplicates != 1 || st.Rejected != 1 {
+	if st.Sent != 2 || st.Duplicates != 1 || st.Rejected != 1 || st.Quarantined != 1 {
 		t.Fatalf("stats = %+v", st)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(rej) != 1 || rej[0] != "c:unknown_kind" {
-		t.Fatalf("rejected = %v", rej)
+	if len(rej) != 1 || rej[0] != "c:unknown_kind" || len(quar) != 1 || quar[0] != "c:rejected:unknown_kind" {
+		t.Fatalf("rejected=%v quarantined=%v", rej, quar)
+	}
+	if got := quarantineIDs(t, dir); len(got) != 1 || got[0] != "c:rejected" {
+		t.Fatalf("quarantine file = %v", got)
 	}
 	if h.n.Load() != 1 {
 		t.Fatalf("a verdict is final, calls = %d", h.n.Load())
@@ -186,11 +254,11 @@ func TestMalformed200IsRetriedNotCountedSent(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
 	c.Publish(item("a", PriorityHigh))
 	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
 	closeClient(t, c)
-	if st := c.Stats(); st.Retries < 1 || st.Dropped != 0 {
+	if st := c.Stats(); st.Retries < 1 || st.Dropped != 0 || st.Quarantined != 0 {
 		t.Fatalf("stats = %+v", st)
 	}
 }
@@ -205,7 +273,7 @@ func TestOmittedIDsAreRetriedAlone(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL, FlushInterval: time.Hour}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, FlushInterval: time.Hour})))
 	for _, id := range []string{"a", "b", "c"} {
 		c.Publish(item(id, PriorityHigh))
 	}
@@ -216,42 +284,88 @@ func TestOmittedIDsAreRetriedAlone(t *testing.T) {
 	}
 }
 
-func TestNoVerdictIsDroppedAfterMaxUnresolved(t *testing.T) {
-	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 200, `{}`, nil }}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	var reasons sync.Map
-	c, _ := New(fast(Config{URL: srv.URL, MaxUnresolved: 2, OnDrop: func(n int, r string) { reasons.Store(r, n) }}))
-	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "drop", func() bool { return c.Stats().Dropped == 1 })
-	closeClient(t, c)
-	if v, ok := reasons.Load("unresolved"); !ok || v.(int) != 1 {
-		t.Fatalf("drop reasons: %v", v)
-	}
-	if st := c.Stats(); st.Sent != 0 {
-		t.Fatalf("stats = %+v", st)
-	}
-}
-
-func TestRetryTransientThenDeliver(t *testing.T) {
-	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		switch call {
-		case 1:
-			return 503, "", nil
-		case 2:
-			return 429, "", map[string]string{"Retry-After": "0"}
-		case 3:
-			return 401, "", nil
+// An event the hub never gives a valid verdict for is set aside, not dropped as
+// if delivered, and the events behind it still flow.
+func TestUnresolvedExhaustionIsQuarantinedAndDoesNotBlock(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		for _, id := range ids {
+			if id == "stuck" {
+				// every answer that mentions "stuck" gives it no verdict
+				var parts []string
+				for _, o := range ids {
+					if o != "stuck" {
+						parts = append(parts, fmt.Sprintf(`{"id":%q,"status":"accepted","cursor":"1"}`, o))
+					}
+				}
+				return 200, `{"results":[` + strings.Join(parts, ",") + `]}`, nil
+			}
 		}
 		return 0, "", nil
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
+	var reasons sync.Map
+	c, _ := New(quiet(fast(Config{URL: srv.URL, MaxUnresolved: 2, SpoolDir: dir, BatchSize: 1,
+		OnQuarantine: func(it Item, reason, code string) { reasons.Store(it.ID, reason) }})))
+	c.Publish(item("stuck", PriorityHigh))
+	c.Publish(item("behind", PriorityHigh))
+	waitFor(t, "the event behind to be delivered", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if v, _ := reasons.Load("stuck"); v != "unresolved" {
+		t.Fatalf("quarantine reason = %v", v)
+	}
+	st := c.Stats()
+	if st.Quarantined != 1 || st.Sent != 1 || st.Dropped != 0 {
+		t.Fatalf("stats = %+v (quarantined events are never counted as sent or dropped)", st)
+	}
+	if got := quarantineIDs(t, dir); len(got) != 1 || got[0] != "stuck:unresolved" {
+		t.Fatalf("quarantine file = %v", got)
+	}
+	if got := strings.Join(h.got(), ","); got != "behind" {
+		t.Fatalf("delivered = %s", got)
+	}
+}
+
+func TestNegativeMaxUnresolvedRetriesForever(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		if call <= 12 {
+			return 200, `{}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, MaxUnresolved: -1})))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery after 12 unresolved answers", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Dropped != 0 || st.Quarantined != 0 || st.Retries < 12 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+func TestTransientFailuresAreRetried(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		switch call {
+		case 1:
+			return 503, "", map[string]string{"Retry-After": "0"}
+		case 2:
+			return 429, "", map[string]string{"Retry-After": "0"}
+		case 3:
+			return 405, "", nil
+		case 4:
+			return 404, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL})))
 	c.Publish(item("a", PriorityHigh))
 	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
 	closeClient(t, c)
-	if st := c.Stats(); st.Retries != 3 || st.Dropped != 0 {
+	if st := c.Stats(); st.Retries != 4 || st.Dropped != 0 || st.Quarantined != 0 {
 		t.Fatalf("stats = %+v", st)
 	}
 	if got := h.got(); len(got) != 1 || got[0] != "a" {
@@ -259,21 +373,87 @@ func TestRetryTransientThenDeliver(t *testing.T) {
 	}
 }
 
-func TestBadRequestDropsBatchWithoutRetry(t *testing.T) {
-	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 400, "", nil }}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
-	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "reject", func() bool { return c.Stats().Rejected == 1 })
-	closeClient(t, c)
-	if h.n.Load() != 1 {
-		t.Fatalf("calls = %d, want 1", h.n.Load())
+// Request-level failures that can never succeed set the batch aside undelivered
+// and do not hold up the events behind it.
+func TestFinalRequestFailuresAreQuarantined(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		reason string
+		cfg    func(*Config)
+	}{
+		{"bad request", 400, `{"error":{"code":"bad_body"}}`, "bad_request", nil},
+		{"unauthorized", 401, "", "auth", nil},
+		{"forbidden scope", 403, `{"error":{"code":"scope_required"}}`, "auth", nil},
+		{"app mismatch", 403, `{"error":{"code":"app_mismatch"}}`, "app_mismatch", func(c *Config) { c.RetryAuth = true }},
+		{"unexpected 4xx", 418, "", "http_418", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+				if ids[0] == "bad" {
+					return tc.status, tc.body, nil
+				}
+				return 0, "", nil
+			}}
+			srv := httptest.NewServer(h)
+			defer srv.Close()
+			var errs atomic.Int32
+			cfg := quiet(fast(Config{URL: srv.URL, BatchSize: 1, SpoolDir: dir, OnError: func(error) { errs.Add(1) }}))
+			if tc.cfg != nil {
+				tc.cfg(&cfg)
+			}
+			c, _ := New(cfg)
+			c.Publish(item("bad", PriorityHigh))
+			c.Publish(item("good", PriorityHigh))
+			waitFor(t, "good delivered", func() bool { return c.Stats().Sent == 1 })
+			closeClient(t, c)
+			st := c.Stats()
+			if st.Quarantined != 1 || st.Retries != 0 || st.Dropped != 0 {
+				t.Fatalf("stats = %+v", st)
+			}
+			if got := quarantineIDs(t, dir); len(got) != 1 || got[0] != "bad:"+tc.reason {
+				t.Fatalf("quarantine = %v, want bad:%s", got, tc.reason)
+			}
+			if errs.Load() == 0 {
+				t.Fatal("a quarantine must be reported through OnError")
+			}
+		})
 	}
 }
 
-func TestTooLargeSplitsBatch(t *testing.T) {
+// With RetryAuth a 401 or a 403 scope_required keeps the events and retries.
+func TestRetryAuthKeepsAndRetries(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		switch call {
+		case 1:
+			return 401, "", nil
+		case 2:
+			return 403, `{"error":{"code":"scope_required"}}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, RetryAuth: true})))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Retries != 2 || st.Quarantined != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+func TestTooLargeSplitsBatchAndQuarantinesASingleEvent(t *testing.T) {
+	dir := t.TempDir()
 	h := &hub{status: func(_ int32, ids []string) (int, string, map[string]string) {
+		for _, id := range ids {
+			if id == "huge" {
+				return 413, "", nil
+			}
+		}
 		if len(ids) > 2 {
 			return 413, "", nil
 		}
@@ -281,72 +461,309 @@ func TestTooLargeSplitsBatch(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour})
-	for i := 0; i < 5; i++ {
-		c.Publish(item(fmt.Sprintf("e%d", i), PriorityHigh))
+	c, _ := New(quiet(Config{URL: srv.URL, FlushInterval: time.Hour, SpoolDir: dir}))
+	for _, id := range []string{"e0", "e1", "huge", "e3", "e4"} {
+		c.Publish(item(id, PriorityHigh))
 	}
 	closeClient(t, c)
-	if got := strings.Join(h.got(), ","); got != "e0,e1,e2,e3,e4" {
-		t.Fatalf("ids = %s (order must survive splitting)", got)
+	if got := strings.Join(h.got(), ","); got != "e0,e1,e3,e4" {
+		t.Fatalf("delivered = %s (order must survive splitting)", got)
+	}
+	if got := quarantineIDs(t, dir); len(got) != 1 || got[0] != "huge:payload_too_large" {
+		t.Fatalf("quarantine = %v", got)
 	}
 }
 
-func memIDs(c *Client) string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var ids []string
-	for _, q := range c.mem {
-		ids = append(ids, q.ID)
+func TestVerdictRules(t *testing.T) {
+	items := []Item{{ID: "a"}, {ID: "b"}}
+	cases := []struct {
+		name string
+		body string
+		want [2]string // status of a and b, "" for no verdict
+	}{
+		{"both explicit", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"rejected","code":"schema_invalid"}]}`, [2]string{"accepted", "rejected"}},
+		{"accepted with a code", `{"results":[{"id":"a","status":"accepted","cursor":"1","code":"x"},{"id":"b","status":"duplicate","cursor":"2"}]}`, [2]string{"", "duplicate"}},
+		{"accepted without cursor", `{"results":[{"id":"a","status":"accepted"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"empty string cursor", `{"results":[{"id":"a","status":"accepted","cursor":""},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"numeric cursor", `{"results":[{"id":"a","status":"accepted","cursor":4812},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"boolean cursor", `{"results":[{"id":"a","status":"accepted","cursor":true},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"object cursor", `{"results":[{"id":"a","status":"accepted","cursor":{"x":1}},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"rejected without a code", `{"results":[{"id":"a","status":"rejected"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"rejected with an unknown code", `{"results":[{"id":"a","status":"rejected","code":"nope"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"rejected carrying a cursor", `{"results":[{"id":"a","status":"rejected","code":"id_conflict","cursor":"9"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"ids out of order", `{"results":[{"id":"b","status":"accepted","cursor":"2"},{"id":"a","status":"accepted","cursor":"1"}]}`, [2]string{"", ""}},
+		{"short list matched by id", `{"results":[{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"result for a foreign id", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"zzz","status":"accepted","cursor":"2"}]}`, [2]string{"accepted", ""}},
+		{"unknown status", `{"results":[{"id":"a","status":"mystery","cursor":"1"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
+		{"bare array", `[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"accepted","cursor":"2"}]`, [2]string{"", ""}},
+		{"not json", `oops`, [2]string{"", ""}},
 	}
-	return strings.Join(ids, ",")
+	for _, c := range cases {
+		got := verdicts(items, []byte(c.body))
+		for k := range items {
+			status := ""
+			if got[k] != nil {
+				status = got[k].Status
+			}
+			if status != c.want[k] {
+				t.Errorf("%s: item %s = %q, want %q", c.name, items[k].ID, status, c.want[k])
+			}
+		}
+	}
 }
 
-func TestFullQueueEvictsLowPriorityFirst(t *testing.T) {
-	var drops atomic.Int32
+// The same id twice in one request is answered by position.
+func TestDuplicateIDsInOneBatchAreMatchedByPosition(t *testing.T) {
+	items := []Item{{ID: "a"}, {ID: "a"}}
+	v := verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"a","status":"duplicate","cursor":"1"}]}`))
+	if v[0] == nil || v[0].Status != "accepted" || v[1] == nil || v[1].Status != "duplicate" {
+		t.Fatalf("verdicts = %+v %+v", v[0], v[1])
+	}
+	v = verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"}]}`))
+	if v[0] != nil || v[1] != nil {
+		t.Fatalf("ambiguous duplicate ids must be unresolved: %+v %+v", v[0], v[1])
+	}
+}
+
+func TestIngestURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"http://hub:7777":         "http://hub:7777/events",
+		"http://hub:7777/":        "http://hub:7777/events",
+		"http://hub:7777/events":  "http://hub:7777/events",
+		"http://hub:7777/events/": "http://hub:7777/events",
+		"http://hub/api":          "http://hub/api/events",
+		"http://hub:7777?x=1":     "http://hub:7777/events?x=1",
+		"  http://hub:7777  ":     "http://hub:7777/events",
+	} {
+		if got := ingestURL(in); got != want {
+			t.Errorf("ingestURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestPostsToEventsPathOfBaseURL(t *testing.T) {
+	var path atomic.Value
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path.Store(r.URL.Path)
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	c, _ := New(quiet(Config{URL: srv.URL, FlushInterval: time.Hour}))
+	c.Publish(item("a", PriorityHigh))
+	closeClient(t, c)
+	if path.Load() != "/events" {
+		t.Fatalf("path = %v", path.Load())
+	}
+}
+
+// ---- overflow, priority and loss ----
+
+func TestFullQueueEvictsDebugThenActivityBeforeProtected(t *testing.T) {
 	h := &hub{}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(Config{URL: srv.URL, QueueSize: 3, BatchSize: 100, FlushInterval: time.Hour,
-		OnDrop: func(n int, _ string) { drops.Add(int32(n)) }})
-	c.Publish(item("low1", PriorityLow))
+	var drops atomic.Int32
+	c, _ := New(quiet(Config{URL: srv.URL, QueueSize: 4, BatchSize: 100, FlushInterval: time.Hour,
+		OnDrop: func(n int, _ string) { drops.Add(int32(n)) }}))
+	c.Publish(item("act1", PriorityActivity))
+	c.Publish(item("dbg1", PriorityDebug))
 	c.Publish(item("high1", PriorityHigh))
-	c.Publish(item("low2", PriorityLow))
-	c.Publish(item("high2", PriorityHigh)) // evicts low1
-	c.Publish(item("high3", PriorityHigh)) // evicts low2
-	if got := memIDs(c); got != "high1,high2,high3" {
+	c.Publish(item("act2", PriorityActivity))
+	c.Publish(item("high2", PriorityHigh)) // evicts dbg1 first
+	if got := memIDs(c); got != "act1,high1,act2,high2" {
 		t.Fatalf("queue = %s", got)
 	}
-	if drops.Load() != 2 {
-		t.Fatalf("drops = %d", drops.Load())
+	c.Publish(item("high3", PriorityHigh)) // then the oldest activity
+	if got := memIDs(c); got != "high1,act2,high2,high3" {
+		t.Fatalf("queue = %s", got)
+	}
+	c.Publish(item("high4", PriorityHigh)) // then the other activity
+	if got := memIDs(c); got != "high1,high2,high3,high4" {
+		t.Fatalf("queue = %s", got)
+	}
+	if st := c.Stats(); st.DroppedHigh != 0 || len(st.Losses) != 0 {
+		t.Fatalf("no protected item may be lost yet: %+v", st)
 	}
 	closeClient(t, c)
-	if got := strings.Join(h.got(), ","); got != "high1,high2,high3" {
+	if got := strings.Join(h.got(), ","); got != "high1,high2,high3,high4" {
 		t.Fatalf("delivered = %s", got)
 	}
 }
 
-// With only high-priority items held, an incoming low-priority one is the item
-// that goes; an incoming high-priority one replaces the oldest.
-func TestFullQueueOfHighDropsIncomingLow(t *testing.T) {
+func TestIncomingLessImportantThanEverythingHeldIsRefused(t *testing.T) {
+	c, _ := New(quiet(Config{URL: "http://127.0.0.1:1", QueueSize: 2, FlushInterval: time.Hour}))
+	c.Publish(item("act1", PriorityActivity))
+	c.Publish(item("high1", PriorityHigh))
+	c.Publish(item("dbg1", PriorityDebug)) // below everything held: refused
+	if got := memIDs(c); got != "act1,high1" {
+		t.Fatalf("queue = %s", got)
+	}
+	c.Publish(item("high2", PriorityHigh)) // evicts the activity item, not a protected one
+	if got := memIDs(c); got != "high1,high2" {
+		t.Fatalf("queue = %s", got)
+	}
+	c.Publish(item("act2", PriorityActivity)) // below everything held: refused before any protected loss
+	if got := memIDs(c); got != "high1,high2" {
+		t.Fatalf("queue = %s", got)
+	}
+	if st := c.Stats(); st.DroppedHigh != 0 || len(st.Losses) != 0 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+type logCapture struct {
+	mu   sync.Mutex
+	warn []string
+}
+
+func (l *logCapture) Enabled(context.Context, slog.Level) bool { return true }
+func (l *logCapture) Handle(_ context.Context, r slog.Record) error {
+	if r.Level >= slog.LevelWarn {
+		l.mu.Lock()
+		l.warn = append(l.warn, r.Message)
+		l.mu.Unlock()
+	}
+	return nil
+}
+func (l *logCapture) WithAttrs([]slog.Attr) slog.Handler { return l }
+func (l *logCapture) WithGroup(string) slog.Handler      { return l }
+
+// Losing a protected item is the last resort: it is counted, logged at WARN,
+// reported with its own reason, and recorded with class, times and count.
+func TestProtectedLossIsRecordedLoggedAndReported(t *testing.T) {
+	var mu sync.Mutex
+	reasons := map[string]int{}
+	lc := &logCapture{}
+	c, _ := New(Config{URL: "http://127.0.0.1:1", QueueSize: 2, FlushInterval: time.Hour, Logger: slog.New(lc),
+		OnDrop: func(n int, r string) { mu.Lock(); reasons[r] += n; mu.Unlock() }})
+	before := time.Now().UTC().Add(-time.Second)
+	c.Publish(item("h1", PriorityHigh))
+	c.Publish(item("h2", PriorityHigh))
+	c.Publish(item("h3", PriorityHigh)) // h1 is lost
+	c.Publish(item("h4", PriorityHigh)) // h2 is lost
+	if got := memIDs(c); got != "h3,h4" {
+		t.Fatalf("queue = %s", got)
+	}
+	mu.Lock()
+	if reasons["high_priority_dropped"] != 2 {
+		t.Fatalf("reasons = %v", reasons)
+	}
+	mu.Unlock()
+	st := c.Stats()
+	if st.DroppedHigh != 2 || st.Dropped != 2 {
+		t.Fatalf("stats = %+v", st)
+	}
+	if len(st.Losses) != 1 {
+		t.Fatalf("losses = %+v", st.Losses)
+	}
+	l := st.Losses[0]
+	if l.Class != "protected" || l.Count != 2 || l.First.Before(before) || l.Last.Before(l.First) {
+		t.Fatalf("loss record = %+v", l)
+	}
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	if len(lc.warn) == 0 || !strings.Contains(lc.warn[0], "protected events dropped") {
+		t.Fatalf("WARN log = %v", lc.warn)
+	}
+}
+
+// The loss record survives a restart and is announced by a gap marker, built by
+// the caller, the next time the hub accepts events; then it is cleared.
+func TestLossRecordPersistsAndGapMarkerIsAnnounced(t *testing.T) {
+	dir := t.TempDir()
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	c1, _ := New(quiet(fast(Config{URL: dead.URL, SpoolDir: dir, SpoolMaxBytes: 700, QueueSize: 1, BatchSize: 1})))
+	for i := 0; i < 20; i++ {
+		c1.Publish(item(fmt.Sprintf("h%02d", i), PriorityHigh))
+	}
+	st := c1.Stats()
+	if st.DroppedHigh == 0 || len(st.Losses) != 1 || st.Losses[0].Count != st.DroppedHigh {
+		t.Fatalf("loss not recorded: %+v", st)
+	}
+	closeClient(t, c1) // closing writes the leftovers to the spool, which may cost more
+	dead.Close()
+	st = c1.Stats()
+	if len(st.Losses) != 1 || st.Losses[0].Count != st.DroppedHigh {
+		t.Fatalf("loss record and counter disagree after close: %+v", st)
+	}
+	lost := st.Losses[0].Count
+
+	// A new process on the same directory still knows about the loss.
 	h := &hub{}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(Config{URL: srv.URL, QueueSize: 2, FlushInterval: time.Hour})
-	c.Publish(item("h1", PriorityHigh))
-	c.Publish(item("h2", PriorityHigh))
-	c.Publish(item("l1", PriorityLow))
-	if got := memIDs(c); got != "h1,h2" {
-		t.Fatalf("queue after low = %s", got)
+	var marks atomic.Int32
+	var seen atomic.Value
+	c2, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, SpoolMaxBytes: 700,
+		GapMarker: func(l Loss) (Item, error) {
+			marks.Add(1)
+			seen.Store(l)
+			return Item{ID: "gap1", Priority: PriorityHigh, Body: json.RawMessage(`{"id":"gap1","kind":"alert.raised"}`)}, nil
+		}})))
+	if got := c2.Stats().Losses; len(got) != 1 || got[0].Count != lost {
+		t.Fatalf("loss record after restart = %+v, want count %d", got, lost)
 	}
-	c.Publish(item("h3", PriorityHigh))
-	if got := memIDs(c); got != "h2,h3" {
-		t.Fatalf("queue after high = %s", got)
+	waitFor(t, "gap marker delivered", func() bool {
+		for _, id := range h.got() {
+			if id == "gap1" {
+				return true
+			}
+		}
+		return false
+	})
+	closeClient(t, c2)
+	if marks.Load() != 1 {
+		t.Fatalf("gap marker built %d times", marks.Load())
 	}
-	closeClient(t, c)
-	if got := strings.Join(h.got(), ","); got != "h2,h3" {
-		t.Fatalf("delivered = %s", got)
+	if l := seen.Load().(Loss); l.Class != "protected" || l.Count != lost {
+		t.Fatalf("marker was given %+v", l)
+	}
+	if got := c2.Stats().Losses; len(got) != 0 {
+		t.Fatalf("record not cleared after the marker: %+v", got)
+	}
+	if got := openLossBook(dir).list(); len(got) != 0 {
+		t.Fatalf("record still on disk: %+v", got)
 	}
 }
+
+func TestQuarantineIsBoundedOldestFirst(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{status: func(_ int32, ids []string) (int, string, map[string]string) {
+		var parts []string
+		for _, id := range ids {
+			parts = append(parts, fmt.Sprintf(`{"id":%q,"status":"rejected","code":"unknown_kind"}`, id))
+		}
+		return 200, `{"results":[` + strings.Join(parts, ",") + `]}`, nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(Config{URL: srv.URL, FlushInterval: time.Hour, SpoolDir: dir, QuarantineMaxBytes: 1200, BatchSize: 1}))
+	for i := 0; i < 30; i++ {
+		c.Publish(item(fmt.Sprintf("r%02d", i), PriorityHigh))
+	}
+	closeClient(t, c)
+	got := quarantineIDs(t, dir)
+	if len(got) == 0 || len(got) >= 30 {
+		t.Fatalf("quarantine holds %d records, want some but not all", len(got))
+	}
+	if got[len(got)-1] != "r29:rejected" {
+		t.Fatalf("newest record missing: %v", got)
+	}
+	if st, _ := os.Stat(filepath.Join(dir, "quarantine.jsonl")); st.Size() > 1200 {
+		t.Fatalf("quarantine file is %d bytes, cap 1200", st.Size())
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i-1] >= got[i] {
+			t.Fatalf("not oldest-first: %v", got)
+		}
+	}
+	if c.Stats().Quarantined != 30 {
+		t.Fatalf("every rejected event counts as quarantined: %+v", c.Stats())
+	}
+}
+
+// ---- spool behaviour through the client ----
 
 func TestSpoolOverflowKeepsOrder(t *testing.T) {
 	var down atomic.Bool
@@ -359,7 +776,7 @@ func TestSpoolOverflowKeepsOrder(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL, QueueSize: 4, BatchSize: 2, SpoolDir: t.TempDir()}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, QueueSize: 4, BatchSize: 2, SpoolDir: t.TempDir()})))
 	var want []string
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("e%02d", i)
@@ -390,7 +807,7 @@ func TestQueueSizeOneDeliversOverflow(t *testing.T) {
 	}}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL, QueueSize: 1, BatchSize: 1, SpoolDir: t.TempDir()}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, QueueSize: 1, BatchSize: 1, SpoolDir: t.TempDir()})))
 	for i := 0; i < 6; i++ {
 		c.Publish(item(fmt.Sprintf("q%d", i), PriorityHigh))
 	}
@@ -405,7 +822,7 @@ func TestQueueSizeOneDeliversOverflow(t *testing.T) {
 func TestCloseKeepsUnsentInSpoolAndNextClientResumes(t *testing.T) {
 	dir := t.TempDir()
 	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
-	c1, _ := New(fast(Config{URL: dead.URL, SpoolDir: dir}))
+	c1, _ := New(quiet(fast(Config{URL: dead.URL, SpoolDir: dir})))
 	for _, id := range []string{"a", "b", "c"} {
 		c1.Publish(item(id, PriorityHigh))
 	}
@@ -418,7 +835,7 @@ func TestCloseKeepsUnsentInSpoolAndNextClientResumes(t *testing.T) {
 	h := &hub{}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c2, _ := New(fast(Config{URL: srv.URL, SpoolDir: dir}))
+	c2, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir})))
 	c2.Publish(item("d", PriorityHigh))
 	waitFor(t, "resume", func() bool { return c2.Stats().Sent == 4 })
 	closeClient(t, c2)
@@ -436,7 +853,7 @@ func TestInFlightSpoolRecordsSurviveACrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"a", "b", "c"} {
-		if _, _, err := sp.append(item(id, PriorityHigh)); err != nil {
+		if _, err := sp.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -451,7 +868,7 @@ func TestInFlightSpoolRecordsSurviveACrash(t *testing.T) {
 	}))
 	defer srv.Close()
 	defer close(release)
-	c, err := New(fast(Config{URL: srv.URL, SpoolDir: dir, Timeout: time.Hour}))
+	c, err := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, Timeout: time.Hour})))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +877,6 @@ func TestInFlightSpoolRecordsSurviveACrash(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("request never started")
 	}
-	// "Crash": read the directory as a fresh process would, without Close.
 	again, err := openSpool(dir, 1<<20)
 	if err != nil {
 		t.Fatal(err)
@@ -480,9 +896,8 @@ func TestSecondCloseHonoursItsOwnContext(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-release }))
 	defer srv.Close()
 	defer close(release)
-	c, _ := New(fast(Config{URL: srv.URL, Timeout: time.Hour}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, Timeout: time.Hour})))
 	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "request", func() bool { return true })
 	time.Sleep(50 * time.Millisecond)
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -506,11 +921,11 @@ func TestCallbacksRunOutsideTheLock(t *testing.T) {
 	var c *Client
 	var once sync.Once
 	called := make(chan struct{})
-	c, _ = New(Config{URL: "http://127.0.0.1:1", QueueSize: 1, FlushInterval: time.Hour,
+	c, _ = New(quiet(Config{URL: "http://127.0.0.1:1", QueueSize: 1, FlushInterval: time.Hour,
 		OnDrop: func(int, string) {
 			_ = c.Stats()
 			once.Do(func() { close(called) })
-		}})
+		}}))
 	c.Publish(item("a", PriorityHigh))
 	c.Publish(item("b", PriorityHigh))
 	select {
@@ -523,17 +938,17 @@ func TestCallbacksRunOutsideTheLock(t *testing.T) {
 func TestCloseWithoutSpoolCountsDrop(t *testing.T) {
 	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	defer dead.Close()
-	c, _ := New(fast(Config{URL: dead.URL}))
-	c.Publish(item("a", PriorityHigh))
+	c, _ := New(quiet(fast(Config{URL: dead.URL})))
+	c.Publish(item("a", PriorityActivity))
 	closeClient(t, c)
-	if st := c.Stats(); st.Dropped != 1 {
+	if st := c.Stats(); st.Dropped != 1 || st.DroppedHigh != 0 {
 		t.Fatalf("stats = %+v", st)
 	}
 }
 
 func TestInvalidItemsAreDropped(t *testing.T) {
 	var reason atomic.Value
-	c, _ := New(Config{URL: "http://127.0.0.1:1", OnDrop: func(_ int, r string) { reason.Store(r) }})
+	c, _ := New(quiet(Config{URL: "http://127.0.0.1:1", OnDrop: func(_ int, r string) { reason.Store(r) }}))
 	c.Publish(Item{ID: "x", Body: json.RawMessage(`{not json`)})
 	if reason.Load() != "invalid" {
 		t.Fatalf("bad json: reason = %v", reason.Load())
@@ -552,7 +967,7 @@ func TestTokenFileIsReread(t *testing.T) {
 	defer srv.Close()
 	f := filepath.Join(t.TempDir(), "tok")
 	_ = os.WriteFile(f, []byte("one\n"), 0o600)
-	c, _ := New(fast(Config{URL: srv.URL, TokenFile: f, BatchSize: 1}))
+	c, _ := New(quiet(fast(Config{URL: srv.URL, TokenFile: f, BatchSize: 1})))
 	c.Publish(item("a", PriorityHigh))
 	waitFor(t, "first", func() bool { return c.Stats().Sent == 1 })
 	_ = os.WriteFile(f, []byte("two\n"), 0o600)
@@ -588,7 +1003,7 @@ func TestFromEnv(t *testing.T) {
 	_ = os.WriteFile(f, []byte("filetok"), 0o600)
 	t.Setenv(EnvURL, srv.URL)
 	t.Setenv(TokenFileEnv("fragments-engine"), f)
-	p, err = FromEnv("fragments-engine", Config{FlushInterval: time.Hour})
+	p, err = FromEnv("fragments-engine", quiet(Config{FlushInterval: time.Hour}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,220 +1017,5 @@ func TestFromEnv(t *testing.T) {
 func TestTokenFileEnvName(t *testing.T) {
 	if got := TokenFileEnv("fragments-engine"); got != "HOLLIS_AUTH_TOKEN_FILE_FRAGMENTS_ENGINE" {
 		t.Fatalf("got %s", got)
-	}
-}
-
-func TestIngestURL(t *testing.T) {
-	for in, want := range map[string]string{
-		"http://hub:7777":         "http://hub:7777/events",
-		"http://hub:7777/":        "http://hub:7777/events",
-		"http://hub:7777/events":  "http://hub:7777/events",
-		"http://hub:7777/events/": "http://hub:7777/events",
-		"http://hub/api":          "http://hub/api/events",
-		"http://hub:7777?x=1":     "http://hub:7777/events?x=1",
-		"  http://hub:7777  ":     "http://hub:7777/events",
-	} {
-		if got := ingestURL(in); got != want {
-			t.Errorf("ingestURL(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestPostsToEventsPathOfBaseURL(t *testing.T) {
-	var path atomic.Value
-	h := &hub{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path.Store(r.URL.Path)
-		h.ServeHTTP(w, r)
-	}))
-	defer srv.Close()
-	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour})
-	c.Publish(item("a", PriorityHigh))
-	closeClient(t, c)
-	if path.Load() != "/events" {
-		t.Fatalf("path = %v", path.Load())
-	}
-}
-
-func TestAppMismatchIsTerminalAndDoesNotBlockLaterEvents(t *testing.T) {
-	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
-		if ids[0] == "bad" {
-			return 403, `{"error":{"code":"app_mismatch","message":"x"}}`, nil
-		}
-		return 0, "", nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	var errs atomic.Int32
-	c, _ := New(fast(Config{URL: srv.URL, BatchSize: 1, OnError: func(error) { errs.Add(1) }}))
-	c.Publish(item("bad", PriorityHigh))
-	c.Publish(item("good", PriorityHigh))
-	waitFor(t, "good delivered", func() bool { return c.Stats().Sent == 1 })
-	closeClient(t, c)
-	if st := c.Stats(); st.Rejected != 1 || st.Retries != 0 {
-		t.Fatalf("stats = %+v (app_mismatch must not be retried)", st)
-	}
-	if errs.Load() == 0 {
-		t.Fatal("app_mismatch must be reported through OnError")
-	}
-}
-
-func TestOtherForbiddenAndNotYetEnabledAreRetried(t *testing.T) {
-	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		switch call {
-		case 1:
-			return 403, `{"error":{"code":"scope_required"}}`, nil
-		case 2:
-			return 405, "", nil
-		case 3:
-			return 404, "", nil
-		}
-		return 0, "", nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
-	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
-	closeClient(t, c)
-	if st := c.Stats(); st.Retries != 3 || st.Dropped != 0 || st.Rejected != 0 {
-		t.Fatalf("stats = %+v", st)
-	}
-}
-
-// Acceptance needs a cursor, and a bare array is not the contract's answer.
-func TestAcceptedWithoutCursorAndBareArrayAreUnresolved(t *testing.T) {
-	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		switch call {
-		case 1:
-			return 200, `{"results":[{"id":"a","status":"accepted"}]}`, nil
-		case 2:
-			return 200, `[{"id":"a","status":"accepted","cursor":"1"}]`, nil
-		}
-		return 0, "", nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
-	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "delivery", func() bool { return c.Stats().Sent == 1 })
-	closeClient(t, c)
-	if st := c.Stats(); st.Retries != 2 {
-		t.Fatalf("stats = %+v, want 2 retries before an explicit acceptance", st)
-	}
-}
-
-func TestNumericCursorIsAccepted(t *testing.T) {
-	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		return 200, `{"results":[{"id":"a","status":"accepted","cursor":4812}]}`, nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(Config{URL: srv.URL, FlushInterval: time.Hour})
-	c.Publish(item("a", PriorityHigh))
-	closeClient(t, c)
-	if st := c.Stats(); st.Sent != 1 {
-		t.Fatalf("stats = %+v", st)
-	}
-}
-
-func TestVerdictRules(t *testing.T) {
-	items := []Item{{ID: "a"}, {ID: "b"}}
-	cases := []struct {
-		name string
-		body string
-		want [2]string // status of a and b, "" for no verdict
-	}{
-		{"both explicit", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"rejected","code":"schema_invalid"}]}`, [2]string{"accepted", "rejected"}},
-		{"accepted with a code", `{"results":[{"id":"a","status":"accepted","cursor":"1","code":"x"},{"id":"b","status":"duplicate","cursor":"2"}]}`, [2]string{"", "duplicate"}},
-		{"rejected without a code", `{"results":[{"id":"a","status":"rejected"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
-		{"rejected with an unknown code", `{"results":[{"id":"a","status":"rejected","code":"nope"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
-		{"rejected carrying a cursor", `{"results":[{"id":"a","status":"rejected","code":"id_conflict","cursor":"9"},{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
-		{"ids out of order", `{"results":[{"id":"b","status":"accepted","cursor":"2"},{"id":"a","status":"accepted","cursor":"1"}]}`, [2]string{"", ""}},
-		{"short list matched by id", `{"results":[{"id":"b","status":"accepted","cursor":"2"}]}`, [2]string{"", "accepted"}},
-		{"result for a foreign id", `{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"zzz","status":"accepted","cursor":"2"}]}`, [2]string{"accepted", ""}},
-		{"bare array", `[{"id":"a","status":"accepted","cursor":"1"},{"id":"b","status":"accepted","cursor":"2"}]`, [2]string{"", ""}},
-		{"not json", `oops`, [2]string{"", ""}},
-	}
-	for _, c := range cases {
-		got := verdicts(items, []byte(c.body))
-		for k := range items {
-			status := ""
-			if got[k] != nil {
-				status = got[k].Status
-			}
-			if status != c.want[k] {
-				t.Errorf("%s: item %s = %q, want %q", c.name, items[k].ID, status, c.want[k])
-			}
-		}
-	}
-}
-
-// The same id twice in one request is answered by position.
-func TestDuplicateIDsInOneBatchAreMatchedByPosition(t *testing.T) {
-	items := []Item{{ID: "a"}, {ID: "a"}}
-	v := verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"},{"id":"a","status":"duplicate","cursor":"1"}]}`))
-	if v[0] == nil || v[0].Status != "accepted" || v[1] == nil || v[1].Status != "duplicate" {
-		t.Fatalf("verdicts = %+v %+v", v[0], v[1])
-	}
-	// With a short list the duplicated id cannot be told apart: no verdict.
-	v = verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"}]}`))
-	if v[0] != nil || v[1] != nil {
-		t.Fatalf("ambiguous duplicate ids must be unresolved: %+v %+v", v[0], v[1])
-	}
-}
-
-// By default an event without a valid verdict is never given up on.
-func TestUnresolvedEventsAreRetriedUntilTheHubAnswers(t *testing.T) {
-	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
-		if call <= 12 {
-			return 200, `{}`, nil
-		}
-		return 0, "", nil
-	}}
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	c, _ := New(fast(Config{URL: srv.URL}))
-	c.Publish(item("a", PriorityHigh))
-	waitFor(t, "delivery after 12 unresolved answers", func() bool { return c.Stats().Sent == 1 })
-	closeClient(t, c)
-	if st := c.Stats(); st.Dropped != 0 || st.Retries < 12 {
-		t.Fatalf("stats = %+v", st)
-	}
-}
-
-// Losing a high-priority item is the last resort and is reported as such.
-func TestHighPriorityLossIsReportedSeparately(t *testing.T) {
-	var mu sync.Mutex
-	reasons := map[string]int{}
-	c, _ := New(Config{URL: "http://127.0.0.1:1", QueueSize: 2, FlushInterval: time.Hour,
-		OnDrop: func(n int, r string) { mu.Lock(); reasons[r] += n; mu.Unlock() }})
-	c.Publish(item("h1", PriorityHigh))
-	c.Publish(item("h2", PriorityHigh))
-	c.Publish(item("l1", PriorityLow))  // the incoming low item goes
-	c.Publish(item("h3", PriorityHigh)) // h1 goes
-	mu.Lock()
-	defer mu.Unlock()
-	if reasons["queue_full"] != 1 || reasons["high_priority_dropped"] != 1 {
-		t.Fatalf("reasons = %v", reasons)
-	}
-	if st := c.Stats(); st.Dropped != 2 || st.DroppedHigh != 1 {
-		t.Fatalf("stats = %+v", st)
-	}
-}
-
-func TestSpoolCapReportsHighPriorityLoss(t *testing.T) {
-	s := mustSpool(t, t.TempDir(), 300)
-	var dropped, high int
-	for i := 0; i < 10; i++ {
-		d, h, err := s.append(item(fmt.Sprintf("h%d", i), PriorityHigh))
-		if err != nil {
-			t.Fatal(err)
-		}
-		dropped += d
-		high += h
-	}
-	if dropped == 0 || high != dropped {
-		t.Fatalf("only high priority items were queued: dropped=%d high=%d", dropped, high)
 	}
 }

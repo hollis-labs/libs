@@ -5,17 +5,28 @@
 ### Added
 
 - Initial module: the hub client. `Client` with a bounded queue, batching to the
-  hub's 100 events and 1 MiB limits, retry with backoff, 413 splitting and
-  priority-aware eviction. An event is finished only on an explicit per-event
-  verdict from the hub (accepted, duplicate or rejected); an unreadable or
-  incomplete 200 is retried, never counted as sent.
+  hub's 100 events and 1 MiB limits, retry with backoff, 413 splitting.
+  An event is finished only on an explicit, valid per-event verdict (accepted or
+  duplicate with a string cursor; rejected with a valid code and no cursor);
+  anything else, an unreadable or incomplete 200 included, is retried and never
+  counted as sent.
+- Quarantine: events set aside undelivered (explicitly rejected, a request
+  refused for good with 400, 401, 403 or a single too-large event, or still
+  without a valid verdict after `MaxUnresolved` tries) go to a bounded
+  `quarantine.jsonl` (oldest first), with `OnQuarantine`, `Stats.Quarantined`,
+  a WARN log and `OnError`. They are never counted as sent. `RetryAuth` retries
+  401 and 403 instead.
+- Priorities `PriorityDebug`, `PriorityActivity`, `PriorityHigh`: a full queue or
+  spool drops debug first, then activity, and protected items only as the last
+  resort. Losing a protected item is recorded (`Loss`: class, first and last
+  time, count; persisted in `loss.json`), counted in `Stats.DroppedHigh`, logged
+  at WARN, reported to `OnDrop` as `high_priority_dropped`, and announced by the
+  event `Config.GapMarker` builds when the hub next accepts events.
 - Optional bounded disk spool that keeps order and survives restarts. Records
   stay on disk until the hub settles them, the file is swapped atomically by
   generation, a torn tail is repaired, and disk use is bounded by compaction.
-- Events without a valid verdict are retried for as long as the client runs
-  (`MaxUnresolved` is an opt-in limit). Loss of a high-priority item to a full
-  queue or spool is the last resort and is reported as `high_priority_dropped`
-  and counted in `Stats.DroppedHigh`.
+- With no token, no Authorization header is sent (for a local relay that holds
+  the credential).
 - `FromEnv` (a no-op `Noop` when `HOLLIS_EVENTS_URL` is unset) and `Noop`.
   Envelope-agnostic: items are raw JSON, so the module needs nothing from the
   harness group.

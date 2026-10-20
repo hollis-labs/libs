@@ -38,7 +38,7 @@ func TestPeekDoesNotConsumeUntilAck(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
 	for _, id := range []string{"a", "b", "c"} {
-		if _, _, err := s.append(item(id, PriorityHigh)); err != nil {
+		if _, err := s.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -66,10 +66,10 @@ func TestFileSizeStaysBounded(t *testing.T) {
 	s := mustSpool(t, t.TempDir(), max)
 	var worst int64
 	for i := 0; i < 200; i++ {
-		if _, _, err := s.append(item(fmt.Sprintf("e%03d", i), PriorityHigh)); err != nil {
+		if _, err := s.append(item(fmt.Sprintf("e%03d", i), PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := s.append(item(fmt.Sprintf("f%03d", i), PriorityHigh)); err != nil {
+		if _, err := s.append(item(fmt.Sprintf("f%03d", i), PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 		got, err := s.peek(1)
@@ -93,7 +93,7 @@ func TestFileSizeStaysBounded(t *testing.T) {
 func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
-	if _, _, err := s.append(item("a", PriorityHigh)); err != nil {
+	if _, err := s.append(item("a", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	// A crash mid-write: half a record, no newline.
@@ -107,7 +107,7 @@ func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 	f.Close()
 
 	again := mustSpool(t, dir, 1<<20)
-	if _, _, err := again.append(item("b", PriorityHigh)); err != nil {
+	if _, err := again.append(item("b", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := again.peek(10)
@@ -119,7 +119,7 @@ func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 func TestStrayAndStaleFilesAreCleanedUp(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
-	if _, _, err := s.append(item("a", PriorityHigh)); err != nil {
+	if _, err := s.append(item("a", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	// Leftover of an interrupted swap, and a state head past the end.
@@ -148,7 +148,7 @@ func TestReopenAfterCompactionAndCap(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		id := fmt.Sprintf("h%d", i)
 		all = append(all, id)
-		if _, _, err := s.append(item(id, PriorityHigh)); err != nil {
+		if _, err := s.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -167,16 +167,16 @@ func TestReopenAfterCompactionAndCap(t *testing.T) {
 // already loaded for sending stay valid.
 func TestCapKeepsInFlightRecordsAndHighPriority(t *testing.T) {
 	s := mustSpool(t, t.TempDir(), 700)
-	if _, _, err := s.append(item("first", PriorityHigh)); err != nil {
+	if _, err := s.append(item("first", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	flight, _ := s.peek(1)
 	for i := 0; i < 12; i++ {
-		p := PriorityLow
+		p := PriorityDebug
 		if i%4 == 0 {
 			p = PriorityHigh
 		}
-		if _, _, err := s.append(item(fmt.Sprintf("n%02d", i), p)); err != nil {
+		if _, err := s.append(item(fmt.Sprintf("n%02d", i), p)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -211,5 +211,45 @@ func TestUnreadableTailIsAcknowledged(t *testing.T) {
 	}
 	if again.unread() != 0 {
 		t.Fatalf("unreadable lines left %d unread bytes", again.unread())
+	}
+}
+
+// The cap drops debug records first, then activity, and protected records only
+// when nothing else is left; the counts say which.
+func TestCapDropsByClassInOrder(t *testing.T) {
+	s := mustSpool(t, t.TempDir(), 300)
+	var total lossCounts
+	add := func(id string, p Priority) {
+		l, err := s.append(item(id, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range total {
+			total[i] += l[i]
+		}
+	}
+	for i := 0; i < 3; i++ {
+		add(fmt.Sprintf("d%d", i), PriorityDebug)
+		add(fmt.Sprintf("a%d", i), PriorityActivity)
+		add(fmt.Sprintf("h%d", i), PriorityHigh)
+	}
+	if total.total() == 0 {
+		t.Fatal("nothing was dropped; the cap is too large for this test")
+	}
+	if total[PriorityHigh] != 0 {
+		t.Fatalf("a protected record went while debug/activity records were still held: %v", total)
+	}
+	if total[PriorityActivity] > 0 && total[PriorityDebug] < 3 {
+		t.Fatalf("activity went before every debug record: %v", total)
+	}
+	// Fill the rest with protected records: now they must be lost, and counted.
+	for i := 0; i < 30; i++ {
+		add(fmt.Sprintf("p%02d", i), PriorityHigh)
+	}
+	if total[PriorityHigh] == 0 {
+		t.Fatalf("protected records must be counted when they are the last resort: %v", total)
+	}
+	if s.unread() > 300 {
+		t.Fatalf("unread %d over cap", s.unread())
 	}
 }
