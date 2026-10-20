@@ -1,0 +1,1 @@
+{"entity": {"type": "resource", "id": "tether"}, "from": "running", "to": "deploying", "trigger": {"kind": "human", "ref": "msg://agent/agent-mux/agt_lc7m97f5fp"}, "reason": "deploy", "attempt": 1, "labels": {"project": "tether", "host": "host-a", "connector": "local", "mode": "os_service", "supervisor": "systemd", "env": "dev", "owner": "self", "admin": "self"}}

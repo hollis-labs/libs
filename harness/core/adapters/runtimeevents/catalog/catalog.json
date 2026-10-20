@@ -254,6 +254,18 @@
    "status": "new"
   },
   {
+   "kind": "resource.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:resource.state_changed@1",
+   "status": "new"
+  },
+  {
+   "kind": "deploy.state_changed",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:deploy.state_changed@1",
+   "status": "new"
+  },
+  {
    "kind": "gate.evaluated",
    "category": "state",
    "payload_schema": "urn:hollis-labs:events:gate.evaluated@1",

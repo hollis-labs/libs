@@ -47,6 +47,8 @@ const (
 	KindPhaseStateChanged             = "phase.state_changed"
 	KindClaimStateChanged             = "claim.state_changed"
 	KindDeliveryStateChanged          = "delivery.state_changed"
+	KindResourceStateChanged          = "resource.state_changed"
+	KindDeployStateChanged            = "deploy.state_changed"
 	KindGateEvaluated                 = "gate.evaluated"
 	KindPhaseStarted                  = "phase.started"
 	KindPhaseCompleted                = "phase.completed"
