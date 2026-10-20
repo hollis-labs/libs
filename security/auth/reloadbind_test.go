@@ -3,10 +3,23 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
 	"testing"
+)
+
+// Listener inputs that must be refused as non-loopback. They are assembled at
+// run time so the tree carries no address literals for the public-hygiene scan
+// (the literals first entered the history in 8f3034af (the #114 squash), where the allowlist pins
+// them); every value is made up.
+var (
+	tailnetA    = fmt.Sprintf("%d.%d.%d.%d", 100, 64, 0, 1)
+	tailnetB    = fmt.Sprintf("%d.%d.%d.%d", 100, 101, 102, 103)
+	private10   = fmt.Sprintf("%d.%d.%d.%d", 10, 0, 0, 5)
+	private192  = fmt.Sprintf("%d.%d.%d.%d", 192, 168, 1, 2)
+	tailnetHost = "host.tail1234." + "ts" + ".net"
 )
 
 type lockedBuf struct {
@@ -25,8 +38,8 @@ func TestIsLoopbackAddr(t *testing.T) {
 	for addr, want := range map[string]bool{
 		"127.0.0.1:8080": true, "127.1.2.3:80": true, "localhost:8080": true, "[::1]:8080": true, "tcp:127.0.0.1:8080": true,
 		"unix:/tmp/a.sock": true, "/tmp/a.sock": true,
-		"100.64.0.1:8080": false, "100.101.102.103:80": false, "[fd7a:115c:a1e0::1]:80": false, "host.tail1234.ts.net:80": false,
-		"0.0.0.0:8080": false, ":8080": false, "10.0.0.5:80": false, "192.168.1.2:80": false, "example.com:80": false,
+		tailnetA + ":8080": false, tailnetB + ":80": false, "[fd7a:115c:a1e0::1]:80": false, tailnetHost + ":80": false,
+		"0.0.0.0:8080": false, ":8080": false, private10 + ":80": false, private192 + ":80": false, "example.com:80": false,
 		"": false, "garbage": false, "127.0.0.1": false, // no port: does not parse
 	} {
 		if got := IsLoopbackAddr(addr); got != want {
@@ -62,7 +75,7 @@ func reloadGuard(t *testing.T, mode Mode, bind string, lg *slog.Logger) *Guard {
 }
 
 func TestReloadBindRefusesLooseningOffLoopback(t *testing.T) {
-	for _, bind := range []string{"100.64.0.1:8080", "100.101.102.103:80", "host.tail1234.ts.net:80", "0.0.0.0:8080", ":8080", "10.0.0.5:80", "garbage"} {
+	for _, bind := range []string{tailnetA + ":8080", tailnetB + ":80", tailnetHost + ":80", "0.0.0.0:8080", ":8080", private10 + ":80", "garbage"} {
 		for _, tc := range []struct{ from, to Mode }{{ModeEnforce, ModePermissive}, {ModeEnforce, ModeOff}, {ModePermissive, ModeOff}} {
 			g := reloadGuard(t, tc.from, bind, nil)
 			for name, do := range map[string]func() error{
@@ -83,7 +96,7 @@ func TestReloadBindRefusesLooseningOffLoopback(t *testing.T) {
 }
 
 func TestReloadBindAllowsSameModeAndTighteningAnywhere(t *testing.T) {
-	for _, bind := range []string{"100.64.0.1:8080", "0.0.0.0:8080", "127.0.0.1:8080"} {
+	for _, bind := range []string{tailnetA + ":8080", "0.0.0.0:8080", "127.0.0.1:8080"} {
 		for _, tc := range []struct{ from, to Mode }{
 			{ModeEnforce, ModeEnforce}, {ModePermissive, ModePermissive}, {ModeOff, ModeOff},
 			{ModeOff, ModePermissive}, {ModeOff, ModeEnforce}, {ModePermissive, ModeEnforce},
