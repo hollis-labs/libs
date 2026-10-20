@@ -82,9 +82,10 @@ Contract:
 - Renews at 2/3 of the token's life (`Fraction`, default `DefaultRefreshFraction`): 10 minutes for a 15 minute token.
 - `Token` is safe for concurrent use and renews lazily. At most one mint runs at a time; a caller that finds the token due while another caller is renewing gets the still-valid token without waiting.
 - If the issuer is unreachable at renewal time, the held token keeps being served until it is within `Skew` (5s) of expiry, and mints retry with exponential backoff (`RetryMin` 2s to `RetryMax` 60s). After that `Token` returns `ErrNoToken` wrapping the mint error. It recovers by itself when the issuer returns.
-- A reply whose expiry is not in the future is refused.
+- A reply is judged against the clock when it arrives: a token already expired, or inside `Skew` of expiry, is refused as a failed mint, so the token already held is kept and the retry backoff applies.
+- `Token` honors its context: a caller waiting behind a stalled mint returns `ctx.Err()` as soon as its context is done.
 - `OnRefresh` reports each attempt's result and new expiry; the token is never passed to callbacks, logged or put in an error.
-- `HTTPMinter` posts JSON with the parent credential as a bearer and accepts `{"token", "expires_at"|"ttl_seconds"}` (the shape of Tether's `POST /auth/token`); it falls back to the JWT's own `exp`. It refuses cross-origin redirects and keeps the URL and credential out of errors.
+- `HTTPMinter` posts JSON with the parent credential as a bearer and accepts `{"token", "expires_at"|"ttl_seconds"}` (the shape of Tether's `POST /auth/token`); it falls back to the JWT's own `exp`. It refuses cross-origin redirects. Errors carry the HTTP status at most: never the issuer's reply body (an endpoint may echo the Authorization header), the URL, or the credential.
 - Service tokens (below) do not need a refresher.
 
 ## Deny-list wire format

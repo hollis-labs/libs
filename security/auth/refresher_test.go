@@ -33,9 +33,15 @@ type fakeIssuer struct {
 	n     atomic.Int32
 	fail  atomic.Bool
 	delay chan struct{} // if set, Mint blocks until it is closed
+	// entered, if set, receives a value each time Mint is entered, so a test
+	// can wait for a mint to be in flight instead of sleeping.
+	entered chan struct{}
 }
 
 func (f *fakeIssuer) mint(context.Context) (Issued, error) {
+	if f.entered != nil {
+		f.entered <- struct{}{}
+	}
 	if f.delay != nil {
 		<-f.delay
 	}
@@ -149,6 +155,7 @@ func TestRefresherBacksOffAfterFailure(t *testing.T) {
 func TestRefresherConcurrentCallersShareOneMint(t *testing.T) {
 	r, is, _ := newRefresher(t, 15*time.Minute, nil)
 	is.delay = make(chan struct{})
+	is.entered = make(chan struct{}, 1)
 	var wg sync.WaitGroup
 	toks := make([]string, 16)
 	for i := range toks {
@@ -158,7 +165,7 @@ func TestRefresherConcurrentCallersShareOneMint(t *testing.T) {
 			toks[i], _ = r.Token(context.Background())
 		}()
 	}
-	time.Sleep(50 * time.Millisecond)
+	<-is.entered // one mint is in flight; callers that arrive later wait for it or find its token
 	close(is.delay)
 	wg.Wait()
 	if is.n.Load() != 1 {
@@ -177,11 +184,10 @@ func TestRefresherDueCallerDoesNotBlockOthers(t *testing.T) {
 	first, _ := r.Token(ctx)
 	clk.add(11 * time.Minute)
 	is.delay = make(chan struct{})
-	started := make(chan struct{})
+	is.entered = make(chan struct{}, 1)
 	done := make(chan string)
-	go func() { close(started); tok, _ := r.Token(ctx); done <- tok }()
-	<-started
-	time.Sleep(50 * time.Millisecond) // the renewing caller is now parked in Mint
+	go func() { tok, _ := r.Token(ctx); done <- tok }()
+	<-is.entered // the renewing caller is now parked in Mint
 	if got, err := r.Token(ctx); err != nil || got != first {
 		t.Fatalf("second caller should get the still-valid token without waiting: %q %v", got, err)
 	}
@@ -359,5 +365,123 @@ func TestRefresherWithHTTPMinterEndToEnd(t *testing.T) {
 	}
 	if n.Load() < 3 {
 		t.Fatalf("only %d mints across 5s of 2s tokens", n.Load())
+	}
+}
+
+func TestRefresherCanceledWaiterReturnsWhileAMintIsStalled(t *testing.T) {
+	r, is, _ := newRefresher(t, 15*time.Minute, nil)
+	is.delay = make(chan struct{})
+	is.entered = make(chan struct{}, 1)
+	first := make(chan error, 1)
+	go func() { _, err := r.Token(context.Background()); first <- err }()
+	<-is.entered // the first mint is stalled inside the issuer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	second := make(chan error, 1)
+	go func() { _, err := r.Token(ctx); second <- err }()
+	cancel()
+	select {
+	case err := <-second:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("canceled waiter got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a canceled caller stayed blocked behind a stalled mint")
+	}
+	close(is.delay)
+	if err := <-first; err != nil {
+		t.Fatalf("stalled mint should still complete: %v", err)
+	}
+	if is.n.Load() != 1 {
+		t.Fatalf("canceled waiter caused a mint: %d total", is.n.Load())
+	}
+}
+
+func TestRefresherKeepsOldTokenWhenIssuanceExpiresBeforeItArrives(t *testing.T) {
+	clk := &fakeClock{t: time.Unix(1_800_000_000, 0)}
+	var n atomic.Int32
+	var errs []error
+	r, err := NewRefresher(RefresherConfig{Now: clk.now, OnRefresh: func(_ time.Time, err error) { errs = append(errs, err) },
+		Mint: func(context.Context) (Issued, error) {
+			if n.Add(1) == 1 {
+				return Issued{Token: "old", ExpiresAt: clk.now().Add(15 * time.Minute)}, nil
+			}
+			// Valid when minted (now+1s) but the clock passes it before the
+			// reply is handled.
+			iss := Issued{Token: "stale", ExpiresAt: clk.now().Add(time.Second)}
+			clk.add(2 * time.Second)
+			return iss, nil
+		}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if tok, _ := r.Token(ctx); tok != "old" {
+		t.Fatalf("first token %q", tok)
+	}
+	clk.add(11 * time.Minute) // due, 4m of life left
+	tok, err := r.Token(ctx)
+	if err != nil || tok != "old" {
+		t.Fatalf("an already-expired issuance replaced a valid token: %q %v", tok, err)
+	}
+	if len(errs) != 2 || errs[0] != nil || errs[1] == nil {
+		t.Fatalf("OnRefresh results: %v", errs)
+	}
+	before := n.Load()
+	r.Token(ctx) // inside the backoff window: no hammering
+	if n.Load() != before {
+		t.Fatalf("retried inside the backoff window")
+	}
+}
+
+func TestRefresherIssuanceInsideSkewIsUnusable(t *testing.T) {
+	clk := &fakeClock{t: time.Unix(1_800_000_000, 0)}
+	r, _ := NewRefresher(RefresherConfig{Now: clk.now, Skew: 5 * time.Second,
+		Mint: func(context.Context) (Issued, error) {
+			return Issued{Token: "short", ExpiresAt: clk.now().Add(3 * time.Second)}, nil
+		}})
+	if _, err := r.Token(context.Background()); !errors.Is(err, ErrNoToken) {
+		t.Fatalf("a token already inside Skew was handed out: %v", err)
+	}
+}
+
+func TestHTTPMinterErrorsNeverEchoTheResponseBodyCredentialOrURL(t *testing.T) {
+	// An endpoint that reflects the Authorization header into its error body.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("denied: " + r.Header.Get("Authorization") + " " + r.URL.RawQuery)) //nolint:gosec // test endpoint that deliberately reflects secrets
+	}))
+	defer srv.Close()
+	cred := func() (string, error) { return "parent-secret", nil }
+	for name, url := range map[string]string{
+		"reflected body": srv.URL + "/?key=url-secret",
+		"invalid url":    "http://exa mple.invalid/?key=url-secret",
+		"control char":   "http://127.0.0.1:1/\x7f?key=url-secret",
+		"bad scheme":     "ht!tp://127.0.0.1/?key=url-secret",
+	} {
+		m := &HTTPMinter{URL: url, Credential: cred}
+		_, err := m.Mint(context.Background())
+		if err == nil {
+			t.Errorf("%s: no error", name)
+			continue
+		}
+		for _, secret := range []string{"parent-secret", "url-secret", "Bearer"} {
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("%s: error leaks %q: %v", name, secret, err)
+			}
+		}
+	}
+	// The same through the Refresher: OnRefresh and ErrNoToken carry the error.
+	var seen []string
+	r, _ := NewRefresher(RefresherConfig{Mint: (&HTTPMinter{URL: srv.URL + "/?key=url-secret", Credential: cred}).Mint,
+		OnRefresh: func(_ time.Time, err error) { seen = append(seen, err.Error()) }})
+	_, err := r.Token(context.Background())
+	if err == nil || strings.Contains(err.Error(), "parent-secret") || strings.Contains(err.Error(), "url-secret") {
+		t.Fatalf("refresher error: %v", err)
+	}
+	for _, m := range seen {
+		if strings.Contains(m, "parent-secret") || strings.Contains(m, "url-secret") {
+			t.Fatalf("OnRefresh error leaks: %s", m)
+		}
 	}
 }

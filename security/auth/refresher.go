@@ -63,7 +63,7 @@ type RefresherConfig struct {
 type Refresher struct {
 	cfg RefresherConfig
 
-	refreshMu sync.Mutex // serializes mints; held across the issuer call
+	sem chan struct{} // capacity 1: serializes mints, held across the issuer call; waiters honor ctx
 
 	mu      sync.Mutex // guards the fields below
 	tok     string
@@ -100,7 +100,7 @@ func NewRefresher(cfg RefresherConfig) (*Refresher, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Refresher{cfg: cfg}, nil
+	return &Refresher{cfg: cfg, sem: make(chan struct{}, 1)}, nil
 }
 
 // Token returns a token that is valid now, minting or renewing it if needed.
@@ -112,17 +112,25 @@ func (r *Refresher) Token(ctx context.Context) (string, error) {
 		return tok, nil
 	} else if ok {
 		// Valid but due: renew if nobody else is, otherwise serve the old one.
-		if r.refreshMu.TryLock() {
-			defer r.refreshMu.Unlock()
+		select {
+		case r.sem <- struct{}{}:
 			r.refreshLocked(ctx)
+			<-r.sem
+		default:
 		}
 		if tok, ok, _ := r.held(); ok {
 			return tok, nil
 		}
 		return "", r.noToken()
 	}
-	r.refreshMu.Lock()
-	defer r.refreshMu.Unlock()
+	// Nothing usable is held: wait for the in-flight mint, or mint, but give
+	// up as soon as this caller's ctx is done.
+	select {
+	case r.sem <- struct{}{}:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	defer func() { <-r.sem }()
 	if tok, ok, _ := r.held(); ok { // another caller minted while we waited
 		return tok, nil
 	}
@@ -138,11 +146,15 @@ func (r *Refresher) Token(ctx context.Context) (string, error) {
 // are reported through OnRefresh.
 func (r *Refresher) Run(ctx context.Context) {
 	for {
-		r.refreshMu.Lock()
-		if _, ok, due := r.held(); !ok || due {
-			r.refreshLocked(ctx)
+		select {
+		case r.sem <- struct{}{}:
+			if _, ok, due := r.held(); !ok || due {
+				r.refreshLocked(ctx)
+			}
+			<-r.sem
+		case <-ctx.Done():
+			return
 		}
-		r.refreshMu.Unlock()
 		wait := r.untilNext()
 		t := time.NewTimer(wait)
 		select {
@@ -197,7 +209,7 @@ func (r *Refresher) untilNext() time.Duration {
 	return r.cfg.RetryMin
 }
 
-// refreshLocked mints under refreshMu, honoring the retry backoff.
+// refreshLocked mints while the caller holds sem, honoring the retry backoff.
 func (r *Refresher) refreshLocked(ctx context.Context) {
 	r.mu.Lock()
 	if r.cfg.Now().Before(r.nextTry) {
@@ -207,7 +219,11 @@ func (r *Refresher) refreshLocked(ctx context.Context) {
 	r.mu.Unlock()
 	start := r.cfg.Now()
 	got, err := r.cfg.Mint(ctx)
-	if err == nil && (got.Token == "" || !got.ExpiresAt.After(start)) {
+	// Usable means still valid, with Skew to spare, when it arrives: judged
+	// against the clock now, not the instant the request started. An unusable
+	// issuance is a failure, so the token already held is kept and the retry
+	// backoff applies.
+	if err == nil && (got.Token == "" || !r.cfg.Now().Add(r.cfg.Skew).Before(got.ExpiresAt)) {
 		err = errors.New("auth: issuer returned an unusable token")
 	}
 	r.mu.Lock()
@@ -255,8 +271,8 @@ type HTTPMinter struct {
 	Now    func() time.Time
 }
 
-// Mint requests a token. Errors carry the status and a bounded excerpt of the
-// issuer's reply, never the credential or the token.
+// Mint requests a token. Errors carry the HTTP status at most: never the issuer's
+// reply body, the URL, the credential or the token.
 func (m *HTTPMinter) Mint(ctx context.Context) (Issued, error) {
 	if m.URL == "" || m.Credential == nil {
 		return Issued{}, errors.New("auth: HTTPMinter needs URL and Credential")
@@ -271,7 +287,8 @@ func (m *HTTPMinter) Mint(ctx context.Context) (Issued, error) {
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.URL, bytes.NewReader(body))
 	if err != nil {
-		return Issued{}, err
+		// The URL is operator configuration and may embed a secret; never echo it.
+		return Issued{}, errors.New("auth: invalid token endpoint URL")
 	}
 	for k, vs := range m.Header {
 		for _, v := range vs {
@@ -299,7 +316,9 @@ func (m *HTTPMinter) Mint(ctx context.Context) (Issued, error) {
 	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
 	if resp.StatusCode != http.StatusOK {
-		return Issued{}, fmt.Errorf("auth: issuer refused token: status %d: %s", resp.StatusCode, excerpt(raw))
+		// Status only: an endpoint can echo the Authorization header or any
+		// other secret into its body, so the body is never surfaced.
+		return Issued{}, fmt.Errorf("auth: issuer refused token: status %d", resp.StatusCode)
 	}
 	var out struct {
 		Token     string    `json:"token"`
@@ -326,14 +345,6 @@ func (m *HTTPMinter) Mint(ctx context.Context) (Issued, error) {
 		return Issued{}, errors.New("auth: issuer reply carries no expiry")
 	}
 	return Issued{Token: out.Token, ExpiresAt: exp}, nil
-}
-
-func excerpt(b []byte) string {
-	s := strings.TrimSpace(string(b))
-	if len(s) > 200 {
-		s = s[:200] + "..."
-	}
-	return s
 }
 
 // scrubURLError drops the request URL from a transport error so a URL that
