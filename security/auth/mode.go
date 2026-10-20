@@ -21,6 +21,53 @@ const (
 	ModeEnforce Mode = "enforce"
 )
 
+// strictness orders the modes: enforce is the strictest.
+func (m Mode) strictness() int {
+	switch m {
+	case ModeEnforce:
+		return 2
+	case ModePermissive:
+		return 1
+	}
+	return 0
+}
+
+// WeakerThan reports whether m admits more than other does: off is weaker than
+// permissive, which is weaker than enforce. The modes are compared in their
+// ParseMode canonical form; an unrecognized mode is treated as enforce, as the
+// guard does.
+func (m Mode) WeakerThan(other Mode) bool {
+	return m.canonical().strictness() < other.canonical().strictness()
+}
+
+func (m Mode) canonical() Mode {
+	if c, err := ParseMode(string(m)); err == nil {
+		return c
+	}
+	return ModeEnforce
+}
+
+// IsLoopbackAddr reports whether addr is reachable only from this machine: a
+// unix socket, "localhost", or a loopback IP (127.0.0.0/8, ::1). addr may be
+// "host:port", "tcp:host:port" or "unix:/path". It is stricter than
+// ValidateBind, which also accepts tailnet addresses: a tailnet address is
+// reachable from other machines, so it is NOT loopback here. An address that
+// does not parse is not loopback.
+func IsLoopbackAddr(addr string) bool {
+	if strings.HasPrefix(addr, "unix:") || strings.HasPrefix(addr, "/") {
+		return true
+	}
+	host, _, err := net.SplitHostPort(strings.TrimPrefix(addr, "tcp:"))
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
 // ParseMode accepts off, permissive, enforce, and the alias observe
 // (= permissive), case-insensitively.
 func ParseMode(s string) (Mode, error) {

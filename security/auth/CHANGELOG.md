@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Additive; one stricter behavior only for callers that set the new field.
+
+### Added
+
+- `Config.ReloadBind`: the one shared reload-loosening rule. With it set, `Apply`, `SetMode` and `CheckApply` refuse (`ErrLoosenRefused`, wrapped) a move to a weaker mode unless the listener is loopback (`IsLoopbackAddr`: unix socket, `localhost`, loopback IP). Tailnet addresses count as non-loopback here, unlike `ValidateBind`'s startup rule. Same mode and tightening are allowed anywhere, an allowed loosening logs the existing WARN naming the old and new mode, and `New` is not judged by it. It does not require or imply `Config.Addr`.
+- `IsLoopbackAddr(addr)` and `Mode.WeakerThan(other)`.
+
 ## v0.2.1 — 2026-10-20
 
 Bug fix and documentation; no exported API changes.
