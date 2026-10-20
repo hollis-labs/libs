@@ -38,7 +38,7 @@ func TestPeekDoesNotConsumeUntilAck(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
 	for _, id := range []string{"a", "b", "c"} {
-		if _, err := s.append(item(id, PriorityHigh)); err != nil {
+		if _, _, err := s.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -66,10 +66,10 @@ func TestFileSizeStaysBounded(t *testing.T) {
 	s := mustSpool(t, t.TempDir(), max)
 	var worst int64
 	for i := 0; i < 200; i++ {
-		if _, err := s.append(item(fmt.Sprintf("e%03d", i), PriorityHigh)); err != nil {
+		if _, _, err := s.append(item(fmt.Sprintf("e%03d", i), PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.append(item(fmt.Sprintf("f%03d", i), PriorityHigh)); err != nil {
+		if _, _, err := s.append(item(fmt.Sprintf("f%03d", i), PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 		got, err := s.peek(1)
@@ -93,7 +93,7 @@ func TestFileSizeStaysBounded(t *testing.T) {
 func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
-	if _, err := s.append(item("a", PriorityHigh)); err != nil {
+	if _, _, err := s.append(item("a", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	// A crash mid-write: half a record, no newline.
@@ -107,7 +107,7 @@ func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 	f.Close()
 
 	again := mustSpool(t, dir, 1<<20)
-	if _, err := again.append(item("b", PriorityHigh)); err != nil {
+	if _, _, err := again.append(item("b", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := again.peek(10)
@@ -119,7 +119,7 @@ func TestTornTailIsRepairedBeforeAppend(t *testing.T) {
 func TestStrayAndStaleFilesAreCleanedUp(t *testing.T) {
 	dir := t.TempDir()
 	s := mustSpool(t, dir, 1<<20)
-	if _, err := s.append(item("a", PriorityHigh)); err != nil {
+	if _, _, err := s.append(item("a", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	// Leftover of an interrupted swap, and a state head past the end.
@@ -148,7 +148,7 @@ func TestReopenAfterCompactionAndCap(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		id := fmt.Sprintf("h%d", i)
 		all = append(all, id)
-		if _, err := s.append(item(id, PriorityHigh)); err != nil {
+		if _, _, err := s.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -167,7 +167,7 @@ func TestReopenAfterCompactionAndCap(t *testing.T) {
 // already loaded for sending stay valid.
 func TestCapKeepsInFlightRecordsAndHighPriority(t *testing.T) {
 	s := mustSpool(t, t.TempDir(), 700)
-	if _, err := s.append(item("first", PriorityHigh)); err != nil {
+	if _, _, err := s.append(item("first", PriorityHigh)); err != nil {
 		t.Fatal(err)
 	}
 	flight, _ := s.peek(1)
@@ -176,7 +176,7 @@ func TestCapKeepsInFlightRecordsAndHighPriority(t *testing.T) {
 		if i%4 == 0 {
 			p = PriorityHigh
 		}
-		if _, err := s.append(item(fmt.Sprintf("n%02d", i), p)); err != nil {
+		if _, _, err := s.append(item(fmt.Sprintf("n%02d", i), p)); err != nil {
 			t.Fatal(err)
 		}
 	}

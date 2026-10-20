@@ -12,6 +12,10 @@
 - Optional bounded disk spool that keeps order and survives restarts. Records
   stay on disk until the hub settles them, the file is swapped atomically by
   generation, a torn tail is repaired, and disk use is bounded by compaction.
+- Events without a valid verdict are retried for as long as the client runs
+  (`MaxUnresolved` is an opt-in limit). Loss of a high-priority item to a full
+  queue or spool is the last resort and is reported as `high_priority_dropped`
+  and counted in `Stats.DroppedHigh`.
 - `FromEnv` (a no-op `Noop` when `HOLLIS_EVENTS_URL` is unset) and `Noop`.
   Envelope-agnostic: items are raw JSON, so the module needs nothing from the
   harness group.

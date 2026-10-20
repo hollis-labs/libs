@@ -64,9 +64,12 @@ type Config struct {
 	BackoffBase   time.Duration // first retry delay, doubling; default 500ms
 	BackoffMax    time.Duration // default 30s
 
-	// MaxUnresolved is how many times the hub may answer 200 without a
-	// verdict for some of an item's batch (item missing, unknown status,
-	// unreadable body) before those items are dropped. Default 8.
+	// MaxUnresolved, when positive, is how many times the hub may answer 200
+	// without a valid verdict for the same events (missing, unknown status,
+	// unreadable body) before those events are dropped as "unresolved". The
+	// default, 0, never drops them: they are retried with backoff for as long
+	// as the client runs, and the queue and spool caps bound the memory and
+	// disk used meanwhile.
 	MaxUnresolved int
 
 	// SpoolDir, when set, enables the disk spool: items that do not fit in
@@ -78,8 +81,9 @@ type Config struct {
 	SpoolMaxBytes int64
 
 	// OnDrop is called when items are lost: reason is "queue_full",
-	// "spool_full", "closed", "invalid", "unresolved", "rejected" or
-	// "spool_error". OnReject is called for each item the hub rejected (not
+	// "spool_full", "high_priority_dropped" (a state, approval, audit or alert
+	// item lost to a full queue or spool, the last resort), "closed",
+	// "invalid", "unresolved", "rejected" or "spool_error". OnReject is called for each item the hub rejected (not
 	// retried). OnError reports transport and auth failures that are being
 	// retried. None is called with an internal lock held; all must not block.
 	OnDrop   func(n int, reason string)
@@ -93,9 +97,11 @@ type Stats struct {
 	Duplicates uint64
 	Rejected   uint64
 	Dropped    uint64
-	Retries    uint64
-	Queued     int
-	SpoolBytes int64 // unsettled bytes on disk
+	// DroppedHigh counts the high-priority items among Dropped.
+	DroppedHigh uint64
+	Retries     uint64
+	Queued      int
+	SpoolBytes  int64 // unsettled bytes on disk
 }
 
 // Client posts items to a hub. Create one with [New] or [FromEnv].
@@ -115,7 +121,7 @@ type Client struct {
 	carry   []queued // owned by the sender goroutine
 	backoff time.Duration
 
-	sent, dups, rejected, dropped, retries atomic.Uint64
+	sent, dups, rejected, dropped, droppedHigh, retries atomic.Uint64
 }
 
 var _ Publisher = (*Client)(nil)
@@ -145,9 +151,6 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.BackoffMax <= 0 {
 		cfg.BackoffMax = 30 * time.Second
-	}
-	if cfg.MaxUnresolved <= 0 {
-		cfg.MaxUnresolved = 8
 	}
 	cfg.URL = ingestURL(cfg.URL)
 	c := &Client{
@@ -208,6 +211,9 @@ func (c *Client) emit(notes []dropNote) {
 			continue
 		}
 		c.dropped.Add(uint64(d.n))
+		if d.reason == "high_priority_dropped" {
+			c.droppedHigh.Add(uint64(d.n))
+		}
 		if c.cfg.OnDrop != nil {
 			c.cfg.OnDrop(d.n, d.reason)
 		}
@@ -230,11 +236,11 @@ func (c *Client) Publish(it Item) {
 	case c.spool != nil && (c.spool.unread() > 0 || len(c.mem) >= c.cfg.QueueSize):
 		// Everything after unsettled spool records goes behind them, so the
 		// order of delivery is the order of Publish.
-		n, err := c.spool.append(it)
+		n, high, err := c.spool.append(it)
 		if err != nil {
 			notes = append(notes, dropNote{1, "spool_error"})
-		} else if n > 0 {
-			notes = append(notes, dropNote{n, "spool_full"})
+		} else {
+			notes = append(notes, dropNote{n - high, "spool_full"}, dropNote{high, "high_priority_dropped"})
 		}
 	case len(c.mem) >= c.cfg.QueueSize:
 		notes = append(notes, c.makeRoom(it)...)
@@ -265,7 +271,7 @@ func (c *Client) makeRoom(in Item) []dropNote {
 		return []dropNote{{1, "queue_full"}}
 	}
 	c.mem = append(c.mem[1:], queued{Item: in})
-	return []dropNote{{1, "queue_full"}}
+	return []dropNote{{1, "high_priority_dropped"}}
 }
 
 // Stats returns the counters.
@@ -277,7 +283,7 @@ func (c *Client) Stats() Stats {
 		sb = c.spool.unread()
 	}
 	c.mu.Unlock()
-	return Stats{Sent: c.sent.Load(), Duplicates: c.dups.Load(), Rejected: c.rejected.Load(), Dropped: c.dropped.Load(), Retries: c.retries.Load(), Queued: q, SpoolBytes: sb}
+	return Stats{Sent: c.sent.Load(), Duplicates: c.dups.Load(), Rejected: c.rejected.Load(), Dropped: c.dropped.Load(), DroppedHigh: c.droppedHigh.Load(), Retries: c.retries.Load(), Queued: q, SpoolBytes: sb}
 }
 
 // Close makes one last delivery attempt, then keeps whatever is unsent in the
@@ -518,7 +524,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 				continue
 			}
 			unresolved++
-			if unresolved > c.cfg.MaxUnresolved {
+			if c.cfg.MaxUnresolved > 0 && unresolved > c.cfg.MaxUnresolved {
 				c.drop(len(open), "unresolved")
 				finishItems(open)
 				continue
@@ -740,12 +746,11 @@ func (c *Client) finish() {
 			}
 		}
 		if len(fresh) > 0 {
-			n, err := c.spool.prepend(fresh)
-			switch {
-			case err != nil:
+			n, high, err := c.spool.prepend(fresh)
+			if err != nil {
 				notes = append(notes, dropNote{len(fresh), "spool_error"})
-			case n > 0:
-				notes = append(notes, dropNote{n, "spool_full"})
+			} else {
+				notes = append(notes, dropNote{n - high, "spool_full"}, dropNote{high, "high_priority_dropped"})
 			}
 		}
 	}

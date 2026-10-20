@@ -188,15 +188,16 @@ func (s *spool) readFrom(off int64) ([]byte, error) {
 }
 
 // append adds an item at the tail and returns how many items the cap forced
-// out (the new item included, if it was one of them).
-func (s *spool) append(it Item) (dropped int, err error) {
+// out (the new item included, if it was one of them), and how many of those were
+// high priority.
+func (s *spool) append(it Item) (dropped, high int, err error) {
 	line, err := encodeLine(it)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	f, err := os.OpenFile(s.filePath(s.gen), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	n, werr := f.Write(line)
 	cerr := f.Close()
@@ -210,27 +211,27 @@ func (s *spool) append(it Item) (dropped int, err error) {
 		if werr == nil {
 			werr = io.ErrShortWrite
 		}
-		return 0, werr
+		return 0, 0, werr
 	}
 	s.size += int64(len(line))
 	if s.max > 0 && s.unread() > s.max {
 		return s.enforceCap()
 	}
-	return 0, nil
+	return 0, 0, nil
 }
 
 // enforceCap drops records beyond pos (never an in-flight one) until the unread
 // bytes are at most 90% of the cap: oldest PriorityLow first, then oldest of
 // any priority. The prefix before pos is kept byte for byte, so the offsets of
 // in-flight items stay valid.
-func (s *spool) enforceCap() (int, error) {
+func (s *spool) enforceCap() (dropped, high int, err error) {
 	region, err := s.readFrom(s.pos)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	prefix, err := s.readRange(0, s.pos)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	budget := s.max*9/10 - (s.pos - s.head)
 	if budget < 0 {
@@ -252,7 +253,6 @@ func (s *spool) enforceCap() (int, error) {
 		recs = append(recs, rec{line: line, prio: sl.Prio, keep: true})
 		total += int64(len(line))
 	}
-	dropped := 0
 	for pass := 0; pass < 2 && total > budget; pass++ {
 		for i := range recs {
 			if total <= budget {
@@ -262,6 +262,9 @@ func (s *spool) enforceCap() (int, error) {
 				recs[i].keep = false
 				total -= int64(len(recs[i].line))
 				dropped++
+				if recs[i].prio == PriorityHigh {
+					high++
+				}
 			}
 		}
 	}
@@ -273,9 +276,9 @@ func (s *spool) enforceCap() (int, error) {
 		}
 	}
 	if err := s.swap(out.Bytes(), s.head); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return dropped, nil
+	return dropped, high, nil
 }
 
 func (s *spool) readRange(from, to int64) ([]byte, error) {
@@ -372,26 +375,26 @@ func (s *spool) ackTo(off int64) (shift int64, err error) {
 }
 
 // prepend puts items (oldest first) in front of every unsettled record.
-func (s *spool) prepend(items []Item) (dropped int, err error) {
+func (s *spool) prepend(items []Item) (dropped, high int, err error) {
 	rest, err := s.readFrom(s.head)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	var buf bytes.Buffer
 	for _, it := range items {
 		line, err := encodeLine(it)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		buf.Write(line)
 	}
 	buf.Write(rest)
 	if err := s.swap(buf.Bytes(), 0); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	s.head, s.pos = 0, 0
 	if s.max > 0 && s.unread() > s.max {
 		return s.enforceCap()
 	}
-	return 0, nil
+	return 0, 0, nil
 }

@@ -18,9 +18,10 @@
 //     (see the wire format below). "accepted" or "duplicate" count as sent,
 //     "rejected" goes to OnReject and is never retried. A 200 that is
 //     unreadable, omits an event, or gives an invalid verdict leaves those
-//     events unresolved: they are sent again, alone,
-//     with backoff, and dropped (reason "unresolved") only after
-//     Config.MaxUnresolved tries. Events with a verdict are never re-sent.
+//     events unresolved: they are sent again, alone, with backoff, for as long
+//     as the client runs (Config.MaxUnresolved can set a limit, after which
+//     they are dropped as "unresolved"; the default is no limit). Events with
+//     a verdict are never re-sent.
 //   - A request is at most 100 events and about 900 KiB. A 413 halves the
 //     window; a single event the hub refuses as too large is rejected.
 //   - Network errors, 401, 403 (scope_required), 404/405 (ingest not enabled on
@@ -30,6 +31,12 @@
 //     app_mismatch (the events name another app than the credential) can never
 //     succeed, so that batch is dropped and counted rather than blocking
 //     everything behind it. Other 4xx drop the batch and count it as rejected.
+//   - Memory and disk are bounded, so loss under a long outage is possible and
+//     is reported, not hidden: dropping a high-priority item (state, approval,
+//     audit, alert) happens only after every low-priority item that could go
+//     has gone, and is reported with the reason "high_priority_dropped" and
+//     counted in Stats.DroppedHigh. An app that cannot accept even that keeps
+//     its own outbox (see below).
 //   - When the in-memory queue is full and there is no spool, the oldest
 //     [PriorityLow] item is evicted to make room. If everything held is
 //     high priority, an incoming low-priority item is the one dropped, and an

@@ -436,7 +436,7 @@ func TestInFlightSpoolRecordsSurviveACrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"a", "b", "c"} {
-		if _, err := sp.append(item(id, PriorityHigh)); err != nil {
+		if _, _, err := sp.append(item(id, PriorityHigh)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -762,5 +762,60 @@ func TestDuplicateIDsInOneBatchAreMatchedByPosition(t *testing.T) {
 	v = verdicts(items, []byte(`{"results":[{"id":"a","status":"accepted","cursor":"1"}]}`))
 	if v[0] != nil || v[1] != nil {
 		t.Fatalf("ambiguous duplicate ids must be unresolved: %+v %+v", v[0], v[1])
+	}
+}
+
+// By default an event without a valid verdict is never given up on.
+func TestUnresolvedEventsAreRetriedUntilTheHubAnswers(t *testing.T) {
+	h := &hub{status: func(call int32, _ []string) (int, string, map[string]string) {
+		if call <= 12 {
+			return 200, `{}`, nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(fast(Config{URL: srv.URL}))
+	c.Publish(item("a", PriorityHigh))
+	waitFor(t, "delivery after 12 unresolved answers", func() bool { return c.Stats().Sent == 1 })
+	closeClient(t, c)
+	if st := c.Stats(); st.Dropped != 0 || st.Retries < 12 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// Losing a high-priority item is the last resort and is reported as such.
+func TestHighPriorityLossIsReportedSeparately(t *testing.T) {
+	var mu sync.Mutex
+	reasons := map[string]int{}
+	c, _ := New(Config{URL: "http://127.0.0.1:1", QueueSize: 2, FlushInterval: time.Hour,
+		OnDrop: func(n int, r string) { mu.Lock(); reasons[r] += n; mu.Unlock() }})
+	c.Publish(item("h1", PriorityHigh))
+	c.Publish(item("h2", PriorityHigh))
+	c.Publish(item("l1", PriorityLow))  // the incoming low item goes
+	c.Publish(item("h3", PriorityHigh)) // h1 goes
+	mu.Lock()
+	defer mu.Unlock()
+	if reasons["queue_full"] != 1 || reasons["high_priority_dropped"] != 1 {
+		t.Fatalf("reasons = %v", reasons)
+	}
+	if st := c.Stats(); st.Dropped != 2 || st.DroppedHigh != 1 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+func TestSpoolCapReportsHighPriorityLoss(t *testing.T) {
+	s := mustSpool(t, t.TempDir(), 300)
+	var dropped, high int
+	for i := 0; i < 10; i++ {
+		d, h, err := s.append(item(fmt.Sprintf("h%d", i), PriorityHigh))
+		if err != nil {
+			t.Fatal(err)
+		}
+		dropped += d
+		high += h
+	}
+	if dropped == 0 || high != dropped {
+		t.Fatalf("only high priority items were queued: dropped=%d high=%d", dropped, high)
 	}
 }
