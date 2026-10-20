@@ -5,9 +5,10 @@ import _ "embed"
 // EventSchema is the JSON Schema (draft 2020-12) for one event as accepted by
 // POST /events: the generic Event schema (runtimeevents.JSONSchema, $id
 // urn:hollis-labs:runtimeevents:event/v1, which a compiler must have registered)
-// plus a canonical id (evt_ and 32 lowercase hex), a required app, and closed
-// vocabularies for source.confidence and the class fields. CheckItem applies it
-// to every event, including each item of a batch.
+// plus a canonical id (evt_ and 32 lowercase hex) and a required app. It adds
+// no vocabulary restrictions: unknown vocabulary values stay allowed, as in the
+// generic envelope. CheckItem applies it to every event, including each item of
+// a batch.
 //
 //go:embed schema/ingest.v1.event.schema.json
 var EventSchema []byte

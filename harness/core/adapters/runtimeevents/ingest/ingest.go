@@ -214,7 +214,7 @@ type Options struct {
 
 // CheckItem applies the per-event rules for a producer registered as app, in
 // this order: JSON decodes as an Event; payload size; the event matches
-// [EventSchema] (canonical id, required app, closed vocabularies, types);
+// [EventSchema] (the generic envelope plus a canonical id and a required app);
 // [runtimeevents.Event.Validate]; visibility is not "local"; the kind is in the
 // catalog; the app may publish the kind. The payload is only required to be
 // JSON: per-kind payload schemas are not validated here. It returns the decoded event, or a Rejection. It does not check

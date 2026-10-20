@@ -13,8 +13,9 @@ All notable changes to the `harness` module are documented here (the module was 
 - `adapters/runtimeevents/ingest` (CW-20261020-0009): the contract for publishing
   events to the hub with `POST /events`. Limits (100 events, 1 MiB per request,
   64 KiB per payload), `ParseRequest`, `CheckItem` (the per-event rules in a fixed
-  order, including the ingest event JSON Schema: canonical `evt_` id, required app,
-  closed classification vocabularies; the per-kind payload schema is not validated), the per-event `Result` and `Response`, JSON Schemas for the request and
+  order, including the ingest event JSON Schema: the generic envelope plus a canonical
+  `evt_` id and a required app, no new vocabulary restrictions; the per-kind payload
+  schema is not validated), the per-event `Result` and `Response`, JSON Schemas for the request and
   the answer, and fixtures for other languages.
 - `adapters/runtimeevents/catalog`: `producers.json` with `LoadProducers`,
   `ProducerFor` and `ProducerAllows`, the per-app list of kinds a producer may

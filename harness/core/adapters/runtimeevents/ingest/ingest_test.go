@@ -238,7 +238,7 @@ func TestItemFixtures(t *testing.T) {
 		})
 	}
 	invalid := fixtures(t, "item/invalid")
-	if len(invalid) < 20 {
+	if len(invalid) < 15 {
 		t.Fatalf("only %d invalid vectors", len(invalid))
 	}
 	for name, b := range invalid {
