@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+## v0.2.0 — 2026-10-20
+
+### Added
+
+- `Client.Deliver(ctx, items)`: synchronous delivery for a caller that keeps its
+  own durable record (an outbox relay). It bypasses the queue and spool, applies
+  the same rules as the queue (strict verdicts, backoff, quarantine for what can
+  never succeed) and returns a `Result` per item: a `Disposition` (`Sent`,
+  `Quarantined`, or `Pending` when the context ended or the client closed), a
+  `Duplicate` flag and, for a quarantined item, the `Reason` and `Code`. An item
+  is `Quarantined` only once its record is durably written; if the file cannot be
+  written it is retried and stays `Pending`. A 401 or 403 `scope_required` is
+  waited out for as long as the context lives (the `RetryAuthMax` ceiling
+  protects the queue's bounded memory, not a caller with a durable record), so a
+  missing credential cannot drain an outbox into quarantine; `StrictAuth` still
+  makes it final. `Close` waits for a running `Deliver` and cancels its in-flight
+  request. It keeps its own retry state, so it can run next to the queue sender.
+  `Deliver` requires `Config.SpoolDir`: `Quarantined` means "recorded in
+  `quarantine.jsonl`", so a client without one leaves every item `Pending` and
+  reports an error rather than let a relay skip an event it has no copy of. A
+  closed client, or one closed between chunks, sends nothing more. The relay moves
+  its cursor only over `Sent` and `Quarantined`; any other disposition stops it.
+  While `Deliver` waits on an auth failure, `Client.AuthWaitingSince()` (and
+  `relay.Stats.AuthWaitingSince`) say since when, and a WARN naming the status is
+  logged every `Config.AuthWarnInterval` (default 5 minutes), so a permanently
+  wrong scope cannot sit silent.
+- Package `relay`: ships an app's local outbox to the hub. The app supplies a
+  `Source` (entries after a sequence number, in order; optionally `Head` for lag)
+  and a `Cursor` (the last settled sequence number; `FileCursor` is one). The
+  relay moves the cursor only over the contiguous prefix of entries the hub
+  settled or the client durably quarantined, resumes from it after a restart, and
+  reports and retries failures of the source, the cursor store and the hub. At
+  least once; the hub dedupes on the event id. `Stats` report sent, duplicates,
+  rejected, quarantined, cursor, head and lag.
+
+### Fixed
+
+- An item whose body is not valid JSON can now be quarantined (it is stored as a
+  JSON string of its raw bytes; reason `invalid`).
+
 ## v0.1.0 — 2026-10-20
 
 ### Added

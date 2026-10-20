@@ -50,7 +50,8 @@
 //
 // Recovering quarantined events is manual in this version. quarantine.jsonl has
 // one JSON object per line: at, reason, code, message, id, p (the priority) and
-// b (the exact envelope body as it was sent). To resend, stop the client, fix the
+// b (the exact envelope body as it was sent; for the reason "invalid", an item
+// that was not valid JSON, b is a JSON string holding its raw bytes). To resend, stop the client, fix the
 // cause, read the lines you want, call Publish with Item{ID: id, Priority: p,
 // Body: b} on a running client, and remove those lines from the file. The hub
 // dedupes on the id, so resending an event it already has is harmless. A
@@ -94,6 +95,10 @@
 // one by one: the spool survives a process crash, not necessarily a power loss.
 // Order is kept: once the spool holds unsettled records, new items go behind
 // them.
+//
+// For callers that keep their own outbox, Client.Deliver sends synchronously and
+// reports what became of each item, and package relay uses it to ship an outbox
+// to the hub with a persisted cursor.
 //
 // What it is not: a durable outbox. Items still in memory are lost if the
 // process is killed (with a spool, only those that never reached it). An app

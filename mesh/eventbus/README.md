@@ -27,3 +27,21 @@ client deliberately does not do (it is not a durable outbox). It has no
 dependencies and imports nothing from the harness group; turning a
 `runtimeevents.Event` into an `Item` is a few lines in the consuming module.
 Subscribing to the hub's stream is not part of this version.
+
+## Relaying an outbox
+
+An app that must not lose events keeps its own outbox and ships it with the
+`relay` package. The relay reads the outbox in order from a saved cursor, sends
+each batch with `Client.Deliver`, and moves the cursor only over events the hub
+has settled (sent, or durably quarantined). A missing credential is waited out,
+not quarantined. The client needs a `SpoolDir`, whose `quarantine.jsonl` is the durable copy of what cannot be sent. After a crash it resends from the
+saved cursor; the hub dedupes on the event id.
+
+```go
+r, _ := relay.New(relay.Config{
+	Source:    myOutbox,                                   // After(ctx, afterSeq, limit) ([]relay.Entry, error)
+	Cursor:    relay.FileCursor{Path: "/var/lib/app/relay.cursor"},
+	Deliverer: client,                                     // an *eventbus.Client
+})
+go r.Run(ctx)  // returns when ctx is done
+```

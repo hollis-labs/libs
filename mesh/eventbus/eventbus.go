@@ -87,6 +87,11 @@ type Config struct {
 	// immediately instead. Any other 403, app_mismatch included, is final.
 	RetryAuthMax time.Duration
 	StrictAuth   bool
+	// AuthWarnInterval is how often Deliver, which waits out auth failures for
+	// as long as its context lives, logs a WARN naming the status while it is
+	// still waiting (default 5 minutes), so a permanently wrong scope cannot sit
+	// silent. [Client.AuthWaitingSince] says since when.
+	AuthWarnInterval time.Duration
 
 	// SpoolDir, when set, enables the disk spool, the quarantine file and the
 	// loss record: items that do not fit in memory, and anything unsent at
@@ -152,7 +157,11 @@ type Client struct {
 	quar   *quarantine
 	loss   *lossBook
 	closed bool
-	errs   []error // reported by emit, outside the lock
+
+	authWaiting atomic.Int64 // unix nanos when Deliver's auth failures began, 0 when none
+	errs        []error      // reported by emit, outside the lock
+
+	deliverWG sync.WaitGroup // running Deliver calls; Close waits for them
 
 	wake chan struct{}
 	stop chan struct{}
@@ -197,6 +206,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.RetryAuthMax == 0 {
 		cfg.RetryAuthMax = 10 * time.Minute
+	}
+	if cfg.AuthWarnInterval <= 0 {
+		cfg.AuthWarnInterval = 5 * time.Minute
 	}
 	if cfg.QuarantineMaxBytes <= 0 {
 		cfg.QuarantineMaxBytes = 8 << 20
@@ -364,6 +376,142 @@ func (c *Client) makeRoom(in Item) []dropNote {
 	return []dropNote{{1, "queue_full"}}
 }
 
+// Disposition is what became of one item passed to [Client.Deliver].
+type Disposition uint8
+
+const (
+	// DispositionPending: not settled; the call ended first (ctx done, or the
+	// client closed). Nothing was recorded for it.
+	DispositionPending Disposition = iota
+	// DispositionSent: the hub accepted it (or already had it).
+	DispositionSent
+	// DispositionQuarantined: it will not be delivered and is durably recorded
+	// in quarantine (the hub rejected it, refused its request for good, or gave
+	// no valid verdict within MaxUnresolved tries). The caller may move on.
+	DispositionQuarantined
+)
+
+// Result is the outcome of one item passed to [Client.Deliver].
+type Result struct {
+	Disposition Disposition
+	// Duplicate: the hub already had the event (Disposition is Sent).
+	Duplicate bool
+	// Reason and Code say why an item was quarantined: for example "rejected"
+	// with the hub's code, "bad_request", "auth", "app_mismatch", "forbidden",
+	// "payload_too_large", "unresolved" or "invalid".
+	Reason, Code string
+}
+
+// Deliver sends items synchronously, bypassing the queue and the spool, and
+// returns a [Result] for each, in order. It is for a caller that keeps its own
+// durable record and must not move past an event until the hub has settled it
+// (an outbox relay). It applies the same rules as the queue: strict verdicts,
+// retries with backoff for transient failures, quarantine for what can never
+// succeed. Differences that follow from the caller's durable record: a 401 or
+// 403 scope_required is waited out for as long as ctx lives, never quarantined
+// at the RetryAuthMax ceiling (that ceiling protects the queue's bounded
+// memory), though every failure is reported through OnError and StrictAuth
+// still makes them final; and an item is quarantined only once that record is
+// durably written, otherwise it is retried.
+//
+// Deliver needs Config.SpoolDir: Quarantined means "recorded in quarantine.jsonl",
+// so a client without one leaves every item Pending and reports an error. A
+// client that is closed (at entry, or between chunks) sends nothing more.
+//
+// Deliver returns when every item is Sent or Quarantined, or when ctx is done
+// or the client is closed; the items not yet settled are then Pending, and the
+// settled ones before them stay settled. Close waits for a running Deliver,
+// which returns promptly. Items the client cannot send at all (no id, not JSON)
+// are quarantined. Use one goroutine per stream of events so order is kept.
+func (c *Client) Deliver(ctx context.Context, items []Item) []Result {
+	out := make([]Result, len(items))
+	if len(items) == 0 {
+		return out
+	}
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return out
+	}
+	if c.quar.path == "" {
+		// Deliver's caller advances past a Quarantined item on the strength of
+		// the record, so without a place to keep it nothing may be settled as
+		// quarantined: leave everything Pending and say why.
+		c.mu.Unlock()
+		c.report(errors.New("eventbus: Deliver needs Config.SpoolDir (the quarantine record is its durable copy of what it cannot send); nothing was sent"))
+		return out
+	}
+	c.deliverWG.Add(1)
+	c.mu.Unlock()
+	defer c.deliverWG.Done()
+
+	// Close must not wait out a request that is in flight: cancel it.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-c.stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	backoff := c.cfg.BackoffBase
+	i := 0
+	for i < len(items) {
+		select {
+		case <-c.stop:
+			return out // closed: the rest stays Pending
+		default:
+		}
+		if it := items[i]; it.ID == "" || !json.Valid(it.Body) {
+			if c.quarantineItems(items[i:i+1], "invalid", "", "not a sendable item") {
+				out[i] = Result{Disposition: DispositionQuarantined, Reason: "invalid"}
+				i++
+				continue
+			}
+			return out // could not record it: leave it and everything after Pending
+		}
+		// Take as many as fit one request.
+		n, size := 0, 0
+		for i+n < len(items) && n < c.cfg.BatchSize {
+			it := items[i+n]
+			if it.ID == "" || !json.Valid(it.Body) {
+				break
+			}
+			l := len(it.Body) + 1
+			if n > 0 && size+l > c.cfg.MaxBatchBytes {
+				break
+			}
+			size += l
+			n++
+		}
+		batch := make([]queued, n)
+		for k := 0; k < n; k++ {
+			batch[k] = queued{Item: items[i+k]}
+		}
+		chunk := make([]Result, n)
+		_, ok := c.deliverCtx(ctx, &backoff, chunk, batch, false)
+		copy(out[i:], chunk)
+		if !ok {
+			return out
+		}
+		i += n
+	}
+	return out
+}
+
+// AuthWaitingSince is when the hub's current run of 401 / 403 scope_required
+// answers to [Client.Deliver] began, or the zero time when Deliver is not
+// waiting on auth. Deliver waits as long as its context lives, so this is how a
+// permanently wrong scope is noticed.
+func (c *Client) AuthWaitingSince() time.Time {
+	if n := c.authWaiting.Load(); n != 0 {
+		return time.Unix(0, n)
+	}
+	return time.Time{}
+}
+
 // Stats returns the counters.
 func (c *Client) Stats() Stats {
 	c.mu.Lock()
@@ -389,12 +537,16 @@ func (c *Client) Close(ctx context.Context) error {
 	if first {
 		close(c.stop)
 	}
-	select {
-	case <-c.done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	idle := make(chan struct{})
+	go func() { c.deliverWG.Wait(); close(idle) }()
+	for _, ch := range []chan struct{}{c.done, idle} {
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+	return nil
 }
 
 func (c *Client) nudge() {
@@ -565,7 +717,14 @@ func (c *Client) quarantineItems(items []Item, reason, code, message string) boo
 	now := time.Now().UTC()
 	recs := make([]quarantineRec, len(items))
 	for i, it := range items {
-		recs[i] = quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: it.Body}
+		body := it.Body
+		if !json.Valid(body) {
+			// Not JSON, so it cannot sit in the record as raw JSON: keep the
+			// bytes as a JSON string (see the recovery notes in the package
+			// documentation).
+			body, _ = json.Marshal(string(it.Body))
+		}
+		recs[i] = quarantineRec{At: now, Reason: reason, Code: code, Message: message, ID: it.ID, Prio: it.Priority, Body: body}
 	}
 	c.mu.Lock()
 	err, trimErr := c.quar.addAll(recs)
@@ -616,9 +775,29 @@ type postResult struct {
 	results []*itemResult // for outcomeOK, one per sent item, nil when no valid verdict
 }
 
-// deliver sends batch until every item has a verdict. It returns false with
-// the unsettled items when sending should stop (closing, or Close called).
+// deliver is the queue sender's delivery: it uses the client's shared backoff
+// and stops when Close is called.
 func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
+	return c.deliverCtx(context.Background(), &c.backoff, nil, batch, closing)
+}
+
+// deliverCtx sends batch until every item has a verdict. It returns false with
+// the unsettled items when sending should stop (closing, Close called, or ctx
+// done). backoff is the caller's retry delay state, so callers on different
+// goroutines do not share it. If outcomes is not nil it receives, for each item
+// that settles, whether it was sent or quarantined.
+func (c *Client) deliverCtx(ctx context.Context, backoff *time.Duration, outcomes []Result, batch []queued, closing bool) ([]queued, bool) {
+	mark := func(idx []int, r Result) {
+		if outcomes == nil {
+			return
+		}
+		for _, i := range idx {
+			outcomes[i] = r
+		}
+	}
+	quarantined := func(reason, code string) Result {
+		return Result{Disposition: DispositionQuarantined, Reason: reason, Code: code}
+	}
 	settled := make([]bool, len(batch))
 	pending := make([]int, len(batch))
 	for i := range pending {
@@ -627,6 +806,10 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 	window := len(pending)
 	unresolved := 0
 	var authSince time.Time // when the current run of auth failures began
+	var authWarned time.Time
+	if outcomes != nil {
+		defer c.authWaiting.Store(0) // Deliver is done waiting, whatever the outcome
+	}
 
 	finishItems := func(idx []int) {
 		for _, i := range idx {
@@ -657,21 +840,28 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 	}
 
 	for len(pending) > 0 {
+		if ctx.Err() != nil {
+			return unsettled(), false
+		}
 		w := window
 		if w > len(pending) {
 			w = len(pending)
 		}
 		send := append([]int(nil), pending[:w]...)
 		items := itemsOf(send)
-		res := c.post(items)
+		res := c.post(ctx, items)
 		wait := res.wait
 		if res.out != outcomeAuth {
-			authSince = time.Time{}
+			authSince, authWarned = time.Time{}, time.Time{}
+			if outcomes != nil {
+				c.authWaiting.Store(0)
+			}
 		}
 
 		switch res.out {
 		case outcomeFinal:
 			if c.quarantineItems(items, res.reason, res.code, "") {
+				mark(send, quarantined(res.reason, res.code))
 				finishItems(send)
 				continue
 			}
@@ -680,9 +870,23 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			if authSince.IsZero() {
 				authSince = time.Now()
 			}
-			if c.cfg.StrictAuth || (c.cfg.RetryAuthMax > 0 && time.Since(authSince) >= c.cfg.RetryAuthMax) {
+			if outcomes != nil {
+				c.authWaiting.CompareAndSwap(0, authSince.UnixNano())
+				if authWarned.IsZero() || time.Since(authWarned) >= c.cfg.AuthWarnInterval {
+					authWarned = time.Now()
+					c.log.Warn("eventbus: Deliver is still waiting on the hub's auth failure; check the credential and its scope", "status_code", res.code, "since", authSince.UTC().Format(time.RFC3339), "waiting", time.Since(authSince).Round(time.Second).String())
+				}
+			}
+			// The ceiling protects the queue's bounded memory. A caller of Deliver
+			// keeps its own durable record, so waiting loses nothing and must not
+			// quarantine a whole outbox over a missing credential: it waits for as
+			// long as its context lives (every failure is reported). StrictAuth
+			// still makes them final.
+			ceiling := outcomes == nil && c.cfg.RetryAuthMax > 0 && time.Since(authSince) >= c.cfg.RetryAuthMax
+			if c.cfg.StrictAuth || ceiling {
 				if c.quarantineItems(items, "auth", res.code, "") {
 					authSince = time.Time{}
+					mark(send, quarantined("auth", res.code))
 					finishItems(send)
 					continue
 				}
@@ -692,6 +896,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 		case outcomeTooLarge:
 			if w == 1 {
 				if c.quarantineItems(items, "payload_too_large", "", "hub refused the request size") {
+					mark(send, quarantined("payload_too_large", ""))
 					finishItems(send)
 					continue
 				}
@@ -708,11 +913,13 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 				case r != nil && r.Status == "accepted":
 					c.sent.Add(1)
 					c.markerAccepted(items[k].ID)
+					mark([]int{i}, Result{Disposition: DispositionSent})
 					done = append(done, i)
 				case r != nil && r.Status == "duplicate":
 					c.dups.Add(1)
 					c.sent.Add(1)
 					c.markerAccepted(items[k].ID)
+					mark([]int{i}, Result{Disposition: DispositionSent, Duplicate: true})
 					done = append(done, i)
 				case r != nil && r.Status == "rejected":
 					if c.quarantineItems(items[k:k+1], "rejected", r.Code, r.Message) {
@@ -720,6 +927,7 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 						if c.cfg.OnReject != nil {
 							c.cfg.OnReject(items[k].ID, r.Code, r.Message)
 						}
+						mark([]int{i}, quarantined("rejected", r.Code))
 						done = append(done, i)
 					} else {
 						open = append(open, i)
@@ -730,12 +938,13 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			}
 			finishItems(done)
 			if len(open) == 0 {
-				c.backoff = c.cfg.BackoffBase
+				*backoff = c.cfg.BackoffBase
 				continue
 			}
 			unresolved++
 			if c.cfg.MaxUnresolved > 0 && unresolved > c.cfg.MaxUnresolved {
 				if c.quarantineItems(itemsOf(open), "unresolved", "", "no valid verdict from the hub") {
+					mark(open, quarantined("unresolved", ""))
 					finishItems(open)
 					continue
 				}
@@ -749,15 +958,17 @@ func (c *Client) deliver(batch []queued, closing bool) ([]queued, bool) {
 			return unsettled(), false
 		}
 		c.retries.Add(1)
-		d := c.backoff
+		d := *backoff
 		if wait > d {
 			d = wait
 		}
-		if c.backoff < c.cfg.BackoffMax {
-			c.backoff *= 2
+		if *backoff < c.cfg.BackoffMax {
+			*backoff *= 2
 		}
 		select {
 		case <-time.After(d):
+		case <-ctx.Done():
+			return unsettled(), false
 		case <-c.stop:
 			return unsettled(), false
 		}
@@ -783,7 +994,7 @@ func (c *Client) report(err error) {
 }
 
 // post makes one request.
-func (c *Client) post(items []Item) postResult {
+func (c *Client) post(ctx context.Context, items []Item) postResult {
 	var buf bytes.Buffer
 	buf.WriteString(`{"events":[`)
 	for i, it := range items {
@@ -794,9 +1005,9 @@ func (c *Client) post(items []Item) postResult {
 	}
 	buf.WriteString(`]}`)
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
+	rctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.URL, &buf)
+	req, err := http.NewRequestWithContext(rctx, http.MethodPost, c.cfg.URL, &buf)
 	if err != nil {
 		c.report(err)
 		return postResult{out: outcomeFinal, reason: "bad_request"}
@@ -807,7 +1018,9 @@ func (c *Client) post(items []Item) postResult {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		c.report(err)
+		if ctx.Err() == nil { // a canceled caller is not a transport failure
+			c.report(err)
+		}
 		return postResult{out: outcomeRetry}
 	}
 	defer resp.Body.Close()
