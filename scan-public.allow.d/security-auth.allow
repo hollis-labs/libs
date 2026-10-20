@@ -3,3 +3,5 @@ internal-ip security/auth/mode.go The standard tailnet address range that define
 internal-ip security/auth/README.md Documents the accepted tailnet bind range.
 internal-ip security/auth/auth_test.go Made-up bind-address inputs for the ValidateBind table test, accepted and rejected cases.
 tailscale-host security/auth/auth_test.go Placeholder tailnet hostname used as a bind-address test input.
+internal-ip security/auth/reloadbind_test.go Made-up listener addresses (tailnet 100.x, private 10.x/192.168.x) that the ReloadBind test asserts are refused as non-loopback; test vectors, no real hosts. CW-20261020-0038.
+tailscale-host security/auth/reloadbind_test.go Placeholder tailnet hostname used as a ReloadBind test input that must be refused as non-loopback. CW-20261020-0038.
