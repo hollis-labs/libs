@@ -8,6 +8,16 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `adapters/eventbussink` (CW-20261020-0021): a `runtimeevents.Sink` over the hub
+  client `mesh/eventbus` (v0.1.0). It validates each event, clears the fields the
+  hub owns (cursor, recorded_at, actor), fills `Event.App` (`WithApp`), maps
+  severity and category to the client's drop order (debug, activity, protected),
+  and sends the event as its v1.1 JSON. `GapMarker(app)` builds the `alert.raised`
+  event (rule `eventbus.loss`, coalesce key `eventbus.loss:<app>`) that announces
+  protected events the client had to drop. Requires `mesh/eventbus` v0.1.0.
+
 ## v0.14.1 — 2026-10-20
 
 ### Added
