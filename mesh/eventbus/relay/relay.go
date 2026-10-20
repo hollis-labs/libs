@@ -13,6 +13,12 @@
 // event id and answers "duplicate", so nothing is lost and nothing is applied
 // twice. The relay never skips an event it has not seen settled.
 //
+// The relay handles one batch at a time (Config.BatchSize entries), so what is in
+// flight is bounded by it. A missing or expired credential does not drain the
+// outbox into quarantine: Deliver waits for it, and the outbox, being durable,
+// loses nothing while it waits. Close the client to stop a relay that is waiting;
+// Close coordinates with the running Deliver.
+//
 // An app plugs in two small things: a [Source] over its outbox (a method that
 // returns the entries after a sequence number) and a [Cursor] (a place to keep
 // the last settled sequence number; [FileCursor] is one).
@@ -55,10 +61,16 @@ type Cursor interface {
 	Save(ctx context.Context, seq int64) error
 }
 
+// HeadSource is an optional extension of [Source]: the highest sequence number
+// in the outbox. With it the relay reports how far behind it is (Stats.Lag).
+type HeadSource interface {
+	Head(ctx context.Context) (int64, error)
+}
+
 // Deliverer sends a batch and reports what became of each item. It is
 // satisfied by *eventbus.Client.
 type Deliverer interface {
-	Deliver(ctx context.Context, items []eventbus.Item) []eventbus.Disposition
+	Deliver(ctx context.Context, items []eventbus.Item) []eventbus.Result
 }
 
 // Config configures a [Relay]. Source, Cursor and Deliverer are required.
@@ -86,11 +98,18 @@ type Config struct {
 
 // Stats is a snapshot of the relay's counters.
 type Stats struct {
-	Cursor      int64  // last sequence number settled
-	Sent        uint64 // entries the hub accepted
-	Quarantined uint64 // entries set aside undelivered (and so also moved past)
-	Batches     uint64
-	Errors      uint64
+	Cursor int64 // last sequence number settled
+	// Head is the highest outbox sequence number seen when the source can say
+	// (HeadSource), else 0; Lag is Head - Cursor, never below 0.
+	Head, Lag int64
+	// Sent counts entries the hub accepted or already had; Duplicates is the
+	// part of Sent the hub already had. Rejected counts entries the hub
+	// rejected, and Quarantined every entry set aside undelivered (rejected
+	// ones included); the relay moves past those once they are durably
+	// recorded.
+	Sent, Duplicates, Rejected, Quarantined uint64
+	Batches                                 uint64
+	Errors                                  uint64
 }
 
 // Relay moves outbox entries to the hub.
@@ -99,7 +118,10 @@ type Relay struct {
 	wake chan struct{}
 
 	cursor      atomic.Int64
+	head        atomic.Int64
 	sent        atomic.Uint64
+	dups        atomic.Uint64
+	rejected    atomic.Uint64
 	quarantined atomic.Uint64
 	batches     atomic.Uint64
 	errs        atomic.Uint64
@@ -139,12 +161,30 @@ func (r *Relay) Wake() {
 
 // Stats returns the counters.
 func (r *Relay) Stats() Stats {
-	return Stats{
+	st := Stats{
 		Cursor:      r.cursor.Load(),
+		Head:        r.head.Load(),
 		Sent:        r.sent.Load(),
+		Duplicates:  r.dups.Load(),
+		Rejected:    r.rejected.Load(),
 		Quarantined: r.quarantined.Load(),
 		Batches:     r.batches.Load(),
 		Errors:      r.errs.Load(),
+	}
+	if st.Head > st.Cursor {
+		st.Lag = st.Head - st.Cursor
+	}
+	return st
+}
+
+// refreshHead updates the head from the source when it can report one.
+func (r *Relay) refreshHead(ctx context.Context) {
+	hs, ok := r.cfg.Source.(HeadSource)
+	if !ok {
+		return
+	}
+	if h, err := hs.Head(ctx); err == nil {
+		r.head.Store(h)
 	}
 }
 
@@ -217,6 +257,7 @@ func (r *Relay) Run(ctx context.Context) error {
 			save(cursor)
 			return ctx.Err()
 		}
+		r.refreshHead(ctx)
 		entries, err := r.cfg.Source.After(ctx, cursor, r.cfg.BatchSize)
 		if err != nil {
 			if ctx.Err() == nil {
@@ -255,12 +296,18 @@ func (r *Relay) Run(ctx context.Context) error {
 		r.batches.Add(1)
 
 		settled := 0
-		for settled < len(entries) && settled < len(disp) && disp[settled] != eventbus.DispositionPending {
-			switch disp[settled] {
+		for settled < len(entries) && settled < len(disp) && disp[settled].Disposition != eventbus.DispositionPending {
+			switch d := disp[settled]; d.Disposition {
 			case eventbus.DispositionSent:
 				r.sent.Add(1)
+				if d.Duplicate {
+					r.dups.Add(1)
+				}
 			case eventbus.DispositionQuarantined:
 				r.quarantined.Add(1)
+				if d.Reason == "rejected" {
+					r.rejected.Add(1)
+				}
 			}
 			settled++
 		}

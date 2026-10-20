@@ -96,10 +96,10 @@ func (c *memCursor) get() int64 { c.mu.Lock(); defer c.mu.Unlock(); return c.seq
 type scripted struct {
 	mu    sync.Mutex
 	calls [][]string
-	reply func(call int, items []eventbus.Item) []eventbus.Disposition
+	reply func(call int, items []eventbus.Item) []eventbus.Result
 }
 
-func (s *scripted) Deliver(_ context.Context, items []eventbus.Item) []eventbus.Disposition {
+func (s *scripted) Deliver(_ context.Context, items []eventbus.Item) []eventbus.Result {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var ids []string
@@ -110,10 +110,10 @@ func (s *scripted) Deliver(_ context.Context, items []eventbus.Item) []eventbus.
 	return s.reply(len(s.calls), items)
 }
 
-func allSent(_ int, items []eventbus.Item) []eventbus.Disposition {
-	out := make([]eventbus.Disposition, len(items))
+func allSent(_ int, items []eventbus.Item) []eventbus.Result {
+	out := make([]eventbus.Result, len(items))
 	for i := range out {
-		out[i] = eventbus.DispositionSent
+		out[i] = eventbus.Result{Disposition: eventbus.DispositionSent}
 	}
 	return out
 }
@@ -229,12 +229,12 @@ func TestQuarantinedEntriesDoNotWedgeTheRelay(t *testing.T) {
 	ob := &outbox{}
 	ob.add(1, 2, 3)
 	cur := &memCursor{}
-	d := &scripted{reply: func(_ int, items []eventbus.Item) []eventbus.Disposition {
-		out := make([]eventbus.Disposition, len(items))
+	d := &scripted{reply: func(_ int, items []eventbus.Item) []eventbus.Result {
+		out := make([]eventbus.Result, len(items))
 		for i, it := range items {
-			out[i] = eventbus.DispositionSent
+			out[i] = eventbus.Result{Disposition: eventbus.DispositionSent}
 			if it.ID == "e002" {
-				out[i] = eventbus.DispositionQuarantined
+				out[i] = eventbus.Result{Disposition: eventbus.DispositionQuarantined, Reason: "rejected", Code: "unknown_kind"}
 			}
 		}
 		return out
@@ -243,7 +243,7 @@ func TestQuarantinedEntriesDoNotWedgeTheRelay(t *testing.T) {
 	stop := start(t, r)
 	waitFor(t, "cursor 3", func() bool { return cur.get() == 3 })
 	_ = stop()
-	if st := r.Stats(); st.Sent != 2 || st.Quarantined != 1 {
+	if st := r.Stats(); st.Sent != 2 || st.Quarantined != 1 || st.Rejected != 1 {
 		t.Fatalf("stats = %+v", st)
 	}
 }
@@ -256,15 +256,15 @@ func TestCursorStopsAtTheFirstUnsettledEntry(t *testing.T) {
 	cur := &memCursor{}
 	first := true
 	var cancelRun context.CancelFunc
-	d := &scripted{reply: func(_ int, items []eventbus.Item) []eventbus.Disposition {
-		out := make([]eventbus.Disposition, len(items))
+	d := &scripted{reply: func(_ int, items []eventbus.Item) []eventbus.Result {
+		out := make([]eventbus.Result, len(items))
 		for i := range out {
-			out[i] = eventbus.DispositionSent
+			out[i] = eventbus.Result{Disposition: eventbus.DispositionSent}
 		}
 		if first {
 			first = false
-			out[2], out[3] = eventbus.DispositionPending, eventbus.DispositionPending
-			cancelRun() // the call ends before everything is settled
+			out[2], out[3] = eventbus.Result{}, eventbus.Result{} // Pending
+			cancelRun()                                           // the call ends before everything is settled
 		}
 		return out
 	}}
@@ -513,5 +513,255 @@ func TestEndToEndWithTheRealClient(t *testing.T) {
 	_ = stop2()
 	if got := h.got(); got != "e001,e002,e004,e005,e006" || len(h.ids) != before+1 {
 		t.Fatalf("hub got %s; the restart must send only e006", got)
+	}
+}
+
+// ---- rule tests with the real client ----
+
+func (o *outbox) Head(context.Context) (int64, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if len(o.entries) == 0 {
+		return 0, nil
+	}
+	return o.entries[len(o.entries)-1].Seq, nil
+}
+
+func clientWith(t *testing.T, cfg eventbus.Config) *eventbus.Client {
+	t.Helper()
+	cfg.FlushInterval = time.Hour
+	cfg.BackoffBase = time.Millisecond
+	cfg.BackoffMax = 5 * time.Millisecond
+	cfg.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	c, err := eventbus.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = c.Close(ctx)
+	})
+	return c
+}
+
+// The relay crashed after the hub settled the events but before the cursor was
+// saved: the next run sends them again, the hub says duplicate, and nothing is
+// skipped.
+func TestCrashBetweenDeliverAndSaveResendsAndSkipsNothing(t *testing.T) {
+	h := newHub()
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c := clientWith(t, eventbus.Config{URL: srv.URL})
+
+	ob := &outbox{}
+	ob.add(1, 2, 3)
+	lost := &memCursor{} // a cursor whose saves never land: the process "crashes" before them
+	lost.failing.Store(true)
+	r1 := newRelay(t, Config{Source: ob, Cursor: lost, Deliverer: c})
+	stop1 := start(t, r1)
+	waitFor(t, "first run delivered", func() bool { return r1.Stats().Sent == 3 })
+	_ = stop1()
+	if lost.get() != 0 {
+		t.Fatalf("setup: cursor must not have been saved, is %d", lost.get())
+	}
+
+	// Restart: same (unsaved) cursor, same outbox, same hub.
+	cur := &memCursor{}
+	r2 := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c})
+	stop2 := start(t, r2)
+	waitFor(t, "second run caught up", func() bool { return cur.get() == 3 })
+	_ = stop2()
+	if st := r2.Stats(); st.Sent != 3 || st.Duplicates != 3 {
+		t.Fatalf("the resend must be reported as duplicates: %+v", st)
+	}
+	if got := h.got(); got != "e001,e002,e003" {
+		t.Fatalf("hub holds %s: each event exactly once, in order", got)
+	}
+}
+
+// 503 and 429 only delay: the cursor does not move until the hub settles.
+func TestHubFailuresDelayButDoNotAdvanceTheCursor(t *testing.T) {
+	h := newHub()
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1, 2:
+			w.WriteHeader(503)
+		case 3:
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(429)
+		default:
+			h.ServeHTTP(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := clientWith(t, eventbus.Config{URL: srv.URL})
+	ob := &outbox{}
+	ob.add(1, 2)
+	cur := &memCursor{}
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c})
+	stop := start(t, r)
+	waitFor(t, "delivery after the failures", func() bool { return cur.get() == 2 })
+	_ = stop()
+	if got := h.got(); got != "e001,e002" {
+		t.Fatalf("hub holds %s", got)
+	}
+	for _, s := range cur.saves {
+		if s == 0 {
+			t.Fatal("the cursor was saved before anything was settled")
+		}
+	}
+}
+
+// A rejected event advances the cursor only once it is durably quarantined. If
+// the quarantine cannot be written the relay stays put, reports, and moves on
+// when storage works.
+func TestRejectedEventDoesNotAdvanceUntilItIsDurablyQuarantined(t *testing.T) {
+	h := newHub()
+	h.rej["e002"] = true
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "quarantine.jsonl"), 0o700); err != nil { // storage is broken
+		t.Fatal(err)
+	}
+	var errs atomic.Int32
+	c := clientWith(t, eventbus.Config{URL: srv.URL, SpoolDir: dir, OnError: func(error) { errs.Add(1) }})
+	ob := &outbox{}
+	ob.add(1, 2, 3)
+	cur := &memCursor{}
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c})
+	stop := start(t, r)
+	waitFor(t, "a reported storage failure", func() bool { return errs.Load() > 0 })
+	time.Sleep(80 * time.Millisecond)
+	// Deliver holds the whole batch until e002 can be recorded, so the cursor
+	// stays where it was: it never moves past a rejected event that is not yet
+	// durably quarantined. (A restart would resend e001, which the hub dedupes.)
+	if c := cur.get(); c >= 2 {
+		t.Fatalf("cursor = %d: it moved past e002 although e002 could not be recorded", c)
+	}
+	if err := os.Remove(filepath.Join(dir, "quarantine.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "cursor 3 once storage works", func() bool { return cur.get() == 3 })
+	_ = stop()
+	if q, _ := os.ReadFile(filepath.Join(dir, "quarantine.jsonl")); !strings.Contains(string(q), `"e002"`) {
+		t.Fatalf("e002 must be in the quarantine file: %s", q)
+	}
+	if st := r.Stats(); st.Rejected != 1 || st.Quarantined != 1 || st.Sent != 2 {
+		t.Fatalf("stats = %+v", st)
+	}
+}
+
+// A missing credential must not drain the outbox into quarantine: the relay
+// waits, then delivers everything once the credential exists.
+func TestMissingCredentialIsWaitedOutNotQuarantined(t *testing.T) {
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	h := newHub()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer issued" {
+			w.WriteHeader(401)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	c := clientWith(t, eventbus.Config{URL: srv.URL, TokenFile: tokenFile, SpoolDir: dir, RetryAuthMax: 20 * time.Millisecond, BatchSize: 1})
+	ob := &outbox{}
+	ob.add(1, 2, 3, 4, 5, 6)
+	cur := &memCursor{}
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c, BatchSize: 2})
+	stop := start(t, r)
+	time.Sleep(200 * time.Millisecond) // ten times the ceiling
+	if cur.get() != 0 || r.Stats().Quarantined != 0 {
+		t.Fatalf("nothing may be quarantined or moved past: cursor %d, stats %+v", cur.get(), r.Stats())
+	}
+	if err := os.WriteFile(tokenFile, []byte("issued\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "everything delivered", func() bool { return cur.get() == 6 })
+	_ = stop()
+	if got := h.got(); got != "e001,e002,e003,e004,e005,e006" {
+		t.Fatalf("hub holds %s", got)
+	}
+	if q, _ := os.ReadFile(filepath.Join(dir, "quarantine.jsonl")); len(q) != 0 {
+		t.Fatalf("quarantine must be empty: %s", q)
+	}
+}
+
+// Closing the client under a running relay stops delivery cleanly: Close returns,
+// the relay keeps its cursor where it was and stops when its context ends.
+func TestClosingTheClientUnderARunningRelay(t *testing.T) {
+	block := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		select {
+		case <-block:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	defer close(block)
+	c, err := eventbus.New(eventbus.Config{URL: srv.URL, Timeout: time.Hour, FlushInterval: time.Hour,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ob := &outbox{}
+	ob.add(1, 2)
+	cur := &memCursor{}
+	var errs atomic.Int32
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c, OnError: func(error) { errs.Add(1) }})
+	stop := start(t, r)
+	time.Sleep(60 * time.Millisecond) // Deliver is blocked inside the request
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	closed := make(chan error, 1)
+	go func() { closed <- c.Close(ctx) }()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Close did not return while a relay was delivering")
+	}
+	waitFor(t, "the relay to report that the client is closed", func() bool { return errs.Load() > 0 })
+	if cur.get() != 0 {
+		t.Fatalf("cursor = %d: nothing was settled", cur.get())
+	}
+	if err := stop(); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run = %v", err)
+	}
+}
+
+// Lag is reported when the source can say where the head is.
+func TestStatsReportLagWhenTheSourceHasAHead(t *testing.T) {
+	var down atomic.Bool
+	down.Store(true)
+	h := newHub()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down.Load() {
+			w.WriteHeader(503)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	c := clientWith(t, eventbus.Config{URL: srv.URL})
+	ob := &outbox{}
+	ob.add(1, 2, 3, 4)
+	cur := &memCursor{}
+	r := newRelay(t, Config{Source: ob, Cursor: cur, Deliverer: c})
+	stop := start(t, r)
+	waitFor(t, "lag visible while the hub is down", func() bool { return r.Stats().Lag == 4 })
+	down.Store(false)
+	waitFor(t, "lag cleared", func() bool { st := r.Stats(); return st.Cursor == 4 && st.Lag == 0 })
+	_ = stop()
+	if st := r.Stats(); st.Head != 4 || st.Sent != 4 {
+		t.Fatalf("stats = %+v", st)
 	}
 }

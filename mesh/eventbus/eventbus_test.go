@@ -1451,10 +1451,10 @@ func TestQuarantineRacingCloseNeverLosesAnEvent(t *testing.T) {
 
 // ---- Deliver (synchronous delivery for an outbox relay) ----
 
-func dispo(ds []Disposition) string {
+func dispo(rs []Result) string {
 	var out []string
-	for _, d := range ds {
-		out = append(out, map[Disposition]string{DispositionPending: "pending", DispositionSent: "sent", DispositionQuarantined: "quarantined"}[d])
+	for _, r := range rs {
+		out = append(out, map[Disposition]string{DispositionPending: "pending", DispositionSent: "sent", DispositionQuarantined: "quarantined"}[r.Disposition])
 	}
 	return strings.Join(out, ",")
 }
@@ -1471,6 +1471,12 @@ func TestDeliverReportsEachItemsDisposition(t *testing.T) {
 	got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh), item("b", PriorityHigh), item("c", PriorityHigh)})
 	if dispo(got) != "sent,sent,quarantined" {
 		t.Fatalf("dispositions = %s", dispo(got))
+	}
+	if got[0].Duplicate || !got[1].Duplicate {
+		t.Fatalf("duplicate flags = %v %v, want false then true", got[0].Duplicate, got[1].Duplicate)
+	}
+	if got[2].Reason != "rejected" || got[2].Code != "unknown_kind" {
+		t.Fatalf("quarantine reason/code = %q/%q", got[2].Reason, got[2].Code)
 	}
 	if q := quarantineIDs(t, dir); len(q) != 1 || q[0] != "c:rejected" {
 		t.Fatalf("quarantine = %v (a quarantined item must be durable before Deliver reports it)", q)
@@ -1618,7 +1624,7 @@ func TestDeliverAndTheQueueRunConcurrently(t *testing.T) {
 	c, _ := New(quiet(fast(Config{URL: srv.URL})))
 	var wg sync.WaitGroup
 	wg.Add(2)
-	var got []Disposition
+	var got []Result
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 40; i++ {
@@ -1636,9 +1642,9 @@ func TestDeliverAndTheQueueRunConcurrently(t *testing.T) {
 	wg.Wait()
 	waitFor(t, "queued events delivered", func() bool { return c.Stats().Sent == 80 })
 	closeClient(t, c)
-	for i, d := range got {
-		if d != DispositionSent {
-			t.Fatalf("item %d: %v", i, d)
+	for i, r := range got {
+		if r.Disposition != DispositionSent {
+			t.Fatalf("item %d: %v", i, r)
 		}
 	}
 }
@@ -1648,4 +1654,136 @@ func deadHub(t *testing.T) *httptest.Server {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	t.Cleanup(s.Close)
 	return s
+}
+
+// An item is Quarantined only once the record is durably written. If the file
+// cannot be written the item stays Pending (and is retried), never reported as
+// settled.
+func TestDeliverDoesNotSettleAnItemItCannotQuarantine(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "quarantine.jsonl"), 0o700); err != nil { // storage is broken
+		t.Fatal(err)
+	}
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 400, "", nil }}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	var errs atomic.Int32
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, OnError: func(error) { errs.Add(1) }})))
+	defer closeClient(t, c)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	got := c.Deliver(ctx, []Item{item("bad", PriorityHigh)})
+	cancel()
+	if dispo(got) != "pending" {
+		t.Fatalf("with broken storage the item must stay pending, got %s", dispo(got))
+	}
+	if st := c.Stats(); st.Quarantined != 0 || errs.Load() == 0 {
+		t.Fatalf("stats = %+v, errors reported = %d", st, errs.Load())
+	}
+	if err := os.Remove(filepath.Join(dir, "quarantine.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	got = c.Deliver(context.Background(), []Item{item("bad", PriorityHigh)})
+	if dispo(got) != "quarantined" {
+		t.Fatalf("once storage works: %s", dispo(got))
+	}
+	if q := quarantineIDs(t, dir); len(q) != 1 || q[0] != "bad:bad_request" {
+		t.Fatalf("quarantine = %v", q)
+	}
+}
+
+// A caller with its own durable record waits out a missing credential: nothing
+// is quarantined at the RetryAuthMax ceiling, however many chunks follow.
+func TestDeliverWaitsOutAMissingCredentialInsteadOfQuarantining(t *testing.T) {
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	h := &hub{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer issued" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, TokenFile: tokenFile, BatchSize: 5, RetryAuthMax: 30 * time.Millisecond})))
+	defer closeClient(t, c)
+	var items []Item
+	for i := 0; i < 20; i++ {
+		items = append(items, item(fmt.Sprintf("a%02d", i), PriorityHigh))
+	}
+	done := make(chan []Result, 1)
+	go func() { done <- c.Deliver(context.Background(), items) }()
+	time.Sleep(250 * time.Millisecond) // many times the ceiling
+	select {
+	case <-done:
+		t.Fatal("Deliver returned while the credential was still missing")
+	default:
+	}
+	if st := c.Stats(); st.Quarantined != 0 {
+		t.Fatalf("a missing credential must not quarantine anything for a caller with a durable record: %+v", st)
+	}
+	if err := os.WriteFile(tokenFile, []byte("issued\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-done:
+		for i, r := range got {
+			if r.Disposition != DispositionSent {
+				t.Fatalf("item %d: %+v", i, r)
+			}
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Deliver did not finish after the credential appeared")
+	}
+	if n := len(h.got()); n != 20 {
+		t.Fatalf("hub accepted %d events, want 20", n)
+	}
+}
+
+func TestDeliverWithStrictAuthQuarantinesAtOnce(t *testing.T) {
+	dir := t.TempDir()
+	h := &hub{status: func(int32, []string) (int, string, map[string]string) { return 401, "", nil }}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, StrictAuth: true})))
+	defer closeClient(t, c)
+	got := c.Deliver(context.Background(), []Item{item("a", PriorityHigh)})
+	if dispo(got) != "quarantined" || got[0].Reason != "auth" {
+		t.Fatalf("got %s %+v", dispo(got), got[0])
+	}
+}
+
+// Close waits for a running Deliver, which returns promptly with Pending.
+func TestCloseWaitsForARunningDeliver(t *testing.T) {
+	started := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body) // the server notices a disconnect only after the body is read
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, Timeout: time.Hour})))
+	delivered := make(chan []Result, 1)
+	go func() { delivered <- c.Deliver(context.Background(), []Item{item("a", PriorityHigh)}) }()
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("request never started")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := c.Close(ctx); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	select {
+	case got := <-delivered:
+		if dispo(got) != "pending" {
+			t.Fatalf("dispositions = %s", dispo(got))
+		}
+	default:
+		t.Fatal("Close returned while Deliver was still running")
+	}
 }
