@@ -15,7 +15,7 @@
 - Quarantine: events set aside undelivered (explicitly rejected, a request
   refused for good with 400, any other 403 or a single too-large event, or
   still without a valid verdict after `MaxUnresolved` tries, or kept failing
-  with 401 or 403 for `RetryAuthMax`) go to a bounded
+  with 401 or 403 scope_required for `RetryAuthMax`) go to a bounded
   `quarantine.jsonl` (oldest first), with `OnQuarantine`, `Stats.Quarantined`,
   a WARN log and `OnError`. They are never counted as sent. A 401 or a 403
   scope_required waits and retries (a service often starts before its
