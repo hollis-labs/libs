@@ -43,6 +43,11 @@
 // quarantine.jsonl, bounded by Config.QuarantineMaxBytes with the oldest records
 // going first. Without one, only the callback and the counters remain.
 //
+// Quarantine is not a graveyard: Client.ReplayQuarantine puts quarantined events
+// back in the queue (all of them, or only those quarantined for the given
+// reasons, such as "auth" once a credential is fixed), oldest first, and removes
+// them from the file.
+//
 // # Overflow
 //
 // Memory and disk are bounded, so loss under a long outage is possible and is

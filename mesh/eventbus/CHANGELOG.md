@@ -15,7 +15,8 @@
   without a valid verdict after `MaxUnresolved` tries) go to a bounded
   `quarantine.jsonl` (oldest first), with `OnQuarantine`, `Stats.Quarantined`,
   a WARN log and `OnError`. They are never counted as sent. `RetryAuth` retries
-  401 and 403 instead.
+  401 and 403 instead. `ReplayQuarantine` puts quarantined events back in the
+  queue (all, or by reason) once the cause is fixed, oldest first.
 - Priorities `PriorityDebug`, `PriorityActivity`, `PriorityHigh`: a full queue or
   spool drops debug first, then activity, and protected items only as the last
   resort. Losing a protected item is recorded (`Loss`: class, first and last

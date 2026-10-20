@@ -189,3 +189,43 @@ func (q *quarantine) trim() error {
 	q.size = int64(len(rest))
 	return nil
 }
+
+// take removes and returns, oldest first, the records pick selects; the rest
+// stay in the file.
+func (q *quarantine) take(pick func(quarantineRec) bool) ([]quarantineRec, error) {
+	if q.path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(q.path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var taken []quarantineRec
+	var keep bytes.Buffer
+	for _, line := range bytes.SplitAfter(data, []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var rec quarantineRec
+		if json.Unmarshal(bytes.TrimSpace(line), &rec) == nil && pick(rec) {
+			taken = append(taken, rec)
+			continue
+		}
+		keep.Write(line)
+	}
+	if len(taken) == 0 {
+		return nil, nil
+	}
+	tmp := q.path + ".tmp"
+	if err := os.WriteFile(tmp, keep.Bytes(), 0o600); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tmp, q.path); err != nil {
+		return nil, err
+	}
+	q.size = int64(keep.Len())
+	return taken, nil
+}

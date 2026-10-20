@@ -1019,3 +1019,49 @@ func TestTokenFileEnvName(t *testing.T) {
 		t.Fatalf("got %s", got)
 	}
 }
+
+// Quarantined events can be put back: after the cause is fixed they are
+// delivered in their original order and leave the file.
+func TestReplayQuarantineDeliversAfterTheCauseIsFixed(t *testing.T) {
+	dir := t.TempDir()
+	var authed atomic.Bool
+	h := &hub{status: func(call int32, ids []string) (int, string, map[string]string) {
+		if !authed.Load() {
+			return 401, "", nil
+		}
+		return 0, "", nil
+	}}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _ := New(quiet(fast(Config{URL: srv.URL, SpoolDir: dir, BatchSize: 1})))
+	for _, id := range []string{"a", "b", "c"} {
+		c.Publish(item(id, PriorityHigh))
+	}
+	waitFor(t, "all quarantined", func() bool { return c.Stats().Quarantined == 3 })
+	if got := quarantineIDs(t, dir); len(got) != 3 {
+		t.Fatalf("quarantine = %v", got)
+	}
+	authed.Store(true)
+
+	if n, err := c.ReplayQuarantine("unresolved"); err != nil || n != 0 {
+		t.Fatalf("a reason that matches nothing replays nothing: n=%d err=%v", n, err)
+	}
+	n, err := c.ReplayQuarantine("auth")
+	if err != nil || n != 3 {
+		t.Fatalf("replayed n=%d err=%v", n, err)
+	}
+	waitFor(t, "replayed events delivered", func() bool { return c.Stats().Sent == 3 })
+	closeClient(t, c)
+	if got := strings.Join(h.got(), ","); got != "a,b,c" {
+		t.Fatalf("delivered = %s, want the original order", got)
+	}
+	if got := quarantineIDs(t, dir); len(got) != 0 {
+		t.Fatalf("replayed records must leave the file: %v", got)
+	}
+	if st := c.Stats(); st.Replayed != 3 {
+		t.Fatalf("stats = %+v", st)
+	}
+	if _, err := c.ReplayQuarantine(); err == nil {
+		t.Fatal("replaying on a closed client must fail, not lose events")
+	}
+}

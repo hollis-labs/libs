@@ -123,7 +123,9 @@ type Stats struct {
 	Duplicates uint64
 	Rejected   uint64 // rejected by the hub (also quarantined)
 	// Quarantined counts events set aside undelivered; none was sent.
+	// Replayed counts quarantined events put back by ReplayQuarantine.
 	Quarantined uint64
+	Replayed    uint64
 	Dropped     uint64 // lost to a full queue or spool, or discarded
 	// DroppedHigh counts the protected (high-priority) items among Dropped.
 	DroppedHigh     uint64
@@ -154,7 +156,7 @@ type Client struct {
 	carry   []queued // owned by the sender goroutine
 	backoff time.Duration
 
-	sent, dups, rejected, quarantined, dropped, droppedHigh, retries atomic.Uint64
+	sent, dups, rejected, quarantined, replayed, dropped, droppedHigh, retries atomic.Uint64
 }
 
 var _ Publisher = (*Client)(nil)
@@ -346,6 +348,36 @@ func (c *Client) makeRoom(in Item) []dropNote {
 	return []dropNote{{1, "queue_full"}}
 }
 
+// ReplayQuarantine puts quarantined events back in the queue, oldest first, and
+// removes them from quarantine.jsonl. With no reasons given every quarantined
+// event is replayed; otherwise only those quarantined for one of the reasons
+// (for example "auth" after a credential was fixed, or "unresolved"). It returns
+// how many were queued. Events quarantined because the hub rejected them
+// ("rejected") will be rejected again unless the cause was fixed. Without a
+// spool directory there is no file and nothing to replay. Replayed events go
+// through Publish, so the same bounds and loss rules apply.
+func (c *Client) ReplayQuarantine(reasons ...string) (int, error) {
+	want := map[string]bool{}
+	for _, r := range reasons {
+		want[r] = true
+	}
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return 0, errors.New("eventbus: client is closed")
+	}
+	recs, err := c.quar.take(func(r quarantineRec) bool { return len(want) == 0 || want[r.Reason] })
+	c.mu.Unlock()
+	if err != nil {
+		return 0, fmt.Errorf("eventbus: read quarantine: %w", err)
+	}
+	for _, r := range recs {
+		c.Publish(Item{ID: r.ID, Priority: r.Prio, Body: r.Body})
+	}
+	c.replayed.Add(uint64(len(recs)))
+	return len(recs), nil
+}
+
 // Stats returns the counters.
 func (c *Client) Stats() Stats {
 	c.mu.Lock()
@@ -355,6 +387,7 @@ func (c *Client) Stats() Stats {
 	}
 	c.mu.Unlock()
 	st.Sent, st.Duplicates, st.Rejected = c.sent.Load(), c.dups.Load(), c.rejected.Load()
+	st.Replayed = c.replayed.Load()
 	st.Quarantined, st.Dropped, st.DroppedHigh, st.Retries = c.quarantined.Load(), c.dropped.Load(), c.droppedHigh.Load(), c.retries.Load()
 	return st
 }
