@@ -131,7 +131,7 @@ func TestServiceTokenThroughGuard(t *testing.T) {
 	}
 }
 
-// An app-wide wildcard grant (`<app>.*`) is honoured by the verifier; whether
+// An app-wide wildcard grant (`<app>.*`) is honored by the verifier; whether
 // to issue one is the issuer's policy (dev only, with a warning).
 func TestServiceTokenAppWildcardScope(t *testing.T) {
 	is := newIssuer(t, "k1")
