@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-Tests and docs only; no behaviour change. Conformance vectors for `kind=service` JWTs with a far-future `exp` (verify, still valid years later, `exp` required, revocation by `jti` and `sub`, scope handling through the guard). README documents the per-app posture dial (`HOLLIS_AUTH_<APP>` then `HOLLIS_AUTH`) and the service-token contract.
+Added `Refresher` (keeps a short-lived JWT valid: renews at 2/3 of its life, serves the held token while the issuer is down, backoff, `ErrNoToken`) and `HTTPMinter` (token-endpoint client for Tether-style `POST /auth/token`). No change to existing APIs.
+
+Conformance vectors for `kind=service` JWTs with a far-future `exp` (verify, still valid years later, `exp` required, revocation by `jti` and `sub`, scope handling through the guard). README documents the per-app posture dial (`HOLLIS_AUTH_<APP>` then `HOLLIS_AUTH`) and the service-token contract.
 
 ## v0.1.0 — 2026-10-15
 
