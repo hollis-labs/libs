@@ -128,7 +128,13 @@ func TestReloaderWaitsForAStableFile(t *testing.T) {
 	writeFile(t, p, "v0")
 	var seen []string
 	var mu sync.Mutex
-	startReloader(t, &Reloader{Path: p, Interval: 40 * time.Millisecond, Load: func(context.Context) error {
+	// A long interval against back-to-back writes: the three saves land within
+	// microseconds, so a loaded CI runner would have to stall this goroutine for
+	// several hundred milliseconds between two of them for a check to see an
+	// intermediate version as stable (the old 40ms/10ms spacing could be
+	// stretched past that by a busy runner).
+	const interval = 250 * time.Millisecond
+	startReloader(t, &Reloader{Path: p, Interval: interval, Load: func(context.Context) error {
 		b, _ := os.ReadFile(p) //nolint:gosec // test path
 		mu.Lock()
 		seen = append(seen, string(b))
@@ -139,10 +145,9 @@ func TestReloaderWaitsForAStableFile(t *testing.T) {
 	// content may be loaded, never an intermediate one.
 	for _, v := range []string{"a", "ab", "abc"} {
 		writeFile(t, p, v)
-		time.Sleep(10 * time.Millisecond)
 	}
 	waitFor(t, "load", func() bool { mu.Lock(); defer mu.Unlock(); return len(seen) > 0 })
-	time.Sleep(120 * time.Millisecond)
+	time.Sleep(2 * interval) // nothing else may follow
 	mu.Lock()
 	defer mu.Unlock()
 	if len(seen) != 1 || seen[0] != "abc" {

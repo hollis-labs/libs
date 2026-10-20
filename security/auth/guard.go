@@ -48,7 +48,23 @@ type Config struct {
 	// that ValidateBind would refuse for it, so a live reload cannot loosen
 	// auth on a non-local listener.
 	Addr string
+	// ReloadBind, optional, is the listener a RELOAD is judged against. When
+	// set, Apply, SetMode and CheckApply refuse to move to a mode weaker than
+	// the current one (enforce -> permissive or off, permissive -> off) unless
+	// IsLoopbackAddr(ReloadBind): on any other listener, tailnet included, a
+	// reload may keep or tighten the mode but never loosen it. Unlike Addr it
+	// does not judge a mode that is not weaker, so a process started on a
+	// token-gated off/permissive listener can still reload its verifier. It
+	// never applies to New (the startup mode is the caller's, and Addr/
+	// ValidateBind is the startup rule). A loosening that is allowed is logged
+	// at WARN naming the old and new mode.
+	ReloadBind string
 }
+
+// ErrLoosenRefused is returned (wrapped) by Apply, SetMode and CheckApply when
+// Config.ReloadBind names a listener that is not loopback and the new mode is
+// weaker than the current one.
+var ErrLoosenRefused = errors.New("auth: a reload may not loosen the mode")
 
 // Guard applies the mode logic to HTTP requests and MCP tool calls.
 type Guard struct {
@@ -109,8 +125,12 @@ func (g *Guard) CheckApply(m Mode, v Verifier) error {
 // atomic step: a request sees the old pair or the new pair, never a mix, and
 // each request keeps the pair it started under. It refuses, leaving both
 // unchanged, a mode ParseMode does not accept (the canonical form is stored,
-// so "ENFORCE" and " observe " work), enforce with no verifier, and (when
-// Config.Addr is set) a mode ValidateBind rejects for that address.
+// so "ENFORCE" and " observe " work), enforce with no verifier, (when
+// Config.Addr is set) a mode ValidateBind rejects for that address, and (when
+// Config.ReloadBind is set) a mode weaker than the current one unless that
+// listener is loopback; that last refusal wraps ErrLoosenRefused. The loosening
+// check runs against the same state the compare-and-swap retries on, so a
+// concurrent tightening cannot be bypassed by a stale earlier mode.
 func (g *Guard) Apply(m Mode, v Verifier) error {
 	for {
 		cur := g.st.Load()
@@ -146,6 +166,9 @@ func (g *Guard) nextFrom(cur *guardState, m Mode, v Verifier) (Mode, *guardState
 		if err := ValidateBind(g.cfg.Addr, mode); err != nil {
 			return "", nil, err
 		}
+	}
+	if g.cfg.ReloadBind != "" && mode.WeakerThan(cur.mode) && !IsLoopbackAddr(g.cfg.ReloadBind) {
+		return "", nil, fmt.Errorf("%w: %s -> %s on a listener that is not loopback (restart to change it)", ErrLoosenRefused, cur.mode, mode)
 	}
 	return mode, &guardState{mode: mode, verifier: v}, nil
 }
