@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,12 +44,17 @@ type Config struct {
 	// none) and the audit event. It lets an app attach request-scoped audit
 	// without re-parsing the request. Audit, if set, is still called.
 	OnRequest func(*http.Request, Principal, Event)
+	// Addr, optional, is the listen address. When set, SetMode refuses a mode
+	// that ValidateBind would refuse for it, so a live reload cannot loosen
+	// auth on a non-local listener.
+	Addr string
 }
 
 // Guard applies the mode logic to HTTP requests and MCP tool calls.
 type Guard struct {
-	cfg Config
-	lg  *slog.Logger
+	cfg  Config
+	lg   *slog.Logger
+	mode atomic.Pointer[Mode] // live mode; see SetMode
 }
 
 // New validates cfg. An empty Mode is an error: callers choose explicitly
@@ -61,6 +67,8 @@ func New(cfg Config) (*Guard, error) {
 		return nil, errors.New("auth: enforce mode needs a Verifier")
 	}
 	g := &Guard{cfg: cfg, lg: cfg.Logger}
+	m := cfg.Mode
+	g.mode.Store(&m)
 	if g.lg == nil {
 		g.lg = slog.Default()
 	}
@@ -70,11 +78,35 @@ func New(cfg Config) (*Guard, error) {
 	return g, nil
 }
 
-// Mode returns the configured mode.
-func (g *Guard) Mode() Mode { return g.cfg.Mode }
+// Mode returns the current mode.
+func (g *Guard) Mode() Mode { return *g.mode.Load() }
+
+// SetMode changes the mode of a running Guard, so a posture dial can move
+// without a restart. In-flight requests finish under the mode they started
+// with. It refuses an unknown mode, enforce without a Verifier, and (when
+// Config.Addr is set) a mode ValidateBind rejects for that address; on error
+// the mode is unchanged.
+func (g *Guard) SetMode(m Mode) error {
+	if _, err := ParseMode(string(m)); err != nil {
+		return err
+	}
+	if m == ModeEnforce && g.cfg.Verifier == nil {
+		return errors.New("auth: enforce mode needs a Verifier")
+	}
+	if g.cfg.Addr != "" {
+		if err := ValidateBind(g.cfg.Addr, m); err != nil {
+			return err
+		}
+	}
+	old := g.mode.Swap(&m)
+	if *old != m {
+		g.lg.Warn("auth mode changed", "from", string(*old), "to", string(m))
+	}
+	return nil
+}
 
 // Status is the string for health/whoami: "auth=<mode>".
-func (g *Guard) Status() string { return "auth=" + string(g.cfg.Mode) }
+func (g *Guard) Status() string { return "auth=" + string(g.Mode()) }
 
 func (g *Guard) authenticate(ctx context.Context, headers []string) (Principal, string) {
 	tok, st := ParseBearer(headers)
@@ -103,7 +135,7 @@ func (g *Guard) verify(ctx context.Context, tok string) (Principal, string) {
 // decision applies the mode to an authentication result and required scope.
 // It returns the principal to stamp (zero, false when none), and the HTTP
 // status and code if enforce rejects (status 0 = allow).
-func (g *Guard) decision(p Principal, state, required string, unmapped bool, ev *Event) (Principal, bool, int, string) {
+func (g *Guard) decision(mode Mode, p Principal, state, required string, unmapped bool, ev *Event) (Principal, bool, int, string) {
 	stamp := state == StateVerified
 	deny, status, code, reason := false, 0, "", ""
 	switch {
@@ -116,7 +148,7 @@ func (g *Guard) decision(p Principal, state, required string, unmapped bool, ev 
 	case required != "" && !p.HasScope(required):
 		deny, status, code, reason = true, http.StatusForbidden, "scope_required", "missing scope "+required
 	}
-	if g.cfg.Mode == ModeOff && state != StateVerified {
+	if mode == ModeOff && state != StateVerified {
 		p, stamp = Principal{ID: OffModePrincipalID, Kind: KindOperator, Display: "operator (auth off)", Scopes: []string{"*"}}, true
 		ev.Authentication = StateOffMode
 	}
@@ -126,7 +158,7 @@ func (g *Guard) decision(p Principal, state, required string, unmapped bool, ev 
 	} else if stamp {
 		ev.PrincipalID = p.ID
 	}
-	switch g.cfg.Mode {
+	switch mode {
 	case ModeEnforce:
 		if deny {
 			ev.Denied, ev.Reason = true, reason
@@ -162,8 +194,9 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 		p, state := g.authenticate(r.Context(), r.Header.Values("Authorization"))
 		required, known := g.cfg.Scopes.ForRoute(r.Method, r.URL.Path)
 		unmapped := g.cfg.Scopes.denyUnmapped(known, required)
-		ev := Event{At: time.Now().UTC(), Mode: g.cfg.Mode, Authentication: state, Method: r.Method, Route: routeFamily(r.URL.Path)}
-		p, stamp, status, code := g.decision(p, state, required, unmapped, &ev)
+		mode := g.Mode() // one mode per request, even if SetMode runs meanwhile
+		ev := Event{At: time.Now().UTC(), Mode: mode, Authentication: state, Method: r.Method, Route: routeFamily(r.URL.Path)}
+		p, stamp, status, code := g.decision(mode, p, state, required, unmapped, &ev)
 		g.emit(ev)
 		if g.cfg.OnRequest != nil {
 			g.cfg.OnRequest(r, p, ev)
@@ -187,15 +220,16 @@ func (g *Guard) AuthorizeTool(ctx context.Context, tool string) error {
 	required, known := g.cfg.Scopes.ForTool(tool)
 	unmapped := g.cfg.Scopes.denyUnmapped(known, required)
 	p, ok := FromContext(ctx)
+	mode := g.Mode()
 	state := StateMissing
 	if ok && p.Verified {
 		state = StateVerified
-	} else if ok && g.cfg.Mode == ModeOff {
+	} else if ok && mode == ModeOff {
 		state = StateVerified // synthetic off-mode principal
 		p.Verified = true
 	}
-	ev := Event{At: time.Now().UTC(), Mode: g.cfg.Mode, Authentication: state, Tool: tool}
-	_, _, status, _ := g.decision(p, state, required, unmapped, &ev)
+	ev := Event{At: time.Now().UTC(), Mode: mode, Authentication: state, Tool: tool}
+	_, _, status, _ := g.decision(mode, p, state, required, unmapped, &ev)
 	g.emit(ev)
 	switch status {
 	case 0:
