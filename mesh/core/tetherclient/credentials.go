@@ -77,8 +77,12 @@ func (c *Client) resolveToken() (string, error) {
 	return token, err
 }
 
+// maxBearerTokenLen bounds a bearer credential. Tether service tokens are signed
+// and run to a few hundred characters; device bearers are shorter.
+const maxBearerTokenLen = 1024
+
 func validBearerToken(token string) bool {
-	if token == "" || len(token) > 256 {
+	if token == "" || len(token) > maxBearerTokenLen {
 		return false
 	}
 	for _, b := range []byte(token) {
