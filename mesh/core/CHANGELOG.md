@@ -8,6 +8,8 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.9.0 — 2026-10-23
+
 ### Added
 
 - `hitlrouting` (CW-20261023-0006): the routing profile for cards and human-in-the-loop requests,
