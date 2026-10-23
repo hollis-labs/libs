@@ -133,7 +133,10 @@ func (b *bound) args(in []any) []any {
 			}
 			t, ok := dv.(time.Time)
 			if !ok {
-				continue
+				// Already evaluated once: hand the driver the value, not the
+				// Valuer, so Value() is not called a second time.
+				enc = dv
+				break
 			}
 			enc = b.d.EncodeTime(t)
 		default:

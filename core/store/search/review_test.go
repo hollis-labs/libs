@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -308,4 +309,37 @@ func TestNonSimpleLanguageOnPostgres(t *testing.T) {
 	if got := ids(run(t, s, sr, search.Query{Text: "run dog"})); got != "1" {
 		t.Errorf("english config should stem: {%s}", got)
 	}
+}
+
+// Stored text that happens to hold private-use code points, or anything that
+// looks like a marker, must not become markup.
+func TestStoredTextCannotForgeMarkers(t *testing.T) {
+	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
+		sr := install(t, s)
+		storetest.Exec(t, s, `INSERT INTO notes (id, title, body, kind) VALUES (?, ?, ?, ?)`, "30", "t", "head \ue000 evil \ue001 and gsOdeadbeefx fox \ue002 tail", "a")
+		hits := run(t, s, sr, search.Query{Text: "fox", Filters: []search.Filter{{Column: "kind", Values: []any{"a"}}}, Snippet: &search.Snippet{Field: "body"}})
+		for _, h := range hits {
+			if h.ID != "30" {
+				continue
+			}
+			if strings.Count(h.Snippet, "<mark>") != strings.Count(h.Snippet, "</mark>") || strings.Count(h.Snippet, "<mark>") != 1 {
+				t.Errorf("markers not balanced or forged: %q", h.Snippet)
+			}
+			if strings.Contains(h.Snippet, "<mark>evil") {
+				t.Errorf("stored private-use text became a marker: %q", h.Snippet)
+			}
+			return
+		}
+		t.Fatalf("no hit for 30: %+v", hits)
+	})
+}
+
+func TestAngleBracketOnlyTermAgreesOnBothEngines(t *testing.T) {
+	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
+		sr := install(t, s)
+		_, err := sr.Search(ctx, s.Reader(), search.Query{Match: search.Term{Text: "<"}})
+		if !errors.Is(err, search.ErrInvalidQuery) {
+			t.Errorf("err = %v, want ErrInvalidQuery", err)
+		}
+	})
 }

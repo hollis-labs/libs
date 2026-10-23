@@ -62,10 +62,10 @@ type SQLiteConfig struct {
 // PostgresConfig configures the Postgres engine.
 type PostgresConfig struct {
 	// DSN is the runtime connection string (DML-only role in production).
-	DSN string
+	DSN string `json:"-"`
 	// MigrateDSN is the schema-owner connection string used only by
 	// migrate.Up. Empty means migrations run over DSN.
-	MigrateDSN string
+	MigrateDSN string `json:"-"`
 	// AllowInsecure permits a connection without verified TLS (tests, a local
 	// container). Without it Open requires sslmode=verify-full.
 	AllowInsecure bool

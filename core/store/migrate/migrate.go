@@ -55,8 +55,8 @@ func (s Source) checkedTable() (string, error) {
 	if t == "" {
 		t = DefaultTable
 	}
-	if err := store.CheckIdentifier(t); err != nil {
-		return "", fmt.Errorf("migrate: version table: %w", err)
+	if err := store.CheckIdentifier(t); err != nil || strings.Contains(t, ".") {
+		return "", fmt.Errorf("migrate: version table %q must be a plain, unqualified identifier (choose the schema with search_path)", t)
 	}
 	return t, nil
 }

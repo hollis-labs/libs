@@ -19,9 +19,8 @@ func init() {
 		switch v := args[0].(type) {
 		case string:
 			return strings.ToLower(v), nil
-		case []byte:
-			return strings.ToLower(string(v)), nil
 		}
+		// BLOBs, numbers and NULL pass through unchanged.
 		return args[0], nil
 	})
 }

@@ -61,7 +61,7 @@ Shared SQL (the SQL strings in your Go code) follows these rules. `gostore-lint`
 | No `AUTOINCREMENT` / `serial` in shared SQL | Per-dialect DDL belongs in the per-dialect migration files; prefer Go-generated ids. |
 | Time comes from Go as a parameter; never `datetime('now')`, `now()`, `CURRENT_TIMESTAMP` | See Time. |
 | Write `NULLS FIRST` / `NULLS LAST` explicitly | SQLite sorts NULLs smallest, Postgres largest. |
-| `lower(col) LIKE lower(?) ESCAPE '\'` (`store.LikeInsensitive`, `store.LikeEscape`) | `LIKE` is case-insensitive on SQLite and case-sensitive on Postgres. SQLite's `lower()` folds ASCII only; for other scripts use `Dialect.Lower(expr)` (`gostore_lower`, a full-Unicode function the store registers; Postgres `lower()` follows the database locale, so use a UTF-8 database). |
+| `lower(col) LIKE lower(?) ESCAPE '\'` (`store.LikeInsensitive`, `store.LikeEscape`) | `LIKE` is case-insensitive on SQLite and case-sensitive on Postgres. SQLite's `lower()` folds ASCII only; for other scripts use `Dialect.Lower(expr)` (`gostore_lower`, a full-Unicode function the store registers for text; BLOBs, numbers and NULL pass through unchanged; Postgres `lower()` follows the database locale, so use a UTF-8 database). |
 | `LIMIT n OFFSET m`, not `LIMIT m, n`; no `group_concat` | SQLite-only forms. |
 | Booleans are Go `bool` | |
 | JSON: use the `Dialect` helpers | `json_extract` vs `#>>`; numbers need explicit casts. |
@@ -114,7 +114,8 @@ deadlock), so the callback must be safe to run again from scratch.
 A callback that ends its goroutine (`runtime.Goexit`) is rolled back and releases the writer. `synchronous` defaults to `FULL`; set
 `SQLiteConfig.Synchronous` (`NORMAL`, …) knowingly. `:memory:` and `file::memory:…` use one
 connection for reads and writes (each connection to an in-memory URI would otherwise be its own
-database). For heavy write fan-in, `core/util/sqlite/serialwrite` can
+database). Other in-memory spellings such as `file:name?mode=memory&cache=shared` are treated as a
+file path by `core/util`'s sqlitekit; use `:memory:` or a real file. For heavy write fan-in, `core/util/sqlite/serialwrite` can
 batch writes in front of `Store.DB()`.
 
 Backups: `Store.Backup(ctx, dest, store.BackupOptions{})` on SQLite (verified copy and manifest via
@@ -134,7 +135,7 @@ returns `ErrBackupUnsupported`.
   `DSN`; schema changes use a separate `MigrateDSN` (the schema owner). `migrate.Up` uses the
   migration credential, `migrate.Verify` uses the runtime one.
 - Errors that could echo a DSN are not passed through; a parse failure never includes the DSN.
-- `Config`, `PostgresConfig` and their `slog` values print `<redacted>` for both DSNs, and an open
+- `Config`, `PostgresConfig` and their `slog` values print `<redacted>` for both DSNs (and `json.Marshal` omits them), and an open
   `Store` keeps neither (`Store.Config()` returns them blank). Pass the `Config` you opened with to
   `migrate.Ensure`/`migrate.Up` when you need the migration credential.
 
@@ -170,7 +171,8 @@ err = migrate.Ensure(ctx, cfg, s, src) // cfg.SchemaMode auto: migrate, then ver
   lock:** two processes migrating one file can race, and the loser fails to start (busy or
   already-exists) without corrupting anything; a later start completes. Run the migrator from one
   process, or retry the start.
-- `Source.Table` is spliced into SQL and must be a plain identifier.
+- `Source.Table` is spliced into SQL and must be a plain, unqualified identifier (no `schema.`; choose
+the schema with `search_path`).
 - `Baseline(ctx, s, src, version)` adopts a database whose schema already exists at `version` (for
   example from a custom version table): it records migrations up to `version` as applied without
   running them. `version` must be one of the source's versions. It refuses (`ErrAlreadyApplied`)
@@ -261,7 +263,8 @@ included, so a transaction sees its own writes.
   follows the database locale (`lower()`), so use a UTF-8 database.
 - Snippets pick different fragments. On Postgres the excerpt is taken from the folded text with
   `<`/`>` as spaces, so accents and angle brackets in it differ from the stored text. The excerpt is
-  **HTML-escaped** before the markers go in (`Snippet.NoEscape` for plain text); the markers
+  **HTML-escaped** before the markers go in (the database marks matches with per-query random
+  stand-ins, so stored text can never forge or unbalance a marker) (`Snippet.NoEscape` for plain text); the markers
   themselves are inserted verbatim, so they are markup you choose, not user input. Ellipsis is
   SQLite only.
 - Field-qualified phrases (`title:"brown fox"`) parse as the word `title:` plus a phrase; for a
@@ -342,9 +345,12 @@ go run github.com/hollis-labs/libs/core/store/cmd/gostore-lint ./...   # exit 1 
 
 or in a test: `lint.Dir(".", lint.Options{SkipTests: true})`. Rules: `insert-or`, `sqlite-time`,
 `db-clock`, `autoincrement`, `ilike`, `json-path`, `dollar-placeholder`, `sqlite-only`, `like-case`,
-`last-insert-id`, `limit-comma`, `jsonb-operator`. SQL split over concatenated string literals
-(`"SELECT … " + "FROM …"`) is folded and checked as one statement; a non-literal operand folds to a
-placeholder word. Waive a deliberate exception with `// gostore:allow <rule>` on the line or the
+`last-insert-id`, `limit-comma`, `jsonb-operator`. SQL built by concatenation is folded and checked as one statement
+(`"SELECT … " + "FROM …"`, same-file string constants, and `q += "…"` / `q = q + "…"` on a variable
+that started as SQL); an operand built at run time is unknown, and a `LIKE` next to one is not
+flagged. The lint still cannot see SQL assembled across functions, files or `fmt.Sprintf`. Block
+comments nest in the tokenizer as on Postgres; SQLite does not nest them, so the lint can
+under-scan SQL after an inner `*/` (SQLite-only quirk). Waive a deliberate exception with `// gostore:allow <rule>` on the line or the
 line above. Migration `.sql` files are per dialect by design and are not linted.
 
 ## Adoption guide

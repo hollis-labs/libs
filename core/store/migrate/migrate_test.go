@@ -147,9 +147,11 @@ func TestBaselineChecks(t *testing.T) {
 		if err := migrate.Up(ctx, store.Config{}, migrate.Source{}); err == nil {
 			t.Fatal("empty config must fail")
 		}
-		bad := migrate.Source{FS: fixtures, Root: "testdata/migrations", Table: "x; DROP TABLE y"}
-		if err := migrate.Baseline(ctx, s, bad, 1); err == nil {
-			t.Fatal("a version table name that is not an identifier must fail")
+		for _, name := range []string{"x; DROP TABLE y", "main.versions", "app.versions"} {
+			bad := migrate.Source{FS: fixtures, Root: "testdata/migrations", Table: name}
+			if err := migrate.Baseline(ctx, s, bad, 1); err == nil {
+				t.Fatalf("version table %q must be refused", name)
+			}
 		}
 	})
 }

@@ -2,7 +2,9 @@ package search
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html"
@@ -38,21 +40,25 @@ type Snippet struct {
 	NoEscape bool
 }
 
-// Private-use code points stand in for the markers inside the database, so the
-// excerpt can be escaped in Go before the real markers are swapped in. They also
-// keep marker text out of the SQL entirely.
-const (
-	sentOpen  = "\ue000"
-	sentClose = "\ue001"
-	sentEll   = "\ue002"
-)
+// Stand-ins for the markers inside the database, so the excerpt can be escaped
+// in Go before the real markers are swapped in. They are random per query:
+// stored text cannot contain them unless it guessed 96 bits, so content can
+// never forge or unbalance a marker.
+type sentinels struct{ open, close, ell string }
 
-func (sn Snippet) finish(raw string) string {
+func newSentinels() sentinels {
+	var b [12]byte
+	_, _ = rand.Read(b[:])
+	n := hex.EncodeToString(b[:])
+	return sentinels{open: "gsO" + n + "x", close: "gsC" + n + "x", ell: "gsE" + n + "x"}
+}
+
+func (sn Snippet) finish(raw string, st sentinels) string {
 	open, cl, ell, _ := defaults(sn)
 	if !sn.NoEscape {
 		raw = html.EscapeString(raw)
 	}
-	return strings.NewReplacer(sentOpen, open, sentClose, cl, sentEll, ell).Replace(raw)
+	return strings.NewReplacer(st.open, open, st.close, cl, st.ell, ell).Replace(raw)
 }
 
 // Query is one search.
@@ -167,13 +173,14 @@ func (s *Searcher) Search(ctx context.Context, qr store.Querier, q Query) ([]Hit
 	if e == nil && q.Substring == "" {
 		return nil, nil // nothing to search for matches nothing
 	}
+	st := newSentinels()
 	var query string
 	var args []any
 	switch s.d.Name() {
 	case store.DriverSQLite:
-		query, args, err = s.sqliteSQL(q, e)
+		query, args, err = s.sqliteSQL(q, e, st)
 	case store.DriverPostgres:
-		query, args, err = s.postgresSQL(q, e)
+		query, args, err = s.postgresSQL(q, e, st)
 	default:
 		err = fmt.Errorf("%w: %q", store.ErrUnknownDriver, s.d.Name())
 	}
@@ -207,7 +214,7 @@ func (s *Searcher) Search(ctx context.Context, qr store.Querier, q Query) ([]Hit
 			return nil, err
 		}
 		if q.Snippet != nil {
-			h.Snippet = q.Snippet.finish(snip.String)
+			h.Snippet = q.Snippet.finish(snip.String, st)
 		}
 		out = append(out, h)
 	}
@@ -256,7 +263,7 @@ func (s *Searcher) substringArgs(sub string, n int) []any {
 
 func num(f float64) string { return strconv.FormatFloat(f, 'g', -1, 64) }
 
-func (s *Searcher) sqliteSQL(q Query, e Expr) (string, []any, error) {
+func (s *Searcher) sqliteSQL(q Query, e Expr, st sentinels) (string, []any, error) {
 	ix := s.ix
 	var sel, where string
 	var args []any
@@ -291,7 +298,7 @@ func (s *Searcher) sqliteSQL(q Query, e Expr) (string, []any, error) {
 				col = i
 			}
 		}
-		sel += fmt.Sprintf(", snippet(%s, %d, '%s', '%s', '%s', %d) AS snip", ix.Name, col, sentOpen, sentClose, sentEll, words)
+		sel += fmt.Sprintf(", snippet(%s, %d, '%s', '%s', '%s', %d) AS snip", ix.Name, col, st.open, st.close, st.ell, words)
 	}
 	return sel + fmt.Sprintf(" FROM %s JOIN %s s ON s.rowid = %s.rowid WHERE %s MATCH ?/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
 		ix.Name, ix.Table, ix.Name, ix.Name), []any{match}, nil
@@ -317,7 +324,7 @@ func defaults(sn Snippet) (open, cl, ell string, words int) {
 	return
 }
 
-func (s *Searcher) postgresSQL(q Query, e Expr) (string, []any, error) {
+func (s *Searcher) postgresSQL(q Query, e Expr, st sentinels) (string, []any, error) {
 	ix := s.ix
 	if q.Substring != "" {
 		w, n := s.substringWhere()
@@ -363,7 +370,7 @@ func (s *Searcher) postgresSQL(q Query, e Expr) (string, []any, error) {
 			minW = 1
 		}
 		sel += fmt.Sprintf(", ts_headline('%s', %s, q.q, 'StartSel=%s, StopSel=%s, MaxWords=%d, MinWords=%d, MaxFragments=1') AS snip",
-			ix.language(), doc, sentOpen, sentClose, words, minW)
+			ix.language(), doc, st.open, st.close, words, minW)
 	}
 	return sel + fmt.Sprintf(" FROM %s s, (SELECT %s AS q) q WHERE s.%s @@ q.q/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
 		ix.Table, qexpr, ix.vecColumn()), []any{arg}, nil

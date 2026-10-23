@@ -111,6 +111,11 @@ func fts5Compiler(fs fieldSet) compiler {
 	return compiler{
 		fields: fs,
 		term: func(t Term) (string, error) {
+			// Same rule as the Postgres compiler: a term that is only angle
+			// brackets is empty on both engines.
+			if strings.TrimSpace(tagFold.Replace(t.Text)) == "" {
+				return "", fmt.Errorf("%w: empty term", ErrInvalidQuery)
+			}
 			s := fts5Quote(t.Text)
 			if t.Prefix {
 				s += "*"

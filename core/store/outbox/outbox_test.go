@@ -157,6 +157,41 @@ func TestLeaseLostMidBatchDoesNotDoubleDeliver(t *testing.T) {
 	})
 }
 
+// A handler that overruns the lease makes Drain skip the rest of its batch.
+// The skipped messages were charged an attempt at claim; they must get it back,
+// or they would be parked without their handler ever running.
+func TestSkippedMessagesAreNotChargedAnAttempt(t *testing.T) {
+	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
+		o, clk := setup(t, s, outbox.Config{Lease: time.Minute, MaxAttempts: 2, Backoff: func(int) time.Duration { return 0 }})
+		for i := 0; i < 4; i++ {
+			enqueue(t, s, o, "t", fmt.Sprint(i))
+			clk.add(time.Millisecond)
+		}
+		// For two rounds the first handler overruns the lease and the rest of the
+		// batch is skipped. Those skipped messages never reached a handler, so
+		// they must not be charged: without the refund they would reach
+		// MaxAttempts after two rounds and be parked untouched.
+		round, delivered := 0, 0
+		h := func(context.Context, outbox.Message) error {
+			if round < 2 {
+				clk.add(2 * time.Minute)
+			}
+			return nil
+		}
+		for round = 0; round < 6; round++ {
+			n, _ := o.Drain(ctx, s, "w", 4, h)
+			delivered += n
+		}
+		parked, _ := o.Parked(ctx, s.Reader(), 10)
+		if len(parked) != 1 || string(parked[0].Payload) != "0" {
+			t.Fatalf("parked = %+v; only the message whose handler overran twice may be parked", parked)
+		}
+		if delivered != 3 {
+			t.Fatalf("delivered %d of the 3 skipped messages", delivered)
+		}
+	})
+}
+
 func TestStaleFailFromAReusedWorkerNameIsRefused(t *testing.T) {
 	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
 		o, clk := setup(t, s, outbox.Config{Lease: time.Minute})

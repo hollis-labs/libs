@@ -80,3 +80,48 @@ func f(db *sql.DB) {
 		t.Errorf("lines = %d, %d", fs[0].Line, fs[1].Line)
 	}
 }
+
+func TestFileFoldsConstantsAndAppends(t *testing.T) {
+	src := `package x
+
+import "database/sql"
+
+const base = "SELECT a FROM t "
+const where = "WHERE d = datetime('now')"
+const joined = base + where
+
+func f(db *sql.DB, col, pat string) {
+	_ = base + "WHERE c ILIKE ?"
+	q := "SELECT a FROM t"
+	q += " WHERE x ILIKE ?"
+	_ = q
+	r := "SELECT a FROM t WHERE 1=1"
+	r = r + " AND y = datetime('now')"
+	_ = r
+	_ = joined
+	// Clean: the LIKE operand is built at run time, so nothing can be said.
+	_ = "SELECT lower(a) " + col + " LIKE lower(?)"
+	_ = "SELECT a FROM t WHERE " + col + " LIKE ?"
+	_ = "SELECT a FROM t WHERE lower(a) LIKE lower(?) AND " + col + " = ?"
+}
+`
+	fs, err := lint.File("x.go", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[int]string{}
+	for _, f := range fs {
+		got[f.Line] += f.Rule + ","
+	}
+	want := map[int]string{7: "sqlite-time,", 10: "ilike,", 12: "ilike,", 15: "sqlite-time,"}
+	for line, rule := range want {
+		if !strings.Contains(got[line], rule) {
+			t.Errorf("line %d: want %s, got %q (all: %v)", line, rule, got[line], fs)
+		}
+	}
+	for line, rule := range got {
+		if line >= 18 {
+			t.Errorf("false positive on line %d: %s", line, rule)
+		}
+	}
+}

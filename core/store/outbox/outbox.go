@@ -330,6 +330,11 @@ func (o *Outbox) Drain(ctx context.Context, s *store.Store, worker string, batch
 	for _, m := range msgs {
 		remaining := m.ClaimedUntil.Sub(o.cfg.Now())
 		if remaining <= 0 {
+			// Its handler never ran, so the attempt charged at claim is given
+			// back; otherwise a slow handler would park the rest of its batch.
+			if err := o.giveBack(ctx, s, m); err != nil {
+				return done, err
+			}
 			continue
 		}
 		hctx, cancel := context.WithTimeout(ctx, remaining)
@@ -350,6 +355,18 @@ func (o *Outbox) Drain(ctx context.Context, s *store.Store, worker string, batch
 		done++
 	}
 	return done, nil
+}
+
+// giveBack releases a claim whose handler never ran and refunds its attempt.
+// It matches on the claim token only (the lease has ended by definition); if
+// another worker has claimed the message since, it changes nothing.
+func (o *Outbox) giveBack(ctx context.Context, s *store.Store, m Message) error {
+	return s.WriteTx(ctx, func(ctx context.Context, tx store.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE `+o.table+` SET attempts = attempts - 1, claimed_by = NULL, claim_token = NULL, claimed_until = NULL WHERE id = ? AND claim_token = ? AND attempts > 0`,
+			m.ID, m.token)
+		return err
+	})
 }
 
 // Parked lists messages that failed MaxAttempts deliveries and are no longer

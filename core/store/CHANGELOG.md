@@ -66,3 +66,20 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
   and `limit-comma`, `group_concat` joins `sqlite-only`; `serial` only counts in `CREATE`/`ALTER`;
   `lower(coalesce(a, b)) LIKE lower(?)` no longer false-positives.
 - `storetest`: `CI=false`/`0` no longer counts as set; a failed `DROP SCHEMA` fails the test.
+
+### Changed in review, round 2 (PR 122)
+
+- `outbox`: a message `Drain` skips because an earlier handler overran the lease gets its attempt
+  back and its claim released; before, such messages were charged at claim, re-claimed and skipped
+  round after round until parked without their handler running. A test fails without the refund.
+- `search`: snippet stand-ins are random per query (stored text, including U+E000–E002, can no
+  longer forge or unbalance a marker). A term that is only angle brackets is `ErrInvalidQuery` on
+  SQLite as it already was on Postgres.
+- `lint`: resolves same-file string constants, checks `q += "…"` and `q = q + "…"` on a variable that
+  began as SQL, and no longer flags a `LIKE` beside a run-time operand. Known gap: SQL built across
+  functions or with `fmt.Sprintf`.
+- `migrate`: a schema-qualified `Source.Table` is refused (it broke `Baseline` on SQLite).
+- `store`: a `driver.Valuer` is evaluated once; `Config`/`PostgresConfig` DSNs are `json:"-"`;
+  `gostore_lower` leaves BLOBs unchanged.
+- Known gaps recorded: `file:name?mode=memory&cache=shared` is read as a file path by
+  `core/util` sqlitebackup/sqlitekit; SQLite does not nest `/* */` comments though the tokenizer does.

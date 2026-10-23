@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -215,5 +217,29 @@ func TestPostgresTLSIsCheckedPerHost(t *testing.T) {
 		if got := errors.Is(err, store.ErrBadConfig); got != c.refused {
 			t.Errorf("%s: refused=%v, want %v (err: %v)", c.name, got, c.refused, err)
 		}
+	}
+}
+
+type countingValuer struct{ calls *int }
+
+func (c countingValuer) Value() (driver.Value, error) { *c.calls++; return "v", nil }
+
+func TestValuerIsEvaluatedOnce(t *testing.T) {
+	s := storetest.SQLite(t)
+	storetest.Exec(t, s, `CREATE TABLE vv (v TEXT)`)
+	n := 0
+	storetest.Exec(t, s, `INSERT INTO vv (v) VALUES (?)`, countingValuer{&n})
+	if n != 1 {
+		t.Fatalf("Value() called %d times", n)
+	}
+}
+
+func TestConfigJSONOmitsConnectionStrings(t *testing.T) {
+	b, err := json.Marshal(store.Config{Driver: store.DriverPostgres, Postgres: store.PostgresConfig{DSN: "password=hunter2", MigrateDSN: "password=s3cret"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "hunter2") || strings.Contains(string(b), "s3cret") {
+		t.Fatalf("json leaked: %s", b)
 	}
 }

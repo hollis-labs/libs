@@ -58,6 +58,9 @@ func r(name, pattern, msg string) rule {
 	return rule{name: name, re: regexp.MustCompile(`(?i)` + pattern), msg: msg}
 }
 
+// unknown stands for a non-literal operand folded out of a concatenation.
+const unknown = "\x01"
+
 var ddlStart = regexp.MustCompile(`(?i)^\s*(CREATE|ALTER)\b`)
 
 var rules = []rule{
@@ -98,6 +101,11 @@ func Check(query string) []Finding {
 		end := loc[1] + 20
 		if end > len(m) {
 			end = len(m)
+		}
+		before := strings.TrimSpace(m[:loc[0]])
+		after := strings.TrimSpace(m[loc[1]:])
+		if strings.HasSuffix(before, unknown) || strings.HasPrefix(after, unknown) {
+			continue // an operand built at run time: cannot tell
 		}
 		if !lowerLikeRe.MatchString(m[start:end]) {
 			out = append(out, Finding{Rule: "like-case", Message: "LIKE is case-insensitive on SQLite and case-sensitive on Postgres; write lower(col) LIKE lower(?)", SQL: short(query)})
@@ -151,6 +159,8 @@ func File(filename string, src []byte) ([]Finding, error) {
 		}
 		return false
 	}
+	env := constStrings(f)
+	sqlVars := map[string]bool{}
 	var out []Finding
 	add := func(fd Finding, pos token.Pos) {
 		fd.File = filename
@@ -174,19 +184,39 @@ func File(filename string, src []byte) ([]Finding, error) {
 			}
 		case *ast.BinaryExpr:
 			// SQL built as "SELECT ..." + "FROM ...": fold the chain so a rule
-			// that spans the pieces still sees one statement. A non-literal
-			// operand folds to a placeholder word.
+			// that spans the pieces still sees one statement. Same-file string
+			// constants are resolved; any other operand folds to a placeholder.
 			if x.Op != token.ADD {
 				return true
 			}
-			s, lits := foldString(x)
-			if lits == 0 || !sqlStart.MatchString(s) {
+			s, lits, viaVar := foldString(x, env, sqlVars)
+			if lits == 0 || !(sqlStart.MatchString(s) || viaVar) {
 				return true
 			}
 			for _, fd := range Check(s) {
 				add(fd, x.Pos())
 			}
 			return false
+		case *ast.AssignStmt:
+			// q := "SELECT ..."; q += " WHERE x ILIKE ?": a variable that starts as
+			// SQL has its appended pieces checked as they come.
+			if len(x.Lhs) != 1 || len(x.Rhs) != 1 {
+				return true
+			}
+			id, ok := x.Lhs[0].(*ast.Ident)
+			if !ok {
+				return true
+			}
+			s, lits, _ := foldString(x.Rhs[0], env, sqlVars)
+			switch {
+			case x.Tok == token.ADD_ASSIGN && sqlVars[id.Name] && lits > 0:
+				for _, fd := range Check(s) {
+					add(fd, x.Pos())
+				}
+				return false
+			case (x.Tok == token.DEFINE || x.Tok == token.ASSIGN) && lits > 0 && sqlStart.MatchString(s):
+				sqlVars[id.Name] = true
+			}
 		case *ast.SelectorExpr:
 			if x.Sel.Name == "LastInsertId" {
 				add(Finding{Rule: "last-insert-id", Message: "LastInsertId is not portable; use INSERT ... RETURNING id", SQL: "LastInsertId()"}, x.Pos())
@@ -197,26 +227,57 @@ func File(filename string, src []byte) ([]Finding, error) {
 	return out, nil
 }
 
-// foldString joins a chain of "+" operands into one string. Non-literal
-// operands become "_". It returns the number of literal operands folded.
-func foldString(e ast.Expr) (string, int) {
+// foldString joins a chain of "+" operands into one string. Same-file string
+// constants are resolved; other operands become [unknown]. It returns the number
+// of literal operands folded and whether the chain starts from a variable that
+// holds SQL.
+func foldString(e ast.Expr, env map[string]string, sqlVars map[string]bool) (string, int, bool) {
 	switch x := e.(type) {
 	case *ast.BasicLit:
 		if x.Kind == token.STRING {
 			if s, err := strconv.Unquote(x.Value); err == nil {
-				return s, 1
+				return s, 1, false
 			}
+		}
+	case *ast.Ident:
+		if v, ok := env[x.Name]; ok {
+			return v, 1, false
+		}
+		if sqlVars[x.Name] {
+			return unknown, 0, true
 		}
 	case *ast.BinaryExpr:
 		if x.Op == token.ADD {
-			l, ln := foldString(x.X)
-			r, rn := foldString(x.Y)
-			return l + r, ln + rn
+			l, ln, lv := foldString(x.X, env, sqlVars)
+			r, rn, rv := foldString(x.Y, env, sqlVars)
+			return l + r, ln + rn, lv || rv
 		}
 	case *ast.ParenExpr:
-		return foldString(x.X)
+		return foldString(x.X, env, sqlVars)
 	}
-	return "_", 0
+	return unknown, 0, false
+}
+
+// constStrings collects the string constants (and package-level string
+// variables with a literal value) declared in a file, resolving ones built from
+// earlier ones.
+func constStrings(f *ast.File) map[string]string {
+	env := map[string]string{}
+	for pass := 0; pass < 3; pass++ { // a const may refer to a later one
+		ast.Inspect(f, func(n ast.Node) bool {
+			vs, ok := n.(*ast.ValueSpec)
+			if !ok || len(vs.Names) != len(vs.Values) {
+				return true
+			}
+			for i, name := range vs.Names {
+				if s, lits, _ := foldString(vs.Values[i], env, nil); lits > 0 && !strings.Contains(s, unknown) {
+					env[name.Name] = s
+				}
+			}
+			return true
+		})
+	}
+	return env
 }
 
 // Options controls [Dir].
