@@ -1,6 +1,6 @@
 module github.com/hollis-labs/libs/core/store
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/hollis-labs/libs/core/panics v0.1.0
