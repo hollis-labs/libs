@@ -343,3 +343,37 @@ func TestAngleBracketOnlyTermAgreesOnBothEngines(t *testing.T) {
 		}
 	})
 }
+
+func TestSnippetSearchesReuseOnePreparedStatementOnPostgres(t *testing.T) {
+	cfg := storetest.PGConfig(t)
+	if cfg == nil {
+		return
+	}
+	cfg.Postgres.MaxConns = 1 // one session, so pg_prepared_statements sees every statement
+	s, err := store.Open(ctx, *cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	sr := install(t, s)
+	for i := 0; i < 50; i++ {
+		run(t, s, sr, search.Query{Text: "fox", Snippet: &search.Snippet{Field: "body"}})
+	}
+	var n int
+	if err := s.QueryRowContext(ctx, `SELECT count(*) FROM pg_prepared_statements`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	// Every statement the test ran is in the count (the DDL and inserts too);
+	// 50 distinct snippet statements would put it far above this.
+	if n > 30 {
+		t.Fatalf("%d prepared statements after 50 identical searches: the statement text varies per query", n)
+	}
+	before := n
+	for i := 0; i < 50; i++ {
+		run(t, s, sr, search.Query{Text: "fox", Snippet: &search.Snippet{Field: "body"}})
+	}
+	_ = s.QueryRowContext(ctx, `SELECT count(*) FROM pg_prepared_statements`).Scan(&n)
+	if n > before+1 {
+		t.Fatalf("50 more identical searches added %d prepared statements", n-before)
+	}
+}

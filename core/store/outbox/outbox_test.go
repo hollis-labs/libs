@@ -384,3 +384,61 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// Several drainers whose handlers always overrun the lease, so they keep
+// skipping and re-claiming each other's messages. A message must never be
+// charged for a delivery that did not start: attempts equals handler calls.
+func TestConcurrentOverrunningDrainersChargeOnlyRealDeliveries(t *testing.T) {
+	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
+		o, clk := setup(t, s, outbox.Config{Lease: time.Minute, MaxAttempts: 1000, Backoff: func(int) time.Duration { return 0 }})
+		const total = 24
+		for i := 0; i < total; i++ {
+			enqueue(t, s, o, "t", fmt.Sprint(i))
+		}
+		var calls sync.Map // id -> *atomic.Int64
+		handler := func(_ context.Context, m outbox.Message) error {
+			c, _ := calls.LoadOrStore(m.ID, new(atomic.Int64))
+			c.(*atomic.Int64).Add(1)
+			clk.add(90 * time.Second) // overruns the lease every time
+			return nil
+		}
+		var wg sync.WaitGroup
+		for w := 0; w < 4; w++ {
+			wg.Add(1)
+			go func(w int) {
+				defer wg.Done()
+				for r := 0; r < 12; r++ {
+					if _, err := o.Drain(ctx, s, fmt.Sprintf("w%d", w), 6, handler); err != nil {
+						t.Error(err)
+						return
+					}
+				}
+			}(w)
+		}
+		wg.Wait()
+		rows, err := s.QueryContext(ctx, `SELECT id, attempts FROM outbox_messages WHERE delivered_at IS NULL AND claim_token IS NULL`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		checked := 0
+		for rows.Next() {
+			var id string
+			var attempts int64
+			if err := rows.Scan(&id, &attempts); err != nil {
+				t.Fatal(err)
+			}
+			var n int64
+			if c, ok := calls.Load(id); ok {
+				n = c.(*atomic.Int64).Load()
+			}
+			if attempts != n {
+				t.Errorf("message %s: attempts %d but its handler ran %d times", id, attempts, n)
+			}
+			checked++
+		}
+		if checked == 0 {
+			t.Fatal("no unclaimed undelivered messages to check")
+		}
+	})
+}

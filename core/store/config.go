@@ -89,6 +89,10 @@ func (c Config) validate() error {
 		if c.SQLite.Path == "" {
 			return fmt.Errorf("%w: sqlite path is empty", ErrBadConfig)
 		}
+		if strings.Contains(c.SQLite.Path, "mode=memory") {
+			// sqlitekit would create real files with that name.
+			return fmt.Errorf("%w: sqlite path %q is an in-memory URI sqlitekit cannot open; use \":memory:\" or a file", ErrBadConfig, c.SQLite.Path)
+		}
 		switch strings.ToUpper(c.SQLite.Synchronous) {
 		case "", "OFF", "NORMAL", "FULL", "EXTRA":
 		default:

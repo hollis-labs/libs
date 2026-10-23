@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -241,5 +242,34 @@ func TestConfigJSONOmitsConnectionStrings(t *testing.T) {
 	}
 	if strings.Contains(string(b), "hunter2") || strings.Contains(string(b), "s3cret") {
 		t.Fatalf("json leaked: %s", b)
+	}
+}
+
+type failingValuer struct{ calls *int }
+
+func (f failingValuer) Value() (driver.Value, error) { *f.calls++; return nil, errors.New("boom") }
+
+func TestValuerErrorSurfacesWithoutASecondCall(t *testing.T) {
+	s := storetest.SQLite(t)
+	storetest.Exec(t, s, `CREATE TABLE ve (v TEXT)`)
+	n := 0
+	_, err := s.ExecContext(context.Background(), `INSERT INTO ve (v) VALUES (?)`, failingValuer{&n})
+	if err == nil || !strings.Contains(err.Error(), "boom") || n != 1 {
+		t.Fatalf("err = %v after %d calls", err, n)
+	}
+	if err := s.QueryRowContext(context.Background(), `SELECT ?`, failingValuer{&n}).Scan(new(string)); err == nil {
+		t.Fatal("QueryRow must report the Valuer error at Scan")
+	}
+}
+
+func TestMemoryURIsThatWouldCreateFilesAreRefused(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	_, err := store.Open(context.Background(), store.Config{Driver: store.DriverSQLite, SQLite: store.SQLiteConfig{Path: "file:memdb?mode=memory&cache=shared"}})
+	if !errors.Is(err, store.ErrBadConfig) {
+		t.Fatalf("err = %v, want ErrBadConfig", err)
+	}
+	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
+		t.Fatalf("files were created: %v", ents)
 	}
 }

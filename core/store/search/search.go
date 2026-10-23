@@ -266,7 +266,7 @@ func num(f float64) string { return strconv.FormatFloat(f, 'g', -1, 64) }
 func (s *Searcher) sqliteSQL(q Query, e Expr, st sentinels) (string, []any, error) {
 	ix := s.ix
 	var sel, where string
-	var args []any
+	var args, snipArgs []any
 	if q.Substring != "" {
 		w, n := s.substringWhere()
 		where, args = w, s.substringArgs(q.Substring, n)
@@ -298,10 +298,11 @@ func (s *Searcher) sqliteSQL(q Query, e Expr, st sentinels) (string, []any, erro
 				col = i
 			}
 		}
-		sel += fmt.Sprintf(", snippet(%s, %d, '%s', '%s', '%s', %d) AS snip", ix.Name, col, st.open, st.close, st.ell, words)
+		sel += fmt.Sprintf(", snippet(%s, %d, ?, ?, ?, %d) AS snip", ix.Name, col, words)
+		snipArgs = []any{st.open, st.close, st.ell}
 	}
 	return sel + fmt.Sprintf(" FROM %s JOIN %s s ON s.rowid = %s.rowid WHERE %s MATCH ?/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
-		ix.Name, ix.Table, ix.Name, ix.Name), []any{match}, nil
+		ix.Name, ix.Table, ix.Name, ix.Name), append(snipArgs, match), nil
 }
 
 func defaults(sn Snippet) (open, cl, ell string, words int) {
@@ -353,6 +354,7 @@ func (s *Searcher) postgresSQL(q Query, e Expr, st sentinels) (string, []any, er
 	} else {
 		qexpr += "gostore_unaccent(?))"
 	}
+	var snipArgs []any
 	sel := fmt.Sprintf("SELECT s.%s::text AS hit_id, ts_rank_cd(%s, s.%s, q.q, 1)::float8 AS score", ix.IDColumn, warr, ix.vecColumn())
 	if q.Snippet != nil {
 		sn := *q.Snippet
@@ -369,11 +371,14 @@ func (s *Searcher) postgresSQL(q Query, e Expr, st sentinels) (string, []any, er
 		if minW < 1 {
 			minW = 1
 		}
-		sel += fmt.Sprintf(", ts_headline('%s', %s, q.q, 'StartSel=%s, StopSel=%s, MaxWords=%d, MinWords=%d, MaxFragments=1') AS snip",
-			ix.language(), doc, st.open, st.close, words, minW)
+		// The stand-ins are bound parameters, so the statement text is the same for
+		// every search and the driver's prepared statement is reused.
+		sel += fmt.Sprintf(", ts_headline('%s', %s, q.q, 'StartSel=' || ?::text || ', StopSel=' || ?::text || ', MaxWords=%d, MinWords=%d, MaxFragments=1') AS snip",
+			ix.language(), doc, words, minW)
+		snipArgs = []any{st.open, st.close}
 	}
 	return sel + fmt.Sprintf(" FROM %s s, (SELECT %s AS q) q WHERE s.%s @@ q.q/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
-		ix.Table, qexpr, ix.vecColumn()), []any{arg}, nil
+		ix.Table, qexpr, ix.vecColumn()), append(snipArgs, arg), nil
 }
 
 // Rebuild recreates the index from the source table. On SQLite this is the FTS5

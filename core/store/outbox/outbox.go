@@ -357,14 +357,20 @@ func (o *Outbox) Drain(ctx context.Context, s *store.Store, worker string, batch
 	return done, nil
 }
 
-// giveBack releases a claim whose handler never ran and refunds its attempt.
-// It matches on the claim token only (the lease has ended by definition); if
-// another worker has claimed the message since, it changes nothing.
+// giveBack refunds the attempt charged to m at claim and releases the claim if
+// it is still ours. The two are separate because another drainer may have
+// re-claimed the message after our lease ended: its claim must stand, but our
+// charge was for a delivery that never started and has to go regardless.
 func (o *Outbox) giveBack(ctx context.Context, s *store.Store, m Message) error {
 	return s.WriteTx(ctx, func(ctx context.Context, tx store.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE `+o.table+` SET claimed_by = NULL, claim_token = NULL, claimed_until = NULL WHERE id = ? AND claim_token = ?`,
+			m.ID, m.token); err != nil {
+			return err
+		}
 		_, err := tx.ExecContext(ctx,
-			`UPDATE `+o.table+` SET attempts = attempts - 1, claimed_by = NULL, claim_token = NULL, claimed_until = NULL WHERE id = ? AND claim_token = ? AND attempts > 0`,
-			m.ID, m.token)
+			`UPDATE `+o.table+` SET attempts = attempts - 1 WHERE id = ? AND attempts > 0 AND delivered_at IS NULL`,
+			m.ID)
 		return err
 	})
 }

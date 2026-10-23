@@ -51,6 +51,11 @@ type rawQuerier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
+// errValue is an argument whose conversion fails with a known error.
+type errValue struct{ err error }
+
+func (e errValue) Value() (driver.Value, error) { return nil, e.err }
+
 // bound adapts a database/sql handle to [Querier].
 type bound struct {
 	d   Dialect
@@ -129,7 +134,10 @@ func (b *bound) args(in []any) []any {
 			}
 			dv, err := v.Value()
 			if err != nil {
-				continue
+				// Surface this error from the statement instead of letting the
+				// driver call Value() again.
+				enc = errValue{err}
+				break
 			}
 			t, ok := dv.(time.Time)
 			if !ok {

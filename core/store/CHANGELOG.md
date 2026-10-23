@@ -83,3 +83,20 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
   `gostore_lower` leaves BLOBs unchanged.
 - Known gaps recorded: `file:name?mode=memory&cache=shared` is read as a file path by
   `core/util` sqlitebackup/sqlitekit; SQLite does not nest `/* */` comments though the tokenizer does.
+
+### Changed in review, round 3 (PR 122)
+
+- `outbox`: when `Drain` skips a message after an overrun, the attempt refund is separate from the
+  claim release, so it still lands when another drainer has already re-claimed the message (before,
+  such a message was charged twice and parked early). A concurrent-drainer test asserts attempts
+  equal handler calls; it fails on the previous behaviour.
+- `search`: the snippet stand-ins are bound parameters, so every snippet search has the same
+  statement text and the Postgres driver reuses one prepared statement (50 identical searches used
+  to prepare 50). A test counts `pg_prepared_statements`.
+- `lint`: `... LIKE " + pat` is flagged again when the column side has no `lower()`; an appended
+  piece is checked together with the text before it (no false positive for `lower(a)` then
+  `LIKE lower(?)`); a `gostore:allow` on a constant follows it to each use; `INSERT INTO " + t + "
+  DEFAULT VALUES` is flagged; variables and local constants are scoped to their function.
+- `store`: a `driver.Valuer` that fails returns its error from the statement (no second call);
+  `mode=memory` file URIs are refused at `Open` instead of creating files.
+- Known gaps: the lint resolves only same-file constants and in-function variables.
