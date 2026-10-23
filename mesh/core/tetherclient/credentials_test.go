@@ -108,13 +108,21 @@ func TestCredentialsFilesFailClosed(t *testing.T) {
 			t.Fatal("special/symlink file accepted")
 		}
 	}
-	for _, bad := range []string{"", strings.Repeat("x", 400), "secret\ninjected"} {
+	serviceToken := strings.Repeat("x", 456) // a signed Tether service token is this long
+	credentialFile(t, path, serviceToken)
+	if _, err := New("http://127.0.0.1:1", WithTokenFile(path)); err != nil {
+		t.Fatalf("service-token-length credential file rejected: %v", err)
+	}
+	if _, err := New("http://127.0.0.1:1", WithToken(serviceToken)); err != nil {
+		t.Fatalf("service-token-length bearer rejected: %v", err)
+	}
+	for _, bad := range []string{"", strings.Repeat("x", 2000), "secret\ninjected"} {
 		credentialFile(t, path, bad)
 		if _, err := New("http://127.0.0.1:1", WithTokenFile(path)); err == nil {
 			t.Fatal("invalid file content accepted")
 		}
 	}
-	for _, bad := range []string{"secret\nInjected: header", " secret", strings.Repeat("x", 257)} {
+	for _, bad := range []string{"secret\nInjected: header", " secret", strings.Repeat("x", 1025)} {
 		_, err := New("http://127.0.0.1:1", WithToken(bad))
 		if err == nil {
 			t.Fatal("invalid bearer accepted")

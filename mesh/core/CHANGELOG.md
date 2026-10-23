@@ -8,6 +8,13 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.9.1 — 2026-10-23
+
+### Fixed
+
+- `tetherclient`: a bearer credential, from `WithToken`, `TETHER_TOKEN` or a credential file, may now be up to 1024
+  characters (was 256). Signed Tether service tokens are about 456 characters, so a client could not use one.
+
 ## v0.9.0 — 2026-10-23
 
 ### Added

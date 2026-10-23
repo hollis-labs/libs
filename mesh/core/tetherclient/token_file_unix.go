@@ -24,12 +24,12 @@ func readTokenFile(path string) (string, error) {
 	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || !ok || int(owner.Uid) != os.Getuid() {
 		return "", fmt.Errorf("tether: credential file must be a regular file owned by this user with mode 0600")
 	}
-	body, err := io.ReadAll(io.LimitReader(f, 258))
+	body, err := io.ReadAll(io.LimitReader(f, maxBearerTokenLen+2))
 	if err != nil {
 		return "", fmt.Errorf("tether: read credential file: %w", err)
 	}
 	token := strings.TrimSpace(string(body))
-	if len(body) >= 258 || !validBearerToken(token) {
+	if len(body) >= maxBearerTokenLen+2 || !validBearerToken(token) {
 		return "", fmt.Errorf("tether: invalid credential file content")
 	}
 	return token, nil
