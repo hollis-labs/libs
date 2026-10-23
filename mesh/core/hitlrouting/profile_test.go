@@ -208,3 +208,17 @@ func TestValuesRoundTrip(t *testing.T) {
 		t.Fatalf("round trip lost values: %+v", again.Rules)
 	}
 }
+
+func TestParseTrailingData(t *testing.T) {
+	const valid = `{"version":"v1","catch_all":{"sink":"operator","completion":"wait","delivery":"await"}}`
+	for _, ok := range []string{"", "\n", " \t\r\n  "} {
+		if _, err := Parse([]byte(valid + ok)); err != nil {
+			t.Errorf("trailing whitespace %q refused: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"]", "}", "] arbitrary trailing text", "x", ",", "{}", valid, "null", "1", `"s"`, "\n{", "\u0000"} {
+		if _, err := Parse([]byte(valid + bad)); err == nil {
+			t.Errorf("accepted invalid trailing JSON %q", bad)
+		}
+	}
+}

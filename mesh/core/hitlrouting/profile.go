@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -121,7 +122,11 @@ func Parse(b []byte) (Profile, error) {
 	if err := dec.Decode(&p); err != nil {
 		return Profile{}, fmt.Errorf("hitlrouting: %w", err)
 	}
-	if dec.More() {
+	// Decode again: only end of input is acceptable. Anything else, a second value or
+	// stray syntax such as a closing bracket, is trailing data. (Decoder.More is not an
+	// end-of-input check.)
+	var extra json.RawMessage
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		return Profile{}, errors.New("hitlrouting: unexpected data after the profile")
 	}
 	if err := p.Validate(); err != nil {
