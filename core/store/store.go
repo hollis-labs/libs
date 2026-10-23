@@ -2,9 +2,12 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -34,8 +37,13 @@ type Querier interface {
 }
 
 // Tx is the transaction handle a [Store.WriteTx] callback receives. It is the
-// only handle the callback may use; see the package documentation.
-type Tx interface{ Querier }
+// only handle the callback may use; see the package documentation. Only the
+// store creates one. [Querier], by contrast, may be implemented by callers
+// (a test double, an instrumented wrapper).
+type Tx interface {
+	Querier
+	isTx()
+}
 
 type rawQuerier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -47,22 +55,56 @@ type rawQuerier interface {
 type bound struct {
 	d   Dialect
 	raw rawQuerier
-	// cache memoises Rebind results; statements are a small fixed set.
-	cache *sync.Map
+	// cache memoises Rebind results.
+	cache *rebindCache
 }
 
-func newBound(d Dialect, raw rawQuerier, cache *sync.Map) *bound {
+func newBound(d Dialect, raw rawQuerier, cache *rebindCache) *bound {
 	return &bound{d: d, raw: raw, cache: cache}
 }
 
+const (
+	rebindCacheMax = 1024 // entries
+	rebindKeyMax   = 4096 // bytes; longer (usually dynamic) SQL is not cached
+)
+
+// rebindCache is a bounded memo of Rebind results. It is cleared when full, so
+// dynamically built SQL cannot grow it without limit.
+type rebindCache struct {
+	mu sync.Mutex
+	m  map[string]string
+}
+
+func newRebindCache() *rebindCache { return &rebindCache{m: make(map[string]string)} }
+
+func (c *rebindCache) load(q string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	v, ok := c.m[q]
+	return v, ok
+}
+
+func (c *rebindCache) store(q, r string) {
+	if len(q) > rebindKeyMax {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.m) >= rebindCacheMax {
+		clear(c.m)
+	}
+	c.m[q] = r
+}
+
 func (b *bound) Dialect() Dialect { return b.d }
+func (b *bound) isTx()            {}
 
 func (b *bound) rebind(q string) string {
-	if v, ok := b.cache.Load(q); ok {
-		return v.(string)
+	if v, ok := b.cache.load(q); ok {
+		return v
 	}
 	r := b.d.Rebind(q)
-	b.cache.Store(q, r)
+	b.cache.store(q, r)
 	return r
 }
 
@@ -79,6 +121,21 @@ func (b *bound) args(in []any) []any {
 			} else {
 				enc = b.d.EncodeTime(*v)
 			}
+		case driver.Valuer:
+			// sql.NullTime and other Valuers that yield a time.Time are encoded
+			// like a bare time.Time; anything else is left to the driver.
+			if rv := reflect.ValueOf(a); rv.Kind() == reflect.Pointer && rv.IsNil() {
+				continue
+			}
+			dv, err := v.Value()
+			if err != nil {
+				continue
+			}
+			t, ok := dv.(time.Time)
+			if !ok {
+				continue
+			}
+			enc = b.d.EncodeTime(t)
 		default:
 			continue
 		}
@@ -111,7 +168,7 @@ type Store struct {
 	write   *sql.DB
 	read    *sql.DB
 	guard   PanicGuard
-	cache   *sync.Map
+	cache   *rebindCache
 
 	readQ *bound
 	once  *sync.Once
@@ -126,7 +183,7 @@ func Open(ctx context.Context, cfg Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{cfg: cfg, dialect: d, guard: cfg.Guard, cache: &sync.Map{}, once: &sync.Once{}}
+	s := &Store{cfg: cfg, dialect: d, guard: cfg.Guard, cache: newRebindCache(), once: &sync.Once{}}
 	if s.guard == nil {
 		s.guard = panics.Default()
 	}
@@ -140,6 +197,9 @@ func Open(ctx context.Context, cfg Config) (*Store, error) {
 		return nil, err
 	}
 	s.readQ = newBound(d, s.read, s.cache)
+	// The connection strings are not needed again; do not keep credentials (the
+	// migration one above all) on a long-lived runtime handle.
+	s.cfg.Postgres.DSN, s.cfg.Postgres.MigrateDSN = "", ""
 	return s, nil
 }
 
@@ -155,7 +215,7 @@ func (s *Store) openSQLite(ctx context.Context) error {
 		opts.BusyTimeout = c.BusyTimeout
 	}
 	oo := sqlitekit.OpenOptions{Options: opts, CreateParentDir: c.CreateParentDir}
-	if c.Path == ":memory:" {
+	if isMemoryPath(c.Path) {
 		opts.WAL = false
 		oo.Options = opts
 		db, err := sqlitekit.OpenSingle(ctx, c.Path, oo)
@@ -173,7 +233,9 @@ func (s *Store) openSQLite(ctx context.Context) error {
 	ro.Options = opts
 	ro.TxLock = ""
 	ro.MaxOpenConns = c.ReadConns
-	r, err := sqlitekit.OpenReader(ctx, c.Path, ro)
+	// The read pool opens mode=ro: a write through the Reader fails instead of
+	// taking the write lock behind the single writer's back.
+	r, err := sqlitekit.OpenReadOnly(ctx, c.Path, ro)
 	if err != nil {
 		_ = w.Close()
 		return err
@@ -181,6 +243,10 @@ func (s *Store) openSQLite(ctx context.Context) error {
 	s.write, s.read = w, r
 	return nil
 }
+
+// isMemoryPath reports the SQLite in-memory spellings. Each connection to
+// them is its own database, so they get a single shared connection.
+func isMemoryPath(p string) bool { return p == ":memory:" || strings.HasPrefix(p, "file::memory:") }
 
 func (s *Store) openPostgres(ctx context.Context, dsn string) error {
 	db, err := openPG(ctx, dsn, s.cfg.Postgres)
@@ -197,8 +263,10 @@ func openPG(ctx context.Context, dsn string, c PostgresConfig) (*sql.DB, error) 
 		// pgx errors can echo the DSN; do not pass them through.
 		return nil, fmt.Errorf("%w: postgres dsn is not parseable", ErrBadConfig)
 	}
-	if !c.AllowInsecure && (cc.TLSConfig == nil || len(cc.Fallbacks) > 0 || cc.TLSConfig.InsecureSkipVerify) {
-		return nil, fmt.Errorf("%w: postgres requires sslmode=verify-full (set AllowInsecure for local tests)", ErrBadConfig)
+	if !c.AllowInsecure {
+		if err := requireVerifiedTLS(cc); err != nil {
+			return nil, err
+		}
 	}
 	if c.ApplicationName != "" {
 		if _, ok := cc.RuntimeParams["application_name"]; !ok {
@@ -224,6 +292,28 @@ func openPG(ctx context.Context, dsn string, c PostgresConfig) (*sql.DB, error) 
 	return db, nil
 }
 
+// requireVerifiedTLS demands sslmode=verify-full on the primary host and on every
+// fallback host. A Unix-domain socket is a local transport and needs no TLS.
+func requireVerifiedTLS(cc *pgx.ConnConfig) error {
+	type hop struct {
+		host string
+		tls  *tls.Config
+	}
+	hops := []hop{{cc.Host, cc.TLSConfig}}
+	for _, f := range cc.Fallbacks {
+		hops = append(hops, hop{f.Host, f.TLSConfig})
+	}
+	for _, h := range hops {
+		if strings.HasPrefix(h.host, "/") {
+			continue
+		}
+		if h.tls == nil || h.tls.InsecureSkipVerify {
+			return fmt.Errorf("%w: postgres requires sslmode=verify-full on every host (set AllowInsecure for local tests)", ErrBadConfig)
+		}
+	}
+	return nil
+}
+
 // sanitizePGErr keeps the server's error but drops anything shaped like a DSN.
 func sanitizePGErr(err error) error {
 	if strings.Contains(err.Error(), "password=") || strings.Contains(err.Error(), "postgres://") {
@@ -233,7 +323,8 @@ func sanitizePGErr(err error) error {
 }
 
 // OpenMigration opens a second Postgres pool with the migration credential
-// (Config.Postgres.MigrateDSN). On SQLite it returns the Store itself.
+// (Config.Postgres.MigrateDSN). It returns (nil, false, nil) on SQLite and when
+// no MigrateDSN is set; the caller then migrates over the runtime Store.
 func OpenMigration(ctx context.Context, cfg Config) (*Store, bool, error) {
 	if cfg.Driver != DriverPostgres || cfg.Postgres.MigrateDSN == "" {
 		return nil, false, nil
@@ -248,7 +339,8 @@ func OpenMigration(ctx context.Context, cfg Config) (*Store, bool, error) {
 // Dialect returns the engine adapter.
 func (s *Store) Dialect() Dialect { return s.dialect }
 
-// Config returns the configuration the Store was opened with.
+// Config returns the configuration the Store was opened with, with the
+// connection strings removed.
 func (s *Store) Config() Config { return s.cfg }
 
 // DB returns the write handle, for libraries that need a *sql.DB (goose, backup
@@ -309,18 +401,35 @@ func (s *Store) retry() txutil.RetryOptions {
 func (s *Store) WriteTx(ctx context.Context, fn func(ctx context.Context, tx Tx) error) error {
 	return txutil.WithImmediateRetry(ctx, s.write, s.retry(), func(raw *sql.Tx) error {
 		tx := newBound(s.dialect, raw, s.cache)
-		return s.guard.Call("store.WriteTx", func() error { return fn(ctx, tx) })
+		// A callback that ends its goroutine (runtime.Goexit) neither returns nor
+		// panics, so neither commit nor rollback would run and the single writer
+		// connection would stay held. Roll back on that path.
+		returned := false
+		defer func() {
+			if !returned {
+				_ = raw.Rollback()
+			}
+		}()
+		err := s.guard.Call("store.WriteTx", func() error { return fn(ctx, tx) })
+		returned = true
+		return err
 	})
 }
 
-// ReadTx runs fn in a read-only transaction on the read pool, for a consistent
-// view over several queries.
+// ReadTx runs fn in a read-only transaction on the read pool, for one consistent
+// snapshot over several queries: REPEATABLE READ on Postgres, a WAL read
+// snapshot on SQLite.
 func (s *Store) ReadTx(ctx context.Context, fn func(ctx context.Context, q Querier) error) (err error) {
-	raw, err := s.read.BeginTx(ctx, &sql.TxOptions{ReadOnly: s.dialect.Name() == DriverPostgres})
+	opts := &sql.TxOptions{}
+	if s.dialect.Name() == DriverPostgres {
+		// READ COMMITTED would give every statement its own snapshot.
+		opts = &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead}
+	}
+	raw, err := s.read.BeginTx(ctx, opts)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = raw.Rollback() }()
+	defer func() { _ = raw.Rollback() }() // also runs on Goexit
 	return s.guard.Call("store.ReadTx", func() error { return fn(ctx, newBound(s.dialect, raw, s.cache)) })
 }
 

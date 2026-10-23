@@ -136,6 +136,10 @@ func tsQuote(s string) string {
 	return "'" + s + "'"
 }
 
+// tagFold mirrors the translate() in the generated vector: the parser would
+// read "<b>" as a tag.
+var tagFold = strings.NewReplacer("<", " ", ">", " ")
+
 func tsCompiler(fs fieldSet) compiler {
 	paren := func(parts []string, op string) string {
 		if len(parts) == 1 {
@@ -146,7 +150,10 @@ func tsCompiler(fs fieldSet) compiler {
 	return compiler{
 		fields: fs,
 		term: func(t Term) (string, error) {
-			s := tsQuote(t.Text)
+			text := strings.TrimSpace(tagFold.Replace(t.Text))
+			if text == "" {
+				return "", fmt.Errorf("%w: empty term", ErrInvalidQuery)
+			}
 			label := ""
 			if t.Prefix {
 				label += "*"
@@ -154,10 +161,25 @@ func tsCompiler(fs fieldSet) compiler {
 			if t.Field != "" {
 				label += string(fs.letters[t.Field])
 			}
+			suffix := ""
 			if label != "" {
-				s += ":" + label
+				suffix = ":" + label
 			}
-			return s, nil
+			// A quoted multi-word term is a phrase. With a prefix, only the last
+			// word is a prefix (as in FTS5's "brown fo"*), so the words before it
+			// are joined with <-> and the label goes on the last word alone.
+			words := strings.Fields(text)
+			if t.Prefix && len(words) > 1 {
+				head := make([]string, len(words)-1)
+				for i, w := range words[:len(words)-1] {
+					head[i] = tsQuote(w)
+					if t.Field != "" {
+						head[i] += ":" + string(fs.letters[t.Field])
+					}
+				}
+				return "(" + strings.Join(head, " <-> ") + " <-> " + tsQuote(words[len(words)-1]) + suffix + ")", nil
+			}
+			return tsQuote(text) + suffix, nil
 		},
 		and: func(p []string) string { return paren(p, " & ") },
 		or:  func(p []string) string { return paren(p, " | ") },

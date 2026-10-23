@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -122,4 +123,48 @@ func (c Config) EffectiveSchemaMode() SchemaMode {
 		return SchemaVerify
 	}
 	return SchemaAuto
+}
+
+const redacted = "<redacted>"
+
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return redacted
+}
+
+// Redacted returns c with every connection string replaced, safe to log.
+func (c Config) Redacted() Config {
+	c.Postgres.DSN, c.Postgres.MigrateDSN = redact(c.Postgres.DSN), redact(c.Postgres.MigrateDSN)
+	return c
+}
+
+// The formatting and logging hooks below keep a DSN with a password out of
+// logs, %v/%+v/%#v output and slog records.
+
+type plainConfig Config // no methods: breaks the String recursion
+
+func (c Config) String() string   { return fmt.Sprintf("%+v", plainConfig(c.Redacted())) }
+func (c Config) GoString() string { return "store.Config" + c.String() }
+func (c Config) LogValue() slog.Value {
+	r := c.Redacted()
+	return slog.GroupValue(
+		slog.String("driver", string(r.Driver)),
+		slog.String("schema_mode", string(r.SchemaMode)),
+		slog.String("sqlite_path", r.SQLite.Path),
+		slog.String("postgres_dsn", r.Postgres.DSN),
+		slog.String("postgres_migrate_dsn", r.Postgres.MigrateDSN),
+	)
+}
+
+type plainPostgres PostgresConfig
+
+func (p PostgresConfig) String() string {
+	p.DSN, p.MigrateDSN = redact(p.DSN), redact(p.MigrateDSN)
+	return fmt.Sprintf("%+v", plainPostgres(p))
+}
+func (p PostgresConfig) GoString() string { return "store.PostgresConfig" + p.String() }
+func (p PostgresConfig) LogValue() slog.Value {
+	return slog.GroupValue(slog.String("dsn", redact(p.DSN)), slog.String("migrate_dsn", redact(p.MigrateDSN)), slog.Bool("allow_insecure", p.AllowInsecure))
 }

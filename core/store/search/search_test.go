@@ -193,7 +193,7 @@ func TestInvalidStructuredQueriesAreErrors(t *testing.T) {
 			"empty filter":    {Text: "fox", Filters: []search.Filter{{Column: "kind"}}},
 			"negative offset": {Text: "fox", Offset: -1},
 			"bad snippet":     {Text: "fox", Snippet: &search.Snippet{Field: "nope"}},
-			"quote marker":    {Text: "fox", Snippet: &search.Snippet{Open: "'"}},
+			"nul marker":      {Text: "fox", Snippet: &search.Snippet{Open: "a\x00b"}},
 		} {
 			if _, err := sr.Search(ctx, s.Reader(), q); !errors.Is(err, search.ErrInvalidQuery) {
 				t.Errorf("%s: err = %v, want ErrInvalidQuery", name, err)
@@ -275,9 +275,6 @@ func TestIndexStaysInSyncWithTheTable(t *testing.T) {
 		storetest.Exec(t, s, `DELETE FROM notes WHERE id = ?`, "5")
 		if got := ids(run(t, s, sr, search.Query{Text: "lazy"})); got != "" {
 			t.Errorf("deleted row still found: {%s}", got)
-		}
-		if err := sr.Check(ctx, s.Reader()); err != nil {
-			t.Errorf("check: %v", err)
 		}
 		// Check and Rebuild run through a transaction on the write connection.
 		err := s.WriteTx(ctx, func(ctx context.Context, tx store.Tx) error {

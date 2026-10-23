@@ -54,6 +54,15 @@ func SQLite(t *testing.T) *store.Store {
 	return s
 }
 
+// ciSet reports whether CI is truthy: set, and not "", "0" or "false".
+func ciSet() bool {
+	switch strings.ToLower(os.Getenv("CI")) {
+	case "", "0", "false":
+		return false
+	}
+	return true
+}
+
 // PGConfig returns a Config for a fresh, private schema on the test server, or
 // nil after skipping the test when no server is configured. The schema is
 // dropped when the test ends.
@@ -61,7 +70,7 @@ func PGConfig(t *testing.T) *store.Config {
 	t.Helper()
 	dsn := os.Getenv(EnvDSN)
 	if dsn == "" {
-		if os.Getenv(EnvRequire) == "1" || os.Getenv("CI") != "" {
+		if os.Getenv(EnvRequire) == "1" || ciSet() {
 			t.Fatalf("%s is not set and Postgres is required here (%s=1 or CI)", EnvDSN, EnvRequire)
 		}
 		t.Skipf("%s not set; skipping Postgres", EnvDSN)
@@ -90,7 +99,9 @@ func PGConfig(t *testing.T) *store.Config {
 	t.Cleanup(func() {
 		a := stdlib.OpenDB(*cc)
 		defer a.Close()
-		_, _ = a.ExecContext(ctx, "DROP SCHEMA "+schema+" CASCADE")
+		if _, err := a.ExecContext(ctx, "DROP SCHEMA "+schema+" CASCADE"); err != nil {
+			t.Errorf("drop test schema %s: %v", schema, err)
+		}
 	})
 	return &store.Config{
 		Driver:   store.DriverPostgres,

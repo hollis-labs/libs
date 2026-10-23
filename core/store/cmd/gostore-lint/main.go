@@ -1,5 +1,5 @@
 // Command gostore-lint checks Go source for SQL that is not portable between
-// SQLite and Postgres. Usage: gostore-lint [-skip-tests] [dir ...]. It exits 1
+// SQLite and Postgres. Usage: gostore-lint [-skip-tests] [dir ...] (a trailing /... is accepted). It exits 1
 // when it finds anything.
 package main
 
@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hollis-labs/libs/core/store/lint"
 )
@@ -20,6 +21,11 @@ func main() {
 	}
 	bad := false
 	for _, d := range dirs {
+		// "./..." and "pkg/..." mean the directory tree, which Dir always walks.
+		d = strings.TrimSuffix(strings.TrimSuffix(d, "..."), "/")
+		if d == "" {
+			d = "."
+		}
 		fs, err := lint.Dir(d, lint.Options{SkipTests: *skip})
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "gostore-lint:", err)

@@ -30,7 +30,15 @@ func TestCheck(t *testing.T) {
 		{"SELECT * FROM t WHERE a = $1", "dollar-placeholder"},
 		{"PRAGMA foreign_keys = ON", "sqlite-only"},
 		{"SELECT * FROM t WHERE name LIKE ?", "like-case"},
+		{"SELECT a FROM t WHERE doc ?| array['x']", "jsonb-operator"},
+		{"SELECT a FROM t WHERE doc ?& array['x']", "jsonb-operator"},
+		{"SELECT a FROM t LIMIT 10, 5", "limit-comma"},
+		{"SELECT group_concat(a) FROM t", "sqlite-only"},
+		{"CREATE TABLE t (id SERIAL PRIMARY KEY)", "autoincrement"},
 		// Clean.
+		{"SELECT a FROM t WHERE doc ??| array['x']", ""},
+		{"SELECT serial FROM devices WHERE id = ?", ""},
+		{"SELECT * FROM t WHERE lower(coalesce(a, b)) LIKE lower(?) ESCAPE '\\'", ""},
 		{"SELECT * FROM t WHERE lower(name) LIKE lower(?) ESCAPE '\\'", ""},
 		{"INSERT INTO t (a) VALUES (?) ON CONFLICT (a) DO NOTHING", ""},
 		{"SELECT 'datetime(now) INSERT OR IGNORE' FROM t -- now()\n WHERE a = ?", ""},
@@ -56,13 +64,16 @@ func f(db *sql.DB) {
 	_, _ = db.Exec("PRAGMA user_version")
 	_ = "not sql: select the best"
 	_ = "SELECT a FROM t WHERE b = ?"
+	_ = "SELECT a FROM t " +
+		"WHERE b = datetime('now')"
+	_ = "SELECT a " + col + " FROM t WHERE x ILIKE ?"
 }
 `
 	fs, err := lint.File("x.go", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := rules(fs); got != "insert-or,last-insert-id" {
+	if got := rules(fs); got != "insert-or,last-insert-id,sqlite-time,ilike" {
 		t.Fatalf("findings = %q: %v", got, fs)
 	}
 	if fs[0].Line != 6 || fs[1].Line != 7 {

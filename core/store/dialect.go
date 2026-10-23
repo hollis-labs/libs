@@ -36,6 +36,15 @@ type Dialect interface {
 	// SupportsReturning is true for both supported engines; it exists so a
 	// future dialect can opt out loudly.
 	SupportsReturning() bool
+
+	// Lower renders a case-folding of the expression. SQLite's own lower() only
+	// folds ASCII, so there it is a registered full-Unicode function; on Postgres
+	// it is lower(), which follows the database's locale (use a UTF-8 locale).
+	Lower(expr string) string
+
+	// sealed keeps Dialect implementable only inside this package, so adding a
+	// method later is not a breaking change.
+	sealed()
 }
 
 // DialectFor returns the adapter for a driver.
@@ -97,8 +106,10 @@ func LikeEscape(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-// LikeInsensitive renders a case-insensitive LIKE that behaves the same on both
-// engines: lower() on both sides, backslash as the escape character.
+// LikeInsensitive renders a case-insensitive LIKE: lower() on both sides,
+// backslash as the escape character. For ASCII text it behaves the same on both
+// engines; for other scripts use [Dialect.Lower], because SQLite's lower() folds
+// ASCII only.
 func LikeInsensitive(column string) (string, error) {
 	if err := CheckIdentifier(column); err != nil {
 		return "", err
@@ -111,9 +122,11 @@ func LikeInsensitive(column string) (string, error) {
 type sqliteDialect struct{}
 
 func (sqliteDialect) Name() Driver               { return DriverSQLite }
-func (sqliteDialect) Rebind(q string) string     { return strings.ReplaceAll(q, "??", "?") }
+func (sqliteDialect) Rebind(q string) string     { return rebindSQLite(q) }
 func (sqliteDialect) EncodeTime(t time.Time) any { return Canonical(t).Format(TimeFormat) }
 func (sqliteDialect) ClaimLock() string          { return "" }
+func (sqliteDialect) sealed()                    {}
+func (sqliteDialect) Lower(e string) string      { return SQLiteLowerFunc + "(" + e + ")" }
 func (sqliteDialect) SupportsReturning() bool    { return true }
 func sqlitePath(path []string) string {
 	var b strings.Builder
@@ -160,6 +173,8 @@ func (postgresDialect) Name() Driver               { return DriverPostgres }
 func (postgresDialect) Rebind(q string) string     { return Rebind(q) }
 func (postgresDialect) EncodeTime(t time.Time) any { return Canonical(t) }
 func (postgresDialect) ClaimLock() string          { return "FOR UPDATE SKIP LOCKED" }
+func (postgresDialect) sealed()                    {}
+func (postgresDialect) Lower(e string) string      { return "lower(" + e + ")" }
 func (postgresDialect) SupportsReturning() bool    { return true }
 func pgPath(c string, path []string) string {
 	return "((" + c + ")::jsonb #>> '{" + strings.Join(path, ",") + "}')"

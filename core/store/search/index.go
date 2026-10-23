@@ -49,9 +49,11 @@ type Index struct {
 	Language string
 	// KeepDiacritics turns off accent folding (unaccent on Postgres).
 	KeepDiacritics bool
-	// UnaccentSchema is the schema holding the unaccent extension on Postgres.
-	// Default "public".
-	UnaccentSchema string
+	// ExtensionSchema is the schema the unaccent and pg_trgm extensions live in
+	// on Postgres; the migration creates them there (CREATE EXTENSION ... SCHEMA)
+	// and qualifies what it uses from them. Default "public". It must exist and
+	// be readable by the runtime role.
+	ExtensionSchema string
 	// Fuzzy adds pg_trgm GIN indexes on lower(field) so [Query.Substring] is
 	// indexed on Postgres.
 	Fuzzy bool
@@ -107,9 +109,19 @@ func (ix Index) Validate() error {
 	if ix.Language != "" && !langRe.MatchString(ix.Language) {
 		return bad("language %q", ix.Language)
 	}
-	if ix.UnaccentSchema != "" {
-		if err := store.CheckIdentifier(ix.UnaccentSchema); err != nil || strings.Contains(ix.UnaccentSchema, ".") {
-			return bad("unaccent schema %q", ix.UnaccentSchema)
+	if ix.ExtensionSchema != "" {
+		if err := store.CheckIdentifier(ix.ExtensionSchema); err != nil || strings.Contains(ix.ExtensionSchema, ".") {
+			return bad("extension schema %q", ix.ExtensionSchema)
+		}
+	}
+	names := []string{ix.Name, ix.Table, ix.IDColumn}
+	names = append(names, ix.Filters...)
+	for _, f := range ix.Fields {
+		names = append(names, f.Column)
+	}
+	for _, n := range names {
+		if reserved[strings.ToLower(n)] {
+			return bad("%q is a reserved word and would break the generated SQL; rename it", n)
 		}
 	}
 	for _, n := range ix.PrefixLengths {
@@ -127,12 +139,22 @@ func (ix Index) language() string {
 	return ix.Language
 }
 
-func (ix Index) unaccentSchema() string {
-	if ix.UnaccentSchema == "" {
+func (ix Index) extSchema() string {
+	if ix.ExtensionSchema == "" {
 		return "public"
 	}
-	return ix.UnaccentSchema
+	return ix.ExtensionSchema
 }
+
+// reserved lists words that are reserved in SQLite or Postgres. Names are
+// spliced unquoted, so one of these would break the generated DDL or queries.
+var reserved = func() map[string]bool {
+	m := map[string]bool{}
+	for _, w := range strings.Fields(`all analyse analyze and any array as asc asymmetric authorization between binary both case cast check collate column constraint create cross current_date current_time current_timestamp current_user default deferrable desc distinct do else end except false fetch for foreign from full grant group having in initially inner intersect into is join leading left like limit localtime localtimestamp natural not notnull null offset on only or order outer overlaps placing primary references returning right select session_user similar some symmetric table then to trailing true union unique user using variadic verbose when where window with index match rank rowid replace insert update delete drop alter transaction trigger view virtual values pragma`) {
+		m[w] = true
+	}
+	return m
+}()
 
 func (ix Index) tokenizer() string {
 	switch {
@@ -245,8 +267,16 @@ func (ix Index) sqliteUp() []string {
 			ix.Name, ix.Table, ix.Name, ix.Name, ix.cols(), ix.prefixed("old.")),
 	}
 	if !ix.ImmutableContent {
-		out = append(out, fmt.Sprintf("CREATE TRIGGER %s_au AFTER UPDATE OF %s ON %s BEGIN\n  INSERT INTO %s(%s, rowid, %s) VALUES ('delete', old.rowid, %s);\n  INSERT INTO %s(rowid, %s) VALUES (new.rowid, %s);\nEND",
-			ix.Name, ix.cols(), ix.Table, ix.Name, ix.Name, ix.cols(), ix.prefixed("old."), ix.Name, ix.cols(), ix.prefixed("new.")))
+		// Fire on any update of the row, but act only when the rowid or an
+		// indexed column changed. "UPDATE OF <cols>" would miss a change to the
+		// INTEGER PRIMARY KEY (the rowid) and leave the index pointing at a row
+		// that no longer exists.
+		changed := []string{"old.rowid IS NOT new.rowid"}
+		for _, f := range ix.Fields {
+			changed = append(changed, "old."+f.Column+" IS NOT new."+f.Column)
+		}
+		out = append(out, fmt.Sprintf("CREATE TRIGGER %s_au AFTER UPDATE ON %s WHEN %s BEGIN\n  INSERT INTO %s(%s, rowid, %s) VALUES ('delete', old.rowid, %s);\n  INSERT INTO %s(rowid, %s) VALUES (new.rowid, %s);\nEND",
+			ix.Name, ix.Table, strings.Join(changed, " OR "), ix.Name, ix.Name, ix.cols(), ix.prefixed("old."), ix.Name, ix.cols(), ix.prefixed("new.")))
 	}
 	return append(out, fmt.Sprintf("INSERT INTO %s(%s) VALUES ('rebuild')", ix.Name, ix.Name))
 }
@@ -254,22 +284,25 @@ func (ix Index) sqliteUp() []string {
 func (ix Index) postgresUp() []string {
 	var out []string
 	fold := !ix.KeepDiacritics
+	us := ix.extSchema()
+	// Angle brackets are turned into spaces before indexing: the default text
+	// search parser reads "<script>" as a tag and drops it, so text like
+	// "script alert" would match on SQLite and not here.
 	wrap := func(col string) string {
-		e := "coalesce(" + col + ", '')"
+		e := "translate(coalesce(" + col + ", ''), '<>', '  ')"
 		if fold {
 			e = "gostore_unaccent(" + e + ")"
 		}
 		return e
 	}
 	if fold {
-		us := ix.unaccentSchema()
 		out = append(out,
-			"CREATE EXTENSION IF NOT EXISTS unaccent",
+			"CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA "+us,
 			// gostore:allow dollar-placeholder (a Postgres function body, emitted into a migration, never run through Rebind)
 			fmt.Sprintf("CREATE OR REPLACE FUNCTION gostore_unaccent(text) RETURNS text\n  LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT\n  AS $$ SELECT %s.unaccent('%s.unaccent'::regdictionary, $1) $$", us, us))
 	}
 	if ix.Fuzzy {
-		out = append(out, "CREATE EXTENSION IF NOT EXISTS pg_trgm")
+		out = append(out, "CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA "+us)
 	}
 	fs := ix.fieldSet()
 	parts := make([]string, len(ix.Fields))
@@ -281,7 +314,7 @@ func (ix Index) postgresUp() []string {
 		fmt.Sprintf("CREATE INDEX %s_gin ON %s USING GIN (%s)", ix.Name, ix.Table, ix.vecColumn()))
 	if ix.Fuzzy {
 		for _, f := range ix.Fields {
-			out = append(out, fmt.Sprintf("CREATE INDEX %s_trgm_%s ON %s USING GIN (lower(%s) gin_trgm_ops)", ix.Name, f.Column, ix.Table, f.Column))
+			out = append(out, fmt.Sprintf("CREATE INDEX %s_trgm_%s ON %s USING GIN (lower(%s) %s.gin_trgm_ops)", ix.Name, f.Column, ix.Table, f.Column, us))
 		}
 	}
 	return out

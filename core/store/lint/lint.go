@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hollis-labs/libs/core/store"
+	"github.com/hollis-labs/libs/core/store/internal/sqlmask"
 )
 
 // Finding is one rule violation.
@@ -50,32 +50,42 @@ type rule struct {
 	name string
 	re   *regexp.Regexp
 	msg  string
+	// when, if set, restricts the rule to statements it matches.
+	when *regexp.Regexp
 }
 
 func r(name, pattern, msg string) rule {
-	return rule{name, regexp.MustCompile(`(?i)` + pattern), msg}
+	return rule{name: name, re: regexp.MustCompile(`(?i)` + pattern), msg: msg}
 }
+
+var ddlStart = regexp.MustCompile(`(?i)^\s*(CREATE|ALTER)\b`)
 
 var rules = []rule{
 	r("insert-or", `\bINSERT\s+OR\s+(REPLACE|IGNORE|ABORT|FAIL|ROLLBACK)\b|\bREPLACE\s+INTO\b`, "use INSERT ... ON CONFLICT (...) DO NOTHING / DO UPDATE"),
 	r("sqlite-time", `\b(datetime|strftime|julianday|unixepoch)\s*\(|\bdate\s*\(\s*\)`, "time comes from Go as a parameter"),
 	r("db-clock", `\bnow\s*\(|\bCURRENT_(TIMESTAMP|DATE|TIME)\b|\bLOCALTIMESTAMP\b`, "time comes from Go as a parameter; the database clock is not portable"),
-	r("autoincrement", `\bAUTOINCREMENT\b|\b(BIG|SMALL)?SERIAL\b`, "no AUTOINCREMENT/serial in shared SQL; use a Go-generated id or RETURNING"),
+	r("autoincrement", `\bAUTOINCREMENT\b`, "no AUTOINCREMENT in shared SQL; use a Go-generated id or RETURNING"),
+	{name: "autoincrement", re: regexp.MustCompile(`(?i)\b(BIG|SMALL)?SERIAL\b`), msg: "no serial column in shared SQL; use a Go-generated id or RETURNING", when: ddlStart},
 	r("ilike", `\bILIKE\b`, "use lower(col) LIKE lower(?) (store.LikeInsensitive)"),
 	r("json-path", `\bjson_extract\s*\(|->>|#>>|\bjsonb_\w+\s*\(`, "use the Dialect JSON helpers (JSONText, JSONInt, ...)"),
 	r("dollar-placeholder", `\$\d+`, "use ? placeholders; the store rebinds them"),
-	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bINSERT\s+INTO\s+\w+\s+DEFAULT\s+VALUES\b`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
+	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bgroup_concat\s*\(|\bINSERT\s+INTO\s+\w+\s+DEFAULT\s+VALUES\b`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
+	r("limit-comma", `\bLIMIT\s+(\d+|\?)\s*,\s*(\d+|\?)`, "write LIMIT n OFFSET m; LIMIT a, b is SQLite-only"),
+	r("jsonb-operator", `(^|[^?])\?[|&]`, "?| and ?& are Postgres JSONB operators and collide with the placeholder; use the Dialect JSON helpers"),
 }
 
 var likeRe = regexp.MustCompile(`(?i)\bLIKE\b`)
-var lowerLikeRe = regexp.MustCompile(`(?i)lower\s*\([^()]*\)\s+(NOT\s+)?LIKE\s+lower\s*\(`)
+var lowerLikeRe = regexp.MustCompile(`(?i)(?:gostore_)?lower\s*\((?:[^()]|\([^()]*\))*\)\s+(NOT\s+)?LIKE\s+(?:gostore_)?lower\s*\(`)
 
 // Check returns the rule violations in one SQL statement. String literals,
 // quoted identifiers and comments are ignored.
 func Check(query string) []Finding {
-	m := store.Mask(query)
+	m := sqlmask.Mask(query)
 	var out []Finding
 	for _, rl := range rules {
+		if rl.when != nil && !rl.when.MatchString(m) {
+			continue
+		}
 		if rl.re.MatchString(m) {
 			out = append(out, Finding{Rule: rl.name, Message: rl.msg, SQL: short(query)})
 		}
@@ -162,6 +172,21 @@ func File(filename string, src []byte) ([]Finding, error) {
 			for _, fd := range Check(s) {
 				add(fd, x.Pos())
 			}
+		case *ast.BinaryExpr:
+			// SQL built as "SELECT ..." + "FROM ...": fold the chain so a rule
+			// that spans the pieces still sees one statement. A non-literal
+			// operand folds to a placeholder word.
+			if x.Op != token.ADD {
+				return true
+			}
+			s, lits := foldString(x)
+			if lits == 0 || !sqlStart.MatchString(s) {
+				return true
+			}
+			for _, fd := range Check(s) {
+				add(fd, x.Pos())
+			}
+			return false
 		case *ast.SelectorExpr:
 			if x.Sel.Name == "LastInsertId" {
 				add(Finding{Rule: "last-insert-id", Message: "LastInsertId is not portable; use INSERT ... RETURNING id", SQL: "LastInsertId()"}, x.Pos())
@@ -170,6 +195,28 @@ func File(filename string, src []byte) ([]Finding, error) {
 		return true
 	})
 	return out, nil
+}
+
+// foldString joins a chain of "+" operands into one string. Non-literal
+// operands become "_". It returns the number of literal operands folded.
+func foldString(e ast.Expr) (string, int) {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		if x.Kind == token.STRING {
+			if s, err := strconv.Unquote(x.Value); err == nil {
+				return s, 1
+			}
+		}
+	case *ast.BinaryExpr:
+		if x.Op == token.ADD {
+			l, ln := foldString(x.X)
+			r, rn := foldString(x.Y)
+			return l + r, ln + rn
+		}
+	case *ast.ParenExpr:
+		return foldString(x.X)
+	}
+	return "_", 0
 }
 
 // Options controls [Dir].

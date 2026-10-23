@@ -359,14 +359,14 @@ func TestBackupSQLiteAndPostgresRefusal(t *testing.T) {
 	setup(t, s)
 	storetest.Exec(t, s, `INSERT INTO items (id, name) VALUES (?, ?)`, "1", "a")
 	dest := t.TempDir() + "/copy.db"
-	if _, err := s.Backup(ctx, dest); err != nil {
+	if _, err := s.Backup(ctx, dest, store.BackupOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.VerifyBackup(ctx, dest); err != nil {
 		t.Fatalf("verify: %v", err)
 	}
 	if pg := storetest.Postgres(t); pg != nil {
-		if _, err := pg.Backup(ctx, dest); !errors.Is(err, store.ErrBackupUnsupported) {
+		if _, err := pg.Backup(ctx, dest, store.BackupOptions{}); !errors.Is(err, store.ErrBackupUnsupported) {
 			t.Errorf("postgres backup: %v", err)
 		}
 	}

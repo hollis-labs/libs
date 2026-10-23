@@ -63,14 +63,14 @@ func TestSeparateMigrationAndRuntimeRoles(t *testing.T) {
 		t.Fatal("DML-only role must not be able to migrate")
 	}
 	// Verify mode reports the missing schema without needing DDL rights.
-	if err := migrate.Ensure(ctx, rt, src); !errors.Is(err, migrate.ErrSchemaMismatch) {
+	if err := migrate.Ensure(ctx, cfg, rt, src); !errors.Is(err, migrate.ErrSchemaMismatch) {
 		t.Fatalf("verify before migration: %v", err)
 	}
 	// The migration role applies the schema; auto mode would do this at startup.
 	if err := migrate.Up(ctx, cfg, src); err != nil {
 		t.Fatalf("up with the migration role: %v", err)
 	}
-	if err := migrate.Ensure(ctx, rt, src); err != nil {
+	if err := migrate.Ensure(ctx, cfg, rt, src); err != nil {
 		t.Fatalf("verify after migration: %v", err)
 	}
 	// And the runtime role can use the tables but not alter them.
@@ -81,7 +81,7 @@ func TestSeparateMigrationAndRuntimeRoles(t *testing.T) {
 	// Auto mode with a MigrateDSN migrates over the owner and verifies over the runtime role.
 	auto := cfg
 	auto.SchemaMode = store.SchemaAuto
-	if err := migrate.Ensure(ctx, rt.WithConfig(auto), src); err != nil {
+	if err := migrate.Ensure(ctx, auto, rt, src); err != nil {
 		t.Fatalf("auto ensure: %v", err)
 	}
 }

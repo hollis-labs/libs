@@ -54,20 +54,23 @@ Shared SQL (the SQL strings in your Go code) follows these rules. `gostore-lint`
 
 | Rule | Why |
 |---|---|
-| `?` placeholders only | The store rebinds to `$1…` for Postgres with a tokenizer that skips string literals, quoted identifiers, comments and dollar-quoted bodies. `??` is a literal `?`. |
+| `?` placeholders only | The store rebinds to `$1…` for Postgres with a tokenizer that skips string literals (including `E'…'` with backslash escapes), quoted identifiers, line and nested block comments, and `$tag$…$tag$` bodies (a `$` inside an identifier such as `a$b$c` is not a quote). The same tokenizer runs for SQLite. `??` is a literal `?` on both engines, outside literals and comments. |
+| Never the JSONB operators `?`, `?\|`, `?&` | They collide with the placeholder; write `??\|` if you must, or use the `Dialect` JSON helpers. The lint flags `?\|` and `?&`. |
 | `INSERT … ON CONFLICT (…) DO UPDATE / DO NOTHING`; never `INSERT OR …` / `REPLACE INTO` | Same syntax on both. |
 | `RETURNING` for generated ids; never `LastInsertId` | Postgres has no `LastInsertId`. |
 | No `AUTOINCREMENT` / `serial` in shared SQL | Per-dialect DDL belongs in the per-dialect migration files; prefer Go-generated ids. |
 | Time comes from Go as a parameter; never `datetime('now')`, `now()`, `CURRENT_TIMESTAMP` | See Time. |
 | Write `NULLS FIRST` / `NULLS LAST` explicitly | SQLite sorts NULLs smallest, Postgres largest. |
-| `lower(col) LIKE lower(?) ESCAPE '\'` (`store.LikeInsensitive`, `store.LikeEscape`) | `LIKE` is case-insensitive on SQLite and case-sensitive on Postgres. |
+| `lower(col) LIKE lower(?) ESCAPE '\'` (`store.LikeInsensitive`, `store.LikeEscape`) | `LIKE` is case-insensitive on SQLite and case-sensitive on Postgres. SQLite's `lower()` folds ASCII only; for other scripts use `Dialect.Lower(expr)` (`gostore_lower`, a full-Unicode function the store registers; Postgres `lower()` follows the database locale, so use a UTF-8 database). |
+| `LIMIT n OFFSET m`, not `LIMIT m, n`; no `group_concat` | SQLite-only forms. |
 | Booleans are Go `bool` | |
 | JSON: use the `Dialect` helpers | `json_extract` vs `#>>`; numbers need explicit casts. |
 | No `PRAGMA`, `GLOB`, `IFNULL`, `ILIKE` in shared SQL | Engine specific (use `COALESCE`). |
 
 ### Time
 
-Time always comes from Go. `time.Time` and `*time.Time` arguments are encoded for you:
+Time always comes from Go. `time.Time`, `*time.Time` and any `driver.Valuer` that yields a `time.Time`
+(`sql.NullTime`) are encoded for you:
 
 - **SQLite** stores fixed-width UTC text `2006-01-02T15:04:05.000000000Z` (`store.TimeFormat`). It is
   *not* RFC 3339Nano, which trims trailing zeros and stops sorting in time order.
@@ -97,7 +100,8 @@ SQLite has one writer. `Open` gives you:
 
 - a **write pool of one connection** with `BEGIN IMMEDIATE` transactions (`core/util/sqlite`:
   `sqlitekit`, `txutil`), and
-- a separate **read pool** (default 4 connections, WAL) for concurrent reads.
+- a separate **read pool** (default 4 connections, WAL, opened `mode=ro`) for concurrent reads. A
+  write through `Reader()` or `QueryContext` fails instead of taking the write lock.
 
 `WriteTx` retries the whole transaction on `SQLITE_BUSY`/`LOCKED` (Postgres: serialization failure,
 deadlock), so the callback must be safe to run again from scratch.
@@ -107,21 +111,32 @@ deadlock), so the callback must be safe to run again from scratch.
 > held by your transaction) from inside the callback deadlocks or waits on a lock the transaction
 > holds. Tether hit exactly this with `SetMaxOpenConns(1)`.
 
-`synchronous` defaults to `FULL`; set `SQLiteConfig.Synchronous` (`NORMAL`, …) knowingly. `:memory:`
-uses one connection for reads and writes. For heavy write fan-in, `core/util/sqlite/serialwrite` can
+A callback that ends its goroutine (`runtime.Goexit`) is rolled back and releases the writer. `synchronous` defaults to `FULL`; set
+`SQLiteConfig.Synchronous` (`NORMAL`, …) knowingly. `:memory:` and `file::memory:…` use one
+connection for reads and writes (each connection to an in-memory URI would otherwise be its own
+database). For heavy write fan-in, `core/util/sqlite/serialwrite` can
 batch writes in front of `Store.DB()`.
 
-Backups: `Store.Backup(ctx, dest)` on SQLite (verified copy via `core/util/sqlitebackup`);
-`store.VerifyBackup`. Postgres is backed up out of process (`pg_dump` by ops).
+Backups: `Store.Backup(ctx, dest, store.BackupOptions{})` on SQLite (verified copy and manifest via
+`core/util/sqlitebackup`, which is wrapped: `BackupOptions`/`BackupResult` are this package's own
+types); `store.VerifyBackup`. Postgres is backed up out of process (`pg_dump` by ops) and `Backup`
+returns `ErrBackupUnsupported`.
 
 ## Postgres
 
-- **TLS**: `Open` refuses a connection that is not `sslmode=verify-full` unless
-  `PostgresConfig.AllowInsecure` is set (local containers, CI).
+- **TLS**: `Open` refuses a connection that is not `sslmode=verify-full` on **every** host of the DSN
+  (fallbacks included) unless `PostgresConfig.AllowInsecure` is set (local containers, CI). A
+  Unix-domain socket host needs no TLS.
+- **Transactions**: `WriteTx` is `READ COMMITTED` with retry on serialization failure and deadlock;
+  `ReadTx` is `REPEATABLE READ`, read-only, so several queries see one snapshot (on SQLite a WAL
+  read snapshot).
 - **Credentials** (ADR `adr_shared_postgres_app_agent_access`): the app runs with a **DML-only**
   `DSN`; schema changes use a separate `MigrateDSN` (the schema owner). `migrate.Up` uses the
   migration credential, `migrate.Verify` uses the runtime one.
 - Errors that could echo a DSN are not passed through; a parse failure never includes the DSN.
+- `Config`, `PostgresConfig` and their `slog` values print `<redacted>` for both DSNs, and an open
+  `Store` keeps neither (`Store.Config()` returns them blank). Pass the `Config` you opened with to
+  `migrate.Ensure`/`migrate.Up` when you need the migration credential.
 
 ## Migrations (`store/migrate`)
 
@@ -142,20 +157,30 @@ func TestParity(t *testing.T) { // identical version numbers per dialect
 }
 
 // at startup
-err = migrate.Ensure(ctx, s, src) // SchemaMode auto: migrate, then verify. verify: verify only.
+err = migrate.Ensure(ctx, cfg, s, src) // cfg.SchemaMode auto: migrate, then verify. verify: verify only.
 ```
 
 - `Config.SchemaMode` is `auto` or `verify`. Default: `auto` on SQLite, `verify` on Postgres.
-- `Verify` reads one row from the version table and needs **no DDL rights**; it fails with
-  `ErrSchemaMismatch` when the database is behind or ahead of the build.
+- `Verify` reads the applied versions from the version table and needs **no DDL rights**. It compares
+  the applied *set* with the build's versions, so it fails with `ErrSchemaMismatch` when the
+  database is behind, ahead, or missing a version in the middle (0001 and 0003 applied, 0002 added
+  later).
 - Concurrent migrators on Postgres are serialised by goose's advisory lock (one lock id per version
-  table). SQLite needs no lock.
+  table), so racing starters queue and the later ones find nothing to do. **SQLite has no such
+  lock:** two processes migrating one file can race, and the loser fails to start (busy or
+  already-exists) without corrupting anything; a later start completes. Run the migrator from one
+  process, or retry the start.
+- `Source.Table` is spliced into SQL and must be a plain identifier.
 - `Baseline(ctx, s, src, version)` adopts a database whose schema already exists at `version` (for
   example from a custom version table): it records migrations up to `version` as applied without
-  running them. It refuses when the table already records migrations. You must have checked that
-  the live schema matches.
+  running them. `version` must be one of the source's versions. It refuses (`ErrAlreadyApplied`)
+  when the table already records migrations; the check and the writes share one transaction (and,
+  on Postgres, goose's advisory lock), so two concurrent baselines cannot both succeed. You must
+  have checked that the live schema matches. Run `Up` afterwards for anything newer.
 - Statements containing semicolons (triggers, functions) need goose `StatementBegin/End`.
-- Go-coded migrations (`goose.WithGoMigrations`) are not wired in v1; add them when needed.
+- Go-coded migrations (`goose.WithGoMigrations`) are not wired in v1; add them when needed. goose
+  is pinned to the newest release that builds with the pgx pin; `go mod tidy` and `govulncheck` run
+  in this module's CI.
 
 ## Full-text search (`store/search`)
 
@@ -182,10 +207,20 @@ hits, err := sr.Search(ctx, s.Reader(), search.Query{
 ```
 
 **Index.** The text lives in the source table (external content). SQLite: an FTS5 table plus
-`AFTER INSERT/DELETE/UPDATE` triggers (omit the update trigger with `ImmutableContent`), tokenizer
+`AFTER INSERT/DELETE/UPDATE` triggers (the update trigger fires on any update but acts only when the
+rowid or an indexed column changed, so changing an `INTEGER PRIMARY KEY` is safe; omit it with
+`ImmutableContent`), tokenizer
 configurable (default `unicode61 remove_diacritics 2`), optional prefix indexes. Postgres: a stored
 generated `<Name>_vec` column with `setweight` per field, a GIN index, an `unaccent` wrapper for
-diacritics, and `pg_trgm` indexes when `Fuzzy` is set. 1–4 fields (Postgres has four weight
+diacritics, and `pg_trgm` indexes when `Fuzzy` is set. The extensions are created `SCHEMA
+<ExtensionSchema>` (default `public`; that schema must exist and the runtime role must be able to
+read it), and the migration role needs `CREATE` there (both extensions are "trusted" on Postgres 13+,
+so a database owner can create them). `<` and `>` are turned into spaces before indexing and in
+queries, because the default parser would otherwise read `<script>` as a tag and drop it. Table,
+column and index names must be plain identifiers and not reserved words (`order`, `group`, …);
+`Validate` refuses them. `gostore_unaccent` is shared by every index and `Down` does not drop it.
+Adding the generated column rewrites the table under an `ACCESS EXCLUSIVE` lock: run that migration
+in a quiet moment on a big table. 1–4 fields (Postgres has four weight
 classes); weights map to classes by rank. `Up` also backfills existing rows.
 
 **Query model.** `Expr` is `Term{Text, Prefix, Phrase, Field}`, `And`, `Or`, `Not`. `search.Parse`
@@ -201,21 +236,39 @@ hand-built `Expr` that is structurally invalid (standalone `Not`, unknown field)
 `Limit` defaults to 20 (max 1000). `Query.Substring` is a case-insensitive substring search (LIKE
 based; trigram-indexed on Postgres with `Fuzzy`), with a constant score.
 
-**Maintenance.** `Rebuild` (FTS5 `rebuild`; Postgres `REINDEX`) after bulk loads that bypassed
-triggers or a `VACUUM` that renumbered rowids (a SQLite table without an `INTEGER PRIMARY KEY` has
-unstable rowids); `Check` runs the FTS5 integrity check (Postgres: no row lacks a vector). Both
-accept a `Tx`, and `Search` accepts a `Tx` too, so a transaction sees its own writes.
+**Maintenance.** Both take a `store.Tx`, so call them inside `Store.WriteTx` (the FTS5 commands are
+writes). `Rebuild` runs FTS5 `rebuild` after bulk loads that bypassed triggers or a `VACUUM`. SQLite
+documents that `VACUUM` may renumber the rowids of a table without an `INTEGER PRIMARY KEY`; we could
+not make it happen in testing, and `Rebuild` is the remedy if it does. On Postgres `Rebuild` does
+nothing (the generated column is always current); a damaged GIN index needs `REINDEX`, which
+requires table ownership, so run it with the migration credential. `Check` runs the FTS5
+integrity check; on Postgres it confirms the GIN index exists and is valid and no row lacks a
+vector (it cannot detect drift, because there is none). `Search` takes any `Querier`, a `Tx`
+included, so a transaction sees its own writes.
 
 **What differs between engines (accepted and documented).**
 
 - **Scores are comparable within one dialect only** (`-bm25` vs `ts_rank_cd`); ranking order differs.
   Never compare scores across engines or assert absolute scores.
 - Tokenisation differs (unicode61 vs the `simple` configuration): hyphenated words, URLs, e-mail
-  addresses and numbers with separators split differently. No stemming by default on either.
-- Snippets pick different fragments; on Postgres with diacritic folding the excerpt is the folded
-  text. Snippets are not HTML-escaped.
-- The result **sets** for words, phrases, prefixes, AND/OR/NOT and field queries are the same; the
-  conformance suite asserts sets and top-k, not order.
+  addresses and numbers with separators split differently. No stemming by default on either;
+  `Index.Language` (Postgres only) turns it on there.
+- **Accent folding:** common accents fold the same (`café`/`cafe`, `résumé`/`resume`). Postgres
+  `unaccent` also expands ligatures and special letters (`ß`→`ss`, `æ`→`ae`, `ø`→`o`, `œ`→`oe`);
+  SQLite's `remove_diacritics 2` does not, so `strasse` finds `Straße` on Postgres only. A test
+  pins this down (`TestKnownEngineDifferences`).
+- `Substring` is case-insensitive for all of Unicode on SQLite (`gostore_lower`); on Postgres it
+  follows the database locale (`lower()`), so use a UTF-8 database.
+- Snippets pick different fragments. On Postgres the excerpt is taken from the folded text with
+  `<`/`>` as spaces, so accents and angle brackets in it differ from the stored text. The excerpt is
+  **HTML-escaped** before the markers go in (`Snippet.NoEscape` for plain text); the markers
+  themselves are inserted verbatim, so they are markup you choose, not user input. Ellipsis is
+  SQLite only.
+- Field-qualified phrases (`title:"brown fox"`) parse as the word `title:` plus a phrase; for a
+  phrase restricted to a field build the `Expr` (`Term{Text: "brown fox", Field: "title"}`).
+- A multi-word term with `Prefix` set prefixes only its last word on both engines.
+- The result **sets** for words, phrases, prefixes, AND/OR/NOT and field queries are the same except
+  for the cases above; the conformance suite asserts sets and top-k, not order.
 
 Using it as the fallback when embeddings are absent needs nothing else: there is no vector
 dependency. (Embeddings/vector search are out of scope.)
@@ -231,12 +284,21 @@ o, _ := outbox.New(outbox.Config{Lease: time.Minute})
 
 // 1. in the business transaction
 _, err = o.Enqueue(ctx, tx, "invoice.paid", payload)
-// 2. in a drainer
-n, err := o.Drain(ctx, s, "worker-1", 20, func(ctx context.Context, m outbox.Message) error { return deliver(m) })
+// 2. in a drainer; the name is only a label, ownership is a per-claim token
+host, _ := os.Hostname()
+n, err := o.Drain(ctx, s, host, 20, func(ctx context.Context, m outbox.Message) error { return deliver(ctx, m) })
 ```
 
 At-least-once delivery. A claim is a lease; a dead drainer's messages come back after `Lease`.
-Failures back off (`Backoff`) and a message that reaches `MaxAttempts` is parked. Handler panics
+Every claim writes a random token, and `Ack`/`Fail` must present it while the lease is still running:
+a worker whose lease ended gets `ErrLeaseLost` instead of clearing the new owner's claim, even if
+both use the same worker name. `Drain` skips a message whose lease ran out before its turn and
+gives the handler a context that ends with the lease; keep *batch size × worst-case handler time*
+below `Lease`. Lease expiry is judged by each drainer's own clock, so drainers on different hosts
+need clocks well within the lease. A handler should be idempotent (that is what at-least-once
+means). Failures back off (`Backoff`) and a message that reaches `MaxAttempts` is parked; `Parked`
+lists them and `Retry(id)` puts one back in line. `Pending` does not count parked messages. Error
+text is stored cut to 500 bytes on a character boundary, with invalid UTF-8 and NUL removed. Handler panics
 are contained (`core/panics`) and recorded as a reference, not as the panic text. The claim
 statement is per dialect (`ClaimSQL`): `FOR UPDATE SKIP LOCKED` on Postgres, none on SQLite where
 writers are already serialised. `core/util/queue` has no Postgres driver; a queue driver over this
@@ -260,8 +322,11 @@ func TestJobs(t *testing.T) {
 ```
 
 SQLite always runs. Postgres runs against `GOSTORE_TEST_PG_DSN` (each test gets a private schema,
-dropped afterwards; the user must be able to `CREATE EXTENSION` for `search`). Without the DSN the
-Postgres subtests **skip locally and fail** when `GOSTORE_REQUIRE_PG=1` or `CI` is set. A throwaway
+dropped afterwards, and a failed drop fails the test). The harness creates the `pg_trgm` and
+`unaccent` extensions up front as the test user, so a test that needs the real migration role
+(`search`'s `TestIndexMigratesUnderTheRealMigrationRole`) makes its own database and role. Without the
+DSN the Postgres subtests **skip locally and fail** when `GOSTORE_REQUIRE_PG=1` or `CI` is set to
+anything but empty, `0` or `false`. A throwaway
 server:
 
 ```sh
@@ -272,12 +337,14 @@ export GOSTORE_TEST_PG_DSN="host=127.0.0.1 port=55432 user=postgres password=tes
 ## Lint
 
 ```sh
-go run github.com/hollis-labs/libs/core/store/cmd/gostore-lint ./...   # exit 1 on findings
+go run github.com/hollis-labs/libs/core/store/cmd/gostore-lint ./...   # exit 1 on findings; a trailing /... is accepted
 ```
 
 or in a test: `lint.Dir(".", lint.Options{SkipTests: true})`. Rules: `insert-or`, `sqlite-time`,
 `db-clock`, `autoincrement`, `ilike`, `json-path`, `dollar-placeholder`, `sqlite-only`, `like-case`,
-`last-insert-id`. Waive a deliberate exception with `// gostore:allow <rule>` on the line or the
+`last-insert-id`, `limit-comma`, `jsonb-operator`. SQL split over concatenated string literals
+(`"SELECT … " + "FROM …"`) is folded and checked as one statement; a non-literal operand folds to a
+placeholder word. Waive a deliberate exception with `// gostore:allow <rule>` on the line or the
 line above. Migration `.sql` files are per dialect by design and are not linted.
 
 ## Adoption guide
@@ -295,6 +362,24 @@ line above. Migration `.sql` files are per dialect by design and are not linted.
    need it; SQLite stays the default for tests, local spools and caches.
 7. **Search**: define an `Index`, add `GooseSQL` output to both migration directories, and call
    `Searcher.Search` where the FTS5 query is today.
+
+## API shape
+
+`Dialect` and `Tx` are sealed: only this package implements them, so adding a method is not a
+breaking change. `Querier` is open; implement it for a test double or an instrumented wrapper (its
+`Dialect()` must return a value obtained from `store.DialectFor` or a `Store`). Wrapped types
+(`BackupOptions`, `BackupResult`) are this module's own; nothing from `core/util` appears in its
+API.
+
+## Tested, and not
+
+Covered on both engines by the conformance suite: rebinding and `??`, time round trip and order
+(including `sql.NullTime`), transactions and panic containment, `Goexit` in a write transaction,
+`ReadTx` snapshot, migrations (verify with a gap, baseline checks and concurrent baselines,
+concurrent starters, DML-only role), search sets, snippets, key updates, tag-shaped text, `VACUUM`
+plus `Rebuild`, outbox leases, stale `Fail`, parked messages, error text. Not covered: Postgres
+under a non-UTF-8 database locale, `Language` values other than `simple`/`english`, hosts with
+skewed clocks, and fuzzing beyond the seeded corpus in CI (the fuzz targets run for a while locally).
 
 ## Not in v1
 

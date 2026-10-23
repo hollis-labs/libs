@@ -3,9 +3,12 @@ package search
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"html"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hollis-labs/libs/core/store"
 )
@@ -21,14 +24,35 @@ type Filter struct {
 type Snippet struct {
 	// Field is the column excerpted. Default: the highest-weight field.
 	Field string
-	// Open and Close wrap matches. Default "<mark>" and "</mark>". The excerpt
-	// is not HTML-escaped; escape it (or choose plain markers) before showing it
-	// in a page.
+	// Open and Close wrap matches. Default "<mark>" and "</mark>". They are
+	// inserted verbatim, so they are markup you chose, not user input.
 	Open, Close string
 	// Ellipsis marks omitted text. Default "…". Used on SQLite only.
 	Ellipsis string
 	// Words is the approximate excerpt length. Default 16.
 	Words int
+	// NoEscape returns the stored text as it is, with only the markers added.
+	// By default the excerpt is HTML-escaped (&, <, >, quotes) before the
+	// markers go in, so it is safe to put in a page whatever the stored content
+	// holds; set NoEscape for plain-text output and escape it yourself.
+	NoEscape bool
+}
+
+// Private-use code points stand in for the markers inside the database, so the
+// excerpt can be escaped in Go before the real markers are swapped in. They also
+// keep marker text out of the SQL entirely.
+const (
+	sentOpen  = "\ue000"
+	sentClose = "\ue001"
+	sentEll   = "\ue002"
+)
+
+func (sn Snippet) finish(raw string) string {
+	open, cl, ell, _ := defaults(sn)
+	if !sn.NoEscape {
+		raw = html.EscapeString(raw)
+	}
+	return strings.NewReplacer(sentOpen, open, sentClose, cl, sentEll, ell).Replace(raw)
 }
 
 // Query is one search.
@@ -109,8 +133,8 @@ func (s *Searcher) snippetField(sn *Snippet) (string, error) {
 }
 
 func validMarker(m string) error {
-	if strings.ContainsAny(m, "',\\\x00") {
-		return fmt.Errorf("%w: snippet markers must not contain quotes, commas or backslashes", ErrInvalidQuery)
+	if strings.ContainsAny(m, "\x00") || !utf8.ValidString(m) {
+		return fmt.Errorf("%w: snippet markers must be valid text without NUL", ErrInvalidQuery)
 	}
 	return nil
 }
@@ -126,6 +150,14 @@ func (s *Searcher) Search(ctx context.Context, qr store.Querier, q Query) ([]Hit
 	}
 	if q.Offset < 0 {
 		return nil, fmt.Errorf("%w: negative offset", ErrInvalidQuery)
+	}
+	if q.Snippet != nil {
+		open, cl, ell, _ := defaults(*q.Snippet)
+		for _, m := range []string{open, cl, ell} {
+			if err := validMarker(m); err != nil {
+				return nil, err
+			}
+		}
 	}
 	q.Substring = clean(q.Substring)
 	e, err := s.expr(q)
@@ -174,7 +206,9 @@ func (s *Searcher) Search(ctx context.Context, qr store.Querier, q Query) ([]Hit
 		if err != nil {
 			return nil, err
 		}
-		h.Snippet = snip.String
+		if q.Snippet != nil {
+			h.Snippet = q.Snippet.finish(snip.String)
+		}
 		out = append(out, h)
 	}
 	return out, rows.Err()
@@ -206,7 +240,7 @@ func (s *Searcher) filters(fs []Filter) ([]any, string, error) {
 func (s *Searcher) substringWhere() (string, int) {
 	parts := make([]string, len(s.ix.Fields))
 	for i, f := range s.ix.Fields {
-		parts[i] = "lower(s." + f.Column + ") LIKE lower(?) ESCAPE '\\'"
+		parts[i] = s.d.Lower("s."+f.Column) + " LIKE " + s.d.Lower("?") + " ESCAPE '\\'"
 	}
 	return "(" + strings.Join(parts, " OR ") + ")", len(parts)
 }
@@ -250,19 +284,14 @@ func (s *Searcher) sqliteSQL(q Query, e Expr) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		open, cl, ell, words := defaults(sn)
-		for _, m := range []string{open, cl, ell} {
-			if err := validMarker(m); err != nil {
-				return "", nil, err
-			}
-		}
+		_, _, _, words := defaults(sn)
 		col := 0
 		for i, f := range ix.Fields {
 			if f.Column == field {
 				col = i
 			}
 		}
-		sel += fmt.Sprintf(", snippet(%s, %d, '%s', '%s', '%s', %d) AS snip", ix.Name, col, open, cl, ell, words)
+		sel += fmt.Sprintf(", snippet(%s, %d, '%s', '%s', '%s', %d) AS snip", ix.Name, col, sentOpen, sentClose, sentEll, words)
 	}
 	return sel + fmt.Sprintf(" FROM %s JOIN %s s ON s.rowid = %s.rowid WHERE %s MATCH ?/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
 		ix.Name, ix.Table, ix.Name, ix.Name), []any{match}, nil
@@ -324,13 +353,8 @@ func (s *Searcher) postgresSQL(q Query, e Expr) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		open, cl, _, words := defaults(sn)
-		for _, m := range []string{open, cl} {
-			if err := validMarker(m); err != nil {
-				return "", nil, err
-			}
-		}
-		doc := "coalesce(s." + field + ", '')"
+		_, _, _, words := defaults(sn)
+		doc := "translate(coalesce(s." + field + ", ''), '<>', '  ')"
 		if !ix.KeepDiacritics {
 			doc = "gostore_unaccent(" + doc + ")"
 		}
@@ -339,7 +363,7 @@ func (s *Searcher) postgresSQL(q Query, e Expr) (string, []any, error) {
 			minW = 1
 		}
 		sel += fmt.Sprintf(", ts_headline('%s', %s, q.q, 'StartSel=%s, StopSel=%s, MaxWords=%d, MinWords=%d, MaxFragments=1') AS snip",
-			ix.language(), doc, open, cl, words, minW)
+			ix.language(), doc, sentOpen, sentClose, words, minW)
 	}
 	return sel + fmt.Sprintf(" FROM %s s, (SELECT %s AS q) q WHERE s.%s @@ q.q/*FILTERS*/ ORDER BY score DESC, hit_id ASC LIMIT ? OFFSET ?",
 		ix.Table, qexpr, ix.vecColumn()), []any{arg}, nil
@@ -347,34 +371,51 @@ func (s *Searcher) postgresSQL(q Query, e Expr) (string, []any, error) {
 
 // Rebuild recreates the index from the source table. On SQLite this is the FTS5
 // 'rebuild' command (needed after bulk loads that bypassed the triggers, or a
-// VACUUM that renumbered rowids); on Postgres the tsvector column is generated
-// and always current, so this reindexes the GIN index.
-func (s *Searcher) Rebuild(ctx context.Context, qr store.Querier) error {
+// VACUUM that renumbered the rowids of a table without an INTEGER PRIMARY KEY).
+// It writes, so call it inside Store.WriteTx.
+//
+// On Postgres it does nothing: the tsvector column is generated and always
+// current. A damaged GIN index is rebuilt with REINDEX, which needs ownership
+// of the table and so belongs with the schema owner (MigrateDSN), not the
+// DML-only runtime role.
+func (s *Searcher) Rebuild(ctx context.Context, tx store.Tx) error {
 	switch s.d.Name() {
 	case store.DriverSQLite:
-		_, err := qr.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s(%s) VALUES ('rebuild')", s.ix.Name, s.ix.Name))
+		_, err := tx.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s(%s) VALUES ('rebuild')", s.ix.Name, s.ix.Name))
 		return err
 	case store.DriverPostgres:
-		_, err := qr.ExecContext(ctx, "REINDEX INDEX "+s.ix.Name+"_gin")
-		return err
+		return nil
 	}
 	return fmt.Errorf("%w: %q", store.ErrUnknownDriver, s.d.Name())
 }
 
-// Check verifies the index against the source table. On SQLite it runs the FTS5
-// integrity-check with content comparison; on Postgres it confirms no row has a
-// missing vector. A non-nil error means the index is damaged: Rebuild it.
-func (s *Searcher) Check(ctx context.Context, qr store.Querier) error {
+// Check verifies the index. On SQLite it runs the FTS5 integrity-check with
+// content comparison (a write command, so call it inside Store.WriteTx). On
+// Postgres the vector is generated and cannot drift from the row, so the check
+// is that the GIN index exists and is valid and that no row lacks a vector. A
+// non-nil error means the index is damaged: Rebuild it (SQLite) or REINDEX it
+// as the table owner (Postgres).
+func (s *Searcher) Check(ctx context.Context, tx store.Tx) error {
 	switch s.d.Name() {
 	case store.DriverSQLite:
-		_, err := qr.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s(%s, rank) VALUES ('integrity-check', 1)", s.ix.Name, s.ix.Name))
+		_, err := tx.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s(%s, rank) VALUES ('integrity-check', 1)", s.ix.Name, s.ix.Name))
 		if err != nil {
 			return fmt.Errorf("search: integrity check failed: %w", err)
 		}
 		return nil
 	case store.DriverPostgres:
+		var valid sql.NullBool
+		if err := tx.QueryRowContext(ctx, `SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(?)`, s.ix.Name+"_gin").Scan(&valid); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("search: index %s_gin does not exist", s.ix.Name)
+			}
+			return err
+		}
+		if !valid.Bool {
+			return fmt.Errorf("search: index %s_gin is not valid", s.ix.Name)
+		}
 		var n int64
-		if err := qr.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s WHERE %s IS NULL", s.ix.Table, s.ix.vecColumn())).Scan(&n); err != nil {
+		if err := tx.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s WHERE %s IS NULL", s.ix.Table, s.ix.vecColumn())).Scan(&n); err != nil {
 			return err
 		}
 		if n > 0 {

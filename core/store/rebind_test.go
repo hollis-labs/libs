@@ -21,6 +21,11 @@ func TestRebind(t *testing.T) {
 		{"SELECT '", "SELECT '"},
 		{"/* unterminated ?", "/* unterminated ?"},
 		{"SELECT $1, ?", "SELECT $1, $1"}, // pre-numbered placeholders are not mixed; documented
+		{`SELECT E'it\'s ?', ?`, `SELECT E'it\'s ?', $1`},
+		{`SELECT 'back\', ?`, `SELECT 'back\', $1`}, // plain string: backslash is not an escape
+		{"SELECT a$b$c ?, ?", "SELECT a$b$c $1, $2"},
+		{"SELECT /* a /* ? */ ? */ ?", "SELECT /* a /* ? */ ? */ $1"},
+		{"SELECT x, ?? , ?", "SELECT x, ? , $1"},
 	}
 	for _, c := range cases {
 		if got := store.Rebind(c.in); got != c.want {
@@ -35,24 +40,8 @@ func FuzzRebindNeverPanics(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, s string) {
 		_ = store.Rebind(s)
-		_ = store.Mask(s)
+		_ = store.Rebind(s + s)
 	})
-}
-
-func TestMaskKeepsOffsets(t *testing.T) {
-	in := "SELECT 'datetime(now)' -- now()\nFROM t /* x */"
-	out := store.Mask(in)
-	if len(out) != len(in) {
-		t.Fatalf("length changed: %d -> %d", len(in), len(out))
-	}
-	if out[:7] != "SELECT " || out[len(out)-1] != ' ' && out[len(out)-1] != '/' {
-		// shape check only
-	}
-	for _, bad := range []string{"datetime", "now()", " x "} {
-		if contains(out, bad) {
-			t.Errorf("Mask left %q in %q", bad, out)
-		}
-	}
 }
 
 func contains(s, sub string) bool {
@@ -62,4 +51,22 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestRebindSQLite(t *testing.T) {
+	d, err := store.DialectFor(store.DriverSQLite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct{ in, want string }{
+		{"SELECT a ?? b, ?", "SELECT a ? b, ?"},
+		{"SELECT '??' , ?? -- ??\n, ?", "SELECT '??' , ? -- ??\n, ?"},
+		{"SELECT /* ?? */ ?", "SELECT /* ?? */ ?"},
+		{"SELECT $$ ?? $$", "SELECT $$ ?? $$"},
+	}
+	for _, c := range cases {
+		if got := d.Rebind(c.in); got != c.want {
+			t.Errorf("sqlite Rebind(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
 }

@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      govulncheck:
+        description: Also run govulncheck against the module
+        required: false
+        type: boolean
+        default: false
       postgres:
         description: Start a disposable PostgreSQL server and export STREAMLOG_PG_DSN and GOSTORE_TEST_PG_DSN for the tests
         required: false
@@ -95,3 +100,7 @@ jobs:
 
       - name: test
         run: go test -count=1 ${{ inputs.race && '-race' || '' }} ./...
+
+      - name: govulncheck
+        if: ${{ inputs.govulncheck }}
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
