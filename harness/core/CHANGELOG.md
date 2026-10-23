@@ -8,6 +8,18 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `adapters/runtimeevents/catalog` (CW-20261023-0002, Cards T1): the `card.*` family
+  (`card.created`, `card.updated`, `card.resolved`, `card.expired`,
+  `card.effect.completed`, `card.effect.failed`) in a new `card` category, with
+  payload schemas `card.created@1`, `card.updated@1`, `card.resolved@1`,
+  `card.expired@1` and `card.effect@1` (ids and codes only, no free text), examples
+  and invalid fixtures, regenerated Go and TypeScript constants, and a `tachyon`
+  entry in `producers.json` (`card.`). `approval.requested` and `approval.resolved`
+  stay registered and emitted; `mapping.md` maps them onto `card.created` and
+  `card.resolved`. No deprecation yet.
+
 ## v0.15.0 — 2026-10-20
 
 ### Added

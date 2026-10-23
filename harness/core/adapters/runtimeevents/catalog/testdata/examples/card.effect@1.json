@@ -1,0 +1,1 @@
+{"card_id": "card_01", "revision": 2, "op_digest": "sha256:ab12", "results": [{"effect_id": "e1", "status": "completed"}, {"effect_id": "e2", "status": "failed", "code": "target_not_allowed"}]}

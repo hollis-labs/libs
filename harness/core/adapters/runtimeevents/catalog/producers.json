@@ -33,6 +33,11 @@
    "kinds": ["audit."]
   },
   {
+   "app": "tachyon",
+   "note": "native cards only; other apps adopt card.* later at the operator's direction (CW-20261023-0002)",
+   "kinds": ["card."]
+  },
+  {
    "app": "tether",
    "note": "off-box workers and relays acting for the hub; the hub's own producers publish in process",
    "kinds": ["process.", "session.", "turn.", "stdin.", "stdout.", "stderr.", "agent.", "policy.", "plant.", "sandbox.", "interrupt.", "message.", "wake.", "tool.", "daemon.", "fleet.", "audit.", "alert.", "sysop.", "ai.", "workspace.", "provider.", "broker.", "routing.", "event."]

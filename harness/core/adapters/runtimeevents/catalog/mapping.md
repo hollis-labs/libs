@@ -30,6 +30,10 @@ Inventory sources, read 2026-10-16:
 
 All 32 kinds in `kinds.go` are kept. `agent.permission_*` and `policy.approval_requested` keep their kinds and are also mapped to `approval.requested` and `approval.resolved` notifications at the bus, as section 6 of the design specifies.
 
+## Cards (`card.*`)
+
+`card.created`, `card.updated`, `card.resolved`, `card.expired`, `card.effect.completed` and `card.effect.failed` are the card family (CW-20261023-0002). Approval is a card kind, so the existing approval notifications map onto it: `approval.requested` to `card.created` and `approval.resolved` to `card.resolved`. Both approval kinds stay registered and emitted, and are not deprecated until the deprecation window opens. A producer that emits a card for an approval emits the `approval.*` notification too during that window. Card payloads carry ids and codes only: no titles, bodies or other free text, so the browser fetches the body through an operator-gated route. Only `tachyon` may publish `card.*` for now; other apps adopt later at the operator's direction.
+
 ## mesh/core
 
 | Today | Outcome |

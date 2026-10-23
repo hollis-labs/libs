@@ -9,6 +9,7 @@
   "message",
   "tool",
   "approval",
+  "card",
   "audit",
   "alert",
   "fleet",
@@ -395,12 +396,50 @@
    "kind": "approval.requested",
    "category": "approval",
    "payload_schema": "urn:hollis-labs:events:approval.requested@1",
-   "status": "new"
+   "status": "new",
+   "note": "approval is a card kind: maps to card.created; stays registered and emitted until the deprecation window opens"
   },
   {
    "kind": "approval.resolved",
    "category": "approval",
    "payload_schema": "urn:hollis-labs:events:approval.resolved@1",
+   "status": "new",
+   "note": "approval is a card kind: maps to card.resolved; stays registered and emitted until the deprecation window opens"
+  },
+  {
+   "kind": "card.created",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.created@1",
+   "status": "new"
+  },
+  {
+   "kind": "card.updated",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.updated@1",
+   "status": "new"
+  },
+  {
+   "kind": "card.resolved",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.resolved@1",
+   "status": "new"
+  },
+  {
+   "kind": "card.expired",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.expired@1",
+   "status": "new"
+  },
+  {
+   "kind": "card.effect.completed",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.effect@1",
+   "status": "new"
+  },
+  {
+   "kind": "card.effect.failed",
+   "category": "card",
+   "payload_schema": "urn:hollis-labs:events:card.effect@1",
    "status": "new"
   },
   {

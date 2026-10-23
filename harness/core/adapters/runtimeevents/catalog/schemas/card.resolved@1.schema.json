@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:card.resolved@1",
+  "title": "card.resolved@1",
+  "description": "Notification that a card reached a terminal state by a response or a cancel. Ids and codes only: no free text (CW-20261023-0001). Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "card_id",
+    "revision",
+    "outcome",
+    "source_app"
+  ],
+  "properties": {
+    "card_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Server-minted card id."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Card revision this event describes; responses are compare-and-set on it."
+    },
+    "card_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Card type code (for example approval, form, notify). A code, not a title."
+    },
+    "risk": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Risk class code, computed server-side. Absent means the most restrictive class."
+    },
+    "op_digest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Digest over the exact change set a card's effects may run, where the card has effects."
+    },
+    "source_app": {
+      "type": "string",
+      "minLength": 1,
+      "description": "App that owns the card, derived from the verified credential subject, never self-asserted."
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "outcome": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Outcome code: for example approved, denied, answered, canceled, superseded."
+    },
+    "responder": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assurance": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Assurance code recorded with the response, never the identity itself."
+    }
+  }
+}
