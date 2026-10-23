@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -72,7 +73,7 @@ var rules = []rule{
 	r("ilike", `\bILIKE\b`, "use lower(col) LIKE lower(?) (store.LikeInsensitive)"),
 	r("json-path", `\bjson_extract\s*\(|->>|#>>|\bjsonb_\w+\s*\(`, "use the Dialect JSON helpers (JSONText, JSONInt, ...)"),
 	r("dollar-placeholder", `\$\d+`, "use ? placeholders; the store rebinds them"),
-	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bgroup_concat\s*\(|\bINSERT\s+INTO\s+(?:[^\s(]+\s+)?DEFAULT\s+VALUES\b`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
+	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bgroup_concat\s*\(`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
 	r("limit-comma", `\bLIMIT\s+(\d+|\?)\s*,\s*(\d+|\?)`, "write LIMIT n OFFSET m; LIMIT a, b is SQLite-only"),
 	r("jsonb-operator", `(^|[^?])\?[|&]`, "?| and ?& are Postgres JSONB operators and collide with the placeholder; use the Dialect JSON helpers"),
 }
@@ -164,9 +165,11 @@ func short(s string) string {
 	return s
 }
 
-// clauseStart matches a fragment that begins with a SQL clause keyword, so
-// "WHERE name LIKE " + pat is linted although it is not a whole statement.
-var clauseStart = regexp.MustCompile(`(?is)^\s*(WHERE|AND|OR|SET|ORDER\s+BY|GROUP\s+BY|HAVING|JOIN|(LEFT|INNER|CROSS)\s+JOIN|ON|FROM|VALUES|LIMIT)\s+\S`)
+// clauseStart matches a fragment that begins with an UPPERCASE SQL clause
+// keyword, so "WHERE name LIKE " + pat is linted although it is not a whole
+// statement. Lower case is not matched: prose such as "on startup, ..." or
+// "from $1 to $2" is not SQL.
+var clauseStart = regexp.MustCompile(`(?s)^\s*(WHERE|AND|OR|SET|ORDER\s+BY|GROUP\s+BY|HAVING|JOIN|(LEFT|INNER|CROSS)\s+JOIN|ON|FROM|VALUES|LIMIT)\s+\S`)
 
 func isSQL(s string) bool { return sqlStart.MatchString(s) || clauseStart.MatchString(s) }
 
@@ -180,44 +183,32 @@ func File(filename string, src []byte) ([]Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	waived := map[int][]string{}
+	// covers maps a line to the waivers in force on it. A comment on the same line
+	// covers that line; a comment alone on its line also covers the next one.
+	// "*" is a bare gostore:allow (every rule).
+	covers := map[int][]string{}
+	tf := fset.File(f.Pos())
 	for _, cg := range f.Comments {
 		for _, c := range cg.List {
-			if i := strings.Index(c.Text, "gostore:allow"); i >= 0 {
-				line := fset.Position(c.Pos()).Line
-				waived[line] = append(waived[line], strings.Fields(c.Text[i+len("gostore:allow"):])...)
+			k := strings.Index(c.Text, "gostore:allow")
+			if k < 0 {
+				continue
+			}
+			ws := strings.Fields(c.Text[k+len("gostore:allow"):])
+			if len(ws) == 0 {
+				ws = []string{"*"}
+			}
+			line := fset.Position(c.Pos()).Line
+			covers[line] = append(covers[line], ws...)
+			if strings.TrimSpace(string(src[tf.Offset(tf.LineStart(line)):tf.Offset(c.Pos())])) == "" {
+				covers[line+1] = append(covers[line+1], ws...)
 			}
 		}
 	}
 	isWaived := func(rule string, line int) bool {
-		for _, l := range []int{line, line - 1} {
-			ws, ok := waived[l]
-			if !ok {
-				continue
-			}
-			if len(ws) == 0 {
-				return true
-			}
-			for _, w := range ws {
-				if w == rule {
-					return true
-				}
-			}
-		}
-		return false
+		return slices.Contains(covers[line], "*") || slices.Contains(covers[line], rule)
 	}
-	waiversAt := func(line int) []string {
-		var out []string
-		for _, l := range []int{line, line - 1} {
-			if ws, ok := waived[l]; ok {
-				if len(ws) == 0 {
-					return []string{"*"}
-				}
-				out = append(out, ws...)
-			}
-		}
-		return out
-	}
+	waiversAt := func(line int) []string { return covers[line] }
 	pkgEnv := constStrings(f, fset, waiversAt)
 	env := pkgEnv
 	vars := map[string]string{} // variables that hold SQL, with the text so far

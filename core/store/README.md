@@ -114,8 +114,9 @@ deadlock), so the callback must be safe to run again from scratch.
 A callback that ends its goroutine (`runtime.Goexit`) is rolled back and releases the writer. `synchronous` defaults to `FULL`; set
 `SQLiteConfig.Synchronous` (`NORMAL`, …) knowingly. `:memory:` and `file::memory:…` use one
 connection for reads and writes (each connection to an in-memory URI would otherwise be its own
-database). URIs with `mode=memory` (for example `file:name?mode=memory&cache=shared`) are refused at `Open`:
-`core/util`'s sqlitekit would create real files with that name. Use `:memory:` or a file. For heavy write fan-in, `core/util/sqlite/serialwrite` can
+database). Every `file:` URI except `file::memory:` (and `file::memory:?…`) is refused at `Open` with
+`ErrBadConfig`, `file:/path?mode=ro` and `?immutable=1` included: `Open` builds the URI itself, so
+sqlitekit would create real files named after the string. Give a plain file path. For heavy write fan-in, `core/util/sqlite/serialwrite` can
 batch writes in front of `Store.DB()`.
 
 Backups: `Store.Backup(ctx, dest, store.BackupOptions{})` on SQLite (verified copy and manifest via
@@ -350,7 +351,10 @@ or in a test: `lint.Dir(".", lint.Options{SkipTests: true})`. Rules: `insert-or`
 `last-insert-id`, `limit-comma`, `jsonb-operator`. SQL built by concatenation is folded and checked as one statement
 (`"SELECT … " + "FROM …"`, same-file string constants, and `q += "…"` / `q = q + "…"` on a variable
 that started as SQL); an operand built at run time is unknown, and a `LIKE` next to one is not
-flagged. A waiver on a constant's declaration follows it to every use. Variables are tracked per
+flagged. A waiver on a constant's declaration covers that constant's own matches wherever it is used, not
+new ones appended to it; a trailing waiver comment covers its own line, a comment alone on a line
+also covers the next. Clause fragments (`WHERE …`, `AND …`, `SET …`, `ORDER BY …`, `JOIN …`, `ON …`,
+…) are recognised by **upper-case** keywords only, so prose like "on startup, …" is not linted. Variables are tracked per
 function. The lint still cannot see SQL assembled across functions, files or `fmt.Sprintf`. Block
 comments nest in the tokenizer as on Postgres; SQLite does not nest them, so the lint can
 under-scan SQL after an inner `*/` (SQLite-only quirk). Waive a deliberate exception with `// gostore:allow <rule>` on the line or the

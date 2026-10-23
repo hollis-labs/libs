@@ -140,7 +140,7 @@ func a(db *sql.DB, col, pat string) {
 	q += " LIKE lower(?)" // clean: the pair is split across pieces
 	_ = q
 	_ = waivedBase + " AND b = ?" // clean: the waiver on the constant follows it
-	_ = "INSERT INTO " + col + " DEFAULT VALUES" // line 14: sqlite-only
+	_ = "INSERT INTO " + col + " DEFAULT VALUES" // clean: both engines accept it
 	_ = "SELECT a FROM t WHERE lower(a) LIKE " + pat // clean: the left side is lower()
 	_ = "SELECT a FROM t WHERE x LIKE lower(" + pat + ")" // line 16: left side has no lower()
 }
@@ -159,7 +159,7 @@ func b() {
 	for _, f := range fs {
 		got[f.Line] += f.Rule + ","
 	}
-	want := map[int]string{9: "like-case,", 14: "sqlite-only,", 16: "like-case,"}
+	want := map[int]string{9: "like-case,", 16: "like-case,"}
 	if len(got) != len(want) {
 		t.Errorf("findings = %v, want lines %v", fs, want)
 	}
@@ -185,8 +185,6 @@ func a(pat string) {
 	_ = r
 	r += " AND y ILIKE ?" // line 13
 	_ = "WHERE name LIKE " + pat // line 14: a clause fragment is linted
-	_ = "INSERT INTO \"t\" DEFAULT VALUES" // line 15
-	_ = "INSERT INTO s.t DEFAULT VALUES" // line 16
 	_ = waivedBase + " AND f = ?" // clean
 }
 `
@@ -198,7 +196,44 @@ func a(pat string) {
 	for _, f := range fs {
 		got[f.Line] += f.Rule + ","
 	}
-	want := map[int]string{7: "sqlite-time,", 10: "sqlite-time,", 13: "ilike,", 14: "like-case,", 15: "sqlite-only,", 16: "sqlite-only,"}
+	want := map[int]string{7: "sqlite-time,", 10: "sqlite-time,", 13: "ilike,", 14: "like-case,"}
+	if len(got) != len(want) {
+		t.Errorf("findings = %v", fs)
+	}
+	for line, rule := range want {
+		if got[line] != rule {
+			t.Errorf("line %d: got %q, want %q", line, got[line], rule)
+		}
+	}
+}
+
+func TestFileRound5(t *testing.T) {
+	src := `package x
+
+func a(pat string) {
+	q := "SELECT a FROM t WHERE d = datetime('now')" // gostore:allow sqlite-time
+	q += " AND e = strftime('%s', 'now')" // line 5: a trailing waiver covers its own line only
+	_ = q
+	_ = "SELECT a FROM t WHERE x ILIKE ?" // gostore:allow ilike
+	_ = "SELECT a FROM t WHERE y ILIKE ?" // line 8: the waiver above was trailing
+	// gostore:allow ilike
+	_ = "SELECT a FROM t WHERE z ILIKE ?" // clean: a comment alone on its line covers the next
+	_ = "on startup, behaves like before"
+	_ = "from $1 to $2"
+	_ = "limit 5, 10 reached"
+	_ = "and so on " + pat + " like that"
+	_ = "WHERE name LIKE " + pat // line 15: upper-case clause keywords are recognised
+}
+`
+	fs, err := lint.File("x.go", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[int]string{}
+	for _, f := range fs {
+		got[f.Line] += f.Rule + ","
+	}
+	want := map[int]string{5: "sqlite-time,", 8: "ilike,", 15: "like-case,"}
 	if len(got) != len(want) {
 		t.Errorf("findings = %v", fs)
 	}

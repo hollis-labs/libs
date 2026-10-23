@@ -43,8 +43,12 @@ type Config struct {
 
 // SQLiteConfig configures the SQLite engine.
 type SQLiteConfig struct {
-	// Path is the database file, or ":memory:" for a private in-memory database
-	// (one connection serves reads and writes).
+	// Path is the database file, or ":memory:" (also "file::memory:" and
+	// "file::memory:?..." ) for a private in-memory database; one connection serves
+	// reads and writes. Give a plain file path: every other "file:" URI
+	// ("file:/x.db?mode=ro", "?immutable=1", "?mode=memory", ...) is refused with
+	// ErrBadConfig, because Open builds the URI itself and such a path would
+	// create a real file named after it.
 	Path string
 	// Synchronous is the synchronous pragma: OFF, NORMAL, FULL or EXTRA.
 	// Default FULL; relax it knowingly.
@@ -89,7 +93,7 @@ func (c Config) validate() error {
 		if c.SQLite.Path == "" {
 			return fmt.Errorf("%w: sqlite path is empty", ErrBadConfig)
 		}
-		if p := c.SQLite.Path; strings.HasPrefix(strings.ToLower(p), "file:") && !strings.HasPrefix(p, "file::memory:") {
+		if p := c.SQLite.Path; strings.HasPrefix(strings.ToLower(p), "file:") && !isMemoryPath(p) {
 			// Open builds the "file:" URI itself, so a path that already starts with
 			// one would create real files named after it (plus -wal and -shm).
 			return fmt.Errorf("%w: sqlite path %q: give a file path, \":memory:\" or a \"file::memory:\" URI", ErrBadConfig, p)

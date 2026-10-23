@@ -261,7 +261,9 @@ func (s *Store) openSQLite(ctx context.Context) error {
 
 // isMemoryPath reports the SQLite in-memory spellings. Each connection to
 // them is its own database, so they get a single shared connection.
-func isMemoryPath(p string) bool { return p == ":memory:" || strings.HasPrefix(p, "file::memory:") }
+func isMemoryPath(p string) bool {
+	return p == ":memory:" || p == "file::memory:" || strings.HasPrefix(p, "file::memory:?")
+}
 
 func (s *Store) openPostgres(ctx context.Context, dsn string) error {
 	db, err := openPG(ctx, dsn, s.cfg.Postgres)

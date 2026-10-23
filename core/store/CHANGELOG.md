@@ -113,3 +113,14 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
   `"WHERE name LIKE " + pat` flags. `INSERT INTO "t"` and `INSERT INTO s.t DEFAULT VALUES` flag.
 - `store`: every `file:` path except `file::memory:` is refused at `Open` (case and encoding
   variants created real files). A failing `Valuer`'s error reads `store: argument N: …` on Postgres.
+
+### Changed in review, round 5 (PR 122)
+
+- `lint`: clause fragments are recognised by upper-case keywords only (lower-case prose such as
+  "from $1 to $2" no longer flags). A trailing `gostore:allow` covers its own line; only a comment
+  alone on its line also covers the next. `INSERT INTO t DEFAULT VALUES` is no longer flagged (both
+  engines accept it; the rule was a false positive). Fragment constants are reported at their
+  declaration, not at use, and a waiver on the composing constant does not hide them.
+- `store`: only `file::memory:` and `file::memory:?…` are accepted `file:` forms (`file::memory:x.db`
+  created a file); the refusal, including `?mode=ro` and `?immutable=1`, is documented on
+  `SQLiteConfig.Path` and in the README.
