@@ -1,0 +1,125 @@
+package store
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+)
+
+// Driver selects the engine behind a [Store].
+type Driver string
+
+// Supported drivers.
+const (
+	DriverSQLite   Driver = "sqlite"
+	DriverPostgres Driver = "postgres"
+)
+
+// SchemaMode says what a process does about the schema at startup.
+type SchemaMode string
+
+// Schema modes. Auto applies pending migrations with the migration credential;
+// Verify only checks that the schema is at the version this build expects, which
+// is what a DML-only runtime role can do.
+const (
+	SchemaAuto   SchemaMode = "auto"
+	SchemaVerify SchemaMode = "verify"
+)
+
+// Config is the one configuration struct for both engines. Exactly the section
+// that matches Driver is read.
+type Config struct {
+	Driver Driver
+	// SchemaMode is read by migrate.Ensure. Empty means auto for SQLite and
+	// verify for Postgres: a shared server migrates deliberately.
+	SchemaMode SchemaMode
+	SQLite     SQLiteConfig
+	Postgres   PostgresConfig
+	// Guard contains panics in transaction callbacks. Nil uses panics.Default().
+	Guard PanicGuard
+}
+
+// SQLiteConfig configures the SQLite engine.
+type SQLiteConfig struct {
+	// Path is the database file, or ":memory:" for a private in-memory database
+	// (one connection serves reads and writes).
+	Path string
+	// Synchronous is the synchronous pragma: OFF, NORMAL, FULL or EXTRA.
+	// Default FULL; relax it knowingly.
+	Synchronous string
+	// Journal is "wal" (default) or "delete".
+	Journal string
+	// BusyTimeout bounds waiting for another process's lock. Default 5s.
+	BusyTimeout time.Duration
+	// ReadConns is the read pool size. Default 4.
+	ReadConns int
+	// CreateParentDir creates the database directory when missing.
+	CreateParentDir bool
+}
+
+// PostgresConfig configures the Postgres engine.
+type PostgresConfig struct {
+	// DSN is the runtime connection string (DML-only role in production).
+	DSN string
+	// MigrateDSN is the schema-owner connection string used only by
+	// migrate.Up. Empty means migrations run over DSN.
+	MigrateDSN string
+	// AllowInsecure permits a connection without verified TLS (tests, a local
+	// container). Without it Open requires sslmode=verify-full.
+	AllowInsecure bool
+	// MaxConns is the pool size. Default 10.
+	MaxConns int
+	// ConnMaxLifetime recycles pooled connections. Default 30m.
+	ConnMaxLifetime time.Duration
+	// ApplicationName is set on the session when the DSN does not.
+	ApplicationName string
+}
+
+// Configuration errors.
+var (
+	ErrUnknownDriver = errors.New("store: unknown driver")
+	ErrBadConfig     = errors.New("store: invalid config")
+)
+
+func (c Config) validate() error {
+	switch c.Driver {
+	case DriverSQLite:
+		if c.SQLite.Path == "" {
+			return fmt.Errorf("%w: sqlite path is empty", ErrBadConfig)
+		}
+		switch strings.ToUpper(c.SQLite.Synchronous) {
+		case "", "OFF", "NORMAL", "FULL", "EXTRA":
+		default:
+			return fmt.Errorf("%w: sqlite synchronous %q", ErrBadConfig, c.SQLite.Synchronous)
+		}
+		switch strings.ToLower(c.SQLite.Journal) {
+		case "", "wal", "delete":
+		default:
+			return fmt.Errorf("%w: sqlite journal %q", ErrBadConfig, c.SQLite.Journal)
+		}
+	case DriverPostgres:
+		if c.Postgres.DSN == "" {
+			return fmt.Errorf("%w: postgres dsn is empty", ErrBadConfig)
+		}
+	default:
+		return fmt.Errorf("%w: %q", ErrUnknownDriver, c.Driver)
+	}
+	switch c.SchemaMode {
+	case "", SchemaAuto, SchemaVerify:
+	default:
+		return fmt.Errorf("%w: schema mode %q", ErrBadConfig, c.SchemaMode)
+	}
+	return nil
+}
+
+// EffectiveSchemaMode resolves the empty default.
+func (c Config) EffectiveSchemaMode() SchemaMode {
+	if c.SchemaMode != "" {
+		return c.SchemaMode
+	}
+	if c.Driver == DriverPostgres {
+		return SchemaVerify
+	}
+	return SchemaAuto
+}

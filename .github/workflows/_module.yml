@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       postgres:
-        description: Start a disposable PostgreSQL server and export STREAMLOG_PG_DSN for the tests
+        description: Start a disposable PostgreSQL server and export STREAMLOG_PG_DSN and GOSTORE_TEST_PG_DSN for the tests
         required: false
         type: boolean
         default: false
@@ -72,6 +72,8 @@ jobs:
           done
           docker exec pg pg_isready -U postgres -h 127.0.0.1
           echo "STREAMLOG_PG_DSN=host=127.0.0.1 port=5432 user=postgres password=test dbname=postgres sslmode=disable" >> "$GITHUB_ENV"
+          # core/store: its harness fails (not skips) without a server when CI is set.
+          echo "GOSTORE_TEST_PG_DSN=host=127.0.0.1 port=5432 user=postgres password=test dbname=postgres sslmode=disable" >> "$GITHUB_ENV"
 
       - name: gofmt
         run: |
