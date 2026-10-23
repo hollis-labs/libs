@@ -30,6 +30,12 @@ Inventory sources, read 2026-10-16:
 
 All 32 kinds in `kinds.go` are kept. `agent.permission_*` and `policy.approval_requested` keep their kinds and are also mapped to `approval.requested` and `approval.resolved` notifications at the bus, as section 6 of the design specifies.
 
+## Cards (`card.*`)
+
+`card.created`, `card.updated`, `card.resolved`, `card.expired`, `card.effect.completed` and `card.effect.failed` are the card family (CW-20261023-0002). Approval is a card kind. Existing `approval.*` producers (Cerberus, Tangent) keep emitting `approval.requested` and `approval.resolved` exactly as today, and both kinds stay registered and are not deprecated until the deprecation window opens. New card producers emit `card.*` only. The compatibility mapping (`approval.requested` to `card.created`, `approval.resolved` to `card.resolved`) is for consumers that want to treat both families as cards. No `approval.*` kind is authorized for `tachyon`, which publishes `card.*` only; any other producer would need its exact kinds added to `producers.json` first.
+
+Ids and codes only is descriptive in v1, not a guarantee: like every catalog schema, the card schemas allow unknown fields and arbitrary strings, so the catalog does not enforce it. Enforcement is the producer's and the Tachyon browser-projection overlay's (a server-side per-kind allowlist). Free-text event fields stay blocked by CW-20261023-0001, so the browser fetches the body through an operator-gated route.
+
 ## mesh/core
 
 | Today | Outcome |

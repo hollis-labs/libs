@@ -69,6 +69,10 @@ func TestProducerAllows(t *testing.T) {
 		{"torque", "fleet.node.down", false},
 		{"torque", "daemon.started", true},
 		{"torque", "daemon.shutdown_started", false},
+		{"tachyon", "card.created", true},
+		{"tachyon", "card.effect.completed", true},
+		{"tachyon", "approval.requested", false},
+		{"torque", "card.created", false},
 		{"nobody", "task.state_changed", false},
 		{"", "task.state_changed", false},
 	}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:card.effect@1",
+  "title": "card.effect@1",
+  "description": "Receipt for the effects a resolved card ran (card.effect.completed or card.effect.failed). Idempotent per card id and revision. By v1 convention the fields are ids and codes, with no free text (CW-20261023-0001); this is descriptive, not enforced by the catalog. The schema stays open: unknown fields and arbitrary strings validate. Enforcement is the producer's and Tachyon's server-side browser projection.",
+  "type": "object",
+  "required": [
+    "card_id",
+    "revision",
+    "op_digest",
+    "results"
+  ],
+  "properties": {
+    "card_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Server-minted card id."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Card revision this event describes; responses are compare-and-set on it."
+    },
+    "op_digest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Digest over the exact change set a card's effects may run, where the card has effects."
+    },
+    "source_app": {
+      "type": "string",
+      "minLength": 1,
+      "description": "App that owns the card, derived from the verified credential subject, never self-asserted."
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "effect_id",
+          "status"
+        ],
+        "properties": {
+          "effect_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed",
+              "skipped"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "Error or result code, never message text."
+          }
+        }
+      }
+    },
+    "error_code": {
+      "type": "string"
+    }
+  }
+}
