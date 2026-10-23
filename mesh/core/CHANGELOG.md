@@ -10,6 +10,19 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ### Added
 
+- `hitlrouting` (CW-20261023-0006): the routing profile for cards and human-in-the-loop requests,
+  a thin layer over `core/util/router`. A rule file matches a request on `kind`, `source`, `tool` and
+  `namespace` (exact, any-of list, or glob), names a sink id, and carries two closed parameters,
+  `completion` (`wait`, `async`, `notify`) and `delivery` (`durable_message`, `await`), validated when
+  the file is parsed. A `catch_all` is required, so every request with a kind gets a sink. `Resolve`
+  returns the sink, the parameters, the matching rule and the router's decision record. Resolving a sink
+  id to an actual delivery is the host application's. Unknown fields, bad enum values, duplicate ids and
+  rules that match nothing specific are refused with every problem listed.
+  Dependency note: the module now requires `core/util` v0.6.0 (only `core/util/router` is imported, which
+  is standard-library only). `core/util` itself requires newer versions of some libraries, so this raises
+  the module's minimum `modernc.org/sqlite` from v1.34.5 to v1.60.1 (with `modernc.org/libc`,
+  `mathutil` and `memory`, `mattn/go-isatty`, `ncruces/go-strftime` and `golang.org/x/text` to match);
+  the module's tests pass on the new versions.
 - `forums`: host-neutral forum, topic and post contracts, moved next to `messaging` from the former `core/forums` module (and the retired `go-forums` repository). The package is `github.com/hollis-labs/libs/mesh/core/forums`; the module `core/forums` and its tags are not continued. Earlier history is in `forums/HISTORY.md`.
 - Draft caller-profile examples for operation-bound WebAuthn evidence carried
   through go-hitl response extensions, with synthetic positive/negative vectors
