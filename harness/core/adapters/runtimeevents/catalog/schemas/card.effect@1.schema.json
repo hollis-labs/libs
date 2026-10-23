@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hollis-labs:events:card.effect@1",
   "title": "card.effect@1",
-  "description": "Receipt for the effects a resolved card ran (card.effect.completed or card.effect.failed). Idempotent per card id and revision. Ids and codes only: no free text (CW-20261023-0001). Unknown fields are allowed.",
+  "description": "Receipt for the effects a resolved card ran (card.effect.completed or card.effect.failed). Idempotent per card id and revision. By v1 convention the fields are ids and codes, with no free text (CW-20261023-0001); this is descriptive, not enforced by the catalog. The schema stays open: unknown fields and arbitrary strings validate. Enforcement is the producer's and Tachyon's server-side browser projection.",
   "type": "object",
   "required": [
     "card_id",

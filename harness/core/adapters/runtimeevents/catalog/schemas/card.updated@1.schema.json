@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hollis-labs:events:card.updated@1",
   "title": "card.updated@1",
-  "description": "Notification that a card changed while still pending (revision bumped, superseded or re-targeted). Ids and codes only: no free text (CW-20261023-0001). Unknown fields are allowed.",
+  "description": "Notification that a card changed while still pending (revision bumped, superseded or re-targeted). By v1 convention the fields are ids and codes, with no free text (CW-20261023-0001); this is descriptive, not enforced by the catalog. The schema stays open: unknown fields and arbitrary strings validate. Enforcement is the producer's and Tachyon's server-side browser projection.",
   "type": "object",
   "required": [
     "card_id",
