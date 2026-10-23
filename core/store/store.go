@@ -56,6 +56,10 @@ type errValue struct{ err error }
 
 func (e errValue) Value() (driver.Value, error) { return nil, e.err }
 
+// GoString is what pgx prints for an argument it cannot encode ("%#v"); show the
+// reason instead of the struct.
+func (e errValue) GoString() string { return e.err.Error() }
+
 // bound adapts a database/sql handle to [Querier].
 type bound struct {
 	d   Dialect
@@ -136,7 +140,7 @@ func (b *bound) args(in []any) []any {
 			if err != nil {
 				// Surface this error from the statement instead of letting the
 				// driver call Value() again.
-				enc = errValue{err}
+				enc = errValue{fmt.Errorf("store: argument %d: %w", i+1, err)}
 				break
 			}
 			t, ok := dv.(time.Time)

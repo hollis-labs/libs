@@ -79,6 +79,9 @@ type Message struct {
 
 	worker string
 	token  string
+	// epoch counts Retry calls; a refund is only valid within the epoch it
+	// was charged in.
+	epoch int64
 }
 
 // Outbox is the helper bound to a table and a dialect.
@@ -138,6 +141,7 @@ func (o *Outbox) DDL(d store.Dialect) []string {
     claim_token   TEXT,
     claimed_until %s,
     attempts      BIGINT NOT NULL DEFAULT 0,
+    epoch         BIGINT NOT NULL DEFAULT 0,
     last_error    TEXT NOT NULL DEFAULT '',
     delivered_at  %s
 )`, t, payload, ts, ts, ts, ts),
@@ -222,7 +226,7 @@ func (o *Outbox) Claim(ctx context.Context, s *store.Store, worker string, limit
 		for rows.Next() {
 			var m Message
 			var ls sql.NullString
-			if err := rows.Scan(&m.ID, &m.Topic, &m.Payload, store.ScanTime(&m.CreatedAt), &m.Attempts, &ls); err != nil {
+			if err := rows.Scan(&m.ID, &m.Topic, &m.Payload, store.ScanTime(&m.CreatedAt), &m.Attempts, &ls, &m.epoch); err != nil {
 				return err
 			}
 			m.LastError = ls.String
@@ -258,7 +262,7 @@ WHERE id IN (
     ORDER BY created_at ASC, id ASC
     LIMIT ? ` + lock + `
 )
-RETURNING id, topic, payload, created_at, attempts, last_error`)
+RETURNING id, topic, payload, created_at, attempts, last_error, epoch`)
 }
 
 // Ack marks a claimed message delivered. It returns [ErrLeaseLost] when m's
@@ -358,7 +362,8 @@ func (o *Outbox) Drain(ctx context.Context, s *store.Store, worker string, batch
 }
 
 // giveBack refunds the attempt charged to m at claim and releases the claim if
-// it is still ours. The two are separate because another drainer may have
+// it is still ours. The refund applies only within m's epoch: a Retry in between
+// reset the count, and decrementing it would undercount a later real delivery. The two are separate because another drainer may have
 // re-claimed the message after our lease ended: its claim must stand, but our
 // charge was for a delivery that never started and has to go regardless.
 func (o *Outbox) giveBack(ctx context.Context, s *store.Store, m Message) error {
@@ -369,8 +374,8 @@ func (o *Outbox) giveBack(ctx context.Context, s *store.Store, m Message) error 
 			return err
 		}
 		_, err := tx.ExecContext(ctx,
-			`UPDATE `+o.table+` SET attempts = attempts - 1 WHERE id = ? AND attempts > 0 AND delivered_at IS NULL`,
-			m.ID)
+			`UPDATE `+o.table+` SET attempts = attempts - 1 WHERE id = ? AND epoch = ? AND attempts > 0 AND delivered_at IS NULL`,
+			m.ID, m.epoch)
 		return err
 	})
 }
@@ -404,7 +409,7 @@ func (o *Outbox) Retry(ctx context.Context, s *store.Store, id string) (bool, er
 	var n int64
 	err := s.WriteTx(ctx, func(ctx context.Context, tx store.Tx) error {
 		res, err := tx.ExecContext(ctx,
-			`UPDATE `+o.table+` SET attempts = 0, available_at = ?, claimed_by = NULL, claim_token = NULL, claimed_until = NULL WHERE id = ? AND delivered_at IS NULL`,
+			`UPDATE `+o.table+` SET attempts = 0, epoch = epoch + 1, available_at = ?, claimed_by = NULL, claim_token = NULL, claimed_until = NULL WHERE id = ? AND delivered_at IS NULL`,
 			o.cfg.Now(), id)
 		if err != nil {
 			return err

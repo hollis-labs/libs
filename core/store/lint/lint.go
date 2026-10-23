@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,30 +72,63 @@ var rules = []rule{
 	r("ilike", `\bILIKE\b`, "use lower(col) LIKE lower(?) (store.LikeInsensitive)"),
 	r("json-path", `\bjson_extract\s*\(|->>|#>>|\bjsonb_\w+\s*\(`, "use the Dialect JSON helpers (JSONText, JSONInt, ...)"),
 	r("dollar-placeholder", `\$\d+`, "use ? placeholders; the store rebinds them"),
-	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bgroup_concat\s*\(|\bINSERT\s+INTO\s+[\w\x01]+\s+DEFAULT\s+VALUES\b`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
+	r("sqlite-only", `\bPRAGMA\b|\bGLOB\b|\bIFNULL\s*\(|\bgroup_concat\s*\(|\bINSERT\s+INTO\s+(?:[^\s(]+\s+)?DEFAULT\s+VALUES\b`, "SQLite-only construct (use COALESCE, or keep it out of shared SQL)"),
 	r("limit-comma", `\bLIMIT\s+(\d+|\?)\s*,\s*(\d+|\?)`, "write LIMIT n OFFSET m; LIMIT a, b is SQLite-only"),
 	r("jsonb-operator", `(^|[^?])\?[|&]`, "?| and ?& are Postgres JSONB operators and collide with the placeholder; use the Dialect JSON helpers"),
 }
 
 var likeRe = regexp.MustCompile(`(?i)\bLIKE\b`)
 
-// Check returns the rule violations in one SQL statement. String literals,
-// quoted identifiers and comments are ignored.
-func Check(query string) []Finding {
-	m := sqlmask.Mask(query)
-	var out []Finding
+// counts returns how many times each rule matches the masked statement m.
+func counts(m string) map[string]int {
+	c := map[string]int{}
 	for _, rl := range rules {
 		if rl.when != nil && !rl.when.MatchString(m) {
 			continue
 		}
-		if rl.re.MatchString(m) {
-			out = append(out, Finding{Rule: rl.name, Message: rl.msg, SQL: short(query)})
-		}
+		c[rl.name] += len(rl.re.FindAllStringIndex(m, -1))
 	}
 	for _, loc := range likeRe.FindAllStringIndex(m, -1) {
 		if likeNeedsCase(m, loc) {
-			out = append(out, Finding{Rule: "like-case", Message: "LIKE is case-insensitive on SQLite and case-sensitive on Postgres; write lower(col) LIKE lower(?)", SQL: short(query)})
-			break
+			c["like-case"]++
+		}
+	}
+	return c
+}
+
+const likeCaseMsg = "LIKE is case-insensitive on SQLite and case-sensitive on Postgres; write lower(col) LIKE lower(?)"
+
+// Check returns the rule violations in one SQL statement. String literals,
+// quoted identifiers and comments are ignored.
+func Check(query string) []Finding {
+	c := counts(sqlmask.Mask(query))
+	var out []Finding
+	seen := map[string]bool{}
+	for _, rl := range rules {
+		if c[rl.name] > 0 && !seen[rl.name] {
+			seen[rl.name] = true
+			out = append(out, Finding{Rule: rl.name, Message: rl.msg, SQL: short(query)})
+		}
+	}
+	if c["like-case"] > 0 {
+		out = append(out, Finding{Rule: "like-case", Message: likeCaseMsg, SQL: short(query)})
+	}
+	return out
+}
+
+// newFindings returns the rules that match full more often than the text it was
+// built from (prior) plus the matches a waived fragment constant brought in
+// (allow). Counting matches, not presence, means a waiver on earlier text never
+// hides a new violation of the same rule in what was appended.
+func newFindings(full string, prior string, allow map[string]int) []Finding {
+	fc, pc := counts(sqlmask.Mask(full)), map[string]int{}
+	if prior != "" {
+		pc = counts(sqlmask.Mask(prior))
+	}
+	var out []Finding
+	for _, fd := range Check(full) {
+		if fc[fd.Rule] > pc[fd.Rule]+allow[fd.Rule] {
+			out = append(out, fd)
 		}
 	}
 	return out
@@ -131,6 +163,12 @@ func short(s string) string {
 	}
 	return s
 }
+
+// clauseStart matches a fragment that begins with a SQL clause keyword, so
+// "WHERE name LIKE " + pat is linted although it is not a whole statement.
+var clauseStart = regexp.MustCompile(`(?is)^\s*(WHERE|AND|OR|SET|ORDER\s+BY|GROUP\s+BY|HAVING|JOIN|(LEFT|INNER|CROSS)\s+JOIN|ON|FROM|VALUES|LIMIT)\s+\S`)
+
+func isSQL(s string) bool { return sqlStart.MatchString(s) || clauseStart.MatchString(s) }
 
 var sqlStart = regexp.MustCompile(`(?is)^\s*(SELECT|INSERT|UPDATE|DELETE|WITH|CREATE|ALTER|DROP|REPLACE)\s+\S`)
 
@@ -184,20 +222,24 @@ func File(filename string, src []byte) ([]Finding, error) {
 	env := pkgEnv
 	vars := map[string]string{} // variables that hold SQL, with the text so far
 	var out []Finding
-	// addNew reports the findings of full that are not already present in prior
-	// (the text the variables or constants it was built from), and honours the
-	// waivers carried by the constants it used.
-	addNew := func(full, prior string, carried []string, pos token.Pos) {
-		had := map[string]bool{}
-		if prior != "" {
-			for _, fd := range Check(prior) {
-				had[fd.Rule] = true
+	// addNew reports the rules that match full more often than the text it was
+	// built from (prior), once the matches inside waived fragment constants are
+	// set aside; a waiver covers its own constant's matches and nothing appended.
+	addNew := func(full, prior string, frags []constVal, pos token.Pos) {
+		allow := map[string]int{}
+		for _, fr := range frags {
+			c := counts(sqlmask.Mask(fr.text))
+			for _, w := range fr.waive {
+				if w == "*" {
+					for rule, n := range c {
+						allow[rule] += n
+					}
+				} else {
+					allow[w] += c[w]
+				}
 			}
 		}
-		for _, fd := range Check(full) {
-			if had[fd.Rule] || slices.Contains(carried, "*") || slices.Contains(carried, fd.Rule) {
-				continue
-			}
+		for _, fd := range newFindings(full, prior, allow) {
 			fd.File = filename
 			fd.Line = fset.Position(pos).Line
 			if !isWaived(fd.Rule, fd.Line) {
@@ -219,7 +261,7 @@ func File(filename string, src []byte) ([]Finding, error) {
 				return true
 			}
 			str, err := strconv.Unquote(x.Value)
-			if err != nil || !sqlStart.MatchString(str) {
+			if err != nil || !isSQL(str) {
 				return true
 			}
 			addNew(str, "", nil, x.Pos())
@@ -232,10 +274,10 @@ func File(filename string, src []byte) ([]Finding, error) {
 				return true
 			}
 			fv := foldString(x, env, vars)
-			if fv.lits == 0 || !(sqlStart.MatchString(fv.text) || fv.viaVar) {
+			if fv.lits == 0 || !(isSQL(fv.text) || fv.viaVar) {
 				return true
 			}
-			addNew(fv.text, strings.Join(fv.prior, ""), fv.waive, x.Pos())
+			addNew(fv.text, strings.Join(fv.prior, ""), fv.frags, x.Pos())
 			return false
 		case *ast.AssignStmt:
 			// q := "SELECT ..."; q += " WHERE x ILIKE ?": a variable that starts as
@@ -251,13 +293,13 @@ func File(filename string, src []byte) ([]Finding, error) {
 			switch {
 			case x.Tok == token.ADD_ASSIGN && vars[id.Name] != "" && fv.lits > 0:
 				prev := vars[id.Name]
-				addNew(prev+fv.text, prev+strings.Join(fv.prior, ""), fv.waive, x.Pos())
+				addNew(prev+fv.text, prev+strings.Join(fv.prior, ""), fv.frags, x.Pos())
 				vars[id.Name] = prev + fv.text
 				return false
-			case (x.Tok == token.DEFINE || x.Tok == token.ASSIGN) && fv.lits > 0 && (sqlStart.MatchString(fv.text) || fv.viaVar):
+			case (x.Tok == token.DEFINE || x.Tok == token.ASSIGN) && fv.lits > 0 && (isSQL(fv.text) || fv.viaVar):
 				// Check here, against what the pieces already were, and do not
 				// descend: the variable's own text is about to change.
-				addNew(fv.text, strings.Join(fv.prior, ""), fv.waive, x.Pos())
+				addNew(fv.text, strings.Join(fv.prior, ""), fv.frags, x.Pos())
 				vars[id.Name] = fv.text
 				return false
 			case (x.Tok == token.DEFINE || x.Tok == token.ASSIGN) && vars[id.Name] != "":
@@ -279,10 +321,10 @@ func File(filename string, src []byte) ([]Finding, error) {
 // folded is a string expression reduced to text.
 type folded struct {
 	text   string
-	lits   int      // literal and constant operands folded
-	viaVar bool     // an operand was a variable that holds SQL
-	prior  []string // the text of those variables (already checked when they were built)
-	waive  []string // waivers carried by constants used ("*" for all rules)
+	lits   int        // literal and constant operands folded
+	viaVar bool       // an operand was a variable that holds SQL
+	prior  []string   // the text of those variables (already checked when they were built)
+	frags  []constVal // waived constants used that are not SQL on their own
 }
 
 // constVal is a resolved string constant with the waivers on its declaration.
@@ -304,9 +346,11 @@ func foldString(e ast.Expr, env map[string]constVal, vars map[string]string) fol
 		}
 	case *ast.Ident:
 		if v, ok := env[x.Name]; ok {
-			f := folded{text: v.text, lits: 1, waive: v.waive}
-			if sqlStart.MatchString(v.text) {
+			f := folded{text: v.text, lits: 1}
+			if isSQL(v.text) {
 				f.prior = []string{v.text} // a constant that is SQL is checked where it is declared
+			} else if len(v.waive) > 0 {
+				f.frags = []constVal{v}
 			}
 			return f
 		}
@@ -317,12 +361,21 @@ func foldString(e ast.Expr, env map[string]constVal, vars map[string]string) fol
 		if x.Op == token.ADD {
 			l, r := foldString(x.X, env, vars), foldString(x.Y, env, vars)
 			return folded{text: l.text + r.text, lits: l.lits + r.lits, viaVar: l.viaVar || r.viaVar,
-				prior: append(l.prior, r.prior...), waive: append(l.waive, r.waive...)}
+				prior: append(l.prior, r.prior...), frags: append(l.frags, r.frags...)}
 		}
 	case *ast.ParenExpr:
 		return foldString(x.X, env, vars)
 	}
 	return folded{text: unknown}
+}
+
+// inheritedWaivers lists the waivers of the waived constants a constant was built from.
+func inheritedWaivers(fv folded) []string {
+	var out []string
+	for _, fr := range fv.frags {
+		out = append(out, fr.waive...)
+	}
+	return out
 }
 
 // constStrings collects the package-level string constants (and variables with
@@ -363,7 +416,7 @@ func collectConsts(gd *ast.GenDecl, env map[string]constVal, fset *token.FileSet
 			ws := waiversAt(fset.Position(vs.Pos()).Line)
 			for i, name := range vs.Names {
 				if fv := foldString(vs.Values[i], env, nil); fv.lits > 0 && !strings.Contains(fv.text, unknown) {
-					env[name.Name] = constVal{text: fv.text, waive: append(append([]string(nil), fv.waive...), ws...)}
+					env[name.Name] = constVal{text: fv.text, waive: append(inheritedWaivers(fv), ws...)}
 				}
 			}
 		}

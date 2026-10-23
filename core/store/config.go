@@ -89,9 +89,10 @@ func (c Config) validate() error {
 		if c.SQLite.Path == "" {
 			return fmt.Errorf("%w: sqlite path is empty", ErrBadConfig)
 		}
-		if strings.Contains(c.SQLite.Path, "mode=memory") {
-			// sqlitekit would create real files with that name.
-			return fmt.Errorf("%w: sqlite path %q is an in-memory URI sqlitekit cannot open; use \":memory:\" or a file", ErrBadConfig, c.SQLite.Path)
+		if p := c.SQLite.Path; strings.HasPrefix(strings.ToLower(p), "file:") && !strings.HasPrefix(p, "file::memory:") {
+			// Open builds the "file:" URI itself, so a path that already starts with
+			// one would create real files named after it (plus -wal and -shm).
+			return fmt.Errorf("%w: sqlite path %q: give a file path, \":memory:\" or a \"file::memory:\" URI", ErrBadConfig, p)
 		}
 		switch strings.ToUpper(c.SQLite.Synchronous) {
 		case "", "OFF", "NORMAL", "FULL", "EXTRA":

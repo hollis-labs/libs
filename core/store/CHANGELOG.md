@@ -100,3 +100,16 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
 - `store`: a `driver.Valuer` that fails returns its error from the statement (no second call);
   `mode=memory` file URIs are refused at `Open` instead of creating files.
 - Known gaps: the lint resolves only same-file constants and in-function variables.
+
+### Changed in review, round 4 (PR 122)
+
+- `outbox`: the table has an `epoch` column that `Retry` bumps and `Claim` returns; the skip refund
+  applies only within the claim's epoch, so a Retry in between cannot be undercounted. Known limit:
+  a refund that lands after another drainer delivered the message leaves one unrefunded charge on a
+  delivered row (metrics only).
+- `lint`: findings are counted per rule, so a waiver on earlier text or on a constant covers only
+  those matches and a new violation of the same rule in appended text is reported. Clause fragments
+  (`WHERE …`, `AND …`, `SET …`, `ORDER BY …`, `JOIN …`, `ON …`, …) are linted as SQL, so
+  `"WHERE name LIKE " + pat` flags. `INSERT INTO "t"` and `INSERT INTO s.t DEFAULT VALUES` flag.
+- `store`: every `file:` path except `file::memory:` is refused at `Open` (case and encoding
+  variants created real files). A failing `Valuer`'s error reads `store: argument N: …` on Postgres.

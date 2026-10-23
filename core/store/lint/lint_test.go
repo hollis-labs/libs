@@ -113,7 +113,7 @@ func f(db *sql.DB, col, pat string) {
 	for _, f := range fs {
 		got[f.Line] += f.Rule + ","
 	}
-	want := map[int]string{7: "sqlite-time,", 10: "ilike,", 12: "ilike,", 15: "sqlite-time,"}
+	want := map[int]string{6: "sqlite-time,", 10: "ilike,", 12: "ilike,", 15: "sqlite-time,"}
 	for line, rule := range want {
 		if !strings.Contains(got[line], rule) {
 			t.Errorf("line %d: want %s, got %q (all: %v)", line, rule, got[line], fs)
@@ -162,6 +162,45 @@ func b() {
 	want := map[int]string{9: "like-case,", 14: "sqlite-only,", 16: "like-case,"}
 	if len(got) != len(want) {
 		t.Errorf("findings = %v, want lines %v", fs, want)
+	}
+	for line, rule := range want {
+		if got[line] != rule {
+			t.Errorf("line %d: got %q, want %q", line, got[line], rule)
+		}
+	}
+}
+
+func TestFileRound4(t *testing.T) {
+	src := `package x
+
+// gostore:allow sqlite-time
+const waivedBase = "SELECT a FROM t WHERE d = datetime('now')"
+
+func a(pat string) {
+	_ = waivedBase + " AND e = datetime('now')" // line 7: a new violation beside a waived constant
+	q := "SELECT a FROM t WHERE d = datetime('now')" // gostore:allow sqlite-time
+	_ = q
+	q += " AND e = strftime('%s', 'now')" // line 10: new, the waiver was for the first
+	r := "SELECT a FROM t WHERE x ILIKE ?" // gostore:allow ilike
+	_ = r
+	r += " AND y ILIKE ?" // line 13
+	_ = "WHERE name LIKE " + pat // line 14: a clause fragment is linted
+	_ = "INSERT INTO \"t\" DEFAULT VALUES" // line 15
+	_ = "INSERT INTO s.t DEFAULT VALUES" // line 16
+	_ = waivedBase + " AND f = ?" // clean
+}
+`
+	fs, err := lint.File("x.go", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[int]string{}
+	for _, f := range fs {
+		got[f.Line] += f.Rule + ","
+	}
+	want := map[int]string{7: "sqlite-time,", 10: "sqlite-time,", 13: "ilike,", 14: "like-case,", 15: "sqlite-only,", 16: "sqlite-only,"}
+	if len(got) != len(want) {
+		t.Errorf("findings = %v", fs)
 	}
 	for line, rule := range want {
 		if got[line] != rule {

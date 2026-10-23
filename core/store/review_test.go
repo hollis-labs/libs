@@ -262,14 +262,33 @@ func TestValuerErrorSurfacesWithoutASecondCall(t *testing.T) {
 	}
 }
 
-func TestMemoryURIsThatWouldCreateFilesAreRefused(t *testing.T) {
+func TestFileURIPathsThatWouldCreateFilesAreRefused(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	_, err := store.Open(context.Background(), store.Config{Driver: store.DriverSQLite, SQLite: store.SQLiteConfig{Path: "file:memdb?mode=memory&cache=shared"}})
-	if !errors.Is(err, store.ErrBadConfig) {
-		t.Fatalf("err = %v, want ErrBadConfig", err)
+	for _, p := range []string{"file:memdb?mode=memory&cache=shared", "file:x?MODE=MEMORY", "file:x?mode=%6Demory", "file:x?vfs=memdb", "FILE:x.db", "file:x.db"} {
+		_, err := store.Open(context.Background(), store.Config{Driver: store.DriverSQLite, SQLite: store.SQLiteConfig{Path: p}})
+		if !errors.Is(err, store.ErrBadConfig) {
+			t.Errorf("%q: err = %v, want ErrBadConfig", p, err)
+		}
 	}
 	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
 		t.Fatalf("files were created: %v", ents)
+	}
+	s, err := store.Open(context.Background(), store.Config{Driver: store.DriverSQLite, SQLite: store.SQLiteConfig{Path: "file::memory:"}})
+	if err != nil {
+		t.Fatalf("file::memory: must stay allowed: %v", err)
+	}
+	_ = s.Close()
+}
+
+func TestPostgresValuerErrorIsReadable(t *testing.T) {
+	s := storetest.Postgres(t)
+	if s == nil {
+		return
+	}
+	n := 0
+	_, err := s.ExecContext(context.Background(), `SELECT ?::text`, failingValuer{&n})
+	if err == nil || !strings.Contains(err.Error(), "store: argument 1: boom") || strings.Contains(err.Error(), "errValue{") {
+		t.Fatalf("err = %v", err)
 	}
 }

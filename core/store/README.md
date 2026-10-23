@@ -300,7 +300,9 @@ gives the handler a context that ends with the lease; keep *batch size × worst-
 below `Lease`. Lease expiry is judged by each drainer's own clock, so drainers on different hosts
 need clocks well within the lease. A handler should be idempotent (that is what at-least-once
 means). Failures back off (`Backoff`) and a message that reaches `MaxAttempts` is parked; `Parked`
-lists them and `Retry(id)` puts one back in line. `Pending` does not count parked messages. Error
+lists them and `Retry(id)` puts one back in line. `Pending` does not count parked messages. `Retry` starts a new epoch, so a late refund from before it cannot erase a later real delivery.
+A refund can also arrive after another drainer has already delivered the message; that leaves one
+unrefunded charge on a delivered row, which affects metrics only. Error
 text is stored cut to 500 bytes on a character boundary, with invalid UTF-8 and NUL removed. Handler panics
 are contained (`core/panics`) and recorded as a reference, not as the panic text. The claim
 statement is per dialect (`ClaimSQL`): `FOR UPDATE SKIP LOCKED` on Postgres, none on SQLite where

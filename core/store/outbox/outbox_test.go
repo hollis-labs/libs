@@ -442,3 +442,45 @@ func TestConcurrentOverrunningDrainersChargeOnlyRealDeliveries(t *testing.T) {
 		}
 	})
 }
+
+// A refund must not outlive a Retry: A claims, its lease ends, an operator
+// retries the message, C claims and fails it, and only then does A skip it and
+// refund. The refund belongs to the epoch before the Retry and must not touch
+// C's real delivery.
+func TestRefundDoesNotCrossARetry(t *testing.T) {
+	storetest.EachDialect(t, func(t *testing.T, s *store.Store) {
+		o, clk := setup(t, s, outbox.Config{Lease: time.Minute, Backoff: func(int) time.Duration { return 0 }})
+		first := enqueue(t, s, o, "t", "first")
+		clk.add(time.Millisecond)
+		second := enqueue(t, s, o, "t", "second")
+		_, err := o.Drain(ctx, s, "A", 2, func(_ context.Context, m outbox.Message) error {
+			if m.ID != first {
+				return nil
+			}
+			clk.add(2 * time.Minute) // A's leases end while it is still in `first`
+			if ok, err := o.Retry(ctx, s, second); err != nil || !ok {
+				t.Errorf("retry: %v %v", ok, err)
+			}
+			got, err := o.Claim(ctx, s, "C", 5)
+			if err != nil {
+				t.Error(err)
+			}
+			for _, m := range got {
+				if m.ID == second {
+					_ = o.Fail(ctx, s, m, errors.New("C failed")) // C's one real delivery
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var attempts int
+		if err := s.QueryRowContext(ctx, `SELECT attempts FROM outbox_messages WHERE id = ?`, second).Scan(&attempts); err != nil {
+			t.Fatal(err)
+		}
+		if attempts != 1 {
+			t.Fatalf("attempts = %d, want 1: A's refund crossed the Retry and erased C's delivery", attempts)
+		}
+	})
+}
