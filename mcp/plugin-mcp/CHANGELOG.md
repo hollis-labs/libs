@@ -8,6 +8,10 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+### Fixed
+
+- `go-mcp/sanitize` and `go-mcp-sanitize` (pattern 3, trailing generic close tag): a close tag that balances an earlier unclosed opener of the same name is now left alone at any distance. It used to be stripped whenever the opener was 64 or more characters away, so the closing `</svg>` or `</html>` was deleted from any long SVG or HTML document passed through an adapter that uses the sanitizer, and a trailing `</tag>` in a long note or comment was lost the same way. Stray close tags with no unclosed opener (the leakage the pattern exists for) are still stripped. Opener matching is now case-insensitive, ignores self-closing tags and no longer confuses `<svgx>` with `<svg>`. Consumers pick this up on their next bump of the module.
+
 ### Added
 
 - `plugin-hooks`: the host-owned hook and filter engine (registry, catalog, execution, breaker, observability, remote scheduling, `hookstest` conformance harness, TypeScript reference in `plugin-hooks/ts`) and its SDK `bridge`, imported with history from the former `plugin-hooks` repository (whose `v0.1.0` tag is not carried). Import paths are now `github.com/hollis-labs/libs/mcp/plugin-mcp/plugin-hooks[/...]`. The bridge tests that replay against a prepared SDK copy skip unless `SDK_TEST_SOURCE` is set (`plugin-hooks/bridge/scripts/prepare.sh`; the script's new layout is untested).

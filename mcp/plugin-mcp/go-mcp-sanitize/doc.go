@@ -18,8 +18,9 @@
 //     `<parameter name="OTHER">CONTENT</parameter>` (including the open-only
 //     tail variant) has the markup removed; CONTENT is injected into
 //     args["OTHER"] only when that slot is empty/missing.
-//  3. Trailing generic close-tag: a stray `</xxx>` near the tail with no
-//     balancing open-tag within 64 characters earlier is stripped.
+//  3. Trailing generic close-tag: a stray `</xxx>` at the tail with no unclosed
+//     `<xxx>` opener anywhere earlier is stripped. A close tag that balances an
+//     earlier opener (the root of a long SVG or HTML document) is kept.
 //  4. Tags-array recovery: a "tags" string field is parsed as JSON; if that
 //     fails, patterns 1-3 are applied first and the parse is retried.
 //

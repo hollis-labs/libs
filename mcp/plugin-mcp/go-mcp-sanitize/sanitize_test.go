@@ -336,3 +336,44 @@ func TestSanitize_NonStringField(t *testing.T) {
 		t.Fatalf("non-string fields mutated")
 	}
 }
+
+// A long document keeps its root close tag (CW-20261024-0130): the old rule
+// stripped any trailing close tag whose opener was 64 or more characters away.
+func TestPattern3_KeepsTheRootCloseTagOfLongDocuments(t *testing.T) {
+	longSVG := `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="#06b6d4"/><text x="10" y="20">` + strings.Repeat("hello ", 40) + `</text></svg>`
+	longHTML := "<!doctype html>\n<html lang=\"en\"><head><title>t</title></head><body>" + strings.Repeat("<p>paragraph of content</p>\n", 20) + "</body></html>"
+	for name, doc := range map[string]string{
+		"long svg":                      longSVG,
+		"long html":                     longHTML,
+		"html with trailing newline":    longHTML + "\n",
+		"uppercase opener, lower close": `<SVG xmlns="http://www.w3.org/2000/svg" width="400" height="200">` + strings.Repeat("<g/>", 30) + `</svg>`,
+		"nested same name":              "<div class=\"outer\">" + strings.Repeat("x", 80) + "<div>inner</div></div>",
+		"short svg":                     `<svg><rect/></svg>`,
+	} {
+		got, _, changed := CleanFreeText(doc, "content")
+		if changed || got != doc {
+			t.Errorf("%s: a balanced document must be left exactly as it was (changed=%v, lost %d bytes)", name, changed, len(doc)-len(got))
+		}
+		cleaned, report := Sanitize(map[string]any{"content": doc})
+		if report.Changed() || cleaned["content"] != doc {
+			t.Errorf("%s: Sanitize altered a balanced document", name)
+		}
+	}
+}
+
+// Stray close tags are still leakage, including ones that only look balanced.
+func TestPattern3_StillStripsUnbalancedCloseTags(t *testing.T) {
+	long := strings.Repeat("x", 100)
+	for name, tc := range map[string]struct{ in, want string }{
+		"no opener":                                   {"prose " + long + "\n</note>", "prose " + long},
+		"closed already, then stray":                  {"<p>" + long + "</p>\n</p>", "<p>" + long + "</p>"},
+		"opener has a longer name":                    {"<svgx>" + long + "</svg>", "<svgx>" + long},
+		"self-closing is no opener":                   {"<br/>" + long + "</br>", "<br/>" + long},
+		"opener only in other case but different tag": {"<div>" + long + "</span>", "<div>" + long},
+	} {
+		got, _, changed := CleanFreeText(tc.in, "content")
+		if !changed || got != tc.want {
+			t.Errorf("%s: got %q changed=%v, want %q", name, got, changed, tc.want)
+		}
+	}
+}
