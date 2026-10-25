@@ -310,30 +310,39 @@ func isTrailingNoise(tail string) bool {
 var genericCloseTagAtEnd = regexp.MustCompile(`</[A-Za-z][A-Za-z0-9_:-]*>\s*$`)
 
 // stripTrailingGenericCloseTag implements pattern 3: a trailing `</xxx>` that
-// looks like leakage. Heuristic: the close-tag is at end-of-string (after
-// stripping trailing whitespace) AND the whole string isn't an HTML/Markdown
-// document with a matching open-tag. We accept both criteria as "leakage" if
-// there's no balancing open-tag earlier in the string.
+// looks like leakage. A close tag is legitimate markup, and left alone, when an
+// earlier opening tag of the same name is still unclosed, i.e. the close tag
+// balances it. That holds at any distance: the root element of a long SVG or
+// HTML document (`<svg ...>` ... `</svg>`) must keep its closing tag. A close tag
+// with no unclosed opener before it is stray leakage and is stripped.
 func stripTrailingGenericCloseTag(s string) (clean string, changed bool) {
 	loc := genericCloseTagAtEnd.FindStringIndex(s)
 	if loc == nil {
 		return s, false
 	}
 	tag := s[loc[0]:loc[1]]
-	// Extract just the name to check for a matching open-tag.
 	name := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(tag), "</"), ">")
-	openMarker := "<" + name
-	if idx := strings.Index(s[:loc[0]], openMarker); idx >= 0 {
-		// There's a matching open-tag earlier — could be legitimate
-		// HTML/Markdown. Only strip if it looks like a torn fragment
-		// (open-tag is < 64 chars from the close).
-		if loc[0]-idx < 64 {
-			// Treat as legitimate inline tag, leave alone.
-			return s, false
-		}
-		// Otherwise, treat as leakage.
+	if hasUnclosedOpener(s[:loc[0]], name) {
+		return s, false
 	}
 	return s[:loc[0]], true
+}
+
+// hasUnclosedOpener reports whether head holds more opening tags named name than
+// closing tags of that name, so that a following `</name>` closes one of them.
+// Names compare case-insensitively (HTML and SVG tags are), self-closing tags
+// (`<name ... />`) are not openers, and `<namex>` is a different tag from `<name>`.
+func hasUnclosedOpener(head, name string) bool {
+	quoted := regexp.QuoteMeta(name)
+	openTag := regexp.MustCompile(`(?i)<` + quoted + `(?:\s[^<>]*)?>`)
+	closeTag := regexp.MustCompile(`(?i)</` + quoted + `\s*>`)
+	opens := 0
+	for _, m := range openTag.FindAllString(head, -1) {
+		if !strings.HasSuffix(m, "/>") {
+			opens++
+		}
+	}
+	return opens > len(closeTag.FindAllStringIndex(head, -1))
 }
 
 // tryUnmarshalStringArray attempts to parse `s` as a JSON array of strings.
