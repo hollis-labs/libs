@@ -8,6 +8,12 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-25
+
+### Changed
+
+- The module now requires Go 1.26.10 (GO-2026-6809). Consumers on 1.26.9 get 1.26.10 when they bump.
+
 ### Fixed
 
 - `go-mcp/sanitize` and `go-mcp-sanitize` (pattern 3, trailing generic close tag): a close tag that balances an earlier unclosed opener of the same name is now left alone at any distance. It used to be stripped whenever the opener was 64 or more characters away, so the closing `</svg>` or `</html>` was deleted from any long SVG or HTML document passed through an adapter that uses the sanitizer, and a trailing `</tag>` in a long note or comment was lost the same way. Stray close tags with no unclosed opener (the leakage the pattern exists for) are still stripped. Opener matching is now case-insensitive, ignores self-closing tags and no longer confuses `<svgx>` with `<svg>`. Consumers pick this up on their next bump of the module.
