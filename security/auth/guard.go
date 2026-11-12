@@ -336,8 +336,13 @@ func writeError(w http.ResponseWriter, status int, code, required string) {
 	}
 	w.WriteHeader(status)
 	msg := "verified caller identity required"
-	if code == "scope_required" {
+	switch code {
+	case "scope_required":
 		msg = "required scope: " + required
+	case "route_not_mapped":
+		msg = "no scope is mapped for this route"
+	case "auth_unavailable":
+		msg = "authentication is temporarily unavailable"
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": msg}})
 }
