@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.1 — unreleased
+## v0.3.1 — 2026-11-12
 
 Bug fix; no exported API changes. The status, error code and JSON shape of every rejection are unchanged.
 
