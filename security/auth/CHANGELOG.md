@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1 — unreleased
+
+Bug fix; no exported API changes. The status, error code and JSON shape of every rejection are unchanged.
+
+### Fixed
+
+- `Guard.Middleware` answered every rejection except `scope_required` with the message "verified caller identity required". A route with no scope mapping (`route_not_mapped`) now says "no scope is mapped for this route", and a verifier that could not answer (`auth_unavailable`, 503) says "authentication is temporarily unavailable". `unauthorized` keeps the old message.
+
 ## v0.3.0 — 2026-10-20
 
 Additive; one stricter behavior only for callers that set the new field.
