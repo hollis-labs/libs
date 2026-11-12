@@ -16,6 +16,12 @@ type HandlerOptions struct {
 	// still enforce same-origin unless the deployment adds its own CORS
 	// headers.
 	AllowedOrigins []string
+
+	// JSONResponse makes the handler answer a POST with a single
+	// application/json body instead of a text/event-stream (SSE) frame, even
+	// when the client sends Accept: application/json, text/event-stream.
+	// Default false keeps the SSE framing.
+	JSONResponse bool
 }
 
 // NewHandler returns an http.Handler exposing server over the MCP
@@ -31,7 +37,7 @@ func NewHandler(server *gmcp.Server, opts HandlerOptions) http.Handler {
 
 	sdkHandler := mcpsdk.NewStreamableHTTPHandler(
 		func(*http.Request) *mcpsdk.Server { return server.SDKServer() },
-		&mcpsdk.StreamableHTTPOptions{Stateless: true},
+		&mcpsdk.StreamableHTTPOptions{Stateless: true, JSONResponse: opts.JSONResponse},
 	)
 
 	return &originGuard{allowed: allowed, next: sdkHandler}

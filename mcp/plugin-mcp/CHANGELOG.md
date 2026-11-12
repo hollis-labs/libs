@@ -8,6 +8,10 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+### Added
+
+- `go-mcp/transport/http`: `HandlerOptions.JSONResponse`. When set, a POST is answered with a single `application/json` body instead of a `text/event-stream` frame, including when the client sends `Accept: application/json, text/event-stream`. Default false keeps the SSE framing, so existing consumers are unchanged. Additive (minor).
+
 ## [0.6.0] - 2026-10-25
 
 ### Changed
