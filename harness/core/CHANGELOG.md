@@ -29,9 +29,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Changed
 
-- Requires `mesh/core` with `EventScope.Cell` and `Event.Summary` (was v0.6.0). The branch pins a
-  pseudo-version of that commit; it must be replaced by the `mesh/core` release tag before this
-  module is tagged.
+- Requires `mesh/core` v0.10.0 (was v0.6.0), for `EventScope.Cell` and `Event.Summary`.
+  `golang.org/x/text` moves to v0.42.0 with it.
 
 ## v0.16.0 — 2026-10-23
 
