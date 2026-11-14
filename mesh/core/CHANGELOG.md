@@ -8,6 +8,8 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.10.0 — 2026-11-14
+
 ### Added
 
 - `EventScope.Cell` (`cell`, omitempty) (CW-20261114-0019): the team a seat belongs to (for example
