@@ -8,6 +8,8 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+## v0.17.0 — 2026-11-14
+
 ### Added
 
 - `adapters/runtimeevents` (CW-20261114-0019): `Event.Summary` (`summary`, omitempty), a one-line,
