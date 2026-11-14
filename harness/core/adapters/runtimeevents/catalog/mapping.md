@@ -66,6 +66,8 @@ This overlaps CW-20261014-0144, which resolves here. That task now implements th
 | `sysop.session_stop`, `sysop.session_checkpoint`, `sysop.logical_agent_resume`, `sysop.session_cleanup`, `sysop.logical_agent_policy` | keep (category audit) |
 | `tool_call_start` / `tool_call_end` | → `tool.call.started` / `tool.call.finished` (X3). `ok` appears only on finished. |
 | `machine_authority_decision`, `sandbox_rule_unenforced` | name pending (X3 and X4) |
+| (no event today) provider context cleared (`/clear`) or compacted | → `session.cleared` / `session.compacted` (CW-20261114-0019), payload `{source, provider_session_id?}` |
+| (no event today) seat blocked on a human or another agent, and the end of that wait | → `seat.waiting` / `seat.unblocked` (CW-20261114-0019), payload `{waiting_for, request_id?, reason?}` / `{waiting_for, request_id?, resolution?}` |
 
 ## Torque
 

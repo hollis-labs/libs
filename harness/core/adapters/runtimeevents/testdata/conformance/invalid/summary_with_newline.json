@@ -1,0 +1,1 @@
+{"schema_version":"1","id":"evt_bad9","kind":"seat.waiting","time":"2026-11-14T03:00:00Z","subject":"msg://agent/tether/photon-builder","sequence":1,"source":{"channel":"hook"},"summary":"waiting for approval\nof a shell command"}

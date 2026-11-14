@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:session_compacted@1",
+  "title": "session_compacted@1",
+  "description": "The provider session's context was compacted. The envelope session_id is the Tether session; provider_session_id is the provider's own session id when it exposes one. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "source"
+  ],
+  "properties": {
+    "source": {
+      "const": "compact"
+    },
+    "provider_session_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

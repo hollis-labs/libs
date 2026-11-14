@@ -45,6 +45,7 @@ func ToMesh(e Event) (mesh.Event, error) {
 		Scope:          e.Scope,
 		Payload:        e.Payload,
 		PayloadDigest:  e.PayloadDigest,
+		Summary:        e.Summary,
 	}
 	if e.Process != (Process{}) {
 		b, err := json.Marshal(e.Process)
@@ -109,6 +110,7 @@ func FromMesh(m mesh.Event) (Event, error) {
 		Truncated:     m.Truncated,
 		Scope:         m.Scope,
 		PayloadDigest: m.PayloadDigest,
+		Summary:       m.Summary,
 	}
 	if len(m.Payload) > 0 && !bytes.Equal(bytes.TrimSpace(m.Payload), []byte("null")) {
 		out.Payload = m.Payload

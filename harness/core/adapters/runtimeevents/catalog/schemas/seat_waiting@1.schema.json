@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:seat_waiting@1",
+  "title": "seat_waiting@1",
+  "description": "The seat is blocked waiting on a human or another agent. waiting_for is approval, input or question, or another short code; request_id names the request being waited on when there is one; reason is a short redacted note. seat.unblocked with the same waiting_for (and request_id) ends the wait. Unknown fields are allowed.",
+  "type": "object",
+  "required": [
+    "waiting_for"
+  ],
+  "properties": {
+    "waiting_for": {
+      "type": "string",
+      "minLength": 1,
+      "examples": [
+        "approval",
+        "input",
+        "question"
+      ]
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}

@@ -73,6 +73,12 @@ func TestProducerAllows(t *testing.T) {
 		{"tachyon", "card.effect.completed", true},
 		{"tachyon", "approval.requested", false},
 		{"torque", "card.created", false},
+		{"tether", "message.read", true},
+		{"tether", "session.cleared", true},
+		{"tether", "session.compacted", true},
+		{"tether", "seat.waiting", true},
+		{"tether", "seat.unblocked", true},
+		{"torque", "seat.waiting", false},
 		{"nobody", "task.state_changed", false},
 		{"", "task.state_changed", false},
 	}

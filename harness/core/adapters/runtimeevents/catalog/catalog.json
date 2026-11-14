@@ -225,6 +225,34 @@
    "note": "Tether emits {from,to,exit_code,reason} today; add entity and trigger (CW-20261016-0136)"
   },
   {
+   "kind": "session.cleared",
+   "category": "activity",
+   "payload_schema": "urn:hollis-labs:events:session_cleared@1",
+   "status": "new",
+   "note": "Tether; the provider session's context was cleared (/clear)"
+  },
+  {
+   "kind": "session.compacted",
+   "category": "activity",
+   "payload_schema": "urn:hollis-labs:events:session_compacted@1",
+   "status": "new",
+   "note": "Tether; the provider session's context was compacted"
+  },
+  {
+   "kind": "seat.waiting",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:seat_waiting@1",
+   "status": "new",
+   "note": "Tether; the seat is blocked waiting on a human or another agent; seat.unblocked ends the wait"
+  },
+  {
+   "kind": "seat.unblocked",
+   "category": "state",
+   "payload_schema": "urn:hollis-labs:events:seat_unblocked@1",
+   "status": "new",
+   "note": "Tether; the wait announced by seat.waiting ended"
+  },
+  {
    "kind": "checkpoint.state_changed",
    "category": "state",
    "payload_schema": "urn:hollis-labs:events:state_changed@1",

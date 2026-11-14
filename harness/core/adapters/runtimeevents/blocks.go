@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	mesh "github.com/hollis-labs/libs/mesh/core"
 )
@@ -104,7 +105,8 @@ var ErrInvalid = errors.New("runtimeevents: invalid event")
 // at least one of SessionID or Subject; SessionID for every
 // [SessionBound] kind. When Actor is set its URN and Kind are required.
 // A non-zero Corr.Depth requires Corr.CausationID. A set PayloadDigest must
-// be well formed and requires an absent Payload.
+// be well formed and requires an absent Payload. Summary, when set, is at
+// most [MaxSummaryLen] characters with no carriage return or line feed.
 func (e Event) Validate() error {
 	var missing []string
 	if e.SchemaVersion == "" {
@@ -152,6 +154,12 @@ func (e Event) Validate() error {
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("%w %s: missing %s", ErrInvalid, e.ID, strings.Join(missing, ", "))
+	}
+	if utf8.RuneCountInString(e.Summary) > MaxSummaryLen {
+		return fmt.Errorf("%w %s: summary longer than %d characters", ErrInvalid, e.ID, MaxSummaryLen)
+	}
+	if strings.ContainsAny(e.Summary, "\r\n") {
+		return fmt.Errorf("%w %s: summary contains a line break", ErrInvalid, e.ID)
 	}
 	return nil
 }
