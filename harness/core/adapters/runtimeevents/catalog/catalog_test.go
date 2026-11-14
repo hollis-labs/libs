@@ -247,3 +247,29 @@ func TestPayloadExamples(t *testing.T) {
 		}
 	}
 }
+
+// The payload variants Tether emits for the seat and session context kinds
+// (CW-20261114-0019) pass their schemas.
+func TestTetherSeatAndContextPayloads(t *testing.T) {
+	for _, c := range []struct {
+		id, payload string
+		valid       bool
+	}{
+		{"session_cleared@1", `{"source":"clear","via":"turn_input"}`, true},
+		{"session_compacted@1", `{"source":"compact","trigger":"manual","pre_tokens":0}`, true},
+		{"session_compacted@1", `{"source":"compact","pre_tokens":1.5}`, false},
+		{"seat_waiting@1", `{"waiting_for":"approval"}`, true},
+		{"seat_waiting@1", `{"reason":"no waiting_for"}`, false},
+		{"seat_unblocked@1", `{"resolution":"session_ended"}`, true},
+		{"seat_unblocked@1", `{"waiting_for":"question","resolution":"turn_ended"}`, true},
+	} {
+		s := compilePayloadSchema(t, "urn:hollis-labs:events:"+c.id)
+		inst, err := jsonschema.UnmarshalJSON(strings.NewReader(c.payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Validate(inst); (err == nil) != c.valid {
+			t.Errorf("%s %s: valid=%v, want %v (%v)", c.id, c.payload, err == nil, c.valid, err)
+		}
+	}
+}

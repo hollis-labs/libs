@@ -155,6 +155,9 @@
         },
         "team_run_id": {
           "type": "string"
+        },
+        "cell": {
+          "type": "string"
         }
       }
     },
@@ -280,6 +283,12 @@
       "type": "string",
       "pattern": "^(sha256:[0-9a-f]{64}|withheld)$",
       "description": "Set only by retention when the payload was removed (D7 envelope tier). When present, payload is absent."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^[^\\r\\n]*$",
+      "description": "One-line, human-readable, redacted description of what happened: at most 200 characters, no carriage return or line feed."
     }
   },
   "allOf": [

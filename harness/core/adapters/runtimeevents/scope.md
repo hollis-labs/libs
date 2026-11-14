@@ -34,6 +34,7 @@ It is event stream contract C3 (CW-20261016-0131). The design is in Tesseract: `
 | `agent_urn` | Agent address (`msg://agent/…`) | Tether `Snapshot.AgentURN` | Tether |
 | `logical_agent_id` | Tether logical agent | Tether session row and `Snapshot.LogicalAgentID` | Tether (not persisted on events: gap G5) |
 | `team_run_id` | Tether team run | Tether `team_runs.run_id` (today only in message metadata, as `team_run`) | Tether (gap G6) |
+| `cell` | Team the seat belongs to (for example `photon`, `command`): a short name, not a URN | Tether seat and roster configuration | Tether |
 
 `session_id` stays at the top level of the envelope, outside `scope`. Provider, runtime, pid and provider session id stay in `process`.
 `actor` says *who* caused an event and `scope` says *where* it belongs, so `agent_urn` in scope can differ from `actor.urn`. For example, a reaction service (actor) can update an agent's task (scope).

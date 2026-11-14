@@ -40,7 +40,7 @@
   {
    "app": "tether",
    "note": "off-box workers and relays acting for the hub; the hub's own producers publish in process",
-   "kinds": ["process.", "session.", "turn.", "stdin.", "stdout.", "stderr.", "agent.", "policy.", "plant.", "sandbox.", "interrupt.", "message.", "wake.", "tool.", "daemon.", "fleet.", "audit.", "alert.", "sysop.", "ai.", "workspace.", "provider.", "broker.", "routing.", "event."]
+   "kinds": ["process.", "session.", "turn.", "stdin.", "stdout.", "stderr.", "agent.", "policy.", "plant.", "sandbox.", "interrupt.", "message.", "wake.", "tool.", "daemon.", "fleet.", "audit.", "alert.", "sysop.", "ai.", "workspace.", "provider.", "broker.", "routing.", "event.", "seat."]
   }
  ]
 }

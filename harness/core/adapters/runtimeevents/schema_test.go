@@ -66,7 +66,7 @@ func TestEventOmitsUnsetOptionals(t *testing.T) {
 	}
 	s := string(raw)
 
-	mustOmit := []string{"app", "turn_id", "parent_id", "raw_offset", "payload", "confidence"}
+	mustOmit := []string{"app", "turn_id", "parent_id", "raw_offset", "payload", "confidence", "summary"}
 	for _, key := range mustOmit {
 		if strings.Contains(s, `"`+key+`"`) {
 			t.Errorf("unset optional %q appears in JSON: %s", key, s)
@@ -84,6 +84,37 @@ func TestEventOmitsUnsetOptionals(t *testing.T) {
 	for _, sub := range mustInclude {
 		if !strings.Contains(s, sub) {
 			t.Errorf("required substring missing: %s\nin: %s", sub, s)
+		}
+	}
+}
+
+func TestEventSummaryValidation(t *testing.T) {
+	base := Event{
+		SchemaVersion: SchemaVersion,
+		ID:            "evt_sum",
+		Kind:          "seat.waiting",
+		Time:          time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC),
+		Subject:       "msg://agent/tether/photon-builder",
+		Sequence:      1,
+		Source:        Source{Channel: ChannelHook},
+	}
+	for _, c := range []struct {
+		name    string
+		summary string
+		valid   bool
+	}{
+		{"empty", "", true},
+		{"one line", "photon-builder is waiting for approval", true},
+		{"200 characters", strings.Repeat("a", MaxSummaryLen), true},
+		{"200 multibyte characters", strings.Repeat("é", MaxSummaryLen), true},
+		{"201 characters", strings.Repeat("a", MaxSummaryLen+1), false},
+		{"line feed", "waiting\nfor approval", false},
+		{"carriage return", "waiting\rfor approval", false},
+	} {
+		ev := base
+		ev.Summary = c.summary
+		if err := ev.Validate(); (err == nil) != c.valid {
+			t.Errorf("%s: valid=%v, want %v (%v)", c.name, err == nil, c.valid, err)
 		}
 	}
 }

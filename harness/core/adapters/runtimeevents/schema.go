@@ -3,6 +3,8 @@ package runtimeevents
 import (
 	"encoding/json"
 	"time"
+
+	mesh "github.com/hollis-labs/libs/mesh/core"
 )
 
 // SchemaVersion is the on-the-wire version of the [Event] envelope. Bump
@@ -85,7 +87,19 @@ type Event struct {
 	// is kept (PII). When it is set Payload is absent. Producers never set
 	// it. See [Event.Tombstoned].
 	PayloadDigest string `json:"payload_digest,omitempty"`
+
+	// Summary is a one-line, human-readable, redacted description of what
+	// happened, for display. At most [MaxSummaryLen] characters (Unicode
+	// code points) and no carriage return or line feed; see [Event.Validate].
+	// Producers redact it before emitting: it must not carry secrets or
+	// content the payload would withhold.
+	Summary string `json:"summary,omitempty"`
 }
+
+// MaxSummaryLen is the longest [Event.Summary] that [Event.Validate]
+// accepts, in characters (Unicode code points). It equals
+// mesh.MaxEventSummaryLen.
+const MaxSummaryLen = mesh.MaxEventSummaryLen
 
 // Tombstoned reports whether a retention pass removed the event's payload.
 func (e Event) Tombstoned() bool { return e.PayloadDigest != "" }
