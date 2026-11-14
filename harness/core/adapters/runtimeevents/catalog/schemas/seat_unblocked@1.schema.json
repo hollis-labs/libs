@@ -2,11 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hollis-labs:events:seat_unblocked@1",
   "title": "seat_unblocked@1",
-  "description": "The wait announced by seat.waiting ended. waiting_for and request_id repeat the values of the matching seat.waiting; resolution says how it ended (for example approved, denied, answered, cancelled, timed_out). Unknown fields are allowed.",
+  "description": "The wait announced by seat.waiting ended. waiting_for and request_id repeat the values of the matching seat.waiting; waiting_for may be omitted when several open requests of different kinds closed together. resolution says how the wait ended: Tether sends resolved, turn_ended or session_ended; other values are allowed. Unknown fields are allowed.",
   "type": "object",
-  "required": [
-    "waiting_for"
-  ],
   "properties": {
     "waiting_for": {
       "type": "string",
@@ -22,7 +19,13 @@
       "minLength": 1
     },
     "resolution": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1,
+      "examples": [
+        "resolved",
+        "turn_ended",
+        "session_ended"
+      ]
     }
   }
 }

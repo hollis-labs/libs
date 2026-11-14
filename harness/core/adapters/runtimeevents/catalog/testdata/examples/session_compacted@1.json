@@ -1,4 +1,6 @@
 {
   "source": "compact",
-  "provider_session_id": "3f0c2a8e-5b7d-4c1a-9e2f-6a1b0c9d8e7f"
+  "provider_session_id": "3f0c2a8e-5b7d-4c1a-9e2f-6a1b0c9d8e7f",
+  "trigger": "auto",
+  "pre_tokens": 167000
 }

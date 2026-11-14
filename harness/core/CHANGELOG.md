@@ -18,10 +18,11 @@ All notable changes to the `harness` module are documented here (the module was 
 - `adapters/runtimeevents`: `scope.cell` (`Scope.Cell`, from `mesh.EventScope`), the team a seat
   belongs to (for example `photon`, `command`), in the JSON Schema and in `scope.md`.
 - `adapters/runtimeevents/catalog` (CW-20261114-0019): kinds `session.cleared` (activity,
-  `session_cleared@1`: `{source:"clear", provider_session_id?}`), `session.compacted` (activity,
-  `session_compacted@1`: `{source:"compact", provider_session_id?}`), `seat.waiting` (state,
+  `session_cleared@1`: `{source:"clear", provider_session_id?, via?}`), `session.compacted` (activity,
+  `session_compacted@1`: `{source:"compact", provider_session_id?, trigger?, pre_tokens?}`), `seat.waiting` (state,
   `seat_waiting@1`: `{waiting_for, request_id?, reason?}`) and `seat.unblocked` (state,
-  `seat_unblocked@1`: `{waiting_for, request_id?, resolution?}`), all status `new`, with examples and
+  `seat_unblocked@1`: `{waiting_for?, request_id?, resolution?}`; `waiting_for` may be omitted when
+  several open requests of different kinds closed together), all status `new`, with examples and
   invalid fixtures, regenerated Go and TypeScript constants, `mapping.md` rows, and `seat.` added to
   `tether` in `producers.json` (`session.*` and `message.read` were already covered by its
   `session.` and `message.` prefixes).

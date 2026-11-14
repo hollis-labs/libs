@@ -1,5 +1,5 @@
 {
-  "waiting_for": "approval",
+  "waiting_for": "question",
   "request_id": "req_01",
-  "reason": "shell command needs approval"
+  "reason": "asked the operator which branch to use"
 }
