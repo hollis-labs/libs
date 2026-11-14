@@ -8,6 +8,17 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+### Added
+
+- `EventScope.Cell` (`cell`, omitempty) (CW-20261114-0019): the team a seat belongs to (for example
+  `photon` or `command`), a low-cardinality scope dimension like the others.
+- `Event.Summary` (`summary`, omitempty) (CW-20261114-0019): a one-line, human-readable, redacted
+  description of what happened. `Event.Validate` rejects a summary longer than 200 characters
+  (`MaxEventSummaryLen`, counted in Unicode code points) or containing a carriage return or line feed;
+  `ValidateEventSummary` is the same check on its own. It exists so the `runtimeevents` envelope
+  (`harness/core`), which gains the same field, still projects onto `Event` without loss. Both fields
+  are additive and `schema_version` stays "1".
+
 ## v0.9.1 — 2026-10-23
 
 ### Fixed
