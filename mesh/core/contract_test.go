@@ -43,8 +43,9 @@ func TestEventV11BlocksRoundTripAndStayOptional(t *testing.T) {
 	at := time.Date(2026, 10, 16, 5, 0, 0, 0, time.UTC)
 	e := mesh.Event{SchemaVersion: "1", ID: "evt_1", Kind: "task.state_changed", Time: at, Actor: mesh.Actor{URN: "msg://service/torque/scheduler", Kind: mesh.ActorService}, Subject: "msg://task/torque/CW-1", Generation: 1, SourceSequence: 3, Cursor: "env:9", Visibility: "environment", Payload: json.RawMessage(`{}`),
 		RawOffset: &off, RecordedAt: &at, Depth: 2, ActorRole: "reaction", ActorVerified: "token",
-		Scope: &mesh.EventScope{ProjectID: "p1", TaskID: "CW-1", Attempt: 2},
-		Class: &mesh.EventClass{Category: "state", Severity: "info", Sensitivity: "private", PII: true, Labels: []string{"a"}, Sanitized: true, Redactions: 1}}
+		Scope:   &mesh.EventScope{ProjectID: "p1", TaskID: "CW-1", Attempt: 2, Cell: "photon"},
+		Summary: "task CW-1 moved to running",
+		Class:   &mesh.EventClass{Category: "state", Severity: "info", Sensitivity: "private", PII: true, Labels: []string{"a"}, Sanitized: true, Redactions: 1}}
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +63,12 @@ func TestEventV11BlocksRoundTripAndStayOptional(t *testing.T) {
 
 	// An event without the new fields marshals with none of their keys, so
 	// v1 readers and stored v1 bytes see no change.
-	e.RawOffset, e.RecordedAt, e.Depth, e.ActorRole, e.ActorVerified, e.Scope, e.Class, e.PayloadDigest = nil, nil, 0, "", "", nil, nil, ""
+	e.RawOffset, e.RecordedAt, e.Depth, e.ActorRole, e.ActorVerified, e.Scope, e.Class, e.PayloadDigest, e.Summary = nil, nil, 0, "", "", nil, nil, "", ""
 	b, err = json.Marshal(e)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"raw_offset", "recorded_at", "depth", "actor_role", "actor_verified", "scope", "class", "payload_digest"} {
+	for _, key := range []string{"raw_offset", "recorded_at", "depth", "actor_role", "actor_verified", "scope", "class", "payload_digest", "summary"} {
 		if strings.Contains(string(b), `"`+key+`"`) {
 			t.Fatalf("unset v1.1 field %q was marshalled: %s", key, b)
 		}
@@ -150,5 +151,28 @@ func TestDeviceActor(t *testing.T) {
 	}
 	if err := (mesh.Actor{URN: "msg://service/env/hub", Kind: mesh.ActorDevice}).Validate(); err == nil {
 		t.Fatal("service address accepted as a device actor")
+	}
+}
+
+func TestEventSummaryValidation(t *testing.T) {
+	base := mesh.Event{SchemaVersion: "1", ID: "evt_1", Kind: "seat.waiting", Time: time.Now().UTC(), Actor: mesh.Actor{URN: "msg://service/tether/hub", Kind: mesh.ActorService}, Subject: "msg://agent/test/seat", Generation: 1, SourceSequence: 1, Cursor: "env:1", Visibility: "environment", Payload: json.RawMessage(`{}`)}
+	for _, c := range []struct {
+		name    string
+		summary string
+		valid   bool
+	}{
+		{"empty", "", true},
+		{"one line", "photon seat waiting for approval", true},
+		{"200 characters", strings.Repeat("a", 200), true},
+		{"200 multibyte characters", strings.Repeat("é", 200), true},
+		{"201 characters", strings.Repeat("a", 201), false},
+		{"line feed", "waiting\nfor approval", false},
+		{"carriage return", "waiting\rfor approval", false},
+	} {
+		e := base
+		e.Summary = c.summary
+		if err := e.Validate(); (err == nil) != c.valid {
+			t.Errorf("%s: valid=%v, want %v (%v)", c.name, err == nil, c.valid, err)
+		}
 	}
 }

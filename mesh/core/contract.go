@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ErrorCode string
@@ -192,7 +194,15 @@ type Event struct {
 	// the stored payload bytes, or "withheld" when no digest is kept (PII).
 	// When it is set Payload is JSON null. Producers never set it.
 	PayloadDigest string `json:"payload_digest,omitempty"`
+	// Summary is a one-line, human-readable, redacted description of what
+	// happened: at most [MaxEventSummaryLen] characters (Unicode code points,
+	// as JSON Schema maxLength counts) and no line break.
+	Summary string `json:"summary,omitempty"`
 }
+
+// MaxEventSummaryLen is the longest [Event.Summary] Validate accepts, in
+// characters (Unicode code points).
+const MaxEventSummaryLen = 200
 
 var payloadDigestPattern = regexp.MustCompile(`^(sha256:[0-9a-f]{64}|withheld)$`)
 
@@ -219,6 +229,9 @@ type EventScope struct {
 	AgentURN       string `json:"agent_urn,omitempty"`
 	LogicalAgentID string `json:"logical_agent_id,omitempty"`
 	TeamRunID      string `json:"team_run_id,omitempty"`
+	// Cell is the team a seat belongs to (for example "photon" or
+	// "command"): a short, low-cardinality name, not a URN.
+	Cell string `json:"cell,omitempty"`
 }
 
 // EventClass is the classification block of an event. Category is one of
@@ -250,10 +263,26 @@ func (e Event) Validate() error {
 	} else if !json.Valid(e.Payload) {
 		return NewError(ErrorInvalid, "incomplete event envelope")
 	}
+	if err := ValidateEventSummary(e.Summary); err != nil {
+		return err
+	}
 	if err := e.Actor.Validate(); err != nil {
 		return err
 	}
 	return e.Subject.Validate()
+}
+
+// ValidateEventSummary checks an event summary: at most
+// [MaxEventSummaryLen] characters and no carriage return or line feed. The empty
+// summary is valid.
+func ValidateEventSummary(s string) error {
+	if utf8.RuneCountInString(s) > MaxEventSummaryLen {
+		return NewError(ErrorInvalid, "event summary longer than 200 characters")
+	}
+	if strings.ContainsAny(s, "\r\n") {
+		return NewError(ErrorInvalid, "event summary contains a line break")
+	}
+	return nil
 }
 
 // InstanceView is the provider response view of an executing agent instance.
