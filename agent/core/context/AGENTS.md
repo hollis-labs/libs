@@ -1,4 +1,4 @@
-# go-context-window
+# context
 
 Fixed, ordered context-slot system with per-slot budgets, cache-key tracking and escalating compaction.
 
@@ -9,7 +9,7 @@ the handoff and overflow helpers built around them.
 
 ## Start Here
 
-- `contextwindow` package — the importable API; its `doc.go` is the package documentation.
+- `context` package — the importable API; its `doc.go` is the package documentation.
 - `slot.go` — slot names, `SlotOrder`, `DefaultBudgets`, `DefaultCompactable`. The most sensitive file; read Boundaries first.
 - `INVARIANTS.md` — the mechanism-level guarantees and which tests pin them.
 - `example_test.go` — the runnable examples; the README `## Usage` fence is a complete program in the same shape.
@@ -52,8 +52,8 @@ Run from the repository root. CI uses the same module check.
   `TestDefaults_MatchSeedSnapshot` pins the names and order.
 - The compaction event ID is an opaque random hex string, not a UUID. Do not
   reintroduce `google/uuid` or add a shape check on it.
-- Dependencies are `substrate/llm-core/llmtypes`,
-  `substrate/llm-core/llmcontracts` and `yaml.v3` only.
+- Package dependencies are `libs/llm/core/llmtypes`,
+  `libs/llm/core/llmcontracts` and `yaml.v3` only.
   Every dependency's own `go` line must stay at or below this module's.
 - Do not add references to symbols or files in any consuming application.
 - No `replace` directive in `go.mod` and no committed `go.work`: consumers cannot resolve either.
