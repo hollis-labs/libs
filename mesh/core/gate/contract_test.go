@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -147,13 +148,14 @@ func (f *fakeGate) respond(ticket gate.Ticket, option, principal string) error {
 // fakeHost resolves authoritative state rather than accepting a forged receipt.
 // It also owns the live binding, environment, descriptor and atomic claim lock.
 type fakeHost struct {
-	gate      *fakeGate
-	live      gate.Request
-	mu        sync.Mutex
-	claims    map[string]bool
-	effects   int
-	delivery  []gate.DeliveryReceipt
-	execution []gate.ExecutionReceipt
+	gate       *fakeGate
+	live       gate.Request
+	descriptor string
+	mu         sync.Mutex
+	claims     map[string]bool
+	effects    int
+	delivery   []gate.DeliveryReceipt
+	execution  []gate.ExecutionReceipt
 }
 
 func (h *fakeHost) Verify(c context.Context, r gate.Request, d gate.Decision) error {
@@ -164,7 +166,7 @@ func (h *fakeHost) Verify(c context.Context, r gate.Request, d gate.Decision) er
 	if actual.Decision == nil || !reflect.DeepEqual(*actual.Decision, d) {
 		return gate.ErrAuthority
 	}
-	if r.Binding != h.live.Binding || r.EnforcementPoint != h.live.EnforcementPoint || r.OperationDigest != h.live.OperationDigest || !reflect.DeepEqual(r.Environment, h.live.Environment) {
+	if r.Binding != h.live.Binding || r.EnforcementPoint != h.live.EnforcementPoint || r.OperationDigest != gatetest.Digest("tool-v1", h.descriptor) || r.Adapter != h.live.Adapter || !r.NativeRequestID.Equal(h.live.NativeRequestID) || !reflect.DeepEqual(r.Environment, h.live.Environment) {
 		return gate.ErrAuthority
 	}
 	if r.Environment == nil {
@@ -197,7 +199,7 @@ func (h *fakeHost) execute(r gate.Request, d gate.Decision, uncertain bool) erro
 	return h.effectLocked(r, d, uncertain)
 }
 func (h *fakeHost) claimLocked(r gate.Request, d gate.Decision) error {
-	a := gate.Admission{Binding: h.live.Binding, Adapter: h.live.Adapter, EnforcementPoint: h.live.EnforcementPoint, OperationDigest: h.live.OperationDigest, Now: h.gate.now}
+	a := gate.Admission{Binding: h.live.Binding, Adapter: h.live.Adapter, EnforcementPoint: h.live.EnforcementPoint, OperationDigest: gatetest.Digest("tool-v1", h.descriptor), Now: h.gate.now}
 	if err := gate.ValidateAdmission(ctx, r, d, a, h); err != nil {
 		return err
 	}
@@ -269,7 +271,7 @@ func setup(t *testing.T) (gate.Request, *fakeGate, gate.Ticket, *fakeHost) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r, f, ticket, &fakeHost{gate: f, live: live, claims: map[string]bool{}}
+	return r, f, ticket, &fakeHost{gate: f, live: live, descriptor: gatetest.OperationDescriptor, claims: map[string]bool{}}
 }
 func decided(t *testing.T, f *fakeGate, ticket gate.Ticket, option string) gate.Resolution {
 	t.Helper()
@@ -438,7 +440,7 @@ func TestAdmissionRefusesChangedLiveFactsAndForgedAuthority(t *testing.T) {
 		{"new-generation", func(h *fakeHost, r *gate.Request, d *gate.Decision) { h.live.Binding.Generation++ }, gate.ErrBinding},
 		{"new-attempt", func(h *fakeHost, r *gate.Request, d *gate.Decision) { h.live.Binding.AttemptID = "attempt-8" }, gate.ErrBinding},
 		{"changed-plan", func(h *fakeHost, r *gate.Request, d *gate.Decision) {
-			h.live.OperationDigest = gatetest.Digest("tool-v1", "edited plan")
+			h.descriptor = strings.Replace(h.descriptor, "plan-1@1", "plan-1@2", 1)
 		}, gate.ErrBinding},
 		{"changed-enforcement", func(h *fakeHost, r *gate.Request, d *gate.Decision) { h.live.EnforcementPoint = "other-host" }, gate.ErrBinding},
 		{"expired-at-admission", func(h *fakeHost, r *gate.Request, d *gate.Decision) { h.gate.now = r.ExpiresAt }, gate.ErrExpired},
@@ -630,7 +632,7 @@ func TestNativeAllowRequiresAuthorityBeforeDelivery(t *testing.T) {
 			case "expired":
 				f.now = r.ExpiresAt
 			case "changed-digest":
-				h.live.OperationDigest = gatetest.Digest("tool-v1", "changed")
+				h.descriptor = strings.Replace(h.descriptor, `"value":1`, `"value":2`, 1)
 			case "stale-generation":
 				h.live.Binding.Generation++
 			case "unknown-native-request":

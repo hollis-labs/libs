@@ -10,6 +10,11 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## v0.11.0 — 2026-11-15
 
+### Security
+
+- Raise the minimum Go version to 1.26.11 to include the standard-library fixes
+  for GO-2026-6859 (`net/http`) and GO-2026-6809 (`crypto/x509`).
+
 ### Added
 
 - Experimental `runtimecontract` host-issued binding, environment and portable

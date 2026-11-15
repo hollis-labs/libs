@@ -11,6 +11,10 @@ import (
 	"github.com/hollis-labs/libs/mesh/core/runtimecontract"
 )
 
+// OperationDescriptor is a synthetic versioned descriptor retained separately
+// by fake hosts so admission can rehash current operation bytes.
+const OperationDescriptor = `{"action":"tool.execute","args":{"value":1},"plan":"plan-1@1","workspace":"workspace-1","environment":"environment-1","resource":"resource-1@1","effect":"write"}`
+
 // Digest hashes already canonical host descriptor bytes. Production hosts must
 // define the versioned descriptor and include all operation-relevant facts.
 func Digest(version, descriptor string) runtimecontract.Digest {
@@ -32,7 +36,7 @@ func Request(now time.Time) gate.Request {
 		Adapter:          gate.AdapterScope{AdapterID: "fake-adapter", Protocol: "fake-json-rpc", LaunchMode: "on-request"},
 		Environment:      &runtimecontract.EnvironmentRef{Receipt: Reference("environment-1"), Workspace: Reference("workspace-1"), Lease: Reference("lease-7"), Grants: Reference("grant-1"), Capabilities: []string{"tool.execute"}, ExpiresAt: expiry},
 		EnforcementPoint: "fake-host/tool-admission", OperationID: "operation-1", OperationClass: "tool",
-		OperationDigest:  Digest("tool-v1", `{"action":"tool.execute","args":{"value":1},"environment":"environment-1","resource":"resource-1@1","effect":"write"}`),
+		OperationDigest:  Digest("tool-v1", OperationDescriptor),
 		ResourceVersions: []runtimecontract.Reference{Reference("resource-1")},
 		TurnID:           "turn-1", ToolCallID: "tool-call-1", NativeRequestID: gate.NativeRequestID(`9007199254740993`),
 		Options:   []gate.NativeOption{{ID: "native-allow-once", Kind: gate.Allow, Scope: scope, Payload: []byte(`{"native":"once"}`)}, {ID: "native-deny", Kind: gate.Deny, Scope: scope}},
