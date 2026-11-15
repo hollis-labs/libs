@@ -8,6 +8,17 @@ All notable changes to the `mesh` module are documented here (the module was `me
 
 ## [Unreleased]
 
+## v0.11.0 — 2026-11-15
+
+### Added
+
+- Experimental `runtimecontract` host-issued binding, environment and portable
+  recovery references with structural, digest and declared-capability validation.
+- Experimental `gate` operation-bound approval ports, native ID/option fidelity,
+  immutable request snapshots, trusted-host admission verification and separate
+  delivery/execution receipts. Shared synthetic fixtures exercise SDK and native
+  consumers against the existing HITL lifecycle; no coordinator or host is added.
+
 ## v0.10.0 — 2026-11-14
 
 ### Added
