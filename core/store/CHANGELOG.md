@@ -6,6 +6,21 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
 
 ### Added
 
+- `store`: `SQLiteConfig.ForeignKeys *bool` sets the `foreign_keys` pragma on the writer and the read
+  pool. Nil keeps today's default (on). `false` is for a schema whose references were never enforced
+  and whose data may not satisfy them (a port of an app that always ran with them off); with it,
+  `REFERENCES` and their `ON DELETE` actions are not applied. SQLite only: Postgres always enforces.
+- `store`: `ReadSQLiteSettings(ctx, q)` and `Store.SQLiteSettings(ctx)` read a SQLite connection's
+  settings as it reports them (`synchronous`, `journal_mode`, `busy_timeout`, `foreign_keys`, and the
+  `main` file from `database_list`), so code can assert them before it relies on them: a durable
+  record needs `synchronous` FULL or EXTRA; a proof must be computed on the named file. Pass a
+  `WriteTx` tx or a `ReadTx` querier to read that connection; `Store.SQLiteSettings` reads the writer
+  and must not be called inside a `WriteTx`. Read-only; `ErrSQLiteOnly` on Postgres.
+
+## v0.1.0
+
+### Added
+
 - `store`: `Open`/`Config` for SQLite (single writer plus read pool, IMMEDIATE write transactions,
   `synchronous=FULL` by default) and Postgres (pgx v5 through `database/sql`, `verify-full` TLS
   unless `AllowInsecure`); `Store.WriteTx`/`ReadTx` with panic containment and lock/serialization

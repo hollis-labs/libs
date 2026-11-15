@@ -61,6 +61,11 @@ type SQLiteConfig struct {
 	ReadConns int
 	// CreateParentDir creates the database directory when missing.
 	CreateParentDir bool
+	// ForeignKeys sets the foreign_keys pragma on every connection (writer and
+	// read pool). Nil keeps the default, on. Set it to false only for a schema
+	// whose references were never enforced and whose data may not satisfy them;
+	// with it off, REFERENCES and their ON DELETE actions are not applied.
+	ForeignKeys *bool
 }
 
 // PostgresConfig configures the Postgres engine.

@@ -229,6 +229,9 @@ func (s *Store) openSQLite(ctx context.Context) error {
 	if c.BusyTimeout > 0 {
 		opts.BusyTimeout = c.BusyTimeout
 	}
+	if c.ForeignKeys != nil {
+		opts.ForeignKeys = *c.ForeignKeys
+	}
 	oo := sqlitekit.OpenOptions{Options: opts, CreateParentDir: c.CreateParentDir}
 	if isMemoryPath(c.Path) {
 		opts.WAL = false
