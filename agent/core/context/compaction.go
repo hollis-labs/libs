@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,12 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
 // CompactionMode determines how the summary prompt is shaped.
-// The active mode comes from the broker's Layer 3 classifier.
+// The active mode is chosen by the caller (e.g. from a classifier).
 const (
 	CompactionModeGeneral  = "general"
 	CompactionModeCode     = "code"
@@ -68,9 +68,9 @@ type CompactionPipeline struct {
 // Stage is a single compaction action. Returns true if it made progress.
 type Stage func(ctx context.Context, p *CompactionPipeline) (bool, error)
 
-// namedStage bundles a Stage function with a stable identifier for logging
+// NamedStage bundles a Stage function with a stable identifier for logging
 // and the stages_applied response on /compact.
-type namedStage struct {
+type NamedStage struct {
 	Name string
 	Fn   Stage
 }
@@ -85,8 +85,8 @@ type namedStage struct {
 // summarizing duplicate tool chatter, and BEFORE strip so strip's fallback
 // "N blocks removed" note doesn't hide the fact that some of those blocks
 // were exact duplicates.
-func DefaultStages() []namedStage {
-	return []namedStage{
+func DefaultStages() []NamedStage {
+	return []NamedStage{
 		{"drop_enrichment", stageDropEnrichment},
 		{"dedupe_tool_results", stageDedupeToolResults},
 		{"summarize_oldest", stageSummarizeOldest},
@@ -133,7 +133,7 @@ func (p *CompactionPipeline) runStages(ctx context.Context, recheckBetweenStages
 	// P8 CompactionContract: emit structured metadata if writer is available
 	if p.CompactionEventWriter != nil && p.SessionID != "" {
 		evt := CompactionEvent{
-			ID:                   uuid.New().String(),
+			ID:                   newEventID(),
 			SessionID:            p.SessionID,
 			CoverageWindowStart:  result.CoverageWindowStart,
 			CoverageWindowEnd:    result.CoverageWindowEnd,
@@ -463,6 +463,11 @@ func summarySystemPrompt(mode string) string {
 // serializeMessages converts a message list to a string for token estimation.
 // This is used internally by the compaction pipeline to update the conversation
 // slot content.
+//
+// The est parameter is unused but kept so the ported seed tests, which call
+// it with two arguments, stay unchanged.
+//
+//nolint:unparam // signature retained for the ported seed tests.
 func serializeMessages(msgs []llmtypes.ChatMessage, est TokenEstimator) string {
 	var b strings.Builder
 	for _, m := range msgs {
@@ -476,4 +481,15 @@ func serializeMessages(msgs []llmtypes.ChatMessage, est TokenEstimator) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// newEventID returns an opaque, random, 32-character hex identifier for a
+// CompactionEvent. Consumers must treat it as an opaque string; it is not an
+// RFC 4122 UUID.
+func newEventID() string {
+	var b [16]byte
+	// crypto/rand.Read never returns an error (Go 1.24+); it crashes the
+	// program irrecoverably if the system entropy source fails.
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }

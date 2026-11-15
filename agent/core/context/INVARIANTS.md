@@ -1,310 +1,141 @@
-# Slot system invariants
+# Slot system invariants (mechanism level)
 
-> **Status:** load-bearing contract — every invariant below is enforced
-> by a test in `internal/service/slot_invariants_test.go`. The
-> deliberate-violation tests in the same file prove each assertion has
-> teeth (a real break is caught, not just nominally checked).
+> **Scope.** This file states what the `context` mechanism itself
+> guarantees: the slot table, `ContextWindow.Assemble`, and the cache-key
+> helpers. It does not restate the invariants that depend on how a consumer
+> feeds and consumes the mechanism (dispatch flavors, cache-marker placement,
+> permission and skills renderers).
 >
-> **Provenance:** CW-20260512-0124 (SP-20260512-0011 Wave 4). Codifies
-> emergent properties of Sprints 1-3 and Sprint 4 W1+W2+W3.
+> Those consumer-side properties come from the Nanite application, where this
+> package was extracted from. Nanite's `internal/service/slot_invariants_test.go`
+> remains the full seven-invariant enforcement point after adoption. It now
+> asserts against this module's exported values instead of locally defined
+> ones. This repository has no dispatcher and cannot replicate it.
+>
+> **Provenance:** CW-20260512-0124 (SP-20260512-0011 Wave 4).
 
-The Context Broker assembles every dispatched LLM turn from named slots
-defined in `internal/context/slot.go` (the `SlotOrder` slice). The seven
-invariants below describe contracts that hold across ALL agent-flavored
-dispatch types (chat, sync subagent, async subagent, background_agent)
-regardless of CallerType. If a future refactor needs to change one,
-update this doc IN THE SAME COMMIT so the test name and the
-human-readable contract stay in sync.
-
----
-
-## INV1 — Stable sent shape (5-7 slots, fixed positions)
-
-**Invariant.** The Context Broker's per-turn `AssemblyPlan` emits
-exactly `len(ctxpkg.SlotOrder)` decisions in the SAME order across
-every dispatch flavor. Positions are load-bearing: Anthropic's
-`cacheable_prefix_tokens` math assumes positional stability. Wire-level
-slot count (slots with non-empty content) lands in the 5..N range
-where N == `len(SlotOrder)`; the 5-7 typical range is the working-
-session shape (Universal + System + Agent + Rules + conversation,
-plus optional Permissions/Workspace/Skills/Tools).
-
-**Why it matters.** A slot drop or reorder breaks the cacheable prefix
-and produces non-deterministic cache miss patterns. Every dispatch
-type MUST emit the same plan shape so cache savings are predictable
-across chat ↔ subagent ↔ background dispatches.
-
-**Enforced by.** `invariantStableSentShape` in
-`internal/service/slot_invariants_test.go`, exercised by
-`TestSlotInvariants_AcrossDispatchTypes` for each of the four dispatch
-flavors. Cross-flavor identity is additionally pinned by
-`TestSlotInvariants_IdenticalShapeAcrossCallerTypes`.
-
-**Relied on by.** `internal/llm/anthropic/cache_plan.go`
-(`stablePrefixSlotPriority` walk assumes ordered SlotBlocks);
-`internal/service/chat_generate.go` (`request_build` slog walks
-`ctxpkg.SlotOrder` to emit `<slot>_tokens` fields per dispatch).
+If a change needs to alter one of the guarantees below, update this file in
+the same commit as the test change.
 
 ---
 
-## INV2 — Universal slot always at position 0
+## M1. Stable slot order (seed INV1)
 
-**Invariant.** `SlotUniversal` sits at position 0 of every plan AND
-carries non-empty content sourced verbatim from
-`chat.UniversalRulesBlock()`. Every dispatch flavor — chat, sync/async
-subagent, background_agent — sees the universal-rules block as the
-first system-prompt block on the wire.
+**Guarantee.** `SlotOrder` is a fixed sequence of 15 slot names, and
+`Assemble` walks it directly. Blocks come out in exactly that order, every
+turn, for every `ContextWindow`; slots with no content are skipped but never
+reordered. Every name in `SlotOrder` has an entry in both `DefaultBudgets()`
+and `DefaultCompactable()`, and those maps have no other entries.
 
-**Why it matters.** This is the structural fix for the c160 subagent
-fabrication regression: pre-CW-20260512-0114, agents with empty
-`SystemPrompt` and no template assignment received zero grounding/
-refusal rules. The universal slot guarantees those rules reach every
-agent regardless of profile body or template assignment. CW-20260512-0122
-extended the block with the "Acknowledge subagent failure" clause so
-the rule continues to be the right shape post-envelope.
+**Why it matters.** Positions are cache-load-bearing. A slot drop, insertion
+or reorder shifts the cacheable prefix consumers build from the assembled
+blocks and produces cache-miss patterns that are hard to attribute. Earlier
+slots are the ones that change least, so their position is what makes
+prefix caching pay off. `SlotUniversal` sits at position 0 for the same
+reason.
 
-**Enforced by.** `invariantUniversalAtPositionZero` in
-`internal/service/slot_invariants_test.go`. Deliberate-violation
-coverage:
-`TestSlotInvariants_DeliberateViolation_UniversalSlotRemoved` (catches
-a regression that disconnected the universal source) and
-`TestSlotInvariants_DeliberateViolation_PositionZeroNotUniversal`
-(catches a refactor that reordered SlotOrder).
+**A missing map entry is silent.** Budgets and compactability are read with
+plain map lookups. A slot absent from `DefaultBudgets` gets `MaxTokens: 0`
+(unbounded) and one absent from `DefaultCompactable` gets `Compactable: false`
+(never compacted): the wrong default for both, with no error.
 
-**Relied on by.** `internal/chat/universal_rules.go::UniversalRulesBlock`
-(content authority); `internal/contextbroker/assembly.go::DecideAssembly`
-(walks `SlotOrder` with SlotUniversal at index 0);
-`internal/llm/anthropic/cache_plan.go::stablePrefixSlotPriority`
-(SlotUniversal first in the priority list).
+**Enforced here by.**
 
----
+- `TestSlotOrder_MatchesSeedSnapshot` pins `SlotOrder` to a hardcoded
+  15-element literal.
+- `TestDefaults_MatchSeedSnapshot` pins the default budgets, compactability,
+  `SlotHandoffMaxTokens`, `BudgetFraction`, `DefaultContextWindowSize` and the
+  four compaction stage names and order.
+- `TestDefaults_CompleteForSlotOrder` checks that both default maps cover
+  `SlotOrder` exactly.
+- `TestAssemble_ordering` and `TestSlotHandoff_RegisteredInOrder` (ported
+  seed tests) check assembled order.
 
-## INV3 — Cache marker priority (universal + system, never dynamic)
+Changing a pinned literal is a deliberate, reviewed act, never a fix-up to
+make a test pass.
 
-**Invariant.** Anthropic cache_control markers land ONLY on slots in
-`internal/llm/anthropic/cache_plan.go::stablePrefixSlotPriority` —
-today exactly `[SlotUniversal, SlotSystem]`. Both slots are
-non-compactable (per `ctxpkg.DefaultCompactable`) and ship with
-non-empty content on a well-formed assembly. Per-turn dynamic slots
-(SlotMode, SlotMemory, SlotPermissions, SlotWorkspace, SlotSkills, SlotTools,
-SlotSession, SlotContext, SlotUserContext, SlotHandoff,
-SlotConversation) NEVER carry markers — dynamic-content marker
-placement would invalidate the cache offset.
-
-**Why it matters.** Cache markers are a finite resource (Anthropic's
-4-marker cap per request). The codified priority guarantees
-SlotUniversal gets the first marker (the largest stable prefix
-savings); a marker on dynamic content would mean every turn invalidates
-the cache. CW-20260512-0109 (SP-20260512-0008 W3) codified the priority.
-
-**Enforced by.** `invariantCacheMarkerPriority` in
-`internal/service/slot_invariants_test.go` pins the broker-side
-precondition (cacheable-prefix anchors are ActionShip with non-empty
-content; compactability flags match `ctxpkg.DefaultCompactable`). The
-downstream wire-level marker placement is pinned by
-`TestCacheMarkerPriority_UniversalSlotFirst_LoadBearing` and
-`TestCacheMarkerPriority_NeverOnDynamicContent` in
-`internal/llm/anthropic/cache_marker_priority_test.go`.
-
-**Relied on by.** `internal/llm/anthropic/params.go`
-(`buildSystemBlocks` / `buildTools` / `buildMessages` consult the
-plan); `internal/llm/anthropic/cache_plan.go::planCacheMarkers`
-(enforces the cap via reverse-priority drop).
+**Not enforced here.** Cross-flavor identity of the sent shape, and
+Anthropic's `cacheable_prefix_tokens` math, live in the consumer.
 
 ---
 
-## INV4 — Mode slot is permanently inert (post-cut)
+## M2. Agent instructions ship inline (seed INV5, first half)
 
-**Invariant.** `SlotMode` always carries EMPTY content and is always
-decided as `ActionSkip` / `ReasonTag: "skipped_no_content"` — the same
-path any other empty slot takes. Its POSITION and IDENTITY in
-`ctxpkg.SlotOrder` remain unchanged (INV1 still governs the sent
-shape). There is no more content-swap behavior to invariant-test:
-Phase 0 item 21 ("Cut Modes, in full" —
-`TASKS/phase-0/21-cut-modes.md`) deleted both Session Mode
-(`sessions.current_mode_id`, the `modes` table, `store.GetSessionMode`
-/ `SetSessionMode`) and Legacy Agent Mode (`agent_modes`,
-`store.AgentMode`) — the two mechanisms that used to feed this slot's
-content. `classify.ClassifyMode`, the per-turn classifier that used to
-suggest mode switches, was deleted in the same change.
+**Guarantee.** `SlotAgent` is exempt from the per-slot truncation ceiling
+in `Assemble` (`name != SlotAgent`). Agent instructions ship whole even when
+they exceed their `MaxTokens` budget. Every other slot over its ceiling is
+truncated with a `[truncated]` suffix, on a UTF-8 rune boundary, and its cache
+key is recomputed.
 
-**Why this invariant changed, not just its enforcement.** This
-invariant used to read "changing a session's `current_mode_id` changes
-`SlotMode`'s CONTENT on the next dispatch" (CW-20260512-0115, SP-20260512-0009
-W5 — mode as a SESSION attribute). That contract is now vacuous by
-construction: there is no more `current_mode_id` to change. Per this
-doc's own "How to evolve the contract" step 1, the deliberate update
-here — rather than silent rot — is to assert the new, real behavior:
-SlotMode is permanently empty, not merely "currently always the same
-value because nothing sets it." `SlotMode` itself is **not** removed —
-`SlotOrder`, INV1 (stable sent shape), and INV3 (cache marker priority
-list) all reference it structurally, and removing the slot would ripple
-into those invariants and `internal/llm/anthropic/cache_plan.go`. That
-would be a separate, later decision, out of this task's scope.
+**Why it matters.** An agent must receive its role and boot instructions
+before it can use tools to orient itself. The exemption is deliberate, not an
+oversight to clean up.
 
-**Why it matters.** A future regression that accidentally starts
-writing content into `SlotMode` again (e.g. repurposing the slot for
-something unrelated to modes) would silently reintroduce dynamic,
-per-turn content into a slot whose whole contract is now "always
-empty" — this invariant is the tripwire for that. Position stability
-still matters independently: the cacheable prefix slots ahead of
-SlotMode (Universal, System) must not shift.
-
-**Enforced by.** `invariantModeSlotInert` in
-`internal/service/slot_invariants_test.go` (replaces the retired
-`invariantModeAwareContentSwap`), exercised across every dispatch
-flavor by `TestSlotInvariants_AcrossDispatchTypes` and pinned with
-teeth by `TestSlotInvariants_DeliberateViolation_ModeSlotNotInert`.
-The three tests in `internal/service/mode_session_attr_test.go` that
-used to assert the mode-aware content swap
-(`Test_ModeIsSessionAttribute_SameAgentDifferentModes_DifferentSlotContent`,
-`Test_ModeChangeMidSession_NextDispatchReflectsNewMode`,
-`Test_ModeChangeMidSession_CacheableSlotsUnchanged`) were retired —
-see that file's header comment for the full rationale; its two shared
-helpers (`findSlotDecision`, `indexOfSlot`) survive for
-`slot_invariants_test.go`'s use.
-
-**Relied on by.** `internal/chat/context_client.go::AssembleSlotSources`
-(sources `SlotMode` as a hardcoded empty string — see that function's
-doc comment); `internal/service/context.go::AssembleSlots` (no longer
-takes `mode *store.AgentMode` / `sessionMode *store.Mode` parameters).
+**Enforced here by.** `TestTruncateSlot` (ported seed test) covers truncation
+of ordinary slots. The seed has no mechanism-level test for the `SlotAgent`
+exemption itself; Nanite's `TestSlotInvariants_AgentInstructionsInline`
+covers it end to end.
 
 ---
 
-## INV5 — Pointer / stash determinism
+## M3. Deterministic cache keys (seed INV5, second half, mechanism part)
 
-**Invariant.** Agent instructions (`SlotAgent`) always ship inline,
-including when they exceed their per-slot budget; final context-window
-assembly must not truncate them either. An agent must receive
-its role and boot instructions before it can use tools to orient itself.
-`TestSlotInvariants_AgentInstructionsInline` verifies this through slot
-assembly and the model-facing slot blocks across dispatch types.
+**Guarantee.** `ComputeCacheKey` is the SHA-256 hex digest of the content, so
+identical content yields identical keys across runs and processes. Identical
+`SetContent` calls on a fresh `ContextWindow` yield byte-identical `Assemble`
+output.
 
-For other slots, when content exceeds its per-slot budget, the
-broker substitutes a deterministic pointer envelope
-(`<ref:artifact_id=ART-..., tokens=N, available via dev_read>`) and
-stashes the original content. Same `(SessionID, SlotName, Content)`
-tuple MUST produce the same `ArtifactID` across runs — content
-addressing via `contextbroker.DeterministicArtifactID`. Two
-back-to-back assemblies of identical input produce byte-identical
-pointer envelopes; the cacheable prefix is preserved.
+`Assemble` mutates `PrevHashes` and `CacheHits` as a side effect. Call it once
+per turn: a second call without an intervening `SetContent` sees every slot as
+unchanged, so its `Changed` values differ from the first call's. This is
+documented behavior, not a bug.
 
-**Why it matters.** The pointer envelope itself is part of the wire
-payload. Non-deterministic IDs would invalidate the cacheable prefix
-on every turn where an oversized slot is present (e.g. AGENTS.md
-walk-up of a large project tree). CW-20260512-0110 wired the
-artifact-store-backed stash with the atomicity contract: stash MUST
-complete before pointer ships; if it fails, the slot falls back to
-inline ship rather than emit a pointer to nowhere.
+**Not in this package.** The pointer/stash envelope for oversized slots, its
+content-addressed artifact IDs, and the atomicity rule (stash before pointer
+ships) belong to the consumer's broker. This package only supplies the
+deterministic keys such a scheme builds on.
 
-**Enforced by.** `invariantPointerStashDeterminism` in
-`internal/service/slot_invariants_test.go`. Deliberate-violation
-coverage:
-`TestSlotInvariants_DeliberateViolation_PointerNonDeterministic`
-(a regressed stasher returning different IDs across calls is caught
-end-to-end).
-
-**Relied on by.** `internal/contextbroker/stash.go::SlotStasher`
-contract (the artifact-store-backed implementation in
-`internal/service`); `internal/contextbroker/assembly.go::DecideAssembly`
-(atomicity fallback at the
-`stasher.StashSlot(...) → err != nil` branch).
+**Enforced here by.** `TestComputeCacheKey_deterministic`,
+`TestAssemble_cacheHits`.
 
 ---
 
-## INV6 — Permission visibility
+## M4. The mode slot is a fixed point in the table (seed INV4, table part)
 
-**Invariant.** When the agent has effective path constraints (binary-
-scoped `DevToolsAllowedPaths` or session-scoped `PathGrants`), the
-`SlotPermissions` block renders the constraints in human-readable form
-with a stable "## Path access" header. The LLM reads what it can reach
-rather than reasoning about access from priors and fabricating.
-CW-20260512-0118 (SP-20260512-0010 W2) is the structural fix for the
-c160 turn-16 fabrication regression target.
+**Guarantee.** `SlotMode` keeps its position (between `SlotAgent` and
+`SlotRules`), its 500-token budget and `Compactable: false` in the constant
+tables. It is covered by M1 like any other slot.
 
-**Why it matters.** Pre-CW-20260512-0118 the path constraint substrate
-was invisible to the LLM. The path_grants lineage system gave child
-sessions access to paths the parent mentioned, but the child's prompt
-had no language about that — when a guessed path failed, the child
-concluded "I have no access" and fabricated. SlotPermissions closes
-the loop: the constraint substrate now ships to the LLM as part of the
-prompt, with a refusal hook that points at the path-naming convention.
+**Not in this package.** That `SlotMode` carries empty content and is skipped
+at assembly is a property of what the consumer writes into it; this package
+does not force the slot empty. The consumer that seeded this package
+currently never populates it.
 
-**Enforced by.** `invariantPermissionVisibility` in
-`internal/service/slot_invariants_test.go`. The renderer's shape
-(scope qualifier text, deny-enumeration, provenance tags, refusal
-hook) is pinned by `TestAssembleSlotSources_PermissionsSlot_*` in
-`internal/chat/context_client_permissions_test.go`. Subagent deny
-inheritance (W3 / CW-20260512-0119) is pinned by
-`TestDeriveSubagentRuleSet_ThreeLevelChain` in
-`internal/permission/derivation_test.go` +
-`TestChatRunner_ThreeLevelChainPropagatesDenies` in
-`internal/service/subagent_runner_derivation_test.go`.
-
-**Relied on by.** `internal/chat/context_client.go::buildPermissionsSlotContent`
-(renderer); `RenderPermissionSummary` in `go-permission/summary`
-(human-readable projection); the universal-rules block's refusal hook
-(in `internal/chat/universal_rules.go`) which cites the
-SlotPermissions content.
+**Enforced here by.** `TestDefaults_MatchSeedSnapshot` and
+`TestSlotOrder_MatchesSeedSnapshot`.
 
 ---
 
-## INV7 — Skills listing: name + description, own slot, no bodies
+## Consumer-side invariants that remain in Nanite
 
-**Invariant.** An agent's granted skills reach the model as a listing in
-`SlotSkills` and nowhere else in the prompt: one line per skill, the
-slug followed by a one-line description (`- <slug>: <description>`),
-under a header that names `skill_get(slug)` as the way to load one.
-`SlotSkills` is non-compactable. The listing never carries a skill body,
-and `SlotAgent` carries no skill text.
+| Seed invariant | Property | Why it is not enforced here |
+|---|---|---|
+| INV2 | Universal slot at position 0 on every dispatch flavor, sourced from the universal-rules block | Needs the dispatcher and the universal-rules renderer |
+| INV3 | Cache markers only on the stable-prefix slots, never on dynamic slots | Provider-adapter behavior |
+| INV6 | Permission summary renders path constraints | Permission renderer |
+| INV7 | Skills listing is name plus description in its own slot, no bodies | Skills renderer |
 
-**Why it matters.** This is progressive disclosure per the Agent Skills
-spec (D-37, CW-20260919-0012): the description's job is to tell the
-agent when to load a skill, so the prompt pays for a line per skill, not
-for the skills. A separate slot means the listing is budgeted, inspected
-and compacted like every other slot instead of riding inside the agent
-prompt. It is non-compactable for the same reason `SlotAgent` is —
-losing it mid-conversation strands skills the agent can no longer name.
-Bodies are fetched with `skill_get`, which is not cache-exempt, so a
-large body comes back as a preview plus a `tool_result://` pointer that
-`fetch_tool_result` pages through, the same as any other large result.
-
-**Enforced by.** `invariantSkillsListing` in
-`internal/service/slot_invariants_test.go`, exercised across every
-dispatch flavor by `TestSlotInvariants_AcrossDispatchTypes` and pinned
-with teeth by `TestSlotInvariants_DeliberateViolation_SkillsListing`.
-Line shape and the description bound are pinned by
-`TestBuildSkillListForSession_DescriptionIsOneBoundedLine` in
-`internal/chat/skill_list_loadhint_test.go`. That `skill_get` results go
-through the result cache is pinned by
-`TestSkillGetResultsAreCached` in
-`internal/service/chat_tool_cache_exempt_test.go`.
-
-**Relied on by.** `internal/chat/context_client.go::buildSkillsSlotContent`
-(renderer); `internal/chat/context.go::buildSkillListForSession`
-(per-agent listing, capped at `SkillEssentialCap`);
-`internal/service/context.go::slotSourceMap` (binds the source to the
-slot).
-
----
+Position 0 for `SlotUniversal` is still guaranteed here structurally (it is
+the first element of `SlotOrder`, pinned by M1); what is not guaranteed is
+that a consumer fills it.
 
 ## How to evolve the contract
 
-If a future ticket needs to change one of these invariants:
-
-1. Update the contract paragraph above WITH the rationale in the same
-   commit as the test change.
-2. The test name in `internal/service/slot_invariants_test.go` is the
-   primary pointer; rename intentionally if scope changes (a
-   `git grep` for the old test name will surface stale doc references).
-3. Add a deliberate-violation test for the new invariant shape if you
-   add a new one — the violation pin is the load-bearing teeth check.
-4. Update `internal/llm/anthropic/cache_plan.go::stablePrefixSlotPriority`
-   in lock-step if INV3 changes — that list is the exhaustive
-   definition of the cacheable prefix.
-5. The W1 cross-CallerType structural pin
-   (`TestRun_identicalShapeAcrossCallerTypes` in
-   `internal/dispatcher/dispatcher_test.go`) is the upstream peer of
-   `TestSlotInvariants_IdenticalShapeAcrossCallerTypes` here — they
-   pin the same property at different layers (dispatcher input vs
-   broker output). Keep them aligned.
+1. Update the paragraph above with the rationale in the same commit as the
+   test change.
+2. Adding a slot means appending to `SlotOrder`, adding entries to both
+   default maps, and updating the pin literals in `slot_pin_test.go`; it is
+   a breaking change for every consumer's cache prefix and needs a CHANGELOG
+   entry that says so.
+3. In the consumer's repository, update any cache-marker priority list
+   derived from `SlotOrder` in lock-step.

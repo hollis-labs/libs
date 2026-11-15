@@ -1,15 +1,11 @@
-# go-context-window
+# Context windows
 
 Fixed, ordered context-slot system with per-slot budgets, cache-key tracking and escalating compaction.
-
-## Status
-
-**Pre-release.** This project is unreleased, not deployed, and has no outside consumers. It's being built in the open: the code, the docs, and this README describe what exists today, not a pitch for what's planned. Interfaces and behavior change without notice, and there are no compatibility guarantees yet.
 
 ## Install
 
 ```sh
-go get github.com/hollis-labs/libs/agent/core/contextwindow
+go get github.com/hollis-labs/libs/agent/core/context
 ```
 
 ## Usage
@@ -20,15 +16,15 @@ package main
 import (
 	"fmt"
 
-	contextwindow "github.com/hollis-labs/libs/agent/core/contextwindow"
+	ctxpkg "github.com/hollis-labs/libs/agent/core/context"
 )
 
 func main() {
-	cw := contextwindow.NewContextWindow(200_000, contextwindow.DefaultEstimator{})
-	cw.SetContent(contextwindow.SlotSystem, "You are a careful assistant.")
-	cw.SetContent(contextwindow.SlotConversation, "user: hello")
+	cw := ctxpkg.NewContextWindow(200_000, ctxpkg.DefaultEstimator{})
+	cw.SetContent(ctxpkg.SlotSystem, "You are a careful assistant.")
+	cw.SetContent(ctxpkg.SlotConversation, "user: hello")
 
-	// Blocks come back in contextwindow.SlotOrder; empty slots are skipped.
+	// Blocks come back in ctxpkg.SlotOrder; empty slots are skipped.
 	for _, b := range cw.Assemble() {
 		fmt.Printf("%s changed=%v\n", b.SlotName, b.Changed)
 	}
@@ -50,8 +46,8 @@ assembled blocks. See [INVARIANTS.md](./INVARIANTS.md).
 
 ## Compatibility
 
-This module is pre-1.0 and unreleased: minor releases may break the exported
-API. Pin an exact version, and read [CHANGELOG.md](./CHANGELOG.md) before
+The `agent/core` module is pre-1.0: minor releases may break the exported
+API. Pin an exact version, and read [CHANGELOG.md](../CHANGELOG.md) before
 upgrading. Every breaking change is listed there. Any change to `SlotOrder`,
 to a slot name, or to the default budgets or compactability is breaking for
 every consumer's prompt cache and will be called out as such.
@@ -78,4 +74,4 @@ From the repository root, run `scripts/check agent`. Read
 
 ## License
 
-MIT — see the [repository license](../../LICENSE).
+MIT — see the [repository license](../../../LICENSE).

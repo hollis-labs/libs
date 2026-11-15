@@ -1,4 +1,4 @@
-package contextwindow
+package context
 
 // Compile-time interface assertions.
 var (
