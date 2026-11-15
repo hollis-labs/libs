@@ -10,6 +10,9 @@ import (
 	"github.com/hollis-labs/libs/security/policy"
 )
 
+// ModelCallID identifies one model invocation, separately from its parent turn.
+type ModelCallID string
+
 // EventPayload is the experimental SDK payload inside runtimeevents envelope 1.
 // It carries references and outcomes, never raw prompts, arguments, native opaque
 // payloads or error strings. Sequence is producer-local; it is not a replay cursor.
@@ -20,6 +23,8 @@ type EventPayload struct {
 	DefinitionDigest string                     `json:"definition_digest"`
 	Route            string                     `json:"route,omitempty"`
 	Model            string                     `json:"model,omitempty"`
+	ModelCallID      ModelCallID                `json:"model_call_id,omitempty"`
+	Tool             string                     `json:"tool,omitempty"`
 	TurnID           runtimecontract.TurnID     `json:"turn_id,omitempty"`
 	ToolCallID       runtimecontract.ToolCallID `json:"tool_call_id,omitempty"`
 	OperationID      string                     `json:"operation_id,omitempty"`
@@ -45,5 +50,8 @@ func (e *runEvents) emit(ctx context.Context, kind runtimeevents.EventKind, p Ev
 	p.DefinitionDigest = e.base.DefinitionDigest
 	p.Route = e.base.Route
 	p.Model = e.base.Model
+	if p.TurnID != "" {
+		p.ModelCallID = ModelCallID(string(p.TurnID) + "/model/1")
+	}
 	return e.emitter.Emit(ctx, kind, runtimeevents.Source{Channel: "sdk-native", Confidence: runtimeevents.ConfidenceExact}, p, runtimeevents.WithTurnID(string(p.TurnID)))
 }

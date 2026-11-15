@@ -181,6 +181,15 @@ and input ownership through authoritative host ports. Relaunch/fork explicitly
 reject before host calls. Hosts connect its binding/lease admission to the run
 admission above; no production adapter or provider-native resume is supplied.
 
+## Trace and deterministic evaluation
+
+[trace](trace/README.md) records typed SDK events and explicit accounting/receipts,
+produces immutable JSON recordings, and replays evidence without effect ports.
+[eval](eval/README.md) runs deterministic YAML scenarios through this actual loop
+using synthetic models/tools/host authority, with observed trajectory grading and
+presence-aware usage/cost snapshots. Production telemetry, transcript ingestion
+and the richer workbench remain separate SDK-3 slices.
+
 ## Stability and checks
 
 The initial v0 API is experimental. Additive changes preserve existing semantics;

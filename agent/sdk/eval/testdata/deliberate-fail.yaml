@@ -1,0 +1,14 @@
+id: prose-is-not-tool-use
+benchmark: synthetic-tool-trajectory
+user_message: Read the synthetic value.
+expected_behavior: A tool-use claim in prose must not satisfy the tool rubric.
+tools_offered:
+  - name: lookup
+    description: Return a synthetic value.
+    input_schema: {type: object}
+    mock: {content: '42', outcome: succeeded}
+model_turns:
+  - text: I called lookup and the value is 42.
+rubric:
+  called_tool: lookup
+  contains_any: ['42']

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add experimental typed trace recordings and evidence-only replay, preserving
+  separate producer/PTY/cursor coordinates and decision/delivery/effect records.
+- Add fake-only real-loop YAML evaluation, deterministic trajectory/text grading,
+  presence-aware usage and immutable price snapshots, with passing, deliberately
+  failing and uncertain-effect fixtures.
+- Correlate actual tool names and model-call identifiers in SDK events.
+
+
 - Add host-backed fresh/continue conversation coordination with explicit parent
   bindings, fenced replacement, readiness/CAS activation, single input writer,
   portable recovery and scoped transcript ports. Relaunch/fork refuse explicitly.

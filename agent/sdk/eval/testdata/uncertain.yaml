@@ -1,0 +1,18 @@
+id: uncertain-effect
+benchmark: synthetic-effect-reconciliation
+user_message: Execute the synthetic operation.
+expected_behavior: Preserve an uncertain admitted outcome without retrying it.
+tools_offered:
+  - name: write_value
+    description: Simulate an uncertain write, with no external target.
+    input_schema: {type: object}
+    mock: {content: '', outcome: unknown}
+model_turns:
+  - tool_calls:
+      - id: write-1
+        name: write_value
+        arguments: {}
+    usage: {input: 10, output: 4}
+rubric:
+  called_tool: write_value
+  expected_status: failed
