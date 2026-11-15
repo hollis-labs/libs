@@ -383,3 +383,52 @@ func TestOwnSourceIsPortable(t *testing.T) {
 		t.Errorf("%s", f)
 	}
 }
+
+func TestSQLiteForeignKeysOption(t *testing.T) {
+	off, on := false, true
+	for _, c := range []struct {
+		name string
+		fk   *bool
+		path string
+		want int
+	}{
+		{"default is on", nil, "file", 1},
+		{"explicit on", &on, "file", 1},
+		{"off", &off, "file", 0},
+		{"off in memory", &off, ":memory:", 0},
+		{"default in memory", nil, ":memory:", 1},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := c.path
+			if path == "file" {
+				path = t.TempDir() + "/fk.db"
+			}
+			s, err := store.Open(ctx, store.Config{Driver: store.DriverSQLite,
+				SQLite: store.SQLiteConfig{Path: path, ReadConns: 2, ForeignKeys: c.fk}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			var w, r int
+			if err := s.DB().QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&w); err != nil || w != c.want {
+				t.Fatalf("writer foreign_keys = %d (%v), want %d", w, err, c.want)
+			}
+			if err := s.Reader().QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&r); err != nil || r != c.want {
+				t.Fatalf("reader foreign_keys = %d (%v), want %d", r, err, c.want)
+			}
+			err = s.WriteTx(ctx, func(ctx context.Context, tx store.Tx) error {
+				if _, err := tx.ExecContext(ctx, `CREATE TABLE parent (id INTEGER PRIMARY KEY)`); err != nil {
+					return err
+				}
+				if _, err := tx.ExecContext(ctx, `CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))`); err != nil {
+					return err
+				}
+				_, err := tx.ExecContext(ctx, `INSERT INTO child (id, parent_id) VALUES (1, 42)`)
+				return err
+			})
+			if orphanOK := err == nil; orphanOK != (c.want == 0) {
+				t.Fatalf("orphan insert: err=%v, want accepted=%v", err, c.want == 0)
+			}
+		})
+	}
+}
