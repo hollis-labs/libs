@@ -10,6 +10,10 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Added
 
+- `agentsessions.JsonRpcPreparedReply`: final admission callback after writer
+  serialization, with a one-shot scoped sender, delivery deadlines and revocation
+  cancellation. `CodexGateResponder` requires a host fence held through live
+  verification, once claim and physical send, closing queued stale-allow delivery.
 - `agentsessions`: opt-in asynchronous structured JSON-RPC request responder,
   lossless native IDs, host-issued attempt binding, lifecycle cancellation,
   bounded pending workers and reply delivery observations. Existing headless

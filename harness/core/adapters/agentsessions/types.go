@@ -653,6 +653,8 @@ type StartOptions struct {
 	// the transport input and invalidate pending requests without approval.
 	// Async requests are observed by this responder, without synthetic request
 	// events; notification event callbacks retain their reader-goroutine contract.
+	// Authorization-sensitive replies must return *JsonRpcPreparedReply so final
+	// admission happens after writer serialization, with its fence held through send.
 	JsonRpcRequestResponder func(context.Context, JsonRpcServerRequest) (any, *JsonRpcError)
 
 	// JsonRpcAttemptBinding is required with JsonRpcRequestResponder. Before each
@@ -749,6 +751,27 @@ type JsonRpcServerRequest struct {
 	Method  string
 	Params  json.RawMessage
 	Binding runtimecontract.Binding
+}
+
+// JsonRpcReplySender writes at most one reply on the exact originating attempt.
+// It is synchronous and valid only inside JsonRpcPreparedReply.Deliver. Its ctx
+// must carry the host's admission deadline/revocation signal; runtime lifecycle
+// cancellation independently constrains it. A failed/partial send is uncertain,
+// never permission to release a consumed grant or retry the operation.
+type JsonRpcReplySender func(context.Context, any, *JsonRpcError) error
+
+// JsonRpcPreparedReply defers trusted admission until AFTER writer serialization.
+// Deliver must acquire the host fence, resolve/verify live facts and claim there,
+// then call send while the fence remains held. It must not retain send, and must
+// return promptly on ctx cancellation. An error before send produces a refusal;
+// after send, the delivery observation determines transport uncertainty.
+type JsonRpcPreparedReply struct {
+	Deliver func(context.Context, JsonRpcReplySender) error
+}
+
+// MarshalJSON prevents accidental early use through a synchronous/raw reply path.
+func (*JsonRpcPreparedReply) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("agentsessions: prepared reply requires serialized delivery")
 }
 
 type JsonRpcReplyStatus string

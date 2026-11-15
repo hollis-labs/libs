@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/hollis-labs/libs/mesh/core/gate"
 	"github.com/hollis-labs/libs/mesh/core/runtimecontract"
@@ -121,35 +122,10 @@ func (s *jsonRpcStdioSession) respondToServerRequestAsync(a *jsonRpcServerAttemp
 		callbackRequest.ID = bytes.Clone(request.ID)
 		callbackRequest.Params = bytes.Clone(request.Params)
 		result, rpcErr := s.opts.JsonRpcRequestResponder(ctx, callbackRequest)
-		// A queued writer must recheck ownership AFTER acquiring serialization.
+		// A prepared admission callback runs only after serialization. It holds
+		// its host fence through the one-shot send, never just while queuing bytes.
 		s.writeLock.Lock()
-		s.ioLock.Lock()
-		if a != s.serverAttempt || a.closed || a.pending[key] != p || ctx.Err() != nil {
-			if a.pending[key] == p {
-				delete(a.pending, key)
-			}
-			s.ioLock.Unlock()
-			s.writeLock.Unlock()
-			s.observeServerReply(request, JsonRpcReplyDiscarded, context.Canceled)
-			return
-		}
-		stdin := s.stdin
-		s.ioLock.Unlock()
-		encoded, err := encodeServerReply(id, result, rpcErr)
-		status := JsonRpcReplyDiscarded
-		if err == nil && stdin != nil {
-			status = JsonRpcReplyUnknown
-			// Cancellation may interrupt a blocked OS-pipe write without taking
-			// writeLock or ioLock. The captured writer can never become a successor.
-			stopClose := context.AfterFunc(ctx, func() { _ = stdin.Close() })
-			err = writeRPCFrame(stdin, encoded)
-			stopClose()
-			if err == nil {
-				status = JsonRpcReplySent
-			}
-		} else if err == nil {
-			err = ErrNoInputChannel
-		}
+		status, err := s.deliverServerReply(ctx, a, p, key, id, result, rpcErr)
 		s.ioLock.Lock()
 		if a.pending[key] == p {
 			delete(a.pending, key)
@@ -161,6 +137,104 @@ func (s *jsonRpcStdioSession) respondToServerRequestAsync(a *jsonRpcServerAttemp
 		}
 		s.observeServerReply(request, status, err)
 	}()
+}
+
+// Caller holds writeLock, never ioLock, across this entire callback scope.
+func (s *jsonRpcStdioSession) deliverServerReply(nativeCtx context.Context, a *jsonRpcServerAttempt, p *jsonRpcServerPending, key string, id json.RawMessage, result any, rpcErr *JsonRpcError) (JsonRpcReplyStatus, error) {
+	s.ioLock.Lock()
+	live := a == s.serverAttempt && !a.closed && a.pending[key] == p && nativeCtx.Err() == nil
+	s.ioLock.Unlock()
+	if !live {
+		return JsonRpcReplyDiscarded, context.Canceled
+	}
+	var sendMu sync.Mutex
+	active, used := true, false
+	status := JsonRpcReplyDiscarded
+	var writeErr error
+	send := func(hostCtx context.Context, value any, replyErr *JsonRpcError) error {
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		if !active || used {
+			return fmt.Errorf("agentsessions: reply sender no longer available")
+		}
+		used = true
+		if hostCtx == nil {
+			writeErr = fmt.Errorf("agentsessions: reply context required")
+			return writeErr
+		}
+		deliveryCtx, cancel := context.WithCancel(hostCtx)
+		defer cancel()
+		stopNative := context.AfterFunc(nativeCtx, cancel)
+		defer stopNative()
+		encoded, err := encodeServerReply(id, value, replyErr)
+		if err != nil {
+			writeErr = err
+			return err
+		}
+		s.ioLock.Lock()
+		live := a == s.serverAttempt && !a.closed && a.pending[key] == p && nativeCtx.Err() == nil && deliveryCtx.Err() == nil
+		stdin := s.stdin
+		s.ioLock.Unlock()
+		if !live {
+			writeErr = context.Canceled
+			return writeErr
+		}
+		if stdin == nil {
+			writeErr = ErrNoInputChannel
+			return writeErr
+		}
+		// Deadline/revocation and lifecycle cancellation interrupt a blocked write
+		// by closing only the captured originating writer, without lifecycle locks.
+		stopClose := context.AfterFunc(deliveryCtx, func() { _ = stdin.Close() })
+		defer stopClose()
+		if err := deliveryCtx.Err(); err != nil {
+			writeErr = err
+			return err
+		}
+		if err := nativeCtx.Err(); err != nil {
+			writeErr = err
+			return err
+		}
+		status = JsonRpcReplyUnknown
+		writeErr = writeRPCFrame(stdin, encoded)
+		if writeErr == nil {
+			writeErr = deliveryCtx.Err()
+		}
+		if writeErr == nil {
+			writeErr = nativeCtx.Err()
+		}
+		if writeErr == nil {
+			status = JsonRpcReplySent
+		}
+		return writeErr
+	}
+	var admissionErr error
+	if prepared, ok := result.(*JsonRpcPreparedReply); ok && rpcErr == nil {
+		if prepared == nil || prepared.Deliver == nil {
+			admissionErr = fmt.Errorf("agentsessions: empty prepared reply")
+		} else {
+			admissionErr = prepared.Deliver(nativeCtx, send)
+		}
+	} else {
+		admissionErr = send(nativeCtx, result, rpcErr)
+	}
+	sendMu.Lock()
+	// A failed admission can only produce a refusal, never its prepared allow.
+	refused := !used
+	sendMu.Unlock()
+	if refused {
+		if admissionErr == nil {
+			admissionErr = fmt.Errorf("agentsessions: prepared reply did not send")
+		}
+		_ = send(nativeCtx, nil, &JsonRpcError{Code: -32000, Message: "agentsessions: final reply admission refused"})
+	}
+	sendMu.Lock()
+	active = false
+	sendMu.Unlock()
+	if writeErr != nil {
+		return status, writeErr
+	}
+	return status, admissionErr
 }
 
 func (s *jsonRpcStdioSession) observeServerReply(r JsonRpcServerRequest, status JsonRpcReplyStatus, err error) {

@@ -6,13 +6,13 @@ stdio. It consumes `mesh/core/gate`, with host-issued runtime references from
 provide an identity verifier, or create another interaction store.
 
 The host supplies the existing authoritative GatePort, AuthorityVerifier,
-current operation resolver and atomic once-claim port. Register `Respond` as
+current operation resolver, atomic once-claim port and `WithFence` port. Register `Respond` as
 `StartOptions.JsonRpcRequestResponder` and supply `JsonRpcAttemptBinding` for
 every actual process attempt. A replacement must have a fresh attempt ID and a
 strictly increasing generation. Preserve that binding through the host's item
 registry, policy checks and claim. Provider thread/turn IDs alone are insufficient.
 
-`Resolve` runs before the interaction request and again before a native reply.
+`Resolve` runs before the interaction request and again at final serialized admission.
 Its immutable template includes the host's idempotency key, absolute expiry,
 enforcement point, environment, resource versions, policy and obligations.
 Its canonical JSON descriptor must include authoritative targets, operation
@@ -42,12 +42,21 @@ elicitations, missing MCP argument metadata, display-only tool names, file
 changes and other methods. A future adapter can extend these with their own
 binding and fixtures. No canonical authorization is parsed from display text.
 
-Only an authoritative, validated gate resolution can select an option. The
-injected verifier resolves responder authority and obligations; an allow also
-passes shared `ValidateAdmission` and the host's atomic claim. A denial is
-distinct from cancellation. The provider owns its subsequent admission and
-effects; the library cannot certify them. The host must fence current binding
-and lease through its claim. Unknown claims require reconciliation.
+Only an authoritative, validated gate resolution can select an option. `Respond`
+returns a non-marshallable `JsonRpcPreparedReply`, not sendable approval bytes.
+The runtime invokes its callback after acquiring writer serialization. The
+mandatory host `WithFence` holds current binding, lease and authority stable
+through live fact resolution, shared `ValidateAdmission`, atomic once claim,
+post-claim validation and the physical send. Revocation must either wait until
+the fenced action completes or cancel its context before taking effect. The
+callback and send retain the minimum request/decision/scope deadline; a blocked
+write is interrupted when that deadline or revocation context ends. Verifying
+before the writer queue does not establish admission. The generic raw responder
+remains a headless reply surface and cannot supply these authorization guarantees.
+
+A denial is distinct from cancellation. The provider owns subsequent admission
+and effects; the library cannot certify them. Failed or uncertain delivery never
+releases the host's consumed claim. Reconcile it before any retry.
 
 The async runtime keeps at most 64 responder workers, including cancelled
 workers that have not returned. Callbacks must honor cancellation. Duplicate
@@ -63,7 +72,9 @@ for the exact attempt; a late responder cannot write into a successor, even
 when native IDs recur. A cancelled blocked write may require closing that
 transport input. `JsonRpcReplyObserver` reports `sent` only for a complete write,
 `unknown` for failed/partial writes, and `discarded` for fenced replies. These
-are delivery observations, never acknowledgements or execution receipts.
+are delivery observations, never acknowledgements or execution receipts. Final
+admission failure can send a JSON-RPC refusal; its observation retains the
+admission error even when those refusal bytes were completely written.
 Record them in the host's delivery journal and reconcile uncertainty before
 retrying. The observer and resolver run on workers and must return promptly.
 Notification event callbacks retain their reader-goroutine contract; async
@@ -105,3 +116,6 @@ Fixtures combine these pinned shapes with synthetic host facts from
 `mesh/core/gate/gatetest` and the actual HITL service over its test memory store.
 They cover ordinary command and MCP once/deny/cancel, unknown options, incomplete
 binding, changed bytes/generation, authority/claim refusal and lifecycle fencing.
+Regression cases also cover revocation/expiry behind writer serialization,
+post-claim expiry, a fence held through send, and deadline/revocation during a
+blocked physical write. Prepared senders are one-shot and cannot be retained.

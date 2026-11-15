@@ -50,6 +50,12 @@ type CodexGateResponder struct {
 	Authority gate.AuthorityVerifier
 	Resolve   func(context.Context, agentsessions.JsonRpcServerRequest) (CodexGateFacts, error)
 	Claim     func(context.Context, gate.Request, gate.Decision) error
+	// WithFence acquires the trusted host admission fence before invoking action
+	// and holds it until action returns, INCLUDING the physical send. Its context
+	// must be cancelled on authority/lease revocation; it must not detach the input
+	// context. Changes must either wait for the fence or cancel its context before
+	// taking effect. This is separate from the atomic once claim.
+	WithFence func(context.Context, gate.Request, gate.Decision, func(context.Context) error) error
 	Now       func() time.Time
 }
 
@@ -60,11 +66,12 @@ func (r CodexGateResponder) clock() time.Time {
 	return time.Now()
 }
 
-// Respond fits StartOptions.JsonRpcRequestResponder. Return means a proposed
-// transport response, not acknowledgement or execution success. Lifecycle clearing
+// Respond fits StartOptions.JsonRpcRequestResponder. A decided response is a
+// prepared callback, not sendable bytes. Admission/claim run after serialization
+// while the trusted host fence remains held through physical delivery. Lifecycle clearing
 // cancels ctx and invalidates the runtime's pending reply before it is written.
 func (r CodexGateResponder) Respond(ctx context.Context, native agentsessions.JsonRpcServerRequest) (any, *agentsessions.JsonRpcError) {
-	if r.Gate == nil || r.Authority == nil || r.Resolve == nil || r.Claim == nil {
+	if r.Gate == nil || r.Authority == nil || r.Resolve == nil || r.Claim == nil || r.WithFence == nil {
 		return gateRPCError(gate.ErrUnsupported)
 	}
 	req, err := r.request(ctx, native)
@@ -117,28 +124,70 @@ func (r CodexGateResponder) Respond(ctx context.Context, native agentsessions.Js
 		if resolution.State == gate.Cancelled || resolution.State == gate.Expired {
 			return codexGateCancel(native.Method), nil
 		}
-		d := *resolution.Decision
-		live, err := r.request(ctx, native)
+		// Retain a detached decision while waiting for writer serialization.
+		raw, err := json.Marshal(resolution.Decision)
 		if err != nil {
 			return gateRPCError(err)
 		}
-		liveDigest, _ := live.Digest()
-		if liveDigest != digest {
-			return gateRPCError(gate.ErrBinding)
-		}
-		option, err := r.validateDecision(ctx, req, d)
-		if err != nil {
+		var decision gate.Decision
+		if err = json.Unmarshal(raw, &decision); err != nil {
 			return gateRPCError(err)
 		}
-		if option.Kind == gate.Allow {
-			if err := r.Claim(ctx, req, d); err != nil {
-				return gateRPCError(err)
+		return &agentsessions.JsonRpcPreparedReply{Deliver: func(deliveryCtx context.Context, send agentsessions.JsonRpcReplySender) error {
+			deadline := req.ExpiresAt
+			if decision.ExpiresAt.Before(deadline) {
+				deadline = decision.ExpiresAt
 			}
-		}
-		if err := ctx.Err(); err != nil {
-			return gateRPCError(err)
-		}
-		return json.RawMessage(bytes.Clone(option.Payload)), nil
+			if decision.Scope.ExpiresAt.Before(deadline) {
+				deadline = decision.Scope.ExpiresAt
+			}
+			boundedCtx, stop := context.WithDeadline(deliveryCtx, deadline)
+			defer stop()
+			return r.WithFence(boundedCtx, req, decision, func(fenceCtx context.Context) error {
+				if fenceCtx == nil {
+					return gate.ErrAuthority
+				}
+				// Preserve the grant deadline even if the injected fence supplies a
+				// revocation context of its own. Native lifecycle is constrained by send.
+				ctx, cancel := context.WithDeadline(fenceCtx, deadline)
+				defer cancel()
+				stopParent := context.AfterFunc(boundedCtx, cancel)
+				defer stopParent()
+				check := func() (gate.NativeOption, error) {
+					if err := boundedCtx.Err(); err != nil {
+						return gate.NativeOption{}, err
+					}
+					if err := ctx.Err(); err != nil {
+						return gate.NativeOption{}, err
+					}
+					live, err := r.request(ctx, native)
+					if err != nil {
+						return gate.NativeOption{}, err
+					}
+					liveDigest, _ := live.Digest()
+					if liveDigest != digest {
+						return gate.NativeOption{}, gate.ErrBinding
+					}
+					return r.validateDecision(ctx, req, decision)
+				}
+				option, err := check()
+				if err != nil {
+					return err
+				}
+				if option.Kind == gate.Allow {
+					if err = r.Claim(ctx, req, decision); err != nil {
+						return err
+					}
+					// Claim may consume time or discover revocation. Recheck inside the
+					// same fence; consumed/uncertain claims are never released on failure.
+					option, err = check()
+					if err != nil {
+						return err
+					}
+				}
+				return send(ctx, json.RawMessage(bytes.Clone(option.Payload)), nil)
+			})
+		}}, nil
 	}
 }
 

@@ -5,9 +5,11 @@ package agentsessions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -246,6 +248,84 @@ func TestAsyncBlockedWriteDoesNotPreventStopOrCancellation(t *testing.T) {
 			receiveRPC(t, done)
 			if receiveRPC(t, observed) != JsonRpcReplyUnknown {
 				t.Fatal("failed write reported delivered")
+			}
+		})
+	}
+}
+
+func TestAsyncPreparedAdmissionRunsAfterWriterQueue(t *testing.T) {
+	for _, cause := range []string{"revoked", "expired"} {
+		t.Run(cause, func(t *testing.T) {
+			var valid atomic.Bool
+			valid.Store(true)
+			prepared := make(chan struct{})
+			s, a, w := newAsyncTestSession(t, func(context.Context, JsonRpcServerRequest) (any, *JsonRpcError) {
+				close(prepared)
+				return &JsonRpcPreparedReply{Deliver: func(ctx context.Context, send JsonRpcReplySender) error {
+					if !valid.Load() {
+						return errors.New(cause)
+					}
+					return send(ctx, map[string]string{"decision": "accept"}, nil)
+				}}, nil
+			})
+			s.writeLock.Lock()
+			id := json.RawMessage(`42`)
+			s.respondToServerRequestAsync(a, jsonRpcFrame{ID: &id, Method: "approval"})
+			receiveRPC(t, prepared)
+			valid.Store(false)
+			s.writeLock.Unlock()
+			frame := receiveRPC(t, w.frames)
+			var reply struct {
+				Result json.RawMessage
+				Error  *JsonRpcError
+			}
+			if json.Unmarshal(frame, &reply) != nil || reply.Error == nil || len(reply.Result) != 0 {
+				t.Fatalf("stale queued allow emitted: %s", frame)
+			}
+		})
+	}
+}
+
+func TestAsyncPreparedBlockedWriteDeadlineAndRevocation(t *testing.T) {
+	for _, cause := range []string{"expiry", "revocation"} {
+		t.Run(cause, func(t *testing.T) {
+			hostCtx, revoke := context.WithCancel(context.Background())
+			defer revoke()
+			deadline := time.Now().Add(150 * time.Millisecond)
+			var retained JsonRpcReplySender
+			s, a, _ := newAsyncTestSession(t, func(context.Context, JsonRpcServerRequest) (any, *JsonRpcError) {
+				return &JsonRpcPreparedReply{Deliver: func(ctx context.Context, send JsonRpcReplySender) error {
+					retained = send
+					if cause == "expiry" {
+						var cancel context.CancelFunc
+						ctx, cancel = context.WithDeadline(ctx, deadline)
+						defer cancel()
+					} else {
+						ctx = hostCtx
+					}
+					return send(ctx, map[string]string{"decision": "accept"}, nil)
+				}}, nil
+			})
+			w := &blockedRPCWriter{entered: make(chan struct{}), closed: make(chan struct{})}
+			s.stdin = w
+			observed := make(chan JsonRpcReplyStatus, 1)
+			s.opts.JsonRpcReplyObserver = func(_ JsonRpcServerRequest, status JsonRpcReplyStatus, err error) {
+				if err == nil {
+					t.Error("expired blocked write lost uncertainty")
+				}
+				observed <- status
+			}
+			id := json.RawMessage(`42`)
+			s.respondToServerRequestAsync(a, jsonRpcFrame{ID: &id, Method: "approval"})
+			receiveRPC(t, w.entered)
+			if cause == "revocation" {
+				revoke()
+			}
+			if receiveRPC(t, observed) != JsonRpcReplyUnknown {
+				t.Fatal("blocked delivery was not uncertain")
+			}
+			if err := retained(context.Background(), nil, nil); err == nil {
+				t.Fatal("retained sender remained usable after admission fence")
 			}
 		})
 	}

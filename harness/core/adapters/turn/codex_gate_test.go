@@ -101,8 +101,29 @@ func codexGateFixture(t *testing.T, method string) (*CodexGateResponder, *codexT
 	}
 	f := &codexTestGate{choice: "accept", service: hitl.NewService(memstore.New(), hitl.Options{Clock: func() time.Time { return codexGateTime }})}
 	claims := new(int)
-	r := &CodexGateResponder{Gate: f, Authority: &codexTestAuthority{}, Now: func() time.Time { return codexGateTime }, Resolve: func(context.Context, agentsessions.JsonRpcServerRequest) (CodexGateFacts, error) { return *facts, nil }, Claim: func(context.Context, gate.Request, gate.Decision) error { *claims++; return nil }}
+	r := &CodexGateResponder{Gate: f, Authority: &codexTestAuthority{}, Now: func() time.Time { return codexGateTime }, Resolve: func(context.Context, agentsessions.JsonRpcServerRequest) (CodexGateFacts, error) { return *facts, nil }, Claim: func(context.Context, gate.Request, gate.Decision) error { *claims++; return nil },
+		WithFence: func(ctx context.Context, _ gate.Request, _ gate.Decision, action func(context.Context) error) error {
+			return action(ctx)
+		}}
 	return r, f, facts, native, claims
+}
+
+// Unit tests invoke the prepared callback explicitly. Transport tests exercise
+// its actual post-serialization placement in agentsessions.
+func completeCodexPreparedForTest(r *CodexGateResponder, ctx context.Context, native agentsessions.JsonRpcServerRequest) (any, *agentsessions.JsonRpcError) {
+	result, rpcErr := r.Respond(ctx, native)
+	if rpcErr != nil {
+		return result, rpcErr
+	}
+	if prepared, ok := result.(*agentsessions.JsonRpcPreparedReply); ok {
+		var value any
+		err := prepared.Deliver(ctx, func(_ context.Context, v any, e *agentsessions.JsonRpcError) error { value = v; rpcErr = e; return nil })
+		if err != nil {
+			return gateRPCError(err)
+		}
+		return value, rpcErr
+	}
+	return result, rpcErr
 }
 
 func TestCodexGateNativeOnceChoices(t *testing.T) {
@@ -111,7 +132,7 @@ func TestCodexGateNativeOnceChoices(t *testing.T) {
 			t.Run(method+"/"+choice, func(t *testing.T) {
 				r, f, _, native, claims := codexGateFixture(t, method)
 				f.choice = choice
-				result, rpcErr := r.Respond(context.Background(), native)
+				result, rpcErr := completeCodexPreparedForTest(r, context.Background(), native)
 				if rpcErr != nil {
 					t.Fatal(rpcErr)
 				}
@@ -171,7 +192,7 @@ func TestCodexGateRefusesUnsupportedFactsAndChoices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r, f, facts, native, claims := codexGateFixture(t, tc.method)
 			tc.change(facts, &native)
-			result, rpcErr := r.Respond(context.Background(), native)
+			result, rpcErr := completeCodexPreparedForTest(r, context.Background(), native)
 			if rpcErr == nil || result != nil || f.request.OperationID != "" || *claims != 0 {
 				t.Fatal("unsupported request reached gate or claim")
 			}
@@ -201,7 +222,7 @@ func TestCodexGateRechecksLiveBindingAuthorityAndClaim(t *testing.T) {
 			case "expiry":
 				f.mutate = func(out *gate.Resolution) { out.Decision.ExpiresAt = codexGateTime.Add(-time.Second) }
 			}
-			result, rpcErr := r.Respond(context.Background(), native)
+			result, rpcErr := completeCodexPreparedForTest(r, context.Background(), native)
 			if rpcErr == nil || result != nil || *claims != 0 {
 				t.Fatalf("fault permitted native acceptance: %s", fault)
 			}
@@ -214,8 +235,91 @@ func TestCodexGateLifecycleCancellationWithdraws(t *testing.T) {
 	f.wait = true
 	ctx, cancel := context.WithCancel(context.Background())
 	f.afterRequest = cancel
-	result, rpcErr := r.Respond(ctx, native)
+	result, rpcErr := completeCodexPreparedForTest(r, ctx, native)
 	if result != nil || rpcErr == nil || !f.cancelled || *claims != 0 {
 		t.Fatal("cancelled native request not withdrawn")
+	}
+}
+
+func TestCodexPreparedRechecksQueuedExpiryRevocationAndFacts(t *testing.T) {
+	for _, fault := range []string{"expiry", "revocation", "operation"} {
+		t.Run(fault, func(t *testing.T) {
+			r, _, facts, native, claims := codexGateFixture(t, CodexCommandApprovalMethod)
+			now := codexGateTime
+			r.Now = func() time.Time { return now }
+			value, rpcErr := r.Respond(context.Background(), native)
+			if rpcErr != nil {
+				t.Fatal(rpcErr)
+			}
+			prepared := value.(*agentsessions.JsonRpcPreparedReply)
+			if *claims != 0 {
+				t.Fatal("grant consumed before writer admission")
+			}
+			if _, err := json.Marshal(prepared); err == nil {
+				t.Fatal("prepared allow could be sent outside serialized runtime")
+			}
+			switch fault {
+			case "expiry":
+				now = facts.Request.ExpiresAt.Add(time.Second)
+			case "revocation":
+				r.Authority.(*codexTestAuthority).refuse = true
+			case "operation":
+				facts.Descriptor = json.RawMessage(`{"changed":"operation"}`)
+			}
+			sent := false
+			err := prepared.Deliver(context.Background(), func(context.Context, any, *agentsessions.JsonRpcError) error { sent = true; return nil })
+			if err == nil || sent || *claims != 0 {
+				t.Fatal("queued stale decision reached native send")
+			}
+		})
+	}
+}
+
+func TestCodexPreparedExpiryAfterClaimRetainsClaimWithoutSend(t *testing.T) {
+	r, _, facts, native, claims := codexGateFixture(t, CodexCommandApprovalMethod)
+	now := codexGateTime
+	r.Now = func() time.Time { return now }
+	claim := r.Claim
+	r.Claim = func(ctx context.Context, req gate.Request, d gate.Decision) error {
+		if err := claim(ctx, req, d); err != nil {
+			return err
+		}
+		now = facts.Request.ExpiresAt.Add(time.Second)
+		return nil
+	}
+	value, rpcErr := r.Respond(context.Background(), native)
+	if rpcErr != nil {
+		t.Fatal(rpcErr)
+	}
+	sent := false
+	err := value.(*agentsessions.JsonRpcPreparedReply).Deliver(context.Background(), func(context.Context, any, *agentsessions.JsonRpcError) error { sent = true; return nil })
+	if err == nil || sent || *claims != 1 {
+		t.Fatal("post-claim expiry sent allow or released uncertain claim")
+	}
+}
+
+func TestCodexPreparedHoldsHostFenceThroughPhysicalSend(t *testing.T) {
+	r, _, _, native, claims := codexGateFixture(t, CodexCommandApprovalMethod)
+	inside := false
+	r.WithFence = func(ctx context.Context, _ gate.Request, _ gate.Decision, action func(context.Context) error) error {
+		inside = true
+		defer func() { inside = false }()
+		return action(ctx)
+	}
+	value, rpcErr := r.Respond(context.Background(), native)
+	if rpcErr != nil {
+		t.Fatal(rpcErr)
+	}
+	err := value.(*agentsessions.JsonRpcPreparedReply).Deliver(context.Background(), func(ctx context.Context, _ any, _ *agentsessions.JsonRpcError) error {
+		if !inside || *claims != 1 {
+			t.Fatal("physical send escaped admission fence/claim")
+		}
+		if _, ok := ctx.Deadline(); !ok {
+			t.Fatal("grant deadline was lost at send")
+		}
+		return errors.New("uncertain physical write")
+	})
+	if err == nil || inside || *claims != 1 {
+		t.Fatal("uncertainty released claim or host fence")
 	}
 }
