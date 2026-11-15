@@ -5,10 +5,10 @@ It implements `mesh/core/gate.GatePort` and `ReceiptSink`, using the existing
 `mesh/core/hitl` lifecycle and `security/policy` evaluator. It runs no operation,
 server, provider process, inbox or service lifecycle.
 
-This candidate requires Go 1.26.11 and the **not yet published** `mesh/core`
-v0.11.0 foundation. The dependency must be reviewed, published and resolved from
-a clean consumer before landing this module. Local overlay results establish
-source behavior only. No release or production integration is claimed.
+Requires Go 1.26.11 and the released `mesh/core` v0.11.0 foundation. Dependencies
+resolve through the module's version pins and checksums, without local
+replacements. This coordinator module is unreleased; production integration
+remains separate work.
 
 ## Host bindings
 
