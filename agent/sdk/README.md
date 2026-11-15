@@ -96,8 +96,8 @@ is insufficient. Admission rechecks that authority while claiming the effect.
 A pending result returns `ErrPending` and `Result.PendingTicket`. A cancelled or
 expired wait never authorizes an effect. Cancelling the Run/Await context ends
 the wait, without withdrawing the interaction. Hosts can explicitly call
-`GatePort.Cancel` on the retained ticket. This API has no pending-run resume or
-session controller. Gate delivery receipts for external native provider RPCs
+`GatePort.Cancel` on the retained ticket. `Operative.Run` has no pending-run
+resume. Gate delivery receipts for external native provider RPCs
 belong to their adapters; a decision is never evidence of delivery or execution.
 
 ## Models, tools and context
@@ -175,8 +175,11 @@ retain claims before rerunning any failed/uncertain operation.
 Even a run which fails preflight after reservation keeps its ID consumed.
 One operative accepts one active Run; concurrent calls return `ErrBusy`. This is
 not a distributed input lease. Runs carry no implicit transcript or plan across
-calls. Durable conversations, replacement, forks, provider-native resume,
-recovery and input ownership require a separate host/session controller.
+calls. The separate [`session`](session/README.md) package coordinates fresh and
+continue conversation attempts, readiness-based replacement, recovery references
+and input ownership through authoritative host ports. Relaunch/fork explicitly
+reject before host calls. Hosts connect its binding/lease admission to the run
+admission above; no production adapter or provider-native resume is supplied.
 
 ## Stability and checks
 

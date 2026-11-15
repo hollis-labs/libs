@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+- Add host-backed fresh/continue conversation coordination with explicit parent
+  bindings, fenced replacement, readiness/CAS activation, single input writer,
+  portable recovery and scoped transcript ports. Relaunch/fork refuse explicitly.
+- Preserve uncertain effect and old approval evidence across replacement; reject
+  stale input/events/approvals and exercise concurrency with transactional fakes.
 - Reserve single-use logical run IDs atomically in host-owned retained state
   before model/memory/tool activity; carry the immutable reservation through each
   effect admission and refuse uncertain/replayed inputs across replacements.
-
-
 - Add the experimental headless definition-to-operative facade over the existing
   runloop, model-turn reader and canonical context window.
 - Add explicit model routing, pinned local/MCP tools, policy projection, native
