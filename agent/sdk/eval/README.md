@@ -45,10 +45,18 @@ The top-level fields retain Nanite's scenario shape:
 a stored price snapshot and virtual `duration_ms`. Each tool mock has a content
 string and an explicit `outcome` of `succeeded` or `unknown`. Tool input schemas
 and all scripted arguments are validated before execution. Remote schema
-references are refused with no loader/network access. Scripted JSON numeric tokens are retained through SDK argument binding. Schema
-validation uses a numeric view for the published validator: plain 64-bit integers
-remain exact; wider integral values that cannot be validated without rounding
-are refused.
+references are refused with no loader/network access. Authored numeric scalar text is checked before YAML's ordinary numeric
+conversion. A conversion must retain the same mathematical value in JSON;
+otherwise `Decode` returns `ErrUnsupported` before loop activity. Accepted number
+spellings may be canonicalized (for example `1e3` to `1000`), but changed values
+are refused. Plain 64-bit integer identifiers remain exact.
+
+The same value-preservation check applies to programmatic `json.Number` arguments
+before the published schema validator receives a numeric view. A fractional value
+which would round to an integer is refused, even for a `number` schema. Ordinary
+supported decimals and exponents still work, and genuine fractions still fail an
+`integer` schema. Exact comparisons are bounded to 1024-byte numeric tokens and
+decimal exponents from -1024 through 1024; unsupported precision is explicit.
 
 The next actual model
 request must contain the SDK's correctly paired tool results.

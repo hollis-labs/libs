@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Refuse lossy authored decimal/exponent conversions before scenario decoding and
+  precision-losing programmatic number validation before any model/tool activity.
+
+
 - Add experimental typed trace recordings and evidence-only replay, preserving
   separate producer/PTY/cursor coordinates and decision/delivery/effect records.
 - Add fake-only real-loop YAML evaluation, deterministic trajectory/text grading,

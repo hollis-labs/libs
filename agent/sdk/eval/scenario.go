@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -148,14 +149,21 @@ func Decode(reader io.Reader) (Scenario, error) {
 	if len(raw) > MaxScenarioBytes {
 		return s, fmt.Errorf("%w: scenario size", ErrInvalid)
 	}
-	var value any
+	var document yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(raw))
-	if err = decoder.Decode(&value); err != nil {
+	if err = decoder.Decode(&document); err != nil {
 		return s, err
 	}
-	var extra any
+	var extra yaml.Node
 	if err = decoder.Decode(&extra); err != io.EOF {
 		return s, fmt.Errorf("%w: expected one document", ErrInvalid)
+	}
+	if err = checkAuthoredNumbers(&document); err != nil {
+		return s, err
+	}
+	var value any
+	if err = document.Decode(&value); err != nil {
+		return s, err
 	}
 	encoded, err := json.Marshal(value)
 	if err != nil {
@@ -252,7 +260,7 @@ func validate(s Scenario) (map[string]*jsonschema.Resolved, error) {
 
 // The published schema validator's type classifier treats json.Number as a
 // string. Project only its validation view; authoritative arguments keep their
-// original JSON tokens throughout the SDK operation descriptor.
+// accepted JSON tokens throughout the SDK operation descriptor.
 func validateArguments(schema *jsonschema.Resolved, args map[string]any) error {
 	view, err := validationView(args)
 	if err != nil {
@@ -270,8 +278,15 @@ func validationView(v any) (any, error) {
 			return n, nil
 		}
 		n, err := value.Float64()
-		if err != nil || math.IsInf(n, 0) || math.IsNaN(n) || (math.Trunc(n) == n && math.Abs(n) > 1<<53) {
-			return nil, fmt.Errorf("%w: numeric argument exceeds supported validation precision", ErrUnsupported)
+		if err != nil || math.IsInf(n, 0) || math.IsNaN(n) {
+			return nil, fmt.Errorf("%w: non-finite numeric argument", ErrUnsupported)
+		}
+		encoded, err := json.Marshal(n)
+		if err != nil {
+			return nil, err
+		}
+		if err = compareNumbers(value.String(), string(encoded), false); err != nil {
+			return nil, err
 		}
 		return n, nil
 	case map[string]any:
@@ -297,4 +312,82 @@ func validationView(v any) (any, error) {
 	default:
 		return v, nil
 	}
+}
+
+// Check original scalar text before YAML's generic decoder can turn a numeric
+// value into float64. Alias targets are already in Content; do not expand them
+// here. The normal decoder retains its existing alias/merge/duplicate checks.
+func checkAuthoredNumbers(node *yaml.Node) error {
+	// An out-of-range plain JSON number can resolve as a YAML string. Refuse it
+	// rather than letting a numeric token acquire string-schema permissions.
+	if node.Kind == yaml.ScalarNode && node.Style == 0 && node.ShortTag() == "!!str" {
+		decoder := json.NewDecoder(strings.NewReader(node.Value))
+		decoder.UseNumber()
+		var value any
+		if decoder.Decode(&value) == nil {
+			if _, numeric := value.(json.Number); numeric && json.Valid([]byte(node.Value)) {
+				return fmt.Errorf("%w: unsupported numeric scalar", ErrUnsupported)
+			}
+		}
+	}
+
+	if node.Kind == yaml.ScalarNode && (node.ShortTag() == "!!int" || node.ShortTag() == "!!float") {
+		var decoded any
+		if err := node.Decode(&decoded); err != nil {
+			return fmt.Errorf("%w: unsupported numeric scalar", ErrUnsupported)
+		}
+		encoded, err := json.Marshal(decoded)
+		if err != nil {
+			return fmt.Errorf("%w: unsupported numeric scalar", ErrUnsupported)
+		}
+		if err = compareNumbers(strings.ReplaceAll(node.Value, "_", ""), string(encoded), node.ShortTag() == "!!int"); err != nil {
+			return err
+		}
+	}
+	for _, child := range node.Content {
+		if err := checkAuthoredNumbers(child); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Compare mathematical decimal values, not their spellings or a second rounded
+// float. JSON's shortest float representation must retain the original value.
+// The length bound also prevents unbounded big-number work on fixture input.
+func compareNumbers(authored, projected string, yamlInteger bool) error {
+	const maxNumericBytes = 1024
+	unsupported := func() error {
+		return fmt.Errorf("%w: numeric value cannot be preserved at supported precision", ErrUnsupported)
+	}
+	if len(authored) > maxNumericBytes || len(projected) > maxNumericBytes {
+		return unsupported()
+	}
+	if !yamlInteger {
+		if index := strings.LastIndexAny(authored, "eE"); index >= 0 {
+			exponent, err := strconv.ParseInt(authored[index+1:], 10, 32)
+			if err != nil || exponent < -1024 || exponent > 1024 {
+				return unsupported()
+			}
+		}
+	}
+	var original *big.Rat
+	if yamlInteger {
+		integer, ok := new(big.Int).SetString(authored, 0)
+		if !ok {
+			return unsupported()
+		}
+		original = new(big.Rat).SetInt(integer)
+	} else {
+		var ok bool
+		original, ok = new(big.Rat).SetString(authored)
+		if !ok {
+			return unsupported()
+		}
+	}
+	converted, ok := new(big.Rat).SetString(projected)
+	if !ok || original.Cmp(converted) != 0 {
+		return unsupported()
+	}
+	return nil
 }
