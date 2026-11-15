@@ -5,15 +5,18 @@ package agentsessions
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/creack/pty"
 	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
 )
 
@@ -129,9 +132,11 @@ func TestJsonRpcStdioSession_DrainAfterFastExit(t *testing.T) {
 	}
 }
 
-// The PTY reader starts only after the child has been reaped. The waiter
-// used to close the master first, discarding what the child wrote; now it
-// drains before closing.
+// The PTY reader starts only after the child has been reaped. Seed the real PTY
+// buffer with the child's final output through a pipe: Darwin tty close waits
+// for master reads, so attaching the child directly would deadlock this forced
+// interleaving. The waiter must still drain the unread frame before closing the
+// master. Real child/PTY launch is covered by the runtime tests.
 func TestPTYSession_DrainAfterFastExit(t *testing.T) {
 	dir := t.TempDir()
 	script := writeFastExitScript(t, dir, "done")
@@ -149,11 +154,29 @@ func TestPTYSession_DrainAfterFastExit(t *testing.T) {
 		copyDone: make(chan struct{}), stopRequested: make(chan struct{}),
 	}
 	s.alive.Store(true)
-	cmd, ptmx, cleanup, err := s.spawnAttempt(0)
+	ptmx, tty, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cleanup()
+	defer func() { _ = tty.Close() }()
+	defer func() { _ = ptmx.Close() }()
+	cmd := exec.Command(script)
+	cmd.Dir = dir
+	output, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	final, err := io.ReadAll(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tty.Write(final); err != nil {
+		t.Fatal(err)
+	}
+	s.cmd, s.ptmx = cmd, ptmx
 	s.spawnWaiterLegacy(ptmx, cmd)
 	waitReaped(t, func() bool {
 		s.ptmxLock.Lock()
@@ -161,6 +184,17 @@ func TestPTYSession_DrainAfterFastExit(t *testing.T) {
 		return s.ptmx == nil
 	})
 	s.spawnReaderLegacy(ptmx, make(chan struct{}))
+	// Keep the slave open until the real reader has delivered the buffered frame;
+	// last-slave close may discard unread output on Darwin.
+	select {
+	case ev := <-fanout:
+		if ev.Type != llmtypes.EventDone {
+			t.Fatalf("final event = %s, want done", ev.Type)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("final line lost after child exit")
+	}
+	_ = tty.Close()
 
 	finished := make(chan error, 1)
 	go func() { _, err := s.Wait(); finished <- err }()
@@ -171,16 +205,6 @@ func TestPTYSession_DrainAfterFastExit(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("wait did not finish")
-	}
-	for {
-		select {
-		case ev := <-fanout:
-			if ev.Type == llmtypes.EventDone {
-				return
-			}
-		default:
-			t.Fatal("final line lost after child exit")
-		}
 	}
 }
 

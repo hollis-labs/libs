@@ -24,6 +24,10 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Changed
 
+- PTY drain regression fixture captures the child's final output into a real PTY
+  buffer before reaping, avoiding Darwin's unread-terminal close wait while
+  retaining the close-before-drain data-loss assertion. Production PTY behavior
+  is unchanged.
 - JSON-RPC write serialization allows Stop/cancellation to close a blocked
   captured writer without waiting for its physical write to finish.
 - Requires Go 1.26.11 and `mesh/core` v0.11.0 for shared runtime/gate contracts.
