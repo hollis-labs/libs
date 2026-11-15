@@ -2,8 +2,8 @@
 
 The Cairn library foundation for provider projections, launch preparation,
 sessions and managed workspace artifacts. Import packages from
-`github.com/hollis-labs/libs/harness/core` with Go 1.26.9. The module pins
-`llm-core` at v0.1.0 and `mesh` at v0.3.0; it needs no workspace or local replacement.
+`github.com/hollis-labs/libs/harness/core` with Go 1.26.11. The module pins
+`llm/core` at v0.2.0 and `mesh/core` at v0.11.0; it needs no workspace or local replacement.
 
 ## Package boundaries
 
@@ -22,6 +22,9 @@ sessions and managed workspace artifacts. Import packages from
   workspace materialization route. Pure `ProjectExecution` requires no authority.
 - `adapters/wrapper` and `adapters/agentsessions` consume prepared launches;
   materializing start paths require explicit inactive/private artifact authority.
+- `adapters/turn` offers an opt-in [structured Codex approval adapter](adapters/turn/codex-gate.md)
+  over the shared gate port, with cancellable request handling and exact attempt
+  fencing. Hosts supply authority, current operation facts and once claims.
 - `workspace` plans explicit resources and inputs, acquires the complete lock
   union and preflights all groups before mutation. The concrete
   `workspace/materialize` engine writes managed artifacts; credentials,

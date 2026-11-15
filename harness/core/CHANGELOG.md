@@ -8,6 +8,22 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ## [Unreleased]
 
+### Added
+
+- `agentsessions`: opt-in asynchronous structured JSON-RPC request responder,
+  lossless native IDs, host-issued attempt binding, lifecycle cancellation,
+  bounded pending workers and reply delivery observations. Existing headless
+  hooks retain their behavior when the new responder is unset.
+- `turn.CodexGateResponder`: exact command/MCP operation binding through
+  `mesh/core/gate`, explicit host once ceiling, native options, authority and
+  atomic claim ports. Unsupported binding and scope semantics refuse explicitly.
+
+### Changed
+
+- JSON-RPC write serialization allows Stop/cancellation to close a blocked
+  captured writer without waiting for its physical write to finish.
+- Requires Go 1.26.11 and `mesh/core` v0.11.0 for shared runtime/gate contracts.
+
 ## v0.17.0 — 2026-11-14
 
 ### Added
