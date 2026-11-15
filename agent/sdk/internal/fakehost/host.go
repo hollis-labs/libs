@@ -23,7 +23,26 @@ import (
 	"github.com/hollis-labs/libs/security/policy"
 )
 
+type runKey struct {
+	Owner        runtimecontract.OwnerID
+	Operative    runtimecontract.OperativeID
+	Conversation runtimecontract.ConversationID
+	ID           string
+}
+
+func key(r sdk.RunReservation) runKey {
+	return runKey{r.Binding.OwnerID, r.Binding.OperativeID, r.Binding.ConversationID, r.RunID}
+}
+
+// RunLedger models authoritative retained host state across SDK instances and
+// replacement hosts. Production hosts need durable transactional storage.
+type RunLedger struct {
+	mu      sync.Mutex
+	entries map[runKey]sdk.RunReservation
+}
+
 type Host struct {
+	Runs            *RunLedger
 	mu              sync.Mutex
 	Binding         runtimecontract.Binding
 	Environment     runtimecontract.EnvironmentRef
@@ -45,7 +64,7 @@ func New() *Host {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	r := gatetest.Request(now)
 	// These are the same neutral fixtures consumed by the gate conformance suite.
-	h := &Host{Binding: r.Binding, Environment: *r.Environment, NowTime: now, Claims: map[string]bool{}, Mode: "allow"}
+	h := &Host{Runs: &RunLedger{entries: map[runKey]sdk.RunReservation{}}, Binding: r.Binding, Environment: *r.Environment, NowTime: now, Claims: map[string]bool{}, Mode: "allow"}
 	h.Service = hitl.NewService(memstore.New(), hitl.Options{Clock: h.Now})
 	h.Model = &Model{Host: h}
 	return h
@@ -102,6 +121,37 @@ func (h *Host) Evaluate(_ context.Context, op sdk.Operation) (sdk.PolicyResult, 
 	return sdk.PolicyResult{Decision: policy.Decision{Effect: policy.Ask, Obligations: []policy.Obligation{{Kind: policy.Approval, PolicyID: "synthetic-policy", Reference: "approval-rule-1"}}}, Reference: gatetest.Reference("policy-1"), Obligations: []gate.ObligationRef{{Kind: "approval", Ref: gatetest.Reference("approval-rule-1")}}}, nil
 }
 
+// ReserveRun retains a single-use conversation-scoped ID atomically. It never
+// interprets matching arguments as equivalent work or clears failed reservations.
+func (h *Host) ReserveRun(ctx context.Context, r sdk.RunReservation) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := h.verifyEnvironment(ctx, r.Binding, r.Environment, nil); err != nil {
+		return err
+	}
+	if r.RunID == "" || r.DefinitionDigest == "" || r.Route == "" || r.Model == "" || r.InputDigest.DescriptorVersion != "sdk-run-input-v1" {
+		return sdk.ErrAdmission
+	}
+	if err := r.InputDigest.Validate(); err != nil {
+		return err
+	}
+	h.Runs.mu.Lock()
+	defer h.Runs.mu.Unlock()
+	if _, exists := h.Runs.entries[key(r)]; exists {
+		return sdk.ErrRunUsed
+	}
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	var snapshot sdk.RunReservation
+	if err = json.Unmarshal(raw, &snapshot); err != nil {
+		return err
+	}
+	h.Runs.entries[key(r)] = snapshot
+	return nil
+}
+
 // Admit's lock fences this synthetic host's current binding through callback
 // completion and keeps uncertain once claims consumed. It does not prove any
 // production issuer, policy, filesystem or network authority.
@@ -114,8 +164,15 @@ func (h *Host) Admit(ctx context.Context, a sdk.Admission, start func(context.Co
 	if err := h.verifyEnvironment(ctx, a.Binding, a.Environment, nil); err != nil {
 		return err
 	}
+	h.Runs.mu.Lock()
+	reserved, exists := h.Runs.entries[key(a.Run)]
+	matches := exists && reflect.DeepEqual(reserved, a.Run)
+	h.Runs.mu.Unlock()
+	if !matches || a.Run.Binding != a.Binding || !reflect.DeepEqual(a.Run.Environment, a.Environment) || a.Run.DefinitionDigest != a.DefinitionDigest || (a.Kind == "model" && a.Route != a.Run.Route) {
+		return sdk.ErrAdmission
+	}
 	if a.Kind == "tool" {
-		if a.Operation == nil || a.Policy == nil {
+		if a.Operation == nil || a.Policy == nil || a.Operation.RunID != a.Run.RunID || a.Operation.InputDigest != a.Run.InputDigest {
 			return sdk.ErrAdmission
 		}
 		digest, err := a.Operation.Digest()

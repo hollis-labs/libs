@@ -2,6 +2,9 @@ package sdk
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -72,8 +75,22 @@ func (o *Operative) Run(ctx context.Context, input Input) (result Result, runErr
 	if err = events.emit(ctx, "sdk.run.started", EventPayload{}); err != nil {
 		return result, err
 	}
+	if err = o.verify(ctx, in); err != nil {
+		return result, err
+	}
+	reservation, err := reserveDescriptor(in, o.digest, route)
+	if err != nil {
+		return result, err
+	}
+	snapshot, err := clone(reservation)
+	if err != nil {
+		return result, err
+	}
+	if err = o.ports.Admission.ReserveRun(ctx, snapshot); err != nil {
+		return result, err
+	}
 	window := agentcontext.NewContextWindow(route.Provider.Capabilities().ContextWindowSize, nil)
-	if err = o.prepare(ctx, in, window); err != nil {
+	if err = o.prepare(ctx, in, reservation, window); err != nil {
 		return result, err
 	}
 	// Negotiate once-only gate capabilities before the first model effect.
@@ -149,7 +166,7 @@ func (o *Operative) Run(ctx context.Context, input Input) (result Result, runErr
 			if e := events.emit(c, runtimeevents.KindTurnStarted, EventPayload{TurnID: currentTurn}); e != nil {
 				return out, fail(e)
 			}
-			e := o.admit(c, Admission{Kind: "model", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, Route: route.Name}, func(admitted context.Context) error {
+			e := o.admit(c, Admission{Run: reservation, Kind: "model", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, Route: route.Name}, func(admitted context.Context) error {
 				var e error
 				out, e = turn.ExecuteTurn(admitted, turn.TurnRequest{Stream: func(streamCtx context.Context) (<-chan llmtypes.StreamEvent, error) {
 					return route.Provider.StreamChat(streamCtx, request)
@@ -215,7 +232,7 @@ func (o *Operative) Run(ctx context.Context, input Input) (result Result, runErr
 			messages = append(messages, assistant)
 			toolResults := llmtypes.ChatMessage{Role: "user"}
 			for _, call := range out.ToolUseBlocks {
-				toolResult, e := o.executeTool(c, in, currentTurn, call, selected[call.Name], &events, &result)
+				toolResult, e := o.executeTool(c, in, reservation, currentTurn, call, selected[call.Name], &events, &result)
 				if e != nil {
 					return fail(e)
 				}
@@ -244,4 +261,17 @@ func contains[T comparable](values []T, v T) bool {
 		}
 	}
 	return false
+}
+
+func reserveDescriptor(in Input, definitionDigest string, route Route) (RunReservation, error) {
+	raw, err := json.Marshal(struct {
+		Input            Input
+		DefinitionDigest string
+		Route, Model     string
+	}{in, definitionDigest, route.Name, route.Model})
+	if err != nil {
+		return RunReservation{}, err
+	}
+	hash := sha256.Sum256(raw)
+	return RunReservation{RunID: in.ID, Binding: in.Binding, Environment: in.Environment, DefinitionDigest: definitionDigest, Route: route.Name, Model: route.Model, InputDigest: runtimecontract.Digest{Scheme: "sha256", DescriptorVersion: "sdk-run-input-v1", Value: hex.EncodeToString(hash[:])}}, nil
 }

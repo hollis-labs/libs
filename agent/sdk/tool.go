@@ -29,7 +29,7 @@ func (op Operation) Digest() (runtimecontract.Digest, error) {
 	return runtimecontract.Digest{Scheme: "sha256", DescriptorVersion: op.Version, Value: hex.EncodeToString(hash[:])}, nil
 }
 
-func (o *Operative) executeTool(ctx context.Context, in Input, turnID runtimecontract.TurnID, call llmtypes.ToolUseBlock, tool Tool, events *runEvents, result *Result) (out ToolResult, err error) {
+func (o *Operative) executeTool(ctx context.Context, in Input, reservation RunReservation, turnID runtimecontract.TurnID, call llmtypes.ToolUseBlock, tool Tool, events *runEvents, result *Result) (out ToolResult, err error) {
 	if err = o.verify(ctx, in); err != nil {
 		return out, err
 	}
@@ -37,7 +37,7 @@ func (o *Operative) executeTool(ctx context.Context, in Input, turnID runtimecon
 	if err != nil {
 		return out, err
 	}
-	op := Operation{Version: "sdk-tool-v1", ID: fmt.Sprintf("%s/tool/%s", turnID, call.ID), Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, PermissionProfile: o.definition.HarnessProfile.Permissions.Profile, TurnID: turnID, ToolCallID: runtimecontract.ToolCallID(call.ID), Tool: call.Name, Arguments: args, Versions: tool.Versions}
+	op := Operation{RunID: reservation.RunID, InputDigest: reservation.InputDigest, Version: "sdk-tool-v1", ID: fmt.Sprintf("%s/tool/%s", turnID, call.ID), Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, PermissionProfile: o.definition.HarnessProfile.Permissions.Profile, TurnID: turnID, ToolCallID: runtimecontract.ToolCallID(call.ID), Tool: call.Name, Arguments: args, Versions: tool.Versions}
 	projection, err := clone(op)
 	if err != nil {
 		return out, err
@@ -146,7 +146,7 @@ func (o *Operative) executeTool(ctx context.Context, in Input, turnID runtimecon
 		return out, err
 	}
 	invoked := false
-	err = o.admit(ctx, Admission{Kind: "tool", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, Operation: &op, Request: request, Decision: decision, Policy: &evaluated}, func(c context.Context) error {
+	err = o.admit(ctx, Admission{Run: reservation, Kind: "tool", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest, Operation: &op, Request: request, Decision: decision, Policy: &evaluated}, func(c context.Context) error {
 		// Decode the admitted descriptor, rather than mutable provider/host maps.
 		var decoded map[string]any
 		decoderErr := decodeArgs(op.Arguments, &decoded)

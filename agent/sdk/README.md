@@ -43,6 +43,22 @@ owner, expiry, and capability coverage; `EnvironmentVerifier` verifies actual
 issuance, live lease, grants, owner and current attempt. It runs before every
 model/tool admission and before memory retrieval.
 
+`AdmissionPort.ReserveRun` atomically persists a single-use logical run ID before
+any memory, model or tool activity. Its key is owner + operative + conversation +
+run ID, independent of attempt/generation and provider tool-call IDs. The immutable
+`RunReservation` binds the full attempt/environment, definition, selected model
+route and a versioned digest of the complete input. Every subsequent effect
+admission must resolve and verify that exact retained record.
+
+Existing IDs return `ErrRunUsed`, even after failure, cancellation, unknown tool
+outcome, a changed prompt, a new SDK instance or a replacement host/attempt. All
+reservation errors stop execution; the SDK does not retry them. A host must retain
+accepted or ambiguously committed reservations durably across crashes and must
+never automatically release them. Reconciled resume is unsupported in this API.
+A fresh run ID denotes a new logical input; tools are not deduplicated by their
+arguments. The synthetic host uses a shared in-memory ledger to exercise these
+semantics; production persistence and atomicity belong to the host.
+
 `AdmissionPort.Admit` is the enforcement boundary. It must recheck current
 binding, environment, policy, resource versions and grants, and fence changes
 through effect start. Its callback runs synchronously exactly once. Models are
@@ -156,6 +172,7 @@ the next model turn and observed as failed tool execution. A context/result limi
 hit after a tool returns does not undo its effect. The host must reconcile and
 retain claims before rerunning any failed/uncertain operation.
 
+Even a run which fails preflight after reservation keeps its ID consumed.
 One operative accepts one active Run; concurrent calls return `ErrBusy`. This is
 not a distributed input lease. Runs carry no implicit transcript or plan across
 calls. Durable conversations, replacement, forks, provider-native resume,
@@ -178,5 +195,6 @@ scripts/scan-public
 Run these from the repository root. Behavioral conformance includes the actual
 loop, shared gate fixtures and HITL lifecycle, policy paths, receipt/capability
 refusal, stale model/tool admission, scoped memory, resource pins, cancellation,
-unknown-effect refusal, and the shared MCP HTTP transport with a simulated
+unknown-effect refusal, run-ID replay refusal across instances/replacements,
+ambiguous reservation outcomes, and the shared MCP HTTP transport with a simulated
 post-effect transport failure. Synthetic fixtures are not production authority.

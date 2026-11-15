@@ -26,6 +26,7 @@ var (
 	ErrLimit         = errors.New("sdk: run limit exceeded")
 	ErrContextBudget = errors.New("sdk: context budget exceeded")
 	ErrBusy          = errors.New("sdk: operative already running")
+	ErrRunUsed       = errors.New("sdk: run ID already reserved; reconciled resume unsupported")
 	ErrEffectPanic   = errors.New("sdk: admitted callback panicked; reconcile external effects")
 	ErrAdmission     = errors.New("sdk: invalid host admission")
 )
@@ -61,7 +62,8 @@ type Limits struct {
 }
 
 // Input addresses one explicitly enrolled attempt. ID is a host-unique run ID
-// within this binding; reusing it must not re-execute claimed effects. Each Run
+// within its owner/operative/conversation, across attempt replacements. Every ID
+// is single-use, including after cancellation, failure or uncertainty. Each Run
 // starts from Text alone. Session/history ownership is outside this API.
 type Input struct {
 	ID          string
@@ -96,10 +98,26 @@ type EnvironmentVerifier interface {
 	Verify(context.Context, runtimecontract.Binding, runtimecontract.EnvironmentRef, []string) error
 }
 
+// RunReservation is the immutable host admission record for one logical input.
+// InputDigest hashes the complete input, definition and selected route/model;
+// no raw prompt is retained here. It is not a credential or an effect receipt.
+// The host reservation key is OwnerID + OperativeID + ConversationID + RunID,
+// excluding attempt/generation so replacement cannot replay uncertain work.
+type RunReservation struct {
+	RunID            string
+	Binding          runtimecontract.Binding
+	Environment      runtimecontract.EnvironmentRef
+	DefinitionDigest string
+	Route            string
+	Model            string
+	InputDigest      runtimecontract.Digest
+}
+
 // Admission identifies the effect about to start. Model is also external and
 // billable. Tool admission includes the exact descriptor and gate projection.
 type Admission struct {
-	Kind             string // model, memory, tool
+	Run              RunReservation // exact record accepted by ReserveRun, required for every effect
+	Kind             string         // model, memory, tool
 	Binding          runtimecontract.Binding
 	Environment      runtimecontract.EnvironmentRef
 	DefinitionDigest string
@@ -119,6 +137,14 @@ type Admission struct {
 // success without calling it. The callback must finish before Admit returns;
 // the host owns cancellation of admitted work if its binding is later revoked.
 type AdmissionPort interface {
+	// ReserveRun verifies live binding/environment and atomically persists a new
+	// immutable reservation before ANY model, memory or tool effect. Existing IDs
+	// always return ErrRunUsed, even with identical input, a successor attempt or
+	// another SDK instance. All errors (including ambiguous commit outcomes) refuse
+	// execution. Retain accepted/uncertain reservations across crashes and failures;
+	// never release them automatically. This API supports no reconciled resume.
+	// A later Admit must resolve this exact reservation from authoritative state.
+	ReserveRun(context.Context, RunReservation) error
 	Admit(context.Context, Admission, func(context.Context) error) error
 }
 
@@ -182,6 +208,8 @@ type ToolResult struct {
 // bytes from the normalized llmtypes tool input. Host-specific effects/resources
 // must be included in Versions or refused by host admission. It is not a plan.
 type Operation struct {
+	RunID             string                         `json:"run_id"`
+	InputDigest       runtimecontract.Digest         `json:"input_digest"`
 	Version           string                         `json:"version"`
 	ID                string                         `json:"id"`
 	Binding           runtimecontract.Binding        `json:"binding"`

@@ -188,7 +188,7 @@ func definitionRefs(d agentdef.Definition) []pinned {
 	return refs
 }
 
-func (o *Operative) prepare(ctx context.Context, in Input, window *agentcontext.ContextWindow) error {
+func (o *Operative) prepare(ctx context.Context, in Input, reservation RunReservation, window *agentcontext.ContextWindow) error {
 	if err := o.verify(ctx, in); err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (o *Operative) prepare(ctx context.Context, in Input, window *agentcontext.
 	}
 	if o.ports.Memory != nil {
 		var items []MemoryItem
-		err := o.admit(ctx, Admission{Kind: "memory", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest}, func(c context.Context) error {
+		err := o.admit(ctx, Admission{Run: reservation, Kind: "memory", Binding: in.Binding, Environment: in.Environment, DefinitionDigest: o.digest}, func(c context.Context) error {
 			var e error
 			items, e = o.ports.Memory.Read(c, MemoryQuery{Binding: in.Binding, Query: in.Text, MaxItems: o.ports.Limits.MemoryItems, MaxBytes: o.ports.Limits.MemoryBytes})
 			return e

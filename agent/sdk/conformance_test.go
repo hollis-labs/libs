@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -215,22 +216,36 @@ func TestChangedDescriptorRefusedAtAtomicClaim(t *testing.T) {
 	h := fakehost.New()
 	o := newOperative(t, h, func(p *sdk.Ports) {
 		original := p.Admission
-		p.Admission = admissionFunc(func(ctx context.Context, a sdk.Admission, start func(context.Context) error) error {
+		p.Admission = admissionOverride{AdmissionPort: original, admit: func(ctx context.Context, a sdk.Admission, start func(context.Context) error) error {
 			if a.Operation != nil {
 				a.Operation.Arguments = json.RawMessage(`{"changed":true}`)
 			}
 			return original.Admit(ctx, a, start)
-		})
+		}}
 	})
 	if _, err := o.Run(context.Background(), h.Input()); err == nil || h.Effects != 0 {
 		t.Fatalf("changed digest admitted: %v", err)
 	}
 }
 
-type admissionFunc func(context.Context, sdk.Admission, func(context.Context) error) error
+type admissionOverride struct {
+	sdk.AdmissionPort
+	admit   func(context.Context, sdk.Admission, func(context.Context) error) error
+	reserve func(context.Context, sdk.RunReservation) error
+}
 
-func (f admissionFunc) Admit(ctx context.Context, a sdk.Admission, start func(context.Context) error) error {
-	return f(ctx, a, start)
+func (f admissionOverride) Admit(ctx context.Context, a sdk.Admission, start func(context.Context) error) error {
+	if f.admit != nil {
+		return f.admit(ctx, a, start)
+	}
+	return f.AdmissionPort.Admit(ctx, a, start)
+}
+
+func (f admissionOverride) ReserveRun(ctx context.Context, r sdk.RunReservation) error {
+	if f.reserve != nil {
+		return f.reserve(ctx, r)
+	}
+	return f.AdmissionPort.ReserveRun(ctx, r)
 }
 
 type resolverFunc func(context.Context, runtimecontract.Binding, agentdef.Ref) ([]byte, error)
@@ -693,5 +708,150 @@ func TestPolicyAllowNeedsNoApprovalService(t *testing.T) {
 				t.Fatalf("Ask without approval ports authorized: %v", err)
 			}
 		})
+	}
+}
+
+func freshCallModel(h *fakehost.Host) {
+	h.Model.Stream = func(context.Context, llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
+		call := llmtypes.ToolUseBlock{ID: fmt.Sprintf("%s/provider-call-%d", h.Binding.AttemptID, h.ModelCalls), Name: "read_value", Input: map[string]any{}}
+		return fakehost.Stream(llmtypes.StreamEvent{Type: llmtypes.EventToolUse, ToolUse: &call}, llmtypes.StreamEvent{Type: llmtypes.EventDone}), nil
+	}
+}
+
+func TestRunReservationBlocksUncertainReplayWithFreshProviderCallID(t *testing.T) {
+	for _, gated := range []bool{false, true} {
+		name := "policy-allow"
+		if gated {
+			name = "approval"
+		}
+		t.Run(name, func(t *testing.T) {
+			h := fakehost.New()
+			freshCallModel(h)
+			if !gated {
+				h.PolicyResult = &sdk.PolicyResult{Decision: policy.Decision{Effect: policy.Allow}, Reference: gatetest.Reference("policy-1")}
+			}
+			configure := func(p *sdk.Ports) {
+				p.Tools[0].Execute = func(context.Context, map[string]any) (sdk.ToolResult, error) {
+					h.Effects++
+					return sdk.ToolResult{}, errors.New("disconnect after effect")
+				}
+			}
+			o := newOperative(t, h, configure)
+			if _, err := o.Run(context.Background(), h.Input()); err == nil || h.Effects != 1 || h.ModelCalls != 1 {
+				t.Fatalf("uncertain first run not exercised: effects=%d models=%d err=%v", h.Effects, h.ModelCalls, err)
+			}
+			// A new SDK instance must consult the same host ledger before a second
+			// provider can invent a new call ID. A changed prompt is not a fresh run ID.
+			o = newOperative(t, h, configure)
+			in := h.Input()
+			in.Text = "Changed prompt for the same logical run ID"
+			if _, err := o.Run(context.Background(), in); !errors.Is(err, sdk.ErrRunUsed) || h.Effects != 1 || h.ModelCalls != 1 {
+				t.Fatalf("uncertain run replayed: effects=%d models=%d err=%v", h.Effects, h.ModelCalls, err)
+			}
+			// Explicitly new logical input remains possible with identical tool args.
+			in = h.Input()
+			in.ID = "run-2"
+			if _, err := o.Run(context.Background(), in); err == nil || h.Effects != 2 || h.ModelCalls != 2 {
+				t.Fatalf("distinct run ID was argument-deduplicated: effects=%d models=%d err=%v", h.Effects, h.ModelCalls, err)
+			}
+		})
+	}
+}
+
+func TestRunReservationSurvivesReplacementHostAndAttempt(t *testing.T) {
+	h := fakehost.New()
+	freshCallModel(h)
+	o := newOperative(t, h, func(p *sdk.Ports) {
+		p.Tools[0].Execute = func(context.Context, map[string]any) (sdk.ToolResult, error) {
+			h.Effects++
+			return sdk.ToolResult{}, errors.New("uncertain effect")
+		}
+	})
+	if _, err := o.Run(context.Background(), h.Input()); err == nil || h.Effects != 1 {
+		t.Fatal("uncertain first run missing")
+	}
+	replacement := fakehost.New()
+	replacement.Runs = h.Runs
+	replacement.Binding.Generation++
+	replacement.Binding.AttemptID = "replacement-attempt"
+	freshCallModel(replacement)
+	o = newOperative(t, replacement, nil)
+	if _, err := o.Run(context.Background(), replacement.Input()); !errors.Is(err, sdk.ErrRunUsed) || replacement.ModelCalls != 0 || replacement.Effects != 0 {
+		t.Fatalf("replacement replayed retained logical run: %v", err)
+	}
+}
+
+func TestReservationErrorAndAmbiguousCommitStartNoEffects(t *testing.T) {
+	for _, ambiguous := range []bool{false, true} {
+		name := "refused"
+		if ambiguous {
+			name = "committed-response-lost"
+		}
+		t.Run(name, func(t *testing.T) {
+			h := fakehost.New()
+			memoryCalls, reserveCalls := 0, 0
+			unavailable := errors.New("reservation unavailable or uncertain")
+			memory := memoryFunc(func(context.Context, sdk.MemoryQuery) ([]sdk.MemoryItem, error) { memoryCalls++; return nil, nil })
+			o := newOperative(t, h, func(p *sdk.Ports) {
+				original := p.Admission
+				p.Memory = memory
+				p.Admission = admissionOverride{AdmissionPort: original, reserve: func(ctx context.Context, r sdk.RunReservation) error {
+					reserveCalls++
+					if ambiguous {
+						if err := original.ReserveRun(ctx, r); err != nil {
+							return err
+						}
+					}
+					return unavailable
+				}}
+			})
+			if _, err := o.Run(context.Background(), h.Input()); !errors.Is(err, unavailable) || reserveCalls != 1 || memoryCalls != 0 || h.ModelCalls != 0 || h.Effects != 0 {
+				t.Fatalf("reservation error authorized/retried: %v reserves=%d memory=%d models=%d effects=%d", err, reserveCalls, memoryCalls, h.ModelCalls, h.Effects)
+			}
+			if ambiguous {
+				o = newOperative(t, h, func(p *sdk.Ports) { p.Memory = memory })
+				if _, err := o.Run(context.Background(), h.Input()); !errors.Is(err, sdk.ErrRunUsed) || memoryCalls != 0 || h.ModelCalls != 0 || h.Effects != 0 {
+					t.Fatalf("ambiguous reservation retried fresh work: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestHostRunReservationHasOneWinnerAcrossSDKInstances(t *testing.T) {
+	first, second := fakehost.New(), fakehost.New()
+	second.Runs = first.Runs
+	noTools := func(ctx context.Context, r llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
+		return fakehost.Stream(llmtypes.StreamEvent{Type: llmtypes.EventDone}), nil
+	}
+	first.Model.Stream = noTools
+	second.Model.Stream = noTools
+	a, b := newOperative(t, first, nil), newOperative(t, second, nil)
+	ready := make(chan struct{})
+	results := make(chan error, 2)
+	for _, entry := range []struct {
+		o *sdk.Operative
+		h *fakehost.Host
+	}{{a, first}, {b, second}} {
+		go func(o *sdk.Operative, h *fakehost.Host) {
+			<-ready
+			_, err := o.Run(context.Background(), h.Input())
+			results <- err
+		}(entry.o, entry.h)
+	}
+	close(ready)
+	succeeded, refused := 0, 0
+	for range 2 {
+		err := <-results
+		if err == nil {
+			succeeded++
+		} else if errors.Is(err, sdk.ErrRunUsed) {
+			refused++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if succeeded != 1 || refused != 1 || first.ModelCalls+second.ModelCalls != 1 {
+		t.Fatalf("run reservation lacked atomic winner: succeeded=%d refused=%d models=%d", succeeded, refused, first.ModelCalls+second.ModelCalls)
 	}
 }
