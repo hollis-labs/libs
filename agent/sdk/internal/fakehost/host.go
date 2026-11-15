@@ -43,6 +43,8 @@ type RunLedger struct {
 
 type Host struct {
 	Runs            *RunLedger
+	ReceiptSink     gate.ReceiptSink
+	tools           []sdk.Tool
 	mu              sync.Mutex
 	Binding         runtimecontract.Binding
 	Environment     runtimecontract.EnvironmentRef
@@ -83,7 +85,11 @@ func (h *Host) Ports() sdk.Ports {
 		h.Effects++
 		return sdk.ToolResult{Content: "42"}, nil
 	}}
-	return sdk.Ports{Router: router, Tools: []sdk.Tool{tool}, Environment: environmentPort{h}, Admission: h, Policy: h, Gate: sdk.GateAdapter{Port: h}, Authority: authorityPort{h}, Events: runtimeevents.SinkFunc(func(ctx context.Context, event runtimeevents.Event) error {
+	tools := []sdk.Tool{tool}
+	if h.tools != nil {
+		tools = h.tools
+	}
+	return sdk.Ports{Router: router, Tools: tools, Environment: environmentPort{h}, Admission: h, Policy: h, Gate: sdk.GateAdapter{Port: h}, Authority: authorityPort{h}, Events: runtimeevents.SinkFunc(func(ctx context.Context, event runtimeevents.Event) error {
 		if err := event.Validate(); err != nil {
 			return err
 		}
@@ -179,7 +185,18 @@ func (h *Host) Admit(ctx context.Context, a sdk.Admission, start func(context.Co
 		if err != nil {
 			return err
 		}
-		if a.Operation.Tool != "read_value" || !reflect.DeepEqual(a.Operation.Versions, []runtimecontract.Reference{gatetest.Reference("read-value-v1")}) || a.Operation.Binding != h.Binding || !reflect.DeepEqual(a.Operation.Environment, h.Environment) {
+		expected := []runtimecontract.Reference{gatetest.Reference("read-value-v1")}
+		found := a.Operation.Tool == "read_value"
+		if h.tools != nil {
+			found = false
+			for _, tool := range h.tools {
+				if tool.Definition.Name == a.Operation.Tool {
+					found = true
+					expected = tool.Versions
+				}
+			}
+		}
+		if !found || !reflect.DeepEqual(a.Operation.Versions, expected) || a.Operation.Binding != h.Binding || !reflect.DeepEqual(a.Operation.Environment, h.Environment) {
 			return gate.ErrAuthority
 		}
 		current, err := h.Evaluate(ctx, *a.Operation)
@@ -206,14 +223,16 @@ func (h *Host) Admit(ctx context.Context, a sdk.Admission, start func(context.Co
 			return errors.New("synthetic claim consumed: reconcile")
 		}
 		h.Claims[key] = true
-		h.Receipts = append(h.Receipts, gate.ExecutionReceipt{DecisionRef: decisionRef, OperationID: a.Operation.ID, Binding: h.Binding, State: gate.ExecutionStarted})
+		if err = h.recordExecution(ctx, gate.ExecutionReceipt{DecisionRef: decisionRef, OperationID: a.Operation.ID, Binding: h.Binding, State: gate.ExecutionStarted}); err != nil {
+			return err
+		}
 		err = start(ctx)
 		state := gate.ExecutionSucceeded
 		if err != nil {
 			state = gate.ExecutionUnknown
 		}
-		h.Receipts = append(h.Receipts, gate.ExecutionReceipt{DecisionRef: decisionRef, OperationID: a.Operation.ID, Binding: h.Binding, State: state})
-		return err
+		receiptErr := h.recordExecution(context.WithoutCancel(ctx), gate.ExecutionReceipt{DecisionRef: decisionRef, OperationID: a.Operation.ID, Binding: h.Binding, State: state})
+		return errors.Join(err, receiptErr)
 	}
 	return start(ctx)
 }
@@ -397,4 +416,27 @@ func Stream(events ...llmtypes.StreamEvent) <-chan llmtypes.StreamEvent {
 	}
 	close(ch)
 	return ch
+}
+
+// SetTools configures a synthetic catalog; call only before sharing the host.
+func (h *Host) SetTools(tools []sdk.Tool) error {
+	h.tools = make([]sdk.Tool, len(tools))
+	seen := map[string]bool{}
+	for i, tool := range tools {
+		if tool.Definition.Name == "" || seen[tool.Definition.Name] || len(tool.Versions) == 0 {
+			return sdk.ErrInvalid
+		}
+		seen[tool.Definition.Name] = true
+		versions := append([]runtimecontract.Reference(nil), tool.Versions...)
+		tool.Versions = versions
+		h.tools[i] = tool
+	}
+	return nil
+}
+func (h *Host) recordExecution(ctx context.Context, r gate.ExecutionReceipt) error {
+	h.Receipts = append(h.Receipts, r)
+	if h.ReceiptSink != nil {
+		return h.ReceiptSink.RecordExecution(ctx, r)
+	}
+	return nil
 }

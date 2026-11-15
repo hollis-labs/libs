@@ -1,0 +1,51 @@
+id: lookup-pass
+benchmark: synthetic-tool-trajectory
+description: A real SDK tool turn followed by its paired model response.
+user_message: Read the synthetic value.
+expected_behavior: Execute lookup once and report the returned value.
+tools_offered:
+  - name: lookup
+    description: Return a synthetic value.
+    input_schema:
+      type: object
+      properties:
+        key: {type: string}
+      required: [key]
+      additionalProperties: false
+    mock:
+      content: '42'
+      outcome: succeeded
+model_turns:
+  - tool_calls:
+      - id: lookup-1
+        name: lookup
+        arguments: {key: value}
+    duration_ms: 5
+    usage:
+      input: 100
+      output: 10
+      cache_read: 40
+      cache_write: 10
+      reasoning: 3
+      input_includes_cache: true
+      output_includes_reasoning: true
+    price:
+      input_per_million: 2
+      output_per_million: 4
+      cache_read_per_million: 1
+      cache_write_per_million: 3
+      reasoning_per_million: 4
+      source: synthetic-fixture
+  - text: The value is 42.
+    duration_ms: 7
+    usage:
+      input: 20
+      output: 5
+      cache_read: 0
+      cache_write: 0
+      reasoning: 0
+rubric:
+  called_tool: lookup
+  tool_order: [lookup]
+  avoided_tools: [write_value]
+  contains_any: ['42']

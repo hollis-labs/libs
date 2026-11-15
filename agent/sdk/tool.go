@@ -52,7 +52,7 @@ func (o *Operative) executeTool(ctx context.Context, in Input, reservation RunRe
 	if err = evaluated.Reference.Validate(); err != nil {
 		return out, err
 	}
-	policyPayload := EventPayload{TurnID: turnID, ToolCallID: op.ToolCallID, OperationID: op.ID, Policy: &evaluated.Reference, PolicyEffect: evaluated.Decision.Effect}
+	policyPayload := EventPayload{Tool: call.Name, TurnID: turnID, ToolCallID: op.ToolCallID, OperationID: op.ID, Policy: &evaluated.Reference, PolicyEffect: evaluated.Decision.Effect}
 	if err = events.emit(ctx, "sdk.policy.evaluated", policyPayload); err != nil {
 		return out, err
 	}
@@ -75,7 +75,7 @@ func (o *Operative) executeTool(ctx context.Context, in Input, reservation RunRe
 	if err != nil {
 		return out, err
 	}
-	payload := EventPayload{TurnID: turnID, ToolCallID: op.ToolCallID, OperationID: op.ID, Policy: &evaluated.Reference}
+	payload := EventPayload{Tool: call.Name, TurnID: turnID, ToolCallID: op.ToolCallID, OperationID: op.ID, Policy: &evaluated.Reference}
 	var request *gate.Request
 	var decision *gate.Decision
 	needsApproval := evaluated.Decision.Effect == policy.Ask || len(evaluated.Decision.Obligations) > 0
@@ -113,6 +113,9 @@ func (o *Operative) executeTool(ctx context.Context, in Input, reservation RunRe
 			return out, err
 		}
 		payload.ApprovalState = resolution.State
+		if resolution.Decision != nil {
+			payload.DecisionID = resolution.Decision.Resolution.ResolutionID
+		}
 		if err = events.emit(ctx, runtimeevents.KindAgentPermissionResolved, payload); err != nil {
 			return out, err
 		}
