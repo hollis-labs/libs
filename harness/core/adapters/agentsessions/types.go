@@ -12,6 +12,7 @@ import (
 	"github.com/hollis-labs/libs/harness/core/sandbox"
 	"github.com/hollis-labs/libs/harness/core/workspace"
 	llmtypes "github.com/hollis-labs/libs/llm/core/llmtypes"
+	"github.com/hollis-labs/libs/mesh/core/runtimecontract"
 )
 
 // State is the process-level lifecycle state the Manager records and
@@ -643,6 +644,31 @@ type StartOptions struct {
 	// Added in v0.9.5.
 	JsonRpcRequestHook func(method string, params json.RawMessage) (result any, rpcErr *JsonRpcError)
 
+	// JsonRpcRequestResponder opts into asynchronous server-request handling on
+	// jsonrpc-stdio only. It takes precedence over JsonRpcRequestHook. The reader
+	// continues while it waits; callbacks MUST return when ctx is cancelled.
+	// Cancellation/clearing, EOF, Stop and transport replacement invalidate the
+	// reply. At most 64 callbacks may be running per session (including cancelled
+	// callbacks that have not returned); excess or duplicate pending IDs close
+	// the transport input and invalidate pending requests without approval.
+	// Async requests are observed by this responder, without synthetic request
+	// events; notification event callbacks retain their reader-goroutine contract.
+	// Authorization-sensitive replies must return *JsonRpcPreparedReply so final
+	// admission happens after writer serialization, with its fence held through send.
+	JsonRpcRequestResponder func(context.Context, JsonRpcServerRequest) (any, *JsonRpcError)
+
+	// JsonRpcAttemptBinding is required with JsonRpcRequestResponder. Before each
+	// spawn, the host supplies a fresh, verified runtime binding for the zero-based
+	// transport attempt. Bindings must change across replacement; provider session
+	// IDs are not runtime generations. The callback must not start a session.
+	JsonRpcAttemptBinding func(attempt int) (runtimecontract.Binding, error)
+
+	// JsonRpcReplyObserver observes async reply delivery on a worker goroutine.
+	// Sent means a complete transport write, never provider acknowledgement or
+	// execution. Unknown includes failed/partial writes; reconcile before retry.
+	// Discarded means lifecycle fencing prevented the write. Keep observers short.
+	JsonRpcReplyObserver func(JsonRpcServerRequest, JsonRpcReplyStatus, error)
+
 	// AutoPlantBootDir requests BootDirSpec preparation only with explicit
 	// ArtifactRoot and ArtifactAuthorization. False, non-provider and empty-spec
 	// requests are no-ops. The runtime creates no implicit temporary root or
@@ -716,6 +742,45 @@ type StartOptions struct {
 	// Added in v0.6.0.
 	ResourceLimits *ResourceLimits
 }
+
+// JsonRpcServerRequest is a detached structured request from one transport
+// attempt. ID preserves JSON number/string identity without float64 coercion.
+// Binding is host-issued; it is a reference, never an authority credential.
+type JsonRpcServerRequest struct {
+	ID      json.RawMessage
+	Method  string
+	Params  json.RawMessage
+	Binding runtimecontract.Binding
+}
+
+// JsonRpcReplySender writes at most one reply on the exact originating attempt.
+// It is synchronous and valid only inside JsonRpcPreparedReply.Deliver. Its ctx
+// must carry the host's admission deadline/revocation signal; runtime lifecycle
+// cancellation independently constrains it. A failed/partial send is uncertain,
+// never permission to release a consumed grant or retry the operation.
+type JsonRpcReplySender func(context.Context, any, *JsonRpcError) error
+
+// JsonRpcPreparedReply defers trusted admission until AFTER writer serialization.
+// Deliver must acquire the host fence, resolve/verify live facts and claim there,
+// then call send while the fence remains held. It must not retain send, and must
+// return promptly on ctx cancellation. An error before send produces a refusal;
+// after send, the delivery observation determines transport uncertainty.
+type JsonRpcPreparedReply struct {
+	Deliver func(context.Context, JsonRpcReplySender) error
+}
+
+// MarshalJSON prevents accidental early use through a synchronous/raw reply path.
+func (*JsonRpcPreparedReply) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("agentsessions: prepared reply requires serialized delivery")
+}
+
+type JsonRpcReplyStatus string
+
+const (
+	JsonRpcReplySent      JsonRpcReplyStatus = "sent"
+	JsonRpcReplyUnknown   JsonRpcReplyStatus = "unknown"
+	JsonRpcReplyDiscarded JsonRpcReplyStatus = "discarded"
+)
 
 // Runtime is the high-level contract a session-spawner satisfies. It
 // names itself, declares capabilities, validates configuration via
