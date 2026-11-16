@@ -1,4 +1,4 @@
-module github.com/hollis-labs/ade/go/agenthost
+module github.com/hollis-labs/ade-core/go/agenthost
 
 go 1.26.11
 
