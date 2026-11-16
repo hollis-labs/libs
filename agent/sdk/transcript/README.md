@@ -48,6 +48,10 @@ assistant/user roles, tool-use/result links, and usage. A separate test runs
 the real SDK loop with its fake model and tool through a host event sink and
 checks the resulting transcript. It does not claim a production host adapter
 or direct compatibility with an application ingestion parser.
+The SDK loop fixture emits Claude's native snake_case usage fields. Its
+`resultRef` resolves to the complete MCP success envelope in
+`testdata/resultenv_tool_success.json`; the fixture is also checked with the
+published `agent/resultenv` receipt contract in the task evidence.
 
 Public API stability is experimental v0. The host must separately provide
 authorized conversation selection, attempt fencing, retention, backup,

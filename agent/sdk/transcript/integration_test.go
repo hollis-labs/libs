@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -77,9 +78,12 @@ func TestActualSDKLoopWritesClaudeShape(t *testing.T) {
 		case runtimeevents.KindAgentToolUse:
 			return appendMessage("assistant", []any{map[string]any{"type": "tool_use", "id": string(payload.ToolCallID), "name": payload.Tool, "input": map[string]any{}}}, nil, nil)
 		case runtimeevents.KindAgentToolResult:
-			// The fake host retains these synthetic envelope bytes. A real host
-			// issues and verifies the reference against its durable receipt.
-			envelope := []byte(`{"version":"resultenv/v1","outcome":"success"}`)
+			// The fake host retains a complete MCP result envelope for the
+			// tool's "42" result. A production host issues its own reference.
+			envelope, err := os.ReadFile("testdata/resultenv_tool_success.json")
+			if err != nil {
+				return err
+			}
 			sum := sha256.Sum256(envelope)
 			ref := runtimecontract.Reference{ID: "fixture-receipt", Revision: "1", Digest: runtimecontract.Digest{Scheme: "sha256", Value: hex.EncodeToString(sum[:])}, IssuerRef: "fixture-host", OwnerID: h.Binding.OwnerID}
 			receipts[ref.ID] = envelope
@@ -160,6 +164,25 @@ func TestActualSDKLoopWritesClaudeShape(t *testing.T) {
 				sum := sha256.Sum256(retained)
 				if row.ResultRef.Digest.Value != hex.EncodeToString(sum[:]) {
 					t.Fatal("receipt digest mismatch")
+				}
+				var envelope struct {
+					Version   string `json:"version"`
+					Outcome   string `json:"outcome"`
+					MCPResult struct {
+						Content []struct {
+							Type string `json:"type"`
+							Text string `json:"text"`
+						} `json:"content"`
+						StructuredContent struct {
+							Value int `json:"value"`
+						} `json:"structuredContent"`
+					} `json:"mcp_result"`
+				}
+				if err := json.Unmarshal(retained, &envelope); err != nil {
+					t.Fatal(err)
+				}
+				if envelope.Version != "resultenv/v1" || envelope.Outcome != "success" || len(envelope.MCPResult.Content) != 1 || envelope.MCPResult.Content[0].Type != "text" || envelope.MCPResult.Content[0].Text != "42" || envelope.MCPResult.StructuredContent.Value != 42 {
+					t.Fatalf("incomplete tool result receipt: %+v", envelope)
 				}
 				references++
 			}
