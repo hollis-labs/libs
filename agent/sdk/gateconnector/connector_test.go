@@ -89,6 +89,8 @@ type fakeGate struct {
 	awaits    int
 	cancels   int
 	cancelled bool
+	expired   bool
+	selected  string
 }
 
 func (f *fakeGate) Capabilities(_ context.Context, a gate.AdapterScope) (gate.Capabilities, error) {
@@ -113,10 +115,22 @@ func (f *fakeGate) Request(_ context.Context, request gate.Request) (gate.Ticket
 func (f *fakeGate) Await(_ context.Context, ticket gate.Ticket, _ gate.WaitOptions) (gate.Resolution, error) {
 	f.calls++
 	f.awaits++
-	if !f.cancelled {
-		return gate.Resolution{State: gate.Pending, Ticket: ticket}, nil
+	if f.cancelled {
+		return gate.Resolution{State: gate.Cancelled, Ticket: ticket, Outcome: hitl.Canceled{ItemID: ticket.Handle.ItemID, InteractionRevision: 2, Cause: hitl.CauseCallerWithdrawn, TerminatedAt: f.now}}, nil
 	}
-	return gate.Resolution{State: gate.Cancelled, Ticket: ticket, Outcome: hitl.Canceled{ItemID: ticket.Handle.ItemID, InteractionRevision: 2, Cause: hitl.CauseCallerWithdrawn, TerminatedAt: f.now}}, nil
+	if f.expired {
+		return gate.Resolution{State: gate.Expired, Ticket: ticket, Outcome: hitl.Expired{ItemID: ticket.Handle.ItemID, InteractionRevision: 2, TerminatedAt: f.now}}, nil
+	}
+	if f.selected != "" {
+		for _, option := range f.request.Options {
+			if option.ID == f.selected {
+				resolution := hitl.ResolutionRecord{ResolutionID: "decision-1", Response: hitl.Response{Kind: "gate", Decision: option.ID}, Participant: hitl.Participant{PrincipalRef: "human-1", Assurance: "verified"}, ResolvedAt: f.now, InteractionRevision: 2}
+				return gate.Resolution{State: gate.Decided, Ticket: ticket, Outcome: hitl.Resolved{ItemID: ticket.Handle.ItemID, InteractionRevision: 2, Resolution: resolution}, Decision: &gate.Decision{Ticket: ticket, Resolution: resolution, OptionID: option.ID, Scope: option.Scope, OperationDigest: f.request.OperationDigest, AuthorityRef: "fake-authority", ExpiresAt: f.request.ExpiresAt}}, nil
+			}
+		}
+		return gate.Resolution{}, gate.ErrUnsupported
+	}
+	return gate.Resolution{State: gate.Pending, Ticket: ticket}, nil
 }
 func (f *fakeGate) Cancel(ctx context.Context, ticket gate.Ticket, cause hitl.CancelCause) (gate.Resolution, error) {
 	f.calls++
@@ -185,6 +199,36 @@ func TestAmbiguousAttachReusesIdenticalRequest(t *testing.T) {
 	result, err := restarted.Reconcile(context.Background(), r.IdempotencyKey, r.Binding)
 	if err != nil || result.State != gate.Pending || port.requests != 2 {
 		t.Fatalf("ambiguous recovery: %+v %v requests=%d", result, err, port.requests)
+	}
+}
+
+func TestReconcileReadsAllowDenyAndExpiryFromPort(t *testing.T) {
+	for _, state := range []string{"allow", "deny", "expired"} {
+		t.Run(state, func(t *testing.T) {
+			r, port, _, connector := fixture(t)
+			if _, err := connector.Open(context.Background(), r); err != nil {
+				t.Fatal(err)
+			}
+			switch state {
+			case "allow":
+				port.selected = r.Options[0].ID
+			case "deny":
+				port.selected = r.Options[1].ID
+			case "expired":
+				port.expired = true
+			}
+			result, err := connector.Reconcile(context.Background(), r.IdempotencyKey, r.Binding)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state == "expired" {
+				if result.State != gate.Expired || result.Decision != nil {
+					t.Fatalf("expiry: %+v", result)
+				}
+			} else if result.State != gate.Decided || result.Decision == nil || result.Decision.OptionID != port.selected {
+				t.Fatalf("selected native decision changed: %+v", result)
+			}
+		})
 	}
 }
 
