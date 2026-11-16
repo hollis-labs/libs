@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
+
+## [0.1.0] - 2026-11-16
 
 - First version: an embedded agent host an application mounts over HTTP. It runs the model
   conversation through a gateway, keeps threads in SQLite, streams chatstream/v1 events, and
