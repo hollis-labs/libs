@@ -13,6 +13,9 @@ line or a torn tail. The host reconciles by replay; this package refuses a torn
 tail and never truncates it automatically. A projection callback runs only after
 the append is durable. A projection error returns the committed cursor with the
 error, so index work can be retried without rewriting the log.
+`Replay` returns verified complete entries together with `ErrTorn` when it
+encounters an incomplete tail; callers must inspect both values. The suffix
+respects the supplied committed cursor even when the tail is torn.
 
 Segments are numbered from 1 with no holes. The default target is 16 MiB;
 rotation happens before an append that would exceed it, except a single large
@@ -48,5 +51,5 @@ or direct compatibility with an application ingestion parser.
 
 Public API stability is experimental v0. The host must separately provide
 authorized conversation selection, attempt fencing, retention, backup,
-projection retry, and full result-envelope references once the result contract
-is available. The package has no independent transcript search service.
+projection retry, and issuance of references to full result envelopes. The
+package has no independent transcript search service.

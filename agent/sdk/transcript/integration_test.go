@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -94,7 +95,13 @@ func TestActualSDKLoopWritesClaudeShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := appendMessage("assistant", []any{map[string]any{"type": "text", "text": result.Text}}, result.Usage, nil); err != nil {
+	claudeUsage := map[string]int{
+		"input_tokens":                result.Usage.InputTokens,
+		"output_tokens":               result.Usage.OutputTokens,
+		"cache_creation_input_tokens": result.Usage.CacheCreationTokens,
+		"cache_read_input_tokens":     result.Usage.CacheReadTokens,
+	}
+	if err := appendMessage("assistant", []any{map[string]any{"type": "text", "text": result.Text}}, claudeUsage, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Close(); err != nil {
@@ -136,6 +143,13 @@ func TestActualSDKLoopWritesClaudeShape(t *testing.T) {
 				}
 			}
 			if len(row.Message.Usage) > 0 {
+				var got map[string]int
+				if err := json.Unmarshal(row.Message.Usage, &got); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(got, claudeUsage) {
+					t.Fatalf("Claude usage fields/values: got %v, want %v", got, claudeUsage)
+				}
 				usage++
 			}
 			if row.ResultRef != nil && row.ResultRef.Validate() == nil {

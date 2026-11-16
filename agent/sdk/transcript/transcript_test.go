@@ -144,7 +144,11 @@ func TestTornTailAndNoImplicitRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = w.Append(fixture(t)[0]); err != nil {
+	first, err := w.Append(fixture(t)[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = w.Append(fixture(t)[1]); err != nil {
 		t.Fatal(err)
 	}
 	if err = w.Close(); err != nil {
@@ -159,8 +163,13 @@ func TestTornTailAndNoImplicitRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = f.Close()
-	if _, err := Replay(root, "conversation", Cursor{}); !errors.Is(err, ErrTorn) {
-		t.Fatalf("replay torn: %v", err)
+	entries, err := Replay(root, "conversation", Cursor{})
+	if !errors.Is(err, ErrTorn) || len(entries) != 2 || entries[0].Cursor != first {
+		t.Fatalf("replay torn prefix: %d entries, %v", len(entries), err)
+	}
+	suffix, err := Replay(root, "conversation", first)
+	if !errors.Is(err, ErrTorn) || len(suffix) != 1 || suffix[0].Cursor != entries[1].Cursor {
+		t.Fatalf("replay torn suffix: %d entries, %v", len(suffix), err)
 	}
 	if _, err := Open(root, "conversation", Options{}); !errors.Is(err, ErrTorn) {
 		t.Fatalf("open torn: %v", err)

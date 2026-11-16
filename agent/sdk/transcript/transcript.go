@@ -236,6 +236,9 @@ func (w *Writer) Close() error {
 
 // Replay returns the exact suffix after a committed cursor. Missing segments,
 // changed records, invalid offsets and torn tails are errors, never silent EOF.
+// On ErrTorn, entries contains the verified complete suffix before the torn
+// record. The caller can reconcile that committed prefix without repairing the
+// file; Open still refuses to append until the tail is handled explicitly.
 // An absent directory is an empty log only for the zero cursor.
 func Replay(root, conversationID string, after Cursor) ([]Entry, error) {
 	dir, err := ConversationDir(root, conversationID)
@@ -263,7 +266,7 @@ func Replay(root, conversationID string, after Cursor) ([]Entry, error) {
 	var previousHash string
 	for _, segment := range segments {
 		entries, e := scanSegment(dir, segment, previousHash)
-		if e != nil {
+		if e != nil && !errors.Is(e, ErrTorn) {
 			return nil, e
 		}
 		if len(entries) > 0 {
@@ -280,6 +283,12 @@ func Replay(root, conversationID string, after Cursor) ([]Entry, error) {
 				continue
 			}
 			out = append(out, entry)
+		}
+		if e != nil {
+			if !matched {
+				return nil, ErrGap
+			}
+			return out, e
 		}
 	}
 	if !matched {
@@ -384,10 +393,10 @@ func scanSegment(dir string, n uint64, previousHash string) ([]Entry, error) {
 			break
 		}
 		if e != nil || len(line) == 0 || line[len(line)-1] != '\n' {
-			return nil, ErrTorn
+			return out, ErrTorn
 		}
 		if len(line) > maxRecord || !json.Valid(line[:len(line)-1]) {
-			return nil, ErrTorn
+			return out, ErrTorn
 		}
 		offset += int64(len(line))
 		sum := sha256.Sum256(append([]byte(previousHash), line...))
