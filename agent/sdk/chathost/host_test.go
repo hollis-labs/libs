@@ -221,3 +221,55 @@ func TestConcurrentHostInstancesAdmitOneWriter(t *testing.T) {
 		t.Fatalf("wins=%d refused=%d", wins, refused)
 	}
 }
+
+func TestGuardedTakeoverFencesPTYAndChat(t *testing.T) {
+	root := t.TempDir()
+	h := makeHost(t, root)
+	ctx := principal("one")
+	if err := h.RegisterAgent(ctx, Agent{ID: "agent", Owner: "one", Seat: "seat", Kind: Stable, Supervisor: Nanite}); err != nil {
+		t.Fatal(err)
+	}
+	b := binding("one", "agent", "conversation", "attempt", 1)
+	active(t, h, ctx, b)
+	first, _ := h.Attach(ctx, b, Controller)
+	second, _ := h.Attach(ctx, b, Controller)
+	old, err := h.Acquire(ctx, b, session.WriterID(first.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	guarded, err := Open(root, func(ctx context.Context, owner runtimecontract.OwnerID, p Permission) error {
+		if p == TakeoverControl {
+			return errors.New("takeover denied")
+		}
+		return authorized(ctx, owner, p)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = guarded.Takeover(ctx, b, session.WriterID(second.ID)); err == nil {
+		t.Fatal("ordinary control displaced writer")
+	}
+	if err = h.ValidateLease(ctx, old); err != nil {
+		t.Fatal(err)
+	}
+	newLease, err := h.Takeover(ctx, b, session.WriterID(second.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = h.ValidateLease(ctx, old); !errors.Is(err, session.ErrLease) {
+		t.Fatalf("old PTY lease: %v", err)
+	}
+	if _, err = h.Submit(ctx, session.Input{ID: "old-input", Lease: old, Text: "stale"}); !errors.Is(err, session.ErrLease) {
+		t.Fatalf("old chat writer: %v", err)
+	}
+	called := false
+	if err = h.WithLease(ctx, newLease, func() error { called = true; return nil }); err != nil || !called {
+		t.Fatalf("new PTY effect: called=%v err=%v", called, err)
+	}
+	if err = h.WithLease(ctx, old, func() error { t.Fatal("stale effect ran"); return nil }); !errors.Is(err, session.ErrLease) {
+		t.Fatalf("stale effect: %v", err)
+	}
+	if _, err = h.Submit(ctx, session.Input{ID: "new-input", Lease: newLease, Text: "accepted"}); err != nil {
+		t.Fatal(err)
+	}
+}

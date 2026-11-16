@@ -23,10 +23,11 @@ import (
 type Permission string
 
 const (
-	Read    Permission = "read"
-	Control Permission = "control"
-	Admin   Permission = "admin"
-	Runtime Permission = "runtime"
+	Read            Permission = "read"
+	Control         Permission = "control"
+	Admin           Permission = "admin"
+	Runtime         Permission = "runtime"
+	TakeoverControl Permission = "takeover"
 )
 
 // Authorize must authenticate the caller independently of the IDs in a request.
@@ -513,6 +514,86 @@ func (h *Host) Acquire(ctx context.Context, b runtimecontract.Binding, w session
 		return nil
 	})
 	return out, err
+}
+
+// Takeover atomically replaces the current writer lease with a fresh lease for
+// an attached controller. A host must grant TakeoverControl explicitly; ordinary
+// Control permission cannot displace an active writer.
+func (h *Host) Takeover(ctx context.Context, b runtimecontract.Binding, w session.WriterID) (session.Lease, error) {
+	if err := b.Validate(); err != nil {
+		return session.Lease{}, err
+	}
+	if err := h.check(ctx, b.OwnerID, Control); err != nil {
+		return session.Lease{}, err
+	}
+	if err := h.check(ctx, b.OwnerID, TakeoverControl); err != nil {
+		return session.Lease{}, err
+	}
+	id, err := token()
+	if err != nil {
+		return session.Lease{}, err
+	}
+	var out session.Lease
+	err = h.transact(true, func(s *state) error {
+		c := s.Conversations[key(b)]
+		if c == nil || c.Record.Binding != b || c.Record.Phase != session.Active {
+			return session.ErrStale
+		}
+		a, ok := c.Attachments[string(w)]
+		if !ok || a.Binding != b || a.Role != Controller {
+			return session.ErrLease
+		}
+		out = session.Lease{ID: session.LeaseID(id), Binding: b, Writer: w, ExpiresAt: h.now().Add(30 * time.Second)}
+		c.Lease = &out
+		return nil
+	})
+	return out, err
+}
+
+func (h *Host) validLease(s *state, l session.Lease) error {
+	c := s.Conversations[key(l.Binding)]
+	if c == nil || c.Record.Binding != l.Binding || c.Record.Phase != session.Active {
+		return session.ErrStale
+	}
+	if c.Lease == nil || !sameLease(*c.Lease, l) || !h.now().Before(l.ExpiresAt) {
+		return session.ErrLease
+	}
+	a, ok := c.Attachments[string(l.Writer)]
+	if !ok || a.Binding != l.Binding || a.Role != Controller {
+		return session.ErrLease
+	}
+	return nil
+}
+
+// ValidateLease is a preflight check. External PTY effects still need exact
+// binding admission at delivery; use WithLease for synchronous local effects.
+func (h *Host) ValidateLease(ctx context.Context, l session.Lease) error {
+	if err := h.check(ctx, l.Binding.OwnerID, Control); err != nil {
+		return err
+	}
+	return h.transact(false, func(s *state) error { return h.validLease(s, l) })
+}
+
+// WithLease holds the durable binding lock while a synchronous PTY input or
+// resize callback completes. This prevents a generation switch or takeover
+// between admission and the local effect. Do not use for an asynchronous send:
+// the receiving transport must recheck the binding and lease at delivery.
+func (h *Host) WithLease(ctx context.Context, l session.Lease, effect func() error) error {
+	if effect == nil {
+		return session.ErrInvalid
+	}
+	if err := h.check(ctx, l.Binding.OwnerID, Control); err != nil {
+		return err
+	}
+	return h.transact(false, func(s *state) error {
+		if err := h.validLease(s, l); err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return effect()
+	})
 }
 func (h *Host) Renew(ctx context.Context, l session.Lease) (session.Lease, error) {
 	if err := h.check(ctx, l.Binding.OwnerID, Control); err != nil {

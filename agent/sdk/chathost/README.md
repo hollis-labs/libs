@@ -22,6 +22,14 @@ the runtime intact. `Publish` appends output from the host runtime. `Admit`
 records event or approval references; admission alone never authorizes an
 effect. Every input, output and message checks the complete active binding.
 
+An explicitly authorized controller can call `Takeover(binding, writerID)` to
+atomically replace the previous lease. The host's authorizer must grant the
+separate `TakeoverControl` permission. `ValidateLease` checks the current
+binding and lease for PTY preflight. `WithLease` holds the binding lock through
+a synchronous local PTY input or resize, so takeover and generation changes
+cannot interleave with that effect. An asynchronous transport must check the
+same binding and lease again at its delivery point.
+
 Committed cursors are sequential positions within one conversation. They are
 not PTY byte offsets. Attachments and writer leases are invalidated when a new
 generation reserves the conversation; clients reattach using the new binding.
@@ -33,8 +41,8 @@ the same admission behavior. Native provider transcripts and Gatecrasher
 decisions remain in their own authoritative stores.
 
 The CHAT-2/3 integration seams are `Attach`, `ReadEvents`, `Acquire`, `Submit`,
-`Detach`, `Publish` and `Admit`. Terminal control must obtain a controller
-attachment and input lease; observers use viewer attachments. Status adapters
+`Detach`, `Takeover`, `ValidateLease`, `WithLease`, `Publish` and `Admit`.
+Terminal control must obtain a controller attachment and input lease; observers use viewer attachments. Status adapters
 publish against the exact runtime generation. Frontends should preserve the
 returned cursor for reconnect and show a gap if a future bounded adapter
 cannot replay it.
