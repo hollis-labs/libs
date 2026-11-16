@@ -233,6 +233,9 @@ func (h *Host) RegisterAgent(ctx context.Context, a Agent) error {
 	default:
 		return session.ErrInvalid
 	}
+	if a.Seat != "" && strings.TrimSpace(string(a.Seat)) == "" {
+		return session.ErrInvalid
+	}
 	if a.Kind == Embedded && a.Supervisor != App {
 		return session.ErrInvalid
 	}
@@ -319,6 +322,9 @@ func (h *Host) CompareAndSwap(ctx context.Context, sc session.Scope, version str
 		if old.Version != version {
 			return session.ErrConflict
 		}
+		if next.Reason != old.Reason && next.Binding == old.Binding {
+			return session.ErrInvalid
+		}
 		if old.Binding.SeatID != next.Binding.SeatID {
 			return session.ErrInvalid
 		}
@@ -354,7 +360,7 @@ func (h *Host) CreateChild(ctx context.Context, parent runtimecontract.Binding, 
 	if err := child.Binding.Validate(); err != nil {
 		return session.Record{}, err
 	}
-	if child.Binding.OwnerID != parent.OwnerID || child.Binding.OperativeID != parent.OperativeID || child.Binding.ConversationID == parent.ConversationID || child.Binding.Generation != 1 || child.Phase != session.Fenced {
+	if child.Binding.OwnerID != parent.OwnerID || child.Binding.OperativeID != parent.OperativeID || child.Binding.ConversationID == parent.ConversationID || child.Binding.Generation != 1 || child.Phase != session.Fenced || child.Parent != nil || child.Version != "" {
 		return session.Record{}, session.ErrInvalid
 	}
 	if err := h.check(ctx, parent.OwnerID, Admin); err != nil {
@@ -419,7 +425,11 @@ func (h *Host) Attach(ctx context.Context, b runtimecontract.Binding, role Role)
 	return a, err
 }
 func (h *Host) Detach(ctx context.Context, a Attachment) error {
-	if err := h.check(ctx, a.Binding.OwnerID, Read); err != nil {
+	permission := Read
+	if a.Role == Controller {
+		permission = Control
+	}
+	if err := h.check(ctx, a.Binding.OwnerID, permission); err != nil {
 		return err
 	}
 	return h.transact(true, func(s *state) error {
