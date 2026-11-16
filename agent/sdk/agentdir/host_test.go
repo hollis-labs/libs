@@ -192,6 +192,14 @@ func TestExampleDirectories(t *testing.T) {
 			t.Fatalf("%s boot: %v", name, err)
 		}
 	}
+	for _, name := range []string{"stable", "task"} {
+		req := httptest.NewRequest(http.MethodPost, "/agents/"+name+"/turns", strings.NewReader(`{"text":"from HTTP"}`))
+		w := httptest.NewRecorder()
+		h.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/event-stream") || !strings.Contains(w.Body.String(), "event: run.finish") {
+			t.Fatalf("%s chatstream: %d %s", name, w.Code, w.Body.String())
+		}
+	}
 }
 
 func TestEmbeddedDirectoryRunsActualSDKLoop(t *testing.T) {
