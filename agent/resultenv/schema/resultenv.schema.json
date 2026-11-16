@@ -6,7 +6,7 @@
   "required": ["version", "outcome"],
   "properties": {
     "version": {"const": "resultenv/v1"},
-    "outcome": {"enum": ["success", "nonzero_exit", "tool_error", "transport_error", "timeout", "cancelled", "unknown", "not_run"]},
+    "outcome": {"enum": ["success", "nonzero_exit", "signal", "tool_error", "transport_error", "timeout", "cancelled", "unknown", "not_run"]},
     "mcp_result": {"type": "object", "description": "Raw MCP CallToolResult, including all content and metadata fields; unknown fields are preserved."},
     "output_schema_ref": {"type": "string", "minLength": 1},
     "truncation": {
@@ -16,6 +16,9 @@
       "additionalProperties": false
     },
     "exit_code": {"type": "integer"},
+    "signal": {"type": "string", "minLength": 1},
+    "cancel_requested": {"type": "boolean"},
+    "cancel_confirmed": {"type": "boolean"},
     "stdout": {"type": "string"},
     "stderr": {"type": "string"},
     "error": {
@@ -28,7 +31,9 @@
   },
   "additionalProperties": false,
   "allOf": [
-    {"if": {"properties": {"outcome": {"enum": ["success", "tool_error"]}}}, "then": {"required": ["mcp_result"]}},
-    {"if": {"properties": {"outcome": {"const": "nonzero_exit"}}}, "then": {"required": ["exit_code"]}}
+    {"if": {"properties": {"outcome": {"const": "success"}}}, "then": {"anyOf": [{"required": ["mcp_result"]}, {"required": ["exit_code"], "properties": {"exit_code": {"const": 0}}}]}},
+    {"if": {"properties": {"outcome": {"const": "tool_error"}}}, "then": {"anyOf": [{"required": ["mcp_result"]}, {"required": ["error"]}]}},
+    {"if": {"properties": {"outcome": {"const": "nonzero_exit"}}}, "then": {"required": ["exit_code"], "properties": {"exit_code": {"not": {"const": 0}}}}},
+    {"if": {"properties": {"outcome": {"const": "signal"}}}, "then": {"required": ["signal"]}}
   ]
 }

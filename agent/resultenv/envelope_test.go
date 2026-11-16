@@ -27,8 +27,8 @@ func loadFixtures(t *testing.T) []fixture {
 	if err := json.Unmarshal(raw, &fixtures); err != nil {
 		t.Fatal(err)
 	}
-	if len(fixtures) != 11 {
-		t.Fatalf("fixture count = %d, want 11", len(fixtures))
+	if len(fixtures) != 14 {
+		t.Fatalf("fixture count = %d, want 14", len(fixtures))
 	}
 	return fixtures
 }
@@ -134,6 +134,43 @@ func TestUnknownDistinctFromNotRunAndError(t *testing.T) {
 	}
 	if len(seen) != 3 || !seen[Unknown] || !seen[NotRun] || !seen[ToolError] {
 		t.Fatalf("outcomes collapsed: %v", seen)
+	}
+}
+
+func TestDirectCommandOutcomes(t *testing.T) {
+	want := map[string]Outcome{
+		"direct_exec_success": Success,
+		"nonzero_exit":        NonzeroExit,
+		"signal_exit":         Signal,
+		"direct_tool_error":   ToolError,
+		"cancelled":           Cancelled,
+	}
+	for _, f := range loadFixtures(t) {
+		outcome, ok := want[f.Name]
+		if !ok {
+			continue
+		}
+		var e Envelope
+		if err := json.Unmarshal(f.Envelope, &e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Outcome != outcome {
+			t.Fatalf("%s outcome = %s, want %s", f.Name, e.Outcome, outcome)
+		}
+		switch f.Name {
+		case "direct_exec_success":
+			if len(e.MCPResult) != 0 || e.ExitCode == nil || *e.ExitCode != 0 {
+				t.Fatal("direct success fabricated MCP result or lost exit code")
+			}
+		case "signal_exit":
+			if e.Signal != "SIGTERM" || e.ExitCode != nil {
+				t.Fatal("signal collapsed into exit code")
+			}
+		case "cancelled":
+			if e.CancelRequested == nil || !*e.CancelRequested || e.CancelConfirmed == nil || !*e.CancelConfirmed {
+				t.Fatal("cancel request/confirmation lost")
+			}
+		}
 	}
 }
 

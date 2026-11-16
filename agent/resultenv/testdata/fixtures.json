@@ -35,6 +35,16 @@
     }
   },
   {
+    "name": "direct_exec_success",
+    "envelope": {
+      "version": "resultenv/v1",
+      "outcome": "success",
+      "exit_code": 0,
+      "stdout": "ready\n",
+      "stderr": ""
+    }
+  },
+  {
     "name": "nonzero_exit",
     "envelope": {
       "version": "resultenv/v1",
@@ -45,11 +55,29 @@
     }
   },
   {
+    "name": "signal_exit",
+    "envelope": {
+      "version": "resultenv/v1",
+      "outcome": "signal",
+      "signal": "SIGTERM",
+      "stdout": "partial output\n",
+      "stderr": "terminated\n"
+    }
+  },
+  {
     "name": "tool_error",
     "envelope": {
       "version": "resultenv/v1",
       "outcome": "tool_error",
       "mcp_result": {"content": [{"type": "text", "text": "invalid argument"}], "isError": true}
+    }
+  },
+  {
+    "name": "direct_tool_error",
+    "envelope": {
+      "version": "resultenv/v1",
+      "outcome": "tool_error",
+      "error": {"code": "invalid_arguments", "message": "invalid command arguments"}
     }
   },
   {
@@ -73,7 +101,9 @@
     "envelope": {
       "version": "resultenv/v1",
       "outcome": "cancelled",
-      "error": {"code": "cancelled", "message": "cancelled by caller"}
+      "error": {"code": "cancelled", "message": "cancelled by caller"},
+      "cancel_requested": true,
+      "cancel_confirmed": true
     }
   },
   {

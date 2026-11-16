@@ -19,6 +19,7 @@ type Outcome string
 const (
 	Success        Outcome = "success"
 	NonzeroExit    Outcome = "nonzero_exit"
+	Signal         Outcome = "signal"
 	ToolError      Outcome = "tool_error"
 	TransportError Outcome = "transport_error"
 	Timeout        Outcome = "timeout"
@@ -49,6 +50,9 @@ type Envelope struct {
 	OutputSchemaRef string          `json:"output_schema_ref,omitempty"`
 	Truncation      *Truncation     `json:"truncation,omitempty"`
 	ExitCode        *int            `json:"exit_code,omitempty"`
+	Signal          string          `json:"signal,omitempty"`
+	CancelRequested *bool           `json:"cancel_requested,omitempty"`
+	CancelConfirmed *bool           `json:"cancel_confirmed,omitempty"`
 	Stdout          string          `json:"stdout,omitempty"`
 	Stderr          string          `json:"stderr,omitempty"`
 	Error           *Failure        `json:"error,omitempty"`
@@ -60,7 +64,7 @@ func (e Envelope) Validate() error {
 		return fmt.Errorf("%w: version", ErrInvalid)
 	}
 	switch e.Outcome {
-	case Success, NonzeroExit, ToolError, TransportError, Timeout, Cancelled, Unknown, NotRun:
+	case Success, NonzeroExit, Signal, ToolError, TransportError, Timeout, Cancelled, Unknown, NotRun:
 	default:
 		return fmt.Errorf("%w: outcome", ErrInvalid)
 	}
@@ -70,11 +74,17 @@ func (e Envelope) Validate() error {
 			return fmt.Errorf("%w: MCP result must be an object", ErrInvalid)
 		}
 	}
-	if (e.Outcome == Success || e.Outcome == ToolError) && len(e.MCPResult) == 0 {
-		return fmt.Errorf("%w: MCP result required", ErrInvalid)
+	if e.Outcome == Success && len(e.MCPResult) == 0 && (e.ExitCode == nil || *e.ExitCode != 0) {
+		return fmt.Errorf("%w: success requires MCP result or zero exit code", ErrInvalid)
+	}
+	if e.Outcome == ToolError && len(e.MCPResult) == 0 && e.Error == nil {
+		return fmt.Errorf("%w: tool error requires MCP result or error", ErrInvalid)
 	}
 	if e.Outcome == NonzeroExit && (e.ExitCode == nil || *e.ExitCode == 0) {
 		return fmt.Errorf("%w: nonzero exit code required", ErrInvalid)
+	}
+	if e.Outcome == Signal && strings.TrimSpace(e.Signal) == "" {
+		return fmt.Errorf("%w: signal name required", ErrInvalid)
 	}
 	if e.Error != nil && strings.TrimSpace(e.Error.Code) == "" {
 		return fmt.Errorf("%w: error code required", ErrInvalid)

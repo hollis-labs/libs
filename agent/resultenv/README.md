@@ -5,6 +5,13 @@ inside `mcp_result`; it is never flattened to text or `isError`. The envelope
 distinguishes known tool failure, command exit, transport failure, timeout,
 cancel, unknown effect, and an operation known not to have run.
 
+For direct command execution, `success` carries `exit_code: 0` and does not
+need an MCP result; `nonzero_exit` carries its nonzero code and separate stdout
+and stderr. `signal` carries the terminating signal name. `cancel_requested`
+and `cancel_confirmed` are separate optional booleans, so a requested cancel
+is never mistaken for confirmed termination. A non-MCP `tool_error` carries
+`error` rather than a fabricated MCP result.
+
 Hosts capture raw MCP response JSON with `FromMCPRaw` before their model-facing
 projection. They issue a `runtimecontract.Reference` whose SHA-256 digest covers
 the exact envelope JSON bytes, then store those bytes in a `Receipt`. `ModelView`
