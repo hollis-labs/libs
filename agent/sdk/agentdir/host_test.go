@@ -52,6 +52,19 @@ func (r fakeRunner) Run(ctx context.Context, text string) (sdk.Result, error) {
 	return sdk.Result{RunID: "run-1", Status: sdk.Succeeded, Text: text}, nil
 }
 
+func (r fakeRunner) RunStream(ctx context.Context, text string, delta func(string) error) (sdk.Result, error) {
+	result, err := r.Run(ctx, text)
+	if err != nil {
+		return result, err
+	}
+	for _, part := range []string{text[:len(text)/2], text[len(text)/2:]} {
+		if err := delta(part); err != nil {
+			return sdk.Result{}, err
+		}
+	}
+	return result, nil
+}
+
 func definition(mode string) string {
 	return fmt.Sprintf("---\nschema_version: '2'\ndefinition_id: def:example\nrevision: '1'\nname: example\ndescription: Example agent.\nbehavior:\n  purpose: Reply to a turn.\nrequirements: {}\nharness_profile:\n  permissions:\n    profile: example\ncontinuity:\n  mode: %s\n---\nOriginal instructions.\n", mode)
 }
@@ -117,7 +130,7 @@ func TestKindsLifetimeReloadAndHTTP(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/agents/stable/turns", strings.NewReader(`{"text":"hello"}`))
 	w := httptest.NewRecorder()
 	h.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `event: run.finish`) || !strings.Contains(w.Body.String(), `event: message.start`) || !strings.Contains(w.Body.String(), `"text":"hello"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `event: run.finish`) || !strings.Contains(w.Body.String(), `event: message.start`) || !strings.Contains(w.Body.String(), `"text":"he"`) || !strings.Contains(w.Body.String(), `"text":"llo"`) {
 		t.Fatalf("HTTP chatstream: %d %s", w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()

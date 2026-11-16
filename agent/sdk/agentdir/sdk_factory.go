@@ -12,7 +12,11 @@ import (
 // mints a binding, environment receipt, grant or run ID.
 type SDKFactory struct {
 	Ports func(context.Context, Snapshot, string) (sdk.Ports, error)
-	Input func(context.Context, Snapshot, string, string) (sdk.Input, error)
+	// StreamPorts must route the provider through TapProvider with the supplied
+	// sink. The host owns provider selection, so this adapter cannot replace its
+	// router after construction.
+	StreamPorts func(context.Context, Snapshot, string, func(string) error) (sdk.Ports, error)
+	Input       func(context.Context, Snapshot, string, string) (sdk.Input, error)
 }
 
 func (f SDKFactory) New(_ context.Context, s Snapshot, conversationID string) (Runner, error) {
@@ -29,7 +33,24 @@ type sdkRunner struct {
 }
 
 func (r sdkRunner) Run(ctx context.Context, text string) (sdk.Result, error) {
-	ports, err := r.factory.Ports(ctx, r.snapshot, r.conversationID)
+	return r.run(ctx, text, nil)
+}
+
+func (r sdkRunner) RunStream(ctx context.Context, text string, delta func(string) error) (sdk.Result, error) {
+	if r.factory.StreamPorts == nil {
+		return sdk.Result{}, ErrStreamingUnavailable
+	}
+	return r.run(ctx, text, delta)
+}
+
+func (r sdkRunner) run(ctx context.Context, text string, delta func(string) error) (sdk.Result, error) {
+	var ports sdk.Ports
+	var err error
+	if delta == nil {
+		ports, err = r.factory.Ports(ctx, r.snapshot, r.conversationID)
+	} else {
+		ports, err = r.factory.StreamPorts(ctx, r.snapshot, r.conversationID, delta)
+	}
 	if err != nil {
 		return sdk.Result{}, err
 	}
