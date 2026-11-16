@@ -21,6 +21,7 @@
     "cancel_confirmed": {"type": "boolean"},
     "stdout": {"type": "string"},
     "stderr": {"type": "string"},
+    "combined_output": {"type": "string", "description": "PTY's one merged byte stream; do not label it stdout or stderr."},
     "error": {
       "type": "object",
       "required": ["code", "message"],

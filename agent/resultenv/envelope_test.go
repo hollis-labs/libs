@@ -27,8 +27,8 @@ func loadFixtures(t *testing.T) []fixture {
 	if err := json.Unmarshal(raw, &fixtures); err != nil {
 		t.Fatal(err)
 	}
-	if len(fixtures) != 14 {
-		t.Fatalf("fixture count = %d, want 14", len(fixtures))
+	if len(fixtures) != 15 {
+		t.Fatalf("fixture count = %d, want 15", len(fixtures))
 	}
 	return fixtures
 }
@@ -140,6 +140,7 @@ func TestUnknownDistinctFromNotRunAndError(t *testing.T) {
 func TestDirectCommandOutcomes(t *testing.T) {
 	want := map[string]Outcome{
 		"direct_exec_success": Success,
+		"pty_combined_output": Success,
 		"nonzero_exit":        NonzeroExit,
 		"signal_exit":         Signal,
 		"direct_tool_error":   ToolError,
@@ -170,6 +171,55 @@ func TestDirectCommandOutcomes(t *testing.T) {
 			if e.CancelRequested == nil || !*e.CancelRequested || e.CancelConfirmed == nil || !*e.CancelConfirmed {
 				t.Fatal("cancel request/confirmation lost")
 			}
+		case "pty_combined_output":
+			if e.CombinedOutput == "" || e.Stdout != "" || e.Stderr != "" {
+				t.Fatal("PTY stream was split or lost")
+			}
+		}
+	}
+}
+
+func TestSerializedReceiptPreservesEnvelopeBytes(t *testing.T) {
+	for _, f := range loadFixtures(t) {
+		r, err := NewReceipt(refFor(f.Envelope), f.Envelope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wire, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var restored Receipt
+		if err := json.Unmarshal(wire, &restored); err != nil {
+			t.Fatal(err)
+		}
+		got, err := restored.Envelope()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, f.Envelope) {
+			t.Fatalf("%s: receipt JSON changed envelope bytes", f.Name)
+		}
+	}
+}
+
+func TestModelViewPreservesLargeNumbers(t *testing.T) {
+	raw := []byte(`{
+  "version": "resultenv/v1",
+  "outcome": "success",
+  "mcp_result": {"content": [], "structuredContent": {"id": 9007199254740993, "decimal": 1.234567890123456789}}
+}`)
+	r, err := NewReceipt(refFor(raw), raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := ModelView(r, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"9007199254740993", "1.234567890123456789"} {
+		if !bytes.Contains(view, []byte(want)) {
+			t.Fatalf("model view lost numeric precision for %s: %s", want, view)
 		}
 	}
 }

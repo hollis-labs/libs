@@ -45,6 +45,15 @@
     }
   },
   {
+    "name": "pty_combined_output",
+    "envelope": {
+      "version": "resultenv/v1",
+      "outcome": "success",
+      "exit_code": 0,
+      "combined_output": "stdout and stderr share one PTY stream\n"
+    }
+  },
+  {
     "name": "nonzero_exit",
     "envelope": {
       "version": "resultenv/v1",

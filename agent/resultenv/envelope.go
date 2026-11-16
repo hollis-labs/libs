@@ -55,6 +55,7 @@ type Envelope struct {
 	CancelConfirmed *bool           `json:"cancel_confirmed,omitempty"`
 	Stdout          string          `json:"stdout,omitempty"`
 	Stderr          string          `json:"stderr,omitempty"`
+	CombinedOutput  string          `json:"combined_output,omitempty"`
 	Error           *Failure        `json:"error,omitempty"`
 	Redact          []string        `json:"redact,omitempty"`
 }
@@ -124,9 +125,11 @@ func FromMCPRaw(raw []byte, outputSchemaRef string) (Envelope, error) {
 
 // Receipt is the host's lossless record. Ref is a host-issued immutable
 // locator, not a permission grant. EnvelopeJSON is retained byte for byte.
+// Its []byte JSON representation is base64, so receipt serialization cannot
+// reformat the bytes covered by the digest.
 type Receipt struct {
 	Ref          runtimecontract.Reference `json:"ref"`
-	EnvelopeJSON json.RawMessage           `json:"envelope"`
+	EnvelopeJSON []byte                    `json:"envelope_bytes"`
 }
 
 func NewReceipt(ref runtimecontract.Reference, envelopeJSON []byte) (Receipt, error) {
@@ -144,7 +147,7 @@ func NewReceipt(ref runtimecontract.Reference, envelopeJSON []byte) (Receipt, er
 	if !strings.EqualFold(ref.Digest.Value, hex.EncodeToString(sum[:])) {
 		return Receipt{}, fmt.Errorf("%w: receipt digest mismatch", ErrInvalid)
 	}
-	return Receipt{Ref: ref, EnvelopeJSON: append(json.RawMessage(nil), envelopeJSON...)}, nil
+	return Receipt{Ref: ref, EnvelopeJSON: bytes.Clone(envelopeJSON)}, nil
 }
 
 func (r Receipt) Envelope() ([]byte, error) {
