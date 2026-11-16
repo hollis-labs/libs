@@ -1,0 +1,9 @@
+{
+  "liveness": "alive",
+  "work": "blocked",
+  "attention": "permission",
+  "process_generation": 4,
+  "source_seq": 12,
+  "record_id": "build/test",
+  "message": "Approve deployment?"
+}
