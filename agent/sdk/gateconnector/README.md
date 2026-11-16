@@ -16,6 +16,12 @@ ending a wait does not cancel it.
 
 `Project` yields reference-only evidence for transcript sidebands, invocation
 records and tool cards. Decision, delivery and execution facts are separate.
+`EncodeApprovalLine` turns that correlated evidence into an `approval` system
+sideband for the published SDK transcript contract, with host-issued UUID,
+session and timestamp. It preserves the native option/scope and separate
+delivery and execution receipt refs; an unknown effect remains unknown. The
+host must verify conversation/binding and append the line durably. Nothing in
+this package writes a transcript or treats its line as an admission token.
 It checks ticket/request/receipt correlation but is **not** authority verification
 or admission. The executor must recheck host facts, call the authoritative
 verifier, claim a valid grant atomically, and fence that claim through effect

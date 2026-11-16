@@ -2,6 +2,7 @@ package gateconnector_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"sync"
@@ -286,6 +287,21 @@ func TestEvidenceSeparatesDecisionDeliveryAndExecution(t *testing.T) {
 	}
 	if evidence.Delivery.EvidenceRef != "write-attempt-1" || evidence.Execution.EvidenceRef != "effect-uncertain-1" {
 		t.Fatalf("receipt refs collapsed: %+v", evidence)
+	}
+	line, err := gateconnector.EncodeApprovalLine(r, decided, &delivery, &execution, gateconnector.TranscriptIdentity{UUID: "approval-line-1", SessionID: "session-1", Timestamp: connector.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sideband struct {
+		Type    string                     `json:"type"`
+		Subtype string                     `json:"subtype"`
+		Payload gateconnector.ApprovalLine `json:"payload"`
+	}
+	if err := json.Unmarshal(line, &sideband); err != nil {
+		t.Fatal(err)
+	}
+	if sideband.Type != "system" || sideband.Subtype != "approval" || sideband.Payload.DecisionID != "decision-1" || sideband.Payload.DeliveryReceiptRef != "write-attempt-1" || sideband.Payload.ExecutionReceiptRef != "effect-uncertain-1" || sideband.Payload.ExecutionState != gate.ExecutionUnknown || sideband.Payload.Scope == nil || sideband.Payload.Scope.Kind != gate.Once {
+		t.Fatalf("transcript line lost approval refs or scope: %+v", sideband)
 	}
 	delivery.DecisionRef = "different-decision"
 	if _, err := gateconnector.Project(r, decided, &delivery, &execution); !errors.Is(err, gate.ErrBinding) {
