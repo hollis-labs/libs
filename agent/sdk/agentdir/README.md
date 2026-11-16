@@ -22,14 +22,24 @@ The host supplies a `Store` for authoritative conversation IDs, terminal task
 state and one input writer; a `Factory` creates the runner. `SDKFactory` adapts
 that runner to `sdk.New` and `Operative.Run`, using host-issued ports and input.
 The SDK does not issue identities, grants, environment receipts or leases.
-`MemoryStore` is only a local reference projection; production hosts must use
-a durable store and transcript writer. The JSONL transcript port is owned by
-the chat host and can be supplied through SDK ports when available. This
-package does not create a second transcript store.
+`MemoryStore` is only a local reference projection. `TranscriptStableStore`
+uses the sibling `agent/sdk/transcript` package to keep a stable seat's
+conversation and completed user/assistant turns across process restarts. It
+holds that package's exclusive writer lock for each turn, checks the authored
+definition ID against the first log record and exposes `Replay` from a
+committed transcript cursor. Its host supplies the private root and caller
+authorization. Task terminal state, embedded app state, provider recovery,
+generation fencing, retention and search still require a production host.
+The process-restart test kills a host test process, starts a new one against
+the same log, and replays only the suffix after the prior cursor.
 
 `Host.Handler()` exposes `POST /agents/{name}/turns` with native
-`chatstream/v1` SSE events. It sends the completed answer as one text delta;
-the richer incremental stream and cursor replay require the transcript host.
+`chatstream/v1` SSE events. It flushes each provider text delta before the
+run finishes. `SDKFactory.StreamPorts` asks the embedding host to construct
+its selected router with `TapProvider`, which forwards admitted provider
+deltas to the SSE writer. A runner lacking `RunStream` is rejected explicitly.
+The transcript cursor is separate from the SSE event sequence; reconnect
+from the transcript requires the host's authorized replay route.
 Authentication and authorization belong to the embedding HTTP server.
 
 `examples/agents/` contains valid stable, task and embedded directories. A
