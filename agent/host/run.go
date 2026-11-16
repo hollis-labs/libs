@@ -1,4 +1,4 @@
-package agenthost
+package host
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/hubbind"
 )
 
-// The ext keys on a tool call's part.end that tell the page to run it (contracts/agent-host.md).
+// The ext keys on a tool call's part.end that tell the page to run it (WIRE.md).
 const (
 	ExtExec   = "ade.exec"
 	ExtClient = "ade.client"

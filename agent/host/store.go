@@ -1,4 +1,4 @@
-package agenthost
+package host
 
 import (
 	"context"

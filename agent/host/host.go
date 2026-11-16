@@ -1,4 +1,4 @@
-// Package agenthost is the server's side of the agent-host wire (contracts/agent-host.md):
+// Package host is the server's side of the agent-host wire (WIRE.md):
 // it runs the model, keeps one running thread per owner, relays each tool call to the page
 // that declared the tool and takes the page's answer back to the model.
 //
@@ -9,7 +9,7 @@
 // It is built on the portfolio's shared libraries: the run loop and turn reader from
 // libs/agent/core, the model contracts from libs/llm/core, and the chatstream/v1 events and
 // their hub from libs/ui/ui-go.
-package agenthost
+package host
 
 import (
 	"context"

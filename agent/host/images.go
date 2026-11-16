@@ -1,4 +1,4 @@
-package agenthost
+package host
 
 import (
 	"encoding/base64"
