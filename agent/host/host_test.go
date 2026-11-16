@@ -472,11 +472,26 @@ func TestCancelEndsWithAbort(t *testing.T) {
 	if code, _ := a.call(t, "u1", "DELETE", "/thread", nil); code != 409 {
 		t.Fatalf("busy new thread: %d", code)
 	}
+	// The cancel is posted beside the stream. The stream can end (run.abort) before the
+	// cancel's answer is read, so the test waits for that answer before it ends, and the
+	// request is not tied to the test's context, which ends with the test.
+	cancelled := make(chan int, 1)
 	go func() {
 		time.Sleep(200 * time.Millisecond)
-		a.call(t, "u1", "POST", "/runs/"+run+"/cancel", map[string]any{})
+		req, _ := http.NewRequestWithContext(context.Background(), "POST", a.srv.URL+"/api/agent/runs/"+run+"/cancel", strings.NewReader("{}"))
+		req.Header.Set("X-User", "u1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			cancelled <- -1
+			return
+		}
+		_ = res.Body.Close()
+		cancelled <- res.StatusCode
 	}()
 	evs, _ := a.events(t, run, "", nil)
+	if code := <-cancelled; code != 204 {
+		t.Fatalf("cancel: %d", code)
+	}
 	conformance.Check(t, evs)
 	if last(evs).Verb != chatstream.VerbRunAbort || terminals(evs) != 1 {
 		t.Fatalf("ended with %+v", last(evs))
