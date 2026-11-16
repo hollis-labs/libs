@@ -1,0 +1,9 @@
+{
+  "source_repository": "hollis-labs/gatecrasher",
+  "source_commit": "ac24a5c855146625eff79064d7cbf287bcecaf1b",
+  "source_path": "internal/api/api.go",
+  "routes": [
+    { "method": "POST", "path": "/api/gate/v1/authorize-response", "purpose": "pre-CAS response assessment" },
+    { "method": "POST", "path": "/api/gate/v1/recipes/fingerprint", "purpose": "bounded SDK recipe" }
+  ]
+}

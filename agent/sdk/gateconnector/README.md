@@ -28,4 +28,11 @@ path. This connector cannot invent a missing ticket or recover from UI text.
 The in-memory test store proves process replacement behavior only; it is not a
 production durable store.
 
+Gatecrasher service main at `ac24a5c855146625eff79064d7cbf287bcecaf1b`
+exposes only response assessment and a bounded recipe route over HTTP. The
+`testdata/gatecrasher-http-ac24a5c.json` snapshot pins those routes for the
+contract test. `ServiceHTTPPort` returns `gate.ErrUnsupported` for capabilities,
+Request, Await and Cancel; no client invents missing endpoints or treats response
+assessment as an approval. Recheck the service contract before adding HTTP support.
+
 Run `go test -race ./gateconnector` and `go test ./...` from `agent/sdk`.
