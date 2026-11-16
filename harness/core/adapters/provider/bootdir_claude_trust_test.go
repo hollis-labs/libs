@@ -265,6 +265,8 @@ func setHomeForTest(t *testing.T, homeDir string) {
 	t.Helper()
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
+	// Codex checks its explicit home before HOME; never retain an inherited auth root.
+	t.Setenv("CODEX_HOME", filepath.Join(homeDir, ".codex"))
 }
 
 // TestClaudeBootDirSpec_SettingsJSON_NoSideEffectWhenBootDirEmpty pins the
