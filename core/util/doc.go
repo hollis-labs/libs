@@ -10,5 +10,5 @@
 // declarative rule router), ledger (the decision ledger record, with ledgertest) and
 // workclient (a client for the Work service's HTTP API).
 //
-// The module is released with module-prefixed tags of the form util/vX.Y.Z.
+// The module is released with module-prefixed tags of the form core/util/vX.Y.Z.
 package util
