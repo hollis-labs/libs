@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 )
 
 func staticToken(tok string) func(context.Context) (string, error) {
@@ -538,5 +539,12 @@ func TestOversizeEventIsBadAnswer(t *testing.T) {
 	er := NewEventReader(strings.NewReader("data: " + strings.Repeat("x", 2<<20) + "\n\n"))
 	if _, err := er.Next(); !errors.Is(err, ErrBadAnswer) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestCappedMessageKeepsWholeCharacters(t *testing.T) {
+	e := answerError(500, []byte(strings.Repeat("é", maxMessage)))
+	if !utf8.ValidString(e.Message) {
+		t.Error("the cut split a character")
 	}
 }

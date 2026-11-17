@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 // Sentinels an *Error or a transport failure matches under errors.Is.
@@ -94,7 +95,11 @@ func answerError(status int, raw []byte) *Error {
 	if e.Message == "" && body == nil {
 		e.Message = strings.TrimSpace(string(raw))
 		if len(e.Message) > maxMessage {
-			e.Message = e.Message[:maxMessage] + "…"
+			cut := maxMessage
+			for cut > 0 && !utf8.RuneStart(e.Message[cut]) {
+				cut--
+			}
+			e.Message = e.Message[:cut] + "…"
 		}
 	}
 	e.Task, _ = body["task"].(string)

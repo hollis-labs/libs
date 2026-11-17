@@ -46,7 +46,8 @@ type Config struct {
 	// CorrelationPrefix starts each X-Correlation-ID; empty means "workclient".
 	CorrelationPrefix string
 	// HTTP is the client for the JSON routes; nil means one with a 60 s timeout. The event
-	// stream uses its Transport without a timeout.
+	// stream uses its Transport without a timeout. It is copied, not changed. Its
+	// CheckRedirect, when set, replaces the default, which follows redirects for reads only.
 	HTTP *http.Client
 }
 
