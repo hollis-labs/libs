@@ -139,10 +139,19 @@ func (h *Host) check(ctx context.Context, owner runtimecontract.OwnerID, p Permi
 	return h.authorize(ctx, owner, p)
 }
 func key(b runtimecontract.Binding) string {
-	return string(b.OwnerID) + "\x00" + string(b.OperativeID) + "\x00" + string(b.ConversationID)
+	return tupleKey(string(b.OwnerID), string(b.OperativeID), string(b.ConversationID))
 }
 func scopeKey(s session.Scope) string {
-	return string(s.OwnerID) + "\x00" + string(s.OperativeID) + "\x00" + string(s.ConversationID)
+	return tupleKey(string(s.OwnerID), string(s.OperativeID), string(s.ConversationID))
+}
+func tupleKey(parts ...string) string {
+	var b strings.Builder
+	for _, part := range parts {
+		b.WriteString(strconv.Itoa(len(part)))
+		b.WriteByte(':')
+		b.WriteString(part)
+	}
+	return b.String()
 }
 func equalScope(b runtimecontract.Binding, s session.Scope) bool {
 	return b.OwnerID == s.OwnerID && b.OperativeID == s.OperativeID && b.ConversationID == s.ConversationID
@@ -293,7 +302,7 @@ func (h *Host) Load(ctx context.Context, sc session.Scope) (session.Record, erro
 	var out session.Record
 	err := h.transact(false, func(s *state) error {
 		c := s.Conversations[scopeKey(sc)]
-		if c == nil {
+		if c == nil || !equalScope(c.Record.Binding, sc) {
 			return session.ErrNotFound
 		}
 		out = clone(c.Record)

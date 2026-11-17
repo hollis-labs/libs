@@ -139,6 +139,26 @@ func TestDurableTwoViewsOneWriterAndChildIsolation(t *testing.T) {
 	}
 }
 
+// Distinct accepted ID tuples must not share a durable map key, even when a
+// component contains the separator used by an earlier host implementation.
+func TestOwnerScopeDelimiterIsolation(t *testing.T) {
+	h := makeHost(t, t.TempDir())
+	victim := principal("victim")
+	if err := h.RegisterAgent(victim, Agent{ID: "a", Owner: "victim", Seat: "seat", Kind: Stable, Supervisor: App}); err != nil {
+		t.Fatal(err)
+	}
+	b := binding("victim", "a", "b\x00c", "attempt", 1)
+	active(t, h, victim, b)
+	ownerScope := session.Scope{OwnerID: b.OwnerID, OperativeID: b.OperativeID, ConversationID: b.ConversationID}
+	if got, err := h.Load(victim, ownerScope); err != nil || got.Binding != b {
+		t.Fatalf("victim load: %+v %v", got, err)
+	}
+	otherScope := session.Scope{OwnerID: "victim\x00a", OperativeID: "b", ConversationID: "c"}
+	if got, err := h.Load(principal("victim\x00a"), otherScope); !errors.Is(err, session.ErrNotFound) {
+		t.Fatalf("cross-owner load returned %+v, %v", got, err)
+	}
+}
+
 func TestGenerationFenceAndOwnerIsolation(t *testing.T) {
 	h := makeHost(t, t.TempDir())
 	ctx := principal("one")
