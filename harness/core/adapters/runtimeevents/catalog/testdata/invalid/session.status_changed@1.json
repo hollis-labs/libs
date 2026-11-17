@@ -1,0 +1,7 @@
+{
+  "liveness": "alive",
+  "work": "blocked",
+  "attention": "permission",
+  "process_generation": 0,
+  "source_seq": 12
+}

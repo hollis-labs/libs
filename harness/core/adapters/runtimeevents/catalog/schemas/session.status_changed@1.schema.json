@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hollis-labs:events:session.status_changed@1",
+  "title": "session.status_changed@1",
+  "description": "Current process liveness, reported work, and user attention for one session. The producer's PTY process generation fences late output; envelope cursor is assigned by the durable log.",
+  "type": "object",
+  "required": ["liveness", "work", "attention", "process_generation", "source_seq"],
+  "properties": {
+    "liveness": {"enum": ["alive", "dead", "unknown"]},
+    "work": {"enum": ["idle", "working", "done", "blocked", "error", "unknown"]},
+    "attention": {"enum": ["none", "permission", "question", "auth", "user", "done", "error", "unknown"]},
+    "process_generation": {"type": "integer", "minimum": 1},
+    "source_seq": {"type": "integer", "minimum": 0},
+    "record_id": {"type": "string", "maxLength": 128},
+    "message": {"type": "string", "maxLength": 2048}
+  }
+}
