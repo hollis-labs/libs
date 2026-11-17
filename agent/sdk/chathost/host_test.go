@@ -159,6 +159,40 @@ func TestOwnerScopeDelimiterIsolation(t *testing.T) {
 	}
 }
 
+func TestScopeKeyInjectiveForEmptyPrefixAndNULComponents(t *testing.T) {
+	components := []string{"", "a", "ab", "b", "\x00", "a\x00", "\x00b"}
+	type tuple struct{ owner, operative, conversation string }
+	seen := make(map[string]tuple)
+	for _, owner := range components {
+		for _, operative := range components {
+			for _, conversation := range components {
+				parts := tuple{owner, operative, conversation}
+				key := scopeKey(session.Scope{
+					OwnerID:        runtimecontract.OwnerID(owner),
+					OperativeID:    runtimecontract.OperativeID(operative),
+					ConversationID: runtimecontract.ConversationID(conversation),
+				})
+				if previous, ok := seen[key]; ok && previous != parts {
+					t.Fatalf("distinct scope tuples collided: %#v and %#v", previous, parts)
+				}
+				seen[key] = parts
+				bindingKey := keyForTest(parts)
+				if key != bindingKey {
+					t.Fatalf("binding/scope key mismatch for %#v", parts)
+				}
+			}
+		}
+	}
+}
+
+func keyForTest(parts struct{ owner, operative, conversation string }) string {
+	return key(runtimecontract.Binding{
+		OwnerID:        runtimecontract.OwnerID(parts.owner),
+		OperativeID:    runtimecontract.OperativeID(parts.operative),
+		ConversationID: runtimecontract.ConversationID(parts.conversation),
+	})
+}
+
 func TestGenerationFenceAndOwnerIsolation(t *testing.T) {
 	h := makeHost(t, t.TempDir())
 	ctx := principal("one")
