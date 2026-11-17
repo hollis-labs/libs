@@ -3,6 +3,7 @@ package agentdir
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -92,5 +93,45 @@ func TestSDKStreamsDeltasBeforeCompletion(t *testing.T) {
 	}
 	if !strings.Contains(string(rest), `"text":"second"`) || !strings.Contains(string(rest), "event: run.finish") {
 		t.Fatalf("missing incremental completion: %s", rest)
+	}
+}
+
+func TestTapProviderCancelsUpstreamOnSinkFailure(t *testing.T) {
+	fh := fakehost.New()
+	cancelled := make(chan struct{})
+	fh.Model.Stream = func(ctx context.Context, _ llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
+		out := make(chan llmtypes.StreamEvent)
+		go func() {
+			defer close(out)
+			select {
+			case out <- llmtypes.StreamEvent{Type: llmtypes.EventDelta, Content: "undeliverable"}:
+			case <-ctx.Done():
+			}
+			<-ctx.Done()
+			close(cancelled)
+		}()
+		return out, nil
+	}
+	parent, parentCancel := context.WithCancel(context.Background())
+	defer parentCancel()
+	stream, err := (TapProvider{Provider: fh.Model, Delta: func(string) error { return errors.New("client disconnected") }}).StreamChat(parent, llmtypes.ChatRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case event := <-stream:
+		if event.Type != llmtypes.EventError || !strings.Contains(event.Error, "client disconnected") {
+			t.Fatalf("sink error was lost: %+v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("sink error was not delivered")
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("upstream context stayed active after sink failure")
+	}
+	if parent.Err() != nil {
+		t.Fatal("tap cancelled the parent request context")
 	}
 }

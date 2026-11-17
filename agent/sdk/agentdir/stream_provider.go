@@ -29,12 +29,15 @@ func (p TapProvider) StreamChat(ctx context.Context, req llmtypes.ChatRequest) (
 	if p.Provider == nil || p.Delta == nil {
 		return nil, fmt.Errorf("agentdir: provider and delta sink required")
 	}
-	stream, err := p.Provider.StreamChat(ctx, req)
+	streamCtx, cancel := context.WithCancel(ctx)
+	stream, err := p.Provider.StreamChat(streamCtx, req)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	out := make(chan llmtypes.StreamEvent)
 	go func() {
+		defer cancel()
 		defer close(out)
 		for {
 			select {
@@ -46,6 +49,7 @@ func (p TapProvider) StreamChat(ctx context.Context, req llmtypes.ChatRequest) (
 				}
 				if event.Type == llmtypes.EventDelta && event.Content != "" {
 					if err := p.Delta(event.Content); err != nil {
+						cancel()
 						select {
 						case out <- llmtypes.StreamEvent{Type: llmtypes.EventError, Error: err.Error()}:
 						case <-ctx.Done():
