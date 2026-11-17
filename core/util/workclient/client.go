@@ -86,12 +86,29 @@ func New(c Config) (*Client, error) {
 	if c.CorrelationPrefix == "" {
 		c.CorrelationPrefix = "workclient"
 	}
-	cl := &Client{base: u, cfg: c, hc: c.HTTP}
-	if cl.hc == nil {
-		cl.hc = &http.Client{Timeout: 60 * time.Second}
+	hc := &http.Client{Timeout: 60 * time.Second}
+	if c.HTTP != nil {
+		cp := *c.HTTP
+		hc = &cp
 	}
-	cl.stream = &http.Client{Transport: cl.hc.Transport, CheckRedirect: cl.hc.CheckRedirect, Jar: cl.hc.Jar}
+	if hc.CheckRedirect == nil {
+		hc.CheckRedirect = safeRedirect
+	}
+	cl := &Client{base: u, cfg: c, hc: hc}
+	cl.stream = &http.Client{Transport: hc.Transport, CheckRedirect: hc.CheckRedirect, Jar: hc.Jar}
 	return cl, nil
+}
+
+// safeRedirect follows a redirect only for a read: a redirected write could land on a
+// different route than the one asked for.
+func safeRedirect(req *http.Request, via []*http.Request) error {
+	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		return fmt.Errorf("workclient: refused to follow a redirect for %s", req.Method)
+	}
+	if len(via) >= 10 {
+		return errors.New("workclient: too many redirects")
+	}
+	return nil
 }
 
 // ---- Per-call identity ----
@@ -102,32 +119,55 @@ const (
 	keyOwnerNS ctxKey = iota
 	keyPrincipal
 	keyActor
+	keyCorrelation
 )
 
-// WithOwnerNS sets the owner namespace for calls made with ctx.
+// none marks a header dropped for one call.
+type none struct{}
+
+// WithOwnerNS sets the owner namespace for calls made with ctx. An empty ns leaves
+// Config.OwnerNS in place.
 func WithOwnerNS(ctx context.Context, ns string) context.Context {
 	return context.WithValue(ctx, keyOwnerNS, ns)
 }
 
-// WithPrincipal sets the delegated principal for calls made with ctx.
+// WithPrincipal sets the delegated principal for calls made with ctx. An empty urn leaves
+// Config.Principal in place; WithoutPrincipal drops it.
 func WithPrincipal(ctx context.Context, urn string) context.Context {
 	return context.WithValue(ctx, keyPrincipal, urn)
 }
 
-// WithActor sets the asserted actor for calls made with ctx.
+// WithoutPrincipal sends calls made with ctx without X-Principal-URN, whatever Config says.
+func WithoutPrincipal(ctx context.Context) context.Context {
+	return context.WithValue(ctx, keyPrincipal, none{})
+}
+
+// WithActor sets the asserted actor for calls made with ctx. An empty urn leaves
+// Config.Actor in place.
 func WithActor(ctx context.Context, urn string) context.Context {
 	return context.WithValue(ctx, keyActor, urn)
 }
 
+// WithCorrelation sends id as the X-Correlation-ID of calls made with ctx, so a caller's
+// own request id follows it into the service's log.
+func WithCorrelation(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, keyCorrelation, id)
+}
+
 func pick(ctx context.Context, k ctxKey, def string) string {
-	if v, ok := ctx.Value(k).(string); ok {
-		return v
+	switch v := ctx.Value(k).(type) {
+	case none:
+		return ""
+	case string:
+		if v != "" {
+			return v
+		}
 	}
 	return def
 }
 
 // OwnerNS is the owner namespace calls made with ctx are sent with ("" leaves it to the
-// service).
+// service's default).
 func (c *Client) OwnerNS(ctx context.Context) string {
 	return pick(ctx, keyOwnerNS, c.cfg.OwnerNS)
 }
@@ -159,7 +199,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, q url.Valu
 	}
 	tok, err := c.cfg.Token(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("workclient: the service key: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	set := func(h, v string) {
@@ -170,13 +210,20 @@ func (c *Client) newRequest(ctx context.Context, method, path string, q url.Valu
 	set(HeaderOwnerNS, pick(ctx, keyOwnerNS, c.cfg.OwnerNS))
 	set(HeaderPrincipal, pick(ctx, keyPrincipal, c.cfg.Principal))
 	set(HeaderActor, pick(ctx, keyActor, c.cfg.Actor))
-	req.Header.Set(HeaderCorrelation, c.correlationID())
+	corr := pick(ctx, keyCorrelation, "")
+	if corr == "" {
+		corr = c.correlationID()
+	}
+	req.Header.Set(HeaderCorrelation, corr)
 	req.Header.Set("Accept", "application/json")
 	return req, nil
 }
 
 // do sends a JSON request and decodes a 2xx answer into out (nil: ignored).
-func (c *Client) do(ctx context.Context, method, path string, q url.Values, in, out any) error {
+func (c *Client) do(ctx context.Context, method string, path route, q url.Values, in, out any) error {
+	if path.err != nil {
+		return path.err
+	}
 	var body io.Reader
 	if in != nil {
 		b, err := json.Marshal(in)
@@ -185,7 +232,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, in, 
 		}
 		body = bytes.NewReader(b)
 	}
-	req, err := c.newRequest(ctx, method, path, q, body)
+	req, err := c.newRequest(ctx, method, path.path, q, body)
 	if err != nil {
 		return err
 	}
@@ -216,15 +263,32 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, in, 
 	return nil
 }
 
-// p is /v1/work with each part path-escaped.
-func p(parts ...string) string {
+// ErrBadID is a workspace, item, note or view id that cannot name one: empty, "." or "..".
+// The service's router would clean such a path into another route (a note delete with id
+// ".." would become a workspace delete), so the client refuses it before sending.
+var ErrBadID = errors.New("workclient: an id may not be empty, \".\" or \"..\"")
+
+// route is an escaped path, or why it could not be made.
+type route struct {
+	path string
+	err  error
+}
+
+// fixed is a path with no ids in it.
+func fixed(path string) route { return route{path: path} }
+
+// p is /v1/work with each part path-escaped. A part that is empty, "." or ".." is refused.
+func p(parts ...string) route {
 	var b strings.Builder
 	b.WriteString("/v1/work")
 	for _, s := range parts {
+		if s == "" || s == "." || s == ".." {
+			return route{err: ErrBadID}
+		}
 		b.WriteByte('/')
 		b.WriteString(url.PathEscape(s))
 	}
-	return b.String()
+	return route{path: b.String()}
 }
 
 type revOut struct {
@@ -241,7 +305,7 @@ func (c *Client) Workspaces(ctx context.Context, app string) (Listing, error) {
 	if app != "" {
 		q.Set("app", app)
 	}
-	if err := c.do(ctx, "GET", "/v1/work", q, nil, &out); err != nil {
+	if err := c.do(ctx, "GET", fixed("/v1/work"), q, nil, &out); err != nil {
 		return Listing{}, err
 	}
 	if out.Workspaces == nil {
@@ -253,7 +317,7 @@ func (c *Client) Workspaces(ctx context.Context, app string) (Listing, error) {
 // NewWorkspace makes a workspace and, when in.Template is set, its starting tree.
 func (c *Client) NewWorkspace(ctx context.Context, in NewWorkspace) (Created, error) {
 	var out Created
-	err := c.do(ctx, "POST", "/v1/work", nil, in, &out)
+	err := c.do(ctx, "POST", fixed("/v1/work"), nil, in, &out)
 	return out, err
 }
 
@@ -323,9 +387,22 @@ func (c *Client) Detail(ctx context.Context, ws, id string) (Detail, error) {
 
 // EditItem edits an item and returns its new revision. See Edit for a stale BaseRev.
 func (c *Client) EditItem(ctx context.Context, ws, id string, e Edit) (int, error) {
+	e.Tags = clearable(e.Tags)
+	e.Material = clearable(e.Material)
+	e.Published = clearable(e.Published)
+	e.Links = clearable(e.Links)
 	var out revOut
 	err := c.do(ctx, "PUT", p(ws, "items", id), nil, e, &out)
 	return out.Rev, err
+}
+
+// clearable makes a pointer to a nil slice a pointer to an empty one: JSON null would
+// leave the list as it is, and the caller asked to clear it.
+func clearable[T any](v *[]T) *[]T {
+	if v != nil && *v == nil {
+		return &[]T{}
+	}
+	return v
 }
 
 // Move sets one of an item's keys (stage, or a field) to value and returns its revision.
@@ -377,8 +454,8 @@ func (c *Client) TorqueStatus(ctx context.Context, ws, id string) (ItemTask, err
 
 // ---- Notes, rounds, sign-off ----
 
-// AddNote adds a draft comment or suggestion to an item.
-func (c *Client) AddNote(ctx context.Context, ws, id string, n Note) (Note, error) {
+// AddNote adds a draft comment or suggestion to an item and returns it as stored.
+func (c *Client) AddNote(ctx context.Context, ws, id string, n NewNote) (Note, error) {
 	var out Note
 	err := c.do(ctx, "POST", p(ws, "items", id, "notes"), nil, n, &out)
 	return out, err

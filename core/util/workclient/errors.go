@@ -14,6 +14,11 @@ var (
 	ErrUnauthorized = errors.New("workclient: the service did not accept the key")
 	ErrForbidden    = errors.New("workclient: forbidden")
 	ErrUnavailable  = errors.New("workclient: the service cannot do that now")
+	// ErrConflict is any 409: a stale edit (Error.Conflict), a sign-off over open notes
+	// (Error.OpenNotes), or a write that lost a race and can be retried.
+	ErrConflict = errors.New("workclient: conflict")
+	// ErrUpstream is a 502: something the service depends on failed.
+	ErrUpstream = errors.New("workclient: the service's upstream failed")
 	// ErrUnreachable is a request that got no answer.
 	ErrUnreachable = errors.New("workclient: the Work service could not be reached")
 	// ErrBadAnswer is an answer that could not be read or is not the JSON expected.
@@ -66,9 +71,16 @@ func (e *Error) Is(target error) bool {
 		return e.Status == http.StatusForbidden
 	case ErrUnavailable:
 		return e.Status == http.StatusServiceUnavailable
+	case ErrConflict:
+		return e.Status == http.StatusConflict
+	case ErrUpstream:
+		return e.Status == http.StatusBadGateway
 	}
 	return false
 }
+
+// maxMessage bounds the text kept from an answer that is not JSON.
+const maxMessage = 4 << 10
 
 // answerError reads a non-2xx answer.
 func answerError(status int, raw []byte) *Error {
@@ -81,6 +93,9 @@ func answerError(status int, raw []byte) *Error {
 	e.Message, _ = body["message"].(string)
 	if e.Message == "" && body == nil {
 		e.Message = strings.TrimSpace(string(raw))
+		if len(e.Message) > maxMessage {
+			e.Message = e.Message[:maxMessage] + "…"
+		}
 	}
 	e.Task, _ = body["task"].(string)
 	num := func(k string) int {

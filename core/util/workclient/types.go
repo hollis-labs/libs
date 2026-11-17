@@ -165,6 +165,16 @@ type Note struct {
 	Rev       int    `json:"rev"`
 }
 
+// NewNote is a draft note to add: a comment (Text), or a suggestion to replace Quote in
+// Section with Replace.
+type NewNote struct {
+	Kind    string `json:"kind"` // comment | suggestion
+	Section string `json:"section,omitempty"`
+	Quote   string `json:"quote,omitempty"`
+	Replace string `json:"replace,omitempty"`
+	Text    string `json:"text,omitempty"`
+}
+
 // RoundNote is a note as a sent round holds it.
 type RoundNote struct {
 	ID      string `json:"id"`
@@ -265,7 +275,7 @@ type NewItem struct {
 }
 
 // Edit changes an item made from revision BaseRev. Nil and empty fields are left as they
-// are. If the item moved on since BaseRev, the service keeps the edit as suggestions and
+// are; a non-nil pointer to a nil slice clears that list. If the item moved on since BaseRev, the service keeps the edit as suggestions and
 // answers with a Conflict.
 type Edit struct {
 	BaseRev   int               `json:"base_rev"`

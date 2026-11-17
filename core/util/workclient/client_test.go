@@ -113,7 +113,8 @@ func TestHeadersAndContextOverrides(t *testing.T) {
 		t.Errorf("correlation id = %q", r.Header.Get(HeaderCorrelation))
 	}
 
-	ctx := WithActor(WithPrincipal(WithOwnerNS(context.Background(), "team-b"), ""), "agent:x")
+	ctx := WithActor(WithoutPrincipal(WithOwnerNS(context.Background(), "team-b")), "agent:x")
+	ctx = WithCorrelation(ctx, "req-7")
 	if _, err := cl.Workspaces(ctx, "planner"); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,18 @@ func TestHeadersAndContextOverrides(t *testing.T) {
 		t.Errorf("overrides not sent: ns %q actor %q", r.Header.Get(HeaderOwnerNS), r.Header.Get(HeaderActor))
 	}
 	if _, set := r.Header[HeaderPrincipal]; set {
-		t.Error("an empty principal override still sent X-Principal-URN")
+		t.Error("WithoutPrincipal still sent X-Principal-URN")
+	}
+	if r.Header.Get(HeaderCorrelation) != "req-7" {
+		t.Errorf("correlation = %q, want the caller's", r.Header.Get(HeaderCorrelation))
+	}
+	// An empty override keeps the configured value rather than dropping the header.
+	if _, err := cl.Workspaces(WithPrincipal(WithOwnerNS(context.Background(), ""), ""), "planner"); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = f.last()
+	if r.Header.Get(HeaderOwnerNS) != "team-a" || r.Header.Get(HeaderPrincipal) != "msg://user/a" {
+		t.Errorf("empty overrides: ns %q principal %q", r.Header.Get(HeaderOwnerNS), r.Header.Get(HeaderPrincipal))
 	}
 	if r.URL.Query().Get("app") != "planner" {
 		t.Errorf("app = %q", r.URL.Query().Get("app"))
@@ -167,7 +179,7 @@ func TestErrors(t *testing.T) {
 	f, srv := newFake(t)
 	f.on("PUT /v1/work/w/items/1", 409, `{"code":"conflict","message":"stale","conflict":true,"rev":7,"suggestions":2}`)
 	f.on("POST /v1/work/w/items/1/signoff", 409, `{"code":"conflict","message":"open notes","open":3,"round":2}`)
-	f.on("POST /v1/work/w/items/1/torque", 502, `{"code":"upstream_error","message":"comment failed","task":"CW-1"}`)
+	f.on("POST /v1/work/w/items/1/torque", 502, `{"code":"upstream_error","message":"comment failed","task":"T-1"}`)
 	f.on("POST /v1/work/w/items/1/round", 403, `{"code":"forbidden","message":"owners only"}`)
 	f.on("PUT /v1/work/w/owners", 401, `{"code":"unauthenticated","message":"no key"}`)
 	f.on("POST /v1/work/w/items/1/cut", 503, `{"code":"unavailable","message":"no caster"}`)
@@ -187,7 +199,7 @@ func TestErrors(t *testing.T) {
 	}
 
 	task, created, err := cl.SendToTorque(ctx, "w", "1")
-	if task != "CW-1" || created || err == nil {
+	if task != "T-1" || created || err == nil {
 		t.Errorf("SendToTorque = %q, %v, %v", task, created, err)
 	}
 
@@ -199,6 +211,12 @@ func TestErrors(t *testing.T) {
 	}
 	if _, body := f.last(); body != `{"owners":[]}` {
 		t.Errorf("SetOwners(nil) body = %s", body)
+	}
+	if !errors.Is(err, ErrUpstream) {
+		t.Errorf("502 = %v", err)
+	}
+	if _, err := cl.EditItem(ctx, "w", "1", Edit{}); !errors.Is(err, ErrConflict) {
+		t.Errorf("409 = %v", err)
 	}
 	if err := cl.Cut(ctx, "w", "1"); !errors.Is(err, ErrUnavailable) {
 		t.Errorf("503 = %v", err)
@@ -231,7 +249,7 @@ func TestTokenErrorStopsTheRequest(t *testing.T) {
 	cl := newClient(t, srv.URL, func(c *Config) {
 		c.Token = func(context.Context) (string, error) { return "", errors.New("no key") }
 	})
-	if _, err := cl.Workspaces(context.Background(), ""); err == nil || err.Error() != "no key" {
+	if _, err := cl.Workspaces(context.Background(), ""); err == nil || !strings.Contains(err.Error(), "no key") {
 		t.Errorf("err = %v", err)
 	}
 	if len(f.reqs) != 0 {
@@ -318,7 +336,7 @@ func TestRoutesAndBodies(t *testing.T) {
 			return err
 		}, ""},
 		{"POST /v1/work/w/items/1/notes", `{"id":"n1","kind":"comment","rev":1}`, func() error {
-			n, err := cl.AddNote(ctx, "w", "1", Note{Kind: "comment", Text: "hi"})
+			n, err := cl.AddNote(ctx, "w", "1", NewNote{Kind: "comment", Text: "hi"})
 			if err == nil && n.ID != "n1" {
 				return errors.New("bad note")
 			}
@@ -373,13 +391,13 @@ func TestEventStreamFromHead(t *testing.T) {
 			"id: 43\nevent: work.note.changed\ndata: {\"seq\":43,\"kind\":\"work.note.changed\",\"note\":\"n1\"}\n\n")
 	}
 	cl := newClient(t, srv.URL)
-	stream, from, err := cl.EventStream(context.Background(), "")
+	stream, from, err := cl.EventStream(context.Background(), FromHead)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = stream.Close() }()
-	if from != "41" {
-		t.Errorf("from = %q", from)
+	if from != 41 {
+		t.Errorf("from = %d", from)
 	}
 	er := NewEventReader(stream)
 	ev, err := er.Next()
@@ -399,7 +417,7 @@ func TestEventStreamRefused(t *testing.T) {
 	f, srv := newFake(t)
 	f.on("GET /v1/events", 403, `{"code":"forbidden","message":"admin only"}`)
 	cl := newClient(t, srv.URL)
-	if _, _, err := cl.EventStream(context.Background(), "5"); !errors.Is(err, ErrForbidden) {
+	if _, _, err := cl.EventStream(context.Background(), 5); !errors.Is(err, ErrForbidden) {
 		t.Errorf("err = %v", err)
 	}
 }
@@ -415,6 +433,109 @@ func TestHeadMissing(t *testing.T) {
 
 func TestEventReaderBadData(t *testing.T) {
 	er := NewEventReader(strings.NewReader("data: {nope\n\n"))
+	if _, err := er.Next(); !errors.Is(err, ErrBadAnswer) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestDotIDsAreRefused(t *testing.T) {
+	f, srv := newFake(t)
+	cl := newClient(t, srv.URL)
+	ctx := context.Background()
+	for _, id := range []string{"", ".", ".."} {
+		if err := cl.DropNote(ctx, "w", id); !errors.Is(err, ErrBadID) {
+			t.Errorf("DropNote(%q) = %v", id, err)
+		}
+		if _, err := cl.Open(ctx, id); !errors.Is(err, ErrBadID) {
+			t.Errorf("Open(%q) = %v", id, err)
+		}
+	}
+	if len(f.reqs) != 0 {
+		t.Errorf("%d requests sent for refused ids", len(f.reqs))
+	}
+	// Dots inside an id are fine.
+	f.on("GET /v1/work/w/items/a..b", 200, `{"id":"a..b"}`)
+	if d, err := cl.Detail(ctx, "w", "a..b"); err != nil || d.ID != "a..b" {
+		t.Errorf("Detail(a..b) = %+v, %v", d.Card, err)
+	}
+}
+
+func TestRedirectedWritesAreNotFollowed(t *testing.T) {
+	f, srv := newFake(t)
+	f.answers["DELETE /v1/work/w/notes/n1"] = func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/v1/work/w", http.StatusTemporaryRedirect)
+	}
+	f.on("DELETE /v1/work/w", 200, `{"deleted":true}`)
+	f.answers["GET /v1/work/old"] = func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/v1/work/new", http.StatusTemporaryRedirect)
+	}
+	f.on("GET /v1/work/new", 200, `{"space":{"default_view":"v1"}}`)
+	cl := newClient(t, srv.URL, func(c *Config) { c.HTTP = &http.Client{} })
+	if err := cl.DropNote(context.Background(), "w", "n1"); err == nil {
+		t.Error("a redirected delete was followed")
+	}
+	for _, r := range f.reqs {
+		if r.URL.Path == "/v1/work/w" {
+			t.Fatal("the redirect reached the workspace delete")
+		}
+	}
+	if o, err := cl.Open(context.Background(), "old"); err != nil || o.Space.Default != "v1" {
+		t.Errorf("a redirected read: %+v, %v", o, err)
+	}
+}
+
+func TestEditClearsWithAnEmptyList(t *testing.T) {
+	f, srv := newFake(t)
+	f.on("PUT /v1/work/w/items/1", 200, `{"rev":2}`)
+	cl := newClient(t, srv.URL)
+	var tags []string
+	if _, err := cl.EditItem(context.Background(), "w", "1", Edit{BaseRev: 1, Tags: &tags}); err != nil {
+		t.Fatal(err)
+	}
+	_, body := f.last()
+	var got map[string]any
+	_ = json.Unmarshal([]byte(body), &got)
+	if l, ok := got["tags"].([]any); !ok || len(l) != 0 {
+		t.Errorf("tags = %#v, want []", got["tags"])
+	}
+	if got["links"] != nil {
+		t.Errorf("links = %#v, want null (left as it is)", got["links"])
+	}
+}
+
+func TestHeadFromADegradedService(t *testing.T) {
+	f, srv := newFake(t)
+	f.on("GET /healthz", 503, `{"status":"degraded","events_head":9}`)
+	cl := newClient(t, srv.URL)
+	if h, err := cl.Head(context.Background()); err != nil || h != 9 {
+		t.Errorf("Head = %d, %v", h, err)
+	}
+}
+
+func TestStreamThatIsNotEvents(t *testing.T) {
+	f, srv := newFake(t)
+	f.answers["GET /v1/events"] = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, "<html>")
+	}
+	cl := newClient(t, srv.URL)
+	if _, _, err := cl.EventStream(context.Background(), 0); !errors.Is(err, ErrBadAnswer) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestLongTextAnswerIsCapped(t *testing.T) {
+	f, srv := newFake(t)
+	f.on("POST /v1/work/w/items/1/cut", 500, strings.Repeat("x", 100<<10))
+	cl := newClient(t, srv.URL)
+	var e *Error
+	if err := cl.Cut(context.Background(), "w", "1"); !errors.As(err, &e) || len(e.Message) > maxMessage+8 {
+		t.Errorf("message length %d", len(e.Message))
+	}
+}
+
+func TestOversizeEventIsBadAnswer(t *testing.T) {
+	er := NewEventReader(strings.NewReader("data: " + strings.Repeat("x", 2<<20) + "\n\n"))
 	if _, err := er.Next(); !errors.Is(err, ErrBadAnswer) {
 		t.Errorf("err = %v", err)
 	}
