@@ -8,6 +8,10 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `workclient`: a client for the Work service's HTTP API (workspaces, items, notes, review rounds, sign-off, views and the change-event stream) with its own types for the service's JSON, per-call identity through the context (`WithOwnerNS`, `WithPrincipal`, `WithActor`), a key read on every request (`TokenFile`), `*Error` with `Conflict` and `OpenNotes`, and the sentinels `ErrNotFound`, `ErrUnauthorized`, `ErrForbidden`, `ErrUnavailable`, `ErrUnreachable` and `ErrBadAnswer`. Standard library only.
+
 ### Fixed
 
 - OTel redaction clones event and link slices before rewriting them, preserving
