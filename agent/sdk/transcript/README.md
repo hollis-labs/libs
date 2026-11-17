@@ -31,13 +31,21 @@ The `MessageRecord` wrapper preserves Claude's `type`, `uuid`, `parentUuid`,
 `sessionId`, `timestamp`, and `message`. The message object preserves content
 blocks and usage verbatim. Assistant `tool_use` and user `tool_result` remain
 linked by their native IDs. `SidebandRecord` carries approval, outcome, usage,
-and compaction data as `system` or `summary` rows for host readers; ordinary
-Claude ingestion can skip unfamiliar subtypes. A user tool-result message may
+and compaction data as `system` or `summary` rows for host readers. Fragments
+Engine's Claude ingester (tested at `e1554a9f`) skips these rows, including
+approval and receipt metadata; adopters that need them must read the SDK log
+directly. Its collector returns one fragment per numbered segment, while its
+transcript store combines segments with the same `sessionId` into one ordered
+conversation and tracks a cursor per file. Expose the segment directory once
+to that ingester; an additional assembled JSONL view would replay the same
+events. A user tool-result message may
 carry `resultRef`, a typed
 `runtimecontract.Reference` to the host's immutable result receipt. Encoding
 checks its shape and requires a user `tool_result` block. Reference validation
 does not verify host issuance or the receipt's envelope digest; the host does
 that before admission and stores the exact bytes separately.
+Fragments Engine parses the native `tool_result` block but skips the top-level
+`resultRef`; receipt resolution remains the host's responsibility.
 
 The captured Claude Code
 fixture in `testdata/claude_tool_turn.jsonl` was reduced from
