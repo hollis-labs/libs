@@ -8,9 +8,15 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.7.0 — 2026-11-17
+
 ### Added
 
 - `workclient`: a client for the Work service's HTTP API (workspaces, items, notes, review rounds, sign-off, views and the change-event stream) with its own types for the service's JSON; per-call identity through the context (`WithOwnerNS`, `WithPrincipal`, `WithoutPrincipal`, `WithActor`, `WithCorrelation`); a key read on every request (`TokenFile`); `*Error` with `Conflict` and `OpenNotes` and the sentinels `ErrNotFound`, `ErrUnauthorized`, `ErrForbidden`, `ErrConflict`, `ErrUpstream`, `ErrUnavailable`, `ErrUnreachable` and `ErrBadAnswer`. Ids that are empty, `.` or `..` are refused (`ErrBadID`) and redirected writes are not followed. Standard library only.
+
+### Changed
+
+- Dependencies: `google.golang.org/grpc` v1.83.2 and `golang.org/x/net` v0.62.0 (GO-2026-6443, GO-2026-6866, GO-2026-6860; none reached from this module's code), with `golang.org/x/sys` v0.49.0, `golang.org/x/text` v0.43.0 and `golang.org/x/crypto` v0.58.0 following.
 
 ### Fixed
 

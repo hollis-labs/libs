@@ -35,7 +35,7 @@ something from a higher group, the shared part moves down. The ranks live in
 
 | Module | Import path | Scope |
 |---|---|---|
-| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper, a Tesseract memory API client, a middleware kit (HTTP, queue jobs, conformance suite), a rule router and a decision ledger. |
+| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper, a Tesseract memory API client, a Work service HTTP client, a middleware kit (HTTP, queue jobs, conformance suite), a rule router and a decision ledger. |
 | `core/panics` | `github.com/hollis-labs/libs/core/panics` | Panic containment: recover at a boundary, return a ref and keep a redacted, bounded record. Goroutine, call and `net/http` guards; no dependencies. |
 | `core/store` | `github.com/hollis-labs/libs/core/store` | Storage driver layer: one set of handwritten SQL on SQLite or Postgres. Dialect adapter (placeholder rebinding, time, JSON), single-writer SQLite and pgx Postgres opening, goose migrations per dialect, portable full-text search, a transactional outbox, a portable-SQL lint and a two-engine test harness. |
 | `security/webauthn` | `github.com/hollis-labs/libs/security/webauthn` | UV-required WebAuthn primitives, durable single-use ceremonies, a credential-store interface, SQLite storage and synthetic authenticator tests. |
