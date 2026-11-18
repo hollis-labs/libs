@@ -1,0 +1,335 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "th-1",
+        "turn_id": "t-1"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "t-1",
+    "ext": {
+      "codex": {
+        "thread_id": "th-1",
+        "turn_id": "t-1"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "r1",
+    "kind": "reasoning"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "r1",
+    "text": "**Looking"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "r1",
+    "text": " it up**"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "r1",
+    "text": "\n\n"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "r1",
+    "text": "Then answer."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/reasoning/textDelta",
+      "payload": {
+        "method": "item/reasoning/textDelta",
+        "params": {
+          "threadId": "th-1",
+          "turnId": "t-1",
+          "itemId": "r1",
+          "delta": "raw thought",
+          "contentIndex": 0
+        }
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "r1",
+    "final": {
+      "content": "raw thought",
+      "text": "**Looking it up**\n\nThen answer."
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "w1",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "go 1.26 release notes",
+      "item_type": "webSearch",
+      "name": "web_search"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "w1",
+    "json_fragment": "{\"action\":null,\"query\":\"go 1.26 release notes\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "w1",
+    "final": {
+      "action": null,
+      "query": "go 1.26 release notes"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "w1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "w1",
+      "is_error": false
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "w1#result",
+    "final": {
+      "is_error": false,
+      "results": [
+        {
+          "title": "Go 1.26 Release Notes",
+          "url": "https://go.dev/doc/go1.26"
+        }
+      ],
+      "text": "[{\"title\":\"Go 1.26 Release Notes\",\"url\":\"https://go.dev/doc/go1.26\"}]"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "d1",
+    "kind": "tool_call",
+    "meta": {
+      "item_type": "dynamicToolCall",
+      "name": "lookup",
+      "status": "completed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "d1",
+    "json_fragment": "{\"arguments\":{\"key\":\"x\"},\"namespace\":\"host\",\"tool\":\"lookup\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "d1",
+    "final": {
+      "arguments": {
+        "key": "x"
+      },
+      "namespace": "host",
+      "tool": "lookup"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "d1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "d1",
+      "is_error": true
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "d1#result",
+    "final": {
+      "content_items": [
+        {
+          "type": "inputText",
+          "text": "no such key"
+        }
+      ],
+      "duration_ms": 5,
+      "is_error": true,
+      "status": "completed",
+      "text": "no such key"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "m1",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "m1",
+    "text": "Done."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "m1",
+    "final": {
+      "text": "Done."
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.plan",
+    "value": {
+      "explanation": null,
+      "plan": [
+        {
+          "step": "look it up",
+          "status": "completed"
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "t-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 90,
+      "cache_read": 120,
+      "cache_write": 10,
+      "output": 33,
+      "reasoning": 7,
+      "total": 260
+    }
+  }
+]

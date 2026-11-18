@@ -1,0 +1,255 @@
+{
+ "name": "malformed-and-unknown",
+ "description": "Hand-written: lines that are not JSON-RPC notifications this decoder maps. A line that is not JSON, a JSON array, an object with no method or id, an unknown method, an error response, another thread's delta, a server request that is not an approval (item/tool/call), a command output delta, a reasoning item with no summary, an agentMessage whose completed text rewrites what streamed (final is the completed text), and a turn/completed whose params do not fit (still terminal, by status).",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "th-1"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "th-1",
+     "turn": {
+      "id": "t-1",
+      "items": [],
+      "status": "inProgress",
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "data_text": "not json {"
+  },
+  {
+   "data": [
+    1,
+    2
+   ]
+  },
+  {
+   "data": {
+    "foo": "bar"
+   }
+  },
+  {
+   "data": {
+    "method": "some/futureNotification",
+    "params": {
+     "threadId": "th-1",
+     "x": 1
+    }
+   }
+  },
+  {
+   "data": {
+    "id": 7,
+    "error": {
+     "code": -32600,
+     "message": "bad request"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-other",
+     "turnId": "t-other",
+     "itemId": "m-other",
+     "delta": "not ours"
+    }
+   }
+  },
+  {
+   "data": {
+    "id": 9,
+    "method": "item/tool/call",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "callId": "c9",
+     "tool": "lookup",
+     "arguments": {}
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "r0",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "r0",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "commandExecution",
+      "id": "c1",
+      "command": "/bin/bash -lc 'yes | head -2'",
+      "cwd": "/work",
+      "status": "inProgress",
+      "commandActions": [
+       {
+        "type": "unknown",
+        "command": "yes | head -2"
+       }
+      ],
+      "aggregatedOutput": null,
+      "exitCode": null,
+      "durationMs": null
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/commandExecution/outputDelta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "c1",
+     "delta": "y\ny\n"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "commandExecution",
+      "id": "c1",
+      "command": "/bin/bash -lc 'yes | head -2'",
+      "cwd": "/work",
+      "status": "completed",
+      "commandActions": [
+       {
+        "type": "unknown",
+        "command": "yes | head -2"
+       }
+      ],
+      "aggregatedOutput": "y\ny\n",
+      "exitCode": 0,
+      "durationMs": 3
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "m1",
+      "text": "",
+      "phase": "final_answer"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "m1",
+     "delta": "Draft "
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "m1",
+     "delta": "answer"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "m1",
+      "text": "Final answer.",
+      "phase": "final_answer"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "th-1",
+     "turn": {
+      "id": "t-1",
+      "status": "completed",
+      "items": "not-an-array",
+      "error": null,
+      "durationMs": "slow"
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "late",
+     "delta": "after the end"
+    }
+   }
+  }
+ ]
+}
