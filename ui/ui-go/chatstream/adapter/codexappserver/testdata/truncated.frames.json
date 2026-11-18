@@ -1,0 +1,81 @@
+{
+ "name": "truncated",
+ "description": "Hand-written: the stream stops mid-answer with a tool call done and no turn/completed. The open text part ends with what streamed in final, then run.error upstream_truncated.",
+ "frames": [
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "th-1",
+     "turn": {
+      "id": "t-1",
+      "items": [],
+      "status": "inProgress",
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "fileChange",
+      "id": "f1",
+      "changes": [
+       {
+        "path": "/work/a.txt",
+        "kind": {
+         "type": "update",
+         "move_path": null
+        },
+        "diff": "@@ -1 +1 @@\n-a\n+b\n"
+       }
+      ],
+      "status": "failed"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "m1",
+      "text": "",
+      "phase": "commentary"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "m1",
+     "delta": "The patch failed; "
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "m1",
+     "delta": "retrying"
+    }
+   }
+  }
+ ]
+}

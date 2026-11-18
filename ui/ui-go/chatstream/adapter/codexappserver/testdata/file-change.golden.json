@@ -1,0 +1,415 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd3-028b-7ee3-a49c-9a7c2fc99e05"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "01a1efd3-02b8-7e53-86ef-cbc704d84a02",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd3-028b-7ee3-a49c-9a7c2fc99e05",
+        "turn_id": "01a1efd3-02b8-7e53-86ef-cbc704d84a02"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/started.userMessage",
+      "payload": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd3-0702-7d83-973d-2025e6f5f173",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Use apply_patch to create a file note.txt containing the single line hi. Then reply done.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd3-028b-7ee3-a49c-9a7c2fc99e05",
+          "turnId": "01a1efd3-02b8-7e53-86ef-cbc704d84a02",
+          "startedAtMs": 1795024946946
+        },
+        "emittedAtMs": 1795024946947
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/completed.userMessage",
+      "payload": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd3-0702-7d83-973d-2025e6f5f173",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Use apply_patch to create a file note.txt containing the single line hi. Then reply done.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd3-028b-7ee3-a49c-9a7c2fc99e05",
+          "turnId": "01a1efd3-02b8-7e53-86ef-cbc704d84a02",
+          "completedAtMs": 1795024946946
+        },
+        "emittedAtMs": 1795024946947
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "kind": "text",
+    "meta": {
+      "phase": "narration"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "I"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "’ll"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " create"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " `"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "note"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": ".txt"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "`"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " with"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " the"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " line"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": " `"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "hi"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "text": "`.\n"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_0a091daeadddde61016afde834b32087d1b18d9f94de860138",
+    "final": {
+      "text": "I’ll create `note.txt` with the line `hi`.\n"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "/work/note.txt",
+      "item_type": "fileChange",
+      "name": "apply_patch",
+      "status": "inProgress"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71",
+    "json_fragment": "{\"changes\":[{\"path\":\"/work/note.txt\",\"kind\":{\"type\":\"add\"},\"diff\":\"hi\\n\"}]}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71",
+    "final": {
+      "changes": [
+        {
+          "path": "/work/note.txt",
+          "kind": {
+            "type": "add"
+          },
+          "diff": "hi\n"
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71",
+      "is_error": false
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "exec-de4e5fc3-e45c-4a8a-9671-4858a8d8fb71#result",
+    "final": {
+      "changes": [
+        {
+          "path": "/work/note.txt",
+          "kind": {
+            "type": "add"
+          },
+          "diff": "hi\n"
+        }
+      ],
+      "is_error": false,
+      "status": "completed",
+      "text": "add /work/note.txt"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.diff",
+    "value": {
+      "diff": "diff --git a/note.txt b/note.txt\nnew file mode 100644\nindex 0000000000000000000000000000000000000000..45b983be36b73c0788dc9cbcb76cbb80fc7bb057\n--- /dev/null\n+++ b/note.txt\n@@ -0,0 +1 @@\n+hi\n"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.diff",
+    "value": {
+      "diff": "diff --git a/note.txt b/note.txt\nnew file mode 100644\nindex 0000000000000000000000000000000000000000..45b983be36b73c0788dc9cbcb76cbb80fc7bb057\n--- /dev/null\n+++ b/note.txt\n@@ -0,0 +1 @@\n+hi\n"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_0a091daeadddde61016afde837929087d1807729a857a7d37d",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0a091daeadddde61016afde837929087d1807729a857a7d37d",
+    "text": "done"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_0a091daeadddde61016afde837929087d1807729a857a7d37d",
+    "final": {
+      "text": "done"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.diff",
+    "value": {
+      "diff": "diff --git a/note.txt b/note.txt\nnew file mode 100644\nindex 0000000000000000000000000000000000000000..45b983be36b73c0788dc9cbcb76cbb80fc7bb057\n--- /dev/null\n+++ b/note.txt\n@@ -0,0 +1 @@\n+hi\n"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "01a1efd3-02b8-7e53-86ef-cbc704d84a02"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 3723,
+      "cache_read": 27648,
+      "output": 66,
+      "total": 31437
+    }
+  }
+]

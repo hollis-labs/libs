@@ -1,0 +1,185 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "th-1",
+        "turn_id": "t-1"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "t-1",
+    "ext": {
+      "codex": {
+        "thread_id": "th-1",
+        "turn_id": "t-1"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "f1",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "/work/a.txt",
+      "item_type": "fileChange",
+      "name": "apply_patch",
+      "status": "failed"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "f1",
+    "json_fragment": "{\"changes\":[{\"path\":\"/work/a.txt\",\"kind\":{\"type\":\"update\",\"move_path\":null},\"diff\":\"@@ -1 +1 @@\\n-a\\n+b\\n\"}]}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "f1",
+    "final": {
+      "changes": [
+        {
+          "path": "/work/a.txt",
+          "kind": {
+            "type": "update",
+            "move_path": null
+          },
+          "diff": "@@ -1 +1 @@\n-a\n+b\n"
+        }
+      ]
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "f1#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "f1",
+      "is_error": true
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "f1#result",
+    "final": {
+      "changes": [
+        {
+          "path": "/work/a.txt",
+          "kind": {
+            "type": "update",
+            "move_path": null
+          },
+          "diff": "@@ -1 +1 @@\n-a\n+b\n"
+        }
+      ],
+      "is_error": true,
+      "status": "failed",
+      "text": "update /work/a.txt"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "m1",
+    "kind": "text",
+    "meta": {
+      "phase": "narration"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "m1",
+    "text": "The patch failed; "
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "m1",
+    "text": "retrying"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "m1",
+    "final": {
+      "text": "The patch failed; retrying"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "t-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.error",
+    "code": "upstream_truncated",
+    "retryable": true,
+    "message": "upstream ended without a terminal event"
+  }
+]

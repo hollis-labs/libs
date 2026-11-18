@@ -8,6 +8,12 @@ All notable changes to the `ui-go` module are documented here. The format follow
 
 ## [Unreleased]
 
+## v0.5.0 — 2026-11-18
+
+### Added
+
+- `chatstream/adapter/codexappserver`: a decoder for the JSON-RPC messages `codex app-server` writes on stdout, for one turn. Agent message text and reasoning summaries stream as deltas; tool items (command, MCP, file change, web search, dynamic and collab calls) become tool_call and tool_result parts; approval and user-input server requests are `codex.approval_request` / `codex.user_input_request` activity only. Every `part.end` carries complete content in `final`. turn/completed maps to exactly one terminal event (completed `run.finish` with the turn's usage, interrupted `run.abort`, failed `run.error` `turn_failed`), and a stream without one ends in `run.error` `upstream_truncated`. Fixtures are live captures from codex-cli 0.163.0 plus hand-written edge cases; registered in `conformance/crosscheck`.
+
 ## v0.4.0 — 2026-10-16
 
 ### Added

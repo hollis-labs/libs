@@ -1,0 +1,296 @@
+{
+ "name": "reasoning",
+ "description": "Live capture (codex-cli 0.163.0): a reasoning summary streamed by item/reasoning/summaryTextDelta, then the answer, with usage.",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+      "environments": [
+       {
+        "environmentId": "local",
+        "cwd": "/work",
+        "runtimeWorkspaceRoots": [
+         "/work"
+        ]
+       }
+      ],
+      "extra": null,
+      "sessionId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+      "forkedFromId": null,
+      "parentThreadId": null,
+      "preview": "",
+      "ephemeral": true,
+      "section": null,
+      "sectionEnteredAt": null,
+      "projectId": null,
+      "historyMode": "paginated",
+      "modelProvider": "openai",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "low",
+      "createdAt": 1795024897,
+      "updatedAt": 1795024897,
+      "recencyAt": 1795024897,
+      "status": {
+       "type": "idle"
+      },
+      "path": null,
+      "cwd": "/work",
+      "cliVersion": "0.163.0",
+      "originator": "capture",
+      "source": "vscode",
+      "canAcceptDirectInput": true,
+      "threadSource": null,
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "daybreakEnabled": null,
+      "turns": []
+     }
+    },
+    "emittedAtMs": 1795024897134
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turn": {
+      "id": "01a1efd2-4471-7652-a311-c4dc8294e670",
+      "rootTurnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": 1795024897,
+      "completedAt": null,
+      "durationMs": null
+     }
+    },
+    "emittedAtMs": 1795024897152
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-494f-7aa2-8165-eaac968bb4f5",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Think step by step: what is 17*23 + 4? Reply with just the number.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "startedAtMs": 1795024898383
+    },
+    "emittedAtMs": 1795024898383
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-494f-7aa2-8165-eaac968bb4f5",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Think step by step: what is 17*23 + 4? Reply with just the number.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "completedAtMs": 1795024898383
+    },
+    "emittedAtMs": 1795024898383
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "startedAtMs": 1795024900151
+    },
+    "emittedAtMs": 1795024900151
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryPartAdded",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "itemId": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+     "summaryIndex": 0
+    },
+    "emittedAtMs": 1795024906214
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryTextDelta",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "itemId": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+     "delta": "**Calculating 391 plus 4**",
+     "summaryIndex": 0
+    },
+    "emittedAtMs": 1795024906214
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+      "summary": [
+       "**Calculating 391 plus 4**"
+      ],
+      "content": []
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "completedAtMs": 1795024906214
+    },
+    "emittedAtMs": 1795024906215
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+      "text": "",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "startedAtMs": 1795024906216
+    },
+    "emittedAtMs": 1795024906216
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "itemId": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+     "delta": "395"
+    },
+    "emittedAtMs": 1795024906216
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+      "text": "395",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "completedAtMs": 1795024906314
+    },
+    "emittedAtMs": 1795024906314
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 15499,
+       "inputTokens": 15480,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 19,
+       "reasoningOutputTokens": 12
+      },
+      "last": {
+       "totalTokens": 15499,
+       "inputTokens": 15480,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 19,
+       "reasoningOutputTokens": 12
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024906322
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+     "turn": {
+      "id": "01a1efd2-4471-7652-a311-c4dc8294e670",
+      "rootTurnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+      "items": [
+       {
+        "type": "agentMessage",
+        "id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+        "text": "395",
+        "phase": "final_answer",
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+       }
+      ],
+      "itemsView": "summary",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1795024897,
+      "completedAt": 1795024906,
+      "durationMs": 9183
+     }
+    },
+    "emittedAtMs": 1795024906323
+   }
+  }
+ ]
+}
