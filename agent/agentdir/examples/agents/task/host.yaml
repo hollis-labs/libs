@@ -1,0 +1,7 @@
+kind: task
+lifetime: until-task-end
+task_id: sample-task
+
+runtime:
+  provider: anthropic
+  max_steps: 50

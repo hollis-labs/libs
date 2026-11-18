@@ -1,0 +1,7 @@
+kind: stable
+lifetime: on-demand
+seat_id: sample-stable
+
+runtime:
+  provider: anthropic
+  max_steps: 50
