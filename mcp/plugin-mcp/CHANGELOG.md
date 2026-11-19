@@ -8,8 +8,39 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+### Changed
+
+- The module now requires Go 1.26.11 (GO-2026-6859, net/http header race).
+  This also lets the pinned CI vulnerability check pass on a patched toolchain.
+
+- **Breaking security defaults (`go-mcp/transport/http`)**: empty
+  `AllowedHosts` now permits only `localhost` and loopback IP literals;
+  empty `AllowedOrigins` permits only same-origin requests, rather than all
+  origins. Requests without Origin remain supported. Host is checked even
+  without Origin, blocking DNS rebinding; forwarded headers are ignored.
+  Migration: set `AllowedHosts` to each trusted authority received by the
+  handler (hostname/IP, optionally with a port; a portless entry allows all
+  ports). Set `AllowedOrigins` to exact trusted HTTP(S) origins for
+  cross-origin clients or TLS-terminating proxies. Lists replace defaults;
+  include loopback entries explicitly if still needed. Wildcards are not
+  supported. No-Origin local CLI/SDK clients continue working by default.
+  An explicit host list replaces the SDK's local-address heuristic so a
+  trusted public Host can reach a loopback listener behind a proxy.
+
 ### Added
 
+- `go-mcp/auth.NewProtectedResource`: validated, immutable RFC 9728 discovery
+  metadata for an explicit HTTPS resource and at least one authorization
+  server issuer. `HTTPMiddleware(provider)` on the returned resource serves
+  public root/endpoint well-known metadata and adds its configured URL to
+  bearer challenges while preserving provider token checks. Use
+  `transport/http.Guard` outside the composed stack; mount at the HTTP root
+  so discovery routes are reachable. Metadata does not implement OAuth or
+  token audience validation; JWKS-only integrations still need a real issuer.
+- `go-mcp/auth.CanAccess` and `AuthorizeTools`: per-call authorization with
+  the verified bearer identity, denying absent identity/policy. Direct and
+  stdio calls without that identity fail closed. Tools/list is unchanged.
+  See `go-mcp/README.md` for composition and migration examples.
 - `go-mcp/transport/http`: `HandlerOptions.JSONResponse`. When set, a POST is answered with a single `application/json` body instead of a `text/event-stream` frame, including when the client sends `Accept: application/json, text/event-stream`. Default false keeps the SSE framing, so existing consumers are unchanged. Additive (minor).
 
 ## [0.6.0] - 2026-10-25

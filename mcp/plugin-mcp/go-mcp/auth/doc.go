@@ -13,6 +13,11 @@
 // transport is untouched by any of this (it keeps the existing local
 // process-trust model).
 //
+// [NewProtectedResource] adds public RFC 9728 metadata and configures bearer
+// challenges for an explicitly configured HTTPS resource/issuer. [CanAccess]
+// and [AuthorizeTools] apply application-owned per-tool authorization to the
+// SDK's verified identity; they fail closed when authentication is absent.
+//
 // [Redact] and [MergeRedacted] are a separate, general-purpose pair for
 // credential-shaped config (e.g. HTTP headers configured for an MCP server
 // connection) that a caller stores and later echoes back to a UI or API
