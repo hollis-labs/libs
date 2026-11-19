@@ -16,6 +16,8 @@ This module is versioned independently with `core/store/vX.Y.Z` tags.
   record needs `synchronous` FULL or EXTRA; a proof must be computed on the named file. Pass a
   `WriteTx` tx or a `ReadTx` querier to read that connection; `Store.SQLiteSettings` reads the writer
   and must not be called inside a `WriteTx`. Read-only; `ErrSQLiteOnly` on Postgres.
+  `MainPath` is the path exactly as SQLite reports it, which may have symlinks resolved (macOS
+  reports `/private/var/...` for a file opened as `/var/...`): compare with `filepath.EvalSymlinks`.
 
 ## v0.1.0
 
