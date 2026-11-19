@@ -6,6 +6,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -50,6 +51,11 @@ type Principal struct {
 	Parent    string    `json:"parent,omitempty"`
 	TokenID   string    `json:"token_id,omitempty"`
 	ExpiresAt time.Time `json:"expires_at,omitzero"`
+	// Extra holds the verified token's claims this package does not map to a field (for example a
+	// Warden token's "act" actor chain and "grant" id), raw, so a resource server can log provenance. It is
+	// nil for API keys and for tokens with no other claims. It is information, never authority: scopes,
+	// audience and the deny-list decide access.
+	Extra map[string]json.RawMessage `json:"extra,omitempty"`
 }
 
 // HasScope reports whether the principal holds scope. A grant matches when it
