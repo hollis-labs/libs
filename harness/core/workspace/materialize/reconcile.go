@@ -33,28 +33,71 @@ func ManifestPath(targetRoot string) string {
 }
 
 func SaveManifest(targetRoot string, manifest Manifest) error {
+	root, _, err := openExistingTargetRoot(targetRoot)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	return saveManifestRoot(root, manifest)
+}
+
+// saveManifestRoot never resolves a control path outside the already-open output
+// root. The pinned control directory also avoids following a swapped symlink
+// between temporary-file creation and publication of the control manifest.
+func saveManifestRoot(root *os.Root, manifest Manifest) error {
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err
 	}
-	path := ManifestPath(targetRoot)
-	if err = os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+	const control = ".materialize"
+	if err = root.Mkdir(control, 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".manifest-*.tmp")
+	info, err := root.Lstat(control)
 	if err != nil {
 		return err
 	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
-	if _, err = tmp.Write(data); err != nil {
-		_ = tmp.Close()
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return ErrUnsafeTarget
+	}
+	dir, err := root.OpenRoot(control)
+	if err != nil {
+		return ErrUnsafeTarget
+	}
+	defer func() { _ = dir.Close() }()
+	opened, err := dir.Stat(".")
+	if err != nil || !os.SameFile(info, opened) {
+		return ErrUnsafeTarget
+	}
+	name := ".manifest-" + randomSuffix() + ".tmp"
+	file, err := dir.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
 		return err
 	}
-	if err = tmp.Close(); err != nil {
+	defer func() { _ = dir.Remove(name) }()
+	if _, err = file.Write(data); err != nil {
+		_ = file.Close()
 		return err
 	}
-	return os.Rename(tmpName, path)
+	if err = file.Close(); err != nil {
+		return err
+	}
+	return dir.Rename(name, "manifest.json")
+}
+
+func (e *DefaultEngine) saveManifest(ctx context.Context, target string, root *os.Root, manifest Manifest) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if e.opts.BeforeManifest != nil {
+		if err := e.opts.BeforeManifest(target); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return saveManifestRoot(root, manifest)
 }
 
 func LoadManifest(targetRoot string) (Manifest, error) {
@@ -222,7 +265,7 @@ func (e *DefaultEngine) applyReconcile(ctx context.Context, req Request) (Handle
 			return Handle{TargetRoot: targetAbs, Manifest: rp.Plan.Manifest, Report: report}, err
 		}
 	}
-	if err := SaveManifest(targetAbs, rp.Plan.Manifest); err != nil {
+	if err := e.saveManifest(ctx, targetAbs, root, rp.Plan.Manifest); err != nil {
 		report.Complete = false
 		return Handle{TargetRoot: targetAbs, Manifest: rp.Plan.Manifest, Report: report}, err
 	}
