@@ -57,11 +57,9 @@ func TestPrepareRuntime_CodexAuthUsesResolverAndNoAmbientFallback(t *testing.T) 
 	if err != nil {
 		t.Fatalf("read auth.json: %v", err)
 	}
-	if string(got) != string(secret) {
-		t.Fatalf("auth.json content came from wrong source: %s", got)
-	}
+	assertCredentialContent(t, string(got), string(secret))
 	if strings.Contains(mustJSON(t, result), "fake-runtime-secret") || strings.Contains(mustJSON(t, result), "ambient-secret") {
-		t.Fatalf("result leaked secret: %s", mustJSON(t, result))
+		t.Fatal("result leaked credential material (values redacted)")
 	}
 	if result.Effects[0].Redacted != RedactedSecret || !result.Effects[0].Secret {
 		t.Fatalf("secret metadata not redacted: %#v", result.Effects[0])
@@ -126,7 +124,7 @@ func TestPrepareRuntime_RequiredUnauthorizedOrUnavailableFailsBeforeCredentialLo
 		t.Fatal("expected resolver error")
 	}
 	if strings.Contains(err.Error(), "fake-runtime-secret") {
-		t.Fatalf("diagnostic leaked resolver secret: %v", err)
+		t.Fatal("diagnostic leaked credential material (values redacted)")
 	}
 	assertPreparationCode(t, err, "unavailable_effect")
 }
@@ -155,9 +153,11 @@ func TestPrepareRuntime_CodexAuthIdempotentAndCleanupPreservesModifiedFile(t *te
 		t.Fatalf("second PrepareRuntime: %v", err)
 	}
 	authPath := filepath.Join(boot, "auth.json")
-	if got, _ := os.ReadFile(authPath); string(got) != `{"token":"fake-runtime-secret"}` {
-		t.Fatalf("unexpected auth after repeated prepare: %s", got)
+	got, err := os.ReadFile(authPath)
+	if err != nil {
+		t.Fatal("could not read prepared auth fixture")
 	}
+	assertCredentialContent(t, string(got), `{"token":"fake-runtime-secret"}`)
 	if err := first.Cleanup(context.Background()); err != nil {
 		t.Fatalf("first cleanup: %v", err)
 	}
@@ -174,13 +174,11 @@ func TestPrepareRuntime_CodexAuthIdempotentAndCleanupPreservesModifiedFile(t *te
 	if err := second.Cleanup(context.Background()); err != nil {
 		t.Fatalf("second cleanup: %v", err)
 	}
-	got, err := os.ReadFile(authPath)
+	got, err = os.ReadFile(authPath)
 	if err != nil {
 		t.Fatalf("modified auth should survive cleanup: %v", err)
 	}
-	if string(got) != `{"token":"user-replaced-secret"}` {
-		t.Fatalf("cleanup clobbered modified auth: %s", got)
-	}
+	assertCredentialContent(t, string(got), `{"token":"user-replaced-secret"}`)
 }
 
 func TestPrepareRuntime_ClaudeTrustSyntheticHomeConcurrentCleanup(t *testing.T) {
@@ -330,16 +328,12 @@ func TestBootDirSpec_CodexAuthLegacyOptIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pure Render: %v", err)
 	}
-	if content != "" {
-		t.Fatalf("pure Render read ambient auth: %q", content)
-	}
+	assertCredentialContent(t, content, "")
 	content, err = auth.Render(PlantContext{LegacyAllowHostEffects: true})
 	if err != nil {
 		t.Fatalf("legacy Render: %v", err)
 	}
-	if content != `{"token":"ambient-secret"}` {
-		t.Fatalf("legacy Render did not read ambient auth: %q", content)
-	}
+	assertCredentialContent(t, content, `{"token":"ambient-secret"}`)
 }
 
 func assertPreparationCode(t *testing.T, err error, want string) {
@@ -376,4 +370,13 @@ func readClaudeConfig(t *testing.T, home string) map[string]any {
 		t.Fatalf("parse claude config: %v", err)
 	}
 	return cfg
+}
+
+// Do not add actual/expected values here: a broken isolation invariant can
+// turn either side of an assertion into credential material.
+func assertCredentialContent(t testing.TB, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Fatal("credential content mismatch (values redacted)")
+	}
 }

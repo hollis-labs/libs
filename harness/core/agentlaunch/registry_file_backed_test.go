@@ -397,32 +397,25 @@ func TestIngestCatalogMissingSubdir(t *testing.T) {
 	}
 }
 
-// TestIngestRealCatalog runs a read-only ingest against the developer's
-// live ~/.tether/catalog/ when present. It skips gracefully when the
-// directory is absent so the suite never depends on machine-local state.
-func TestIngestRealCatalog(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skipf("no home dir: %v", err)
-	}
+// TestIngestHomeCatalog uses the same home-relative layout as a host catalog,
+// but owns every file: default tests must never inspect an operator's catalog.
+func TestIngestHomeCatalog(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	root := filepath.Join(home, ".tether", "catalog")
-	if _, err := os.Stat(root); err != nil {
-		t.Skipf("live catalog %s not present", root)
+	mkSubdir(t, root, "agents", map[string]string{"fixture.yaml": "id: fixture-agent\nname: Fixture\n"})
+	resolvedHome, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal("could not resolve synthetic home")
 	}
-
-	fbr := NewFileBackedRegistrar(root)
+	fbr := NewFileBackedRegistrar(filepath.Join(resolvedHome, ".tether", "catalog"))
 	report, err := fbr.IngestCatalog()
 	if err != nil {
-		t.Fatalf("live IngestCatalog: %v", err)
+		t.Fatal("synthetic home catalog ingest failed")
 	}
-	if !report.Reconciles() {
-		t.Errorf("live catalog ingest does not reconcile: files=%v registered=%v",
-			report.FilesBySubdir, report.RegisteredBySubdir)
-	}
-	t.Logf("live catalog ingest: registered=%d by-kind=%v skipped=%d errors=%d",
-		report.Registered(), report.RegisteredByKind, len(report.Skipped), len(report.Errors))
-	for _, ie := range report.Errors {
-		t.Logf("live catalog per-file error: %s: %s", ie.FilePath, ie.Message)
+	if !report.Reconciles() || report.Registered() != 1 || len(report.Errors) != 0 {
+		t.Fatal("synthetic home catalog did not reconcile to exactly one registered entry")
 	}
 }
 

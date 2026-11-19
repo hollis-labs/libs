@@ -801,13 +801,13 @@ func TestReadCodexAuthSource_PermissionError(t *testing.T) {
 	t.Setenv("CODEX_HOME", dir)
 	content, ok, err := readCodexAuthSource()
 	if err == nil {
-		t.Fatalf("want permission error, got content=%q ok=%v", content, ok)
+		t.Fatalf("want permission error, got nil (credential values redacted), ok=%v", ok)
 	}
 	if ok {
 		t.Errorf("ok should be false on error")
 	}
 	if content != "" {
-		t.Errorf("content should be empty on error, got %q", content)
+		t.Error("content should be empty on error (values redacted)")
 	}
 }
 
@@ -824,7 +824,7 @@ func TestReadCodexAuthSource_Missing(t *testing.T) {
 		t.Errorf("ok should be false for missing source")
 	}
 	if content != "" {
-		t.Errorf("content should be empty for missing source, got %q", content)
+		t.Error("content should be empty for missing source (values redacted)")
 	}
 }
 
