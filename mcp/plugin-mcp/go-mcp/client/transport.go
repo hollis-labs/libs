@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hollis-labs/libs/mcp/plugin-mcp/go-mcp/compat"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/go-mcp/tracing"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -82,6 +83,9 @@ func dialSDK(ctx context.Context, name string, cfg ServerConfig, maxResponseByte
 		opts.clientOpts(name, clientOpts)
 	}
 	sdkClient := mcpsdk.NewClient(&mcpsdk.Implementation{Name: opts.identityName, Version: opts.identityVersion}, clientOpts)
+	if opts.traceContext {
+		sdkClient.AddSendingMiddleware(tracing.Sending())
+	}
 
 	switch kind {
 	case TransportStdio:

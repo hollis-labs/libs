@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### HTTP security and authorization (breaking)
+### HTTP security and authorization (breaking, module v0.10.0)
 
 - Empty `AllowedHosts` now allows only localhost/loopback literals; empty
   `AllowedOrigins` now allows only same-origin requests. No-Origin local
@@ -20,6 +20,14 @@ All notable changes to this project will be documented in this file.
   for missing identity or policy (including unauthenticated direct/stdio calls).
 - Migration and composition examples: `README.md`, HTTP authorization and
   discovery. Module release notes and version live in `../CHANGELOG.md`.
+
+### Added (trace propagation, module v0.9.0)
+
+- `client.WithTraceContext`, `server.WithTraceContext` and `tracing`: optional
+  W3C request `_meta` propagation, server spans and trusted-context attribute
+  callback. Standard keys supersede legacy underscore keys. Disabled by default;
+  no exporter, baggage forwarding, token parsing or automatic identity attribution.
+  See `docs/tracing.md` for adoption and correlation trust boundaries.
 
 ### Added (server)
 
