@@ -13,6 +13,10 @@
 // are empty until the layers that fill them exist; filling them later does not
 // change the schema version.
 //
+// The evidence subpackage is the other half: a passive recorder of the run's
+// runtime events with typed correlations, receipts, export and replay. A turn
+// record summarises a turn; an evidence recording keeps its event trail.
+//
 // A record never holds prompts, completions, tool arguments or tool output.
 // Error text it does hold must already be redacted by the writer.
 //
@@ -21,8 +25,8 @@
 // reserved lists (fired, hooks_run), null means the layer did not run and []
 // means it ran and produced nothing.
 //
-// This package is unrelated to agent/sdk/trace, the SDK's event evidence
-// recording; import one of them under an alias if a file needs both.
+// The evidence subpackage was extracted from agent/sdk/trace, which remains
+// until agent/sdk is retired.
 package trace
 
 import (
