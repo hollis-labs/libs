@@ -130,9 +130,8 @@ deliberate and is not to be changed to behave like this package.
 
 ## `_meta` conventions (Hollis Labs-wide)
 
-Status: ratified convention, not enforced by code. Nothing in this module
-checks, lints or rewrites any of it, and existing apps are not required to
-comply today.
+Status: trace propagation is opt-in; the remaining conventions are not enforced
+by code. Existing applications keep their behavior until they opt in.
 
 1. **`_meta`, never `arguments`, for anything that isn't a tool's own input.**
    Trace context, idempotency keys, provenance/session stamping and any future
@@ -142,11 +141,14 @@ comply today.
    it with `client.WithCallMeta` (neither interprets keys).
 
 2. **Two key-naming tiers.**
-   - Tier 1, shared-library concerns: bare, underscore-prefixed keys, spelled
-     `_traceparent` and `_tracestate` (W3C trace context, owned by go-otel).
-     Reserved for a cross-cutting concern owned by a library shared across the
-     every Hollis Labs application. W3C `baggage` has no `_meta` key: go-otel does not carry
-     it over MCP today, and this convention does not define one.
+   - Tier 1, shared-library concerns: `traceparent` and `tracestate` in request
+     `_meta`, following MCP 2026-07-28 and W3C Trace Context. Opt-in
+     `client.WithTraceContext` writes these standard keys. `server.WithTraceContext`
+     extracts them and creates request spans; `tracing.Options.Attributes` is a
+     context-only seam for application-owned correlation attributes.
+     Legacy `_traceparent`/`_tracestate` are accepted inbound only when the
+     standard parent key is absent. Standard keys win even when malformed.
+     No automatic baggage propagation or identity extraction is provided.
    - Tier 2, app-specific concerns: `<app>/<camelCase>`, e.g.
      `hadron/idempotencyKey`. Metadata one app's tools define for their own
      callers. New app-specific keys use this form.
@@ -198,8 +200,9 @@ checked.
 
 ### Out of scope
 
-No code, lint rule, typed accessor or API is added by this convention. Trace
-injection into `_meta` is a separate piece of work. Identity header design is out of scope here.
+The `tracing` package implements the trace portion only. Identity verification,
+run-token parsing and identity header design remain application-owned. Never
+copy unverified request metadata into verified span attributes.
 
 ### Compatibility and migration
 

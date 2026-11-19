@@ -8,6 +8,19 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-19
+
+### Added
+
+- `go-mcp`: opt-in `client.WithTraceContext` and `server.WithTraceContext`
+  propagate W3C `traceparent`/`tracestate` through request `_meta` on SDK
+  transports. Server request spans accept application-owned correlation
+  attributes from trusted context only; metadata never becomes verified
+  attribution automatically. Legacy underscore keys are accepted inbound
+  when standard keys are absent. No exporter, baggage or identity parser is
+  installed. HTTP roundtrip and carrier tests cover parentage, opt-in defaults,
+  malformed metadata, attribution isolation and cancellation preservation.
+
 ## [0.7.0] - 2026-11-19
 
 ### Changed
