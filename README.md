@@ -15,7 +15,7 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | `mcp` | Plugin and Model Context Protocol libraries. |
 | `ui` | Streaming and web UI building blocks for Go services. |
 | `workflow` | Workflow engine and its host. |
-| `llm` | LLM-facing libraries. No module is present yet. |
+| `llm` | LLM-facing libraries. Present: `llm/core`, `llm/embed-local` (in-process sentence embeddings). |
 | `mesh` | Messaging and coordination between components. |
 | `harness` | The layer that runs agent processes: launching, sandboxing, adapters, interception and brokering. Sits strictly below `agent`; imports `mesh`, `llm` and below. |
 | `agent` | Agent runtime built on the harness: context, turns, tools, approvals and reflexes. |
@@ -44,6 +44,7 @@ something from a higher group, the shared part moves down. The ranks live in
 | `ui/ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `mcp/plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 | `workflow/engine` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |
+| `llm/embed-local` | `github.com/hollis-labs/libs/llm/embed-local` | In-process sentence embeddings with a local ONNX model (hugot): pure Go by default, ONNX Runtime with `-tags ORT`. Satisfies `classify.Embedder`. Go 1.27. |
 | `app/app-host` | `github.com/hollis-labs/libs/app/app-host` | HTTP/embedded SPA assembly, reviewed plugin registry delivery and process inventory. |
 | `mesh/pipeline` | `github.com/hollis-labs/libs/mesh/pipeline` | Portable immutable message stages, bounded annotations and traces, and durable store interfaces. |
 
