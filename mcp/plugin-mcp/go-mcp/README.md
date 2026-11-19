@@ -916,3 +916,9 @@ in-memory transport, not `compat`, stdio or HTTP, and is unrelated to
 Compatibility: additive, new in the next release; it imports `server` and the
 official SDK's `mcp` package and adds no dependency. Any change to what
 counts as a passing handshake is a breaking change to the floor it defines.
+
+### MCP Apps
+
+The optional [`ui`](ui/README.md) package connects tool metadata to bundled HTML
+resources. See the runnable [Gatecrasher approval card](examples/approval-card/README.md)
+for client-owned decisions and direct secret intake.
