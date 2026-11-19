@@ -40,6 +40,10 @@ A rule votes for a label when its `when` conditions on the context hold (`eq`, `
 - `Decision`: asks a `decide.Decider` one Choice question per facet, built from the pack (the facet's About, each label's About and examples). The text is scrubbed of credentials first. Option order is rotated by the text. Answers become votes of `ln(p·K)`. It runs at `Async`.
 - `Affect`: cue words, negation, exclamation marks and capitals vote on tone. `AffectFacet()` is the facet to layer in.
 
+## Novelty
+
+A single nearest-neighbour "novelty" score mostly finds duplicates, so it is split in two. `Dedupe` groups near-copies. `Emerging` clusters what the classifier abstained on, after collapsing near-copies, and returns clusters with enough distinct members to be a candidate new label, each with a representative text.
+
 ## Evaluation
 
 `Evaluate` reports, per facet, accuracy, precision on what was answered, coverage, accuracy of the top label by probability band, the confusion matrix, and the majority-label floor. Hold evaluation examples out of training. `FitTemperature` fits a facet's temperature on labelled examples (lowest negative log-likelihood); set it in a pack layer.

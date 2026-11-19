@@ -50,6 +50,8 @@
 // gateway) one Choice question per facet built from the pack, at Async. Affect
 // is a lexicon judge for tone (neutral, frustrated, urgent, positive).
 // FitTemperature calibrates a facet's probabilities on labelled examples.
+// Dedupe and Emerging split novelty in two: near-copies, and clusters forming
+// among what the classifier abstained on (candidate new labels).
 //
 // The package is standard library plus the ledger and decide packages.
 package classify

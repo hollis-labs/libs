@@ -8,6 +8,13 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.10.0 — 2026-11-19
+
+### Added
+
+- `embed`: texts to vectors through an AI gateway's `POST /ai/embeddings` (http(s) or a unix socket). It batches, returns vectors in input order, refuses a change of dimension between calls, and keeps the token and input out of errors. `Client` satisfies `classify.Embedder`. Standard library only.
+- `classify`: `Dedupe` (groups of near-copies) and `Emerging` (clusters among abstained inputs, counted after collapsing near-copies, each with a representative). Together they split novelty into "seen before" and "something new forming".
+
 ## v0.9.0 — 2026-11-19
 
 ### Added
