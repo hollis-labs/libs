@@ -171,3 +171,60 @@ func TestConfidence(t *testing.T) {
 		t.Errorf("levels %v", lv)
 	}
 }
+
+func TestJEVDialectWritesTheNativeBodyInOrder(t *testing.T) {
+	var body, path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		body, path = string(b), r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"jev-1.13.0","answers":{"act":{"type":"choice","choice":"task","probabilities":{"task":0.9,"question":0.1}},` +
+			`"risky":{"type":"noul","noul":0.2}},"usage":{"input_tokens":30,"output_tokens":0}}`))
+	}))
+	defer srv.Close()
+	c := NewJEVClient(srv.URL, fixtureKey)
+	req := actRequest()
+	req.Model = "jev"
+	req.Questions[0].Options = []Option{{Key: "task", Description: "do something"}, {Key: "question"}}
+	req.Questions = append(req.Questions, Question{Key: "risky", Type: Noul, Instructions: "Is it risky?", True: "it is"})
+	resp, err := c.Decide(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/v1/systemone" || c.Name() != "decide-jev" {
+		t.Fatalf("path %q name %q", path, c.Name())
+	}
+	want := `{"state":{"text":"fix the build"},"model":"jev","questions":{` +
+		`"act":{"type":"choice","instructions":"What does it ask?","criteria":{"task":"do something","question":null}},` +
+		`"risky":{"type":"noul","instructions":"Is it risky?","criteria":{"true":"it is"}}}}`
+	if body != want {
+		t.Fatalf("body\n got %s\nwant %s", body, want)
+	}
+	if resp.Answers["act"].Choice != "task" || resp.Answers["risky"].Noul != 0.2 || resp.Model != "jev-1.13.0" || resp.Usage.InputTokens != 30 {
+		t.Fatalf("response %+v", resp)
+	}
+	if a := resp.Answers["act"]; a.Confidence < 0.79 || a.Confidence > 0.81 {
+		t.Fatalf("choice confidence %v", a.Confidence)
+	}
+}
+
+func TestJEVDialectNeedsAModelAndChecksAnswers(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"model":"jev-1.13.0","answers":{"act":{"type":"choice","choice":"poem"}}}`))
+	}))
+	defer srv.Close()
+	c := NewJEVClient(srv.URL, fixtureKey)
+	if _, err := c.Decide(context.Background(), actRequest()); err != nil {
+		// actRequest carries a model; an unoffered choice must still be refused.
+		if !strings.Contains(err.Error(), "not offered") {
+			t.Fatalf("unexpected error %v", err)
+		}
+	} else {
+		t.Fatal("an unoffered choice was accepted")
+	}
+	r := actRequest()
+	r.Model = ""
+	if _, err := c.Decide(context.Background(), r); err == nil {
+		t.Fatal("no model accepted")
+	}
+}

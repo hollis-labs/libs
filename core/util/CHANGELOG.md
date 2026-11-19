@@ -8,6 +8,13 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.11.0 — 2026-11-19
+
+### Added
+
+- `decide`: `DialectJEV` and `NewJEVClient`, JEV's own System-1 API (`POST /v1/systemone`, the way an LLM gateway relays it). The body is written by hand so question, option and level order is kept byte for byte, `Request.Model` (the gateway's route) is required, and answers are checked the same way as the gateway dialect's.
+- `embed`: `DialectOpenAI` and `NewOpenAIClient`, an OpenAI-compatible `POST /v1/embeddings` with a model alias.
+
 ## v0.10.0 — 2026-11-19
 
 ### Added
