@@ -3,10 +3,11 @@
 Captured 2026-11-19 from the installed Linux x86-64 Agy CLI, executable SHA256
 `94104f028e6962fa2f71d393a7ae27d835ceba1c4898422a103e22c6a5fd6828`.
 The binary does not expose a version flag in its help or Go build metadata.
-Each NDJSON file is a real stdout recording. The sole redaction is init.cwd,
-replaced by `/work`; conversation IDs, deltas, usage and tool fields are retained.
-Sibling stderr files record the independent stderr stream. Captures ran in an
-empty scratch directory with no repository content supplied to the model.
+Each NDJSON file is a real stdout recording. Scratch-directory prefixes in
+init.cwd and tool parameters are replaced by `/work`; conversation IDs, text
+deltas, usage and other tool fields are retained.
+Sibling stderr files record the independent stderr stream. Captures ran in a
+scratch directory outside the repository, with no repository content supplied to the model.
 
 Commands (each redirects stdout/stderr to the matching sibling capture files):
 
