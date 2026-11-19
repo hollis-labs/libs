@@ -3,12 +3,20 @@
 All notable changes to the `plugin-mcp` module are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the module adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are tagged
-`plugin-mcp/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
+`mcp/plugin-mcp/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-19
+
+### Changed
+
+- Require Go 1.26.11 to include the standard-library fix for GO-2026-6859, identified by the release vulnerability gate.
+
 ### Added
+
+- `go-mcp/ui`: optional MCP Apps capability, tool resource metadata and bundled HTML resources with explicit CSP connect origins. `server.Tool.Meta` survives SDK and paginated catalogs. Runnable Gatecrasher card example covers approve, choose, answer and direct client secret intake, with executable client-flow and MCP wire tests.
 
 - `go-mcp/transport/http`: `HandlerOptions.JSONResponse`. When set, a POST is answered with a single `application/json` body instead of a `text/event-stream` frame, including when the client sends `Accept: application/json, text/event-stream`. Default false keeps the SSE framing, so existing consumers are unchanged. Additive (minor).
 
