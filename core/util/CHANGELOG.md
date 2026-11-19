@@ -8,6 +8,13 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.9.0 — 2026-11-19
+
+### Added
+
+- `decide`: structured questions to a decision provider (`noul`, `choice`, `score`) answered with probabilities. `Decider` is the seam. `Client` speaks a decision gateway's `POST /ai/decide`, over http(s) or a unix socket. It validates requests before calling and checks every answer against its question. It retries only rate-limited, overloaded and timed-out calls, and never puts the token or the request text in an error. Also `Scripted` for tests, the confidence helpers, and `Scrub` for recognisable credentials. Standard library only.
+- `classify`: `Decision`, a judge that asks a `decide.Decider` one Choice question per facet, built from the pack. It scrubs the text, rotates option order by the text, votes `ln(p·K)` and runs at `Async`. `Affect` and `AffectFacet`, a lexicon-and-heuristics tone judge (neutral, frustrated, urgent, positive). `FitTemperature`, which calibrates a facet by negative log-likelihood on labelled examples.
+
 ## v0.8.0 — 2026-11-19
 
 ### Added

@@ -35,6 +35,11 @@ A rule votes for a label when its `when` conditions on the context hold (`eq`, `
 }]}
 ```
 
+## More judges
+
+- `Decision`: asks a `decide.Decider` one Choice question per facet, built from the pack (the facet's About, each label's About and examples). The text is scrubbed of credentials first. Option order is rotated by the text. Answers become votes of `ln(p·K)`. It runs at `Async`.
+- `Affect`: cue words, negation, exclamation marks and capitals vote on tone. `AffectFacet()` is the facet to layer in.
+
 ## Evaluation
 
-`Evaluate` reports, per facet, accuracy, precision on what was answered, coverage, accuracy of the top label by probability band, the confusion matrix, and the majority-label floor. Hold evaluation examples out of training.
+`Evaluate` reports, per facet, accuracy, precision on what was answered, coverage, accuracy of the top label by probability band, the confusion matrix, and the majority-label floor. Hold evaluation examples out of training. `FitTemperature` fits a facet's temperature on labelled examples (lowest negative log-likelihood); set it in a pack layer.

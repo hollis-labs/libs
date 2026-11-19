@@ -46,5 +46,10 @@
 // Result.LedgerRecords turns a result into one ledger row per facet, so
 // decisions, corrections and training labels share the ledger's store.
 //
-// The package is standard library plus the ledger package.
+// Decision asks a decide.Decider (a decision provider such as JEV, through a
+// gateway) one Choice question per facet built from the pack, at Async. Affect
+// is a lexicon judge for tone (neutral, frustrated, urgent, positive).
+// FitTemperature calibrates a facet's probabilities on labelled examples.
+//
+// The package is standard library plus the ledger and decide packages.
 package classify
