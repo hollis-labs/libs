@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/hollis-labs/libs/core/panics"
+	"github.com/hollis-labs/libs/mcp/plugin-mcp/go-mcp/tracing"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -96,4 +97,12 @@ func WithDuplicateTools(p DuplicatePolicy) Option {
 // declared with RegisterChecked and an explicit Behavior.
 func WithBehaviorRequired() Option {
 	return func(o *options) { o.behaviorRequired = true }
+}
+
+// WithTraceContext opts in to W3C extraction and request spans on all SDK
+// transports. Direct Server.CallTool bypasses the protocol middleware.
+// Install identity-verifying receiving middleware before this option when its
+// trusted context values supply opts.Attributes. No identities are read from _meta.
+func WithTraceContext(opts tracing.Options) Option {
+	return WithReceivingMiddleware(tracing.Receiving(opts))
 }

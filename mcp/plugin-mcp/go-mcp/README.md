@@ -13,6 +13,8 @@ module currently exposes:
   tool-annotation contract (`readOnlyHint`/`destructiveHint`/etc. are never
   optional or inferred from a tool's name), deterministic `tools/list`
   ordering, and stdio serving
+- `tracing` — opt-in W3C trace context in request `_meta` and server spans;
+  see [trace propagation](docs/tracing.md)
 - `client` — connects OUT to external MCP servers over stdio, streamable
   HTTP, or legacy SSE: dial-on-first-use, one retry on a recoverable
   error, a lazy health probe for non-stdio connections, and an opt-in
@@ -624,9 +626,7 @@ way to a client that advertises it.
 
 Not part of these packages: required-scope enforcement, an error-code
 vocabulary (the guard's code is `invalid_argument` and overridable with
-`WithErrorCode`), a conformance suite beyond `mcptest.Connect` (see below), OpenTelemetry spans or
-trace-carrier parsing (go-mcp stays OTel-free; `_traceparent` is only
-exempted from the argument check), and gateway concerns such as policy,
+`WithErrorCode`), a conformance suite beyond `mcptest.Connect` (see below), and gateway concerns such as policy,
 budgets, tool visibility and virtual servers. Sanitization is not default-on,
 and hints are never inferred from tool names.
 

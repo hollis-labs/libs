@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added (trace propagation, module v0.9.0)
+
+- `client.WithTraceContext`, `server.WithTraceContext` and `tracing`: optional
+  W3C request `_meta` propagation, server spans and trusted-context attribute
+  callback. Standard keys supersede legacy underscore keys. Disabled by default;
+  no exporter, baggage forwarding, token parsing or automatic identity attribution.
+  See `docs/tracing.md` for adoption and correlation trust boundaries.
+
 ### Added (server)
 
 - `server.RecoverPanics` (tool middleware) and `server.RecoverPanicsReceiving`

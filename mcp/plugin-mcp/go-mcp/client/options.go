@@ -44,6 +44,7 @@ type config struct {
 
 	callRetry    RetryPolicy
 	callTimeouts map[string]time.Duration
+	traceContext bool
 	clientOpts   func(server string, o *mcpsdk.ClientOptions)
 }
 
@@ -228,4 +229,12 @@ func defaultCommandEnv(cfg ServerConfig) ([]string, error) {
 	}
 	sort.Strings(extra)
 	return append(env, extra...), nil
+}
+
+// WithTraceContext opts in to W3C traceparent/tracestate injection into request
+// _meta on every transport. It uses the current span, creates no spans, and
+// leaves untraced calls unchanged. A valid current span wins over explicit
+// trace metadata; unrelated WithCallMeta keys are preserved.
+func WithTraceContext() Option {
+	return func(c *config) { c.traceContext = true }
 }
