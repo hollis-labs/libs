@@ -73,7 +73,7 @@ The same program lives in [`examples/decode`](./examples/decode/main.go).
 | Package | What it is |
 |---|---|
 | `chatstream` | `Event`, the `Verb` and `PartKind` vocabularies, `FinishReason`, the disjoint-component `Usage`, `Capabilities`, `Reduce`/`Message`, the `Provider`/`Adapter`/`Decoder` interfaces and `DecodeFrames` |
-| `chatstream/adapter/anthropic`, `openaichat`, `openairesponses`, `acp`, `claudejson`, `codexjson` | one `Decoder` per dialect, each separately importable; stdlib only, no provider SDK |
+| `chatstream/adapter/anthropic`, `openaichat`, `openairesponses`, `acp`, `claudejson`, `codexjson`, `codexappserver` | one `Decoder` per dialect, each separately importable; stdlib only, no provider SDK |
 | `chatstream/sink` and `sink/native`, `aisdk`, `agui`, `openaicompat`, `nanitelegacy` | the `Encoder` interface and one encoder per target |
 | `chatstream/framing` | SSE (through go-ssekit's parser) and line framing into `Frame`s |
 | `chatstream/hubbind` | the documented seam to go-streamhub: publish with the hub's `Seq`, terminal predicate, events from a subscription with gaps in-band |

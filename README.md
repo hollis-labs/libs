@@ -15,7 +15,7 @@ being folded into the `agent`, `mesh`, `llm` and `security` groups.
 | `mcp` | Plugin and Model Context Protocol libraries. |
 | `ui` | Streaming and web UI building blocks for Go services. |
 | `workflow` | Workflow engine and its host. |
-| `llm` | LLM-facing libraries. No module is present yet. |
+| `llm` | LLM-facing libraries. Present: `llm/core`, `llm/embed-local` (in-process sentence embeddings). |
 | `mesh` | Messaging and coordination between components. |
 | `harness` | The layer that runs agent processes: launching, sandboxing, adapters, interception and brokering. Sits strictly below `agent`; imports `mesh`, `llm` and below. |
 | `agent` | Agent runtime built on the harness: context, turns, tools, approvals and reflexes. |
@@ -35,7 +35,7 @@ something from a higher group, the shared part moves down. The ranks live in
 
 | Module | Import path | Scope |
 |---|---|---|
-| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper, a Tesseract memory API client, a middleware kit (HTTP, queue jobs, conformance suite), a rule router and a decision ledger. |
+| `core/util` | `github.com/hollis-labs/libs/core/util` | Small, general-purpose utilities: SQLite helpers and backups, string helpers, service errors, transport parity, OpenTelemetry setup, SFTP sync, application paths, local-daemon helpers, a queue, a scheduler, a worktree helper, a Tesseract memory API client, a Work service HTTP client, a middleware kit (HTTP, queue jobs, conformance suite), a rule router and a decision ledger. |
 | `core/panics` | `github.com/hollis-labs/libs/core/panics` | Panic containment: recover at a boundary, return a ref and keep a redacted, bounded record. Goroutine, call and `net/http` guards; no dependencies. |
 | `core/store` | `github.com/hollis-labs/libs/core/store` | Storage driver layer: one set of handwritten SQL on SQLite or Postgres. Dialect adapter (placeholder rebinding, time, JSON), single-writer SQLite and pgx Postgres opening, goose migrations per dialect, portable full-text search, a transactional outbox, a portable-SQL lint and a two-engine test harness. |
 | `security/webauthn` | `github.com/hollis-labs/libs/security/webauthn` | UV-required WebAuthn primitives, durable single-use ceremonies, a credential-store interface, SQLite storage and synthetic authenticator tests. |
@@ -44,6 +44,7 @@ something from a higher group, the shared part moves down. The ranks live in
 | `ui/ui-go` | `github.com/hollis-labs/libs/ui/ui-go` | Server-sent events, stream hubs, chat streaming, web UI helpers, directives and envelopes. |
 | `mcp/plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 | `workflow/engine` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |
+| `llm/embed-local` | `github.com/hollis-labs/libs/llm/embed-local` | In-process sentence embeddings with a local ONNX model (hugot): pure Go by default, ONNX Runtime with `-tags ORT`. Satisfies `classify.Embedder`. Go 1.27. |
 | `app/app-host` | `github.com/hollis-labs/libs/app/app-host` | HTTP/embedded SPA assembly, reviewed plugin registry delivery and process inventory. |
 | `mesh/pipeline` | `github.com/hollis-labs/libs/mesh/pipeline` | Portable immutable message stages, bounded annotations and traces, and durable store interfaces. |
 

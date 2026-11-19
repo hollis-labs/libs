@@ -1,0 +1,176 @@
+{
+ "name": "turn-failed",
+ "description": "Live capture (codex-cli 0.163.0): an unknown model. A warning, a non-retrying error notification (activity, not terminal), then turn/completed with status failed: run.error turn_failed with the upstream message unwrapped.",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+      "environments": [
+       {
+        "environmentId": "local",
+        "cwd": "/work",
+        "runtimeWorkspaceRoots": [
+         "/work"
+        ]
+       }
+      ],
+      "extra": null,
+      "sessionId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+      "forkedFromId": null,
+      "parentThreadId": null,
+      "preview": "",
+      "ephemeral": true,
+      "section": null,
+      "sectionEnteredAt": null,
+      "projectId": null,
+      "historyMode": "paginated",
+      "modelProvider": "openai",
+      "model": "no-such-model-xyz",
+      "reasoningEffort": "low",
+      "createdAt": 1795024897,
+      "updatedAt": 1795024897,
+      "recencyAt": 1795024897,
+      "status": {
+       "type": "idle"
+      },
+      "path": null,
+      "cwd": "/work",
+      "cliVersion": "0.163.0",
+      "originator": "capture",
+      "source": "vscode",
+      "canAcceptDirectInput": true,
+      "threadSource": null,
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "daybreakEnabled": null,
+      "turns": []
+     }
+    },
+    "emittedAtMs": 1795024897134
+   }
+  },
+  {
+   "data": {
+    "method": "warning",
+    "params": {
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "message": "Model metadata for `no-such-model-xyz` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+    },
+    "emittedAtMs": 1795024897144
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "turn": {
+      "id": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+      "rootTurnId": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": 1795024897,
+      "completedAt": null,
+      "durationMs": null
+     }
+    },
+    "emittedAtMs": 1795024897148
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-47e7-79a0-bcad-2847d2051eec",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Say hi.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "turnId": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+     "startedAtMs": 1795024898023
+    },
+    "emittedAtMs": 1795024898023
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-47e7-79a0-bcad-2847d2051eec",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Say hi.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "turnId": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+     "completedAtMs": 1795024898023
+    },
+    "emittedAtMs": 1795024898023
+   }
+  },
+  {
+   "data": {
+    "method": "error",
+    "params": {
+     "error": {
+      "message": "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'no-such-model-xyz' model is not supported when using Codex with a ChatGPT account.\",\"code\":\"model_not_found\"}}",
+      "codexErrorInfo": "other",
+      "additionalDetails": null,
+      "misalignment": null
+     },
+     "willRetry": false,
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "turnId": "01a1efd2-4476-7871-9d13-0e7a42d203a7"
+    },
+    "emittedAtMs": 1795024898669
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "01a1efd2-4444-78c0-8da0-abb7c56c4069",
+     "turn": {
+      "id": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+      "rootTurnId": "01a1efd2-4476-7871-9d13-0e7a42d203a7",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "failed",
+      "error": {
+       "message": "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'no-such-model-xyz' model is not supported when using Codex with a ChatGPT account.\",\"code\":\"model_not_found\"}}",
+       "codexErrorInfo": "other",
+       "additionalDetails": null,
+       "misalignment": null
+      },
+      "startedAt": 1795024897,
+      "completedAt": 1795024898,
+      "durationMs": 1525
+     }
+    },
+    "emittedAtMs": 1795024898669
+   }
+  }
+ ]
+}

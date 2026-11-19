@@ -1,0 +1,25 @@
+package codexappserver_test
+
+import (
+	"fmt"
+
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/codexappserver"
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/conformance"
+)
+
+// ExampleNew decodes a recorded app-server turn and prints how the run began
+// and ended: bracketed by run.start and exactly one terminal event. A real
+// caller feeds the app-server's stdout lines from framing.Lines through
+// chatstream.DecodeFrames instead of a fixture.
+func ExampleNew() {
+	fx, err := conformance.LoadFixture("testdata/text-deltas.frames.json")
+	if err != nil {
+		panic(err)
+	}
+	events, err := conformance.DecodeFixture(codexappserver.New(), fx)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(events[0].Verb, "...", events[len(events)-1].Verb)
+	// Output: run.start ... run.finish
+}

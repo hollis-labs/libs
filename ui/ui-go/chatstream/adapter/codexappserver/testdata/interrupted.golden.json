@@ -1,0 +1,262 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd2-4443-7d73-a2d6-fdee3531ed93"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+        "turn_id": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/started.userMessage",
+      "payload": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-487e-7741-888e-c77831b27bb1",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Write a 600-word essay about rivers. Do not use tools.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+          "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+          "startedAtMs": 1795024898174
+        },
+        "emittedAtMs": 1795024898174
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/completed.userMessage",
+      "payload": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-487e-7741-888e-c77831b27bb1",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Write a 600-word essay about rivers. Do not use tools.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+          "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+          "completedAtMs": 1795024898174
+        },
+        "emittedAtMs": 1795024898174
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": "A"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " river"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " begins"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " as"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " a"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " gathering"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": "."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " Rain"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " slips"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " through"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "text": " soil"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "response",
+      "payload": {
+        "id": 4,
+        "result": {}
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+    "final": {
+      "text": "A river begins as a gathering. Rain slips through soil"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.abort",
+    "reason": "interrupted"
+  }
+]

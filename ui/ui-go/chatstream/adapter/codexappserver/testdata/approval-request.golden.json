@@ -1,0 +1,494 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd3-028b-7210-8386-e86200df3e89"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "01a1efd3-02b0-7741-913c-8c07eb46b4f1",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd3-028b-7210-8386-e86200df3e89",
+        "turn_id": "01a1efd3-02b0-7741-913c-8c07eb46b4f1"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/started.userMessage",
+      "payload": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd3-07e0-76b1-b501-791a96a323be",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Run the shell command: touch made.txt . Then reply with one short sentence.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd3-028b-7210-8386-e86200df3e89",
+          "turnId": "01a1efd3-02b0-7741-913c-8c07eb46b4f1",
+          "startedAtMs": 1795024947168
+        },
+        "emittedAtMs": 1795024947168
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/completed.userMessage",
+      "payload": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd3-07e0-76b1-b501-791a96a323be",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Run the shell command: touch made.txt . Then reply with one short sentence.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd3-028b-7210-8386-e86200df3e89",
+          "turnId": "01a1efd3-02b0-7741-913c-8c07eb46b4f1",
+          "completedAtMs": 1795024947168
+        },
+        "emittedAtMs": 1795024947168
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "kind": "text",
+    "meta": {
+      "phase": "narration"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": "I"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": "’ll"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": " run"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": " `"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": "touch"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": " made"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": ".txt"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "text": "`.\n"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_00b583a75b5766cc016afde834a22887d18ee6b1d43bd515e1",
+    "final": {
+      "text": "I’ll run `touch made.txt`.\n"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+    "kind": "tool_call",
+    "meta": {
+      "detail": "touch made.txt",
+      "item_type": "commandExecution",
+      "name": "shell",
+      "status": "inProgress"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+    "json_fragment": "{\"command\":\"/bin/bash -lc 'touch made.txt'\",\"cwd\":\"/work\"}"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+    "final": {
+      "command": "/bin/bash -lc 'touch made.txt'",
+      "cwd": "/work"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.approval_request",
+    "value": {
+      "item_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "kind": "command",
+        "threadId": "01a1efd3-028b-7210-8386-e86200df3e89",
+        "turnId": "01a1efd3-02b0-7741-913c-8c07eb46b4f1",
+        "itemId": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+        "startedAtMs": 1795024949453,
+        "environmentId": "local",
+        "command": "/bin/bash -lc 'touch made.txt'",
+        "cwd": "/work",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "touch made.txt"
+          }
+        ],
+        "proposedExecpolicyAmendment": [
+          "touch",
+          "made.txt"
+        ],
+        "availableDecisions": [
+          "accept",
+          {
+            "acceptWithExecpolicyAmendment": {
+              "execpolicy_amendment": [
+                "touch",
+                "made.txt"
+              ]
+            }
+          },
+          "cancel"
+        ]
+      },
+      "request_id": 0
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "activity",
+    "kind": "codex.server_request_resolved",
+    "value": {
+      "request_id": 0
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26#result",
+    "kind": "tool_result",
+    "meta": {
+      "call_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26",
+      "is_error": true
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "exec-577395d8-5a40-4312-a621-6aeb2bf5ce26#result",
+    "final": {
+      "is_error": true,
+      "status": "declined",
+      "text": ""
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": "The"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " command"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " was"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " rejected"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": ","
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " so"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " I"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " couldn"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": "’t"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " create"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": " `"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": "made"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": ".txt"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "text": "`."
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_00b583a75b5766cc016afde836c7fc87d19df290e0d7b15943",
+    "final": {
+      "text": "The command was rejected, so I couldn’t create `made.txt`."
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "01a1efd3-02b0-7741-913c-8c07eb46b4f1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 3533,
+      "cache_read": 27520,
+      "output": 62,
+      "total": 31115
+    }
+  }
+]

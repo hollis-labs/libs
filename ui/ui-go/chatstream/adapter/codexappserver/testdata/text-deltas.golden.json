@@ -1,0 +1,462 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "codex_apps",
+          "status": "starting",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024878516
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "echo",
+          "status": "starting",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024878516
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "thread/settings/updated",
+      "payload": {
+        "method": "thread/settings/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "threadSettings": {
+            "disabledPluginIds": [],
+            "cwd": "/work",
+            "approvalPolicy": "never",
+            "approvalsReviewer": "user",
+            "sandboxPolicy": {
+              "type": "readOnly",
+              "networkAccess": false
+            },
+            "activePermissionProfile": null,
+            "model": "gpt-6-astra",
+            "modelProvider": "openai",
+            "serviceTier": null,
+            "effort": "low",
+            "summary": "detailed",
+            "collaborationMode": {
+              "mode": "default",
+              "settings": {
+                "model": "gpt-6-astra",
+                "reasoning_effort": "low",
+                "developer_instructions": null
+              }
+            },
+            "multiAgentMode": "explicitRequestOnly",
+            "personality": null
+          }
+        },
+        "emittedAtMs": 1795024878518
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "response",
+      "payload": {
+        "id": 3,
+        "result": {
+          "turn": {
+            "id": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+            "rootTurnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "inProgress",
+            "error": null,
+            "startedAt": null,
+            "completedAt": null,
+            "durationMs": null
+          }
+        }
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "thread/status/changed",
+      "payload": {
+        "method": "thread/status/changed",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "status": {
+            "type": "active",
+            "activeFlags": []
+          }
+        },
+        "emittedAtMs": 1795024878519
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+        "turn_id": "01a1efd1-fbb5-7453-8633-8e53446e8607"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "echo",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024878527
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "codex_apps",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024879189
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/started.userMessage",
+      "payload": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-002c-7121-872e-d006bcc2f32f",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly the words: hello from codex. Do not run any tools.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+          "startedAtMs": 1795024879661
+        },
+        "emittedAtMs": 1795024879661
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/completed.userMessage",
+      "payload": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-002c-7121-872e-d006bcc2f32f",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly the words: hello from codex. Do not run any tools.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+          "completedAtMs": 1795024879661
+        },
+        "emittedAtMs": 1795024879661
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "echo",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024879769
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "mcpServer/startupStatus/updated",
+      "payload": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "name": "codex_apps",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1795024879769
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "text": "hello"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "text": " from"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "text": " cod"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "text": "ex"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "turn/moderationMetadata",
+      "payload": {
+        "method": "turn/moderationMetadata",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+          "metadata": {
+            "prompt": {},
+            "generation": {},
+            "tool_call": {},
+            "tool_response": {}
+          }
+        },
+        "emittedAtMs": 1795024881695
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+    "final": {
+      "text": "hello from codex"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "thread/status/changed",
+      "payload": {
+        "method": "thread/status/changed",
+        "params": {
+          "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+          "status": {
+            "type": "idle"
+          }
+        },
+        "emittedAtMs": 1795024881706
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "01a1efd1-fbb5-7453-8633-8e53446e8607"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 3329,
+      "cache_read": 12160,
+      "output": 8,
+      "total": 15497
+    }
+  }
+]

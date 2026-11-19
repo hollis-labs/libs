@@ -18,6 +18,10 @@ const (
 	KindSessionIdle       EventKind = "session.idle"
 	KindSessionProcessing EventKind = "session.processing"
 	KindSessionHeartbeat  EventKind = "session.heartbeat"
+	// KindSessionStatusChanged separates process liveness, reported work and
+	// attention. Its payload carries the PTY process generation; the envelope
+	// Cursor remains the durable replay position, distinct from RawOffset.
+	KindSessionStatusChanged EventKind = "session.status_changed"
 
 	// KindSessionLost reports that a resume did not continue the provider
 	// session it asked for: the provider either started a new session in

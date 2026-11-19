@@ -24,8 +24,11 @@ type SQLiteSettings struct {
 	BusyTimeout time.Duration
 	// ForeignKeys reports whether foreign keys are enforced.
 	ForeignKeys bool
-	// MainPath is the file behind the "main" schema, as SQLite reports it
-	// (absolute), or "" for an in-memory database.
+	// MainPath is the file behind the "main" schema, absolute, exactly as
+	// SQLite reports it, or "" for an in-memory database. SQLite may report the
+	// path with symlinks resolved (macOS reports /private/var/... for a file
+	// opened as /var/...), so compare it with filepath.EvalSymlinks of the path
+	// you expect, not with that path as written.
 	MainPath string
 }
 
@@ -88,7 +91,9 @@ func ReadSQLiteSettings(ctx context.Context, q Querier) (SQLiteSettings, error) 
 // ReadSQLiteSettings). It waits for the single writer connection, so do not
 // call it inside a WriteTx callback: pass the callback's tx to
 // ReadSQLiteSettings instead. The read pool's settings are read with
-// ReadSQLiteSettings(ctx, s.Reader()). On Postgres it returns ErrSQLiteOnly.
+// ReadSQLiteSettings(ctx, s.Reader()); each call on the pool may run on a
+// different read connection, so to read one connection use ReadTx. On
+// Postgres it returns ErrSQLiteOnly.
 func (s *Store) SQLiteSettings(ctx context.Context) (SQLiteSettings, error) {
 	return ReadSQLiteSettings(ctx, newBound(s.dialect, s.write, s.cache))
 }

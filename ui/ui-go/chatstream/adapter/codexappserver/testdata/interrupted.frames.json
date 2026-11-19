@@ -1,0 +1,336 @@
+{
+ "name": "interrupted",
+ "description": "Live capture (codex-cli 0.163.0): turn/interrupt mid-answer. The agentMessage never completes; turn/completed has status interrupted. The open text part closes with what streamed, then run.abort.",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+      "environments": [
+       {
+        "environmentId": "local",
+        "cwd": "/work",
+        "runtimeWorkspaceRoots": [
+         "/work"
+        ]
+       }
+      ],
+      "extra": null,
+      "sessionId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+      "forkedFromId": null,
+      "parentThreadId": null,
+      "preview": "",
+      "ephemeral": true,
+      "section": null,
+      "sectionEnteredAt": null,
+      "projectId": null,
+      "historyMode": "paginated",
+      "modelProvider": "openai",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "low",
+      "createdAt": 1795024897,
+      "updatedAt": 1795024897,
+      "recencyAt": 1795024897,
+      "status": {
+       "type": "idle"
+      },
+      "path": null,
+      "cwd": "/work",
+      "cliVersion": "0.163.0",
+      "originator": "capture",
+      "source": "vscode",
+      "canAcceptDirectInput": true,
+      "threadSource": null,
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "daybreakEnabled": null,
+      "turns": []
+     }
+    },
+    "emittedAtMs": 1795024897151
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turn": {
+      "id": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+      "rootTurnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": 1795024897,
+      "completedAt": null,
+      "durationMs": null
+     }
+    },
+    "emittedAtMs": 1795024897163
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-487e-7741-888e-c77831b27bb1",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Write a 600-word essay about rivers. Do not use tools.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "startedAtMs": 1795024898174
+    },
+    "emittedAtMs": 1795024898174
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-487e-7741-888e-c77831b27bb1",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Write a 600-word essay about rivers. Do not use tools.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "completedAtMs": 1795024898174
+    },
+    "emittedAtMs": 1795024898174
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "rs_040dc9a872c4b087016afde804d3c087d19c13594758a513be",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "startedAtMs": 1795024900851
+    },
+    "emittedAtMs": 1795024900851
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "rs_040dc9a872c4b087016afde804d3c087d19c13594758a513be",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "completedAtMs": 1795024903807
+    },
+    "emittedAtMs": 1795024903807
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+      "text": "",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "startedAtMs": 1795024903810
+    },
+    "emittedAtMs": 1795024903810
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": "A"
+    },
+    "emittedAtMs": 1795024903811
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " river"
+    },
+    "emittedAtMs": 1795024903811
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " begins"
+    },
+    "emittedAtMs": 1795024903811
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " as"
+    },
+    "emittedAtMs": 1795024903811
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " a"
+    },
+    "emittedAtMs": 1795024903814
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " gathering"
+    },
+    "emittedAtMs": 1795024903814
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": "."
+    },
+    "emittedAtMs": 1795024903814
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " Rain"
+    },
+    "emittedAtMs": 1795024903814
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " slips"
+    },
+    "emittedAtMs": 1795024903814
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " through"
+    },
+    "emittedAtMs": 1795024903816
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+     "itemId": "msg_040dc9a872c4b087016afde8067e5487d1b82bd0e739aedcc9",
+     "delta": " soil"
+    },
+    "emittedAtMs": 1795024903816
+   }
+  },
+  {
+   "data": {
+    "id": 4,
+    "result": {}
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "01a1efd2-4443-7d73-a2d6-fdee3531ed93",
+     "turn": {
+      "id": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+      "rootTurnId": "01a1efd2-4486-7ae3-8ec5-7c5e89e7416b",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "interrupted",
+      "error": null,
+      "startedAt": 1795024897,
+      "completedAt": 1795024903,
+      "durationMs": 6658
+     }
+    },
+    "emittedAtMs": 1795024903820
+   }
+  }
+ ]
+}

@@ -1,0 +1,443 @@
+{
+ "name": "text-deltas",
+ "description": "Live capture (codex-cli 0.163.0): a plain text turn, the answer streamed as item/agentMessage/delta, with the surrounding noise kept (the turn/start response, MCP startup status, thread status and settings, moderation metadata) to show it is preserved as raw.",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+      "environments": [
+       {
+        "environmentId": "local",
+        "cwd": "/work",
+        "runtimeWorkspaceRoots": [
+         "/work"
+        ]
+       }
+      ],
+      "extra": null,
+      "sessionId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+      "forkedFromId": null,
+      "parentThreadId": null,
+      "preview": "",
+      "ephemeral": true,
+      "section": null,
+      "sectionEnteredAt": null,
+      "projectId": null,
+      "historyMode": "paginated",
+      "modelProvider": "openai",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "low",
+      "createdAt": 1795024878,
+      "updatedAt": 1795024878,
+      "recencyAt": 1795024878,
+      "status": {
+       "type": "idle"
+      },
+      "path": null,
+      "cwd": "/work",
+      "cliVersion": "0.163.0",
+      "originator": "capture",
+      "source": "vscode",
+      "canAcceptDirectInput": true,
+      "threadSource": null,
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "daybreakEnabled": null,
+      "turns": []
+     }
+    },
+    "emittedAtMs": 1795024878516
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "codex_apps",
+     "status": "starting",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024878516
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "echo",
+     "status": "starting",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024878516
+   }
+  },
+  {
+   "data": {
+    "method": "thread/settings/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "threadSettings": {
+      "disabledPluginIds": [],
+      "cwd": "/work",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "activePermissionProfile": null,
+      "model": "gpt-6-astra",
+      "modelProvider": "openai",
+      "serviceTier": null,
+      "effort": "low",
+      "summary": "detailed",
+      "collaborationMode": {
+       "mode": "default",
+       "settings": {
+        "model": "gpt-6-astra",
+        "reasoning_effort": "low",
+        "developer_instructions": null
+       }
+      },
+      "multiAgentMode": "explicitRequestOnly",
+      "personality": null
+     }
+    },
+    "emittedAtMs": 1795024878518
+   }
+  },
+  {
+   "data": {
+    "id": 3,
+    "result": {
+     "turn": {
+      "id": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "rootTurnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": null,
+      "completedAt": null,
+      "durationMs": null
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "thread/status/changed",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "status": {
+      "type": "active",
+      "activeFlags": []
+     }
+    },
+    "emittedAtMs": 1795024878519
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turn": {
+      "id": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "rootTurnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": 1795024878,
+      "completedAt": null,
+      "durationMs": null
+     }
+    },
+    "emittedAtMs": 1795024878519
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "echo",
+     "status": "ready",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024878527
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "codex_apps",
+     "status": "ready",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024879189
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-002c-7121-872e-d006bcc2f32f",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Reply with exactly the words: hello from codex. Do not run any tools.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "startedAtMs": 1795024879661
+    },
+    "emittedAtMs": 1795024879661
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd2-002c-7121-872e-d006bcc2f32f",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Reply with exactly the words: hello from codex. Do not run any tools.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "completedAtMs": 1795024879661
+    },
+    "emittedAtMs": 1795024879661
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "echo",
+     "status": "ready",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024879769
+   }
+  },
+  {
+   "data": {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "name": "codex_apps",
+     "status": "ready",
+     "error": null,
+     "failureReason": null
+    },
+    "emittedAtMs": 1795024879769
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+      "text": "",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "startedAtMs": 1795024881622
+    },
+    "emittedAtMs": 1795024881622
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "itemId": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+     "delta": "hello"
+    },
+    "emittedAtMs": 1795024881622
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "itemId": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+     "delta": " from"
+    },
+    "emittedAtMs": 1795024881622
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "itemId": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+     "delta": " cod"
+    },
+    "emittedAtMs": 1795024881622
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "itemId": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+     "delta": "ex"
+    },
+    "emittedAtMs": 1795024881622
+   }
+  },
+  {
+   "data": {
+    "method": "turn/moderationMetadata",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "metadata": {
+      "prompt": {},
+      "generation": {},
+      "tool_call": {},
+      "tool_response": {}
+     }
+    },
+    "emittedAtMs": 1795024881695
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+      "text": "hello from codex",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "completedAtMs": 1795024881696
+    },
+    "emittedAtMs": 1795024881696
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 15497,
+       "inputTokens": 15489,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 8,
+       "reasoningOutputTokens": 0
+      },
+      "last": {
+       "totalTokens": 15497,
+       "inputTokens": 15489,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 8,
+       "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024881705
+   }
+  },
+  {
+   "data": {
+    "method": "thread/status/changed",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "status": {
+      "type": "idle"
+     }
+    },
+    "emittedAtMs": 1795024881706
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "01a1efd1-fa6e-7172-9a88-813e98d5cd4f",
+     "turn": {
+      "id": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "rootTurnId": "01a1efd1-fbb5-7453-8633-8e53446e8607",
+      "items": [
+       {
+        "type": "agentMessage",
+        "id": "msg_0160c088d75d4216016afde7f197f087d1b7b51c7eff1b1cd0",
+        "text": "hello from codex",
+        "phase": "final_answer",
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+       }
+      ],
+      "itemsView": "summary",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1795024878,
+      "completedAt": 1795024881,
+      "durationMs": 3187
+     }
+    },
+    "emittedAtMs": 1795024881706
+   }
+  }
+ ]
+}

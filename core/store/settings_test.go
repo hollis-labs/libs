@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -19,14 +20,14 @@ func TestSQLiteSettingsReportTheConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	abs, _ := filepath.Abs(path)
-	want := store.SQLiteSettings{Synchronous: "NORMAL", JournalMode: "wal", BusyTimeout: 250 * time.Millisecond, ForeignKeys: false, MainPath: abs}
+	want := store.SQLiteSettings{Synchronous: "NORMAL", JournalMode: "wal", BusyTimeout: 250 * time.Millisecond, ForeignKeys: false, MainPath: resolved(t, path)}
 
 	check := func(name string, got store.SQLiteSettings, err error) {
 		t.Helper()
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
+		got.MainPath = resolved(t, got.MainPath)
 		if got != want {
 			t.Fatalf("%s: got %+v\nwant %+v", name, got, want)
 		}
@@ -50,6 +51,44 @@ func TestSQLiteSettingsReportTheConnection(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// resolved is p made absolute with symlinks resolved: SQLite may report the
+// main file either way (macOS's temp dir sits behind /var -> /private/var).
+func resolved(t *testing.T, p string) string {
+	t.Helper()
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		t.Fatalf("resolve %s: %v", p, err)
+	}
+	return r
+}
+
+// The macOS case on any OS: the database is opened through a symlinked
+// directory, and MainPath names the same file once both are resolved.
+func TestSQLiteSettingsMainPathThroughASymlink(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	path := filepath.Join(link, "s.db")
+	s, err := store.Open(ctx, store.Config{Driver: store.DriverSQLite, SQLite: store.SQLiteConfig{Path: path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	got, err := s.SQLiteSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved(t, got.MainPath) != resolved(t, path) {
+		t.Fatalf("MainPath %q is not the file opened as %q", got.MainPath, path)
 	}
 }
 

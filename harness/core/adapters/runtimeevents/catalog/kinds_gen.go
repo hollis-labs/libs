@@ -9,6 +9,7 @@ const (
 	KindSessionReady                  = "session.ready"
 	KindSessionIdle                   = "session.idle"
 	KindSessionProcessing             = "session.processing"
+	KindSessionStatusChanged          = "session.status_changed"
 	KindSessionLost                   = "session.lost"
 	KindSessionAuthFailed             = "session.auth_failed"
 	KindSessionHeartbeat              = "session.heartbeat"
