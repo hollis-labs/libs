@@ -236,7 +236,8 @@ func (v *JWTVerifier) Verify(ctx context.Context, token string) (Principal, erro
 		return Principal{}, ErrInvalidToken
 	}
 	p := Principal{Verified: true, ID: c.Sub, Kind: c.Kind, Scopes: strings.Fields(c.Scope),
-		Audience: v.cfg.Audience, SessionID: c.SID, Parent: c.Par, TokenID: c.JTI, ExpiresAt: time.Unix(c.Exp, 0)}
+		Audience: v.cfg.Audience, SessionID: c.SID, Parent: c.Par, TokenID: c.JTI, ExpiresAt: time.Unix(c.Exp, 0),
+		Extra: extraClaims(parts[1])}
 	if v.cfg.DenyList.Denied(p) {
 		return Principal{}, ErrInvalidToken
 	}
@@ -288,3 +289,25 @@ func audienceMatches(raw json.RawMessage, want string) bool {
 }
 
 func isInvalid(err error) bool { return errors.Is(err, ErrInvalidToken) }
+
+// mappedClaims are the claims Verify maps onto Principal fields (or checks and drops).
+var mappedClaims = map[string]bool{"iss": true, "sub": true, "aud": true, "scope": true, "exp": true, "nbf": true,
+	"iat": true, "jti": true, "kind": true, "sid": true, "par": true}
+
+// extraClaims returns the payload's other claims, raw; nil when there are none. The payload already
+// verified and decoded once, so a failure here only means no extras.
+func extraClaims(payload string) map[string]json.RawMessage {
+	var all map[string]json.RawMessage
+	if decodePart(payload, &all) != nil {
+		return nil
+	}
+	for k := range all {
+		if mappedClaims[k] {
+			delete(all, k)
+		}
+	}
+	if len(all) == 0 {
+		return nil
+	}
+	return all
+}

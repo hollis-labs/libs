@@ -1,0 +1,319 @@
+{
+ "name": "reasoning-sections",
+ "description": "Hand-written from the v2 schema: a reasoning summary in two sections (summaryIndex 0 and 1, joined by a blank line), raw reasoning content deltas (kept raw, the content rides in final), a web search, a dynamic tool call that reports success false, and usage across two model calls of the turn (thread totals; the run.finish carries the turn's share).",
+ "frames": [
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "th-1",
+     "turn": {
+      "id": "t-1",
+      "items": [],
+      "status": "inProgress",
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 1100,
+       "inputTokens": 1000,
+       "cachedInputTokens": 400,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 100,
+       "reasoningOutputTokens": 20
+      },
+      "last": {
+       "totalTokens": 110,
+       "inputTokens": 100,
+       "cachedInputTokens": 40,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 10,
+       "reasoningOutputTokens": 2
+      },
+      "modelContextWindow": 258400
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "r1",
+      "summary": [],
+      "content": []
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryPartAdded",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "summaryIndex": 0
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryTextDelta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "delta": "**Looking",
+     "summaryIndex": 0
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryTextDelta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "delta": " it up**",
+     "summaryIndex": 0
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryPartAdded",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "summaryIndex": 1
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/summaryTextDelta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "delta": "Then answer.",
+     "summaryIndex": 1
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/reasoning/textDelta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "r1",
+     "delta": "raw thought",
+     "contentIndex": 0
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "reasoning",
+      "id": "r1",
+      "summary": [
+       "**Looking it up**",
+       "Then answer."
+      ],
+      "content": [
+       "raw thought"
+      ]
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "webSearch",
+      "id": "w1",
+      "query": "go 1.26 release notes",
+      "action": null,
+      "results": null
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "webSearch",
+      "id": "w1",
+      "query": "go 1.26 release notes",
+      "action": {
+       "type": "search",
+       "query": "go 1.26 release notes"
+      },
+      "results": [
+       {
+        "title": "Go 1.26 Release Notes",
+        "url": "https://go.dev/doc/go1.26"
+       }
+      ]
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "dynamicToolCall",
+      "id": "d1",
+      "namespace": "host",
+      "tool": "lookup",
+      "arguments": {
+       "key": "x"
+      },
+      "status": "completed",
+      "contentItems": [
+       {
+        "type": "inputText",
+        "text": "no such key"
+       }
+      ],
+      "success": false,
+      "durationMs": 5
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "m1",
+      "text": "",
+      "phase": "final_answer"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "itemId": "m1",
+     "delta": "Done."
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "m1",
+      "text": "Done.",
+      "phase": "final_answer"
+     },
+     "threadId": "th-1",
+     "turnId": "t-1"
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 1250,
+       "inputTokens": 1120,
+       "cachedInputTokens": 480,
+       "cacheWriteInputTokens": 10,
+       "outputTokens": 130,
+       "reasoningOutputTokens": 25
+      },
+      "last": {
+       "totalTokens": 150,
+       "inputTokens": 120,
+       "cachedInputTokens": 80,
+       "cacheWriteInputTokens": 10,
+       "outputTokens": 30,
+       "reasoningOutputTokens": 5
+      },
+      "modelContextWindow": 258400
+     }
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "turn/plan/updated",
+    "params": {
+     "threadId": "th-1",
+     "turnId": "t-1",
+     "explanation": null,
+     "plan": [
+      {
+       "step": "look it up",
+       "status": "completed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "th-1",
+     "turn": {
+      "id": "t-1",
+      "status": "completed",
+      "items": [],
+      "error": null
+     }
+    }
+   }
+  }
+ ]
+}

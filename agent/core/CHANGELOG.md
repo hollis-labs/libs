@@ -8,6 +8,25 @@ All notable changes to the `agent` module are documented here (the module was `a
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-15
+
+### Security
+
+- Require Go 1.26.11 for the standard library fixes for GO-2026-6859
+  (`net/http`) and GO-2026-6809 (`crypto/x509`).
+
+### Changed (breaking)
+
+- Consolidate the context-window mechanism in `context` and remove the duplicate
+  `contextwindow` package. Consumers must update imports to
+  `github.com/hollis-labs/libs/agent/core/context` after this module is released.
+  `context` retains exported `NamedStage`, opaque random compaction event IDs,
+  mechanism documentation and the existing slot/default pin tests from
+  `contextwindow`. Slot order, budgets, compactability, lazy loading, agent-inline
+  handling and compaction stage order are preserved. Compaction event IDs are
+  opaque strings rather than UUIDs. See `context/MIGRATION.md` for dependency-first
+  consumer adoption.
+
 ### Added
 
 - `reflexspec`: the portable reflex-definition contract (record shape, trigger predicate grammar, per-kind `action_spec` validator and conformance fixtures), imported from the former `reflex-definition-spec` repository with history. It sits beside `reflexes`.

@@ -42,6 +42,13 @@
    "status": "stable"
   },
   {
+   "kind": "session.status_changed",
+   "category": "state",
+   "status": "new",
+   "payload_schema": "urn:hollis-labs:events:session.status_changed@1",
+   "note": "normalized liveness, work, and attention; PTY process generation is distinct from event generation and durable cursor"
+  },
+  {
    "kind": "session.lost",
    "category": "state",
    "status": "stable"

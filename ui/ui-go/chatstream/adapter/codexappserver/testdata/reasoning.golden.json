@@ -1,0 +1,194 @@
+[
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.start",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd2-4442-78e3-8872-a0b5156e4626"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.start",
+    "step_id": "01a1efd2-4471-7652-a311-c4dc8294e670",
+    "ext": {
+      "codex": {
+        "thread_id": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+        "turn_id": "01a1efd2-4471-7652-a311-c4dc8294e670"
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/started.userMessage",
+      "payload": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-494f-7aa2-8165-eaac968bb4f5",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Think step by step: what is 17*23 + 4? Reply with just the number.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+          "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+          "startedAtMs": 1795024898383
+        },
+        "emittedAtMs": 1795024898383
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "raw",
+    "raw": {
+      "dialect": "codex",
+      "type": "item/completed.userMessage",
+      "payload": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a1efd2-494f-7aa2-8165-eaac968bb4f5",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Think step by step: what is 17*23 + 4? Reply with just the number.",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a1efd2-4442-78e3-8872-a0b5156e4626",
+          "turnId": "01a1efd2-4471-7652-a311-c4dc8294e670",
+          "completedAtMs": 1795024898383
+        },
+        "emittedAtMs": 1795024898383
+      }
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.start",
+    "message_id": "msg-1",
+    "role": "assistant"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+    "kind": "reasoning"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+    "text": "**Calculating 391 plus 4**"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "rs_0053617fbca8de0f016afde804216887d192626e3885c71e8d",
+    "final": {
+      "text": "**Calculating 391 plus 4**"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.start",
+    "part_id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+    "kind": "text",
+    "meta": {
+      "phase": "final"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.delta",
+    "part_id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+    "text": "395"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "part.end",
+    "part_id": "msg_0053617fbca8de0f016afde80a323887d1b5dfe845a056c0f9",
+    "final": {
+      "text": "395"
+    }
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "message.end",
+    "message_id": "msg-1"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "step.finish",
+    "step_id": "01a1efd2-4471-7652-a311-c4dc8294e670"
+  },
+  {
+    "v": "1",
+    "seq": 0,
+    "run_id": "run-1",
+    "time": "2026-01-01T00:00:00Z",
+    "verb": "run.finish",
+    "reason": "stop",
+    "usage": {
+      "scope": "final",
+      "uncached_input": 3320,
+      "cache_read": 12160,
+      "output": 7,
+      "reasoning": 12,
+      "total": 15499
+    }
+  }
+]

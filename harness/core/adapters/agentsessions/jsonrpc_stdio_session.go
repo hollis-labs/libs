@@ -86,15 +86,16 @@ func (r *jsonRpcStdioRuntime) Start(ctx context.Context, opts StartOptions) (ses
 	}
 
 	s := &jsonRpcStdioSession{
-		runtime:       r,
-		adapter:       sessionAdapter,
-		bootDir:       bootDir,
-		opts:          opts,
-		logFile:       logF,
-		done:          make(chan error, 1),
-		copyDone:      make(chan struct{}),
-		stopRequested: make(chan struct{}),
-		pending:       make(map[int64]chan jsonRpcResponse),
+		runtime:        r,
+		adapter:        sessionAdapter,
+		bootDir:        bootDir,
+		opts:           opts,
+		requestContext: ctx,
+		logFile:        logF,
+		done:           make(chan error, 1),
+		copyDone:       make(chan struct{}),
+		stopRequested:  make(chan struct{}),
+		pending:        make(map[int64]chan jsonRpcResponse),
 	}
 	s.nextID.Store(callIDBase)
 	s.alive.Store(true)
@@ -183,7 +184,11 @@ type jsonRpcStdioSession struct {
 
 	legacyCleanup func()
 
-	ioLock sync.Mutex
+	ioLock         sync.Mutex
+	writeLock      sync.Mutex
+	serverAttempt  *jsonRpcServerAttempt
+	serverWorkers  int
+	requestContext context.Context
 
 	state atomic.Int32
 	alive atomic.Bool
@@ -244,6 +249,11 @@ func (s *jsonRpcStdioSession) reportSandboxOutcome(out SandboxOutcome) {
 }
 
 func (s *jsonRpcStdioSession) spawnAttempt(attempt int) (*exec.Cmd, io.WriteCloser, io.ReadCloser, func(), error) {
+	serverAttempt, err := s.prepareServerAttempt(attempt)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	binary, ok := s.adapter.Detect()
 	if !ok {
 		return nil, nil, nil, nil, fmt.Errorf("agentsessions: adapter %q binary not found", s.adapter.Name())
@@ -322,6 +332,7 @@ func (s *jsonRpcStdioSession) spawnAttempt(attempt int) (*exec.Cmd, io.WriteClos
 	s.reportSandboxOutcome(sandboxOutcome)
 
 	s.ioLock.Lock()
+	s.replaceServerAttemptLocked(serverAttempt)
 	s.cmd = cmd
 	s.stdin = stdin
 	s.stdout = stdout
@@ -361,9 +372,12 @@ func (s *jsonRpcStdioSession) spawnAttempt(attempt int) (*exec.Cmd, io.WriteClos
 
 func (s *jsonRpcStdioSession) spawnReaderLegacy(stdout io.Reader) {
 	s.readerExited.Store(false)
+	s.ioLock.Lock()
+	serverAttempt := s.serverAttempt
+	s.ioLock.Unlock()
 	go func() {
 		defer close(s.copyDone)
-		s.runReaderLoop(stdout)
+		s.runReaderLoop(stdout, serverAttempt)
 	}()
 }
 
@@ -376,7 +390,9 @@ func (s *jsonRpcStdioSession) spawnReaderLegacy(stdout io.Reader) {
 //
 // The caller clears readerExited before starting it, so the flag is never
 // reset by a reader goroutine that starts late.
-func (s *jsonRpcStdioSession) runReaderLoop(stdout io.Reader) {
+func (s *jsonRpcStdioSession) runReaderLoop(stdout io.Reader, serverAttempt *jsonRpcServerAttempt) {
+	defer s.cancelServerAttempt(serverAttempt)
+
 	var sink io.Writer = s.logFile
 	if s.opts.Fanout != nil {
 		sink = io.MultiWriter(s.logFile, s.opts.Fanout)
@@ -430,9 +446,14 @@ func (s *jsonRpcStdioSession) runReaderLoop(stdout io.Reader) {
 		switch {
 		case frame.Method != "" && frame.ID != nil:
 			// Server-initiated request — JSON-RPC 2.0 requires a response.
-			s.respondToServerRequest(frame)
+			if s.opts.JsonRpcRequestResponder != nil {
+				s.respondToServerRequestAsync(serverAttempt, frame)
+			} else {
+				s.respondToServerRequest(frame)
+			}
 		case frame.Method != "":
 			// Notification — no response expected.
+			s.cancelServerRequests(serverAttempt, frame.Method, frame.Params)
 			s.followTurn(frame.Method, frame.Params)
 			s.reportCodexNotification(frame.Method, frame.Params)
 			if s.opts.JsonRpcNotificationHook != nil {
@@ -510,12 +531,14 @@ func (s *jsonRpcStdioSession) respondToServerRequest(frame jsonRpcFrame) {
 	if err != nil {
 		return
 	}
+	s.writeLock.Lock()
 	s.ioLock.Lock()
 	stdin := s.stdin
-	if stdin != nil {
-		_, _ = stdin.Write(append(encoded, '\n'))
-	}
 	s.ioLock.Unlock()
+	if stdin != nil {
+		_ = writeRPCFrame(stdin, encoded)
+	}
+	s.writeLock.Unlock()
 	s.tickActivity()
 	_, refused := resp["error"]
 	s.reportCodexRequest(frame, refused)
@@ -550,6 +573,7 @@ func (s *jsonRpcStdioSession) spawnWaiterLegacy(cmd *exec.Cmd, stdin io.WriteClo
 		logAbnormalWait("jsonrpc-stdio", s.runtime.cfg.ID, pid, elapsed, err)
 
 		s.ioLock.Lock()
+		s.cancelServerAttemptLocked(s.serverAttempt)
 		s.stdin = nil
 		s.stdout = nil
 		s.ioLock.Unlock()
@@ -670,9 +694,12 @@ func (s *jsonRpcStdioSession) waitOnceSupervised(ctx context.Context, cmd *exec.
 	s.activity.tick()
 
 	s.readerExited.Store(false)
+	s.ioLock.Lock()
+	serverAttempt := s.serverAttempt
+	s.ioLock.Unlock()
 	go func() {
 		defer close(readerDone)
-		s.runReaderLoop(stdout)
+		s.runReaderLoop(stdout, serverAttempt)
 	}()
 
 	sup := s.opts.Supervisor
@@ -721,6 +748,7 @@ func (s *jsonRpcStdioSession) waitOnceSupervised(ctx context.Context, cmd *exec.
 	logAbnormalWait("jsonrpc-stdio", s.runtime.cfg.ID, pid, elapsed, waitErr)
 
 	s.ioLock.Lock()
+	s.cancelServerAttemptLocked(s.serverAttempt)
 	s.stdin = nil
 	s.stdout = nil
 	s.ioLock.Unlock()
@@ -819,6 +847,7 @@ func (s *jsonRpcStdioSession) Stop(ctx context.Context) error {
 		close(s.stopRequested)
 
 		s.ioLock.Lock()
+		s.cancelServerAttemptLocked(s.serverAttempt)
 		cmd := s.cmd
 		stdin := s.stdin
 		s.ioLock.Unlock()
@@ -877,16 +906,19 @@ func (s *jsonRpcStdioSession) SendInput(_ context.Context, data []byte) error {
 	if !s.alive.Load() {
 		return ErrNoInputChannel
 	}
+	s.writeLock.Lock()
+	defer s.writeLock.Unlock()
 	s.ioLock.Lock()
-	defer s.ioLock.Unlock()
-	if s.stdin == nil {
+	stdin := s.stdin
+	s.ioLock.Unlock()
+	if stdin == nil {
 		return ErrNoInputChannel
 	}
 	payload := data
 	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
 		payload = append(append([]byte(nil), data...), '\n')
 	}
-	if _, err := s.stdin.Write(payload); err != nil {
+	if _, err := stdin.Write(payload); err != nil {
 		return err
 	}
 	s.tickActivity()
@@ -949,17 +981,17 @@ func (s *jsonRpcStdioSession) Call(ctx context.Context, method string, params an
 		return nil, fmt.Errorf("agentsessions: jsonrpc encode: %w", err)
 	}
 
+	s.writeLock.Lock()
 	s.ioLock.Lock()
 	stdin := s.stdin
 	s.ioLock.Unlock()
 	if stdin == nil {
+		s.writeLock.Unlock()
 		cleanup()
 		return nil, ErrNoInputChannel
 	}
-
-	s.ioLock.Lock()
-	_, werr := stdin.Write(append(encoded, '\n'))
-	s.ioLock.Unlock()
+	werr := writeRPCFrame(stdin, encoded)
+	s.writeLock.Unlock()
 	if werr != nil {
 		cleanup()
 		return nil, fmt.Errorf("agentsessions: jsonrpc write: %w", werr)

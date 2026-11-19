@@ -8,6 +8,49 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.11.1 — 2026-11-19
+
+### Fixed
+
+- `embed`: texts are now scrubbed of recognisable credentials (`decide.Scrub`) before they are sent to the gateway, as `classify.Decision` already does. Before this, a pasted token in a message reached the embedding provider. `Client.NoScrub` opts out, for a trusted gateway on the same machine only.
+
+## v0.11.0 — 2026-11-19
+
+### Added
+
+- `decide`: `DialectJEV` and `NewJEVClient`, JEV's own System-1 API (`POST /v1/systemone`, the way an LLM gateway relays it). The body is written by hand so question, option and level order is kept byte for byte, `Request.Model` (the gateway's route) is required, and answers are checked the same way as the gateway dialect's.
+- `embed`: `DialectOpenAI` and `NewOpenAIClient`, an OpenAI-compatible `POST /v1/embeddings` with a model alias.
+
+## v0.10.0 — 2026-11-19
+
+### Added
+
+- `embed`: texts to vectors through an AI gateway's `POST /ai/embeddings` (http(s) or a unix socket). It batches, returns vectors in input order, refuses a change of dimension between calls, and keeps the token and input out of errors. `Client` satisfies `classify.Embedder`. Standard library only.
+- `classify`: `Dedupe` (groups of near-copies) and `Emerging` (clusters among abstained inputs, counted after collapsing near-copies, each with a representative). Together they split novelty into "seen before" and "something new forming".
+
+## v0.9.0 — 2026-11-19
+
+### Added
+
+- `decide`: structured questions to a decision provider (`noul`, `choice`, `score`) answered with probabilities. `Decider` is the seam. `Client` speaks a decision gateway's `POST /ai/decide`, over http(s) or a unix socket. It validates requests before calling and checks every answer against its question. It retries only rate-limited, overloaded and timed-out calls, and never puts the token or the request text in an error. Also `Scripted` for tests, the confidence helpers, and `Scrub` for recognisable credentials. Standard library only.
+- `classify`: `Decision`, a judge that asks a `decide.Decider` one Choice question per facet, built from the pack. It scrubs the text, rotates option order by the text, votes `ln(p·K)` and runs at `Async`. `Affect` and `AffectFacet`, a lexicon-and-heuristics tone judge (neutral, frustrated, urgent, positive). `FitTemperature`, which calibrates a facet by negative log-likelihood on labelled examples.
+
+## v0.8.0 — 2026-11-19
+
+### Added
+
+- `classify`: facet classification of short text. Judges cast weighted votes (`Vote`, in log-odds) that the engine combines per facet into probabilities, with a real abstention (`min_p`, a per-label `min_p` for risky labels, `min_margin`) and decisive votes; judges are gated by phase (`Keystroke`, `Submit`, `Async`) and a failing judge only loses its votes. Packs are strict JSON (facets, labels with examples, rules over the text and the context), layer by facet, label and rule id, and are fingerprinted by content. `Bayes` (hashed n-gram naive Bayes, online, JSON-serialisable), `Centroid` over an `Embedder` supplied elsewhere, `Evaluate` (accuracy, coverage, bands, confusion, majority floor) and `Result.LedgerRecords` (one classifier row per facet and phase). Standard library plus `ledger`.
+
+## v0.7.0 — 2026-11-17
+
+### Added
+
+- `workclient`: a client for the Work service's HTTP API (workspaces, items, notes, review rounds, sign-off, views and the change-event stream) with its own types for the service's JSON; per-call identity through the context (`WithOwnerNS`, `WithPrincipal`, `WithoutPrincipal`, `WithActor`, `WithCorrelation`); a key read on every request (`TokenFile`); `*Error` with `Conflict` and `OpenNotes` and the sentinels `ErrNotFound`, `ErrUnauthorized`, `ErrForbidden`, `ErrConflict`, `ErrUpstream`, `ErrUnavailable`, `ErrUnreachable` and `ErrBadAnswer`. Ids that are empty, `.` or `..` are refused (`ErrBadID`) and redirected writes are not followed. Standard library only.
+
+### Changed
+
+- Dependencies: `google.golang.org/grpc` v1.83.2 and `golang.org/x/net` v0.62.0 (GO-2026-6443, GO-2026-6866, GO-2026-6860; none reached from this module's code), with `golang.org/x/sys` v0.49.0, `golang.org/x/text` v0.43.0 and `golang.org/x/crypto` v0.58.0 following.
+
 ### Fixed
 
 - OTel redaction clones event and link slices before rewriting them, preserving

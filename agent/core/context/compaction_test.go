@@ -59,7 +59,7 @@ func TestCompactionPipeline_noCompactionNeeded(t *testing.T) {
 // pairs get collapsed to a pointer-back reference. Deterministic, no LLM.
 // CW-20260419-0004 Part 2.
 func TestStageDedupeToolResults(t *testing.T) {
-	input := map[string]any{"path": "/work/example/foo.md"}
+	input := map[string]any{"path": "/workspace/foo.md"}
 	bigResult := strings.Repeat("x", 4000)
 
 	msgs := []llmtypes.ChatMessage{
@@ -79,7 +79,7 @@ func TestStageDedupeToolResults(t *testing.T) {
 		}},
 		// Turn 3: different input — unique, should survive intact.
 		{Role: "assistant", ContentBlocks: []llmtypes.ContentBlock{
-			{Type: "tool_use", ID: "call-3", Name: "dev_read", Input: &map[string]any{"path": "/work/example/bar.md"}},
+			{Type: "tool_use", ID: "call-3", Name: "dev_read", Input: &map[string]any{"path": "/workspace/bar.md"}},
 		}},
 		{Role: "user", ContentBlocks: []llmtypes.ContentBlock{
 			{Type: "tool_result", ToolUseID: "call-3", Content: bigResult},
@@ -131,7 +131,7 @@ func TestStageDedupeToolResults(t *testing.T) {
 // between reads). Dedupe must match on (name, input, result content) so
 // genuinely changed state is preserved.
 func TestStageDedupeToolResults_DifferentResultsNotDeduped(t *testing.T) {
-	input := map[string]any{"path": "/work/example/foo.md"}
+	input := map[string]any{"path": "/workspace/foo.md"}
 	msgs := []llmtypes.ChatMessage{
 		{Role: "assistant", ContentBlocks: []llmtypes.ContentBlock{
 			{Type: "tool_use", ID: "call-1", Name: "dev_read", Input: &input},

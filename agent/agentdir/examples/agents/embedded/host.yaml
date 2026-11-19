@@ -1,0 +1,7 @@
+kind: embedded
+lifetime: application
+application_id: sample-app
+
+runtime:
+  provider: anthropic
+  max_steps: 50

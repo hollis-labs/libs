@@ -7,7 +7,7 @@ The host supplies models, policy, persistence, tools and lifecycle admission.
 
 | Package | Owns | Host supplies |
 |---|---|---|
-| `context` | Slot windows, token budgets, compaction, overflow and handoff | Provider and persistence callbacks |
+| `context` | Fixed ordered slot windows, token budgets, compaction, overflow and handoff | Summarization provider and persistence callbacks |
 | `agentcontext` | Ordered context slots, provenance, limits, resolvers and skills | Context configuration and resolver inputs |
 | `turn` | Provider event observation, watchdog and terminal detection | Stream and observation callbacks |
 | `runloop` | Request/consume/settle ordering, retry index and finalization | Preparation, provider, tool and output ports |
@@ -16,7 +16,6 @@ The host supplies models, policy, persistence, tools and lifecycle admission.
 | `subagent` | Child lifecycle, fanout, approvals, retries, heartbeat and replies | Explicit spawn authorization, database, profiles, settings and mailbox |
 | `service` | Canonical per-run reduction, status, snapshot and bounded replay | Atomic snapshot store and committed output projection |
 | `transport/httpstream` | Strict cursors and canonical per-run SSE encoding | Route registration, authentication and authorized subscription |
-| `contextwindow` | Fixed ordered context slots, budgets, compaction, overflow and handoff | Summarization provider and persistence callbacks |
 | `loopdetect` | In-memory repeated tool-call detection | Session identity and policy response |
 | `reflexes` | DB-agnostic reflex evaluation, arbitration and action staging | State, storage and action handlers |
 | `toolbroker/broker` | Intent-aware tool selection, pruning and enrichment | Tool registry and optional enrichment data |

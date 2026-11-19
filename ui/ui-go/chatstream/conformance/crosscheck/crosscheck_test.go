@@ -9,6 +9,7 @@ import (
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/acp"
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/anthropic"
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/claudejson"
+	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/codexappserver"
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/codexjson"
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/openaichat"
 	"github.com/hollis-labs/libs/ui/ui-go/chatstream/adapter/openairesponses"
@@ -29,6 +30,7 @@ var adapters = map[string]chatstream.Adapter{
 	"openairesponses": openairesponses.New(),
 	"acp":             acp.New(),
 	"codexjson":       codexjson.New(),
+	"codexappserver":  codexappserver.New(),
 }
 
 var sinks = map[string]func() sink.Encoder{

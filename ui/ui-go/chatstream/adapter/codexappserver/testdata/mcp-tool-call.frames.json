@@ -1,0 +1,804 @@
+{
+ "name": "mcp-tool-call",
+ "description": "Live capture (codex-cli 0.163.0): an MCP call that succeeds and one whose tool returns an error result (status failed, result set, error null).",
+ "frames": [
+  {
+   "data": {
+    "method": "thread/started",
+    "params": {
+     "thread": {
+      "id": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+      "environments": [
+       {
+        "environmentId": "local",
+        "cwd": "/work",
+        "runtimeWorkspaceRoots": [
+         "/work"
+        ]
+       }
+      ],
+      "extra": null,
+      "sessionId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+      "forkedFromId": null,
+      "parentThreadId": null,
+      "preview": "",
+      "ephemeral": true,
+      "section": null,
+      "sectionEnteredAt": null,
+      "projectId": null,
+      "historyMode": "paginated",
+      "modelProvider": "openai",
+      "model": "gpt-6-astra",
+      "reasoningEffort": "low",
+      "createdAt": 1795024945,
+      "updatedAt": 1795024945,
+      "recencyAt": 1795024945,
+      "status": {
+       "type": "idle"
+      },
+      "path": null,
+      "cwd": "/work",
+      "cliVersion": "0.163.0",
+      "originator": "capture",
+      "source": "vscode",
+      "canAcceptDirectInput": true,
+      "threadSource": null,
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "daybreakEnabled": null,
+      "turns": []
+     }
+    },
+    "emittedAtMs": 1795024945846
+   }
+  },
+  {
+   "data": {
+    "method": "turn/started",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turn": {
+      "id": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+      "rootTurnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+      "items": [],
+      "itemsView": "notLoaded",
+      "status": "inProgress",
+      "error": null,
+      "startedAt": 1795024945,
+      "completedAt": null,
+      "durationMs": null
+     }
+    },
+    "emittedAtMs": 1795024945851
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd3-0738-7ce2-8966-1c60e3325e30",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Call the echo MCP tool with text ping, then call the explode MCP tool with reason test. Then reply with one short sentence.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "startedAtMs": 1795024947000
+    },
+    "emittedAtMs": 1795024947000
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "userMessage",
+      "id": "01a1efd3-0738-7ce2-8966-1c60e3325e30",
+      "clientId": null,
+      "content": [
+       {
+        "type": "text",
+        "text": "Call the echo MCP tool with text ping, then call the explode MCP tool with reason test. Then reply with one short sentence.",
+        "text_elements": []
+       }
+      ]
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "completedAtMs": 1795024947000
+    },
+    "emittedAtMs": 1795024947000
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+      "text": "",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "startedAtMs": 1795024949079
+    },
+    "emittedAtMs": 1795024949079
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": "I"
+    },
+    "emittedAtMs": 1795024949079
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": "’ll"
+    },
+    "emittedAtMs": 1795024949079
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " call"
+    },
+    "emittedAtMs": 1795024949079
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " echo"
+    },
+    "emittedAtMs": 1795024949080
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": ","
+    },
+    "emittedAtMs": 1795024949080
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " then"
+    },
+    "emittedAtMs": 1795024949080
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " explode"
+    },
+    "emittedAtMs": 1795024949081
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": ","
+    },
+    "emittedAtMs": 1795024949081
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " with"
+    },
+    "emittedAtMs": 1795024949081
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " the"
+    },
+    "emittedAtMs": 1795024949081
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " values"
+    },
+    "emittedAtMs": 1795024949336
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " you"
+    },
+    "emittedAtMs": 1795024949336
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": " specified"
+    },
+    "emittedAtMs": 1795024949336
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+     "delta": ".\n"
+    },
+    "emittedAtMs": 1795024949336
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_01cbfa45344ec128016afde834f9f487d1968f8b58a26506ac",
+      "text": "I’ll call echo, then explode, with the values you specified.\n",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "completedAtMs": 1795024949563
+    },
+    "emittedAtMs": 1795024949563
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 15539,
+       "inputTokens": 15485,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 54,
+       "reasoningOutputTokens": 0
+      },
+      "last": {
+       "totalTokens": 15539,
+       "inputTokens": 15485,
+       "cachedInputTokens": 12160,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 54,
+       "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024950068
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "mcpToolCall",
+      "id": "exec-43b0fc79-03ae-43ce-a8eb-6ce31fadc7c8",
+      "server": "echo",
+      "tool": "echo",
+      "status": "inProgress",
+      "arguments": {
+       "text": "ping"
+      },
+      "appContext": null,
+      "mcpAppUi": null,
+      "pluginId": null,
+      "readOnlyHint": null,
+      "result": null,
+      "error": null,
+      "durationMs": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "startedAtMs": 1795024952212
+    },
+    "emittedAtMs": 1795024952212
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "mcpToolCall",
+      "id": "exec-43b0fc79-03ae-43ce-a8eb-6ce31fadc7c8",
+      "server": "echo",
+      "tool": "echo",
+      "status": "completed",
+      "arguments": {
+       "text": "ping"
+      },
+      "appContext": null,
+      "mcpAppUi": null,
+      "pluginId": null,
+      "readOnlyHint": null,
+      "result": {
+       "content": [
+        {
+         "type": "text",
+         "text": "echo: ping"
+        }
+       ],
+       "structuredContent": null,
+       "_meta": null
+      },
+      "error": null,
+      "durationMs": 0
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "completedAtMs": 1795024952212
+    },
+    "emittedAtMs": 1795024952212
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 31246,
+       "inputTokens": 31167,
+       "cachedInputTokens": 27520,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 79,
+       "reasoningOutputTokens": 0
+      },
+      "last": {
+       "totalTokens": 15707,
+       "inputTokens": 15682,
+       "cachedInputTokens": 15360,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 25,
+       "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024952228
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "mcpToolCall",
+      "id": "exec-f255d49a-bfa0-43b4-97bf-2422369d9fe9",
+      "server": "echo",
+      "tool": "explode",
+      "status": "inProgress",
+      "arguments": {
+       "reason": "test"
+      },
+      "appContext": null,
+      "mcpAppUi": null,
+      "pluginId": null,
+      "readOnlyHint": null,
+      "result": null,
+      "error": null,
+      "durationMs": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "startedAtMs": 1795024955629
+    },
+    "emittedAtMs": 1795024955629
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "mcpToolCall",
+      "id": "exec-f255d49a-bfa0-43b4-97bf-2422369d9fe9",
+      "server": "echo",
+      "tool": "explode",
+      "status": "failed",
+      "arguments": {
+       "reason": "test"
+      },
+      "appContext": null,
+      "mcpAppUi": null,
+      "pluginId": null,
+      "readOnlyHint": null,
+      "result": {
+       "content": [
+        {
+         "type": "text",
+         "text": "explode failed: test"
+        }
+       ],
+       "structuredContent": null,
+       "_meta": null
+      },
+      "error": null,
+      "durationMs": 1
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "completedAtMs": 1795024955630
+    },
+    "emittedAtMs": 1795024955631
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 47021,
+       "inputTokens": 46917,
+       "cachedInputTokens": 43008,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 104,
+       "reasoningOutputTokens": 0
+      },
+      "last": {
+       "totalTokens": 15775,
+       "inputTokens": 15750,
+       "cachedInputTokens": 15488,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 25,
+       "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024955645
+   }
+  },
+  {
+   "data": {
+    "method": "item/started",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+      "text": "",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "startedAtMs": 1795024957880
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": "Echo"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " returned"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " “"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": "ping"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": ",”"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " and"
+    },
+    "emittedAtMs": 1795024957880
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " explode"
+    },
+    "emittedAtMs": 1795024957972
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " failed"
+    },
+    "emittedAtMs": 1795024957977
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " with"
+    },
+    "emittedAtMs": 1795024957995
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " reason"
+    },
+    "emittedAtMs": 1795024957998
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": " “"
+    },
+    "emittedAtMs": 1795024958092
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": "test"
+    },
+    "emittedAtMs": 1795024958092
+   }
+  },
+  {
+   "data": {
+    "method": "item/agentMessage/delta",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "itemId": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+     "delta": ".”"
+    },
+    "emittedAtMs": 1795024958092
+   }
+  },
+  {
+   "data": {
+    "method": "item/completed",
+    "params": {
+     "item": {
+      "type": "agentMessage",
+      "id": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+      "text": "Echo returned “ping,” and explode failed with reason “test.”",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+     },
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "completedAtMs": 1795024958931
+    },
+    "emittedAtMs": 1795024958931
+   }
+  },
+  {
+   "data": {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+     "tokenUsage": {
+      "total": {
+       "totalTokens": 62857,
+       "inputTokens": 62736,
+       "cachedInputTokens": 58624,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 121,
+       "reasoningOutputTokens": 0
+      },
+      "last": {
+       "totalTokens": 15836,
+       "inputTokens": 15819,
+       "cachedInputTokens": 15616,
+       "cacheWriteInputTokens": 0,
+       "outputTokens": 17,
+       "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+     }
+    },
+    "emittedAtMs": 1795024958941
+   }
+  },
+  {
+   "data": {
+    "method": "turn/completed",
+    "params": {
+     "threadId": "01a1efd3-028b-7ec3-9e86-e37c6cafe8e0",
+     "turn": {
+      "id": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+      "rootTurnId": "01a1efd3-02b8-7a20-8f0d-b631e19259a1",
+      "items": [
+       {
+        "type": "agentMessage",
+        "id": "msg_01cbfa45344ec128016afde83dd88887d19b5a42eb443f5637",
+        "text": "Echo returned “ping,” and explode failed with reason “test.”",
+        "phase": "final_answer",
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+       }
+      ],
+      "itemsView": "summary",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1795024945,
+      "completedAt": 1795024958,
+      "durationMs": 13092
+     }
+    },
+    "emittedAtMs": 1795024958941
+   }
+  }
+ ]
+}
