@@ -47,3 +47,7 @@ not used to override the chatstream disjoint-component total.
   `1 lines, 20 bytes`, not the full file contents. This adapter preserves exactly
   that upstream output, and never invents file content. Scratch working-directory
   prefixes in tool parameters are redacted to `/work` as in the failure capture.
+
+- cancelled_stream: `agy --output-format stream-json --print-timeout 45s -p='Write a very long story about a river. Do not use tools.'`; a line-reading harness sends SIGINT immediately after the first nonempty text_delta. The result repeats the partial response and reports ERROR/interrupted. No DONE update arrives.
+- truncated.frames.json is derived from cancelled_stream by removing the result
+  frame, simulating transport EOF. It is not represented as a separate live run.
