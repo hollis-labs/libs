@@ -1,0 +1,433 @@
+{
+  "name": "tool_failure",
+  "description": "Real Agy 1.5.12 capture, 2026-11-19; conversation IDs and local paths normalized. See capture notes.",
+  "frames": [
+    {
+      "data": {
+        "event": "init",
+        "conversation_id": "capture-conversation",
+        "init": {
+          "cwd": "/work/capture",
+          "tools": [
+            "ask_custom_permission",
+            "ask_permission",
+            "ask_question",
+            "browser_click_element",
+            "browser_drag_pixel_to_pixel",
+            "browser_get_dom",
+            "browser_get_network_request",
+            "browser_input",
+            "browser_list_network_requests",
+            "browser_mouse_down",
+            "browser_mouse_up",
+            "browser_move_mouse",
+            "browser_press_key",
+            "browser_refresh_page",
+            "browser_resize_window",
+            "browser_scroll",
+            "browser_scroll_dom",
+            "browser_select_option",
+            "browser_subagent",
+            "call_mcp_tool",
+            "capture_browser_console_logs",
+            "capture_browser_screenshot",
+            "click_browser_pixel",
+            "command_status",
+            "define_subagent",
+            "delete_knowledge",
+            "execute_browser_javascript",
+            "find_by_name",
+            "finish",
+            "generate_image",
+            "grep_search",
+            "invoke_subagent",
+            "list_browser_pages",
+            "list_dir",
+            "list_permissions",
+            "list_plugin_accounts",
+            "list_resources",
+            "manage_inbox",
+            "manage_subagents",
+            "manage_task",
+            "multi_replace_file_content",
+            "notebook_edit",
+            "notebook_execution",
+            "open_browser_url",
+            "read_browser_page",
+            "read_resource",
+            "read_url_content",
+            "replace_file_content",
+            "run_command",
+            "run_workflow",
+            "schedule",
+            "search_marketplace",
+            "search_web",
+            "sed_file",
+            "send_command_input",
+            "send_message",
+            "view_file",
+            "wait",
+            "wait_5_seconds",
+            "write_to_file"
+          ],
+          "permission_mode": "request-review"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 0,
+          "state": "DONE",
+          "step_type": "user_input"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 1,
+          "state": "DONE",
+          "step_type": "agent_response",
+          "duration_seconds": 6.384650638,
+          "usage": {
+            "input_tokens": 9383,
+            "output_tokens": 78,
+            "thinking_tokens": 0,
+            "cache_read_tokens": 0,
+            "total_tokens": 9461
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 2,
+          "state": "ACTIVE",
+          "step_type": "tool",
+          "tool_name": "read_file",
+          "tool_info": {
+            "name": "read_file",
+            "parameters": {
+              "Path": "/work/capture/example.txt"
+            }
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 2,
+          "state": "ERROR",
+          "step_type": "tool",
+          "tool_name": "read_file",
+          "duration_seconds": 0.31666654,
+          "tool_info": {
+            "name": "read_file",
+            "parameters": {
+              "Path": "/work/capture/example.txt"
+            },
+            "error": {
+              "type": "TOOL_ERROR",
+              "message": "JSON hook \"jsonhook__tether-pulse_PreToolUse_0_0\" failed: command failed: exit status 2, stderr: python3: can't open file '/work/hooks/missing-hook.py': [Errno 2] No such file or directory"
+            }
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 3,
+          "state": "ACTIVE",
+          "step_type": "tool",
+          "tool_name": "read_file",
+          "tool_info": {
+            "name": "read_file",
+            "parameters": {
+              "Path": "/work/capture/missing-capture-file.txt"
+            }
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 3,
+          "state": "ERROR",
+          "step_type": "tool",
+          "tool_name": "read_file",
+          "duration_seconds": 0.065643875,
+          "tool_info": {
+            "name": "read_file",
+            "parameters": {
+              "Path": "/work/capture/missing-capture-file.txt"
+            },
+            "error": {
+              "type": "TOOL_ERROR",
+              "message": "JSON hook \"jsonhook__tether-pulse_PreToolUse_0_0\" failed: command failed: exit status 2, stderr: python3: can't open file '/work/hooks/missing-hook.py': [Errno 2] No such file or directory"
+            }
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "Both `read_file` calls ([example.txt](file:///wo"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "rk"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "/capture/example.txt) and `missing-c"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "apture-file.txt`) were b"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "locked befor"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "e"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": " execution by a `PreToolUse` hook error:\n\n```text\nJSON hook "
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "\"jsonhook__t"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "ether-pulse_PreToolU"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "se_0_0\" failed: command failed: exit status 2, stderr: pytho"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "n3: can't op"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "en"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": " file '/work/hooks/missing-hook.py': [Errno 2] No such file "
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "or directory"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "\n"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": "```\n"
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "ACTIVE",
+          "step_type": "agent_response",
+          "text_delta": ""
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "step_update",
+        "step_update": {
+          "conversation_id": "capture-conversation",
+          "step_index": 4,
+          "state": "DONE",
+          "step_type": "agent_response",
+          "text_delta": "",
+          "duration_seconds": 20.044693234,
+          "usage": {
+            "input_tokens": 2330,
+            "output_tokens": 140,
+            "thinking_tokens": 0,
+            "cache_read_tokens": 7329,
+            "total_tokens": 2470
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "event": "result",
+        "result": {
+          "conversation_id": "capture-conversation",
+          "status": "SUCCESS",
+          "response": "Both `read_file` calls ([example.txt](file:///work/capture/example.txt) and `missing-capture-file.txt`) were blocked before execution by a `PreToolUse` hook error:\n\n```text\nJSON hook \"jsonhook__tether-pulse_PreToolUse_0_0\" failed: command failed: exit status 2, stderr: python3: can't open file '/work/hooks/missing-hook.py': [Errno 2] No such file or directory\n```\n",
+          "duration_seconds": 26.52824918,
+          "num_turns": 1,
+          "usage": {
+            "input_tokens": 11713,
+            "output_tokens": 218,
+            "thinking_tokens": 0,
+            "cache_read_tokens": 7329,
+            "total_tokens": 11931
+          }
+        }
+      }
+    }
+  ]
+}
