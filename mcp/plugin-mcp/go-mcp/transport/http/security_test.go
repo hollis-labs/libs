@@ -122,3 +122,34 @@ func TestConfiguredHostThroughLoopbackListener(t *testing.T) {
 		}
 	}
 }
+
+// A missing Origin is normal for CLI clients, but a present empty Origin is
+// malformed and must never bypass either the default or explicit policy.
+func TestAbsentAndEmptyOrigin(t *testing.T) {
+	for _, opts := range []HandlerOptions{
+		{},
+		{AllowedOrigins: []string{"http://localhost"}},
+	} {
+		for _, present := range []bool{false, true} {
+			called := false
+			h := Guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusNoContent)
+			}), opts)
+			r := httptest.NewRequest(http.MethodPost, "http://localhost/", nil)
+			if present {
+				r.Header.Set("Origin", "")
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			want := http.StatusNoContent
+			if present {
+				want = http.StatusForbidden
+			}
+			if w.Code != want || called == present {
+				t.Fatalf("explicit=%v present=%v: status=%d called=%v, want status=%d called=%v",
+					len(opts.AllowedOrigins) > 0, present, w.Code, called, want, !present)
+			}
+		}
+	}
+}

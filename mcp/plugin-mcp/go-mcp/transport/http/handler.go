@@ -86,7 +86,7 @@ func (g *originGuard) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden origin", http.StatusForbidden)
 		return
 	}
-	if len(values) == 1 && values[0] != "" {
+	if len(values) == 1 {
 		origin, valid := parseOrigin(values[0])
 		_, allowed := g.origins[origin]
 		if g.defaultOrigins {
