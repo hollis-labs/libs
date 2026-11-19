@@ -10,6 +10,7 @@ It is not a model runtime, an embedding provider or a store. A change that adds 
 - `pack.go` — `Pack`, `Layer`, `Compile`, the rule judge.
 - `bayes.go` — the hashed n-gram naive Bayes judge. `centroid.go` — the embedding centroid judge and `Embedder`.
 - `eval.go` — `Evaluate` and `Report`. `calibrate.go` — `FitTemperature`. `ledger.go` — `Result.LedgerRecords`.
+- `novelty.go` — `Dedupe`, `Emerging`.
 - `decision.go` — the judge that asks a `decide.Decider` (JEV through a gateway). `affect.go` — the tone lexicon judge.
 
 ## Commands
@@ -30,3 +31,4 @@ scripts/check -race core/util
 - Votes for an unknown facet or label, or with a non-finite weight, are dropped. Guarded by `TestUnknownFacetsLabelsAndNaNAreIgnored`.
 - The pack hash tracks content, not the version label; the engine fingerprint follows a learning judge. Guarded by `TestHashTracksContentNotVersion` and `TestEngineFingerprintFollowsLearning`.
 - One ledger row per facet and phase; a replay of the same engine over the same input is a duplicate. Guarded by `TestLedgerRecordsOnePerFacetAndReplayIsIdempotent`.
+- `Emerging` counts distinct members after collapsing near-copies, so a repeated paste is never a cluster. Guarded by `TestEmergingCountsDistinctNotCopies`.
