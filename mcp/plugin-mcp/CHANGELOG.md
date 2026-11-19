@@ -40,6 +40,7 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
   the verified bearer identity, denying absent identity/policy. Direct and
   stdio calls without that identity fail closed. Tools/list is unchanged.
   See `go-mcp/README.md` for composition and migration examples.
+
 ## [0.7.0] - 2026-11-19
 
 ### Changed
