@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### Added (trace propagation, module v0.8.0)
+### Added (trace propagation, module v0.9.0)
 
 - `client.WithTraceContext`, `server.WithTraceContext` and `tracing`: optional
   W3C request `_meta` propagation, server spans and trusted-context attribute
@@ -200,7 +200,7 @@ All notable changes to this project will be documented in this file.
   `WithLintInstructions`, `WithRequireChecked`; `MaxInstructionsLen`,
   `ValidateInstructions`, and `WithInstructions` now panics past the limit.
 
-## v0.8.0 — 2026-09-29
+## v0.9.0 — 2026-09-29
 
 ### Changed
 

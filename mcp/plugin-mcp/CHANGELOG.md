@@ -8,7 +8,7 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-11-19
+## [0.9.0] - 2026-11-19
 
 ### Added
 
