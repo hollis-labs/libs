@@ -26,3 +26,17 @@ The sibling frames fixtures wrap each stdout line as conformance fixture data.
 `error: interrupted` into plain stdout. This intentionally tests a mixed stream;
 no malformed JSON was observed on stdout, and this fixture must not be mistaken
 for a naturally malformed stdout capture.
+
+Additional tool captures use existing read-only permissions, without changing
+permission configuration:
+
+- tool_failure: `agy --output-format stream-json --print-timeout 60s -p='Use list_dir to list the current directory. Then use view_file to open the nonexistent file /work/agy_capture_nonexistent_7.txt so that the tool fails. Do not use any command tools. Report both outcomes.'`
+  The CLI resolved these requests to read_file. Reading the directory returned
+  TOOL_ERROR (not a permissions error); the separate nonexistent path was denied.
+  Every occurrence of the scratch working directory in parameters is `/work`.
+
+Cache evidence: the tool-success turn's second model step reports input_tokens
+2508 and cache_read_tokens 9605. Cache therefore cannot be a subset of input;
+Agy reports uncached input separately. output_tokens includes thinking_tokens.
+Its total_tokens counter excludes cache reads; it is retained in the capture,
+not used to override the chatstream disjoint-component total.
