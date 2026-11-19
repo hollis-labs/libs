@@ -177,7 +177,7 @@ All notable changes to this project will be documented in this file.
   to see whether the client understands an input request (for example
   `Elicitation.URL`) before sending one.
 
-## v0.9.0 — 2026-09-29
+## v0.8.0 — 2026-09-29
 
 ### Changed
 
@@ -200,7 +200,7 @@ All notable changes to this project will be documented in this file.
   `WithLintInstructions`, `WithRequireChecked`; `MaxInstructionsLen`,
   `ValidateInstructions`, and `WithInstructions` now panics past the limit.
 
-## v0.9.0 — 2026-09-29
+## v0.8.0 — 2026-09-29
 
 ### Changed
 
