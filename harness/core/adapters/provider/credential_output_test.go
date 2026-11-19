@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -21,7 +22,7 @@ func TestCredentialFailureOutputRedacted(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal("could not create synthetic auth directory")
 		}
-		if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte(`{"token":"`+credentialOutputSentinel+`"}`), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "auth.json"), syntheticAuthJSON(t, credentialOutputSentinel), 0o600); err != nil {
 			t.Fatal("could not seed synthetic auth")
 		}
 	}
@@ -83,7 +84,7 @@ func TestCredentialOutputSubprocess(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal("could not create synthetic auth source")
 	}
-	if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte(`{"token":"`+credentialOutputSentinel+`"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "auth.json"), syntheticAuthJSON(t, credentialOutputSentinel), 0o600); err != nil {
 		t.Fatal("could not seed synthetic auth source")
 	}
 	content, err := NewCodexAdapter().BootDirSpec().PlantedFiles[3].Render(PlantContext{LegacyAllowHostEffects: true})
@@ -92,7 +93,18 @@ func TestCredentialOutputSubprocess(t *testing.T) {
 	}
 	want := ""
 	if mode == "legacy-failure" {
-		want = `{"token":"different-synthetic-fixture"}`
+		want = string(syntheticAuthJSON(t, "different-synthetic-fixture"))
 	}
 	assertCredentialContent(t, content, want)
+}
+
+// Encode synthetic credentials as data, rather than secret-shaped source literals.
+// Both subprocess sources and the deliberately mismatched value use this shape.
+func syntheticAuthJSON(t testing.TB, value string) []byte {
+	t.Helper()
+	data, err := json.Marshal(map[string]string{"token": value})
+	if err != nil {
+		t.Fatal("could not encode synthetic auth fixture")
+	}
+	return data
 }
