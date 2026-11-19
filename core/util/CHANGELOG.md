@@ -8,6 +8,12 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.11.1 — 2026-11-19
+
+### Fixed
+
+- `embed`: texts are now scrubbed of recognisable credentials (`decide.Scrub`) before they are sent to the gateway, as `classify.Decision` already does. Before this, a pasted token in a message reached the embedding provider. `Client.NoScrub` opts out, for a trusted gateway on the same machine only.
+
 ## v0.11.0 — 2026-11-19
 
 ### Added
