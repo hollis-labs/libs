@@ -30,7 +30,7 @@ func TestWireContract(t *testing.T) {
 			caps := &mcp.ClientCapabilities{Extensions: map[string]any{ui.Extension: map[string]any{"mimeTypes": []string{ui.MIMEType}}}}
 			cs, cleanup := mcptest.Connect(t, s, mcptest.WithClientOptions(&mcp.ClientOptions{Capabilities: caps}))
 			defer cleanup()
-			if cs.InitializeResult().Capabilities.Extensions[ui.Extension] == nil {
+			if raw, _ := json.Marshal(cs.InitializeResult().Capabilities.Extensions[ui.Extension]); string(raw) != "{}" {
 				t.Fatal("missing extension")
 			}
 			list, err := cs.ListTools(context.Background(), nil)
@@ -81,6 +81,39 @@ func TestValidationAndSupport(t *testing.T) {
 	for _, types := range []any{[]string{ui.MIMEType}, []any{ui.MIMEType}} {
 		if !ui.Supports(&mcp.ClientCapabilities{Extensions: map[string]any{ui.Extension: map[string]any{"mimeTypes": types}}}) {
 			t.Fatal("explicit support not recognized")
+		}
+	}
+}
+
+func TestOptInAndPerRequestClientCapability(t *testing.T) {
+	plain := server.NewServer("plain", "1")
+	cs, cleanup := mcptest.Connect(t, plain)
+	if cs.InitializeResult().Capabilities.Extensions[ui.Extension] != nil {
+		t.Fatal("Apps enabled implicitly")
+	}
+	cleanup()
+	for _, enabled := range []bool{false, true} {
+		s := server.NewServer("cap-test", "1", server.WithCapabilities(ui.Capabilities()))
+		s.RegisterTool(server.Tool{Name: "capability", InputSchema: server.EmptyObjectSchema(), Handler: func(ctx context.Context, _ map[string]any) (any, error) {
+			return map[string]any{"supported": ui.Supports(server.ClientCapabilities(ctx))}, nil
+		}})
+		caps := &mcp.ClientCapabilities{}
+		if enabled {
+			caps.Extensions = map[string]any{ui.Extension: map[string]any{"mimeTypes": []string{ui.MIMEType}}}
+		}
+		client, done := mcptest.Connect(t, s, mcptest.WithClientOptions(&mcp.ClientOptions{Capabilities: caps}))
+		result, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "capability", Arguments: map[string]any{}})
+		done()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := json.Marshal(result.StructuredContent)
+		want := `{"supported":false}`
+		if enabled {
+			want = `{"supported":true}`
+		}
+		if string(data) != want {
+			t.Fatalf("per-request capability: %s, want %s", data, want)
 		}
 	}
 }

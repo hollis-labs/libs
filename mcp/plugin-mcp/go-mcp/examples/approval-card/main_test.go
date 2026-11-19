@@ -44,6 +44,12 @@ func TestExampleWire(t *testing.T) {
 		t.Fatalf("call: %v %v", result, err)
 	}
 	raw, _ := json.Marshal(result)
+	if len(result.Content) == 0 {
+		t.Fatal("non-UI fallback missing")
+	}
+	if text, ok := result.Content[0].(*mcp.TextContent); !ok || !strings.Contains(text.Text, "gatecrasher.card/v1") {
+		t.Fatal("non-UI text fallback missing card")
+	}
 	if !strings.Contains(string(raw), "gatecrasher.card/v1") {
 		t.Fatal("missing card")
 	}

@@ -19,7 +19,7 @@ const (
 // Capabilities returns fresh capabilities advertising MCP Apps. Merge the
 // Extensions entry into existing capabilities when a server uses other extensions.
 func Capabilities() *mcp.ServerCapabilities {
-	return &mcp.ServerCapabilities{Extensions: map[string]any{Extension: map[string]any{"mimeTypes": []string{MIMEType}}}}
+	return &mcp.ServerCapabilities{Extensions: map[string]any{Extension: map[string]any{}}}
 }
 
 // Supports reports whether the client explicitly supports HTML MCP Apps.

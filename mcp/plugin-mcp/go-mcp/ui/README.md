@@ -24,7 +24,10 @@ contains only the configured network origins. Other resource policy features
 can be implemented directly using the SDK.
 
 `Capabilities` returns fresh `ServerCapabilities` with
-`extensions["io.modelcontextprotocol/ui"].mimeTypes`. When using existing
+`extensions["io.modelcontextprotocol/ui"] = {}`. Client capabilities, in contrast,
+declare `mimeTypes: ["text/html;profile=mcp-app"]` under that extension identifier
+in each request's `_meta["io.modelcontextprotocol/clientCapabilities"]`. The SDK
+provides those per-request settings to `server.ClientCapabilities(ctx)`. When using existing
 capabilities, merge that entry into their `Extensions` map instead of replacing
 the entire capability set. Use `Supports` with `server.ClientCapabilities(ctx)`
 to inspect the caller's explicit MIME support. Hosts without the extension
@@ -37,9 +40,13 @@ The [approval-card example](../examples/approval-card/README.md) bundles a
 framework-free app implementing the Apps `2026-01-26` postMessage lifecycle.
 That extension protocol version is separate from core MCP's `2026-07-28`.
 
+The extension is opt-in: constructing a normal `server.Server` does not add the
+capability, metadata or resources.
+
 Verified 2026-11-19 against the official sources:
 
 - [MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28), Extensions section: explicit opt-in and server/discover capabilities.
+- [Extensions overview](https://modelcontextprotocol.io/extensions/overview): distinct client MIME settings and empty server settings, with per-request negotiation.
 - [MCP Apps overview](https://modelcontextprotocol.io/extensions/apps/overview): sandbox, resource linkage and host responsibilities.
 - [Official Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx): resource MIME, nested `_meta.ui`, CSP, lifecycle, capabilities and tool-result notifications.
 
