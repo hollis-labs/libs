@@ -10,6 +10,10 @@ All notable changes to the `harness` module are documented here (the module was 
 
 ### Added
 
+- Materializer `BeforeManifest` admission runs for every control-manifest commit,
+  including no-op reconcile. Manifest writes stay within pinned output/control
+  directory handles; create stages the manifest before publishing the directory.
+
 - `agentsessions.JsonRpcPreparedReply`: final admission callback after writer
   serialization, with a one-shot scoped sender, delivery deadlines and revocation
   cancellation. `CodexGateResponder` requires a host fence held through live
