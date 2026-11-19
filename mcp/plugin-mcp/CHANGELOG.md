@@ -10,6 +10,10 @@ All notable changes to the `plugin-mcp` module are documented here. The format f
 
 ## [0.7.0] - 2026-11-19
 
+### Changed
+
+- Require Go 1.26.11 to include the standard-library fix for GO-2026-6859, identified by the release vulnerability gate.
+
 ### Added
 
 - `go-mcp/ui`: optional MCP Apps capability, tool resource metadata and bundled HTML resources with explicit CSP connect origins. `server.Tool.Meta` survives SDK and paginated catalogs. Runnable Gatecrasher card example covers approve, choose, answer and direct client secret intake, with executable client-flow and MCP wire tests.
