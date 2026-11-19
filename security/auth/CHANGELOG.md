@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+Additive. The only new refusal applies to an issuer that rotates parent credentials, which no caller
+used before.
+
+### Added
+
+- `HTTPMinter.OnRotate`: when the token endpoint's reply carries a `refresh_token` (the issuer rotated the
+  parent credential on use, as Warden's `/v1/token` does), `Mint` hands it to `OnRotate`, which must store
+  it durably, before it returns the token. An error from `OnRotate` fails the mint. A reply that carries a
+  `refresh_token` while `OnRotate` is nil also fails, rather than drop the only usable credential. Replies
+  without a `refresh_token` behave as before.
+- `Principal.Extra`: the verified JWT's claims that `JWTVerifier` does not map to a field (for example
+  Warden's `act` actor chain and `grant` id), kept raw so resource servers can log provenance. It is nil
+  for API keys and for tokens with no other claims. It is information, not authority.
+
 ## v0.3.1 — 2026-11-12
 
 Bug fix; no exported API changes. The status, error code and JSON shape of every rejection are unchanged.

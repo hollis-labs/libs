@@ -269,6 +269,13 @@ type HTTPMinter struct {
 	Header http.Header
 	Client *http.Client // default 15s timeout; cross-origin redirects are refused
 	Now    func() time.Time
+	// OnRotate receives the next parent credential when the issuer rotates it on use (the reply carries a
+	// "refresh_token", as Warden's /v1/token does). It must store it durably, typically tokenfile.Write over
+	// the file Credential reads, before Mint returns the token: the old parent is already spent, and
+	// presenting it again revokes the whole credential family. An error from it fails the mint. When the
+	// reply carries a refresh_token and OnRotate is nil, Mint fails rather than drop the only usable
+	// credential silently. Mints of one HTTPMinter must not run concurrently (a Refresher serializes them).
+	OnRotate func(next string) error
 }
 
 // Mint requests a token. Errors carry the HTTP status at most: never the issuer's
@@ -321,12 +328,21 @@ func (m *HTTPMinter) Mint(ctx context.Context) (Issued, error) {
 		return Issued{}, fmt.Errorf("auth: issuer refused token: status %d", resp.StatusCode)
 	}
 	var out struct {
-		Token     string    `json:"token"`
-		ExpiresAt time.Time `json:"expires_at"`
-		TTL       int       `json:"ttl_seconds"`
+		Token        string    `json:"token"`
+		ExpiresAt    time.Time `json:"expires_at"`
+		TTL          int       `json:"ttl_seconds"`
+		RefreshToken string    `json:"refresh_token"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil || out.Token == "" {
 		return Issued{}, errors.New("auth: issuer returned an unreadable token")
+	}
+	if out.RefreshToken != "" {
+		if m.OnRotate == nil {
+			return Issued{}, errors.New("auth: issuer rotated the parent credential but HTTPMinter.OnRotate is not set")
+		}
+		if err := m.OnRotate(out.RefreshToken); err != nil {
+			return Issued{}, fmt.Errorf("auth: store rotated parent credential: %w", err)
+		}
 	}
 	now := time.Now
 	if m.Now != nil {
