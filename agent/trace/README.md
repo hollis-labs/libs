@@ -33,12 +33,22 @@ line, _ := json.Marshal(rec)
 | `compactions` | `before`, `after` (estimated tokens), `forced`, `failed`, `error`. |
 | `usage` | `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`; `cost` stays empty until a price is known. |
 | `outcome` | `status` (`completed`, `failed`, `cancelled`), `finish_reason`, `steps`, `error` (redacted). |
-| `situation`, `classified`, `why`, `fired`, `hooks_run` | Reserved for the situation, classifier, selector, reflex and hook layers. Omitted while empty. |
+| `situation`, `classified`, `why` | Reserved for the situation, classifier and selector layers. Omitted while empty. |
+| `fired`, `hooks_run` | Reserved for the reflex and hook layers: `null` when the layer did not run, `[]` when it ran and produced nothing. |
 
 Names reuse the SDK evidence recording (`run_id`, `turn_id`, `tool_call_id`,
 `tool`, `model`) and Surface's context trace (`at`, `slots`, `trimmed`, `why`,
 `fired`, `classified`) where they mean the same thing. Usage follows the
-OpenTelemetry GenAI attribute names, and `Attributes` maps a record onto them.
+OpenTelemetry GenAI attribute names (`gen_ai.provider.name`,
+`gen_ai.usage.cache_read.input_tokens`, ...), and `Attributes` maps a record
+onto them.
+
+The five lists every record has are always written, as `[]` when empty.
+`Validate` is for writers; a reader should accept records it cannot fully
+validate, since a newer one may carry a version or value it does not know.
+
+This is not `agent/sdk/trace`, the SDK's event evidence recording. Import one
+under an alias if a file needs both.
 
 A record never carries prompts, completions, tool arguments or tool output.
 Error text must be redacted before it is recorded. Filling a reserved field

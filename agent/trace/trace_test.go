@@ -28,7 +28,7 @@ func TestJSONShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = `{"version":1,"at":"2026-11-19T12:00:00Z","duration_ms":1500,"conversation_id":"c1","run_id":"r1","turn_id":"r1","role":"chat","source":"user","provider":"anthropic","model":"claude-sonnet-5-5","slots":[{"name":"universal","tokens":600,"changed":false},{"name":"agent","tokens":40,"changed":true}],"trimmed":[],"tools_offered":["read_file","write_file"],"tool_calls":[{"tool_call_id":"t1","tool":"read_file","duration_ms":3,"permission":"allow"}],"compactions":[{"before":9000,"after":3000}],"usage":{"input_tokens":100,"output_tokens":20,"cache_read_tokens":0,"cache_write_tokens":0},"outcome":{"status":"completed","finish_reason":"end_turn","steps":2}}`
+	const want = `{"version":1,"at":"2026-11-19T12:00:00Z","duration_ms":1500,"conversation_id":"c1","run_id":"r1","turn_id":"r1","role":"chat","source":"user","provider":"anthropic","model":"claude-sonnet-5-5","slots":[{"name":"universal","tokens":600,"changed":false},{"name":"agent","tokens":40,"changed":true}],"trimmed":[],"tools_offered":["read_file","write_file"],"tool_calls":[{"tool_call_id":"t1","tool":"read_file","duration_ms":3,"permission":"allow"}],"compactions":[{"before":9000,"after":3000}],"usage":{"input_tokens":100,"output_tokens":20,"cache_read_tokens":0,"cache_write_tokens":0},"outcome":{"status":"completed","finish_reason":"end_turn","steps":2},"fired":null,"hooks_run":null}`
 	if string(raw) != want {
 		t.Fatalf("JSON shape changed; a field rename needs a new Version.\ngot  %s\nwant %s", raw, want)
 	}
@@ -51,6 +51,11 @@ func TestValidate(t *testing.T) {
 		"status":     func(t *Turn) { t.Outcome.Status = "ok" },
 		"call id":    func(t *Turn) { t.ToolCalls[0].ToolCallID = "" },
 		"permission": func(t *Turn) { t.ToolCalls[0].Permission = "maybe" },
+		"error kind": func(t *Turn) { t.ToolCalls[0].ErrorKind = "oops" },
+		"steps":      func(t *Turn) { t.Outcome.Steps = -1 },
+		"usage":      func(t *Turn) { t.Usage.InputTokens = -1 },
+		"slot name":  func(t *Turn) { t.Slots[0].Name = "" },
+		"compaction": func(t *Turn) { t.Compactions[0].After = -1 },
 	} {
 		turn := validTurn()
 		mutate(&turn)
@@ -65,10 +70,25 @@ func TestAttributes(t *testing.T) {
 	for _, a := range validTurn().Attributes() {
 		got[a.Key] = a.Value
 	}
-	if got["gen_ai.request.model"] != "claude-sonnet-5-5" || got["gen_ai.usage.input_tokens"] != 100 || got["agent.turn.tool_calls"] != 1 {
+	if got["gen_ai.provider.name"] != "anthropic" || got["gen_ai.request.model"] != "claude-sonnet-5-5" || got["gen_ai.usage.input_tokens"] != 100 || got["agent.turn.tool_calls"] != 1 {
 		t.Fatalf("attributes %v", got)
 	}
 	if reasons, _ := got["gen_ai.response.finish_reasons"].([]string); strings.Join(reasons, ",") != "end_turn" {
 		t.Fatalf("finish reasons %v", got["gen_ai.response.finish_reasons"])
+	}
+}
+
+func TestNilListsAreWrittenEmpty(t *testing.T) {
+	turn := validTurn()
+	turn.Slots, turn.Trimmed, turn.ToolsOffered, turn.ToolCalls, turn.Compactions = nil, nil, nil, nil, nil
+	turn.Fired = []string{}
+	raw, err := json.Marshal(turn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"slots":[]`, `"trimmed":[]`, `"tools_offered":[]`, `"tool_calls":[]`, `"compactions":[]`, `"fired":[]`, `"hooks_run":null`} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("missing %s in %s", want, raw)
+		}
 	}
 }

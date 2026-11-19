@@ -15,6 +15,14 @@
 //
 // A record never holds prompts, completions, tool arguments or tool output.
 // Error text it does hold must already be redacted by the writer.
+//
+// Lists: the five lists every record has (slots, trimmed, tools_offered,
+// tool_calls, compactions) are always written, as [] when empty. In the
+// reserved lists (fired, hooks_run), null means the layer did not run and []
+// means it ran and produced nothing.
+//
+// This package is unrelated to agent/sdk/trace, the SDK's event evidence
+// recording; import one of them under an alias if a file needs both.
 package trace
 
 import (
@@ -81,10 +89,33 @@ type Turn struct {
 	Classified json.RawMessage `json:"classified,omitempty"`
 	// Why is the selector's reason for the slots it chose.
 	Why string `json:"why,omitempty"`
-	// Fired names the reflexes that fired.
-	Fired []string `json:"fired,omitempty"`
-	// HooksRun names the hooks that ran, as "event/name".
-	HooksRun []string `json:"hooks_run,omitempty"`
+	// Fired names the reflexes that fired: null when no reflex layer ran.
+	Fired []string `json:"fired"`
+	// HooksRun names the hooks that ran, as "event/name": null when no hook
+	// layer ran.
+	HooksRun []string `json:"hooks_run"`
+}
+
+// MarshalJSON writes the always-present lists as [] when they are nil.
+func (t Turn) MarshalJSON() ([]byte, error) {
+	type plain Turn
+	p := plain(t)
+	if p.Slots == nil {
+		p.Slots = []Slot{}
+	}
+	if p.Trimmed == nil {
+		p.Trimmed = []string{}
+	}
+	if p.ToolsOffered == nil {
+		p.ToolsOffered = []string{}
+	}
+	if p.ToolCalls == nil {
+		p.ToolCalls = []ToolCall{}
+	}
+	if p.Compactions == nil {
+		p.Compactions = []Compaction{}
+	}
+	return json.Marshal(p)
 }
 
 // Source says what started a turn.
@@ -158,8 +189,10 @@ type Compaction struct {
 	Error  string `json:"error,omitempty"`
 }
 
-// Usage is token use. Field names follow the OpenTelemetry GenAI usage
-// attributes. Cost stays nil until the agent knows a price.
+// Usage is token use. Input and output match the OpenTelemetry GenAI usage
+// attributes; the cache counts map to gen_ai.usage.cache_read.input_tokens
+// and gen_ai.usage.cache_creation.input_tokens. Cost stays nil until the
+// agent knows a price.
 type Usage struct {
 	InputTokens      int      `json:"input_tokens"`
 	OutputTokens     int      `json:"output_tokens"`
@@ -191,7 +224,9 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
-// Validate reports the first way t breaks the schema.
+// Validate reports the first way t breaks the schema. It is for writers: a
+// reader should not call it, since a newer record may carry a version or an
+// enum value this one does not know.
 func (t Turn) Validate() error {
 	switch {
 	case t.Version != Version:
@@ -200,8 +235,20 @@ func (t Turn) Validate() error {
 		return fmt.Errorf("%w: at is required", ErrInvalid)
 	case t.ConversationID == "" || t.RunID == "" || t.TurnID == "":
 		return fmt.Errorf("%w: conversation_id, run_id and turn_id are required", ErrInvalid)
-	case t.DurationMS < 0:
-		return fmt.Errorf("%w: duration_ms is negative", ErrInvalid)
+	case t.DurationMS < 0 || t.Outcome.Steps < 0:
+		return fmt.Errorf("%w: duration_ms and steps must not be negative", ErrInvalid)
+	case t.Usage.InputTokens < 0 || t.Usage.OutputTokens < 0 || t.Usage.CacheReadTokens < 0 || t.Usage.CacheWriteTokens < 0:
+		return fmt.Errorf("%w: usage must not be negative", ErrInvalid)
+	}
+	for i, slot := range t.Slots {
+		if slot.Name == "" || slot.Tokens < 0 {
+			return fmt.Errorf("%w: slots[%d] needs a name and nonnegative tokens", ErrInvalid, i)
+		}
+	}
+	for i, c := range t.Compactions {
+		if c.Before < 0 || c.After < 0 {
+			return fmt.Errorf("%w: compactions[%d] must not be negative", ErrInvalid, i)
+		}
 	}
 	switch t.Source {
 	case SourceUser, SourceHost, SourceSubagent, SourceResume, SourceSchedule, SourceReflex, SourceGoal:
@@ -222,6 +269,14 @@ func (t Turn) Validate() error {
 		default:
 			return fmt.Errorf("%w: tool_calls[%d] permission %q", ErrInvalid, i, call.Permission)
 		}
+		switch call.ErrorKind {
+		case "", ErrorTool, ErrorDenied, ErrorInvalidArgs, ErrorUnknownTool, ErrorCancelled, ErrorPanic, ErrorLoop:
+		default:
+			return fmt.Errorf("%w: tool_calls[%d] error_kind %q", ErrInvalid, i, call.ErrorKind)
+		}
+		if call.DurationMS < 0 {
+			return fmt.Errorf("%w: tool_calls[%d] duration_ms is negative", ErrInvalid, i)
+		}
 	}
 	return nil
 }
@@ -233,12 +288,12 @@ type Attribute struct {
 	Value any
 }
 
-// Attributes returns the record's summary as span attributes. Model,
-// provider, usage and finish reason use the OpenTelemetry GenAI keys; the
-// rest are under "agent.turn.".
+// Attributes returns the record's summary as span attributes. Provider,
+// model, usage and finish reason use the current OpenTelemetry GenAI keys;
+// the rest are under "agent.turn.".
 func (t Turn) Attributes() []Attribute {
 	attrs := []Attribute{
-		{"gen_ai.system", t.Provider},
+		{"gen_ai.provider.name", t.Provider},
 		{"gen_ai.request.model", t.Model},
 		{"gen_ai.usage.input_tokens", t.Usage.InputTokens},
 		{"gen_ai.usage.output_tokens", t.Usage.OutputTokens},
@@ -248,8 +303,8 @@ func (t Turn) Attributes() []Attribute {
 		{"agent.turn.tools_offered", len(t.ToolsOffered)},
 		{"agent.turn.tool_calls", len(t.ToolCalls)},
 		{"agent.turn.compactions", len(t.Compactions)},
-		{"agent.turn.cache_read_tokens", t.Usage.CacheReadTokens},
-		{"agent.turn.cache_write_tokens", t.Usage.CacheWriteTokens},
+		{"gen_ai.usage.cache_read.input_tokens", t.Usage.CacheReadTokens},
+		{"gen_ai.usage.cache_creation.input_tokens", t.Usage.CacheWriteTokens},
 	}
 	if t.Outcome.FinishReason != "" {
 		attrs = append(attrs, Attribute{"gen_ai.response.finish_reasons", []string{t.Outcome.FinishReason}})
