@@ -17,7 +17,8 @@ scripts/check -race core/util
 
 ## Boundaries
 
-- Standard library only (its tests use `classify`).
+- Standard library plus `core/util/decide` (for `Scrub`); its tests use `classify`.
 - Vectors come back in input order whatever order the gateway sends them, and in batches of `MaxBatch`. Guarded by `TestEmbedBatchesAndKeepsOrder`.
 - A change of dimension between calls is an error, not a silent mix of models. Guarded by `TestEmbedRefusesADimensionChange`.
 - Neither the token nor the input text appears in an error. Guarded by `TestEmbedErrorsDoNotLeakTheToken`.
+- Texts are scrubbed of recognisable credentials before they leave, unless `NoScrub`. Guarded by `TestTextsAreScrubbedBeforeTheyLeave`.

@@ -147,3 +147,30 @@ func TestOpenAIDialect(t *testing.T) {
 		t.Fatal("no model accepted")
 	}
 }
+
+func TestTextsAreScrubbedBeforeTheyLeave(t *testing.T) {
+	var sent []any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		sent = body["input"].([]any)
+		_, _ = w.Write([]byte(`{"data":[{"index":0,"embedding":[1,0]}]}`))
+	}))
+	defer srv.Close()
+	// Built at run time so scanners do not read the fixture as a credential.
+	secret := "sk" + "-" + strings.Repeat("q", 24)
+	c := NewOpenAIClient(srv.URL, fixtureKey, "m")
+	if _, err := c.Embed(context.Background(), []string{"use " + secret + " please"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(sent[0].(string), secret) || !strings.Contains(sent[0].(string), "please") {
+		t.Fatalf("sent %q", sent[0])
+	}
+	c.NoScrub = true
+	if _, err := c.Embed(context.Background(), []string{"use " + secret}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sent[0].(string), secret) {
+		t.Fatal("NoScrub still scrubbed")
+	}
+}

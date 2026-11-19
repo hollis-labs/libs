@@ -16,7 +16,8 @@
 //	200 {"response": {"provider", "model", "embeddings": [{"index", "vector"}], "usage"}}
 //	err {"error": {"code", "message"}}
 //
-// It never puts the token or the input text in an error.
+// Texts are scrubbed of recognisable credentials (decide.Scrub) before they leave
+// the machine. It never puts the token or the input text in an error.
 package embed
 
 import (
@@ -31,6 +32,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hollis-labs/libs/core/util/decide"
 )
 
 // Client embeds through a gateway. Safe for concurrent use.
@@ -46,6 +49,10 @@ type Client struct {
 	HTTP  *http.Client
 	// MaxBatch is how many texts go in one request; 0 is 64.
 	MaxBatch int
+	// NoScrub sends texts as given. By default recognisable credentials are
+	// replaced (decide.Scrub) before a text leaves; set this only for a gateway on
+	// the same machine that is trusted with them.
+	NoScrub bool
 
 	mu  sync.Mutex
 	dim int // the dimension seen first; a change is an error
@@ -148,6 +155,13 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 }
 
 func (c *Client) once(ctx context.Context, texts []string) ([][]float32, error) {
+	if !c.NoScrub {
+		scrubbed := make([]string, len(texts))
+		for i, t := range texts {
+			scrubbed[i] = decide.Scrub(t)
+		}
+		texts = scrubbed
+	}
 	var body []byte
 	var err error
 	path := "/ai/embeddings"
