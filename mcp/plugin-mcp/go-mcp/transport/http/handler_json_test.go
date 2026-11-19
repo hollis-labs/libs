@@ -15,7 +15,7 @@ func TestJSONResponseOption(t *testing.T) {
 		want string
 	}{{false, "text/event-stream"}, {true, "application/json"}} {
 		h := NewHandler(gmcp.NewServer("t", "0"), HandlerOptions{JSONResponse: tc.json})
-		r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+		r := httptest.NewRequest("POST", "http://localhost/", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Accept", "application/json, text/event-stream")
 		w := httptest.NewRecorder()

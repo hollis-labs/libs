@@ -5,4 +5,9 @@
 // Streamable HTTP already carries SSE-formatted responses and notifications
 // over the single POST endpoint where the client's Accept header asks for
 // them.
+//
+// Empty host configuration allows only localhost and loopback IP literals.
+// Empty origin configuration allows same-origin requests and clients without
+// Origin. Configure explicit lists for public hosts and cross-origin clients.
+// Guard applies the policy to a whole stack including auth and discovery.
 package httptransport

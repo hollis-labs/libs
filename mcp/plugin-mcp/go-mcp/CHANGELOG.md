@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### HTTP security and authorization (breaking, module v0.10.0)
+
+- Empty `AllowedHosts` now allows only localhost/loopback literals; empty
+  `AllowedOrigins` now allows only same-origin requests. No-Origin local
+  CLI clients keep working. Public hosts, cross-origin clients and proxies
+  terminating TLS must configure explicit lists; portless host entries allow
+  any port. Explicit lists replace defaults and never trust forwarded
+  headers. `transport/http.Guard` applies both checks outside auth/discovery.
+- `auth.NewProtectedResource` serves RFC 9728 public metadata and configures
+  SDK bearer challenges with a fixed resource_metadata URL. Requires an
+  HTTPS resource and at least one HTTPS issuer; it does not implement OAuth
+  or audience validation. `auth.CanAccess` / `AuthorizeTools` enforce an
+  application policy per tool call using verified identity, failing closed
+  for missing identity or policy (including unauthenticated direct/stdio calls).
+- Migration and composition examples: `README.md`, HTTP authorization and
+  discovery. Module release notes and version live in `../CHANGELOG.md`.
+
 ### Added (trace propagation, module v0.9.0)
 
 - `client.WithTraceContext`, `server.WithTraceContext` and `tracing`: optional

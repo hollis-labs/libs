@@ -363,8 +363,81 @@ keyset values; token counting beyond the 4-bytes-per-token estimate.
 - `NewHandler(server, opts)` — wrap a `server.Server` as an `http.Handler`
   exposing it over the official SDK's Streamable HTTP transport, in
   stateless mode (2026-07-28 / SEP-2567).
-- `HandlerOptions.AllowedOrigins` — optional browser-origin allowlist,
-  enforced ahead of the SDK handler (403 on a disallowed `Origin`).
+- `HandlerOptions.AllowedHosts` — trusted hostnames/IP literals, optionally
+  including a port. An entry without a port permits any port. Empty allows
+  only `localhost` and loopback IP literals; public hosts must be configured.
+- `HandlerOptions.AllowedOrigins` — exact HTTP(S) browser origins. Empty
+  allows only same-origin requests after Host validation. Requests without
+  `Origin` still work; opaque (`null`), malformed and multiple origins fail.
+- `Guard(next, opts)` — apply those policies outside an entire HTTP stack,
+  including authentication and public discovery routes. It rejects with 403
+  before the wrapped handler runs. It never trusts forwarded headers or
+  resolves hostnames. Explicit lists replace defaults; wildcards are unsupported.
+
+### HTTP authorization and discovery
+
+Discovery follows the [2026-07-28 authorization-server discovery requirements](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/authorization-server-discovery)
+and [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html): metadata identifies
+at least one issuer, and clients can discover it through a bearer challenge
+or a well-known URL. This package supplies both discovery mechanisms.
+
+`github.com/hollis-labs/libs/mcp/plugin-mcp/go-mcp/auth`
+
+`HTTPMiddleware(provider)` applies the SDK bearer verifier and its expiration,
+clock-skew and scope checks. A nil provider remains a passthrough. For protected
+HTTP resources, `NewProtectedResource` adds RFC 9728 metadata and configures the
+SDK's `WWW-Authenticate: Bearer resource_metadata="..."` challenge. Required
+scopes from the provider are included in the challenge; supported scopes in
+metadata are descriptive and do not change policy.
+
+```go
+resource, err := auth.NewProtectedResource(auth.ProtectedResourceMetadata{
+    Resource: "https://mcp.example/mcp",
+    AuthorizationServers: []string{"https://issuer.example"},
+    ScopesSupported: []string{"tools:read"},
+})
+if err != nil { return err }
+// provider is the application's auth.Provider (for example its JWKS verifier).
+opts := httptransport.HandlerOptions{
+    AllowedHosts: []string{"mcp.example"},
+    // Set explicitly when a reverse proxy terminates TLS before this handler.
+    AllowedOrigins: []string{"https://mcp.example"},
+}
+mcpHandler := httptransport.NewHandler(srv, opts)
+h := httptransport.Guard(resource.HTTPMiddleware(provider)(mcpHandler), opts)
+// Mount h at the server root so it receives both /mcp and discovery requests.
+```
+
+Discovery is public at `/.well-known/oauth-protected-resource/mcp` and
+`/.well-known/oauth-protected-resource`, with GET/HEAD and OPTIONS support.
+The metadata URL comes from configuration, never request headers. Configure
+externally reachable HTTPS resource and issuer URLs without credentials,
+queries or fragments. Issuers must supply their own OAuth/OIDC discovery and
+authorization/token endpoints: a JWKS URL is not an issuer. Publishing metadata
+alone does not make a static-token or JWKS-only service a full OAuth provider;
+audience validation and OAuth flows remain the application's responsibility.
+Local plain-HTTP development can use `HTTPMiddleware` without discovery.
+For several resources on one host, mount each `MetadataHandler()` at the path
+in `MetadataURL()`, configure each provider's `Options().ResourceMetadataURL`
+to that URL, and choose the root metadata document explicitly in your mux.
+
+`CanAccess(ctx, def, policy)` calls an application's per-tool policy with the
+verified SDK `TokenInfo`; missing identity or policy denies access. Install
+`server.WithToolMiddleware(auth.AuthorizeTools(policy))` to enforce the check
+on every tool call before execution. For example:
+
+```go
+policy := func(ctx context.Context, info *sdkauth.TokenInfo, def server.ToolDefinition) bool {
+    return def.Name == "read" && slices.Contains(info.Scopes, "tools:read")
+}
+srv := server.NewServer("example", "1", server.WithToolMiddleware(auth.AuthorizeTools(policy)))
+```
+
+Denials return a generic `forbidden` tool error. The helper does not hide tools
+from `tools/list`, enforce scope step-up, or cover tools registered directly on
+`SDKServer()`. Stdio and direct calls without a verified HTTP context are denied;
+use a separate application policy for trusted local transports. Caller identity
+in arguments, `_meta` or forwarded headers is never accepted by this helper.
 
 ### Executable staleness
 
