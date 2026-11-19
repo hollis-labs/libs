@@ -17,6 +17,9 @@ import (
 )
 
 type EngineOptions struct {
+	// BeforeManifest runs at every control-manifest commit, including no-op
+	// reconciliation. Errors retain any earlier file changes as an incomplete apply.
+	BeforeManifest        func(targetRoot string) error
 	BeforeInstalledCommit func(context.Context, InstalledFileChange) error
 	BeforeWrite           func(stageRoot string, entry artifact.Entry) error
 	BeforeRename          func(stageRoot string, targetRoot string) error
@@ -143,6 +146,11 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 		}
 	}()
 
+	stageRoot, err := parentRoot.OpenRoot(stageBase)
+	if err != nil {
+		return Handle{}, err
+	}
+	defer func() { _ = stageRoot.Close() }()
 	stageAbs := filepath.Join(parentAbs, stageBase)
 	for _, entry := range plan.Manifest.Entries {
 		if err := ctx.Err(); err != nil {
@@ -161,6 +169,11 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 			return Handle{}, err
 		}
 	}
+	// Publish the control manifest in the owned stage, so the directory rename
+	// makes files and manifest visible together.
+	if err := e.saveManifest(ctx, targetAbs, stageRoot, plan.Manifest); err != nil {
+		return Handle{}, err
+	}
 	if e.opts.BeforeRename != nil {
 		if err := e.opts.BeforeRename(stageAbs, targetAbs); err != nil {
 			return Handle{}, err
@@ -173,9 +186,6 @@ func (e *DefaultEngine) Apply(ctx context.Context, req Request) (Handle, error) 
 		return Handle{}, err
 	}
 	cleanupStage = false
-	if err := SaveManifest(targetAbs, plan.Manifest); err != nil {
-		return Handle{TargetRoot: targetAbs, Manifest: plan.Manifest, Report: Report{Operation: req.Operation, Changes: plan.Report.Changes, Complete: false}}, err
-	}
 	return Handle{TargetRoot: targetAbs, Manifest: plan.Manifest, Report: plan.Report}, nil
 }
 
