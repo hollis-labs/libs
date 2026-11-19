@@ -66,7 +66,9 @@ server.WithTraceContext(tracing.Options{
 
 The accessor and example attribute name above are application-defined. Use the
 application's existing correlation vocabulary; do not label plain headers or raw
-metadata as verified. Never include a run token, credential, prompt or response
+metadata as verified. Use an explicit allowlist of correlation identifiers (agent,
+run, session, task, workstream and parent ids) in each trust namespace. Select each
+field deliberately rather than iterating arbitrary metadata, headers or claims. Never include a run token, credential, prompt or response
 content in attributes, and perform no I/O in the callback. Correlation ids are span
 attributes only, not baggage, tool arguments or new wire identity metadata.
 
