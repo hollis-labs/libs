@@ -1,0 +1,12 @@
+github.com/hollis-labs/libs/harness/core v0.16.0 h1:Kx1ycAgd61aBZJSDoOqX9CKlsvoRugcIypXJ+IEmkN0=
+github.com/hollis-labs/libs/harness/core v0.16.0/go.mod h1:9unAdOAJSvsw5i9rMub7n+kBv+YJbMVzGeTiE8HbgoI=
+github.com/hollis-labs/libs/llm/core v0.4.0 h1:ZdeAqDqVGi4d1sfkJQflg6KVA3fc/Htyl/wAa0EComE=
+github.com/hollis-labs/libs/llm/core v0.4.0/go.mod h1:7ggK4lyXpOBUpk/rdh+cYkh1EUPlP7RsETVi6JCBmDc=
+github.com/hollis-labs/libs/mesh/core v0.11.0 h1:hBl6Kxt2zoNBWJmeOypp+kD02VhKkIQ5hBwjg8wY0ds=
+github.com/hollis-labs/libs/mesh/core v0.11.0/go.mod h1:yZA6PdWpjZN5Pxoxw00NfYKc4e3WAZFd6JucRkofs8Q=
+github.com/hollis-labs/libs/security/policy v0.1.0 h1:XsksYYhpJ315wlr9QmWwxUKRfyDAJSSRiekBh7jpI70=
+github.com/hollis-labs/libs/security/policy v0.1.0/go.mod h1:vFJQekM6tI5OV+2rqK+mx/imNUSSJ26PkvAvgMmdQBo=
+github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 h1:KRzFb2m7YtdldCEkzs6KqmJw4nqEVZGK7IN2kJkjTuQ=
+github.com/santhosh-tekuri/jsonschema/v6 v6.0.2/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
+golang.org/x/text v0.42.0 h1:JbOZXgfeCPU9gacVtYliJqOhD+zhrEqK4LfdpmlUZqI=
+golang.org/x/text v0.42.0/go.mod h1:ojzP1Z+2QtioaF8DTtO8K5q7JWVVYwZKenzujK0Zd0E=
