@@ -36,7 +36,14 @@ permission configuration:
   Every occurrence of the scratch working directory in parameters is `/work`.
 
 Cache evidence: the tool-success turn's second model step reports input_tokens
-2508 and cache_read_tokens 9605. Cache therefore cannot be a subset of input;
+2565 and cache_read_tokens 9619. Cache therefore cannot be a subset of input;
 Agy reports uncached input separately. output_tokens includes thinking_tokens.
 Its total_tokens counter excludes cache reads; it is retained in the capture,
 not used to override the chatstream disjoint-component total.
+
+- tool_success: create `agy_capture_text.txt` containing `agy capture success` plus
+  newline (20 bytes), then run `agy --output-format stream-json --print-timeout 45s -p='Use view_file to read agy_capture_text.txt in the current directory. Do not use any other tools. After reading it, reply only OK. Do not include file paths or links in your response.'`
+  Agy maps view_file to read_file. Successful tool_info.output is a summary,
+  `1 lines, 20 bytes`, not the full file contents. This adapter preserves exactly
+  that upstream output, and never invents file content. Scratch working-directory
+  prefixes in tool parameters are redacted to `/work` as in the failure capture.
