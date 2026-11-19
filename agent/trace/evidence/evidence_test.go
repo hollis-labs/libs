@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -185,5 +186,120 @@ func TestConcurrentProducers(t *testing.T) {
 	}
 	if _, err := evidence.Replay(context.Background(), s); err != nil || len(s.Entries()) != 40 {
 		t.Fatalf("entries %d, %v", len(s.Entries()), err)
+	}
+}
+
+func TestDecisionDeliveryAndExecutionRemainSeparate(t *testing.T) {
+	r, c := record(t)
+	s, _ := r.Snapshot()
+	for _, e := range s.Entries() {
+		if e.Delivery != nil || e.Execution != nil {
+			t.Fatal("a receipt was inferred from a decision")
+		}
+	}
+	native := gate.NativeRequestID(`9007199254740993`)
+	delivery := gate.DeliveryReceipt{DecisionRef: "decision-1", Binding: binding, AdapterID: "fixture", NativeRequestID: native, Status: gate.DeliveryUnknown, EvidenceRef: "fixture"}
+	if err := r.RecordDelivery(context.Background(), delivery); err != nil {
+		t.Fatal(err)
+	}
+	execution := gate.ExecutionReceipt{DecisionRef: "decision-1", OperationID: "operation-1", Binding: binding, State: gate.ExecutionSucceeded, EvidenceRef: "fixture"}
+	forged := execution
+	forged.Binding.Generation++
+	if err := r.RecordExecution(context.Background(), forged); !errors.Is(err, evidence.ErrInvalid) {
+		t.Fatalf("execution for a successor attempt: %v", err)
+	}
+	unobserved := execution
+	unobserved.OperationID = "operation-unknown"
+	if err := r.RecordExecution(context.Background(), unobserved); !errors.Is(err, evidence.ErrInvalid) {
+		t.Fatalf("execution for an unobserved operation: %v", err)
+	}
+	if err := r.RecordExecution(context.Background(), execution); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = r.Snapshot()
+	entries, err := evidence.Replay(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deliveries, executions := 0, 0
+	for _, e := range entries {
+		if e.Delivery != nil {
+			deliveries++
+			if string(e.Delivery.NativeRequestID) != `9007199254740993` || e.Delivery.Status != gate.DeliveryUnknown {
+				t.Fatalf("delivery changed in replay: %+v", e.Delivery)
+			}
+		}
+		if e.Execution != nil {
+			executions++
+			if e.Correlation != c && e.Correlation.OperationID != "operation-1" {
+				t.Fatalf("execution correlation %+v", e.Correlation)
+			}
+		}
+	}
+	if deliveries != 1 || executions != 1 {
+		t.Fatalf("deliveries %d, executions %d", deliveries, executions)
+	}
+}
+
+func TestPositionsAndTraceContextRemainDistinct(t *testing.T) {
+	var captured runtimeevents.Event
+	p := newProducer(runtimeevents.SinkFunc(func(_ context.Context, e runtimeevents.Event) error { captured = e; return nil }), "run-positions")
+	p.emit(t, runtimeevents.KindTurnStarted, "turn-1", nil)
+	offset := int64(0)
+	captured.Sequence, captured.Generation, captured.RawOffset, captured.Cursor = 41, 3, &offset, "committed-cursor-z"
+	captured.Corr = &runtimeevents.Corr{TraceID: "host-trace", SpanID: "host-span", Traceparent: "host-traceparent"}
+	r, err := evidence.NewRecorder(evidence.Metadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Write(context.Background(), captured); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := r.Snapshot()
+	entries, err := evidence.Replay(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := entries[0]
+	if e.Position.SourceSequence != 41 || e.Position.ProducerGeneration != 3 || e.Position.PTYOffset == nil || *e.Position.PTYOffset != 0 ||
+		e.Position.CommittedCursor != "committed-cursor-z" || e.Correlation.Binding.Generation != binding.Generation || !reflect.DeepEqual(e.Event.Corr, captured.Corr) {
+		t.Fatalf("coordinates or trace context conflated: %+v", e)
+	}
+	captured.ID, captured.Cursor, captured.RawOffset = "evt-next", "", nil
+	captured.Sequence++
+	if err := r.Write(context.Background(), captured); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = r.Snapshot()
+	if last := s.Entries()[1]; last.Position.CommittedCursor != "" || last.Position.PTYOffset != nil {
+		t.Fatal("a sequence invented a replay position")
+	}
+}
+
+func TestImportRejectsUnknownFieldsAndTheEntryBound(t *testing.T) {
+	r, _ := record(t)
+	s, _ := r.Snapshot()
+	raw, _ := json.Marshal(s)
+	extra := strings.Replace(string(raw), `{"version":`, `{"unexpected":true,"version":`, 1)
+	var imported evidence.Recording
+	if err := json.Unmarshal([]byte(extra), &imported); err == nil {
+		t.Fatal("an unknown recording field was accepted")
+	}
+	big, err := evidence.NewRecorder(evidence.Metadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := newProducer(big, "run-big")
+	for range evidence.MaxEntries {
+		p.emit(t, runtimeevents.KindAgentDelta, "turn-1", nil)
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+	payload := p.base
+	payload.TurnID, payload.ModelCallID = "turn-1", "turn-1/model/1"
+	err = p.emitter.Emit(context.Background(), runtimeevents.KindAgentDelta, runtimeevents.Source{Channel: "fixture", Confidence: runtimeevents.ConfidenceExact}, payload, runtimeevents.WithTurnID("turn-1"))
+	if !errors.Is(err, evidence.ErrInvalid) {
+		t.Fatalf("entry %d was accepted: %v", evidence.MaxEntries+1, err)
 	}
 }
