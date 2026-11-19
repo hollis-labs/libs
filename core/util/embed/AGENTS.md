@@ -1,6 +1,6 @@
 # embed
 
-Texts to vectors through an AI gateway's `POST /ai/embeddings`. `Client` satisfies `classify.Embedder`.
+Texts to vectors through an AI gateway: OpenAI-compatible `POST /v1/embeddings`, or `POST /ai/embeddings`. `Client` satisfies `classify.Embedder`.
 
 It is not a model runtime or a vector store. A local model (ONNX, cgo) is a separate module; storing or searching vectors is the caller's.
 

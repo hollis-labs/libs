@@ -14,7 +14,18 @@ import (
 	"time"
 )
 
-// Client is a Decider over a decision gateway's HTTP operation. The wire shape:
+// Client is a Decider over HTTP, in one of two dialects (Dialect).
+//
+// DialectJEV is JEV's own System-1 API, as an LLM gateway relays it:
+//
+//	POST {base}/v1/systemone
+//	{"state", "model", "questions": {"<key>": {"type", "instructions", "criteria"}}}
+//	200 {"model", "answers": {"<key>": {...}}, "usage"}
+//
+// Questions are an object; their order, and the order of options and levels, is
+// written exactly as given (JEV leans toward the first option).
+//
+// DialectGateway is a decision gateway's provider-neutral operation:
 //
 //	POST {base}/ai/decide
 //	{"request": {"caller_id", "model_hint", "decision": {"state", "purpose", "on_error", "questions"}}}
@@ -24,6 +35,8 @@ import (
 // It never logs, prints or returns the token, and never puts request text in an
 // error.
 type Client struct {
+	// Dialect is the wire; empty is DialectGateway.
+	Dialect  Dialect
 	BaseURL  string
 	Token    string
 	CallerID string
@@ -32,6 +45,27 @@ type Client struct {
 	// 500ms). Only rate-limited, overloaded and timed-out calls are retried.
 	Backoff  time.Duration
 	Attempts int // default 3
+}
+
+// Dialect is a Client's wire.
+type Dialect string
+
+const (
+	// DialectGateway is POST /ai/decide with provider-neutral questions.
+	DialectGateway Dialect = "gateway"
+	// DialectJEV is POST /v1/systemone with JEV's own body (an LLM gateway
+	// relays it). Request.Model is required: the gateway routes on it ("jev").
+	DialectJEV Dialect = "jev"
+)
+
+// NewJEVClient returns a client for JEV's System-1 API at baseURL (an LLM
+// gateway's base, which serves /v1/systemone), or nil when baseURL is empty.
+func NewJEVClient(baseURL, token string) *Client {
+	c := NewClient(baseURL, token, "")
+	if c != nil {
+		c.Dialect = DialectJEV
+	}
+	return c
 }
 
 // NewClient returns a client for baseURL (http(s)://host[:port] or
@@ -52,7 +86,12 @@ func NewClient(baseURL, token, callerID string) *Client {
 }
 
 // Name implements Decider.
-func (c *Client) Name() string { return "decide-http" }
+func (c *Client) Name() string {
+	if c.Dialect == DialectJEV {
+		return "decide-jev"
+	}
+	return "decide-http"
+}
 
 // Error is a failed call. Message is the gateway's own text, never the request.
 type Error struct {
@@ -120,6 +159,9 @@ func (c *Client) encode(req Request) ([]byte, error) {
 	if err := req.Check(); err != nil {
 		return nil, err
 	}
+	if c.Dialect == DialectJEV {
+		return encodeJEV(req)
+	}
 	var w wireRequest
 	w.Request.CallerID = req.CallerID
 	if w.Request.CallerID == "" {
@@ -141,10 +183,16 @@ func decode(req Request, body []byte) (Response, error) {
 		return Response{}, fmt.Errorf("decide: bad response: %w", err)
 	}
 	r := w.Response
-	resp := Response{Provider: r.Provider, Model: r.Model, Answers: map[string]Answer{}, Usage: r.Usage,
+	resp := Response{Provider: r.Provider, Model: r.Model, Usage: r.Usage,
 		Latency: time.Duration(r.Decision.LatencyMS) * time.Millisecond, RequestID: r.Decision.RequestID}
+	return check(req, resp, r.Decision.Answers)
+}
+
+// check keeps one answer per question, each fitting its question.
+func check(req Request, resp Response, answers map[string]Answer) (Response, error) {
+	resp.Answers = map[string]Answer{}
 	for _, q := range req.Questions {
-		a, ok := r.Decision.Answers[q.Key]
+		a, ok := answers[q.Key]
 		if !ok {
 			return Response{}, fmt.Errorf("decide: no answer for question %q", q.Key)
 		}
@@ -236,7 +284,11 @@ func (c *Client) Decide(ctx context.Context, req Request) (Response, error) {
 }
 
 func (c *Client) once(ctx context.Context, req Request, body []byte) (Response, error) {
-	hr, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/ai/decide", bytes.NewReader(body))
+	path := "/ai/decide"
+	if c.Dialect == DialectJEV {
+		path = "/v1/systemone"
+	}
+	hr, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return Response{}, err
 	}
@@ -264,6 +316,9 @@ func (c *Client) once(ctx context.Context, req Request, body []byte) (Response, 
 			}
 		}
 		return Response{}, e
+	}
+	if c.Dialect == DialectJEV {
+		return decodeJEV(req, raw)
 	}
 	return decode(req, raw)
 }

@@ -1,9 +1,15 @@
-// Package embed turns texts into vectors through an AI gateway's embeddings
-// operation (POST /ai/embeddings). Client satisfies classify.Embedder, so a
-// classify.Centroid judge can run on a gateway's embedding model with no local
-// model and no cgo.
+// Package embed turns texts into vectors through an AI gateway. Client satisfies
+// classify.Embedder, so a classify.Centroid judge can run on a gateway's
+// embedding model with no local model and no cgo.
 //
-// The wire shape:
+// Two dialects. DialectOpenAI is the OpenAI embeddings API, which an LLM gateway
+// serves (the model is the gateway's alias, such as "embed-local"):
+//
+//	POST {base}/v1/embeddings
+//	{"model", "input": ["…"]}
+//	200 {"model", "data": [{"index", "embedding"}]}
+//
+// DialectGateway is a decision gateway's provider-neutral operation:
 //
 //	POST {base}/ai/embeddings
 //	{"request": {"operation": "embedding", "caller_id", "model_hint", "embedding_input": ["…"]}}
@@ -29,6 +35,8 @@ import (
 
 // Client embeds through a gateway. Safe for concurrent use.
 type Client struct {
+	// Dialect is the wire; empty is DialectGateway.
+	Dialect  Dialect
 	BaseURL  string
 	Token    string
 	CallerID string
@@ -41,6 +49,27 @@ type Client struct {
 
 	mu  sync.Mutex
 	dim int // the dimension seen first; a change is an error
+}
+
+// Dialect is a Client's wire.
+type Dialect string
+
+const (
+	// DialectGateway is POST /ai/embeddings with embedding_input.
+	DialectGateway Dialect = "gateway"
+	// DialectOpenAI is POST /v1/embeddings with model and input; Model is required.
+	DialectOpenAI Dialect = "openai"
+)
+
+// NewOpenAIClient returns a client for an OpenAI-compatible embeddings API at
+// baseURL (an LLM gateway's base, which serves /v1/embeddings), or nil when
+// baseURL is empty.
+func NewOpenAIClient(baseURL, token, model string) *Client {
+	c := NewClient(baseURL, token, "", model)
+	if c != nil {
+		c.Dialect = DialectOpenAI
+	}
+	return c
 }
 
 // NewClient returns a client for baseURL (http(s)://host[:port] or
@@ -119,16 +148,30 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 }
 
 func (c *Client) once(ctx context.Context, texts []string) ([][]float32, error) {
-	var w wireRequest
-	w.Request.Operation = "embedding"
-	w.Request.CallerID = c.CallerID
-	w.Request.ModelHint = c.Model
-	w.Request.EmbeddingInput = texts
-	body, err := json.Marshal(w)
+	var body []byte
+	var err error
+	path := "/ai/embeddings"
+	if c.Dialect == DialectOpenAI {
+		if c.Model == "" {
+			return nil, errors.New("embed: the openai dialect needs a model")
+		}
+		path = "/v1/embeddings"
+		body, err = json.Marshal(struct {
+			Model string   `json:"model"`
+			Input []string `json:"input"`
+		}{c.Model, texts})
+	} else {
+		var w wireRequest
+		w.Request.Operation = "embedding"
+		w.Request.CallerID = c.CallerID
+		w.Request.ModelHint = c.Model
+		w.Request.EmbeddingInput = texts
+		body, err = json.Marshal(w)
+	}
 	if err != nil {
 		return nil, err
 	}
-	hr, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/ai/embeddings", bytes.NewReader(body))
+	hr, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +204,23 @@ func (c *Client) once(ctx context.Context, texts []string) ([][]float32, error) 
 		return nil, &Error{Status: res.StatusCode, Code: env.Error.Code, Message: c.redact(msg)}
 	}
 	var wr wireResponse
-	if err := json.Unmarshal(raw, &wr); err != nil {
+	if c.Dialect == DialectOpenAI {
+		var o struct {
+			Data []struct {
+				Index     int       `json:"index"`
+				Embedding []float32 `json:"embedding"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &o); err != nil {
+			return nil, fmt.Errorf("embed: bad response: %w", err)
+		}
+		for _, d := range o.Data {
+			wr.Response.Embeddings = append(wr.Response.Embeddings, struct {
+				Index  int       `json:"index"`
+				Vector []float32 `json:"vector"`
+			}{d.Index, d.Embedding})
+		}
+	} else if err := json.Unmarshal(raw, &wr); err != nil {
 		return nil, fmt.Errorf("embed: bad response: %w", err)
 	}
 	if len(wr.Response.Embeddings) != len(texts) {

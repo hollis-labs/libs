@@ -120,3 +120,30 @@ func TestNewClientWithoutURLIsNil(t *testing.T) {
 		t.Fatal("client without a URL")
 	}
 }
+
+func TestOpenAIDialect(t *testing.T) {
+	var got map[string]any
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &got)
+		_, _ = w.Write([]byte(`{"object":"list","model":"qwen3-embedding-0.6b","data":[{"index":1,"embedding":[0,1]},{"index":0,"embedding":[1,0]}]}`))
+	}))
+	defer srv.Close()
+	c := NewOpenAIClient(srv.URL, fixtureKey, "embed-local")
+	vecs, err := c.Embed(context.Background(), []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/v1/embeddings" || got["model"] != "embed-local" || len(got["input"].([]any)) != 2 {
+		t.Fatalf("request %s %v", path, got)
+	}
+	if vecs[0][0] != 1 || vecs[1][1] != 1 {
+		t.Fatalf("vectors %v", vecs)
+	}
+	c.Model = ""
+	if _, err := c.Embed(context.Background(), []string{"a"}); err == nil {
+		t.Fatal("no model accepted")
+	}
+}
