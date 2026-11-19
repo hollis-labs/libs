@@ -53,7 +53,12 @@ type ToolHandler func(ctx context.Context, args map[string]any) (any, error)
 // the tool's name -- the latter was the exact shape of a permission-gating
 // bug this contract exists to make structurally impossible.
 type Tool struct {
-	Name        string
+	Name string
+
+	// Meta is protocol tool metadata, including optional extension metadata.
+	// Treat it and its nested values as immutable after registration.
+	Meta map[string]any
+
 	Description string
 	InputSchema any
 	Handler     ToolHandler
@@ -110,6 +115,7 @@ type ToolAnnotations struct {
 // ToolDefinition is a tool's public shape, as returned by ToolDefinitions.
 type ToolDefinition struct {
 	Name         string          `json:"name"`
+	Meta         map[string]any  `json:"_meta,omitempty"`
 	Title        string          `json:"title,omitempty"`
 	Description  string          `json:"description"`
 	InputSchema  any             `json:"inputSchema"`
@@ -327,6 +333,7 @@ func (s *Server) registerTool(t Tool, checked bool) {
 	}
 	def := ToolDefinition{
 		Name:         t.Name,
+		Meta:         toolMeta(t),
 		Title:        t.Title,
 		Description:  t.Description,
 		InputSchema:  t.InputSchema,
@@ -371,6 +378,7 @@ func (s *Server) registerTool(t Tool, checked bool) {
 	openWorld := t.OpenWorldHint
 	sdkTool := &mcpsdk.Tool{
 		Name:         t.Name,
+		Meta:         toolMeta(t),
 		Title:        t.Title,
 		Description:  t.Description,
 		InputSchema:  t.InputSchema,
@@ -385,9 +393,7 @@ func (s *Server) registerTool(t Tool, checked bool) {
 			OpenWorldHint:   &openWorld,
 		},
 	}
-	if t.AlwaysLoad {
-		sdkTool.Meta = mcpsdk.Meta{AlwaysLoadMetaKey: true}
-	}
+
 	s.mu.Lock()
 	s.sdkTools[t.Name] = sdkTool
 	s.mu.Unlock()
@@ -575,4 +581,19 @@ func sessionNotifier(ctx context.Context, session *mcpsdk.ServerSession) func(No
 			})
 		}
 	}
+}
+
+// toolMeta copies the top-level map and preserves the AlwaysLoad convention.
+func toolMeta(t Tool) map[string]any {
+	m := make(map[string]any, len(t.Meta)+1)
+	for k, v := range t.Meta {
+		m[k] = v
+	}
+	if t.AlwaysLoad {
+		m[AlwaysLoadMetaKey] = true
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }

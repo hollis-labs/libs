@@ -1,0 +1,40 @@
+{
+  "version": "gatecrasher.card/v1",
+  "approval_id": "apr_example",
+  "type": "approve",
+  "status": "pending",
+  "tier": "critical",
+  "kind": "credential_grant",
+  "source": "example",
+  "title": "Approve the requested operation",
+  "summary": "Reference card; replace this file with an actual Gatecrasher /card response.",
+  "principal": {
+    "sub": "example-agent",
+    "kind": "agent"
+  },
+  "requested": {
+    "scopes": [
+      "example.read"
+    ],
+    "ttl_seconds": 600,
+    "audience": "example-api",
+    "constraints": {}
+  },
+  "evidence": {},
+  "expires_at": "2099-01-01T00:00:00Z",
+  "deciders": "owner",
+  "actions": [
+    {
+      "kind": "approve",
+      "label": "Approve",
+      "outcome": "approved",
+      "decide": "/api/gate/v1/approvals/apr_example/decide"
+    },
+    {
+      "kind": "deny",
+      "label": "Decline",
+      "outcome": "denied",
+      "decide": "/api/gate/v1/approvals/apr_example/decide"
+    }
+  ]
+}

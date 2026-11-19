@@ -54,6 +54,12 @@ jobs:
             ${{ inputs.module }}/go.mod
             ${{ inputs.module }}/go.sum
 
+      # The approval-card executable client-flow test runs the bundled browser JS.
+      - uses: actions/setup-node@v5
+        if: ${{ inputs.module == 'mcp/plugin-mcp' }}
+        with:
+          node-version: "22"
+
       - name: Install Linux sandbox backend
         if: ${{ inputs.sandbox-backend }}
         run: |
