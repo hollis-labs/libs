@@ -8,6 +8,12 @@ All notable changes to the `util` module are documented here. The format follows
 
 ## [Unreleased]
 
+## v0.8.0 — 2026-11-19
+
+### Added
+
+- `classify`: facet classification of short text. Judges cast weighted votes (`Vote`, in log-odds) that the engine combines per facet into probabilities, with a real abstention (`min_p`, a per-label `min_p` for risky labels, `min_margin`) and decisive votes; judges are gated by phase (`Keystroke`, `Submit`, `Async`) and a failing judge only loses its votes. Packs are strict JSON (facets, labels with examples, rules over the text and the context), layer by facet, label and rule id, and are fingerprinted by content. `Bayes` (hashed n-gram naive Bayes, online, JSON-serialisable), `Centroid` over an `Embedder` supplied elsewhere, `Evaluate` (accuracy, coverage, bands, confusion, majority floor) and `Result.LedgerRecords` (one classifier row per facet and phase). Standard library plus `ledger`.
+
 ## v0.7.0 — 2026-11-17
 
 ### Added

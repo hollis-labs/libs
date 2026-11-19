@@ -5,9 +5,10 @@
 // worktree and tesseractclient. They were moved in, with their history, from separate
 // modules; each directory has a MIGRATION.md with the old and the new import path.
 //
-// Three packages were written in this module and have no earlier path: mw (the
+// Five packages were written in this module and have no earlier path: mw (the
 // middleware kit, with httpmw, jobmw and conformance below it), router (a
-// declarative rule router), ledger (the decision ledger record, with ledgertest) and
+// declarative rule router), ledger (the decision ledger record, with ledgertest),
+// classify (facet classification with judges, packs and an abstaining engine) and
 // workclient (a client for the Work service's HTTP API).
 //
 // The module is released with module-prefixed tags of the form core/util/vX.Y.Z.
