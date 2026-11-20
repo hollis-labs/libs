@@ -248,12 +248,12 @@ type SlotBlock struct {
 // The earlier pattern of setting hints on a shared provider singleton is
 // unsafe under concurrent use — see CacheableProvider in go-llm-contracts.
 type CacheHint struct {
+	Position string // "system", "tools", "recent_message"
+	Index    int    // ordering context (e.g. 0 = most recent, 1 = second most recent)
 	// TTL requests a prompt-cache lifetime: empty uses the provider default,
 	// or explicitly "5m" or "1h". Providers without TTL support ignore it.
 	// Omitted TTL preserves the existing serialized request shape.
-	TTL      string `json:"TTL,omitempty"`
-	Position string // "system", "tools", "recent_message"
-	Index    int    // ordering context (e.g. 0 = most recent, 1 = second most recent)
+	TTL string `json:"TTL,omitempty"`
 }
 
 // ValidateTTL checks the optional cache lifetime. Adapters supporting TTL

@@ -39,9 +39,6 @@ type Profile struct {
 
 // Runtime specifies provider and turn limits. Zero values use host defaults.
 type Runtime struct {
-	// CacheTTL is the requested prompt-cache lifetime: empty uses the
-	// provider default, or explicitly "5m" or "1h".
-	CacheTTL        string `yaml:"cache_ttl,omitempty" json:"cache_ttl,omitempty"`
 	Provider        string `yaml:"provider,omitempty" json:"provider,omitempty"`
 	Model           string `yaml:"model,omitempty" json:"model,omitempty"`
 	MaxOutputTokens int    `yaml:"max_output_tokens,omitempty" json:"max_output_tokens,omitempty"`
@@ -76,6 +73,9 @@ type Runtime struct {
 	IdleTimeout string `yaml:"idle_timeout,omitempty" json:"idle_timeout,omitempty"`
 	// Env supplies literal variables to explicitly approved shell commands.
 	Env map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
+	// CacheTTL is the requested prompt-cache lifetime: empty uses the
+	// provider default, or explicitly "5m" or "1h".
+	CacheTTL string `yaml:"cache_ttl,omitempty" json:"cache_ttl,omitempty"`
 }
 
 // Permissions specifies the host's permission mode.
