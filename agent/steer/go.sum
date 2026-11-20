@@ -1,0 +1,4 @@
+github.com/hollis-labs/libs/agent/core v0.5.0 h1:bk2GAHef+lH5ihYKBnQpir5SZoeRNTp7AyY8iYCLkr0=
+github.com/hollis-labs/libs/agent/core v0.5.0/go.mod h1:AHtYM1ZFiaAVnPQYaZjJrI8trpmwomFMPknACIUe+4Y=
+github.com/hollis-labs/libs/core/util v0.11.1 h1:jhRJoQJDzXuVmRJUagCu4b3SwJ5f2VRztfQ0JHeoido=
+github.com/hollis-labs/libs/core/util v0.11.1/go.mod h1:BZUY24frcNPSvP9RGyOOTE5Go+uVZsMMfWQtvVy8CpQ=
