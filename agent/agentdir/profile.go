@@ -76,6 +76,8 @@ type Runtime struct {
 	// CacheTTL is the requested prompt-cache lifetime: empty uses the
 	// provider default, or explicitly "5m" or "1h".
 	CacheTTL string `yaml:"cache_ttl,omitempty" json:"cache_ttl,omitempty"`
+	// DailyTokenBudget caps agent token usage per UTC day; zero means no cap.
+	DailyTokenBudget int `yaml:"daily_token_budget,omitempty" json:"daily_token_budget,omitempty"`
 }
 
 // Permissions specifies the host's permission mode.
@@ -114,6 +116,9 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 ||
 		p.Runtime.CompactAt < 0 || p.Runtime.CompactKeepTokens < 0 || p.Runtime.CompactInputTokens < 0 {
 		return fmt.Errorf("%w: runtime limits must be nonnegative", ErrProfile)
+	}
+	if p.Runtime.DailyTokenBudget < 0 {
+		return fmt.Errorf("%w: runtime.daily_token_budget must be nonnegative", ErrProfile)
 	}
 	switch p.Runtime.CacheTTL {
 	case "", "5m", "1h":
