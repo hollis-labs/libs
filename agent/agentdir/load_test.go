@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestProfiles(t *testing.T) {
@@ -49,7 +50,7 @@ func TestSubtaskRuntimeKeys(t *testing.T) {
 			t.Fatal(err)
 		}
 		if name == "host.yaml" {
-			data = []byte(strings.Replace(string(data), "runtime:\n", "runtime:\n  subtask_limit: 6\n  turn_token_budget: 200000\n  subtask_result_cap: 4000\n", 1))
+			data = []byte(strings.Replace(string(data), "runtime:\n", "runtime:\n  subtask_limit: 6\n  turn_token_budget: 200000\n  subtask_result_cap: 4000\n  compact_at: 110000\n  compact_keep_tokens: 22000\n  compaction_prompt: Summarize.\n  compaction_input_tokens: 100000\n  idle_timeout: 3m\n", 1))
 		}
 		if err := os.WriteFile(filepath.Join(root, name), data, 0600); err != nil {
 			t.Fatal(err)
@@ -59,18 +60,28 @@ func TestSubtaskRuntimeKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := snap.Profile.Runtime; r.SubtaskLimit != 6 || r.TurnTokenBudget != 200000 || r.SubtaskResultCap != 4000 {
+	r := snap.Profile.Runtime
+	if r.SubtaskLimit != 6 || r.TurnTokenBudget != 200000 || r.SubtaskResultCap != 4000 ||
+		r.CompactAt != 110000 || r.CompactKeepTokens != 22000 || r.CompactionPrompt != "Summarize." || r.CompactionInputTokens != 100000 {
 		t.Fatalf("runtime %+v", r)
 	}
+	if d, err := r.IdleTimeoutDuration(); err != nil || d != 3*time.Minute {
+		t.Fatalf("idle_timeout %v, %v", d, err)
+	}
 	for field, set := range map[string]func(*Runtime){
-		"subtask_limit":      func(r *Runtime) { r.SubtaskLimit = -1 },
-		"turn_token_budget":  func(r *Runtime) { r.TurnTokenBudget = -1 },
-		"subtask_result_cap": func(r *Runtime) { r.SubtaskResultCap = -1 },
+		"subtask_limit":           func(r *Runtime) { r.SubtaskLimit = -1 },
+		"turn_token_budget":       func(r *Runtime) { r.TurnTokenBudget = -1 },
+		"subtask_result_cap":      func(r *Runtime) { r.SubtaskResultCap = -1 },
+		"compact_at":              func(r *Runtime) { r.CompactAt = -1 },
+		"compact_keep_tokens":     func(r *Runtime) { r.CompactKeepTokens = -1 },
+		"compaction_input_tokens": func(r *Runtime) { r.CompactionInputTokens = -1 },
+		"idle_timeout_unparsable": func(r *Runtime) { r.IdleTimeout = "soon" },
+		"idle_timeout_zero":       func(r *Runtime) { r.IdleTimeout = "0s" },
 	} {
 		p := snap.Profile
 		set(&p.Runtime)
 		if err := p.Validate(&snap.Definition); err == nil {
-			t.Errorf("a negative %s was accepted: %+v", field, p.Runtime)
+			t.Errorf("an invalid %s was accepted: %+v", field, p.Runtime)
 		}
 	}
 }

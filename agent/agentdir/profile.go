@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hollis-labs/libs/mesh/core/agentdef"
 )
@@ -54,6 +55,22 @@ type Runtime struct {
 	// SubtaskResultCap is the size cap, in tokens, on the result a subtask
 	// hands back; zero uses the host's default; the host may clamp it.
 	SubtaskResultCap int `yaml:"subtask_result_cap,omitempty" json:"subtask_result_cap,omitempty"`
+	// CompactAt is the request size, in tokens, at which the host compacts
+	// the conversation; zero uses the host's default.
+	CompactAt int `yaml:"compact_at,omitempty" json:"compact_at,omitempty"`
+	// CompactKeepTokens is about how much of the end of the conversation a
+	// compaction keeps whole, in tokens; zero uses the host's default.
+	CompactKeepTokens int `yaml:"compact_keep_tokens,omitempty" json:"compact_keep_tokens,omitempty"`
+	// CompactionPrompt replaces the host's prompt for writing a compaction
+	// summary; empty uses the host's default.
+	CompactionPrompt string `yaml:"compaction_prompt,omitempty" json:"compaction_prompt,omitempty"`
+	// CompactionInputTokens bounds what one compaction summary call is sent,
+	// in tokens; zero uses the host's default.
+	CompactionInputTokens int `yaml:"compaction_input_tokens,omitempty" json:"compaction_input_tokens,omitempty"`
+	// IdleTimeout is how long a model stream may go without any event before
+	// the host gives up on it, as a Go duration ("90s", "5m"); empty uses
+	// the host's default. Use IdleTimeoutDuration to read it.
+	IdleTimeout string `yaml:"idle_timeout,omitempty" json:"idle_timeout,omitempty"`
 	// Env supplies literal variables to explicitly approved shell commands.
 	Env map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
 }
@@ -91,8 +108,15 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 		return fmt.Errorf("%w: unsupported provider %q", ErrProfile, p.Runtime.Provider)
 	}
 	if p.Runtime.MaxOutputTokens < 0 || p.Runtime.MaxSteps < 0 || p.Runtime.ContextWindow < 0 || p.Runtime.ToolConcurrency < 0 ||
-		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 {
+		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 ||
+		p.Runtime.CompactAt < 0 || p.Runtime.CompactKeepTokens < 0 || p.Runtime.CompactionInputTokens < 0 {
 		return fmt.Errorf("%w: runtime limits must be nonnegative", ErrProfile)
+	}
+	if _, err := p.Runtime.IdleTimeoutDuration(); err != nil {
+		return fmt.Errorf("%w: %w", ErrProfile, err)
+	}
+	if strings.ContainsRune(p.Runtime.CompactionPrompt, 0) {
+		return fmt.Errorf("%w: runtime.compaction_prompt contains a NUL byte", ErrProfile)
 	}
 	for name, value := range p.Runtime.Env {
 		if !validEnvName(name) || strings.ContainsRune(value, 0) {
@@ -118,4 +142,17 @@ func validEnvName(name string) bool {
 		}
 	}
 	return true
+}
+
+// IdleTimeoutDuration parses runtime.idle_timeout: zero when it is empty,
+// an error when it is not a positive Go duration.
+func (r Runtime) IdleTimeoutDuration() (time.Duration, error) {
+	if r.IdleTimeout == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(r.IdleTimeout)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("runtime.idle_timeout %q must be a positive duration such as \"90s\"", r.IdleTimeout)
+	}
+	return d, nil
 }
