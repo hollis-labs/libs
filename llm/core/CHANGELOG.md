@@ -6,7 +6,7 @@ All notable changes to the `llm-core` module are documented here (the module was
 `llm/core/vX.Y.Z`. Repository-level changes (tooling, CI, docs) are in the root
 `CHANGELOG.md`.
 
-## [Unreleased]
+## [0.5.0] - 2026-11-20
 
 - Add `llmtypes.CacheHint.TTL` and `ValidateTTL` for optional prompt-cache
   lifetimes (`5m` or `1h`). Empty retains the provider default and the existing
