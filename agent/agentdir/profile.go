@@ -73,6 +73,9 @@ type Runtime struct {
 	IdleTimeout string `yaml:"idle_timeout,omitempty" json:"idle_timeout,omitempty"`
 	// Env supplies literal variables to explicitly approved shell commands.
 	Env map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
+	// CacheTTL is the requested prompt-cache lifetime: empty uses the
+	// provider default, or explicitly "5m" or "1h".
+	CacheTTL string `yaml:"cache_ttl,omitempty" json:"cache_ttl,omitempty"`
 }
 
 // Permissions specifies the host's permission mode.
@@ -111,6 +114,11 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 ||
 		p.Runtime.CompactAt < 0 || p.Runtime.CompactKeepTokens < 0 || p.Runtime.CompactInputTokens < 0 {
 		return fmt.Errorf("%w: runtime limits must be nonnegative", ErrProfile)
+	}
+	switch p.Runtime.CacheTTL {
+	case "", "5m", "1h":
+	default:
+		return fmt.Errorf("%w: runtime.cache_ttl must be empty, 5m or 1h", ErrProfile)
 	}
 	if _, err := p.Runtime.IdleTimeoutDuration(); err != nil {
 		return fmt.Errorf("%w: %w", ErrProfile, err)

@@ -30,6 +30,11 @@ per-turn token budget (`turn_token_budget`), compaction (`compact_at`,
 model stream idle timeout (`idle_timeout`), and literal shell environment
 entries.
 
+`runtime.cache_ttl` requests a prompt-cache lifetime: `5m`, `1h`, or empty
+for the provider default. Other values are rejected with `runtime.cache_ttl`
+in the error. Hosts pass this value to their cache hints; providers without
+prompt-cache TTL support may ignore it.
+
 `Load` returns the definition, profile, parsed and raw MCP configuration,
 raw permission rules, and the context and skill contents read for that
 snapshot. Its SHA-256 digest covers the authored files by path and bytes.
