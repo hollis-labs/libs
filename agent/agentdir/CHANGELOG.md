@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0
 
 - Add `runtime.daily_token_budget` for a local per-agent UTC-day token cap.
   Zero means no cap; negative values fail validation with the key named.
