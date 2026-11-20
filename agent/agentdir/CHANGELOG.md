@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add `runtime.cache_ttl` for prompt caching. Empty keeps the provider default;
+  `5m` and `1h` are supported. Other values fail validation with the key named.
+
 ## v0.3.0
 
 - Add compaction and stream keys to `runtime` in the host profile:

@@ -72,3 +72,10 @@ companion modules and provider-specific adapters.
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Prompt-cache lifetime
+
+`CacheHint.TTL` optionally requests `5m` or `1h`; empty retains the provider
+cache default and is omitted from JSON. `CacheHint.ValidateTTL` rejects other
+values. Adapters that support TTL validate it and translate it to their wire
+format. Other providers may ignore it. Cache hints remain per request.

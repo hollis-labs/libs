@@ -8,6 +8,10 @@ All notable changes to the `llm-core` module are documented here (the module was
 
 ## [Unreleased]
 
+- Add `llmtypes.CacheHint.TTL` and `ValidateTTL` for optional prompt-cache
+  lifetimes (`5m` or `1h`). Empty retains the provider default and the existing
+  JSON shape. Providers without TTL support may ignore the hint.
+
 ## [0.4.0] - 2026-10-18
 
 ### Added

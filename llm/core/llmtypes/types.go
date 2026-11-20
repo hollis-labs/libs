@@ -1,6 +1,9 @@
 package llmtypes
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // ProviderCapabilities describes the capabilities supported by a provider.
 type ProviderCapabilities struct {
@@ -245,8 +248,23 @@ type SlotBlock struct {
 // The earlier pattern of setting hints on a shared provider singleton is
 // unsafe under concurrent use — see CacheableProvider in go-llm-contracts.
 type CacheHint struct {
+	// TTL requests a prompt-cache lifetime: empty uses the provider default,
+	// or explicitly "5m" or "1h". Providers without TTL support ignore it.
+	// Omitted TTL preserves the existing serialized request shape.
+	TTL      string `json:"TTL,omitempty"`
 	Position string // "system", "tools", "recent_message"
 	Index    int    // ordering context (e.g. 0 = most recent, 1 = second most recent)
+}
+
+// ValidateTTL checks the optional cache lifetime. Adapters supporting TTL
+// should call it before constructing a provider request.
+func (h CacheHint) ValidateTTL() error {
+	switch h.TTL {
+	case "", "5m", "1h":
+		return nil
+	default:
+		return fmt.Errorf("cache hint TTL must be empty, 5m or 1h")
+	}
 }
 
 // ChatRequest is the unified input to provider chat methods.
