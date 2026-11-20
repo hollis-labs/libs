@@ -244,6 +244,14 @@ func errorMessage(raw []byte) string {
 	return strings.TrimSpace(string(bytes.ToValidUTF8(raw[:min(len(raw), 300)], nil)))
 }
 
+// EventKeepalive is sent while the model writes something that is not passed on as it is
+// written (a long tool input, its thinking). It carries nothing; the turn loop ignores it,
+// and it keeps the turn's idle timer from firing on a stream that is still busy.
+const EventKeepalive llmtypes.EventType = "keepalive"
+
+// keepaliveEvery is how often, at most, a busy stream says so.
+var keepaliveEvery = 5 * time.Second
+
 // StreamChat starts one model invocation. The channel carries text deltas, each finished
 // tool call, usage, and ends with a done or an error event.
 func (g *gateway) StreamChat(ctx context.Context, req llmtypes.ChatRequest) (<-chan llmtypes.StreamEvent, error) {
@@ -252,12 +260,15 @@ func (g *gateway) StreamChat(ctx context.Context, req llmtypes.ChatRequest) (<-c
 		return nil, err
 	}
 	out := make(chan llmtypes.StreamEvent, 32)
+	every := keepaliveEvery
 	go func() {
 		defer close(out)
 		defer res.Body.Close()
+		last := time.Now()
 		send := func(ev llmtypes.StreamEvent) bool {
 			select {
 			case out <- ev:
+				last = time.Now()
 				return true
 			case <-ctx.Done():
 				return false
@@ -296,6 +307,12 @@ func (g *gateway) StreamChat(ctx context.Context, req llmtypes.ChatRequest) (<-c
 			}
 			if json.Unmarshal(ev.Data, &f) != nil {
 				continue
+			}
+			// The model is writing (a tool call's input, its thinking, or a ping) but nothing
+			// here is passed on until the block ends. Say so now and then, so the turn's idle
+			// timer measures a stream that has gone quiet, not one writing a long input.
+			if time.Since(last) >= every && !send(llmtypes.StreamEvent{Type: EventKeepalive}) {
+				return
 			}
 			switch f.Type {
 			case "message_start":
