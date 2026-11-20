@@ -20,8 +20,8 @@
 // A record never holds prompts, completions, tool arguments or tool output.
 // Error text it does hold must already be redacted by the writer.
 //
-// Lists: the five lists every record has (slots, trimmed, tools_offered,
-// tool_calls, compactions) are always written, as [] when empty. In the
+// Lists: the six lists every record has (slots, trimmed, tools_offered,
+// tool_calls, subtasks, compactions) are always written, as [] when empty. In the
 // reserved lists (fired, hooks_run), null means the layer did not run and []
 // means it ran and produced nothing.
 //
@@ -57,6 +57,13 @@ type Turn struct {
 	TurnID         string `json:"turn_id"`
 	// ParentConversationID is set for a subagent's turn.
 	ParentConversationID string `json:"parent_conversation_id,omitempty"`
+	// ParentTurnID and ParentCallID name the parent's turn and its tool call
+	// that started this subagent turn; Depth is how far below the root
+	// conversation it runs (1 for a root's child, 0 for a root). All three
+	// are empty for a root's turn.
+	ParentTurnID string `json:"parent_turn_id,omitempty"`
+	ParentCallID string `json:"parent_call_id,omitempty"`
+	Depth        int    `json:"depth,omitempty"`
 	// Role is the conversation's role, such as chat, worker or planner.
 	Role string `json:"role,omitempty"`
 	// Source says what started the turn: one of the Source constants.
@@ -76,6 +83,9 @@ type Turn struct {
 	ToolsOffered []string `json:"tools_offered"`
 	// ToolCalls are the calls the model made, in order.
 	ToolCalls []ToolCall `json:"tool_calls"`
+	// Subtasks lists the subagents this turn started, in the order it
+	// started them.
+	Subtasks []Subtask `json:"subtasks"`
 	// Compactions are the compaction passes during the turn, in order.
 	Compactions []Compaction `json:"compactions"`
 
@@ -118,6 +128,9 @@ func (t Turn) MarshalJSON() ([]byte, error) {
 	}
 	if p.Compactions == nil {
 		p.Compactions = []Compaction{}
+	}
+	if p.Subtasks == nil {
+		p.Subtasks = []Subtask{}
 	}
 	return json.Marshal(p)
 }
@@ -179,6 +192,35 @@ const (
 	ErrorCancelled   ErrorKind = "cancelled"    // the turn was cancelled first
 	ErrorPanic       ErrorKind = "panic"        // the tool panicked and was contained
 	ErrorLoop        ErrorKind = "loop"         // refused as a repeated identical call
+)
+
+// Subtask is one subagent a turn started. Its own turn records name this turn
+// as their parent.
+type Subtask struct {
+	// ID is the subagent's conversation ID.
+	ID      string `json:"id"`
+	Variant string `json:"variant"`
+	// Status is how it ended, or SubtaskRunning for one still running when
+	// this turn ended (a background subagent).
+	Status     SubtaskStatus `json:"status"`
+	Background bool          `json:"background,omitempty"`
+	// Steps is its step count; zero while it runs.
+	Steps int `json:"steps"`
+	// Usage is what it used, including the subagents it started in turn.
+	Usage Usage `json:"usage"`
+}
+
+// SubtaskStatus is how a subagent ended.
+type SubtaskStatus string
+
+const (
+	SubtaskRunning   SubtaskStatus = "running"   // still running when the parent turn ended
+	SubtaskOK        SubtaskStatus = "ok"        // finished and returned its result
+	SubtaskPartial   SubtaskStatus = "partial"   // stopped early or returned an incomplete result
+	SubtaskLimit     SubtaskStatus = "limit"     // reached a step, token, time or context limit
+	SubtaskError     SubtaskStatus = "error"     // failed
+	SubtaskCancelled SubtaskStatus = "cancelled" // cancelled before finishing
+	SubtaskDenied    SubtaskStatus = "denied"    // a person refused an approval it needed
 )
 
 // Compaction is one compaction pass.
@@ -249,6 +291,26 @@ func (t Turn) Validate() error {
 			return fmt.Errorf("%w: slots[%d] needs a name and nonnegative tokens", ErrInvalid, i)
 		}
 	}
+	switch {
+	case t.Depth < 0:
+		return fmt.Errorf("%w: depth must not be negative", ErrInvalid)
+	case (t.ParentTurnID != "" || t.ParentCallID != "" || t.Depth > 0) && t.ParentConversationID == "":
+		return fmt.Errorf("%w: parent_turn_id, parent_call_id and depth need parent_conversation_id", ErrInvalid)
+	}
+	for i, sub := range t.Subtasks {
+		if sub.ID == "" || sub.Variant == "" || sub.Steps < 0 {
+			return fmt.Errorf("%w: subtasks[%d] needs id and variant, and nonnegative steps", ErrInvalid, i)
+		}
+		switch sub.Status {
+		case SubtaskRunning, SubtaskOK, SubtaskPartial, SubtaskLimit, SubtaskError, SubtaskCancelled, SubtaskDenied:
+		default:
+			return fmt.Errorf("%w: subtasks[%d] status %q", ErrInvalid, i, sub.Status)
+		}
+		u := sub.Usage
+		if u.InputTokens < 0 || u.OutputTokens < 0 || u.CacheReadTokens < 0 || u.CacheWriteTokens < 0 {
+			return fmt.Errorf("%w: subtasks[%d] usage must not be negative", ErrInvalid, i)
+		}
+	}
 	for i, c := range t.Compactions {
 		if c.Before < 0 || c.After < 0 {
 			return fmt.Errorf("%w: compactions[%d] must not be negative", ErrInvalid, i)
@@ -307,6 +369,7 @@ func (t Turn) Attributes() []Attribute {
 		{"agent.turn.tools_offered", len(t.ToolsOffered)},
 		{"agent.turn.tool_calls", len(t.ToolCalls)},
 		{"agent.turn.compactions", len(t.Compactions)},
+		{"agent.turn.subtasks", len(t.Subtasks)},
 		{"gen_ai.usage.cache_read.input_tokens", t.Usage.CacheReadTokens},
 		{"gen_ai.usage.cache_creation.input_tokens", t.Usage.CacheWriteTokens},
 	}

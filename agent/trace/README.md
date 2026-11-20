@@ -24,12 +24,14 @@ line, _ := json.Marshal(rec)
 | `version` | Schema version, `1`. |
 | `at`, `duration_ms` | Start time and how long the turn ran. |
 | `conversation_id`, `run_id`, `turn_id` | Identity. `parent_conversation_id` is set for a subagent. |
+| `parent_turn_id`, `parent_call_id`, `depth` | For a subagent's turn: the parent's turn and the tool call that started it, and its depth below the root (1 for a root's child). Omitted for a root's turn. |
 | `role`, `source` | Conversation role; what started the turn (`user`, `host`, `subagent`, `resume`, `schedule`, `reflex`, `goal`). |
 | `provider`, `model` | What the turn's requests used. |
 | `slots` | Assembled context slots in order: `name`, `tokens`, `changed` (the cache breaks from a changed slot on). |
 | `trimmed` | Entries the selector cut or replaced with a pointer, as `slot/owner/key`. |
 | `tools_offered` | Tool names offered, sorted. |
 | `tool_calls` | `tool_call_id`, `tool`, `duration_ms`, `permission` (`allow`, `approved`, `deny`, `none`), `error_kind`. |
+| `subtasks` | The subagents the turn started, in order: `id`, `variant`, `status` (`running` for a background subagent still going when the turn ended, else `ok`, `partial`, `limit`, `error`, `cancelled`, or `denied` when a person refused an approval it needed), `background`, `steps`, and `usage`. A subagent's usage includes the subagents it started, so a lead's entry covers its whole council. Each subagent's own turn records name this turn as their parent. |
 | `compactions` | `before`, `after` (estimated tokens), `forced`, `failed`, `error`. |
 | `usage` | `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`; `cost` stays empty until a price is known. |
 | `outcome` | `status` (`completed`, `failed`, `cancelled`), `finish_reason`, `steps`, `error` (redacted). |
@@ -43,7 +45,7 @@ OpenTelemetry GenAI attribute names (`gen_ai.provider.name`,
 `gen_ai.usage.cache_read.input_tokens`, ...), and `Attributes` maps a record
 onto them.
 
-The five lists every record has are always written, as `[]` when empty.
+The six lists every record has are always written, as `[]` when empty.
 `Validate` is for writers; a reader should accept records it cannot fully
 validate, since a newer one may carry a version or value it does not know.
 
