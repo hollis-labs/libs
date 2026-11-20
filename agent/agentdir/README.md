@@ -26,7 +26,7 @@ seat, task, or application identifier. Stable and task profiles require
 durable continuity. Optional runtime settings cover provider, model, limits,
 concurrency, the subtask limits (`subtask_limit`, `subtask_result_cap`), the
 per-turn token budget (`turn_token_budget`), compaction (`compact_at`,
-`compact_keep_tokens`, `compaction_prompt`, `compaction_input_tokens`), the
+`compact_keep_tokens`, `compact_prompt`, `compact_input_tokens`), the
 model stream idle timeout (`idle_timeout`), and literal shell environment
 entries.
 

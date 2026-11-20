@@ -61,12 +61,12 @@ type Runtime struct {
 	// CompactKeepTokens is about how much of the end of the conversation a
 	// compaction keeps whole, in tokens; zero uses the host's default.
 	CompactKeepTokens int `yaml:"compact_keep_tokens,omitempty" json:"compact_keep_tokens,omitempty"`
-	// CompactionPrompt replaces the host's prompt for writing a compaction
+	// CompactPrompt replaces the host's prompt for writing a compaction
 	// summary; empty uses the host's default.
-	CompactionPrompt string `yaml:"compaction_prompt,omitempty" json:"compaction_prompt,omitempty"`
-	// CompactionInputTokens bounds what one compaction summary call is sent,
-	// in tokens; zero uses the host's default.
-	CompactionInputTokens int `yaml:"compaction_input_tokens,omitempty" json:"compaction_input_tokens,omitempty"`
+	CompactPrompt string `yaml:"compact_prompt,omitempty" json:"compact_prompt,omitempty"`
+	// CompactInputTokens bounds what one compaction summary call is sent, in
+	// tokens; zero uses the host's default.
+	CompactInputTokens int `yaml:"compact_input_tokens,omitempty" json:"compact_input_tokens,omitempty"`
 	// IdleTimeout is how long a model stream may go without any event before
 	// the host gives up on it, as a Go duration ("90s", "5m"); empty uses
 	// the host's default. Use IdleTimeoutDuration to read it.
@@ -109,14 +109,20 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 	}
 	if p.Runtime.MaxOutputTokens < 0 || p.Runtime.MaxSteps < 0 || p.Runtime.ContextWindow < 0 || p.Runtime.ToolConcurrency < 0 ||
 		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 ||
-		p.Runtime.CompactAt < 0 || p.Runtime.CompactKeepTokens < 0 || p.Runtime.CompactionInputTokens < 0 {
+		p.Runtime.CompactAt < 0 || p.Runtime.CompactKeepTokens < 0 || p.Runtime.CompactInputTokens < 0 {
 		return fmt.Errorf("%w: runtime limits must be nonnegative", ErrProfile)
 	}
 	if _, err := p.Runtime.IdleTimeoutDuration(); err != nil {
 		return fmt.Errorf("%w: %w", ErrProfile, err)
 	}
-	if strings.ContainsRune(p.Runtime.CompactionPrompt, 0) {
-		return fmt.Errorf("%w: runtime.compaction_prompt contains a NUL byte", ErrProfile)
+	if strings.ContainsRune(p.Runtime.CompactPrompt, 0) {
+		return fmt.Errorf("%w: runtime.compact_prompt contains a NUL byte", ErrProfile)
+	}
+	if r := p.Runtime; r.CompactAt > 0 && r.CompactKeepTokens >= r.CompactAt {
+		return fmt.Errorf("%w: runtime.compact_keep_tokens must be smaller than compact_at", ErrProfile)
+	}
+	if r := p.Runtime; r.CompactAt > 0 && r.ContextWindow > 0 && r.CompactAt > r.ContextWindow {
+		return fmt.Errorf("%w: runtime.compact_at must not exceed context_window", ErrProfile)
 	}
 	for name, value := range p.Runtime.Env {
 		if !validEnvName(name) || strings.ContainsRune(value, 0) {
