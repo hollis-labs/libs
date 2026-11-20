@@ -79,7 +79,7 @@ returns.
 | Action | Released |
 | --- | --- |
 | `now` | at the next `Due` |
-| `merge` | after `MergeWindow` (20s), or with a release on the same topic |
+| `merge` | after `MergeWindow` (20s), or with a release on the same topic (items without a topic are one group) |
 | `hold` | when the topic's open question is answered, or after `HoldMax` (30m) |
 | `digest` | at `DigestMax` (10) items or after `DigestEvery` (30m); rides along with any other release unless `Quiet` |
 | `file` | never; kept in `Filed` for a done-for-you log |

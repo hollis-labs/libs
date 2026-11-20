@@ -354,3 +354,20 @@ func TestValidateRejectsAStrandingDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTopiclessItemsMergeTogether(t *testing.T) {
+	c := newClock()
+	e := editor(t, DefaultPolicy(), nil, c)
+	e.Submit(Item{ID: "1", Kind: ItemResult, Text: "one"}, State{})
+	c.advance(5 * time.Second)
+	e.Submit(Item{ID: "2", Kind: ItemResult, Text: "two"}, State{})
+	e.Submit(Item{ID: "3", Topic: "t", Kind: ItemResult, Text: "three"}, State{})
+	c.advance(15 * time.Second)
+	m, ok := e.Due(State{})
+	if !ok || len(m.Items) != 2 || m.Items[0].Item.ID != "1" || m.Items[1].Item.ID != "2" {
+		t.Fatalf("topicless merge %+v", m.Items)
+	}
+	if p := e.Pending(); len(p) != 1 || p[0].Item.ID != "3" {
+		t.Fatalf("a topic's item went with the topicless ones: %+v", p)
+	}
+}

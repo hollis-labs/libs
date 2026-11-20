@@ -409,8 +409,8 @@ func (e *Editor) Submit(it Item, st State) Decision {
 }
 
 // due reports whether a queued item is ready at now. Items are released
-// with anything else due on their topic, so a Merge item on a topic with a
-// Now item goes out with it.
+// with anything else due on their topic (items without one count as one
+// group), so a Merge item on a topic with a Now item goes out with it.
 func (e *Editor) due(q Queued, now time.Time, digestDue bool) bool {
 	switch q.Decision.Action {
 	case Now:
@@ -461,14 +461,13 @@ func (e *Editor) Due(st State) (Message, bool) {
 	for i, q := range e.pending {
 		if e.due(q, now, digest) {
 			ready[i] = true
-			if q.Item.Topic != "" {
-				topics[q.Item.Topic] = true
-			}
+			topics[q.Item.Topic] = true
 		}
 	}
 	// Anything waiting to merge on a topic that is going out goes with it.
+	// Items without a topic count as one group.
 	for i, q := range e.pending {
-		if !ready[i] && q.Decision.Action == Merge && topics[q.Item.Topic] && q.Item.Topic != "" {
+		if !ready[i] && q.Decision.Action == Merge && topics[q.Item.Topic] {
 			ready[i] = true
 		}
 	}
