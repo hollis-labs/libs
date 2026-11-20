@@ -36,7 +36,8 @@ case desk.Dispatch: // run r.Plan wave by wave: r.Plan.Waves()
   `delegate` (a change for the owning seat, with acceptance criteria) and
   `question` (only the owner can decide).
 - A plan is trivial, and goes to the chat agent with no card, when every
-  item is an answer or it is a single item other than a delegation.
+  item is an answer or it is a single item other than a delegation (the
+  chat agent can start one subtask itself).
 - Modes: `off`, `shadow` (plan and record, do nothing), `suggest` (show the
   plan as a card), `auto` (run plans at or above `AutoConfidence`, default
   0.8, and suggest the rest). Start with shadow or suggest.
@@ -67,7 +68,7 @@ if m, ok := ed.Due(state); ok { send(m.Text) }
 if at, ok := ed.Next(state); ok { timer.Reset(time.Until(at)) }
 ```
 
-An item ID is submitted once: a retry returns the first decision. `Remove`
+An item ID is submitted once: a retry while it is queued, filed or among the last 512 released returns the first decision and is not sent again. `Remove`
 and `RemoveTopic` drop queued items (a canceled job, a closed topic), and
 `Snapshot`/`Restore` keep the queue across a restart.
 

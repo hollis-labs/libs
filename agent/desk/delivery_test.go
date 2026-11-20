@@ -327,12 +327,19 @@ func TestDedupRemoveAndSnapshot(t *testing.T) {
 	if err := fresh.Restore(back); err != nil || len(fresh.Pending()) != 3 || len(fresh.Filed()) != 1 {
 		t.Fatalf("restore %v %d %d", err, len(fresh.Pending()), len(fresh.Filed()))
 	}
-	if err := fresh.Restore(Snapshot{Pending: []Queued{{Decision: Decision{Action: "x"}}}}); err == nil {
-		t.Fatal("bad snapshot accepted")
-	}
 	c.advance(time.Minute)
 	if m, ok := fresh.Due(State{}); !ok || len(m.Items) != 3 {
 		t.Fatalf("restored items not released %+v", m.Items)
+	}
+	if d := fresh.Submit(Item{ID: "x", Topic: "t", Kind: ItemResult}, State{}); d.Rule != "released" || len(fresh.Pending()) != 0 {
+		t.Fatalf("a retry after release was queued again: %+v", d)
+	}
+	other := editor(t, DefaultPolicy(), nil, c)
+	if err := other.Restore(Snapshot{Pending: []Queued{{Item: Item{ID: "f"}, Decision: Decision{Action: File}}}}); err != nil || len(other.Pending()) != 0 || len(other.Filed()) != 1 {
+		t.Fatal("a pending File item was not moved to filed")
+	}
+	if err := fresh.Restore(Snapshot{Pending: []Queued{{Decision: Decision{Action: "x"}}}}); err == nil {
+		t.Fatal("bad snapshot accepted")
 	}
 }
 

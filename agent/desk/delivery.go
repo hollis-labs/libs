@@ -320,7 +320,13 @@ type Editor struct {
 	pending []Queued
 	filed   []Queued
 	busyAt  time.Time // when the owner became busy with items due
+	// released remembers the IDs of recently released items (the last
+	// releasedMemory), so a late retry is not sent again.
+	released []string
 }
+
+// releasedMemory is how many released item IDs an editor remembers.
+const releasedMemory = 512
 
 // EditorOption configures an Editor.
 type EditorOption func(*Editor)
@@ -370,8 +376,9 @@ func (e *Editor) questionOpen(topic TopicID) bool {
 }
 
 // Submit decides an item and queues or files it. It returns the decision;
-// call Due to collect what is ready. An item whose ID is already pending
-// or filed is not queued again: Submit returns its first decision, so a
+// call Due to collect what is ready. An item whose ID is pending, filed or
+// among the last 512 released is not queued again: Submit returns its
+// first decision (for a released one, Now with rule "released"), so a
 // retried submit is not sent twice.
 func (e *Editor) Submit(it Item, st State) Decision {
 	now := e.now()
@@ -386,6 +393,9 @@ func (e *Editor) Submit(it Item, st State) Decision {
 			if q.Item.ID == it.ID {
 				return q.Decision
 			}
+		}
+		if slices.Contains(e.released, it.ID) {
+			return Decision{Action: Now, Rule: "released"}
 		}
 	}
 	d := e.policy.Decide(it, st, open)
@@ -523,6 +533,14 @@ func (e *Editor) Flush() (Message, bool) {
 }
 
 func (e *Editor) message(now time.Time, items []Queued) Message {
+	for _, q := range items {
+		if q.Item.ID != "" {
+			e.released = append(e.released, q.Item.ID)
+		}
+	}
+	if extra := len(e.released) - releasedMemory; extra > 0 {
+		e.released = slices.Delete(e.released, 0, extra)
+	}
 	// Group by topic, topics in order of their first item; items without
 	// a topic last.
 	var order []TopicID
@@ -653,16 +671,26 @@ func (e *Editor) Snapshot() Snapshot {
 }
 
 // Restore replaces the editor's queue with a snapshot. Queued items keep
-// the decisions they were queued with.
+// the decisions they were queued with; a pending item decided File moves
+// to the filed list.
 func (e *Editor) Restore(s Snapshot) error {
 	for _, q := range slices.Concat(s.Pending, s.Filed) {
 		if !q.Decision.Action.valid() {
 			return fmt.Errorf("desk: snapshot item %q has unknown action %q", q.Item.ID, q.Decision.Action)
 		}
 	}
+	var pending []Queued
+	filed := slices.Clone(s.Filed)
+	for _, q := range s.Pending {
+		if q.Decision.Action == File {
+			filed = append(filed, q)
+		} else {
+			pending = append(pending, q)
+		}
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.pending, e.filed, e.busyAt = slices.Clone(s.Pending), slices.Clone(s.Filed), s.BusyAt
+	e.pending, e.filed, e.busyAt = pending, filed, s.BusyAt
 	return nil
 }
 
