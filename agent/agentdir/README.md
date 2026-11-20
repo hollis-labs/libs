@@ -45,3 +45,8 @@ Use `ParseMCP` to validate standalone MCP JSON, `ListSkills` to discover
 skills outside the agent directory, and `ReadSkill` to re-read an individual
 skill. The caller owns secret resolution, permission rule interpretation,
 model requests, and process execution.
+
+Optional `identity.tether` binds messaging separately from provider authentication.
+Use an existing `msg://agent/<instance>/<id>` URN or `auto` for host-managed
+registration and reuse. Empty disables it. Credentials and endpoint selection
+remain host concerns and are not stored in this profile.

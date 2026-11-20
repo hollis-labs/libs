@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.0
+
+- Add optional `identity.tether`: an agent messaging URN or `auto` for host-managed registration.
+
 ## v0.5.0
 
 - Add `runtime.daily_token_budget` for a local per-agent UTC-day token cap.
