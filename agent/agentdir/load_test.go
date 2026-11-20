@@ -62,15 +62,15 @@ func TestSubtaskRuntimeKeys(t *testing.T) {
 	if r := snap.Profile.Runtime; r.SubtaskLimit != 6 || r.TurnTokenBudget != 200000 || r.SubtaskResultCap != 4000 {
 		t.Fatalf("runtime %+v", r)
 	}
-	for _, set := range []func(*Runtime){
-		func(r *Runtime) { r.SubtaskLimit = -1 },
-		func(r *Runtime) { r.TurnTokenBudget = -1 },
-		func(r *Runtime) { r.SubtaskResultCap = -1 },
+	for field, set := range map[string]func(*Runtime){
+		"subtask_limit":      func(r *Runtime) { r.SubtaskLimit = -1 },
+		"turn_token_budget":  func(r *Runtime) { r.TurnTokenBudget = -1 },
+		"subtask_result_cap": func(r *Runtime) { r.SubtaskResultCap = -1 },
 	} {
 		p := snap.Profile
 		set(&p.Runtime)
 		if err := p.Validate(&snap.Definition); err == nil {
-			t.Errorf("a negative subtask limit was accepted: %+v", p.Runtime)
+			t.Errorf("a negative %s was accepted: %+v", field, p.Runtime)
 		}
 	}
 }

@@ -24,7 +24,9 @@ The profile supports [stable](examples/agents/stable), [task](examples/agents/ta
 and [embedded](examples/agents/embedded) agents. They bind respectively to a
 seat, task, or application identifier. Stable and task profiles require
 durable continuity. Optional runtime settings cover provider, model, limits,
-concurrency, and literal shell environment entries.
+concurrency, the subtask limits (`subtask_limit`, `subtask_result_cap`), the
+per-turn token budget (`turn_token_budget`), and literal shell environment
+entries.
 
 `Load` returns the definition, profile, parsed and raw MCP configuration,
 raw permission rules, and the context and skill contents read for that

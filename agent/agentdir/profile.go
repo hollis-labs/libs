@@ -44,14 +44,15 @@ type Runtime struct {
 	MaxSteps        int    `yaml:"max_steps,omitempty" json:"max_steps,omitempty"`
 	ContextWindow   int    `yaml:"context_window,omitempty" json:"context_window,omitempty"`
 	ToolConcurrency int    `yaml:"tool_concurrency,omitempty" json:"tool_concurrency,omitempty"`
-	// SubtaskLimit is how many subtasks the host runs at once; zero uses the
-	// host's default and the host may cap it.
+	// SubtaskLimit is how many subtasks the host runs at once, per kind, as
+	// the host defines it; zero uses the host's default and the host may cap
+	// it.
 	SubtaskLimit int `yaml:"subtask_limit,omitempty" json:"subtask_limit,omitempty"`
 	// TurnTokenBudget is a token ceiling one turn shares with the subtasks it
-	// starts; zero is none.
+	// starts; zero is unlimited.
 	TurnTokenBudget int `yaml:"turn_token_budget,omitempty" json:"turn_token_budget,omitempty"`
 	// SubtaskResultCap is the size cap, in tokens, on the result a subtask
-	// hands back; zero uses the host's default.
+	// hands back; zero uses the host's default; the host may clamp it.
 	SubtaskResultCap int `yaml:"subtask_result_cap,omitempty" json:"subtask_result_cap,omitempty"`
 	// Env supplies literal variables to explicitly approved shell commands.
 	Env map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
