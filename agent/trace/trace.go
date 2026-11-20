@@ -11,7 +11,13 @@
 // evidence recording (run_id, turn_id, tool_call_id, tool, model) and Surface's
 // context trace (at, slots, trimmed, why, fired, classified). Reserved fields
 // are empty until the layers that fill them exist; filling them later does not
-// change the schema version.
+// change the schema version. Adding an optional field or a new enum value keeps
+// the version; readers ignore unknown fields. A rename or a change of meaning
+// needs a new version.
+//
+// Usage: a turn's usage covers only its own model requests. Each entry in
+// subtasks carries the total of that subagent's whole tree, so the total of a
+// turn's tree is its own usage plus the usage of every subtask it lists.
 //
 // The evidence subpackage is the other half: a passive recorder of the run's
 // runtime events with typed correlations, receipts, export and replay. A turn
@@ -59,8 +65,9 @@ type Turn struct {
 	ParentConversationID string `json:"parent_conversation_id,omitempty"`
 	// ParentTurnID and ParentCallID name the parent's turn and its tool call
 	// that started this subagent turn; Depth is how far below the root
-	// conversation it runs (1 for a root's child, 0 for a root). All three
-	// are empty for a root's turn.
+	// conversation it runs (1 for a root's child). All three are empty for a
+	// root's turn. A record with parent_conversation_id and depth 0 does not
+	// know its depth (written before v0.2.0 of this package).
 	ParentTurnID string `json:"parent_turn_id,omitempty"`
 	ParentCallID string `json:"parent_call_id,omitempty"`
 	Depth        int    `json:"depth,omitempty"`
@@ -89,7 +96,8 @@ type Turn struct {
 	// Compactions are the compaction passes during the turn, in order.
 	Compactions []Compaction `json:"compactions"`
 
-	// Usage is the turn's token use across every model request.
+	// Usage is the turn's own token use across its model requests. It does
+	// not include its subagents': add Subtasks[].Usage for the tree's total.
 	Usage Usage `json:"usage"`
 	// Outcome is how the turn ended.
 	Outcome Outcome `json:"outcome"`
@@ -197,16 +205,21 @@ const (
 // Subtask is one subagent a turn started. Its own turn records name this turn
 // as their parent.
 type Subtask struct {
-	// ID is the subagent's conversation ID.
-	ID      string `json:"id"`
-	Variant string `json:"variant"`
-	// Status is how it ended, or SubtaskRunning for one still running when
-	// this turn ended (a background subagent).
+	// ConversationID is the subagent's conversation; ToolCallID is this
+	// turn's tool call that started it.
+	ConversationID string `json:"conversation_id"`
+	ToolCallID     string `json:"tool_call_id"`
+	Variant        string `json:"variant"`
+	// Status is how it ended, or SubtaskRunning for a background subagent
+	// still running when this turn ended.
 	Status     SubtaskStatus `json:"status"`
 	Background bool          `json:"background,omitempty"`
-	// Steps is its step count; zero while it runs.
-	Steps int `json:"steps"`
-	// Usage is what it used, including the subagents it started in turn.
+	// Steps is its step count and DurationMS how long it ran; both zero
+	// while it runs.
+	Steps      int   `json:"steps"`
+	DurationMS int64 `json:"duration_ms"`
+	// Usage is what its whole tree used: its own requests and those of the
+	// subagents it started in turn. Unlike a turn's Usage, it is a total.
 	Usage Usage `json:"usage"`
 }
 
@@ -296,13 +309,26 @@ func (t Turn) Validate() error {
 		return fmt.Errorf("%w: depth must not be negative", ErrInvalid)
 	case (t.ParentTurnID != "" || t.ParentCallID != "" || t.Depth > 0) && t.ParentConversationID == "":
 		return fmt.Errorf("%w: parent_turn_id, parent_call_id and depth need parent_conversation_id", ErrInvalid)
+	case (t.ParentTurnID != "" || t.ParentCallID != "") && t.Depth == 0:
+		return fmt.Errorf("%w: parent_turn_id and parent_call_id need depth", ErrInvalid)
+	case t.ParentCallID != "" && t.ParentTurnID == "":
+		return fmt.Errorf("%w: parent_call_id needs parent_turn_id", ErrInvalid)
 	}
+	seen := make(map[string]bool, len(t.Subtasks))
 	for i, sub := range t.Subtasks {
-		if sub.ID == "" || sub.Variant == "" || sub.Steps < 0 {
-			return fmt.Errorf("%w: subtasks[%d] needs id and variant, and nonnegative steps", ErrInvalid, i)
+		if sub.ConversationID == "" || sub.ToolCallID == "" || sub.Variant == "" || sub.Steps < 0 || sub.DurationMS < 0 {
+			return fmt.Errorf("%w: subtasks[%d] needs conversation_id, tool_call_id and variant, and nonnegative steps and duration_ms", ErrInvalid, i)
 		}
+		if seen[sub.ConversationID] {
+			return fmt.Errorf("%w: subtasks[%d] repeats conversation_id %q", ErrInvalid, i, sub.ConversationID)
+		}
+		seen[sub.ConversationID] = true
 		switch sub.Status {
-		case SubtaskRunning, SubtaskOK, SubtaskPartial, SubtaskLimit, SubtaskError, SubtaskCancelled, SubtaskDenied:
+		case SubtaskRunning:
+			if !sub.Background {
+				return fmt.Errorf("%w: subtasks[%d] is running but not background", ErrInvalid, i)
+			}
+		case SubtaskOK, SubtaskPartial, SubtaskLimit, SubtaskError, SubtaskCancelled, SubtaskDenied:
 		default:
 			return fmt.Errorf("%w: subtasks[%d] status %q", ErrInvalid, i, sub.Status)
 		}

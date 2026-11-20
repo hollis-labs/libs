@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func okSubtask(id string) Subtask {
+	return Subtask{ConversationID: id, ToolCallID: "call-" + id, Variant: "worker", Status: SubtaskOK, Steps: 1, DurationMS: 10}
+}
+
 func validTurn() Turn {
 	return Turn{
 		Version: Version, At: time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC), DurationMS: 1500,
@@ -43,28 +47,39 @@ func TestValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*Turn){
-		"version":         func(t *Turn) { t.Version = 2 },
-		"at":              func(t *Turn) { t.At = time.Time{} },
-		"ids":             func(t *Turn) { t.RunID = "" },
-		"duration":        func(t *Turn) { t.DurationMS = -1 },
-		"source":          func(t *Turn) { t.Source = "cron" },
-		"status":          func(t *Turn) { t.Outcome.Status = "ok" },
-		"call id":         func(t *Turn) { t.ToolCalls[0].ToolCallID = "" },
-		"permission":      func(t *Turn) { t.ToolCalls[0].Permission = "maybe" },
-		"error kind":      func(t *Turn) { t.ToolCalls[0].ErrorKind = "oops" },
-		"steps":           func(t *Turn) { t.Outcome.Steps = -1 },
-		"usage":           func(t *Turn) { t.Usage.InputTokens = -1 },
-		"slot name":       func(t *Turn) { t.Slots[0].Name = "" },
-		"compaction":      func(t *Turn) { t.Compactions[0].After = -1 },
-		"depth":           func(t *Turn) { t.Depth = -1 },
-		"orphan parent":   func(t *Turn) { t.ParentTurnID = "r0" },
-		"orphan depth":    func(t *Turn) { t.Depth = 1 },
-		"subtask id":      func(t *Turn) { t.Subtasks = []Subtask{{Variant: "worker", Status: SubtaskOK}} },
-		"subtask variant": func(t *Turn) { t.Subtasks = []Subtask{{ID: "s1", Status: SubtaskOK}} },
-		"subtask status":  func(t *Turn) { t.Subtasks = []Subtask{{ID: "s1", Variant: "worker", Status: "done"}} },
-		"subtask steps":   func(t *Turn) { t.Subtasks = []Subtask{{ID: "s1", Variant: "worker", Status: SubtaskOK, Steps: -1}} },
-		"subtask usage": func(t *Turn) {
-			t.Subtasks = []Subtask{{ID: "s1", Variant: "worker", Status: SubtaskOK, Usage: Usage{OutputTokens: -1}}}
+		"version":              func(t *Turn) { t.Version = 2 },
+		"at":                   func(t *Turn) { t.At = time.Time{} },
+		"ids":                  func(t *Turn) { t.RunID = "" },
+		"duration":             func(t *Turn) { t.DurationMS = -1 },
+		"source":               func(t *Turn) { t.Source = "cron" },
+		"status":               func(t *Turn) { t.Outcome.Status = "ok" },
+		"call id":              func(t *Turn) { t.ToolCalls[0].ToolCallID = "" },
+		"permission":           func(t *Turn) { t.ToolCalls[0].Permission = "maybe" },
+		"error kind":           func(t *Turn) { t.ToolCalls[0].ErrorKind = "oops" },
+		"steps":                func(t *Turn) { t.Outcome.Steps = -1 },
+		"usage":                func(t *Turn) { t.Usage.InputTokens = -1 },
+		"slot name":            func(t *Turn) { t.Slots[0].Name = "" },
+		"compaction":           func(t *Turn) { t.Compactions[0].After = -1 },
+		"depth":                func(t *Turn) { t.Depth = -1 },
+		"orphan parent":        func(t *Turn) { t.ParentTurnID = "r0" },
+		"orphan depth":         func(t *Turn) { t.Depth = 1 },
+		"subtask conversation": func(t *Turn) { t.Subtasks = []Subtask{okSubtask("")} },
+		"subtask call":         func(t *Turn) { s := okSubtask("s1"); s.ToolCallID = ""; t.Subtasks = []Subtask{s} },
+		"subtask variant":      func(t *Turn) { s := okSubtask("s1"); s.Variant = ""; t.Subtasks = []Subtask{s} },
+		"subtask status":       func(t *Turn) { s := okSubtask("s1"); s.Status = "done"; t.Subtasks = []Subtask{s} },
+		"subtask steps":        func(t *Turn) { s := okSubtask("s1"); s.Steps = -1; t.Subtasks = []Subtask{s} },
+		"subtask duration":     func(t *Turn) { s := okSubtask("s1"); s.DurationMS = -1; t.Subtasks = []Subtask{s} },
+		"subtask usage":        func(t *Turn) { s := okSubtask("s1"); s.Usage.OutputTokens = -1; t.Subtasks = []Subtask{s} },
+		"running foreground":   func(t *Turn) { s := okSubtask("s1"); s.Status = SubtaskRunning; t.Subtasks = []Subtask{s} },
+		"duplicate subtask":    func(t *Turn) { t.Subtasks = []Subtask{okSubtask("s1"), okSubtask("s1")} },
+		"parent turn depth 0": func(t *Turn) {
+			t.ParentConversationID, t.ParentTurnID = "c0", "r0"
+		},
+		"parent call depth 0": func(t *Turn) {
+			t.ParentConversationID, t.ParentTurnID, t.ParentCallID = "c0", "r0", "call-1"
+		},
+		"call without turn": func(t *Turn) {
+			t.ParentConversationID, t.ParentCallID, t.Depth = "c0", "call-1", 1
 		},
 	} {
 		turn := validTurn()
@@ -108,11 +123,15 @@ func TestSubagentTurnLinksToItsParent(t *testing.T) {
 	child.Source, child.ParentConversationID, child.ParentTurnID, child.ParentCallID, child.Depth = SourceSubagent, "c0", "r0", "call-1", 1
 	parent := validTurn()
 	parent.Subtasks = []Subtask{
-		{ID: "c1", Variant: "worker", Status: SubtaskOK, Steps: 2, Usage: Usage{InputTokens: 30, OutputTokens: 3}},
-		{ID: "c2", Variant: "research", Status: SubtaskRunning, Background: true},
-		{ID: "c3", Variant: "code", Status: SubtaskDenied, Steps: 1},
+		{ConversationID: "c1", ToolCallID: "call-1", Variant: "worker", Status: SubtaskOK, Steps: 2, DurationMS: 900, Usage: Usage{InputTokens: 30, OutputTokens: 3}},
+		{ConversationID: "c2", ToolCallID: "call-2", Variant: "research", Status: SubtaskRunning, Background: true},
+		{ConversationID: "c3", ToolCallID: "call-3", Variant: "code", Status: SubtaskDenied, Steps: 1},
 	}
-	for name, turn := range map[string]Turn{"child": child, "parent": parent} {
+	// A record that names its parent conversation but not its depth (one
+	// written before v0.2.0) is still valid: its depth is unknown.
+	legacy := validTurn()
+	legacy.Source, legacy.ParentConversationID = SourceSubagent, "c0"
+	for name, turn := range map[string]Turn{"child": child, "parent": parent, "unknown depth": legacy} {
 		if err := turn.Validate(); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -130,7 +149,7 @@ func TestSubagentTurnLinksToItsParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), `{"id":"c2","variant":"research","status":"running","background":true,"steps":0,`) {
+	if !strings.Contains(string(raw), `{"conversation_id":"c2","tool_call_id":"call-2","variant":"research","status":"running","background":true,"steps":0,"duration_ms":0,`) {
 		t.Errorf("subtasks %s", raw)
 	}
 	got := map[string]any{}
@@ -139,5 +158,26 @@ func TestSubagentTurnLinksToItsParent(t *testing.T) {
 	}
 	if got["agent.turn.subtasks"] != 3 {
 		t.Fatalf("subtasks attribute %v", got["agent.turn.subtasks"])
+	}
+}
+
+// A turn's usage is its own; its tree's total adds each subtask's usage,
+// which is already that subtask's tree total.
+func TestTreeUsageIsOwnPlusSubtasks(t *testing.T) {
+	parent := validTurn() // own usage: 100 in, 20 out
+	parent.Subtasks = []Subtask{
+		{ConversationID: "c1", ToolCallID: "call-1", Variant: "worker", Status: SubtaskOK, Steps: 2, Usage: Usage{InputTokens: 30, OutputTokens: 3}},
+		{ConversationID: "c2", ToolCallID: "call-2", Variant: "lead", Status: SubtaskOK, Steps: 3, Usage: Usage{InputTokens: 70, OutputTokens: 7}},
+	}
+	if err := parent.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	total := parent.Usage
+	for _, sub := range parent.Subtasks {
+		total.InputTokens += sub.Usage.InputTokens
+		total.OutputTokens += sub.Usage.OutputTokens
+	}
+	if total.InputTokens != 200 || total.OutputTokens != 30 || parent.Usage.InputTokens != 100 {
+		t.Fatalf("tree total %+v, own %+v", total, parent.Usage)
 	}
 }
