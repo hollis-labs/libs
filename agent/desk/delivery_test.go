@@ -334,6 +334,13 @@ func TestDedupRemoveAndSnapshot(t *testing.T) {
 	if d := fresh.Submit(Item{ID: "x", Topic: "t", Kind: ItemResult}, State{}); d.Rule != "released" || len(fresh.Pending()) != 0 {
 		t.Fatalf("a retry after release was queued again: %+v", d)
 	}
+	restarted := editor(t, DefaultPolicy(), nil, c)
+	if err := restarted.Restore(fresh.Snapshot()); err != nil {
+		t.Fatal(err)
+	}
+	if d := restarted.Submit(Item{ID: "x", Kind: ItemResult}, State{}); d.Rule != "released" {
+		t.Fatalf("the released memory did not survive a restart: %+v", d)
+	}
 	other := editor(t, DefaultPolicy(), nil, c)
 	if err := other.Restore(Snapshot{Pending: []Queued{{Item: Item{ID: "f"}, Decision: Decision{Action: File}}}}); err != nil || len(other.Pending()) != 0 || len(other.Filed()) != 1 {
 		t.Fatal("a pending File item was not moved to filed")

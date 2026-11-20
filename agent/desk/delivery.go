@@ -76,6 +76,9 @@ func (a Action) valid() bool { return slices.Contains(Actions(), a) }
 
 // Item is one thing that could reach the owner.
 type Item struct {
+	// ID identifies one item for de-duplication. It must be unique per
+	// item: a later result for the same job needs its own ID, or Submit
+	// takes it for a retry and drops it.
 	ID      string    `json:"id"`
 	Topic   TopicID   `json:"topic,omitempty"`
 	Kind    ItemKind  `json:"kind"`
@@ -657,16 +660,17 @@ func (e *Editor) RemoveTopic(topic TopicID) []Queued {
 
 // Snapshot is an editor's queue, for a host to persist across a restart.
 type Snapshot struct {
-	Pending []Queued  `json:"pending"`
-	Filed   []Queued  `json:"filed"`
-	BusyAt  time.Time `json:"busy_at,omitzero"`
+	Pending  []Queued  `json:"pending"`
+	Filed    []Queued  `json:"filed"`
+	Released []string  `json:"released,omitempty"` // recently released item IDs
+	BusyAt   time.Time `json:"busy_at,omitzero"`
 }
 
 // Snapshot returns the editor's queue.
 func (e *Editor) Snapshot() Snapshot {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return Snapshot{Pending: slices.Clone(e.pending), Filed: slices.Clone(e.filed), BusyAt: e.busyAt}
+	return Snapshot{Pending: slices.Clone(e.pending), Filed: slices.Clone(e.filed), Released: slices.Clone(e.released), BusyAt: e.busyAt}
 }
 
 // Restore replaces the editor's queue with a snapshot. Queued items keep
@@ -690,6 +694,10 @@ func (e *Editor) Restore(s Snapshot) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.pending, e.filed, e.busyAt = pending, filed, s.BusyAt
+	e.released = slices.Clone(s.Released)
+	if extra := len(e.released) - releasedMemory; extra > 0 {
+		e.released = slices.Delete(e.released, 0, extra)
+	}
 	return nil
 }
 
