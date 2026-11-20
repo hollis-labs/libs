@@ -44,6 +44,15 @@ type Runtime struct {
 	MaxSteps        int    `yaml:"max_steps,omitempty" json:"max_steps,omitempty"`
 	ContextWindow   int    `yaml:"context_window,omitempty" json:"context_window,omitempty"`
 	ToolConcurrency int    `yaml:"tool_concurrency,omitempty" json:"tool_concurrency,omitempty"`
+	// SubtaskLimit is how many subtasks the host runs at once; zero uses the
+	// host's default and the host may cap it.
+	SubtaskLimit int `yaml:"subtask_limit,omitempty" json:"subtask_limit,omitempty"`
+	// TurnTokenBudget is a token ceiling one turn shares with the subtasks it
+	// starts; zero is none.
+	TurnTokenBudget int `yaml:"turn_token_budget,omitempty" json:"turn_token_budget,omitempty"`
+	// SubtaskResultCap is the size cap, in tokens, on the result a subtask
+	// hands back; zero uses the host's default.
+	SubtaskResultCap int `yaml:"subtask_result_cap,omitempty" json:"subtask_result_cap,omitempty"`
 	// Env supplies literal variables to explicitly approved shell commands.
 	Env map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
 }
@@ -80,7 +89,8 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 	default:
 		return fmt.Errorf("%w: unsupported provider %q", ErrProfile, p.Runtime.Provider)
 	}
-	if p.Runtime.MaxOutputTokens < 0 || p.Runtime.MaxSteps < 0 || p.Runtime.ContextWindow < 0 || p.Runtime.ToolConcurrency < 0 {
+	if p.Runtime.MaxOutputTokens < 0 || p.Runtime.MaxSteps < 0 || p.Runtime.ContextWindow < 0 || p.Runtime.ToolConcurrency < 0 ||
+		p.Runtime.SubtaskLimit < 0 || p.Runtime.TurnTokenBudget < 0 || p.Runtime.SubtaskResultCap < 0 {
 		return fmt.Errorf("%w: runtime limits must be nonnegative", ErrProfile)
 	}
 	for name, value := range p.Runtime.Env {

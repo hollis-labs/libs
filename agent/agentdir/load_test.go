@@ -41,6 +41,40 @@ func TestProfiles(t *testing.T) {
 	}
 }
 
+func TestSubtaskRuntimeKeys(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"agent.md", "host.yaml"} {
+		data, err := os.ReadFile(filepath.Join("examples", "agents", "embedded", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name == "host.yaml" {
+			data = []byte(strings.Replace(string(data), "runtime:\n", "runtime:\n  subtask_limit: 6\n  turn_token_budget: 200000\n  subtask_result_cap: 4000\n", 1))
+		}
+		if err := os.WriteFile(filepath.Join(root, name), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snap, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := snap.Profile.Runtime; r.SubtaskLimit != 6 || r.TurnTokenBudget != 200000 || r.SubtaskResultCap != 4000 {
+		t.Fatalf("runtime %+v", r)
+	}
+	for _, set := range []func(*Runtime){
+		func(r *Runtime) { r.SubtaskLimit = -1 },
+		func(r *Runtime) { r.TurnTokenBudget = -1 },
+		func(r *Runtime) { r.SubtaskResultCap = -1 },
+	} {
+		p := snap.Profile
+		set(&p.Runtime)
+		if err := p.Validate(&snap.Definition); err == nil {
+			t.Errorf("a negative subtask limit was accepted: %+v", p.Runtime)
+		}
+	}
+}
+
 func TestMCP(t *testing.T) {
 	for _, tc := range []struct{ raw, transport string }{
 		{`{"command":"tool","args":["test"]}`, "stdio"},
