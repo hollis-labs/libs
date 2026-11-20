@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0
 
 - Add `runtime.cache_ttl` for prompt caching. Empty keeps the provider default;
   `5m` and `1h` are supported. Other values fail validation with the key named.
