@@ -1,6 +1,7 @@
 package desk
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -264,5 +265,85 @@ func TestSetPolicyKeepsQueuedDecisions(t *testing.T) {
 	}
 	if err := e.SetPolicy(Policy{Default: "x"}); err == nil {
 		t.Fatal("invalid policy accepted")
+	}
+}
+
+func TestBusyMaxRestartsAfterAForcedRelease(t *testing.T) {
+	c := newClock()
+	l := NewLedger(c.now)
+	_, _ = l.Open("q", "Q", "")
+	_, _ = l.Ask("q", "", "open question")
+	p := DefaultPolicy()
+	p.BusyMax = 5 * time.Minute
+	e := editor(t, p, l, c)
+	// An item held on an open question stays pending throughout.
+	e.Submit(Item{ID: "held", Topic: "q", Kind: ItemResult, Text: "held"}, State{Busy: true})
+	e.Submit(Item{ID: "1", Kind: ItemResult, Urgency: High, Text: "one"}, State{Busy: true})
+	_, _ = e.Due(State{Busy: true})
+	c.advance(5 * time.Minute)
+	if m, ok := e.Due(State{Busy: true}); !ok || len(m.Items) != 1 {
+		t.Fatalf("forced release %+v %v", m.Items, ok)
+	}
+	e.Submit(Item{ID: "2", Kind: ItemResult, Urgency: High, Text: "two"}, State{Busy: true})
+	if _, ok := e.Due(State{Busy: true}); ok {
+		t.Fatal("after a forced release the next item reached a busy owner at once")
+	}
+	c.advance(5 * time.Minute)
+	if m, ok := e.Due(State{Busy: true}); !ok || m.Items[0].Item.ID != "2" {
+		t.Fatalf("second forced release %+v %v", m.Items, ok)
+	}
+}
+
+func TestDedupRemoveAndSnapshot(t *testing.T) {
+	c := newClock()
+	e := editor(t, DefaultPolicy(), nil, c)
+	d1 := e.Submit(Item{ID: "x", Topic: "t", Kind: ItemResult, Text: "r"}, State{})
+	d2 := e.Submit(Item{ID: "x", Topic: "t", Kind: ItemResult, Urgency: High, Text: "r again"}, State{})
+	if d1 != d2 || len(e.Pending()) != 1 {
+		t.Fatalf("retry queued twice: %+v %+v %d", d1, d2, len(e.Pending()))
+	}
+	e.Submit(Item{ID: "p", Kind: ItemProgress}, State{})
+	if d := e.Submit(Item{ID: "p", Kind: ItemProgress}, State{}); d.Action != File || len(e.Filed()) != 1 {
+		t.Fatal("filed item filed twice")
+	}
+	e.Submit(Item{ID: "y", Topic: "t", Kind: ItemResult}, State{})
+	e.Submit(Item{ID: "z", Topic: "u", Kind: ItemResult}, State{})
+	snap := e.Snapshot()
+	if n := e.Remove("x", "nope"); n != 1 {
+		t.Fatalf("removed %d", n)
+	}
+	if got := e.RemoveTopic("t"); len(got) != 1 || got[0].Item.ID != "y" {
+		t.Fatalf("RemoveTopic %+v", got)
+	}
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Snapshot
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	fresh := editor(t, DefaultPolicy(), nil, c)
+	if err := fresh.Restore(back); err != nil || len(fresh.Pending()) != 3 || len(fresh.Filed()) != 1 {
+		t.Fatalf("restore %v %d %d", err, len(fresh.Pending()), len(fresh.Filed()))
+	}
+	if err := fresh.Restore(Snapshot{Pending: []Queued{{Decision: Decision{Action: "x"}}}}); err == nil {
+		t.Fatal("bad snapshot accepted")
+	}
+	c.advance(time.Minute)
+	if m, ok := fresh.Due(State{}); !ok || len(m.Items) != 3 {
+		t.Fatalf("restored items not released %+v", m.Items)
+	}
+}
+
+func TestValidateRejectsAStrandingDigest(t *testing.T) {
+	p := DefaultPolicy()
+	p.Quiet, p.DigestEvery, p.DigestMax = true, 0, 0
+	if err := p.Validate(); err == nil {
+		t.Fatal("a quiet digest with no schedule accepted")
+	}
+	p.DigestMax = 5
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }

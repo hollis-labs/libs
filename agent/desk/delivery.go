@@ -165,7 +165,8 @@ func DefaultPolicy() Policy {
 // Layer puts policies over a base: each later layer's rules go in front
 // of the earlier ones (so a later layer wins), and its non-zero settings
 // replace the earlier ones. Use it as Layer(DefaultPolicy(), app, module)
-// in the order the host wants to win.
+// in the order the host wants to win. A layer cannot set a setting back to
+// zero or Quiet back to false; build that policy directly instead.
 func Layer(base Policy, layers ...Policy) Policy {
 	out := base
 	out.Rules = slices.Clone(base.Rules)
@@ -216,6 +217,16 @@ func (p Policy) Validate() error {
 	}
 	if p.MergeWindow < 0 || p.HoldMax < 0 || p.DigestEvery < 0 || p.DigestMax < 0 || p.BusyMax < 0 {
 		return fmt.Errorf("desk: policy durations and counts must not be negative")
+	}
+	// A digest that never goes out strands its items.
+	if p.Quiet && p.DigestEvery == 0 && p.DigestMax == 0 {
+		digests := p.Default == Digest
+		for _, r := range p.Rules {
+			digests = digests || r.Do == Digest
+		}
+		if digests {
+			return fmt.Errorf("desk: a quiet policy that digests needs digest_every or digest_max, or digest items never go out")
+		}
 	}
 	return nil
 }
@@ -359,7 +370,9 @@ func (e *Editor) questionOpen(topic TopicID) bool {
 }
 
 // Submit decides an item and queues or files it. It returns the decision;
-// call Due to collect what is ready.
+// call Due to collect what is ready. An item whose ID is already pending
+// or filed is not queued again: Submit returns its first decision, so a
+// retried submit is not sent twice.
 func (e *Editor) Submit(it Item, st State) Decision {
 	now := e.now()
 	if it.At.IsZero() {
@@ -368,6 +381,13 @@ func (e *Editor) Submit(it Item, st State) Decision {
 	open := e.questionOpen(it.Topic)
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if it.ID != "" {
+		for _, q := range slices.Concat(e.pending, e.filed) {
+			if q.Item.ID == it.ID {
+				return q.Decision
+			}
+		}
+	}
 	d := e.policy.Decide(it, st, open)
 	q := Queued{Item: it, Decision: d, Queued: now}
 	if d.Action == File {
@@ -442,11 +462,12 @@ func (e *Editor) Due(st State) (Message, bool) {
 			ready[i] = true
 		}
 	}
+	waited := false
 	if st.Busy && len(ready) > 0 {
 		if e.busyAt.IsZero() {
 			e.busyAt = now
 		}
-		waited := e.policy.BusyMax > 0 && !now.Before(e.busyAt.Add(e.policy.BusyMax))
+		waited = e.policy.BusyMax > 0 && !now.Before(e.busyAt.Add(e.policy.BusyMax))
 		if !waited {
 			for i := range ready {
 				if !interrupts(e.pending[i]) {
@@ -479,7 +500,8 @@ func (e *Editor) Due(st State) (Message, bool) {
 		}
 	}
 	e.pending = keep
-	if len(e.pending) == 0 || !st.Busy {
+	if len(e.pending) == 0 || !st.Busy || waited {
+		// A release BusyMax forced starts the owner's wait afresh.
 		e.busyAt = time.Time{}
 	}
 	return e.message(now, out), true
@@ -587,6 +609,61 @@ func (e *Editor) Next(st State) (time.Time, bool) {
 		consider(*digestOldest, digestOldest.Queued.Add(e.policy.DigestEvery))
 	}
 	return next, !next.IsZero()
+}
+
+// Remove drops queued items by ID (a canceled job, say) and reports how
+// many it dropped.
+func (e *Editor) Remove(ids ...string) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	before := len(e.pending)
+	e.pending = slices.DeleteFunc(e.pending, func(q Queued) bool { return slices.Contains(ids, q.Item.ID) })
+	return before - len(e.pending)
+}
+
+// RemoveTopic drops a topic's queued items (a closed topic) and returns
+// them.
+func (e *Editor) RemoveTopic(topic TopicID) []Queued {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	var out, keep []Queued
+	for _, q := range e.pending {
+		if q.Item.Topic == topic {
+			out = append(out, q)
+		} else {
+			keep = append(keep, q)
+		}
+	}
+	e.pending = keep
+	return out
+}
+
+// Snapshot is an editor's queue, for a host to persist across a restart.
+type Snapshot struct {
+	Pending []Queued  `json:"pending"`
+	Filed   []Queued  `json:"filed"`
+	BusyAt  time.Time `json:"busy_at,omitzero"`
+}
+
+// Snapshot returns the editor's queue.
+func (e *Editor) Snapshot() Snapshot {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return Snapshot{Pending: slices.Clone(e.pending), Filed: slices.Clone(e.filed), BusyAt: e.busyAt}
+}
+
+// Restore replaces the editor's queue with a snapshot. Queued items keep
+// the decisions they were queued with.
+func (e *Editor) Restore(s Snapshot) error {
+	for _, q := range slices.Concat(s.Pending, s.Filed) {
+		if !q.Decision.Action.valid() {
+			return fmt.Errorf("desk: snapshot item %q has unknown action %q", q.Item.ID, q.Decision.Action)
+		}
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pending, e.filed, e.busyAt = slices.Clone(s.Pending), slices.Clone(s.Filed), s.BusyAt
+	return nil
 }
 
 // Pending returns copies of the queued items.

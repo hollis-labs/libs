@@ -59,12 +59,20 @@ func (s Screening) Worth() bool { return s.MultiPart || s.Task }
 var (
 	listLine   = regexp.MustCompile(`(?m)^\s*(?:[-*•]|\d+[.)])\s+(\S.*)$`)
 	sentence   = regexp.MustCompile(`[^.?!\n]+[?]`)
-	taskVerbs  = regexp.MustCompile(`(?i)\b(research|investigate|look into|find out|dig into|compare|benchmark|survey|audit|review|draft|write up|summari[sz]e|analy[sz]e|figure out|track down|file (?:a|the)? ?task|create (?:a )?tasks?|open (?:a )?(?:pr|pull request|issue)|ask (?:the )?\w+ (?:agent|seat|team)|have (?:the )?\w+ (?:agent|seat|team)|tell (?:the )?\w+ (?:agent|seat|team)|coordinate with)\b`)
+	urls       = regexp.MustCompile(`\b[a-z][a-z0-9+.-]*://\S+`)
+	taskVerbs  = regexp.MustCompile(`(?i)\b(research|investigate|look into|dig into|benchmark|audit|track down|file (?:a |the )?task|create (?:a )?tasks?|open (?:a )?(?:pr|pull request|issue)|ask (?:the )?\w+ (?:agent|seat|team)|have (?:the )?\w+ (?:agent|seat|team)|tell (?:the )?\w+ (?:agent|seat|team)|coordinate with)\b`)
 	alsoJoiner = regexp.MustCompile(`(?i)(?:\band also\b|\balso,|\bseparately,|\bon another note\b|\bone more thing\b|\bsecond(?:ly)?,|\bthen,? (?:can|could) you\b)`)
+	// clauseJoin splits "fix the build and deploy nanite" or "check the
+	// logs, then restart tether" into clauses.
+	clauseJoin = regexp.MustCompile(`(?i)\s*(?:,?\s+and then\s+|,?\s+then\s+|,\s+and\s+|\s+and\s+|;\s*)`)
+	// imperative is a clause that starts with a command verb, after an
+	// optional "please", "can you" or "also".
+	imperative = regexp.MustCompile(`(?i)^(?:please\s+|(?:can|could|would) you\s+|also\s+)*(fix|deploy|restart|check|run|ship|update|upgrade|merge|research|investigate|look into|find|compare|review|draft|write|summari[sz]e|analy[sz]e|ask|tell|file|create|open|test|build|release|tag|clean up|add|remove|rename|migrate|install|set up|configure|rebase|revert|roll back)\b`)
 )
 
 // Screen reads a message with rules only. It finds list items, several
-// questions, joiners that start a second request, and task verbs.
+// questions (URLs are not questions), commands joined by "and" or "then",
+// joiners that start a second request, and task verbs.
 func Screen(msg string) Screening {
 	var s Screening
 	if items := listLine.FindAllStringSubmatch(msg, -1); len(items) >= 2 {
@@ -74,7 +82,8 @@ func Screen(msg string) Screening {
 		}
 		s.Reasons = append(s.Reasons, fmt.Sprintf("%d list items", len(items)))
 	}
-	if qs := sentence.FindAllString(msg, -1); len(qs) >= 2 {
+	plain := urls.ReplaceAllString(msg, "URL")
+	if qs := sentence.FindAllString(plain, -1); len(qs) >= 2 {
 		s.MultiPart = true
 		if len(s.Parts) == 0 {
 			for _, q := range qs {
@@ -82,6 +91,19 @@ func Screen(msg string) Screening {
 			}
 		}
 		s.Reasons = append(s.Reasons, fmt.Sprintf("%d questions", len(qs)))
+	}
+	if len(s.Parts) == 0 && !strings.Contains(strings.TrimSpace(plain), "\n") {
+		var commands []string
+		for _, c := range clauseJoin.Split(strings.TrimRight(strings.TrimSpace(msg), ".!"), -1) {
+			if c = strings.TrimSpace(c); imperative.MatchString(c) {
+				commands = append(commands, c)
+			}
+		}
+		if len(commands) >= 2 {
+			s.MultiPart = true
+			s.Parts = commands
+			s.Reasons = append(s.Reasons, fmt.Sprintf("%d commands", len(commands)))
+		}
 	}
 	if alsoJoiner.MatchString(msg) {
 		s.MultiPart = true

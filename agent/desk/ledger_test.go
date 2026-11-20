@@ -157,8 +157,14 @@ func TestLedgerJSONRoundTrip(t *testing.T) {
 	if next.ID == "t1" {
 		t.Fatal("restored ledger reused a generated id")
 	}
-	if err := json.Unmarshal([]byte(`{"topics":[{"id":"a"},{"id":"a"}]}`), &back); err == nil {
+	if err := json.Unmarshal([]byte(`{"topics":[{"id":"z","refs":[{"kind":"job","id":"zz"}]},{"id":"z"}]}`), &back); err == nil {
 		t.Fatal("repeated ids accepted")
+	}
+	if _, err := back.Get("t1"); err != nil {
+		t.Fatal("a failed restore changed the ledger")
+	}
+	if _, ok := back.Find(Ref{Kind: "job", ID: "zz"}); ok {
+		t.Fatal("a failed restore indexed a ref")
 	}
 }
 
@@ -182,5 +188,37 @@ func TestLedgerConcurrent(t *testing.T) {
 	got, _ := l.Get("a")
 	if len(got.Work) != 20 || len(got.Questions) != 20 || len(got.InFlight()) != 0 {
 		t.Fatalf("work %d questions %d", len(got.Work), len(got.Questions))
+	}
+}
+
+func TestLedgerFindWorkWithdrawAndClose(t *testing.T) {
+	l := NewLedger(nil)
+	_, _ = l.Open("a", "A", "")
+	job := Ref{Kind: "job", ID: "j1"}
+	_ = l.Attach("a", Work{ID: "w", State: WorkRunning, Ref: job})
+	topic, w, ok := l.FindWork(job)
+	if !ok || topic.ID != "a" || w.ID != "w" {
+		t.Fatalf("FindWork %v %+v %+v", ok, topic, w)
+	}
+	if _, _, ok := l.FindWork(Ref{Kind: "job", ID: "nope"}); ok {
+		t.Fatal("found unknown work")
+	}
+	_, w, err := l.ProgressRef(job, WorkDone, "result")
+	if err != nil || w.State != WorkDone || w.Result != "result" {
+		t.Fatalf("ProgressRef %+v %v", w, err)
+	}
+	if _, _, err := l.ProgressRef(Ref{Kind: "job", ID: "nope"}, WorkDone, ""); !errors.Is(err, ErrNoWork) {
+		t.Fatalf("ProgressRef unknown: %v", err)
+	}
+	q, _ := l.Ask("a", "", "still needed?")
+	if err := l.Withdraw("a", q.ID); err != nil || l.HasOpenQuestion("a") {
+		t.Fatalf("withdraw: %v", err)
+	}
+	if err := l.Answer("a", q.ID, "x"); err == nil {
+		t.Fatal("answered a withdrawn question")
+	}
+	_, _ = l.Ask("a", "", "another?")
+	if err := l.Close("a"); err != nil || l.HasOpenQuestion("a") {
+		t.Fatalf("close left a question open: %v", err)
 	}
 }

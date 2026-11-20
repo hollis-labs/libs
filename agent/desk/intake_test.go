@@ -19,7 +19,14 @@ func TestScreen(t *testing.T) {
 		{"Can you research how Codex compacts? And what does Claude do?", true, true, 2},
 		{"Please:\n1. fix the tether stall\n2. look into the nanite trace gap\n3. tell me when both are done", true, true, 3},
 		{"- one\n- two", true, false, 2},
-		{"Draft the release notes", false, true, 0},
+		{"Draft the release notes", false, false, 0},
+		{"How are you? Did you sleep ok?", true, false, 2},
+		{"see https://a.com/x?y=1 and https://b.com/z?w=2", false, false, 0},
+		{"can you review this sentence", false, false, 0},
+		{"I want to find out what you think", false, false, 0},
+		{"fix the build and deploy nanite", true, false, 2},
+		{"check the logs, then restart tether.", true, false, 2},
+		{"bread and butter are on the list", false, false, 0},
 		{"ship it, and also ping the release seat", true, false, 0},
 		{"Ask the tether agent to restart the mailer", false, true, 0},
 	} {
@@ -48,7 +55,7 @@ func TestRulesDecomposer(t *testing.T) {
 		}
 	}
 	single, _ := Rules{}.Decompose(t.Context(), Request{Message: "investigate the flaky test"})
-	if len(single.Items) != 1 || single.Items[0].Kind != KindResearch || single.Trivial() {
+	if len(single.Items) != 1 || single.Items[0].Kind != KindResearch || !single.Trivial() {
 		t.Fatalf("single task %+v", single)
 	}
 }
@@ -151,6 +158,19 @@ func TestIntakeDispositions(t *testing.T) {
 		if r.Plan.Validate() != nil {
 			t.Errorf("%s: invalid plan %v", tc.name, r.Plan.Validate())
 		}
+	}
+	// Ordinary chat never gets a card.
+	for _, msg := range []string{"How are you? Did you sleep ok?", "- milk\n- eggs", "can you review this sentence", "investigate the flaky test"} {
+		r, err := (Intake{Mode: IntakeSuggest}).Read(t.Context(), Request{Message: msg})
+		if err != nil || r.Disposition != Chat {
+			t.Errorf("%q: %+v %v", msg, r, err)
+		}
+	}
+	if r, _ := (Intake{Mode: IntakeSuggest}).Read(t.Context(), Request{Message: "fix the build and deploy nanite"}); r.Disposition != Chat {
+		t.Errorf("two answer-kind commands carded: %+v", r.Plan)
+	}
+	if r, _ := (Intake{Mode: IntakeSuggest}).Read(t.Context(), Request{Message: "research the stall, then ask the tether agent to restart"}); r.Disposition != Suggest || len(r.Plan.Items) != 2 {
+		t.Errorf("research then delegate: %+v", r)
 	}
 	if _, err := (Intake{Mode: "loud"}).Read(t.Context(), Request{Message: "x"}); err == nil {
 		t.Fatal("unknown mode accepted")

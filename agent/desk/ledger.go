@@ -71,15 +71,16 @@ type Work struct {
 
 // Question is a question to the owner, open until answered or withdrawn.
 type Question struct {
-	ID       string    `json:"id"`
-	Text     string    `json:"text"`
-	Asked    time.Time `json:"asked"`
-	Answered time.Time `json:"answered,omitzero"`
-	Answer   string    `json:"answer,omitempty"`
+	ID        string    `json:"id"`
+	Text      string    `json:"text"`
+	Asked     time.Time `json:"asked"`
+	Answered  time.Time `json:"answered,omitzero"`
+	Answer    string    `json:"answer,omitempty"`
+	Withdrawn time.Time `json:"withdrawn,omitzero"`
 }
 
 // Open reports whether the question still waits for the owner.
-func (q Question) Open() bool { return q.Answered.IsZero() }
+func (q Question) Open() bool { return q.Answered.IsZero() && q.Withdrawn.IsZero() }
 
 // Topic is one open line of the owner's business: the work in flight on
 // it, what came back, questions waiting on the owner, and related refs.
@@ -225,6 +226,45 @@ func (l *Ledger) List(keep func(Topic) bool) []Topic {
 	return out
 }
 
+// FindWork returns the topic and the work a ref started, for recording a
+// finished job: the work whose Ref it is.
+func (l *Ledger) FindWork(r Ref) (Topic, Work, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	id, ok := l.byRef[r]
+	if !ok {
+		return Topic{}, Work{}, false
+	}
+	t := l.topics[id]
+	for _, w := range t.Work {
+		if w.Ref == r {
+			return t.clone(), w, true
+		}
+	}
+	return Topic{}, Work{}, false
+}
+
+// ProgressRef moves the work a ref started (see FindWork).
+func (l *Ledger) ProgressRef(r Ref, state WorkState, result string) (Topic, Work, error) {
+	t, w, ok := l.FindWork(r)
+	if !ok {
+		return Topic{}, Work{}, fmt.Errorf("%w: no work for %s", ErrNoWork, r)
+	}
+	if err := l.Progress(t.ID, w.ID, state, result); err != nil {
+		return Topic{}, Work{}, err
+	}
+	t, err := l.Get(t.ID)
+	if err != nil {
+		return Topic{}, Work{}, err
+	}
+	for _, x := range t.Work {
+		if x.ID == w.ID {
+			w = x
+		}
+	}
+	return t, w, nil
+}
+
 // Find returns the topic a ref is linked to, for routing a result back to
 // the topic that started the work.
 func (l *Ledger) Find(r Ref) (Topic, bool) {
@@ -345,10 +385,25 @@ func (l *Ledger) Answer(id TopicID, questionID, answer string) error {
 			return fmt.Errorf("%w: %s", ErrNoQuestion, questionID)
 		}
 		if !t.Questions[i].Open() {
-			return fmt.Errorf("desk: question %s already answered", questionID)
+			return fmt.Errorf("desk: question %s is not open", questionID)
 		}
 		t.Questions[i].Answered = l.now()
 		t.Questions[i].Answer = answer
+		return nil
+	})
+}
+
+// Withdraw closes a question without an answer: it no longer matters.
+func (l *Ledger) Withdraw(id TopicID, questionID string) error {
+	return l.update(id, false, func(t *Topic) error {
+		i := slices.IndexFunc(t.Questions, func(x Question) bool { return x.ID == questionID })
+		if i < 0 {
+			return fmt.Errorf("%w: %s", ErrNoQuestion, questionID)
+		}
+		if !t.Questions[i].Open() {
+			return fmt.Errorf("desk: question %s is not open", questionID)
+		}
+		t.Questions[i].Withdrawn = l.now()
 		return nil
 	})
 }
@@ -361,11 +416,17 @@ func (l *Ledger) HasOpenQuestion(id TopicID) bool {
 	return t != nil && slices.ContainsFunc(t.Questions, Question.Open)
 }
 
-// Close finishes a topic. Running work is left as it is; the host cancels
-// it if it should stop.
+// Close finishes a topic and withdraws its open questions. Running work is
+// left as it is; the host cancels it if it should stop.
 func (l *Ledger) Close(id TopicID) error {
 	return l.update(id, false, func(t *Topic) error {
 		t.Status = TopicClosed
+		now := l.now()
+		for i := range t.Questions {
+			if t.Questions[i].Open() {
+				t.Questions[i].Withdrawn = now
+			}
+		}
 		return nil
 	})
 }
@@ -416,24 +477,19 @@ func (l *Ledger) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ledgerJSON{Topics: topics, Seq: seq})
 }
 
-// UnmarshalJSON replaces the ledger's topics with saved ones. The clock is
-// kept (time.Now on a zero Ledger).
+// UnmarshalJSON replaces the ledger's topics with saved ones, or leaves the
+// ledger unchanged when the data is invalid. The clock is kept (time.Now on
+// a zero Ledger).
 func (l *Ledger) UnmarshalJSON(data []byte) error {
 	var in ledgerJSON
 	if err := json.Unmarshal(data, &in); err != nil {
 		return err
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.now == nil {
-		l.now = time.Now
-	}
-	l.topics = map[TopicID]*Topic{}
-	l.byRef = map[Ref]TopicID{}
-	l.seq = in.Seq
+	topics := map[TopicID]*Topic{}
+	byRef := map[Ref]TopicID{}
 	for i := range in.Topics {
 		t := in.Topics[i].clone()
-		if t.ID == "" || l.topics[t.ID] != nil {
+		if t.ID == "" || topics[t.ID] != nil {
 			return fmt.Errorf("desk: saved ledger has an empty or repeated topic id %q", t.ID)
 		}
 		if t.Work == nil {
@@ -445,10 +501,16 @@ func (l *Ledger) UnmarshalJSON(data []byte) error {
 		if t.Refs == nil {
 			t.Refs = []Ref{}
 		}
-		l.topics[t.ID] = &t
+		topics[t.ID] = &t
 		for _, r := range t.Refs {
-			l.byRef[r] = t.ID
+			byRef[r] = t.ID
 		}
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.now == nil {
+		l.now = time.Now
+	}
+	l.topics, l.byRef, l.seq = topics, byRef, in.Seq
 	return nil
 }

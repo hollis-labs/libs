@@ -27,13 +27,16 @@ case desk.Dispatch: // run r.Plan wave by wave: r.Plan.Waves()
 }
 ```
 
-- `Screen` is the cheap first read: list items, several questions, joiners
-  ("and also"), task verbs. Only messages it passes reach the planner.
+- `Screen` is the cheap first read: list items, several questions (a URL's
+  `?` is not one), commands joined by "and" or "then", joiners ("and
+  also") and delegation or research verbs. Only messages it passes reach the planner.
 - `Model` asks a small model for a JSON plan, validates it, and retries once
   with the error. `Rules` is the fallback when there is no model or it fails.
 - Work kinds: `answer` (the chat agent), `research`, `analysis`, `council`,
   `delegate` (a change for the owning seat, with acceptance criteria) and
   `question` (only the owner can decide).
+- A plan is trivial, and goes to the chat agent with no card, when every
+  item is an answer or it is a single item other than a delegation.
 - Modes: `off`, `shadow` (plan and record, do nothing), `suggest` (show the
   plan as a card), `auto` (run plans at or above `AutoConfidence`, default
   0.8, and suggest the rest). Start with shadow or suggest.
@@ -45,12 +48,12 @@ l := desk.NewLedger(nil)
 t, _ := l.Open("", "Orchestration fixes", mode)
 _ = l.Attach(t.ID, desk.Work{ID: "w1", Kind: desk.KindResearch, State: desk.WorkRunning, Ref: desk.Ref{Kind: "job", ID: job}})
 // later, when the job finishes:
-topic, _ := l.Find(desk.Ref{Kind: "job", ID: job})
-_ = l.Progress(topic.ID, "w1", desk.WorkDone, summary)
+topic, work, _ := l.ProgressRef(desk.Ref{Kind: "job", ID: job}, desk.WorkDone, summary)
 ```
 
 A topic holds its work, the questions waiting on the owner (`Ask`,
-`Answer`, `HasOpenQuestion`) and related refs. `OpenTopics` feeds intake so a
+`Answer`, `Withdraw`, `HasOpenQuestion`; `Close` withdraws what is still
+open) and related refs. `OpenTopics` feeds intake so a
 message can continue a topic. The ledger marshals to JSON for the host to
 keep.
 
@@ -63,6 +66,10 @@ ed.Submit(desk.Item{ID: id, Topic: topic.ID, Kind: desk.ItemResult, Source: "sub
 if m, ok := ed.Due(state); ok { send(m.Text) }
 if at, ok := ed.Next(state); ok { timer.Reset(time.Until(at)) }
 ```
+
+An item ID is submitted once: a retry returns the first decision. `Remove`
+and `RemoveTopic` drop queued items (a canceled job, a closed topic), and
+`Snapshot`/`Restore` keep the queue across a restart.
 
 Call `Due` when an item is submitted, when the owner's state changes (stops
 typing, a turn ends), when a question is answered, and at the time `Next`

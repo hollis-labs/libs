@@ -51,7 +51,19 @@ func TestPlanWavesAndCard(t *testing.T) {
 	if !strings.HasPrefix(par.Card(), "Plan: 2 items in parallel\n- [research] x") {
 		t.Fatalf("parallel card:\n%s", par.Card())
 	}
-	if !(Plan{Items: []PlanItem{{ID: "1", Kind: KindAnswer, Goal: "hi"}}}).Trivial() || par.Trivial() {
-		t.Fatal("Trivial")
+	for name, tc := range map[string]struct {
+		p    Plan
+		want bool
+	}{
+		"one answer":       {Plan{Items: []PlanItem{{ID: "1", Kind: KindAnswer}}}, true},
+		"answers only":     {Plan{Items: []PlanItem{{ID: "1", Kind: KindAnswer}, {ID: "2", Kind: KindAnswer}}}, true},
+		"one research":     {Plan{Items: []PlanItem{{ID: "1", Kind: KindResearch}}}, true},
+		"one delegation":   {Plan{Items: []PlanItem{{ID: "1", Kind: KindDelegate}}}, false},
+		"two research":     {par, false},
+		"answer and other": {Plan{Items: []PlanItem{{ID: "1", Kind: KindAnswer}, {ID: "2", Kind: KindCouncil}}}, false},
+	} {
+		if tc.p.Trivial() != tc.want {
+			t.Errorf("%s: Trivial %v", name, !tc.want)
+		}
 	}
 }

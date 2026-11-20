@@ -59,10 +59,19 @@ type Plan struct {
 	Source     string     `json:"source"` // "rules" or "model"
 }
 
-// Trivial reports whether the plan adds nothing to a normal chat turn: one
-// answer item.
+// Trivial reports whether the plan adds nothing to a normal chat turn:
+// every item is an answer, or it is a single item the chat agent can do
+// itself (anything but a delegation, which needs the owning seat).
 func (p Plan) Trivial() bool {
-	return len(p.Items) == 1 && p.Items[0].Kind == KindAnswer
+	if len(p.Items) == 1 && p.Items[0].Kind != KindDelegate {
+		return true
+	}
+	for _, it := range p.Items {
+		if it.Kind != KindAnswer {
+			return false
+		}
+	}
+	return true
 }
 
 // Validate checks that ids are present and unique, kinds and delivery
