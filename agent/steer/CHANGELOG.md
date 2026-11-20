@@ -19,8 +19,10 @@
     `act` and `affect` are data only.
   - Reflexes as configuration: text, predicate (libs agent/core reflexes), event
     and focus triggers; a `Vocabulary` of action kinds with remind and halt built
-    in; cooldowns in a `CooldownStore` (`MemoryCooldowns` with `Snapshot` and
-    `Restore`); `Active` by preset; a `StateFill` and agent id for predicates.
+    in; cooldowns in a context-aware `CooldownStore` whose errors are reported
+    (`MemoryCooldowns` with `Snapshot` and `Restore`); `Active` by preset; host
+    signals as `signal.<key>` attributes, a `StateFill` and an agent id for
+    predicates.
   - Routing: `MessageSubject` (the fields a libs core/util/router rule matches,
     with Surface's slash-command rule) and `ActiveRules`.
   - `Steer.Prepare` runs the pipeline and returns a `Turn` with a `Decision`

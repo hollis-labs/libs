@@ -234,10 +234,11 @@ type Message struct {
 
 // CooldownStore keeps when each reflex last fired. A host that persists it keeps cooldowns
 // across restarts, so a reflex does not fire again just because the process restarted.
-// Implementations must be safe for concurrent use.
+// Implementations must be safe for concurrent use. A store error keeps the reflex from
+// firing and is reported.
 type CooldownStore interface {
-	LastFired(reflex string) (time.Time, bool)
-	SetFired(reflex string, at time.Time)
+	LastFired(ctx context.Context, reflex string) (time.Time, bool, error)
+	SetFired(ctx context.Context, reflex string, at time.Time) error
 }
 
 // MemoryCooldowns is a CooldownStore in memory. Snapshot and Restore let a host persist it.
@@ -250,18 +251,19 @@ type MemoryCooldowns struct {
 func NewMemoryCooldowns() *MemoryCooldowns { return &MemoryCooldowns{last: map[string]time.Time{}} }
 
 // LastFired implements CooldownStore.
-func (c *MemoryCooldowns) LastFired(reflex string) (time.Time, bool) {
+func (c *MemoryCooldowns) LastFired(_ context.Context, reflex string) (time.Time, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	t, ok := c.last[reflex]
-	return t, ok
+	return t, ok, nil
 }
 
 // SetFired implements CooldownStore.
-func (c *MemoryCooldowns) SetFired(reflex string, at time.Time) {
+func (c *MemoryCooldowns) SetFired(_ context.Context, reflex string, at time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.last[reflex] = at
+	return nil
 }
 
 // Snapshot is a copy of when each reflex last fired.
@@ -285,6 +287,10 @@ func (c *MemoryCooldowns) Restore(snap map[string]time.Time) {
 	}
 }
 
+// SignalPrefix is put before every host signal's key in a predicate's attributes: a
+// signal "mail.unread" is the attribute "signal.mail.unread".
+const SignalPrefix = "signal."
+
 // StateFill adds what a host knows to the reflex library's state before predicates run, for
 // example MailUnreadCount, PrefixTokens or ScopeTier.
 type StateFill func(st *reflexes.State, sit Situation)
@@ -298,6 +304,10 @@ type Reflexes struct {
 	agentID   string
 	fill      StateFill
 
+	// fireMu orders cooldown checks, so two messages at once cannot both fire a reflex
+	// that is cooling down. The store is called under it, never under mu.
+	fireMu sync.Mutex
+
 	mu      sync.Mutex
 	pending []string
 }
@@ -305,17 +315,24 @@ type Reflexes struct {
 // maxPending is how many reminders wait for the next message; older ones are dropped.
 const maxPending = 10
 
-// NewReflexes returns a runner using the vocabulary. Options set the clock, the cooldown
-// store, the agent id and a state fill; others are ignored.
-func NewReflexes(v *Vocabulary, opts ...Option) *Reflexes {
+// NewReflexes returns a runner using the vocabulary, which is required. Options set the
+// clock, the cooldown store, the agent id and a state fill; a policy is refused, as it
+// belongs to [New].
+func NewReflexes(v *Vocabulary, opts ...Option) (*Reflexes, error) {
+	if v == nil {
+		return nil, errors.New("steer: NewReflexes needs a vocabulary")
+	}
 	o := collect(opts)
-	return &Reflexes{vocab: v, now: o.now, cooldowns: o.cooldowns, agentID: o.agentID, fill: o.fill}
+	if o.policySet {
+		return nil, errors.New("steer: WithPolicy applies to New, not NewReflexes")
+	}
+	return &Reflexes{vocab: v, now: o.now, cooldowns: o.cooldowns, agentID: o.agentID, fill: o.fill}, nil
 }
 
 // OnMessage runs the active text and predicate reflexes against a message (its text
 // trimmed). Reminders that were waiting come first. A reflex whose trigger cannot be
 // evaluated, or whose action kind is not in the vocabulary, is skipped and reported.
-func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fired, error) {
+func (x *Reflexes) OnMessage(ctx context.Context, m Message, active []Reflex) (Fired, error) {
 	out := Fired{Names: []string{}}
 	x.mu.Lock()
 	out.Reminders, x.pending = x.pending, nil
@@ -348,7 +365,7 @@ func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fir
 			continue
 		}
 		if fired {
-			if err := x.tryFire(r, &out); err != nil {
+			if err := x.tryFire(ctx, r, &out); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -358,27 +375,27 @@ func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fir
 
 // OnEvent runs the active event reflexes for a host event. Reminders wait for the next
 // message; other actions are returned for the host to carry out.
-func (x *Reflexes) OnEvent(topic string, active []Reflex) (Fired, error) {
-	return x.onHost(active, func(r Reflex) bool {
+func (x *Reflexes) OnEvent(ctx context.Context, topic string, active []Reflex) (Fired, error) {
+	return x.onHost(ctx, active, func(r Reflex) bool {
 		t, _ := obj(r.Trigger)["topic"].(string)
 		return r.TriggerKind == TriggerEvent && t != "" && (topic == t || strings.HasPrefix(topic, t+"."))
 	})
 }
 
 // OnFocus runs the active focus reflexes when a window of view comes in front.
-func (x *Reflexes) OnFocus(view string, active []Reflex) (Fired, error) {
-	return x.onHost(active, func(r Reflex) bool {
+func (x *Reflexes) OnFocus(ctx context.Context, view string, active []Reflex) (Fired, error) {
+	return x.onHost(ctx, active, func(r Reflex) bool {
 		v, _ := obj(r.Trigger)["view"].(string)
 		return r.TriggerKind == TriggerFocus && view != "" && view == v
 	})
 }
 
-func (x *Reflexes) onHost(active []Reflex, match func(Reflex) bool) (Fired, error) {
+func (x *Reflexes) onHost(ctx context.Context, active []Reflex, match func(Reflex) bool) (Fired, error) {
 	out := Fired{Names: []string{}}
 	var errs []error
 	for _, r := range active {
 		if match(r) {
-			if err := x.tryFire(r, &out); err != nil {
+			if err := x.tryFire(ctx, r, &out); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -395,28 +412,38 @@ func (x *Reflexes) onHost(active []Reflex, match func(Reflex) bool) (Fired, erro
 	return out, errors.Join(errs...)
 }
 
-// tryFire fires r unless its action kind is unknown or it is cooling down.
-func (x *Reflexes) tryFire(r Reflex, out *Fired) error {
+// tryFire fires r unless its action kind is unknown, it is cooling down, or its cooldown
+// cannot be read or kept.
+func (x *Reflexes) tryFire(ctx context.Context, r Reflex, out *Fired) error {
 	if _, ok := x.vocab.check(r.ActionKind); !ok {
 		return fmt.Errorf("reflex %s: action kind %q is not in the vocabulary; not fired", r.Name, r.ActionKind)
 	}
-	if !x.ready(r) {
-		return nil
+	ready, err := x.ready(ctx, r)
+	if err != nil {
+		return fmt.Errorf("reflex %s: cooldown: %w; not fired", r.Name, err)
 	}
-	x.fire(r, out)
+	if ready {
+		x.fire(r, out)
+	}
 	return nil
 }
 
 // ready reports whether r is past its cooldown, and if so marks it fired now.
-func (x *Reflexes) ready(r Reflex) bool {
-	x.mu.Lock()
-	defer x.mu.Unlock()
+func (x *Reflexes) ready(ctx context.Context, r Reflex) (bool, error) {
+	x.fireMu.Lock()
+	defer x.fireMu.Unlock()
 	now := x.now()
-	if last, ok := x.cooldowns.LastFired(r.Name); ok && r.Cooldown > 0 && now.Sub(last) < time.Duration(r.Cooldown)*time.Second {
-		return false
+	last, ok, err := x.cooldowns.LastFired(ctx, r.Name)
+	if err != nil {
+		return false, err
 	}
-	x.cooldowns.SetFired(r.Name, now)
-	return true
+	if ok && r.Cooldown > 0 && now.Sub(last) < time.Duration(r.Cooldown)*time.Second {
+		return false, nil
+	}
+	if err := x.cooldowns.SetFired(ctx, r.Name, now); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (x *Reflexes) fire(r Reflex, out *Fired) {
@@ -438,7 +465,8 @@ func (x *Reflexes) fire(r Reflex, out *Fired) {
 
 // stateFor is the reflex library's view of a message: the conversation with the message
 // first, the situation as attributes (focused.view, focused.module, selection, mode,
-// layout, source, then the host's Signals), the agent id, and the host's state fill.
+// layout, source), the host's Signals as "signal.<key>" so they cannot stand in for a
+// built-in attribute, the agent id, and the host's state fill.
 func (x *Reflexes) stateFor(m Message) reflexes.State {
 	now := reflexes.MessageSignal{Role: "user", Content: m.Text}
 	st := reflexes.State{SessionID: "owner", AgentID: x.agentID, Attrs: map[string]string{}}
@@ -458,7 +486,7 @@ func (x *Reflexes) stateFor(m Message) reflexes.State {
 	st.Attrs["layout"] = m.Sit.Layout
 	st.Attrs["source"] = m.Sit.Source
 	for k, v := range m.Sit.Signals {
-		st.Attrs[k] = v
+		st.Attrs[SignalPrefix+k] = v
 	}
 	if x.fill != nil {
 		x.fill(&st, m.Sit)

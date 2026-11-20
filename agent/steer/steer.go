@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -152,6 +153,9 @@ type Turn struct {
 // text included; [Decision.TraceFields] is the prompt-free view for a trace.
 type Decision struct {
 	Situation Situation `json:"situation"`
+	// Deliberate is the deliberate mode as set, even when its preset is no longer
+	// registered and the default applied instead; "" when none is set.
+	Deliberate string `json:"deliberate,omitempty"`
 	// Mode is the preset in force; ModeSource is "deliberate", "classified" or "default".
 	Mode       string `json:"mode"`
 	ModeSource string `json:"mode_source"`
@@ -175,6 +179,9 @@ type TraceSituation struct {
 	Views      []string `json:"views,omitempty"`
 	Mode       string   `json:"mode"`
 	ModeSource string   `json:"mode_source"`
+	// Deliberate is the deliberate mode as set, when it differs from Mode (its preset
+	// is gone).
+	Deliberate string   `json:"deliberate,omitempty"`
 	Layout     string   `json:"layout,omitempty"`
 	Source     string   `json:"source,omitempty"`
 	Slots      []string `json:"slots"`
@@ -185,6 +192,9 @@ type TraceSituation struct {
 // when no classifier ran), why and fired. Nothing the owner wrote is included.
 func (d Decision) TraceFields() (situation, classified json.RawMessage, why string, fired []string) {
 	ts := TraceSituation{Mode: d.Mode, ModeSource: d.ModeSource, Layout: d.Situation.Layout, Source: d.Situation.Source, Slots: d.Slots}
+	if d.Deliberate != d.Mode {
+		ts.Deliberate = d.Deliberate
+	}
 	if f := d.Situation.Focused; f != nil {
 		ts.View, ts.Module = f.View, f.Module
 	}
@@ -198,22 +208,47 @@ func (d Decision) TraceFields() (situation, classified json.RawMessage, why stri
 	}
 	situation, _ = json.Marshal(ts)
 	if d.Classified != nil {
+		known := Classification{}
+		for f, r := range d.Classified {
+			if knownFacet(f) {
+				if math.IsNaN(r.P) || r.P < 0 || r.P > 1 {
+					r.P = 0
+				}
+				known[f] = r
+			}
+		}
+		var verdicts []Verdict
+		for _, v := range d.Verdicts {
+			if knownFacet(v.Facet) {
+				verdicts = append(verdicts, v)
+			}
+		}
 		classified, _ = json.Marshal(struct {
 			Result   Classification `json:"result"`
 			Verdicts []Verdict      `json:"verdicts"`
-		}{d.Classified, d.Verdicts})
+		}{known, verdicts})
 	}
 	return situation, classified, d.Why, d.Fired
 }
 
 // Prepare runs the pipeline for one owner message. A host should call it before any routing
 // tool runs: a halt answers the message, and nothing else should act on it. A reflex that
-// cannot be evaluated or fired is reported in the error; the rest of the turn is still
-// returned.
+// is invalid, or cannot be evaluated or fired, is skipped and reported in the error; the
+// rest of the turn is still returned.
 func (s *Steer) Prepare(ctx context.Context, in Input) (Turn, error) {
 	var t Turn
+	var errs []error
+	var valid []Reflex
+	for _, r := range in.Reflexes {
+		if err := r.Validate(s.reflexes.vocab); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		valid = append(valid, r)
+	}
 	policy := s.Policy()
-	t.Mode = Resolve(s.registry, s.modes.Current(), in.Classified, policy)
+	deliberate := s.modes.Current()
+	t.Mode = Resolve(s.registry, deliberate, in.Classified, policy)
 	sit := in.Sit
 	sit.Mode = ""
 	if t.Mode.Source != SourceDefault {
@@ -276,12 +311,13 @@ func (s *Steer) Prepare(ctx context.Context, in Input) (Turn, error) {
 	}
 	t.Tools = dedupe(tools)
 
-	var err error
-	t.Fired, err = s.reflexes.OnMessage(ctx, Message{Text: in.Sit.Input, Prior: in.Prior, Sit: sit}, Active(in.Reflexes, t.Mode.Preset))
+	fired, err := s.reflexes.OnMessage(ctx, Message{Text: in.Sit.Input, Prior: in.Prior, Sit: sit}, Active(valid, t.Mode.Preset))
+	t.Fired = fired
+	errs = append(errs, err)
 
-	t.Decision = Decision{Situation: sit, Mode: t.Mode.Preset.Name, ModeSource: t.Mode.Source, Why: t.Selection.Why,
+	t.Decision = Decision{Situation: sit, Deliberate: deliberate, Mode: t.Mode.Preset.Name, ModeSource: t.Mode.Source, Why: t.Selection.Why,
 		Slots: t.Selection.Names(), Classified: in.Classified, Verdicts: verdicts, Fired: t.Fired.Names}
-	return t, err
+	return t, errors.Join(errs...)
 }
 
 func dedupe(in []string) []string {

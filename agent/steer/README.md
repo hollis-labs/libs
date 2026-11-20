@@ -73,7 +73,8 @@ reports presets that name slots, reflexes or rules the host lacks.
 The classifier runs in the host. Per facet (`slot`, `preset`, `act`,
 `affect`), the gate is `shadow` (record only), `suggest` (offer to the owner
 above the threshold) or `auto` (apply above the threshold, which must be at
-least `AutoFloor`, 0.5). An unknown gate is treated as shadow. The default
+least `AutoFloor`, 0.5). An unknown gate is treated as shadow, and a
+confidence that is NaN or outside 0 to 1 counts as abstained. The default
 suggests `slot` at 0.7 and `preset` at 0.8, and shadows the rest. Set the
 policy with `WithPolicy` or `SetPolicy`; both validate it.
 
@@ -86,21 +87,27 @@ Instances are configuration (`ParseReflexes` reads a JSON array). Trigger kinds:
 `text` (`{"pattern": "<regexp>"}`), `predicate` (a libs agent/core reflexes
 predicate), `event` (`{"topic": "..."}`, prefix match at a dot) and `focus`
 (`{"view": "..."}`). Predicates see `attrs`: `focused.view`,
-`focused.module`, `selection`, `mode`, `layout`, `source`, plus the host's
-`Situation.Signals`. A `StateFill` (`WithStateFill`) sets typed state such as
-unread mail, prefix tokens or scope tier; `WithAgentID` names the agent.
+`focused.module`, `selection`, `mode`, `layout`, `source`, and each host
+signal as `signal.<key>` (`Situation.Signals["mail.unread"]` is
+`signal.mail.unread`), so a signal can never stand in for a built-in
+attribute. A `StateFill` (`WithStateFill`) sets typed state such as unread
+mail, prefix tokens or scope tier; `WithAgentID` names the agent.
 
 Action kinds come from a `Vocabulary`: `remind` and `halt` are built in; a host
 registers its own (`call_tool`, `run_command`, `dispatch_to_agent`) and
 carries them out. A reflex whose kind is not in the vocabulary is skipped and
-reported, never returned as an action. Cooldowns live in a `CooldownStore`
-(`WithCooldowns`); `MemoryCooldowns` has `Snapshot` and `Restore` so a host
-can persist it and not re-fire after a restart.
+reported, never returned as an action, and so is an invalid reflex handed to
+`Prepare`. Cooldowns live in a `CooldownStore` (`WithCooldowns`), whose calls
+take a context and may fail; a store error keeps the reflex from firing and is
+reported. `MemoryCooldowns` has `Snapshot` and `Restore` so a host can persist
+it and not re-fire after a restart. `NewReflexes` needs a vocabulary and takes
+no policy.
 
 ## Trace privacy
 
 `Decision.TraceFields` fills the libs agent/trace record's reserved fields
 with no prompt content: the view and module in front, the open views, the mode
 and its source, the layout, the turn source, the slots, the selector's reason,
-classifier labels and confidences, and the reflexes that fired. Message text,
+classifier labels and confidences for the known facets only, the deliberate
+mode when its preset is gone, and the reflexes that fired. Message text,
 selections, window titles and host signals stay out.

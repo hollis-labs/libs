@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -242,7 +243,8 @@ func TestReflexesFire(t *testing.T) {
 	must(t, v.Register("call_tool", nil))
 	now := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
 	cool := NewMemoryCooldowns()
-	x := NewReflexes(v, WithClock(func() time.Time { return now }), WithCooldowns(cool))
+	x, err := NewReflexes(v, WithClock(func() time.Time { return now }), WithCooldowns(cool))
+	must(t, err)
 	set := []Reflex{
 		{Name: "remind-triage", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"(?i)triage"}`), ActionKind: ActionRemind, Action: raw(`{"body":"lead with decisions"}`), Cooldown: 60},
 		{Name: "stop-1", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"^stop"}`), ActionKind: ActionHalt, Action: raw(`{"message":"first"}`)},
@@ -277,13 +279,13 @@ func TestReflexesFire(t *testing.T) {
 		t.Fatalf("predicate action: %+v", out)
 	}
 	// An event's reminder waits for the next message; a focus action returns at once.
-	if ev, _ := x.OnEvent("notes.saved", set); len(ev.Reminders) != 0 || !reflect.DeepEqual(ev.Names, []string{"saved"}) {
+	if ev, _ := x.OnEvent(ctx, "notes.saved", set); len(ev.Reminders) != 0 || !reflect.DeepEqual(ev.Names, []string{"saved"}) {
 		t.Fatalf("event: %+v", ev)
 	}
-	if ev, _ := x.OnEvent("notesx.saved", set); len(ev.Names) != 0 || ev.Names == nil {
+	if ev, _ := x.OnEvent(ctx, "notesx.saved", set); len(ev.Names) != 0 || ev.Names == nil {
 		t.Fatalf("topic prefix must stop at a dot, and none fired is []: %+v", ev)
 	}
-	if fo, _ := x.OnFocus("mail", set); len(fo.Actions) != 1 || fo.Actions[0].Spec == nil {
+	if fo, _ := x.OnFocus(ctx, "mail", set); len(fo.Actions) != 1 || fo.Actions[0].Spec == nil {
 		t.Fatalf("focus: %+v", fo)
 	}
 	out, _ = x.OnMessage(ctx, Message{Text: "hello"}, set)
@@ -311,7 +313,8 @@ func TestReflexesFire(t *testing.T) {
 	snap := cool.Snapshot()
 	again := NewMemoryCooldowns()
 	again.Restore(snap)
-	y := NewReflexes(v, WithClock(func() time.Time { return now.Add(10 * time.Second) }), WithCooldowns(again))
+	y, err := NewReflexes(v, WithClock(func() time.Time { return now.Add(10 * time.Second) }), WithCooldowns(again))
+	must(t, err)
 	if out, _ := y.OnMessage(ctx, Message{Text: "triage"}, set); len(out.Names) != 0 {
 		t.Fatalf("a restart forgot the cooldown: %+v", out)
 	}
@@ -320,18 +323,64 @@ func TestReflexesFire(t *testing.T) {
 func TestSignalsAndStateFill(t *testing.T) {
 	v := NewVocabulary()
 	var seen string
-	x := NewReflexes(v, WithAgentID("agent-1"), WithStateFill(func(st *reflexes.State, sit Situation) {
+	x, err := NewReflexes(v, WithAgentID("agent-1"), WithStateFill(func(st *reflexes.State, sit Situation) {
 		seen = st.AgentID
 		st.MailUnreadCount = 3
 	}))
+	must(t, err)
 	set := []Reflex{
 		{Name: "mail", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"mail_unread_count","op":">=","value":2}`), ActionKind: ActionRemind, Action: raw(`{"body":"mail waiting"}`)},
-		{Name: "busy", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"attr","key":"calendar.busy","value":"yes"}`), ActionKind: ActionRemind, Action: raw(`{"body":"in a meeting"}`)},
+		{Name: "busy", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"attr","key":"signal.calendar.busy","value":"yes"}`), ActionKind: ActionRemind, Action: raw(`{"body":"in a meeting"}`)},
+		{Name: "focus-only", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"attr","key":"mode","value":"focus"}`), ActionKind: ActionRemind, Action: raw(`{"body":"focused"}`)},
 	}
-	out, err := x.OnMessage(context.Background(), Message{Text: "hi", Sit: Situation{Signals: map[string]string{"calendar.busy": "yes"}}}, set)
+	// A signal named "mode" cannot stand in for the real mode.
+	out, err := x.OnMessage(context.Background(), Message{Text: "hi", Sit: Situation{Signals: map[string]string{"calendar.busy": "yes", "mode": "focus"}}}, set)
 	must(t, err)
 	if seen != "agent-1" || !reflect.DeepEqual(out.Names, []string{"mail", "busy"}) {
 		t.Fatalf("agent %q fired %v", seen, out.Names)
+	}
+	if _, err := NewReflexes(nil); err == nil {
+		t.Fatal("NewReflexes without a vocabulary")
+	}
+	if _, err := NewReflexes(v, WithPolicy(DefaultPolicy())); err == nil {
+		t.Fatal("NewReflexes accepted a policy")
+	}
+}
+
+type failingCooldowns struct{ get, set error }
+
+func (f failingCooldowns) LastFired(context.Context, string) (time.Time, bool, error) {
+	return time.Time{}, false, f.get
+}
+func (f failingCooldowns) SetFired(context.Context, string, time.Time) error { return f.set }
+
+func TestCooldownStoreErrorsAreReported(t *testing.T) {
+	r := Reflex{Name: "r", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"."}`), ActionKind: ActionRemind, Action: raw(`{"body":"b"}`), Cooldown: 60}
+	for _, store := range []failingCooldowns{{get: errors.New("read")}, {set: errors.New("write")}} {
+		x, err := NewReflexes(NewVocabulary(), WithCooldowns(store))
+		must(t, err)
+		out, err := x.OnMessage(context.Background(), Message{Text: "hi"}, []Reflex{r})
+		if err == nil || len(out.Names) != 0 {
+			t.Fatalf("store %+v: %v %+v", store, err, out)
+		}
+	}
+}
+
+func TestBadConfidenceIsAbstained(t *testing.T) {
+	p := Policy{FacetSlot: {Gate: GateAuto, Threshold: 0.7}}
+	for _, conf := range []float64{math.NaN(), -0.1, 1.5} {
+		v := p.Judge(FacetSlot, FacetResult{Label: "notes", P: conf})
+		if v.Outcome != OutcomeRecord || v.Why != "abstained" || v.P != 0 {
+			t.Errorf("confidence %v: %+v", conf, v)
+		}
+	}
+	reg, _ := NewRegistry(DefaultPresets()...)
+	s, _ := newSteer(t, reg)
+	turn, _ := s.Prepare(context.Background(), Input{Sit: Situation{Input: "x"}, Slots: all,
+		Classified: Classification{FacetSlot: {Label: "mail", P: math.NaN()}, "mood": {Label: "SECRET", P: 0.9}}})
+	_, cls, _, _ := turn.Decision.TraceFields()
+	if cls == nil || strings.Contains(string(cls), "mood") || strings.Contains(string(cls), "SECRET") {
+		t.Fatalf("trace classified: %s", cls)
 	}
 }
 
@@ -566,5 +615,58 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A selector that is not a FocusSelector can still take accepted slot suggestions.
+type pinSelector struct {
+	*FocusSelector
+	pinned []string
+}
+
+func (p *pinSelector) Pin(name, view string) {
+	p.pinned = append(p.pinned, name+"@"+view)
+	p.FocusSelector.Pin(name, view)
+}
+
+func TestAcceptUsesAnyPinner(t *testing.T) {
+	reg, _ := NewRegistry(DefaultPresets()...)
+	sel := &pinSelector{FocusSelector: NewFocusSelector(general)}
+	_, owner, err := New(reg, sel, NewVocabulary())
+	must(t, err)
+	must(t, owner.Accept(Verdict{Facet: FacetSlot, Label: "mail", Outcome: OutcomeSuggest}, "notes", all))
+	if !reflect.DeepEqual(sel.pinned, []string{"mail@notes"}) {
+		t.Fatalf("pinned %v", sel.pinned)
+	}
+}
+
+// A deliberate mode whose preset was removed falls back to the default, and the decision
+// still says what was set.
+func TestMissingDeliberateModeIsRecorded(t *testing.T) {
+	reg, _ := NewRegistry(DefaultPresets()...)
+	must(t, reg.Add(LayerApp, "", Preset{Name: "temp"}))
+	s, owner := newSteer(t, reg)
+	must(t, owner.SetMode("temp"))
+	must(t, reg.Remove(LayerApp, "", "temp"))
+	turn, err := s.Prepare(context.Background(), Input{Sit: Situation{Input: "hi"}, Slots: all})
+	must(t, err)
+	if turn.Decision.ModeSource != SourceDefault || turn.Decision.Deliberate != "temp" {
+		t.Fatalf("decision %+v", turn.Decision)
+	}
+	situation, _, _, _ := turn.Decision.TraceFields()
+	if !strings.Contains(string(situation), `"deliberate":"temp"`) {
+		t.Fatalf("trace: %s", situation)
+	}
+}
+
+// Prepare skips and reports a reflex that is not valid, such as a halt with no message.
+func TestPrepareValidatesReflexes(t *testing.T) {
+	reg, _ := NewRegistry(DefaultPresets()...)
+	s, _ := newSteer(t, reg)
+	bad := Reflex{Name: "silent-halt", Enabled: true, TriggerKind: TriggerText, Trigger: raw(`{"pattern":"."}`), ActionKind: ActionHalt, Action: raw(`{}`)}
+	ok := Reflex{Name: "note", Enabled: true, TriggerKind: TriggerText, Trigger: raw(`{"pattern":"."}`), ActionKind: ActionRemind, Action: raw(`{"body":"b"}`)}
+	turn, err := s.Prepare(context.Background(), Input{Sit: Situation{Input: "hi"}, Reflexes: []Reflex{bad, ok}})
+	if err == nil || !strings.Contains(err.Error(), "silent-halt") || turn.Fired.Halt != "" || !reflect.DeepEqual(turn.Fired.Names, []string{"note"}) {
+		t.Fatalf("err %v fired %+v", err, turn.Fired)
 	}
 }

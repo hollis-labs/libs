@@ -115,7 +115,7 @@ type Verdict struct {
 }
 
 // Judge rules on one facet's result. A facet the policy does not name, or names with
-// an unknown gate, is shadowed.
+// an unknown gate, is shadowed. A confidence outside [0, 1], or NaN, counts as abstained.
 func (p Policy) Judge(f Facet, r FacetResult) Verdict {
 	fp, ok := p[f]
 	if !ok || (fp.Gate != GateSuggest && fp.Gate != GateAuto) {
@@ -123,6 +123,8 @@ func (p Policy) Judge(f Facet, r FacetResult) Verdict {
 	}
 	v := Verdict{Facet: f, Label: r.Label, P: r.P, Gate: fp.Gate, Outcome: OutcomeRecord}
 	switch {
+	case math.IsNaN(r.P) || r.P < 0 || r.P > 1:
+		v.P, v.Why = 0, "abstained"
 	case r.Abstained || r.Label == "":
 		v.Why = "abstained"
 	case fp.Gate == GateShadow:
@@ -143,6 +145,15 @@ func (v Verdict) overrule(why string) Verdict {
 		v.Outcome, v.Why = OutcomeRecord, why
 	}
 	return v
+}
+
+// knownFacet reports whether f is one of the facets steering knows.
+func knownFacet(f Facet) bool {
+	switch f {
+	case FacetSlot, FacetPreset, FacetAct, FacetAffect:
+		return true
+	}
+	return false
 }
 
 func (p Policy) clone() Policy {

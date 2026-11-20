@@ -9,6 +9,7 @@ type options struct {
 	now       func() time.Time
 	cooldowns CooldownStore
 	policy    Policy
+	policySet bool
 	agentID   string
 	fill      StateFill
 }
@@ -39,7 +40,9 @@ func WithCooldowns(c CooldownStore) Option { return func(o *options) { o.cooldow
 
 // WithPolicy sets the classifier policy; [New] validates it. The default is
 // [DefaultPolicy].
-func WithPolicy(p Policy) Option { return func(o *options) { o.policy = p.clone() } }
+func WithPolicy(p Policy) Option {
+	return func(o *options) { o.policy, o.policySet = p.clone(), true }
+}
 
 // WithAgentID names the agent in the reflex library's state (State.AgentID).
 func WithAgentID(id string) Option { return func(o *options) { o.agentID = id } }
