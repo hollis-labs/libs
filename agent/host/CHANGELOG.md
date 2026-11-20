@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-20
+
 - A model stream busy writing a long tool input (or thinking) is no longer given up as
   stalled: the gateway sends a `keepalive` event at most every 5 seconds while frames arrive
   that are not passed on as they are written. A stream with no frames still stalls.
