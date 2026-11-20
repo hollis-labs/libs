@@ -47,6 +47,10 @@ type Config struct {
 	// messages are summarised for the model before the next request. Default 110,000;
 	// negative: never.
 	CompactAt int
+	// IdleTimeout is how long a model stream may go without any event before the turn is
+	// given up as stalled. Default 90 seconds. A stream busy writing a long tool input is
+	// not idle: it sends keepalives.
+	IdleTimeout time.Duration
 	// DescribeContext turns the page's context JSON into the text the model sees ahead of
 	// the message. Nil: the JSON itself in a <context> block.
 	DescribeContext func(json.RawMessage) string
@@ -68,6 +72,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.MaxSteps <= 0 {
 		c.MaxSteps = 24
+	}
+	if c.IdleTimeout <= 0 {
+		c.IdleTimeout = 90 * time.Second
 	}
 	if c.CompactAt == 0 {
 		c.CompactAt = defaultCompactAt

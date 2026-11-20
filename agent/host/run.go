@@ -130,7 +130,7 @@ func (r *run) execute(ctx context.Context) {
 				}
 			}
 			res, err := turn.ExecuteTurn(ctx, turn.TurnRequest{
-				IdleTimeout:     90 * time.Second,
+				IdleTimeout:     h.cfg.IdleTimeout,
 				RequireTerminal: true,
 				Stream: func(ctx context.Context) (<-chan llmtypes.StreamEvent, error) {
 					return h.provider.StreamChat(ctx, llmtypes.ChatRequest{
