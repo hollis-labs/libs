@@ -31,9 +31,9 @@ line, _ := json.Marshal(rec)
 | `trimmed` | Entries the selector cut or replaced with a pointer, as `slot/owner/key`. |
 | `tools_offered` | Tool names offered, sorted. |
 | `tool_calls` | `tool_call_id`, `tool`, `duration_ms`, `permission` (`allow`, `approved`, `deny`, `none`), `error_kind`. |
-| `subtasks` | The subagents the turn started, in order: `conversation_id`, `tool_call_id` (the call that started it), `variant`, `status`, `background`, `steps`, `duration_ms` and `usage`. `status` is `running` for a background subagent still going when the turn ended (with `steps` and `duration_ms` 0), else how it ended (see below). `usage` is the total of the subagent's whole tree, so a lead's entry covers its council. Each subagent's own turn records name this turn as their parent. |
+| `subtasks` | The subagents the turn started, in order: `conversation_id`, `tool_call_id` (the call that started it), `variant`, `status`, `background`, `steps`, `duration_ms` and `usage`. `status` is `running` for a background subagent still going when the turn ended, with `steps`, `duration_ms` and `usage` all zero; otherwise it is how the subagent ended (see below), and `usage` is the total of its whole tree, so a lead's entry covers its council. Each subagent's own turn records name this turn as their parent. |
 | `compactions` | `before`, `after` (estimated tokens), `forced`, `failed`, `error`. |
-| `usage` | The turn's own model requests only: `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`; `cost` stays empty until a price is known. A turn tree's total is its own `usage` plus every `subtasks[].usage`. |
+| `usage` | The turn's own model requests only: `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`; `cost` stays empty until a price is known. A turn tree's total is its own `usage` plus every `subtasks[].usage`. A running subtask's usage is in its own turn records; add those for a complete total. |
 | `outcome` | `status` (`completed`, `failed`, `cancelled`), `finish_reason`, `steps`, `error` (redacted). |
 | `situation`, `classified`, `why` | Reserved for the situation, classifier and selector layers. Omitted while empty. |
 | `fired`, `hooks_run` | Reserved for the reflex and hook layers: `null` when the layer did not run, `[]` when it ran and produced nothing. |

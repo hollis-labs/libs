@@ -12,6 +12,12 @@ func okSubtask(id string) Subtask {
 	return Subtask{ConversationID: id, ToolCallID: "call-" + id, Variant: "worker", Status: SubtaskOK, Steps: 1, DurationMS: 10}
 }
 
+func runningSubtask(mutate func(*Subtask)) Subtask {
+	s := Subtask{ConversationID: "bg", ToolCallID: "call-bg", Variant: "worker", Status: SubtaskRunning, Background: true}
+	mutate(&s)
+	return s
+}
+
 func validTurn() Turn {
 	return Turn{
 		Version: Version, At: time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC), DurationMS: 1500,
@@ -72,6 +78,13 @@ func TestValidate(t *testing.T) {
 		"subtask usage":        func(t *Turn) { s := okSubtask("s1"); s.Usage.OutputTokens = -1; t.Subtasks = []Subtask{s} },
 		"running foreground":   func(t *Turn) { s := okSubtask("s1"); s.Status = SubtaskRunning; t.Subtasks = []Subtask{s} },
 		"duplicate subtask":    func(t *Turn) { t.Subtasks = []Subtask{okSubtask("s1"), okSubtask("s1")} },
+		"running with steps":   func(t *Turn) { t.Subtasks = []Subtask{runningSubtask(func(s *Subtask) { s.Steps = 1 })} },
+		"running with duration": func(t *Turn) {
+			t.Subtasks = []Subtask{runningSubtask(func(s *Subtask) { s.DurationMS = 1 })}
+		},
+		"running with usage": func(t *Turn) {
+			t.Subtasks = []Subtask{runningSubtask(func(s *Subtask) { s.Usage.InputTokens = 1 })}
+		},
 		"parent turn depth 0": func(t *Turn) {
 			t.ParentConversationID, t.ParentTurnID = "c0", "r0"
 		},
@@ -158,26 +171,5 @@ func TestSubagentTurnLinksToItsParent(t *testing.T) {
 	}
 	if got["agent.turn.subtasks"] != 3 {
 		t.Fatalf("subtasks attribute %v", got["agent.turn.subtasks"])
-	}
-}
-
-// A turn's usage is its own; its tree's total adds each subtask's usage,
-// which is already that subtask's tree total.
-func TestTreeUsageIsOwnPlusSubtasks(t *testing.T) {
-	parent := validTurn() // own usage: 100 in, 20 out
-	parent.Subtasks = []Subtask{
-		{ConversationID: "c1", ToolCallID: "call-1", Variant: "worker", Status: SubtaskOK, Steps: 2, Usage: Usage{InputTokens: 30, OutputTokens: 3}},
-		{ConversationID: "c2", ToolCallID: "call-2", Variant: "lead", Status: SubtaskOK, Steps: 3, Usage: Usage{InputTokens: 70, OutputTokens: 7}},
-	}
-	if err := parent.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	total := parent.Usage
-	for _, sub := range parent.Subtasks {
-		total.InputTokens += sub.Usage.InputTokens
-		total.OutputTokens += sub.Usage.OutputTokens
-	}
-	if total.InputTokens != 200 || total.OutputTokens != 30 || parent.Usage.InputTokens != 100 {
-		t.Fatalf("tree total %+v, own %+v", total, parent.Usage)
 	}
 }

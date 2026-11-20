@@ -15,9 +15,11 @@
 // the version; readers ignore unknown fields. A rename or a change of meaning
 // needs a new version.
 //
-// Usage: a turn's usage covers only its own model requests. Each entry in
-// subtasks carries the total of that subagent's whole tree, so the total of a
-// turn's tree is its own usage plus the usage of every subtask it lists.
+// Usage: a turn's usage covers only its own model requests. Each finished entry
+// in subtasks carries the total of that subagent's whole tree, so the total of
+// a turn's tree is its own usage plus the usage of every subtask it lists. A
+// running subtask's entry has zero usage: its usage is in its own turn
+// records; add those for a complete total.
 //
 // The evidence subpackage is the other half: a passive recorder of the run's
 // runtime events with typed correlations, receipts, export and replay. A turn
@@ -211,7 +213,8 @@ type Subtask struct {
 	ToolCallID     string `json:"tool_call_id"`
 	Variant        string `json:"variant"`
 	// Status is how it ended, or SubtaskRunning for a background subagent
-	// still running when this turn ended.
+	// still running when this turn ended; a running entry has zero steps,
+	// duration and usage.
 	Status     SubtaskStatus `json:"status"`
 	Background bool          `json:"background,omitempty"`
 	// Steps is its step count and DurationMS how long it ran; both zero
@@ -327,6 +330,9 @@ func (t Turn) Validate() error {
 		case SubtaskRunning:
 			if !sub.Background {
 				return fmt.Errorf("%w: subtasks[%d] is running but not background", ErrInvalid, i)
+			}
+			if sub.Steps != 0 || sub.DurationMS != 0 || sub.Usage != (Usage{}) {
+				return fmt.Errorf("%w: subtasks[%d] is running, so its steps, duration_ms and usage must be zero", ErrInvalid, i)
 			}
 		case SubtaskOK, SubtaskPartial, SubtaskLimit, SubtaskError, SubtaskCancelled, SubtaskDenied:
 		default:

@@ -15,8 +15,10 @@
   `SubtaskStatus` is `running` (background only), `ok`, `partial`, `limit`,
   `error`, `cancelled` or `denied`. Conversation IDs may not repeat.
 - `usage` is now documented as the turn's own model requests only; a
-  subtask's `usage` is its whole tree's total, so a tree's total is a turn's
-  own usage plus its subtasks'.
+  finished subtask's `usage` is its whole tree's total, so a tree's total is
+  a turn's own usage plus its subtasks'. A running entry has zero steps,
+  duration and usage (Validate rejects anything else); its usage is in its
+  own turn records, which a complete total adds.
 - Additive: the schema version stays 1. The versioning rule is written
   down: an optional field or a new enum value keeps the version, and readers
   ignore unknown fields.
