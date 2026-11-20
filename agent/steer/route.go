@@ -1,17 +1,21 @@
 package steer
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/hollis-labs/libs/core/util/router"
 )
 
+var slashRe = regexp.MustCompile(`^/([A-Za-z0-9_.-]+)\s*(.*)$`)
+
 // MessageSubject is the routing subject for an owner's message: the fields a routing rule
 // (libs core/util/router) matches on.
 //
 //	text    the message
-//	slash   the word after a leading "/", if any
+//	slash   the command word after a leading "/" (letters, digits, "_", ".", "-"),
+//	        lower-cased; a "/" followed by anything else is not a slash command
 //	arg     the rest of the message after the slash word
 //	view, module   of the window in front
 //	slot    the primary slot
@@ -27,10 +31,9 @@ func MessageSubject(id string, sit Situation, slot string) router.Subject {
 	}
 	text := strings.TrimSpace(sit.Input)
 	put("text", text)
-	if rest, ok := strings.CutPrefix(text, "/"); ok {
-		word, arg, _ := strings.Cut(rest, " ")
-		put("slash", word)
-		put("arg", strings.TrimSpace(arg))
+	if m := slashRe.FindStringSubmatch(text); m != nil {
+		put("slash", strings.ToLower(m[1]))
+		put("arg", strings.TrimSpace(m[2]))
 	}
 	if sit.Focused != nil {
 		put("view", sit.Focused.View)

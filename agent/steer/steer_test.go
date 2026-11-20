@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hollis-labs/libs/agent/core/reflexes"
 	"github.com/hollis-labs/libs/core/util/router"
 )
 
@@ -123,10 +124,10 @@ func TestRegistryLayers(t *testing.T) {
 		t.Fatalf("first module should win among modules: %+v", p)
 	}
 	must(t, reg.Add(LayerApp, "", Preset{Name: "writing", Instructions: "from app"}))
-	if p, o, _ := reg.Get("writing"); p.Instructions != "from app" || o.LayerName != "app" {
+	if p, o, _ := reg.Get("writing"); p.Instructions != "from app" || o.Layer != LayerApp {
 		t.Fatalf("app should win: %+v %+v", p, o)
 	}
-	reg.Remove(LayerApp, "", "writing")
+	must(t, reg.Remove(LayerApp, "", "writing"))
 	if p, _, _ := reg.Get("writing"); p.Instructions != "from notes" {
 		t.Fatalf("after removing the app preset: %+v", p)
 	}
@@ -144,24 +145,28 @@ func TestRegistryLayers(t *testing.T) {
 	}
 }
 
-func TestOnlyTheOwnerSetsTheMode(t *testing.T) {
+func TestOnlyOwnerControlsSetTheMode(t *testing.T) {
 	reg, _ := NewRegistry(DefaultPresets()...)
-	m := NewModes(reg)
-	for _, k := range []ActorKind{ActorAgent, ActorHost, ActorReflex, ""} {
-		if err := m.Set(Actor{Kind: k}, "focus"); !errors.Is(err, ErrNotOwner) {
-			t.Errorf("%q set the mode: %v", k, err)
-		}
-	}
-	if err := m.Set(Actor{Kind: ActorOwner}, "nope"); !errors.Is(err, ErrUnknownPreset) {
+	s, owner, err := New(reg, NewFocusSelector(general), NewVocabulary())
+	must(t, err)
+	if err := owner.SetMode("nope"); !errors.Is(err, ErrUnknownPreset) {
 		t.Fatalf("unknown mode: %v", err)
 	}
-	must(t, m.Set(Actor{Kind: ActorOwner}, "focus"))
-	if m.Current() != "focus" {
-		t.Fatal(m.Current())
+	must(t, owner.SetMode("focus"))
+	if st := s.Modes().State(); st.Name != "focus" || st.Since.IsZero() {
+		t.Fatalf("state %+v", st)
 	}
-	must(t, m.Set(Actor{Kind: ActorOwner}, ""))
-	if m.Current() != "" {
+	must(t, owner.SetMode(""))
+	if s.Modes().Current() != "" {
 		t.Fatal("not cleared")
+	}
+	// Owner controls never come from data.
+	var decoded struct{ Owner *OwnerControls }
+	if err := json.Unmarshal([]byte(`{"Owner":{}}`), &decoded); !errors.Is(err, ErrNotOwnerControls) {
+		t.Fatalf("decoded owner controls: %v", err)
+	}
+	if _, _, err := New(nil, NewFocusSelector(general), NewVocabulary()); err == nil {
+		t.Fatal("New without a registry")
 	}
 }
 
@@ -235,9 +240,9 @@ func TestReflexValidation(t *testing.T) {
 func TestReflexesFire(t *testing.T) {
 	v := NewVocabulary()
 	must(t, v.Register("call_tool", nil))
-	x := NewReflexes(v)
 	now := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
-	x.now = func() time.Time { return now }
+	cool := NewMemoryCooldowns()
+	x := NewReflexes(v, WithClock(func() time.Time { return now }), WithCooldowns(cool))
 	set := []Reflex{
 		{Name: "remind-triage", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"(?i)triage"}`), ActionKind: ActionRemind, Action: raw(`{"body":"lead with decisions"}`), Cooldown: 60},
 		{Name: "stop-1", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"^stop"}`), ActionKind: ActionHalt, Action: raw(`{"message":"first"}`)},
@@ -272,13 +277,13 @@ func TestReflexesFire(t *testing.T) {
 		t.Fatalf("predicate action: %+v", out)
 	}
 	// An event's reminder waits for the next message; a focus action returns at once.
-	if ev := x.OnEvent("notes.saved", set); len(ev.Reminders) != 0 || !reflect.DeepEqual(ev.Names, []string{"saved"}) {
+	if ev, _ := x.OnEvent("notes.saved", set); len(ev.Reminders) != 0 || !reflect.DeepEqual(ev.Names, []string{"saved"}) {
 		t.Fatalf("event: %+v", ev)
 	}
-	if ev := x.OnEvent("notesx.saved", set); len(ev.Names) != 0 {
-		t.Fatalf("topic prefix must stop at a dot: %+v", ev)
+	if ev, _ := x.OnEvent("notesx.saved", set); len(ev.Names) != 0 || ev.Names == nil {
+		t.Fatalf("topic prefix must stop at a dot, and none fired is []: %+v", ev)
 	}
-	if fo := x.OnFocus("mail", set); len(fo.Actions) != 1 || fo.Actions[0].Spec == nil {
+	if fo, _ := x.OnFocus("mail", set); len(fo.Actions) != 1 || fo.Actions[0].Spec == nil {
 		t.Fatalf("focus: %+v", fo)
 	}
 	out, _ = x.OnMessage(ctx, Message{Text: "hello"}, set)
@@ -291,6 +296,43 @@ func TestReflexesFire(t *testing.T) {
 	if err == nil || out.Halt != "first" {
 		t.Fatalf("broken trigger: %v %+v", err, out)
 	}
+	// An action kind outside the vocabulary never comes back as an action.
+	rogue := Reflex{Name: "rogue", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"go"}`), ActionKind: "run_command", Action: raw(`{"command":"rm"}`)}
+	out, err = x.OnMessage(ctx, Message{Text: "go"}, []Reflex{rogue})
+	if err == nil || len(out.Actions) != 0 || len(out.Names) != 0 {
+		t.Fatalf("unknown action kind: %v %+v", err, out)
+	}
+	// Text is trimmed before triggers run.
+	if out, _ := x.OnMessage(ctx, Message{Text: "  stop  "}, set[1:2]); out.Halt != "first" {
+		t.Fatalf("untrimmed: %+v", out)
+	}
+	// Cooldowns persist through the store: a fresh runner over a restored snapshot is still
+	// cooling down.
+	snap := cool.Snapshot()
+	again := NewMemoryCooldowns()
+	again.Restore(snap)
+	y := NewReflexes(v, WithClock(func() time.Time { return now.Add(10 * time.Second) }), WithCooldowns(again))
+	if out, _ := y.OnMessage(ctx, Message{Text: "triage"}, set); len(out.Names) != 0 {
+		t.Fatalf("a restart forgot the cooldown: %+v", out)
+	}
+}
+
+func TestSignalsAndStateFill(t *testing.T) {
+	v := NewVocabulary()
+	var seen string
+	x := NewReflexes(v, WithAgentID("agent-1"), WithStateFill(func(st *reflexes.State, sit Situation) {
+		seen = st.AgentID
+		st.MailUnreadCount = 3
+	}))
+	set := []Reflex{
+		{Name: "mail", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"mail_unread_count","op":">=","value":2}`), ActionKind: ActionRemind, Action: raw(`{"body":"mail waiting"}`)},
+		{Name: "busy", TriggerKind: TriggerPredicate, Trigger: raw(`{"kind":"attr","key":"calendar.busy","value":"yes"}`), ActionKind: ActionRemind, Action: raw(`{"body":"in a meeting"}`)},
+	}
+	out, err := x.OnMessage(context.Background(), Message{Text: "hi", Sit: Situation{Signals: map[string]string{"calendar.busy": "yes"}}}, set)
+	must(t, err)
+	if seen != "agent-1" || !reflect.DeepEqual(out.Names, []string{"mail", "busy"}) {
+		t.Fatalf("agent %q fired %v", seen, out.Names)
+	}
 }
 
 func TestMessageSubjectAndRules(t *testing.T) {
@@ -299,6 +341,20 @@ func TestMessageSubjectAndRules(t *testing.T) {
 	want := map[string]string{"text": "/open today's note", "slash": "open", "arg": "today's note", "view": "notes", "module": "notes", "slot": "notes", "mode": "focus"}
 	if s.ID != "m1" || !reflect.DeepEqual(s.Fields, want) {
 		t.Fatalf("subject: %+v", s)
+	}
+	for _, tc := range []struct{ in, slash, arg string }{
+		{"/Open Notes", "open", "Notes"},
+		{"/a.b-c_d rest of it", "a.b-c_d", "rest of it"},
+		{"/go", "go", ""},
+		{"/", "", ""},
+		{"/ spaced", "", ""},
+		{"say /go", "", ""},
+		{"/emoji✓ tail", "emoji", "✓ tail"},
+	} {
+		f := MessageSubject("m", Situation{Input: tc.in}, "").Fields
+		if f["slash"] != tc.slash || f["arg"] != tc.arg {
+			t.Errorf("%q: slash %q arg %q, want %q %q", tc.in, f["slash"], f["arg"], tc.slash, tc.arg)
+		}
 	}
 	rs := router.RuleSet{Version: "1", Strategy: router.FirstMatch, Rules: []router.Rule{
 		{ID: "always", Target: "tool:a"},
@@ -311,20 +367,27 @@ func TestMessageSubjectAndRules(t *testing.T) {
 	}
 }
 
+func newSteer(t *testing.T, reg *Registry, opts ...Option) (*Steer, *OwnerControls) {
+	t.Helper()
+	s, owner, err := New(reg, NewFocusSelector(general), NewVocabulary(), opts...)
+	must(t, err)
+	return s, owner
+}
+
 // R6 acceptance: a deliberate mode activates its reflexes and instructions.
 func TestDeliberateModeActivatesItsReflexesAndInstructions(t *testing.T) {
 	reg, _ := NewRegistry(DefaultPresets()...)
 	must(t, reg.Add(LayerApp, "", Preset{Name: "focus", Instructions: "Be brief.", Reflexes: []string{"hush"}, Slots: []string{"drafts"}, Tools: []string{"drafts_write"}}))
-	s := New(reg, NewFocusSelector(general), NewVocabulary())
+	s, owner := newSteer(t, reg)
 	hush := Reflex{Name: "hush", TriggerKind: TriggerText, Trigger: raw(`{"pattern":"."}`), ActionKind: ActionRemind, Action: raw(`{"body":"hold non-urgent updates"}`)}
 	in := Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "what's next?"}, Slots: all, Reflexes: []Reflex{hush}}
 
 	turn, err := s.Prepare(context.Background(), in)
 	must(t, err)
-	if turn.Mode.Source != SourceDefault || len(turn.Fired.Names) != 0 {
+	if turn.Mode.Source != SourceDefault || len(turn.Fired.Names) != 0 || turn.Decision.Situation.Mode != "" {
 		t.Fatalf("before the mode: %+v", turn)
 	}
-	must(t, s.Modes.Set(Actor{Kind: ActorOwner}, "focus"))
+	must(t, owner.SetMode("focus"))
 	turn, err = s.Prepare(context.Background(), in)
 	must(t, err)
 	if turn.Mode.Source != SourceDeliberate || turn.Mode.Preset.Name != "focus" {
@@ -344,10 +407,23 @@ func TestDeliberateModeActivatesItsReflexesAndInstructions(t *testing.T) {
 	}
 }
 
+// The default preset is not a mode: it neither selects mode slots nor matches mode
+// conditions.
+func TestDefaultPresetIsNotAMode(t *testing.T) {
+	reg, _ := NewRegistry(DefaultPresets()...)
+	s, _ := newSteer(t, reg)
+	generalist := Slot{Name: "everything", Modes: []string{"general"}}
+	turn, err := s.Prepare(context.Background(), Input{Sit: Situation{Input: "hi"}, Slots: []Slot{generalist}})
+	must(t, err)
+	if turn.Selection.has("everything") || turn.Decision.Mode != "general" || turn.Decision.Situation.Mode != "" {
+		t.Fatalf("default as a mode: %+v", turn.Decision)
+	}
+}
+
 // R6 acceptance: a classified suggestion surfaces but does not apply in suggest mode.
 func TestClassifiedSuggestionDoesNotApply(t *testing.T) {
 	reg, _ := NewRegistry(DefaultPresets()...)
-	s := New(reg, NewFocusSelector(general), NewVocabulary())
+	s, owner := newSteer(t, reg)
 	cls := Classification{FacetPreset: {Label: "triage", P: 0.9}, FacetSlot: {Label: "mail", P: 0.9}, FacetAct: {Label: "task", P: 0.9}}
 	turn, err := s.Prepare(context.Background(), Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "go through my inbox"}, Slots: all, Classified: cls})
 	must(t, err)
@@ -360,23 +436,58 @@ func TestClassifiedSuggestionDoesNotApply(t *testing.T) {
 	if len(turn.Decision.Verdicts) != 3 {
 		t.Fatalf("verdicts: %+v", turn.Decision.Verdicts)
 	}
-	// The owner accepts the preset suggestion: it becomes the deliberate mode.
-	if err := s.Accept(Actor{Kind: ActorAgent}, turn.Suggestions[0], ""); !errors.Is(err, ErrNotOwner) {
-		t.Fatalf("the agent accepted: %v", err)
+	// Only a suggestion for a known label can be accepted.
+	forged := turn.Suggestions[0]
+	forged.Outcome = OutcomeRecord
+	if owner.Accept(forged, "", all) == nil {
+		t.Fatal("a recorded verdict was accepted")
 	}
-	must(t, s.Accept(Actor{Kind: ActorOwner}, turn.Suggestions[0], ""))
-	must(t, s.Accept(Actor{Kind: ActorOwner}, turn.Suggestions[1], "notes"))
+	unknown := turn.Suggestions[1]
+	unknown.Label = "nope"
+	if owner.Accept(unknown, "", all) == nil {
+		t.Fatal("an unknown slot was accepted")
+	}
+	must(t, owner.Accept(turn.Suggestions[0], "", all))
+	must(t, owner.Accept(turn.Suggestions[1], "notes", all))
 	turn, _ = s.Prepare(context.Background(), Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "next"}, Slots: all})
 	if turn.Mode.Source != SourceDeliberate || turn.Mode.Preset.Name != "triage" || turn.Selection.Primary().Name != "mail" {
 		t.Fatalf("after accepting: %s %s %s", turn.Mode.Source, turn.Mode.Preset.Name, turn.Selection.Primary().Name)
 	}
 
-	// With the slot facet on auto, a confident slot leads.
-	s2 := New(reg, NewFocusSelector(general), NewVocabulary())
-	s2.Policy[FacetSlot] = FacetPolicy{Gate: GateAuto, Threshold: 0.7}
-	turn, _ = s2.Prepare(context.Background(), Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "inbox"}, Slots: all, Classified: Classification{FacetSlot: {Label: "mail", P: 0.9}}})
+	// With the slot facet on auto, a confident slot leads, but not for an empty message.
+	s2, _ := newSteer(t, reg, WithPolicy(Policy{FacetSlot: {Gate: GateAuto, Threshold: 0.7}}))
+	slotCls := Classification{FacetSlot: {Label: "mail", P: 0.9}}
+	turn, _ = s2.Prepare(context.Background(), Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "inbox"}, Slots: all, Classified: slotCls})
 	if turn.Selection.Primary().Name != "mail" || turn.Selection.Why != "classified" {
 		t.Fatalf("auto slot: %+v", turn.Selection)
+	}
+	turn, _ = s2.Prepare(context.Background(), Input{Sit: Situation{Focused: &Focus{View: "notes"}, Input: "  "}, Slots: all, Classified: slotCls})
+	if turn.Selection.Primary().Name != "notes" || len(turn.Suggestions) != 0 || turn.Decision.Verdicts[0].Why != "no input" {
+		t.Fatalf("empty input: %+v %+v", turn.Selection, turn.Decision.Verdicts)
+	}
+}
+
+func TestPolicyIsValidated(t *testing.T) {
+	reg, _ := NewRegistry(DefaultPresets()...)
+	if _, _, err := New(reg, NewFocusSelector(general), NewVocabulary(), WithPolicy(Policy{FacetSlot: {Gate: GateAuto, Threshold: 0.3}})); err == nil {
+		t.Fatal("an auto gate below the floor was accepted")
+	}
+	s, _ := newSteer(t, reg)
+	if s.SetPolicy(Policy{FacetSlot: {Gate: "sometimes", Threshold: 0.9}}) == nil {
+		t.Fatal("an unknown gate was accepted")
+	}
+	p := s.Policy()
+	p[FacetSlot] = FacetPolicy{Gate: GateAuto, Threshold: 0.9}
+	if s.Policy()[FacetSlot].Gate == GateAuto {
+		t.Fatal("Policy returned shared state")
+	}
+	must(t, s.SetPolicy(p))
+	if s.Policy()[FacetSlot].Gate != GateAuto {
+		t.Fatal("SetPolicy did not apply")
+	}
+	// An invalid gate in a policy built by hand is shadowed when judged.
+	if v := (Policy{FacetSlot: {Gate: "sometimes", Threshold: 0.1}}).Judge(FacetSlot, FacetResult{Label: "x", P: 1}); v.Outcome != OutcomeRecord || v.Why != "shadow" {
+		t.Fatalf("invalid gate: %+v", v)
 	}
 }
 
@@ -384,8 +495,8 @@ func TestClassifiedSuggestionDoesNotApply(t *testing.T) {
 func TestModulePresetLoads(t *testing.T) {
 	reg, _ := NewRegistry(DefaultPresets()...)
 	must(t, reg.Add(LayerModule, "drafts", Preset{Name: "writing", Slots: []string{"drafts"}, Instructions: "Help the owner write."}))
-	s := New(reg, NewFocusSelector(general), NewVocabulary())
-	must(t, s.Modes.Set(Actor{Kind: ActorOwner}, "writing"))
+	s, owner := newSteer(t, reg)
+	must(t, owner.SetMode("writing"))
 	turn, err := s.Prepare(context.Background(), Input{Sit: Situation{Input: "start the intro"}, Slots: all})
 	must(t, err)
 	if turn.Mode.Origin.Source != "drafts" || !strings.Contains(strings.Join(turn.Instructions, "\n"), "Help the owner write.") || !turn.Selection.has("drafts") {
@@ -393,22 +504,59 @@ func TestModulePresetLoads(t *testing.T) {
 	}
 }
 
-func TestTraceFields(t *testing.T) {
+func TestTraceFieldsCarryNoPrompt(t *testing.T) {
 	reg, _ := NewRegistry(DefaultPresets()...)
-	s := New(reg, NewFocusSelector(general), NewVocabulary())
-	turn, _ := s.Prepare(context.Background(), Input{Sit: Situation{Input: "hi", Source: "user"}, Slots: all})
-	sit, cls, why, fired := turn.Decision.TraceFields()
-	if cls != nil || why != "default" || fired == nil || len(fired) != 0 {
+	s, _ := newSteer(t, reg)
+	sit := Situation{Input: "SECRET-INPUT", Source: "user", Layout: "desk",
+		Focused: &Focus{View: "notes", Module: "notes", Title: "SECRET-TITLE", Selection: "SECRET-SELECTION"},
+		Windows: []Window{{ID: "w1", View: "notes", Title: "SECRET-TITLE"}, {ID: "w2", View: "mail", Title: "SECRET-MAIL"}},
+		Signals: map[string]string{"k": "SECRET-SIGNAL"}}
+	turn, _ := s.Prepare(context.Background(), Input{Sit: sit, Slots: all})
+	situation, cls, why, fired := turn.Decision.TraceFields()
+	if strings.Contains(string(situation), "SECRET") {
+		t.Fatalf("the trace situation carries text: %s", situation)
+	}
+	if cls != nil || why != "focus" || fired == nil || len(fired) != 0 {
 		t.Fatalf("no classifier: cls=%s why=%s fired=%v", cls, why, fired)
 	}
-	var got map[string]any
-	must(t, json.Unmarshal(sit, &got))
-	if got["mode"] != "general" || got["mode_source"] != "default" || got["source"] != "user" {
-		t.Fatalf("situation: %s", sit)
+	var got TraceSituation
+	must(t, json.Unmarshal(situation, &got))
+	if got.Mode != "general" || got.ModeSource != "default" || got.Source != "user" || got.View != "notes" || !reflect.DeepEqual(got.Views, []string{"notes", "mail"}) || got.Layout != "desk" {
+		t.Fatalf("situation: %+v", got)
 	}
 	turn, _ = s.Prepare(context.Background(), Input{Sit: Situation{Input: "hi"}, Slots: all, Classified: Classification{FacetAct: {Label: "chat", P: 0.4}}})
 	if _, cls, _, _ := turn.Decision.TraceFields(); !strings.Contains(string(cls), `"verdicts"`) {
 		t.Fatalf("classified: %s", cls)
+	}
+}
+
+func TestRegistryChecksAndGuards(t *testing.T) {
+	if _, err := NewRegistry(Preset{Name: "a"}, Preset{Name: "a"}); err == nil {
+		t.Fatal("a duplicate default was accepted")
+	}
+	reg, _ := NewRegistry(DefaultPresets()...)
+	if err := reg.Remove(LayerDefault, "", "general"); err == nil {
+		t.Fatal("the default preset was removed")
+	}
+	must(t, reg.Add(LayerApp, "", Preset{Name: "general", About: "app general"}))
+	must(t, reg.Remove(LayerApp, "", "general")) // the shipped one remains
+	must(t, reg.Add(LayerApp, "", Preset{Name: "ops", Slots: []string{"mail", "ghost"}, Reflexes: []string{"hush", "nope"}, Rules: []string{"r1", "r2"}}))
+	errs := reg.Check(all, []Reflex{{Name: "hush"}}, router.RuleSet{Rules: []router.Rule{{ID: "r1"}}})
+	if len(errs) != 3 {
+		t.Fatalf("check: %v", errs)
+	}
+	for _, l := range []Layer{LayerDefault, LayerModule, LayerApp} {
+		b, err := json.Marshal(Origin{Layer: l})
+		must(t, err)
+		var o Origin
+		must(t, json.Unmarshal(b, &o))
+		if o.Layer != l {
+			t.Fatalf("layer %v round-tripped to %v (%s)", l, o.Layer, b)
+		}
+	}
+	var bad Layer
+	if bad.UnmarshalText([]byte("vendor")) == nil {
+		t.Fatal("an unknown layer was accepted")
 	}
 }
 

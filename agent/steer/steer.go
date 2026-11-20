@@ -6,24 +6,116 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/hollis-labs/libs/agent/core/reflexes"
 )
 
-// Steer runs the pipeline for a host. Build one with [New]; it is safe for concurrent use
-// as long as its parts are (the shipped ones are).
+// Steer runs the pipeline for a host. Build one with [New]; the zero Steer is not usable.
+// It is safe for concurrent use as long as its selector is (the shipped one is).
 type Steer struct {
-	Registry *Registry
-	Modes    *Modes
-	Selector Selector
-	Policy   Policy
-	Reflexes *Reflexes
+	registry *Registry
+	modes    *Modes
+	selector Selector
+	reflexes *Reflexes
+
+	mu     sync.RWMutex
+	policy Policy
 }
 
-// New returns a Steer over a registry, with a mode holder, the given selector, the default
-// policy and a reflex runner over the vocabulary.
-func New(reg *Registry, sel Selector, vocab *Vocabulary) *Steer {
-	return &Steer{Registry: reg, Modes: NewModes(reg), Selector: sel, Policy: DefaultPolicy(), Reflexes: NewReflexes(vocab)}
+// OwnerControls is what only the owner may do: set the mode and accept a suggestion. [New]
+// returns it to the host, which keeps it out of anything the model or an outside party can
+// reach. It is a capability, not an identity: it cannot be built, decoded or forged.
+type OwnerControls struct {
+	s *Steer
+}
+
+// ErrNotOwnerControls is returned when OwnerControls is decoded from data.
+var ErrNotOwnerControls = errors.New("owner controls cannot be decoded")
+
+// UnmarshalJSON refuses: owner controls never come from data.
+func (*OwnerControls) UnmarshalJSON([]byte) error { return ErrNotOwnerControls }
+
+// UnmarshalText refuses: owner controls never come from data.
+func (*OwnerControls) UnmarshalText([]byte) error { return ErrNotOwnerControls }
+
+// New returns a Steer over a registry, a selector and a reflex vocabulary, and the
+// OwnerControls that alone can set its mode. Options set the classifier policy (validated),
+// the clock, the cooldown store, the agent id and a reflex state fill.
+func New(reg *Registry, sel Selector, vocab *Vocabulary, opts ...Option) (*Steer, *OwnerControls, error) {
+	if reg == nil || sel == nil || vocab == nil {
+		return nil, nil, errors.New("steer: a registry, a selector and a vocabulary are required")
+	}
+	o := collect(opts)
+	if err := o.policy.Validate(); err != nil {
+		return nil, nil, err
+	}
+	s := &Steer{registry: reg, modes: &Modes{reg: reg, now: o.now}, selector: sel, policy: o.policy,
+		reflexes: &Reflexes{vocab: vocab, now: o.now, cooldowns: o.cooldowns, agentID: o.agentID, fill: o.fill}}
+	return s, &OwnerControls{s: s}, nil
+}
+
+// Registry is the preset registry.
+func (s *Steer) Registry() *Registry { return s.registry }
+
+// Modes reads the deliberate mode.
+func (s *Steer) Modes() *Modes { return s.modes }
+
+// Selector is the work-slot selector.
+func (s *Steer) Selector() Selector { return s.selector }
+
+// Reflexes is the reflex runner, for host events and focus changes.
+func (s *Steer) Reflexes() *Reflexes { return s.reflexes }
+
+// Policy is a copy of the classifier policy.
+func (s *Steer) Policy() Policy {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.policy.clone()
+}
+
+// SetPolicy replaces the classifier policy after validating it.
+func (s *Steer) SetPolicy(p Policy) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.policy = p.clone()
+	return nil
+}
+
+// SetMode sets the deliberate mode; "" clears it.
+func (c *OwnerControls) SetMode(name string) error { return c.s.modes.set(name) }
+
+// Pinner is a selector that can pin a slot until the window in front changes.
+type Pinner interface {
+	Pin(name, view string)
+}
+
+// Accept applies a suggestion the owner accepted. It must be a suggest outcome for a label
+// the host knows: a preset suggestion names a registered preset and becomes the deliberate
+// mode; a slot suggestion names one of all and is pinned (the selector must be a
+// [Pinner]). view is the view in front.
+func (c *OwnerControls) Accept(v Verdict, view string, all []Slot) error {
+	if v.Outcome != OutcomeSuggest {
+		return errors.New("only a suggestion can be accepted")
+	}
+	switch v.Facet {
+	case FacetPreset:
+		return c.s.modes.set(v.Label)
+	case FacetSlot:
+		if _, ok := Named(all, v.Label); !ok {
+			return errors.New("the suggested slot is not one the host offers")
+		}
+		p, ok := c.s.selector.(Pinner)
+		if !ok {
+			return errors.New("the selector cannot pin a slot")
+		}
+		p.Pin(v.Label, view)
+		return nil
+	}
+	return errors.New("only slot and preset suggestions can be accepted")
 }
 
 // Input is what the host knows when the owner's message arrives.
@@ -52,37 +144,59 @@ type Turn struct {
 	Fired Fired `json:"fired"`
 	// Suggestions are classified results the owner may accept (suggest gate).
 	Suggestions []Verdict `json:"suggestions,omitempty"`
-	// Decision is the record for the turn's trace.
+	// Decision is the record of the turn's steering.
 	Decision Decision `json:"decision"`
 }
 
-// Decision is what a trace records about steering.
+// Decision is what steering decided. It holds the situation as the host gave it, message
+// text included; [Decision.TraceFields] is the prompt-free view for a trace.
 type Decision struct {
-	// Situation is the situation the turn ran in, with the mode resolved.
 	Situation Situation `json:"situation"`
-	// Mode is the preset in force and its source.
-	Mode string `json:"mode"`
-	// ModeSource is "deliberate", "classified" or "default".
+	// Mode is the preset in force; ModeSource is "deliberate", "classified" or "default".
+	Mode       string `json:"mode"`
 	ModeSource string `json:"mode_source"`
 	// Why is the selector's reason for the slots.
 	Why string `json:"why"`
 	// Slots are the active slots, by name.
 	Slots []string `json:"slots"`
-	// Classified is the classifier's raw result; Verdicts are the policy's rulings on it.
+	// Classified is the classifier's result; Verdicts are the policy's rulings on it.
 	Classified Classification `json:"classified,omitempty"`
 	Verdicts   []Verdict      `json:"verdicts,omitempty"`
-	// Fired names the reflexes that fired: nil when the reflex layer did not run.
+	// Fired names the reflexes that fired: [] when none did, nil when no reflex layer ran.
 	Fired []string `json:"fired"`
 }
 
+// TraceSituation is the prompt-free situation a trace records: no message text, no
+// selection, no window titles, no host signals.
+type TraceSituation struct {
+	View   string `json:"view,omitempty"`
+	Module string `json:"module,omitempty"`
+	// Views are the open windows' views.
+	Views      []string `json:"views,omitempty"`
+	Mode       string   `json:"mode"`
+	ModeSource string   `json:"mode_source"`
+	Layout     string   `json:"layout,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	Slots      []string `json:"slots"`
+}
+
 // TraceFields returns the decision in the shape of the libs agent/trace record's reserved
-// fields: situation, classified (null when no classifier ran), why and fired.
+// fields: situation (a [TraceSituation]), classified (labels and confidences only; null
+// when no classifier ran), why and fired. Nothing the owner wrote is included.
 func (d Decision) TraceFields() (situation, classified json.RawMessage, why string, fired []string) {
-	situation, _ = json.Marshal(struct {
-		Situation
-		ModeSource string   `json:"mode_source"`
-		Slots      []string `json:"slots"`
-	}{d.Situation, d.ModeSource, d.Slots})
+	ts := TraceSituation{Mode: d.Mode, ModeSource: d.ModeSource, Layout: d.Situation.Layout, Source: d.Situation.Source, Slots: d.Slots}
+	if f := d.Situation.Focused; f != nil {
+		ts.View, ts.Module = f.View, f.Module
+	}
+	for _, w := range d.Situation.Windows {
+		if w.View != "" && !slices.Contains(ts.Views, w.View) {
+			ts.Views = append(ts.Views, w.View)
+		}
+	}
+	if ts.Slots == nil {
+		ts.Slots = []string{}
+	}
+	situation, _ = json.Marshal(ts)
 	if d.Classified != nil {
 		classified, _ = json.Marshal(struct {
 			Result   Classification `json:"result"`
@@ -92,15 +206,21 @@ func (d Decision) TraceFields() (situation, classified json.RawMessage, why stri
 	return situation, classified, d.Why, d.Fired
 }
 
-// Prepare runs the pipeline for one owner message. A reflex trigger that cannot be
-// evaluated is reported in the error; the rest of the turn is still returned.
+// Prepare runs the pipeline for one owner message. A host should call it before any routing
+// tool runs: a halt answers the message, and nothing else should act on it. A reflex that
+// cannot be evaluated or fired is reported in the error; the rest of the turn is still
+// returned.
 func (s *Steer) Prepare(ctx context.Context, in Input) (Turn, error) {
 	var t Turn
-	t.Mode = Resolve(s.Registry, s.Modes.Current(), in.Classified, s.Policy)
+	policy := s.Policy()
+	t.Mode = Resolve(s.registry, s.modes.Current(), in.Classified, policy)
 	sit := in.Sit
-	sit.Mode = t.Mode.Preset.Name
+	sit.Mode = ""
+	if t.Mode.Source != SourceDefault {
+		sit.Mode = t.Mode.Preset.Name
+	}
 
-	t.Selection = s.Selector.Select(ctx, sit, in.Slots)
+	t.Selection = s.selector.Select(ctx, sit, in.Slots)
 	for _, name := range t.Mode.Preset.Slots {
 		if sl, ok := Named(in.Slots, name); ok && !t.Selection.has(name) {
 			t.Selection.Slots = append(t.Selection.Slots, sl)
@@ -115,24 +235,26 @@ func (s *Steer) Prepare(ctx context.Context, in Input) (Turn, error) {
 		verdicts = append(verdicts, *t.Mode.Verdict)
 	}
 	if r, ok := in.Classified[FacetSlot]; ok {
-		v := s.Policy.Judge(FacetSlot, r)
+		v := policy.Judge(FacetSlot, r)
 		lead, known := Named(in.Slots, r.Label)
 		switch {
 		case v.Outcome == OutcomeRecord:
+		case strings.TrimSpace(in.Sit.Input) == "":
+			v = v.overrule("no input")
 		case !known:
 			v = v.overrule("unknown label")
 		case t.Selection.Why == "pinned":
 			v = v.overrule("pinned")
 		case t.Selection.Primary().Name == r.Label:
 			v = v.overrule("same as selected")
-		case v.Outcome == OutcomeApply && strings.TrimSpace(in.Sit.Input) != "":
+		case v.Outcome == OutcomeApply:
 			t.Selection = leadWith(t.Selection, lead, "classified")
 		}
 		verdicts = append(verdicts, v)
 	}
 	for f, r := range in.Classified {
 		if f != FacetSlot && f != FacetPreset {
-			verdicts = append(verdicts, s.Policy.Judge(f, r).overrule("not acted on"))
+			verdicts = append(verdicts, policy.Judge(f, r).overrule("not acted on"))
 		}
 	}
 	slices.SortStableFunc(verdicts, func(a, b Verdict) int { return strings.Compare(string(a.Facet), string(b.Facet)) })
@@ -155,39 +277,11 @@ func (s *Steer) Prepare(ctx context.Context, in Input) (Turn, error) {
 	t.Tools = dedupe(tools)
 
 	var err error
-	if s.Reflexes != nil {
-		t.Fired, err = s.Reflexes.OnMessage(ctx, Message{Text: in.Sit.Input, Prior: in.Prior, Sit: sit}, Active(in.Reflexes, t.Mode.Preset))
-		if t.Fired.Names == nil {
-			t.Fired.Names = []string{}
-		}
-	}
+	t.Fired, err = s.reflexes.OnMessage(ctx, Message{Text: in.Sit.Input, Prior: in.Prior, Sit: sit}, Active(in.Reflexes, t.Mode.Preset))
 
 	t.Decision = Decision{Situation: sit, Mode: t.Mode.Preset.Name, ModeSource: t.Mode.Source, Why: t.Selection.Why,
 		Slots: t.Selection.Names(), Classified: in.Classified, Verdicts: verdicts, Fired: t.Fired.Names}
-	if s.Reflexes == nil {
-		t.Decision.Fired = nil
-	}
 	return t, err
-}
-
-// Accept applies a suggestion the owner accepted. A slot suggestion pins the slot (when the
-// selector is a [FocusSelector]); a preset suggestion sets the deliberate mode. Only the
-// owner accepts.
-func (s *Steer) Accept(actor Actor, v Verdict, view string) error {
-	if actor.Kind != ActorOwner {
-		return ErrNotOwner
-	}
-	switch v.Facet {
-	case FacetPreset:
-		return s.Modes.Set(actor, v.Label)
-	case FacetSlot:
-		if fs, ok := s.Selector.(*FocusSelector); ok {
-			fs.Pin(v.Label, view)
-			return nil
-		}
-		return errors.New("the selector cannot pin a slot")
-	}
-	return errors.New("only slot and preset suggestions can be accepted")
 }
 
 func dedupe(in []string) []string {

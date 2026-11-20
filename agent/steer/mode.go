@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/hollis-labs/libs/core/util/router"
 )
 
 // Preset is a named bundle of behaviour. A mode is a preset the owner chose.
@@ -45,7 +47,8 @@ func (p Preset) Validate() error {
 	return nil
 }
 
-// Layer is where a preset came from. A higher layer replaces a lower one of the same name.
+// Layer is where a preset came from. A higher layer replaces a lower one of the same name:
+// app > module > default.
 type Layer int
 
 const (
@@ -69,11 +72,33 @@ func (l Layer) String() string {
 	return fmt.Sprintf("layer(%d)", int(l))
 }
 
+// MarshalText writes the layer's name.
+func (l Layer) MarshalText() ([]byte, error) {
+	switch l {
+	case LayerDefault, LayerModule, LayerApp:
+		return []byte(l.String()), nil
+	}
+	return nil, fmt.Errorf("unknown layer %d", int(l))
+}
+
+// UnmarshalText reads a layer's name.
+func (l *Layer) UnmarshalText(b []byte) error {
+	switch string(b) {
+	case "default":
+		*l = LayerDefault
+	case "module":
+		*l = LayerModule
+	case "app":
+		*l = LayerApp
+	default:
+		return fmt.Errorf("unknown layer %q: use default, module or app", b)
+	}
+	return nil
+}
+
 // Origin says where an effective preset came from.
 type Origin struct {
-	Layer Layer `json:"-"`
-	// LayerName is Layer as text, for records.
-	LayerName string `json:"layer"`
+	Layer Layer `json:"layer"`
 	// Source names the contributor within the layer: the module, or "" for the app and the
 	// defaults.
 	Source string `json:"source,omitempty"`
@@ -94,11 +119,15 @@ type Registry struct {
 // ErrUnknownPreset is returned for a preset name the registry does not hold.
 var ErrUnknownPreset = errors.New("no such preset")
 
-// NewRegistry returns a registry holding the given default presets. The first is the
-// default, used when no mode is set and nothing is classified; with none, it is empty.
+// NewRegistry returns a registry holding the given default presets, which must have
+// distinct names. The first is the default, used when no mode is set and nothing is
+// classified; with none, it is empty.
 func NewRegistry(defaults ...Preset) (*Registry, error) {
 	r := &Registry{entries: map[string][]entry{}}
 	for _, p := range defaults {
+		if _, ok := r.entries[p.Name]; ok {
+			return nil, fmt.Errorf("default preset %s is listed twice", p.Name)
+		}
 		if err := r.Add(LayerDefault, "", p); err != nil {
 			return nil, err
 		}
@@ -127,12 +156,12 @@ func (r *Registry) Add(layer Layer, source string, p Preset) error {
 	default:
 		return fmt.Errorf("preset %s: unknown layer %d", p.Name, int(layer))
 	}
-	o := Origin{Layer: layer, LayerName: layer.String(), Source: source}
+	o := Origin{Layer: layer, Source: source}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	list := r.entries[p.Name]
 	for i, e := range list {
-		if e.origin.Layer == layer && e.origin.Source == source {
+		if e.origin == o {
 			list[i] = entry{preset: clonePreset(p), origin: o}
 			return nil
 		}
@@ -141,17 +170,21 @@ func (r *Registry) Add(layer Layer, source string, p Preset) error {
 	return nil
 }
 
-// Remove takes out what a layer and source contributed under name, if anything.
-func (r *Registry) Remove(layer Layer, source, name string) {
+// Remove takes out what a layer and source contributed under name, if anything. It refuses
+// to remove the last definition of the default preset.
+func (r *Registry) Remove(layer Layer, source, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	list := r.entries[name]
-	list = slices.DeleteFunc(list, func(e entry) bool { return e.origin.Layer == layer && e.origin.Source == source })
+	list := slices.DeleteFunc(slices.Clone(r.entries[name]), func(e entry) bool { return e.origin == Origin{Layer: layer, Source: source} })
 	if len(list) == 0 {
+		if name == r.deflt {
+			return fmt.Errorf("preset %s is the default; set another default first", name)
+		}
 		delete(r.entries, name)
-		return
+		return nil
 	}
 	r.entries[name] = list
+	return nil
 }
 
 // SetDefault names the preset used when no mode is set and nothing is classified.
@@ -202,6 +235,32 @@ func (r *Registry) Names() []string {
 	return out
 }
 
+// Check reports every effective preset's reference to a slot, reflex or routing rule the
+// host does not have. A host calls it when its configuration changes; nil means all
+// references resolve.
+func (r *Registry) Check(slots []Slot, reflexes []Reflex, rules router.RuleSet) []error {
+	var errs []error
+	for _, name := range r.Names() {
+		p, _, _ := r.Get(name)
+		for _, s := range p.Slots {
+			if _, ok := Named(slots, s); !ok {
+				errs = append(errs, fmt.Errorf("preset %s: no slot %q", name, s))
+			}
+		}
+		for _, x := range p.Reflexes {
+			if !slices.ContainsFunc(reflexes, func(r Reflex) bool { return r.Name == x }) {
+				errs = append(errs, fmt.Errorf("preset %s: no reflex %q", name, x))
+			}
+		}
+		for _, id := range p.Rules {
+			if !slices.ContainsFunc(rules.Rules, func(r router.Rule) bool { return r.ID == id }) {
+				errs = append(errs, fmt.Errorf("preset %s: no routing rule %q", name, id))
+			}
+		}
+	}
+	return errs
+}
+
 func clonePreset(p Preset) Preset {
 	p.Slots = slices.Clone(p.Slots)
 	p.Reflexes = slices.Clone(p.Reflexes)
@@ -227,60 +286,22 @@ func DefaultPresets() []Preset {
 	}
 }
 
-// ActorKind is who is asking for a change.
-type ActorKind string
-
-const (
-	// ActorOwner is the person the agent works for.
-	ActorOwner ActorKind = "owner"
-	// ActorAgent is the agent itself (a tool call).
-	ActorAgent ActorKind = "agent"
-	// ActorHost is the host acting on its own.
-	ActorHost ActorKind = "host"
-	// ActorReflex is a reflex.
-	ActorReflex ActorKind = "reflex"
-)
-
-// Actor is who is asking.
-type Actor struct {
-	Kind ActorKind `json:"kind"`
-	ID   string    `json:"id,omitempty"`
-}
-
-// ErrNotOwner is returned when anyone but the owner tries to set the mode.
-var ErrNotOwner = errors.New("only the owner sets the mode")
-
-// Modes holds the deliberate mode: the one the owner set. Only the owner sets it; an agent
-// tool, the host on its own, or a reflex cannot. A host that lets the owner set a mode
-// through its UI passes an owner Actor; it must not expose this to the model.
+// Modes holds the deliberate mode: the one the owner set. Reading it is open; setting it
+// goes only through the [OwnerControls] that [New] hands the host, so an agent tool, a
+// reflex or anything decoded from input cannot set it.
 type Modes struct {
 	reg *Registry
 	now func() time.Time
 
 	mu    sync.Mutex
 	name  string
-	by    Actor
 	since time.Time
 }
 
-// NewModes returns a mode holder over the registry, with no mode set.
-func NewModes(reg *Registry) *Modes { return &Modes{reg: reg, now: time.Now} }
-
-// Set sets the deliberate mode; "" clears it. It refuses anyone but the owner, and a name
-// the registry does not hold.
-func (m *Modes) Set(actor Actor, name string) error {
-	if actor.Kind != ActorOwner {
-		return fmt.Errorf("%w (asked by %s)", ErrNotOwner, actor.Kind)
-	}
-	if name != "" {
-		if _, _, ok := m.reg.Get(name); !ok {
-			return fmt.Errorf("%w: %s", ErrUnknownPreset, name)
-		}
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.name, m.by, m.since = name, actor, m.now()
-	return nil
+// ModeState is the deliberate mode and when it was set; Name is "" when none is set.
+type ModeState struct {
+	Name  string    `json:"name"`
+	Since time.Time `json:"since"`
 }
 
 // Current is the deliberate mode, "" when none is set.
@@ -288,6 +309,26 @@ func (m *Modes) Current() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.name
+}
+
+// State is the deliberate mode and when it was set.
+func (m *Modes) State() ModeState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return ModeState{Name: m.name, Since: m.since}
+}
+
+// set sets the deliberate mode; "" clears it.
+func (m *Modes) set(name string) error {
+	if name != "" {
+		if _, _, ok := m.reg.Get(name); !ok {
+			return fmt.Errorf("%w: %s", ErrUnknownPreset, name)
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.name, m.since = name, m.now()
+	return nil
 }
 
 // Source of a resolved preset.

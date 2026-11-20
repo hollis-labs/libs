@@ -45,6 +45,7 @@ something from a higher group, the shared part moves down. The ranks live in
 | `mcp/plugin-mcp` | `github.com/hollis-labs/libs/mcp/plugin-mcp` | Plugin SDK and host, MCP hosting/client/server helpers, sanitization and API projection. |
 | `workflow/engine` | `github.com/hollis-labs/libs/workflow/engine` | The workflow engine and its host. |
 | `llm/embed-local` | `github.com/hollis-labs/libs/llm/embed-local` | In-process sentence embeddings with a local ONNX model (hugot): pure Go by default, ONNX Runtime with `-tags ORT`. Satisfies `classify.Embedder`. Go 1.27. |
+| `agent/steer` | `github.com/hollis-labs/libs/agent/steer` | Host-neutral steering for an agent turn: modes and presets in layers (default < module < app), an owner-only deliberate mode, work-slot selection, a per-facet classifier policy (shadow, suggest, auto), reflexes as configuration, and routing-rule activation. Records a prompt-free decision for the turn trace. |
 | `app/app-host` | `github.com/hollis-labs/libs/app/app-host` | HTTP/embedded SPA assembly, reviewed plugin registry delivery and process inventory. |
 | `mesh/pipeline` | `github.com/hollis-labs/libs/mesh/pipeline` | Portable immutable message stages, bounded annotations and traces, and durable store interfaces. |
 

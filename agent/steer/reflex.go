@@ -220,7 +220,7 @@ type Fired struct {
 	Halt string `json:"halt,omitempty"`
 	// Actions are for the host to carry out.
 	Actions []Action `json:"actions,omitempty"`
-	// Names are the reflexes that fired, in order.
+	// Names are the reflexes that fired, in order; [] when none did.
 	Names []string `json:"fired"`
 }
 
@@ -232,33 +232,96 @@ type Message struct {
 	Sit   Situation
 }
 
+// CooldownStore keeps when each reflex last fired. A host that persists it keeps cooldowns
+// across restarts, so a reflex does not fire again just because the process restarted.
+// Implementations must be safe for concurrent use.
+type CooldownStore interface {
+	LastFired(reflex string) (time.Time, bool)
+	SetFired(reflex string, at time.Time)
+}
+
+// MemoryCooldowns is a CooldownStore in memory. Snapshot and Restore let a host persist it.
+type MemoryCooldowns struct {
+	mu   sync.Mutex
+	last map[string]time.Time
+}
+
+// NewMemoryCooldowns returns an empty in-memory cooldown store.
+func NewMemoryCooldowns() *MemoryCooldowns { return &MemoryCooldowns{last: map[string]time.Time{}} }
+
+// LastFired implements CooldownStore.
+func (c *MemoryCooldowns) LastFired(reflex string) (time.Time, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	t, ok := c.last[reflex]
+	return t, ok
+}
+
+// SetFired implements CooldownStore.
+func (c *MemoryCooldowns) SetFired(reflex string, at time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.last[reflex] = at
+}
+
+// Snapshot is a copy of when each reflex last fired.
+func (c *MemoryCooldowns) Snapshot() map[string]time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string]time.Time, len(c.last))
+	for k, v := range c.last {
+		out[k] = v
+	}
+	return out
+}
+
+// Restore replaces the store's contents with a snapshot.
+func (c *MemoryCooldowns) Restore(snap map[string]time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.last = make(map[string]time.Time, len(snap))
+	for k, v := range snap {
+		c.last[k] = v
+	}
+}
+
+// StateFill adds what a host knows to the reflex library's state before predicates run, for
+// example MailUnreadCount, PrefixTokens or ScopeTier.
+type StateFill func(st *reflexes.State, sit Situation)
+
 // Reflexes runs reflexes and keeps their cooldowns. Reminders fired by an event or a focus
 // change wait for the next message. It is safe for concurrent use.
 type Reflexes struct {
-	vocab *Vocabulary
-	now   func() time.Time
+	vocab     *Vocabulary
+	now       func() time.Time
+	cooldowns CooldownStore
+	agentID   string
+	fill      StateFill
 
 	mu      sync.Mutex
-	last    map[string]time.Time
 	pending []string
 }
 
 // maxPending is how many reminders wait for the next message; older ones are dropped.
 const maxPending = 10
 
-// NewReflexes returns a runner using the vocabulary.
-func NewReflexes(v *Vocabulary) *Reflexes {
-	return &Reflexes{vocab: v, now: time.Now, last: map[string]time.Time{}}
+// NewReflexes returns a runner using the vocabulary. Options set the clock, the cooldown
+// store, the agent id and a state fill; others are ignored.
+func NewReflexes(v *Vocabulary, opts ...Option) *Reflexes {
+	o := collect(opts)
+	return &Reflexes{vocab: v, now: o.now, cooldowns: o.cooldowns, agentID: o.agentID, fill: o.fill}
 }
 
-// OnMessage runs the active text and predicate reflexes against a message. Reminders that
-// were waiting come first.
+// OnMessage runs the active text and predicate reflexes against a message (its text
+// trimmed). Reminders that were waiting come first. A reflex whose trigger cannot be
+// evaluated, or whose action kind is not in the vocabulary, is skipped and reported.
 func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fired, error) {
-	var out Fired
+	out := Fired{Names: []string{}}
 	x.mu.Lock()
 	out.Reminders, x.pending = x.pending, nil
 	x.mu.Unlock()
-	state := stateFor(m)
+	m.Text = strings.TrimSpace(m.Text)
+	state := x.stateFor(m)
 	var errs []error
 	for _, r := range active {
 		var fired bool
@@ -284,8 +347,10 @@ func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fir
 		default:
 			continue
 		}
-		if fired && x.ready(r) {
-			x.fire(r, &out)
+		if fired {
+			if err := x.tryFire(r, &out); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return out, errors.Join(errs...)
@@ -293,7 +358,7 @@ func (x *Reflexes) OnMessage(_ context.Context, m Message, active []Reflex) (Fir
 
 // OnEvent runs the active event reflexes for a host event. Reminders wait for the next
 // message; other actions are returned for the host to carry out.
-func (x *Reflexes) OnEvent(topic string, active []Reflex) Fired {
+func (x *Reflexes) OnEvent(topic string, active []Reflex) (Fired, error) {
 	return x.onHost(active, func(r Reflex) bool {
 		t, _ := obj(r.Trigger)["topic"].(string)
 		return r.TriggerKind == TriggerEvent && t != "" && (topic == t || strings.HasPrefix(topic, t+"."))
@@ -301,18 +366,21 @@ func (x *Reflexes) OnEvent(topic string, active []Reflex) Fired {
 }
 
 // OnFocus runs the active focus reflexes when a window of view comes in front.
-func (x *Reflexes) OnFocus(view string, active []Reflex) Fired {
+func (x *Reflexes) OnFocus(view string, active []Reflex) (Fired, error) {
 	return x.onHost(active, func(r Reflex) bool {
 		v, _ := obj(r.Trigger)["view"].(string)
 		return r.TriggerKind == TriggerFocus && view != "" && view == v
 	})
 }
 
-func (x *Reflexes) onHost(active []Reflex, match func(Reflex) bool) Fired {
-	var out Fired
+func (x *Reflexes) onHost(active []Reflex, match func(Reflex) bool) (Fired, error) {
+	out := Fired{Names: []string{}}
+	var errs []error
 	for _, r := range active {
-		if match(r) && x.ready(r) {
-			x.fire(r, &out)
+		if match(r) {
+			if err := x.tryFire(r, &out); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	if len(out.Reminders) > 0 {
@@ -324,7 +392,19 @@ func (x *Reflexes) onHost(active []Reflex, match func(Reflex) bool) Fired {
 		x.mu.Unlock()
 		out.Reminders = nil
 	}
-	return out
+	return out, errors.Join(errs...)
+}
+
+// tryFire fires r unless its action kind is unknown or it is cooling down.
+func (x *Reflexes) tryFire(r Reflex, out *Fired) error {
+	if _, ok := x.vocab.check(r.ActionKind); !ok {
+		return fmt.Errorf("reflex %s: action kind %q is not in the vocabulary; not fired", r.Name, r.ActionKind)
+	}
+	if !x.ready(r) {
+		return nil
+	}
+	x.fire(r, out)
+	return nil
 }
 
 // ready reports whether r is past its cooldown, and if so marks it fired now.
@@ -332,10 +412,10 @@ func (x *Reflexes) ready(r Reflex) bool {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	now := x.now()
-	if last, ok := x.last[r.Name]; ok && r.Cooldown > 0 && now.Sub(last) < time.Duration(r.Cooldown)*time.Second {
+	if last, ok := x.cooldowns.LastFired(r.Name); ok && r.Cooldown > 0 && now.Sub(last) < time.Duration(r.Cooldown)*time.Second {
 		return false
 	}
-	x.last[r.Name] = now
+	x.cooldowns.SetFired(r.Name, now)
 	return true
 }
 
@@ -357,11 +437,11 @@ func (x *Reflexes) fire(r Reflex, out *Fired) {
 }
 
 // stateFor is the reflex library's view of a message: the conversation with the message
-// first, and the situation as attributes (focused.view, focused.module, selection, mode,
-// layout, source).
-func stateFor(m Message) reflexes.State {
+// first, the situation as attributes (focused.view, focused.module, selection, mode,
+// layout, source, then the host's Signals), the agent id, and the host's state fill.
+func (x *Reflexes) stateFor(m Message) reflexes.State {
 	now := reflexes.MessageSignal{Role: "user", Content: m.Text}
-	st := reflexes.State{SessionID: "owner", Attrs: map[string]string{}}
+	st := reflexes.State{SessionID: "owner", AgentID: x.agentID, Attrs: map[string]string{}}
 	st.Messages = append([]reflexes.MessageSignal{now}, m.Prior...)
 	st.UserMessages = []reflexes.MessageSignal{now}
 	for _, p := range m.Prior {
@@ -377,5 +457,11 @@ func stateFor(m Message) reflexes.State {
 	st.Attrs["mode"] = m.Sit.Mode
 	st.Attrs["layout"] = m.Sit.Layout
 	st.Attrs["source"] = m.Sit.Source
+	for k, v := range m.Sit.Signals {
+		st.Attrs[k] = v
+	}
+	if x.fill != nil {
+		x.fill(&st, m.Sit)
+	}
 	return st
 }

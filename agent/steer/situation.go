@@ -26,8 +26,9 @@ type Situation struct {
 	Focused *Focus `json:"focused,omitempty"`
 	// Windows are all the open windows.
 	Windows []Window `json:"windows,omitempty"`
-	// Mode is the mode in force for this turn. [Steer.Prepare] sets it from the resolved
-	// preset; a host does not need to.
+	// Mode is the mode chosen for this turn: deliberate or classified. [Steer.Prepare] sets
+	// it; it stays "" when the default preset is in force, so the default does not select
+	// slots by mode or match mode conditions.
 	Mode string `json:"mode,omitempty"`
 	// Layout is the saved layout in use, when there is one.
 	Layout string `json:"layout,omitempty"`
@@ -35,6 +36,9 @@ type Situation struct {
 	Input string `json:"input,omitempty"`
 	// Source says what started the turn ("user", "notice", "schedule").
 	Source string `json:"source,omitempty"`
+	// Signals are host facts predicate reflexes can test as attributes ("mail.unread" =
+	// "3"). They are not recorded in the trace.
+	Signals map[string]string `json:"signals,omitempty"`
 }
 
 // Slot is what the agent brings to one kind of work: the tools top of mind there, standing
@@ -61,8 +65,14 @@ type Slot struct {
 // Selection is the slots active for a turn, the first being the primary one.
 type Selection struct {
 	Slots []Slot `json:"slots"`
-	// Why says how they were chosen: "focus", "mode", "preset", "pinned", "kept",
-	// "classified" or "default".
+	// Why says how they were chosen:
+	//   - "focus": the window in front selected the primary slot;
+	//   - "pinned": a pinned slot held;
+	//   - "kept": nothing in front chose, and the last primary slot stayed;
+	//   - "default": nothing chose and the fallback slot is primary;
+	//   - "mode": a kept or default primary, with slots the mode added;
+	//   - "preset": a kept or default primary, with slots the preset added;
+	//   - "classified": the classifier's slot leads.
 	Why string `json:"why"`
 }
 

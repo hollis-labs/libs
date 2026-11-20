@@ -57,6 +57,9 @@ type FacetPolicy struct {
 // Policy is the classifier policy, per facet. A facet it does not name is shadowed.
 type Policy map[Facet]FacetPolicy
 
+// AutoFloor is the lowest threshold a facet may auto-apply at.
+const AutoFloor = 0.5
+
 // DefaultPolicy suggests slots and presets with good confidence and shadows the rest.
 // Nothing applies on its own.
 func DefaultPolicy() Policy {
@@ -78,6 +81,9 @@ func (p Policy) Validate() error {
 		}
 		if math.IsNaN(fp.Threshold) || fp.Threshold <= 0 || fp.Threshold > 1 {
 			return fmt.Errorf("classifier policy %s: threshold %v: use a number above 0, at most 1", f, fp.Threshold)
+		}
+		if fp.Gate == GateAuto && fp.Threshold < AutoFloor {
+			return fmt.Errorf("classifier policy %s: an auto gate needs a threshold of at least %v", f, AutoFloor)
 		}
 	}
 	return nil
@@ -104,14 +110,15 @@ type Verdict struct {
 	Gate    Gate    `json:"gate"`
 	Outcome Outcome `json:"outcome"`
 	// Why explains a record outcome: "shadow", "below threshold", "abstained", "unknown
-	// label", "deliberate mode", "pinned", "same as selected".
+	// label", "deliberate mode", "pinned", "same as selected", "no input", "not acted on".
 	Why string `json:"why,omitempty"`
 }
 
-// Judge rules on one facet's result.
+// Judge rules on one facet's result. A facet the policy does not name, or names with
+// an unknown gate, is shadowed.
 func (p Policy) Judge(f Facet, r FacetResult) Verdict {
 	fp, ok := p[f]
-	if !ok {
+	if !ok || (fp.Gate != GateSuggest && fp.Gate != GateAuto) {
 		fp = FacetPolicy{Gate: GateShadow, Threshold: 1}
 	}
 	v := Verdict{Facet: f, Label: r.Label, P: r.P, Gate: fp.Gate, Outcome: OutcomeRecord}
@@ -136,4 +143,12 @@ func (v Verdict) overrule(why string) Verdict {
 		v.Outcome, v.Why = OutcomeRecord, why
 	}
 	return v
+}
+
+func (p Policy) clone() Policy {
+	out := make(Policy, len(p))
+	for k, v := range p {
+		out[k] = v
+	}
+	return out
 }
