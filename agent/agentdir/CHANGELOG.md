@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.0
+
+- Add compaction and stream keys to `runtime` in the host profile:
+  `compact_at`, `compact_keep_tokens` and `compact_input_tokens` (tokens;
+  zero uses the host's default), `compact_prompt` (empty uses the host's
+  default) and `idle_timeout` (a Go duration such as `90s`; empty uses the
+  host's default). `Validate` refuses negative values, an idle timeout
+  that is not a positive duration, a NUL in the prompt, `compact_keep_tokens`
+  not below `compact_at`, and `compact_at` above `context_window`; `Runtime.IdleTimeoutDuration` parses it.
+
 ## v0.2.0
 
 - Add `runtime.subtask_limit`, `runtime.turn_token_budget` and

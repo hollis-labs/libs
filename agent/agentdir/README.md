@@ -25,7 +25,9 @@ and [embedded](examples/agents/embedded) agents. They bind respectively to a
 seat, task, or application identifier. Stable and task profiles require
 durable continuity. Optional runtime settings cover provider, model, limits,
 concurrency, the subtask limits (`subtask_limit`, `subtask_result_cap`), the
-per-turn token budget (`turn_token_budget`), and literal shell environment
+per-turn token budget (`turn_token_budget`), compaction (`compact_at`,
+`compact_keep_tokens`, `compact_prompt`, `compact_input_tokens`), the
+model stream idle timeout (`idle_timeout`), and literal shell environment
 entries.
 
 `Load` returns the definition, profile, parsed and raw MCP configuration,
