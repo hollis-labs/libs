@@ -3,6 +3,7 @@ package agentdir
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -35,6 +36,14 @@ type Profile struct {
 	ApplicationID string      `yaml:"application_id,omitempty" json:"application_id,omitempty"`
 	Runtime       Runtime     `yaml:"runtime,omitempty" json:"runtime,omitempty"`
 	Permissions   Permissions `yaml:"permissions,omitempty" json:"permissions,omitempty"`
+	Identity      *Identity   `yaml:"identity,omitempty" json:"identity,omitempty"`
+}
+
+// Identity binds a host to messaging identity, separately from execution auth.
+type Identity struct {
+	// Tether is an existing msg://agent/<instance>/<id> URN, or "auto" to
+	// register/reuse an identity. Empty disables the Tether integration.
+	Tether string `yaml:"tether,omitempty" json:"tether,omitempty"`
 }
 
 // Runtime specifies provider and turn limits. Zero values use host defaults.
@@ -106,6 +115,18 @@ func (p Profile) Validate(def *agentdef.Definition) error {
 		}
 	default:
 		return fmt.Errorf("%w: unsupported kind %q", ErrProfile, p.Kind)
+	}
+	if p.Identity != nil && p.Identity.Tether != "" && p.Identity.Tether != "auto" {
+		raw := p.Identity.Tether
+		u, err := url.Parse(raw)
+		valid := err == nil && u.Scheme == "msg" && u.Host == "agent" && u.User == nil && u.RawQuery == "" && u.Fragment == "" && u.RawPath == "" && !strings.ContainsAny(raw, " \t\r\n")
+		if valid {
+			parts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+			valid = len(parts) == 2 && parts[0] != "" && parts[1] != ""
+		}
+		if !valid {
+			return fmt.Errorf("%w: identity.tether must be an agent URN or auto", ErrProfile)
+		}
 	}
 	switch p.Runtime.Provider {
 	case "", "anthropic", "openai":
